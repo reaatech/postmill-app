@@ -5,6 +5,7 @@ import {
   Get,
   HttpException,
   Param,
+  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -112,9 +113,10 @@ export class PostsController {
   @Get('/')
   async getPosts(
     @GetOrgFromRequest() org: Organization,
-    @Query() query: GetPostsDto
+    @Query() query: GetPostsDto,
+    @GetUserFromRequest() user: User,
   ) {
-    return this._postsService.getPostsMinified(org.id, query);
+    return this._postsService.getPostsMinified(org.id, query, user.id);
   }
 
   @Get('/find-slot')
@@ -133,9 +135,10 @@ export class PostsController {
   @Get('/list')
   async getPostsList(
     @GetOrgFromRequest() org: Organization,
-    @Query() query: GetPostsListDto
+    @Query() query: GetPostsListDto,
+    @GetUserFromRequest() user: User,
   ) {
-    return this._postsService.getPostsList(org.id, query);
+    return this._postsService.getPostsList(org.id, query, user.id);
   }
 
   @Get('/old')
@@ -164,7 +167,10 @@ export class PostsController {
   }
 
   @Get('/:id')
-  getPost(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+  getPost(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id', ParseUUIDPipe) id: string
+  ) {
     return this._postsService.getPost(org.id, id);
   }
 

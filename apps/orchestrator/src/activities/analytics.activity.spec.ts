@@ -107,10 +107,11 @@ describe('AnalyticsActivity', () => {
       } as any,
       postAnalyticsSnapshot: {
         upsert: mockUpsert,
+        findMany: vi.fn().mockResolvedValue([]),
         deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       } as any,
       integration: { findUnique: vi.fn() } as any,
-      post: { findMany: vi.fn() } as any,
+      post: { findMany: vi.fn(), update: vi.fn().mockResolvedValue({}) } as any,
       $transaction: vi.fn().mockResolvedValue([]),
     } as any;
 

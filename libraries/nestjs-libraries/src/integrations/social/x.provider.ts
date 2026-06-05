@@ -5,6 +5,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { lookup } from 'mime-types';
@@ -17,6 +18,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { PostPlug } from '@gitroom/helpers/decorators/post.plug';
 import dayjs from 'dayjs';
 import { uniqBy } from 'lodash';
+import { Logger } from '@nestjs/common';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { stripLinks as removeLinks } from '@gitroom/helpers/utils/strip.links';
 import { XDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/x.dto';
@@ -32,6 +34,7 @@ import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
   }`
 )
 export class XProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(XProvider.name);
   identifier = 'x';
   name = 'X';
   isBetweenSteps = false;
@@ -843,5 +846,149 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
   mentionFormat(idOrHandle: string, name: string) {
     return `@${idOrHandle}`;
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      const client = await this.getClient(accessToken);
+
+      const result = await client.v2.search(
+        `conversation_id:${postId}`,
+        {
+          'tweet.fields': ['author_id', 'created_at', 'public_metrics', 'conversation_id'],
+          'user.fields': ['username', 'name', 'profile_image_url'],
+          expansions: ['author_id'],
+          max_results: 100,
+          ...(cursor ? { next_token: cursor } : {}),
+        }
+      );
+
+      const users = (result?.includes?.users || []).reduce(
+        (map: Record<string, any>, u: any) => {
+          map[u.id] = u;
+          return map;
+        },
+        {} as Record<string, any>
+      );
+
+      const comments: SocialCommentDTO[] = (result?.data?.data || []).map((tweet: any) => {
+        const user = users[tweet.author_id] || {};
+        return {
+          platformCommentId: tweet.id,
+          parentPlatformCommentId: tweet.referenced_tweets?.find(
+            (ref: any) => ref.type === 'replied_to'
+          )?.id,
+          author: {
+            id: tweet.author_id || '',
+            name: user.name || user.username || '',
+            username: user.username,
+            picture: user.profile_image_url,
+            profileUrl: `https://twitter.com/${user.username}`,
+          },
+          content: tweet.text || '',
+          createdAt: tweet.created_at,
+          likeCount: tweet.public_metrics?.like_count,
+          replyCount: tweet.public_metrics?.reply_count,
+          raw: tweet,
+        };
+      });
+
+      const nextCursor = result?.meta?.next_token || undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('X fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    parentCommentId: string,
+    message: string,
+    _integration: Integration
+  ) {
+    try {
+      const [accessTokenSplit, accessSecretSplit] = accessToken.split(':');
+
+      const tweetUrl = 'https://api.x.com/2/tweets';
+      const tweetBody = {
+        text: this.stripLinks() ? removeLinks(message) : message,
+        reply: { in_reply_to_tweet_id: parentCommentId },
+      };
+
+      const tweetResponse = await this.fetch(tweetUrl, {
+        method: 'POST',
+        headers: {
+          Authorization: this.signOAuth1('POST', tweetUrl, accessTokenSplit, accessSecretSplit),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(tweetBody),
+      });
+
+      const { data } = (await tweetResponse.json()) as { data: { id: string } };
+
+      return {
+        platformCommentId: data.id,
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: id,
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('X replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: '',
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    commentId: string,
+    like: boolean,
+    _integration: Integration
+  ) {
+    try {
+      const client = await this.getClient(accessToken);
+      const { data: { id: userId } } = await client.v2.me();
+
+      if (like) {
+        await client.v2.like(userId, commentId);
+        return { liked: true };
+      } else {
+        await client.v2.unlike(userId, commentId);
+        return { liked: false };
+      }
+    } catch (err) {
+      this.logger.error('X likeComment error:', err);
+      throw err;
+    }
   }
 }

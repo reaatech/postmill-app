@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import {
   METRIC_REGISTRY,
   normalizeMetric,
@@ -70,10 +71,13 @@ const FALLBACK_THRESHOLD = 0.5;
 
 @Injectable()
 export class AnalyticsService {
+  private readonly _logger = new Logger(AnalyticsService.name);
+
   constructor(
     private prisma: PrismaService,
     private integrationManager: IntegrationManager,
-    private integrationService: IntegrationService
+    private integrationService: IntegrationService,
+    private postsService: PostsService
   ) {}
 
   private getMetricDef(metric: string) {
@@ -802,7 +806,7 @@ export class AnalyticsService {
     return { posts: paginated, total };
   }
 
-  async getPostDetail(org: Organization, postId: string) {
+  async getPostDetail(org: Organization, postId: string, date?: string) {
     const post = await this.prisma.post.findFirst({
       where: { id: postId, organizationId: org.id, deletedAt: null },
       include: { integration: true },
@@ -810,10 +814,57 @@ export class AnalyticsService {
 
     if (!post) throw new NotFoundException('Post not found');
 
-    const snapshots = await this.prisma.postAnalyticsSnapshot.findMany({
-      where: { postId, organizationId: org.id },
+    const daysBack = Math.max(1, Math.min(365, parseInt(date || '30', 10) || 30));
+    const toDate = dayjs().endOf('day').toDate();
+    const fromDate = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
+
+    let snapshots = await this.prisma.postAnalyticsSnapshot.findMany({
+      where: {
+        postId,
+        organizationId: org.id,
+        date: { gte: fromDate, lte: toDate },
+      },
       orderBy: { date: 'asc' },
     });
+
+    if (snapshots.length === 0) {
+      try {
+        const postAnalytics = await this.postsService.checkPostAnalytics(
+          org.id,
+          postId,
+          daysBack
+        );
+        if (
+          postAnalytics &&
+          !('missing' in postAnalytics) &&
+          Array.isArray(postAnalytics) &&
+          postAnalytics.length > 0
+        ) {
+          const providerData = { [post.integrationId]: postAnalytics };
+          const integrationMap = {
+            [post.integrationId]: post.integration.providerIdentifier,
+          };
+          const liveRows = this.convertLiveToSnapshots(
+            providerData,
+            org.id,
+            integrationMap,
+            fromDate,
+            toDate,
+          );
+          if (liveRows.length > 0) {
+            snapshots = liveRows.map((r) => ({
+              ...r,
+              id: '',
+              postId,
+              createdAt: new Date(),
+              integration: {} as any,
+            }));
+          }
+        }
+      } catch (err) {
+        this._logger.error(`getPostDetail live-fallback failed for post ${postId}: ${(err as Error)?.message}`);
+      }
+    }
 
     const metrics: Record<string, MetricSeries[]> = {};
     for (const snap of snapshots) {
@@ -1055,8 +1106,8 @@ export class AnalyticsService {
         value: snap.value,
         integrationId: snap.integrationId,
       }));
-    } catch {
-      // fallback silently
+    } catch (err) {
+      this._logger.error(`getMetricDetail top-posts fallback: ${(err as Error)?.message}`);
     }
 
     const movers: { up: any[]; down: any[] } = { up: [], down: [] };

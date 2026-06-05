@@ -57,6 +57,10 @@ export abstract class SocialAbstract {
   abstract identifier: string;
   maxConcurrentJob = 1;
 
+  get commentsCapabilities() {
+    return { read: false, reply: false, like: false };
+  }
+
   public handleErrors(
     body: string,
     status: number

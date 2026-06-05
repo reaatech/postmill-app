@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.3.0] - 2026-06-05
+
+### Added
+
+- **Calendar upgrade (Track A)** — Card body opens new Post Detail modal with KPI header and thread view; settings/edit icon added to card hover strip; scheduled/published state pill; card stats footer (views/likes/comments) sourced from `PostAnalyticsSnapshot`.
+- **Post Detail modal** — New `PostDetailModal` with KPI strip from `/analytics/v2/post/:postId` (live-fallback added for un-snapshotted posts), full thread from `getPostsRecursively`, and capability-aware comments section.
+- **Social comments foundation (Track B)** — `ISocialMediaComments` provider capability interface, `SocialComment` and `PostCommentRead` Prisma models, social comments Controller/Service/Repository, and Temporal `CommentsActivity` + `commentsCollectionWorkflow` (gated by `RUN_CRON=true`, 30-min sweep cadence, configurable retention).
+
+### Docs
+
+- **README.md** — Rewritten: HTML → markdown conversion, fork notice left-aligned, removed upstream promo and inaccurate compliance lines, added REAA logo and legacy-screenshots note.
+- **CLAUDE.md** — Added "Calendar & Post Detail" architecture section.
+- **`dev/CALENDAR_UPGRADE.md`** — Session handoff updated.
+
 ## [3.2.0] - 2026-06-05
 
 ### Added

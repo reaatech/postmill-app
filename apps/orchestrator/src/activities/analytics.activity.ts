@@ -166,27 +166,27 @@ export class AnalyticsActivity {
     for (const post of posts) {
       if (!post.releaseId || post.releaseId === 'missing') continue;
 
-      const provider = this._integrationManager.getSocialIntegrationUnchecked(
-        post.integration.providerIdentifier
-      );
-      if (!provider?.postAnalytics) continue;
-
-      let token = post.integration.token;
-      if (
-        post.integration.tokenExpiration &&
-        dayjs(post.integration.tokenExpiration).isBefore(dayjs())
-      ) {
-        const refreshed = await this._refreshIntegrationService.refresh(
-          post.integration
-        );
-        if (!refreshed || !refreshed.accessToken) continue;
-        token = refreshed.accessToken;
-        if (provider.refreshWait) {
-          await timer(10000);
-        }
-      }
-
       try {
+        const provider = this._integrationManager.getSocialIntegrationUnchecked(
+          post.integration.providerIdentifier
+        );
+        if (!provider?.postAnalytics) continue;
+
+        let token = post.integration.token;
+        if (
+          post.integration.tokenExpiration &&
+          dayjs(post.integration.tokenExpiration).isBefore(dayjs())
+        ) {
+          const refreshed = await this._refreshIntegrationService.refresh(
+            post.integration
+          );
+          if (!refreshed || !refreshed.accessToken) continue;
+          token = refreshed.accessToken;
+          if (provider.refreshWait) {
+            await timer(10000);
+          }
+        }
+
         const data = await provider.postAnalytics(
           post.integration.internalId,
           token,
@@ -226,6 +226,32 @@ export class AnalyticsActivity {
               },
             });
           }
+        }
+
+        // Update denormalized counters on the Post record
+        const latestSnapshots = await this._prisma.postAnalyticsSnapshot.findMany({
+          where: { postId: post.id, metric: { in: ['views', 'likes', 'comments'] } },
+          orderBy: { date: 'desc' },
+          select: { metric: true, value: true },
+        });
+
+        const latestByMetric: Record<string, number> = {};
+        for (const snap of latestSnapshots) {
+          if (!(snap.metric in latestByMetric)) {
+            latestByMetric[snap.metric] = snap.value;
+          }
+        }
+
+        const updateData: Record<string, number> = {};
+        if ('views' in latestByMetric) updateData.lastViews = latestByMetric.views;
+        if ('likes' in latestByMetric) updateData.lastLikes = latestByMetric.likes;
+        if ('comments' in latestByMetric) updateData.lastComments = latestByMetric.comments;
+
+        if (Object.keys(updateData).length > 0) {
+          await this._prisma.post.update({
+            where: { id: post.id },
+            data: updateData,
+          });
         }
       } catch (err: any) {
         if (err instanceof RefreshToken) {

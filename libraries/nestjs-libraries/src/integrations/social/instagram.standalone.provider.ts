@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -15,6 +16,7 @@ import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { Logger } from '@nestjs/common';
 
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
@@ -42,6 +44,7 @@ export class InstagramStandaloneProvider
   ];
     override maxConcurrentJob = 200; // Instagram standalone has stricter limits
   dto = InstagramDto;
+  private readonly logger = new Logger(InstagramStandaloneProvider.name);
 
   editor = 'normal' as const;
   maxLength() {
@@ -76,6 +79,10 @@ export class InstagramStandaloneProvider
     | { type: 'refresh-token' | 'bad-body' | 'retry'; value: string }
     | undefined {
     return this.instagramProvider.handleErrors(body, status);
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
   }
 
   async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
@@ -237,6 +244,58 @@ export class InstagramStandaloneProvider
       postId,
       date,
       'graph.instagram.com'
+    );
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ) {
+    return this.instagramProvider.fetchComments(
+      id,
+      accessToken,
+      postId,
+      cursor,
+      integration
+    );
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ) {
+    return this.instagramProvider.replyToComment(
+      id,
+      accessToken,
+      postId,
+      parentCommentId,
+      message,
+      integration
+    );
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ) {
+    return this.instagramProvider.likeComment(
+      id,
+      accessToken,
+      postId,
+      commentId,
+      like,
+      integration
     );
   }
 }

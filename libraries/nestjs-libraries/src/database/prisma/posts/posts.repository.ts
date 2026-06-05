@@ -5,6 +5,7 @@ import {
   APPROVED_SUBMIT_FOR_ORDER,
   CreationMethod,
   Post,
+  Prisma,
   State,
 } from '@prisma/client';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
@@ -30,7 +31,9 @@ export class PostsRepository {
     private _comments: PrismaRepository<'comments'>,
     private _tags: PrismaRepository<'tags'>,
     private _tagsPosts: PrismaRepository<'tagsPosts'>,
-    private _errors: PrismaRepository<'errors'>
+    private _errors: PrismaRepository<'errors'>,
+    private _socialComment: PrismaRepository<'socialComment'>,
+    private _postCommentRead: PrismaRepository<'postCommentRead'>
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -126,7 +129,7 @@ export class PostsRepository {
     });
   }
 
-  async getPosts(orgId: string, query: GetPostsDto) {
+  async getPosts(orgId: string, query: GetPostsDto, userId?: string) {
     // Use the provided start and end dates directly
     const startDate = dayjs.utc(query.startDate).toDate();
     const endDate = dayjs.utc(query.endDate).toDate();
@@ -181,6 +184,10 @@ export class PostsRepository {
         intervalInDays: true,
         group: true,
         creationMethod: true,
+        lastViews: true,
+        lastLikes: true,
+        lastComments: true,
+        commentCount: true,
         tags: {
           select: {
             tag: true,
@@ -197,7 +204,7 @@ export class PostsRepository {
       },
     });
 
-    return list.reduce((all, post) => {
+    const posts = list.reduce((all, post) => {
       if (!post.intervalInDays) {
         return [...all, post];
       }
@@ -218,9 +225,44 @@ export class PostsRepository {
 
       return [...all, ...addMorePosts];
     }, [] as any[]);
+
+    // Single-query unread comment counts per post for the given user
+    if (userId) {
+      const postIds = posts.map(p => p.id);
+      const unreadMap = new Map<string, number>();
+
+      if (postIds.length > 0) {
+        const unreadRows = await this._socialComment.$queryRaw<
+          Array<{ post_id: string; unread: number }>
+        >`
+          SELECT
+            sc."postId" AS post_id,
+            COUNT(*)::int AS unread
+          FROM "SocialComment" sc
+          LEFT JOIN "PostCommentRead" pcr
+            ON pcr."postId" = sc."postId" AND pcr."userId" = ${userId}
+          WHERE
+            sc."postId" IN (${Prisma.join(postIds)})
+            AND sc."deletedAt" IS NULL
+            AND sc."isOwn" = false
+            AND (pcr."lastReadAt" IS NULL OR sc."platformCreatedAt" > pcr."lastReadAt")
+          GROUP BY sc."postId"
+        `;
+
+        for (const { post_id, unread } of unreadRows) {
+          unreadMap.set(post_id, unread);
+        }
+      }
+
+      for (const post of posts) {
+        (post as any).unreadComments = unreadMap.get(post.id) || 0;
+      }
+    }
+
+    return posts;
   }
 
-  async getPostsList(orgId: string, query: GetPostsListDto) {
+  async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {
     const page = query.page || 0;
     const limit = query.limit || 20;
     const skip = page * limit;
@@ -293,6 +335,10 @@ export class PostsRepository {
           intervalInDays: true,
           group: true,
           creationMethod: true,
+          lastViews: true,
+          lastLikes: true,
+          lastComments: true,
+          commentCount: true,
           tags: {
             select: {
               tag: true,
@@ -310,6 +356,38 @@ export class PostsRepository {
       }),
       this._post.model.post.count({ where }),
     ]);
+
+    if (userId) {
+      const postIds = posts.map(p => p.id);
+      const unreadMap = new Map<string, number>();
+
+      if (postIds.length > 0) {
+        const unreadRows = await this._socialComment.$queryRaw<
+          Array<{ post_id: string; unread: number }>
+        >`
+          SELECT
+            sc."postId" AS post_id,
+            COUNT(*)::int AS unread
+          FROM "SocialComment" sc
+          LEFT JOIN "PostCommentRead" pcr
+            ON pcr."postId" = sc."postId" AND pcr."userId" = ${userId}
+          WHERE
+            sc."postId" IN (${Prisma.join(postIds)})
+            AND sc."deletedAt" IS NULL
+            AND sc."isOwn" = false
+            AND (pcr."lastReadAt" IS NULL OR sc."platformCreatedAt" > pcr."lastReadAt")
+          GROUP BY sc."postId"
+        `;
+
+        for (const { post_id, unread } of unreadRows) {
+          unreadMap.set(post_id, unread);
+        }
+      }
+
+      for (const post of posts) {
+        (post as any).unreadComments = unreadMap.get(post.id) || 0;
+      }
+    }
 
     return {
       posts,
@@ -866,7 +944,14 @@ export class PostsRepository {
     });
   }
 
-  async getPostByForWebhookId(postId: string) {
+  async updateCommentCount(postId: string, count: number) {
+    return this._post.model.post.update({
+      where: { id: postId },
+      data: { commentCount: count },
+    });
+  }
+
+  getPostByForWebhookId(postId: string) {
     return this._post.model.post.findMany({
       where: {
         id: postId,

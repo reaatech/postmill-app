@@ -26,6 +26,11 @@ const POST_ITEM_KEYS: Record<string, string> = {
   intervalInDays: 'iv',
   actualDate: 'ad',
   creationMethod: 'cm',
+  lastViews: 'lv',
+  lastLikes: 'll',
+  lastComments: 'lc',
+  commentCount: 'cc',
+  unreadComments: 'ur',
 };
 
 const INTEGRATION_KEYS: Record<string, string> = {
@@ -65,7 +70,7 @@ function reverseMap(keyMap: Record<string, string>) {
   return reversed;
 }
 
-function minifyPostItem(post: any) {
+export function minifyPostItem(post: any) {
   return mapKeys(
     {
       ...post,
@@ -88,7 +93,7 @@ function minifyPostItem(post: any) {
   );
 }
 
-function expandPostItem(post: any) {
+export function expandPostItem(post: any) {
   const postReversed = reverseMap(POST_ITEM_KEYS);
   const integrationReversed = reverseMap(INTEGRATION_KEYS);
   const tagReversed = reverseMap(TAG_KEYS);

@@ -3,10 +3,12 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { timer } from '@gitroom/helpers/utils/timer';
+import { Logger } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { capitalize, chunk } from 'lodash';
@@ -29,6 +31,12 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
   ];
   override maxConcurrentJob = 2; // Threads has moderate rate limits
   refreshCron = true;
+
+  private readonly logger = new Logger(ThreadsProvider.name);
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
 
   editor = 'normal' as const;
   maxLength() {
@@ -605,6 +613,89 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     } catch (err) {
       console.error('Error fetching Threads post analytics:', err);
       return [];
+    }
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      let url = `https://graph.threads.net/v1.0/${postId}/replies?access_token=${accessToken}&fields=id,text,username,permalink,timestamp,like_count,replies&limit=50`;
+
+      if (cursor) {
+        url += `&after=${cursor}`;
+      }
+
+      const { data, paging } = await (
+        await this.fetch(url)
+      ).json() as any;
+
+      const comments: SocialCommentDTO[] = (data || []).map((reply: any) => ({
+        platformCommentId: reply.id,
+        author: {
+          id: reply.id,
+          name: reply.username || '',
+          username: reply.username,
+        },
+        content: reply.text || '',
+        createdAt: reply.timestamp || new Date().toISOString(),
+        likeCount: reply.like_count,
+        replyCount: reply.replies?.data?.length,
+        raw: reply,
+      }));
+
+      const nextCursor = paging?.cursors?.after || paging?.next || undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('Threads fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    _integration: Integration
+  ) {
+    try {
+      const { id: replyId } = await (
+        await this.fetch(
+          `https://graph.threads.net/v1.0/${postId}/replies?access_token=${accessToken}`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              text: message,
+              reply_to_id: parentCommentId,
+            }),
+          }
+        )
+      ).json() as any;
+
+      return {
+        platformCommentId: replyId,
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id,
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('Threads replyToComment error:', err);
+      throw err;
     }
   }
 

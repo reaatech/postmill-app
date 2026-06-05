@@ -2,6 +2,8 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentAuthor,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -19,6 +21,7 @@ import {
   AtpAgent,
   BlobRef,
 } from '@atproto/api';
+import { Logger } from '@nestjs/common';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
@@ -148,6 +151,7 @@ async function uploadVideo(
   'Bluesky can have maximum 1 video or 4 pictures in one post, it can also be without attachments'
 )
 export class BlueskyProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(BlueskyProvider.name);
   override maxConcurrentJob = 2; // Bluesky has moderate rate limits
   identifier = 'bluesky';
   name = 'Bluesky';
@@ -426,6 +430,232 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
         releaseURL: `https://bsky.app/profile/${id}/post/${uri.split('/').pop()}`,
       },
     ];
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  // Append any link targets carried in Bluesky rich-text facets that aren't
+  // already visible in the text, so URLs aren't lost to truncated display text.
+  private blueskyContentWithLinks(record: any): string {
+    const text: string = record?.text || '';
+    const facets: any[] = record?.facets || [];
+    const links: string[] = [];
+
+    for (const facet of facets) {
+      for (const feature of facet?.features || []) {
+        const uri = feature?.uri;
+        if (
+          uri &&
+          feature?.$type?.includes('link') &&
+          !text.includes(uri) &&
+          !links.includes(uri)
+        ) {
+          links.push(uri);
+        }
+      }
+    }
+
+    return links.length ? `${text}\n${links.join('\n')}`.trim() : text;
+  }
+
+  // Bluesky returns the thread as a tree (each reply may carry its own
+  // `replies`). Flatten it so nested replies aren't dropped.
+  private flattenBlueskyReplies(
+    replies: any[],
+    out: SocialCommentDTO[] = [],
+    depth = 0,
+    maxDepth = 6
+  ): SocialCommentDTO[] {
+    if (depth >= maxDepth) return out;
+
+    for (const r of replies || []) {
+      const post = r?.post;
+      if (!post) continue;
+
+      out.push({
+        platformCommentId: post.uri,
+        parentPlatformCommentId: post.record?.reply?.parent?.uri || undefined,
+        author: {
+          id: post.author?.did || '',
+          name: post.author?.displayName || post.author?.handle || '',
+          username: post.author?.handle,
+          picture: post.author?.avatar,
+          profileUrl: `https://bsky.app/profile/${post.author?.did}`,
+        },
+        content: this.blueskyContentWithLinks(post.record),
+        createdAt: post.record?.createdAt || post.indexedAt,
+        likeCount: post.likeCount,
+        replyCount: post.replyCount,
+        likedByMe: !!post.viewer?.like,
+        raw: r,
+      });
+
+      if (Array.isArray(r.replies) && r.replies.length) {
+        this.flattenBlueskyReplies(r.replies, out, depth + 1, maxDepth);
+      }
+    }
+
+    return out;
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ) {
+    try {
+      const agent = await this.getAgent(integration);
+
+      const thread = await agent.getPostThread({
+        uri: postId,
+        depth: 6,
+      });
+
+      // @ts-ignore
+      const replies = thread.data.thread?.replies || [];
+
+      const comments = this.flattenBlueskyReplies(replies);
+
+      return { comments };
+    } catch (err) {
+      this.logger.error('Bluesky fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ) {
+    try {
+      const agent = await this.getAgent(integration);
+
+      const rt = new RichText({ text: message });
+      await rt.detectFacets(agent);
+
+      const parentThread = await agent.getPostThread({
+        uri: parentCommentId,
+        depth: 0,
+      });
+
+      // @ts-ignore
+      const parentCid = parentThread.data.thread.post?.cid;
+      // @ts-ignore
+      const rootUri = parentThread.data.thread.post?.record?.reply?.root?.uri || postId;
+      // @ts-ignore
+      const rootCid = parentThread.data.thread.post?.record?.reply?.root?.cid || parentCid;
+
+      // @ts-ignore
+      const { uri } = await agent.post({
+        text: rt.text,
+        facets: rt.facets,
+        createdAt: new Date().toISOString(),
+        reply: {
+          root: { uri: rootUri, cid: rootCid },
+          parent: { uri: parentCommentId, cid: parentCid },
+        },
+      });
+
+      const handle = agent.session?.handle || '';
+      const profile = await agent.getProfile({ actor: agent.session?.did || '' });
+      const displayName = profile.data.displayName || handle;
+
+      return {
+        platformCommentId: uri,
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: agent.session?.did || '',
+          name: displayName,
+          username: handle,
+          picture: profile.data.avatar,
+          profileUrl: `https://bsky.app/profile/${handle}`,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('Bluesky replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: '',
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ) {
+    try {
+      const agent = await this.getAgent(integration);
+
+      if (like) {
+        const thread = await agent.getPostThread({
+          uri: commentId,
+          depth: 0,
+        });
+
+        // @ts-ignore
+        const commentCid = thread.data.thread.post?.cid;
+        if (!commentCid) {
+          return { liked: false };
+        }
+
+        await agent.like(commentId, commentCid);
+        return { liked: true };
+      } else {
+        // Page through likes — the caller's like may not be on the first page.
+        // Most likes are recent; cap at 5 pages to bound API cost.
+        const myDid = agent.session?.did;
+        let likesCursor: string | undefined;
+        for (let page = 0; page < 5; page++) {
+          const likes = await agent.app.bsky.feed.getLikes({
+            uri: commentId,
+            cursor: likesCursor,
+          });
+
+          // @ts-ignore
+          const myLike = likes.data.likes?.find(
+            // @ts-ignore
+            (l: any) => l.actor?.did === myDid
+          );
+
+          if (myLike) {
+            // @ts-ignore
+            await agent.deleteLike(myLike.uri);
+            break;
+          }
+
+          // @ts-ignore
+          likesCursor = likes.data.cursor;
+          if (!likesCursor) break;
+        }
+
+        return { liked: false };
+      }
+    } catch (err) {
+      this.logger.error('Bluesky likeComment error:', err);
+      throw err;
+    }
   }
 
   @Plug({

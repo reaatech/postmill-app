@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalyticsService } from './analytics.service';
 import { METRIC_REGISTRY, isKnownMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 import { NotFoundException } from '@nestjs/common';
+import dayjs from 'dayjs';
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
   PrismaService: class MockPrisma {
@@ -23,8 +24,15 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.serv
   },
 }));
 
+vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({
+  PostsService: class MockService {
+    checkPostAnalytics = vi.fn();
+  },
+}));
+
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 
 // Helper: create local-midnight dates to avoid timezone offset in dayjs formatting
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
@@ -33,6 +41,7 @@ describe('AnalyticsService', () => {
   let service: AnalyticsService;
   let prisma: PrismaService;
   let integrationService: IntegrationService;
+  let postsService: PostsService;
 
   const mockOrg = { id: 'org1', name: 'Test Org' } as any;
 
@@ -55,7 +64,8 @@ describe('AnalyticsService', () => {
     prisma = new PrismaService();
     const manager = {} as any;
     integrationService = new IntegrationService();
-    service = new AnalyticsService(prisma, manager, integrationService);
+    postsService = new PostsService();
+    service = new AnalyticsService(prisma, manager, integrationService, postsService);
   });
 
   // ============ EXISTING TESTS (kept exactly) ============
@@ -722,6 +732,53 @@ describe('AnalyticsService', () => {
       const r = await service.getPostDetail(mockOrg as any, 'post1');
       expect(r.integration.name).toBe('Test Channel');
       expect(r.integration.identifier).toBe('instagram');
+    });
+
+    it('returns snapshots directly without calling live fallback', async () => {
+      (prisma.post.findFirst as any).mockResolvedValue(mkPostDetail());
+      (prisma.postAnalyticsSnapshot.findMany as any).mockResolvedValue([
+        { postId: 'post1', metric: 'impressions', value: 100, date: d(2024, 1, 2) },
+      ]);
+      const r = await service.getPostDetail(mockOrg as any, 'post1');
+      expect(r.metrics.impressions).toHaveLength(1);
+      expect(postsService.checkPostAnalytics).not.toHaveBeenCalled();
+    });
+
+    it('calls live fallback when snapshots empty and converts live data', async () => {
+      const recentDate = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+      (prisma.post.findFirst as any).mockResolvedValue(mkPostDetail());
+      (prisma.postAnalyticsSnapshot.findMany as any).mockResolvedValue([]);
+      (postsService.checkPostAnalytics as any).mockResolvedValue([
+        { label: 'Likes', data: [{ total: '50', date: recentDate }] },
+      ]);
+      const r = await service.getPostDetail(mockOrg as any, 'post1');
+      expect(postsService.checkPostAnalytics).toHaveBeenCalledWith('org1', 'post1', 30);
+      expect(r.metrics.likes).toBeDefined();
+      expect(r.metrics.likes[0].value).toBe(50);
+    });
+
+    it('handles empty snapshots with failing live fallback gracefully', async () => {
+      (prisma.post.findFirst as any).mockResolvedValue(mkPostDetail());
+      (prisma.postAnalyticsSnapshot.findMany as any).mockResolvedValue([]);
+      (postsService.checkPostAnalytics as any).mockRejectedValue(new Error('API down'));
+      const r = await service.getPostDetail(mockOrg as any, 'post1');
+      expect(r.metrics).toEqual({});
+    });
+
+    it('handles live fallback returning missing gracefully', async () => {
+      (prisma.post.findFirst as any).mockResolvedValue(mkPostDetail());
+      (prisma.postAnalyticsSnapshot.findMany as any).mockResolvedValue([]);
+      (postsService.checkPostAnalytics as any).mockResolvedValue({ missing: true });
+      const r = await service.getPostDetail(mockOrg as any, 'post1');
+      expect(r.metrics).toEqual({});
+    });
+
+    it('handles live fallback returning non-array gracefully', async () => {
+      (prisma.post.findFirst as any).mockResolvedValue(mkPostDetail());
+      (prisma.postAnalyticsSnapshot.findMany as any).mockResolvedValue([]);
+      (postsService.checkPostAnalytics as any).mockResolvedValue(undefined);
+      const r = await service.getPostDetail(mockOrg as any, 'post1');
+      expect(r.metrics).toEqual({});
     });
   });
 

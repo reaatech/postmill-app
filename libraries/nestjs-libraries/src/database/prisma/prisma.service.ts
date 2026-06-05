@@ -28,6 +28,10 @@ export class PrismaRepository<T extends keyof PrismaService> {
   constructor(private _prismaService: PrismaService) {
     this.model = this._prismaService;
   }
+
+  async $queryRaw<TResult = unknown>(query: TemplateStringsArray, ...values: any[]): Promise<TResult> {
+    return this._prismaService.$queryRaw(query, ...values);
+  }
 }
 
 @Injectable()

@@ -7,14 +7,18 @@ export default defineConfig({
   resolve: {
     alias: {
       '@gitroom/helpers': path.resolve(__dirname, '../../libraries/helpers/src'),
-      '@gitroom/react/helpers': path.resolve(__dirname, '../../libraries/react/src/helpers'),
+      '@gitroom/react': path.resolve(__dirname, '../../libraries/react-shared-libraries/src'),
       '@gitroom/frontend': path.resolve(__dirname, 'src'),
     },
   },
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['src/components/analytics-v2/**/*.spec.{ts,tsx}'],
+    include: [
+      'src/components/analytics-v2/**/*.spec.{ts,tsx}',
+      'src/components/launches/post-detail/*.spec.{ts,tsx}',
+      'src/components/launches/calendar.spec.{ts,tsx}',
+    ],
     coverage: {
       provider: 'v8',
       reporter: ['text'],

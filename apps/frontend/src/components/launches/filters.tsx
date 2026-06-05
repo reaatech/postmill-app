@@ -1,6 +1,6 @@
 'use client';
 
-import { useCalendar, ListStateFilter } from '@gitroom/frontend/components/launches/calendar.context';
+import { useCalendar, ListStateFilter, EngagementFilter } from '@gitroom/frontend/components/launches/calendar.context';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { useCallback } from 'react';
@@ -267,6 +267,21 @@ export const Filters = () => {
     [calendar]
   );
 
+  const setEngagementFilter = useCallback(
+    (next: EngagementFilter) => () => {
+      if (calendar.engagementFilter === next) return;
+      calendar.setEngagementFilter(next);
+    },
+    [calendar]
+  );
+
+  const engagementFilterOptions: { value: EngagementFilter; label: string }[] = [
+    { value: 'all', label: 'All posts' },
+    { value: 'has_comments', label: 'Has comments' },
+    { value: 'errors', label: 'Errors' },
+    { value: 'top_performers', label: 'Top performers' },
+  ];
+
   const listStateOptions: { value: ListStateFilter; label: string }[] = [
     { value: 'all', label: t('all', 'All') },
     { value: 'scheduled', label: t('scheduled', 'Scheduled') },
@@ -426,6 +441,22 @@ export const Filters = () => {
           <div className="flex-1" />
         </div>
       )}
+      <div className="flex flex-row gap-[8px] text-[14px] font-[500]">
+        {engagementFilterOptions.map((option) => (
+          <div
+            key={option.value}
+            onClick={setEngagementFilter(option.value)}
+            className={clsx(
+              'cursor-pointer px-[10px] py-[4px] rounded-full border transition-all',
+              calendar.engagementFilter === option.value
+                ? 'bg-btnPrimary text-white border-btnPrimary'
+                : 'border-newTableBorder text-newTableText hover:text-textColor'
+            )}
+          >
+            {option.label}
+          </div>
+        ))}
+      </div>
       <SelectCustomer
         customer={calendar.customer as string}
         onChange={(customer: string) => setCustomer(customer)}
