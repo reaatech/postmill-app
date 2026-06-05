@@ -14,7 +14,7 @@ import slugify from 'slugify';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 
 export class ListmonkProvider extends SocialAbstract implements SocialProvider {
-  override maxConcurrentJob = 100; // Bluesky has moderate rate limits
+  override maxConcurrentJob = 100; // ListMonk has moderate rate limits
   identifier = 'listmonk';
   name = 'ListMonk';
   isBetweenSteps = false;

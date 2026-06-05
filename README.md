@@ -13,6 +13,19 @@
 </a>
 </p>
 
+<div align="center" style="border: 2px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 20px; background: #fffbeb;">
+  <strong>⚠️ This is a modified fork</strong><br />
+  This repository is a fork of <a href="https://github.com/gitroomhq/postiz-app">gitroomhq/postiz-app</a> with the following changes:
+  <ul style="text-align: left; display: inline-block; margin-top: 8px;">
+    <li><strong>Database-backed provider config</strong> — Channel OAuth/API credentials managed via an admin UI (<code>/admin/channels</code>) instead of environment variables, encrypted at rest. Includes a one-time <code>scripts/migrate-channel-config.ts</code> to import existing env-var credentials into the database.</li>
+    <li><strong>Admin UI for channels</strong> — Super-admins can enable/disable providers, set credentials, and add per-provider setup instructions. Disabling a provider only blocks new connections — already-connected channels keep posting, refreshing tokens, and reporting analytics.</li>
+    <li><strong>Enhanced test suite</strong> — 630 Vitest tests across all providers and core services with 93%+ statement/function/line coverage.</li>
+    <li><strong>Maintenance &amp; fixes</strong> — Fixes across 33 providers (lazy initialization, credential keys, null safety), frontend hook dependency arrays, and the migration script; plus a safe same-major dependency refresh (React, Next, NestJS, Temporal, TipTap, Sentry, and more).</li>
+    <li><strong>Prebuilt image</strong> — Published to <code>ghcr.io/reaatech/postiz-app</code>.</li>
+  </ul>
+  See <a href="https://github.com/reaatech/postiz-app">github.com/reaatech/postiz-app</a> for the full changelog and source.
+</div>
+
 <h3 align="center"><strong><a href="https://github.com/gitroomhq/postiz-agent">NEW: check out Postiz agent CLI! perfect for OpenClaw and other agents</a></strong></h3>
 <div align="center">
   <strong>

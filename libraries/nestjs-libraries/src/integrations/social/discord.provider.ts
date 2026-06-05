@@ -9,6 +9,7 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { Integration } from '@prisma/client';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 5; // Discord has generous rate limits for webhook posting
@@ -33,9 +34,9 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            process.env.DISCORD_CLIENT_ID +
+            getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId') +
               ':' +
-              process.env.DISCORD_CLIENT_SECRET
+              getEnvOr('DISCORD_CLIENT_SECRET', 'discord', 'clientSecret')
           ).toString('base64')}`,
         },
       })
@@ -63,7 +64,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     const state = makeId(6);
     return {
       url: `https://discord.com/oauth2/authorize?client_id=${
-        process.env.DISCORD_CLIENT_ID
+        getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId')
       }&permissions=377957124096&response_type=code&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/discord`
       )}&integration_type=0&scope=bot+identify+guilds&state=${state}`,
@@ -88,9 +89,9 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            process.env.DISCORD_CLIENT_ID +
+            getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId') +
               ':' +
-              process.env.DISCORD_CLIENT_SECRET
+              getEnvOr('DISCORD_CLIENT_SECRET', 'discord', 'clientSecret')
           ).toString('base64')}`,
         },
       })
@@ -112,8 +113,8 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       accessToken: access_token,
       refreshToken: refresh_token,
       expiresIn: expires_in,
-      picture: `https://cdn.discordapp.com/avatars/${application.bot.id}/${application.bot.avatar}.png`,
-      username: application.bot.username,
+      picture: `https://cdn.discordapp.com/avatars/${application?.bot?.id}/${application?.bot?.avatar}.png`,
+      username: application?.bot?.username,
     };
   }
 
@@ -122,7 +123,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     const list = await (
       await this.fetch(`https://discord.com/api/guilds/${id}/channels`, {
         headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
         },
       })
     ).json();
@@ -174,7 +175,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       await this.fetch(`https://discord.com/api/channels/${channel}/messages`, {
         method: 'POST',
         headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
         },
         body: form,
       })
@@ -213,7 +214,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
           {
             method: 'POST',
             headers: {
-              Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+              Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -259,7 +260,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         {
           method: 'POST',
           headers: {
-            Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+            Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
           },
           body: form,
         }
@@ -281,7 +282,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       await this.fetch(`https://discord.com/api/guilds/${id}/members/@me`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -304,7 +305,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     const allRoles = await (
       await this.fetch(`https://discord.com/api/guilds/${id}/roles`, {
         headers: {
-          Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
           'Content-Type': 'application/json',
         },
       })
@@ -321,7 +322,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         `https://discord.com/api/guilds/${id}/members/search?query=${data.query}`,
         {
           headers: {
-            Authorization: `Bot ${process.env.DISCORD_BOT_TOKEN_ID}`,
+            Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
             'Content-Type': 'application/json',
           },
         }

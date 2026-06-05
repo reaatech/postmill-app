@@ -21,6 +21,7 @@ import { LinkedinDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import imageToPDF from 'image-to-pdf';
 import { Readable } from 'stream';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
@@ -109,8 +110,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token,
-          client_id: process.env.LINKEDIN_CLIENT_ID!,
-          client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+          client_id: getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin', 'clientId'),
+          client_secret: getEnvOr('LINKEDIN_CLIENT_SECRET', 'linkedin', 'clientSecret'),
         }),
       })
     ).json();
@@ -150,7 +151,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     const state = makeId(6);
     const codeVerifier = makeId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id=${
-      process.env.LINKEDIN_CLIENT_ID
+      getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin', 'clientId')
     }&prompt=none&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -175,8 +176,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
         params.refresh ? `?refresh=${params.refresh}` : ''
       }`
     );
-    body.append('client_id', process.env.LINKEDIN_CLIENT_ID!);
-    body.append('client_secret', process.env.LINKEDIN_CLIENT_SECRET!);
+    body.append('client_id', getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin', 'clientId'));
+    body.append('client_secret', getEnvOr('LINKEDIN_CLIENT_SECRET', 'linkedin', 'clientSecret'));
 
     const {
       access_token: accessToken,
@@ -725,7 +726,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       );
     }
 
-    return response.headers.get('x-restli-id')!;
+    return response.headers.get('x-restli-id') || '';
   }
 
   private async createCommentPost(

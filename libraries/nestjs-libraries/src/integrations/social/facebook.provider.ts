@@ -17,6 +17,7 @@ import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   "Facebook posts can be text only, or include photos or a video. If it's a story, it must have at least one attachment (photo or video), and each media is published as a separate story."
@@ -235,7 +236,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     return {
       url:
         'https://www.facebook.com/v20.0/dialog/oauth' +
-        `?client_id=${process.env.FACEBOOK_APP_ID}` +
+        `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/facebook`
         )}` +
@@ -272,13 +273,13 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     const getAccessToken = await (
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
-          `?client_id=${process.env.FACEBOOK_APP_ID}` +
+          `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
           `&redirect_uri=${encodeURIComponent(
             `${process.env.FRONTEND_URL}/integrations/social/facebook${
               params.refresh ? `?refresh=${params.refresh}` : ''
             }`
           )}` +
-          `&client_secret=${process.env.FACEBOOK_APP_SECRET}` +
+          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'facebook', 'clientSecret')}` +
           `&code=${params.code}`
       )
     ).json();
@@ -287,8 +288,8 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
-          `&client_id=${process.env.FACEBOOK_APP_ID}` +
-          `&client_secret=${process.env.FACEBOOK_APP_SECRET}` +
+          `&client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
+          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'facebook', 'clientSecret')}` +
           `&fb_exchange_token=${getAccessToken.access_token}&fields=access_token,expires_in`
       )
     ).json();

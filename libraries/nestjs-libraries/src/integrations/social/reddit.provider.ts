@@ -9,6 +9,7 @@ import { RedditSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/provider
 import { timer } from '@gitroom/helpers/utils/timer';
 import { groupBy } from 'lodash';
 import {
+  RefreshToken,
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -18,9 +19,10 @@ import WebSocket from 'ws';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 // @ts-ignore
-global.WebSocket = WebSocket;
+if (!global.WebSocket) global.WebSocket = WebSocket;
 
 export class RedditProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 1; // Reddit has strict rate limits (1 request per second)
@@ -65,7 +67,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${process.env.REDDIT_CLIENT_ID}:${process.env.REDDIT_CLIENT_SECRET}`
+            `${getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')}:${getEnvOr('REDDIT_CLIENT_SECRET', 'reddit', 'clientSecret')}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({
@@ -98,7 +100,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     const state = makeId(6);
     const codeVerifier = makeId(30);
     const url = `https://www.reddit.com/api/v1/authorize?client_id=${
-      process.env.REDDIT_CLIENT_ID
+      getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')
     }&response_type=code&state=${state}&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/reddit`
     )}&duration=permanent&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -121,7 +123,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${process.env.REDDIT_CLIENT_ID}:${process.env.REDDIT_CLIENT_SECRET}`
+            `${getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')}:${getEnvOr('REDDIT_CLIENT_SECRET', 'reddit', 'clientSecret')}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({
@@ -199,7 +201,11 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
       body: upload,
     });
 
-    return [...(await d.text()).matchAll(/<Location>(.*?)<\/Location>/g)][0][1];
+    const match = [...(await d.text()).matchAll(/<Location>(.*?)<\/Location>/g)];
+    if (!match?.[0]?.[1]) {
+      throw new RefreshToken('reddit', 'No location header found in upload response', {} as BodyInit);
+    }
+    return match[0][1];
   }
 
   async post(
@@ -213,7 +219,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     for (const firstPostSettings of post.settings.subreddit) {
       const kind =
         firstPostSettings.value.type === 'media'
-          ? hasExtension(post.media[0].path, 'mp4')
+          ? hasExtension(post?.media?.[0]?.path, 'mp4')
             ? 'video'
             : 'image'
           : firstPostSettings.value.type;
@@ -236,13 +242,13 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
           ? {
               url: await this.uploadFileToReddit(
                 accessToken,
-                post.media[0].path
+                post?.media?.[0]?.path
               ),
-              ...(hasExtension(post.media[0].path, 'mp4')
+              ...(hasExtension(post?.media?.[0]?.path, 'mp4')
                 ? {
                     video_poster_url: await this.uploadFileToReddit(
                       accessToken,
-                      post.media[0].thumbnail
+                      post?.media?.[0]?.thumbnail
                     ),
                   }
                 : {}),

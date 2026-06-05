@@ -12,11 +12,7 @@ import mime from 'mime';
 import TelegramBot from 'node-telegram-bot-api';
 import { Integration } from '@prisma/client';
 import striptags from 'striptags';
-
-const telegramBot = new TelegramBot(process.env.TELEGRAM_TOKEN!);
-// Added to support local storage posting
-const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5000';
-const mediaStorage = process.env.STORAGE_PROVIDER || 'local';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class TelegramProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Telegram has moderate bot API limits
@@ -26,6 +22,14 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   isWeb3 = true;
   scopes = [] as string[];
   editor = 'html' as const;
+
+  private _bot: TelegramBot | null = null;
+  private get bot(): TelegramBot {
+    if (!this._bot) {
+      this._bot = new TelegramBot(getEnvOr('TELEGRAM_TOKEN', 'telegram', 'token'));
+    }
+    return this._bot;
+  }
   maxLength() {
     return 4096;
   }
@@ -56,7 +60,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     codeVerifier: string;
     refresh?: string;
   }) {
-    const chat = await telegramBot.getChat(params.code);
+    const chat = await this.bot.getChat(params.code);
 
     console.log(JSON.stringify(chat));
     if (!chat?.id) {
@@ -65,7 +69,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
     const photo = !chat?.photo?.big_file_id
       ? ''
-      : await telegramBot.getFileLink(chat.photo.big_file_id);
+      : await this.bot.getFileLink(chat.photo.big_file_id);
 
     // Modified id to work with chat.username (public groups/channels) or chat.id (private groups/channels) when chat.username is not available
     return {
@@ -81,7 +85,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
   async getBotId(query: { id?: number; word: string }) {
     // Added allowed_updates Ensure only necessary updates are fetched
-    const res = await telegramBot.getUpdates({
+    const res = await this.bot.getUpdates({
       ...(query.id ? { offset: query.id } : {}),
       allowed_updates: ['message', 'channel_post'],
     });
@@ -99,7 +103,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     // prevents the code from running while chatId is still undefined to avoid the error 'ETELEGRAM: 400 Bad Request: chat_id is empty'. the code would still work eventually but console spam is not pretty
     if (chatId) {
       //get the numberic ID of the bot
-      const botId = (await telegramBot.getMe()).id;
+      const botId = (await this.bot.getMe()).id;
       // check if the bot is an admin in the chat
       const isAdmin = await this.botIsAdmin(chatId, botId);
       // get the messageId of the message that triggered the connection
@@ -108,21 +112,21 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
       if (!isAdmin) {
         // alternatively you can replace this with a console.log if you do not want to inform the user of the bot's admin status
-        telegramBot.sendMessage(
+        this.bot.sendMessage(
           chatId,
           "Connection Successful. I don't have admin privileges to delete these messages, please go ahead and remove them yourself."
         );
       } else {
         // Delete the message that triggered the connection
-        await telegramBot.deleteMessage(chatId, connectMessageId);
+        await this.bot.deleteMessage(chatId, connectMessageId);
         // Send success message to the chat
-        const successMessage = await telegramBot.sendMessage(
+        const successMessage = await this.bot.sendMessage(
           chatId,
           'Connection Successful. Message will be deleted in 10 seconds.'
         );
         // Delete the success message after 10 seconds
         setTimeout(async () => {
-          await telegramBot.deleteMessage(chatId, successMessage.message_id);
+          await this.bot.deleteMessage(chatId, successMessage.message_id);
           console.log('Success message deleted.');
         }, 10000);
       }
@@ -141,8 +145,8 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   private processMedia(mediaFiles: PostDetails['media']) {
     return (mediaFiles || []).map((media) => {
       let mediaUrl = media.path;
-      if (mediaStorage === 'local' && mediaUrl.startsWith(frontendURL)) {
-        mediaUrl = mediaUrl.replace(frontendURL, '');
+      if ((process.env.STORAGE_PROVIDER || 'local') === 'local' && mediaUrl.startsWith(process.env.FRONTEND_URL || 'http://localhost:5000')) {
+        mediaUrl = mediaUrl.replace(process.env.FRONTEND_URL || 'http://localhost:5000', '');
       }
       //get mime type to pass contentType to telegram api.
       //some photos and videos might not pass telegram api restrictions, so they are sent as documents instead of returning errors
@@ -185,7 +189,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
     // if there's no media, bot sends a text message only
     if (processedMedia.length === 0) {
-      const response = await telegramBot.sendMessage(accessToken, text, {
+      const response = await this.bot.sendMessage(accessToken, text, {
         parse_mode: 'HTML',
         ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
       });
@@ -201,20 +205,20 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
       };
       const response =
         media.type === 'video'
-          ? await telegramBot.sendVideo(
+          ? await this.bot.sendVideo(
               accessToken,
               media.media,
               options,
               media.fileOptions
             )
           : media.type === 'photo'
-          ? await telegramBot.sendPhoto(
+          ? await this.bot.sendPhoto(
               accessToken,
               media.media,
               options,
               media.fileOptions
             )
-          : await telegramBot.sendDocument(
+          : await this.bot.sendDocument(
               accessToken,
               media.media,
               options,
@@ -233,7 +237,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
           parse_mode: 'HTML',
         }));
 
-        const response = await telegramBot.sendMediaGroup(
+        const response = await this.bot.sendMediaGroup(
           accessToken,
           mediaGroup as any[],
           {
@@ -317,7 +321,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
   async botIsAdmin(chatId: number, botId: number): Promise<boolean> {
     try {
-      const chatMember = await telegramBot.getChatMember(chatId, botId);
+      const chatMember = await this.bot.getChatMember(chatId, botId);
 
       if (
         chatMember.status === 'administrator' ||

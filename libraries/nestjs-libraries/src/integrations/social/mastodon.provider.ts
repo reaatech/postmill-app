@@ -9,6 +9,7 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { number, string } from 'yup';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class MastodonProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 5; // Mastodon instances typically have generous limits
@@ -62,10 +63,10 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
   async generateAuthUrl() {
     const state = makeId(6);
     const url = this.generateUrlDynamic(
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
       state,
-      process.env.MASTODON_CLIENT_ID!,
-      process.env.FRONTEND_URL!
+      getEnvOr('MASTODON_CLIENT_ID', 'mastodon', 'clientId'),
+      process.env.FRONTEND_URL || 'http://localhost:5000'
     );
     return {
       url,
@@ -123,9 +124,9 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     refresh?: string;
   }) {
     return this.dynamicAuthenticate(
-      process.env.MASTODON_CLIENT_ID!,
-      process.env.MASTODON_CLIENT_SECRET!,
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      getEnvOr('MASTODON_CLIENT_ID', 'mastodon', 'clientId'),
+      getEnvOr('MASTODON_CLIENT_SECRET', 'mastodon', 'clientSecret'),
+      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
       params.code
     );
   }
@@ -251,7 +252,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     return this.dynamicPost(
       id,
       accessToken,
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
       postDetails
     );
   }
@@ -269,7 +270,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
       postId,
       lastCommentId,
       accessToken,
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
       postDetails
     );
   }

@@ -12,16 +12,23 @@ import {
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import * as process from 'node:process';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import dayjs from 'dayjs';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { GmbSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/gmb.settings.dto';
 
+let _clientAndGmb: {
+  client: OAuth2Client;
+  oauth2: (newClient: OAuth2Client) => ReturnType<typeof google.oauth2>;
+} | undefined;
+
 const clientAndGmb = () => {
+  if (_clientAndGmb) return _clientAndGmb;
+
   const client = new google.auth.OAuth2({
-    clientId: process.env.GOOGLE_GMB_CLIENT_ID || process.env.YOUTUBE_CLIENT_ID,
+    clientId: getEnvOr('GOOGLE_GMB_CLIENT_ID', 'gmb', 'clientId') || getEnvOr('YOUTUBE_CLIENT_ID', 'youtube', 'clientId'),
     clientSecret:
-      process.env.GOOGLE_GMB_CLIENT_SECRET || process.env.YOUTUBE_CLIENT_SECRET,
+      getEnvOr('GOOGLE_GMB_CLIENT_SECRET', 'gmb', 'clientSecret') || getEnvOr('YOUTUBE_CLIENT_SECRET', 'youtube', 'clientSecret'),
     redirectUri: `${process.env.FRONTEND_URL}/integrations/social/gmb`,
   });
 
@@ -31,7 +38,8 @@ const clientAndGmb = () => {
       auth: newClient,
     });
 
-  return { client, oauth2 };
+  _clientAndGmb = { client, oauth2 };
+  return _clientAndGmb;
 };
 
 @Rules(
@@ -96,7 +104,7 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       return {
         type: 'refresh-token',
         value:
-          'Token expired or invalid, please reconnect your YouTube account.',
+          'Token expired or invalid, please reconnect your Google My Business account.',
       };
     }
 
@@ -136,8 +144,14 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     const { client, oauth2 } = clientAndGmb();
     client.setCredentials({ refresh_token });
     const { credentials } = await client.refreshAccessToken();
+    if (!credentials.access_token) {
+      throw new Error('Failed to refresh Google My Business access token');
+    }
+    if (!credentials.expiry_date) {
+      throw new Error('Failed to get Google My Business token expiry date');
+    }
     const user = oauth2(client);
-    const expiryDate = new Date(credentials.expiry_date!);
+    const expiryDate = new Date(credentials.expiry_date);
     const unixTimestamp =
       Math.floor(expiryDate.getTime() / 1000) -
       Math.floor(new Date().getTime() / 1000);
@@ -145,11 +159,11 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     const { data } = await user.userinfo.get();
 
     return {
-      accessToken: credentials.access_token!,
-      expiresIn: unixTimestamp!,
+      accessToken: credentials.access_token,
+      expiresIn: unixTimestamp,
       refreshToken: credentials.refresh_token || refresh_token,
-      id: data.id!,
-      name: data.name!,
+      id: String(data.id || ''),
+      name: data.name || '',
       picture: data?.picture || '',
       username: '',
     };
@@ -178,24 +192,30 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
   }) {
     const { client, oauth2 } = clientAndGmb();
     const { tokens } = await client.getToken(params.code);
+    if (!tokens.access_token) {
+      throw new Error('Failed to get Google My Business access token');
+    }
+    if (!tokens.expiry_date) {
+      throw new Error('Failed to get Google My Business token expiry date');
+    }
     client.setCredentials(tokens);
-    const { scopes } = await client.getTokenInfo(tokens.access_token!);
+    const { scopes } = await client.getTokenInfo(tokens.access_token);
     this.checkScopes(this.scopes, scopes);
 
     const user = oauth2(client);
     const { data } = await user.userinfo.get();
 
-    const expiryDate = new Date(tokens.expiry_date!);
+    const expiryDate = new Date(tokens.expiry_date);
     const unixTimestamp =
       Math.floor(expiryDate.getTime() / 1000) -
       Math.floor(new Date().getTime() / 1000);
 
     return {
-      accessToken: tokens.access_token!,
+      accessToken: tokens.access_token,
       expiresIn: unixTimestamp,
-      refreshToken: tokens.refresh_token!,
-      id: data.id!,
-      name: data.name!,
+      refreshToken: tokens.refresh_token || '',
+      id: String(data.id || ''),
+      name: data.name || '',
       picture: data?.picture || '',
       username: '',
     };

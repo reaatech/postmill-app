@@ -14,8 +14,7 @@ import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-set
 import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.provider';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-
-const instagramProvider = new InstagramProvider();
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
@@ -24,6 +23,13 @@ export class InstagramStandaloneProvider
   extends SocialAbstract
   implements SocialProvider
 {
+  private _instagramProvider: InstagramProvider | undefined;
+  private get instagramProvider(): InstagramProvider {
+    if (!this._instagramProvider) {
+      this._instagramProvider = new InstagramProvider();
+    }
+    return this._instagramProvider;
+  }
   identifier = 'instagram-standalone';
   name = 'Instagram\n(Standalone)';
   isBetweenSteps = false;
@@ -69,7 +75,7 @@ export class InstagramStandaloneProvider
   ):
     | { type: 'refresh-token' | 'bad-body' | 'retry'; value: string }
     | undefined {
-    return instagramProvider.handleErrors(body, status);
+    return this.instagramProvider.handleErrors(body, status);
   }
 
   async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
@@ -106,7 +112,7 @@ export class InstagramStandaloneProvider
     return {
       url:
         `https://www.instagram.com/oauth/authorize?enable_fb_login=0&client_id=${
-          process.env.INSTAGRAM_APP_ID
+          getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId')
         }&redirect_uri=${encodeURIComponent(
           `${
             process?.env.FRONTEND_URL?.indexOf('https') == -1
@@ -127,8 +133,8 @@ export class InstagramStandaloneProvider
     refresh: string;
   }) {
     const formData = new FormData();
-    formData.append('client_id', process.env.INSTAGRAM_APP_ID!);
-    formData.append('client_secret', process.env.INSTAGRAM_APP_SECRET!);
+    formData.append('client_id', getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId'));
+    formData.append('client_secret', getEnvOr('INSTAGRAM_APP_SECRET', 'instagram-standalone', 'clientSecret'));
     formData.append('grant_type', 'authorization_code');
     formData.append(
       'redirect_uri',
@@ -151,8 +157,8 @@ export class InstagramStandaloneProvider
       await fetch(
         'https://graph.instagram.com/access_token' +
           '?grant_type=ig_exchange_token' +
-          `&client_id=${process.env.INSTAGRAM_APP_ID}` +
-          `&client_secret=${process.env.INSTAGRAM_APP_SECRET}` +
+          `&client_id=${getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId')}` +
+          `&client_secret=${getEnvOr('INSTAGRAM_APP_SECRET', 'instagram-standalone', 'clientSecret')}` +
           `&access_token=${getAccessToken.access_token}`
       )
     ).json();
@@ -182,7 +188,7 @@ export class InstagramStandaloneProvider
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    return instagramProvider.post(
+    return this.instagramProvider.post(
       id,
       accessToken,
       postDetails,
@@ -199,7 +205,7 @@ export class InstagramStandaloneProvider
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    return instagramProvider.comment(
+    return this.instagramProvider.comment(
       id,
       postId,
       lastCommentId,
@@ -211,7 +217,7 @@ export class InstagramStandaloneProvider
   }
 
   async analytics(id: string, accessToken: string, date: number) {
-    return instagramProvider.analytics(
+    return this.instagramProvider.analytics(
       id,
       accessToken,
       date,
@@ -225,7 +231,7 @@ export class InstagramStandaloneProvider
     postId: string,
     date: number
   ) {
-    return instagramProvider.postAnalytics(
+    return this.instagramProvider.postAnalytics(
       integrationId,
       accessToken,
       postId,

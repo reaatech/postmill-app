@@ -22,6 +22,7 @@ import { stripLinks as removeLinks } from '@gitroom/helpers/utils/strip.links';
 import { XDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/x.dto';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   `X can have maximum 4 pictures, or maximum one video, it can also be without attachments ${
@@ -172,8 +173,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     // eslint-disable-next-line prefer-rest-params
     const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -205,8 +206,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   ) {
     const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -256,8 +257,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     // eslint-disable-next-line prefer-rest-params
     const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -293,12 +294,12 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
   async generateAuthUrl() {
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
     });
     const { url, oauth_token, oauth_token_secret } =
       await client.generateAuthLink(
-        (process.env.X_URL || process.env.FRONTEND_URL) +
+        (getEnvOr('X_URL', 'x', 'redirectUri') || process.env.FRONTEND_URL) +
           `/integrations/social/x`,
         {
           authAccessType: 'write',
@@ -318,8 +319,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     const [oauth_token, oauth_token_secret] = codeVerifier.split(':');
 
     const startingClient = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: oauth_token,
       accessSecret: oauth_token_secret,
     });
@@ -362,8 +363,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   private async getClient(accessToken: string) {
     const [accessTokenSplit, accessSecretSplit] = accessToken.split(':');
     return new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -384,7 +385,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
         .replace(/\)/g, '%29');
 
     const params: Record<string, string> = {
-      oauth_consumer_key: process.env.X_API_KEY!,
+      oauth_consumer_key: getEnvOr('X_API_KEY', 'x', 'clientId'),
       oauth_nonce: randomBytes(16).toString('hex'),
       oauth_signature_method: 'HMAC-SHA1',
       oauth_timestamp: String(Math.floor(Date.now() / 1000)),
@@ -403,7 +404,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       pct(paramString),
     ].join('&');
 
-    const signingKey = `${pct(process.env.X_API_SECRET!)}&${pct(accessSecret)}`;
+    const signingKey = `${pct(getEnvOr('X_API_SECRET', 'x', 'clientSecret'))}&${pct(accessSecret)}`;
     params.oauth_signature = createHmac('sha1', signingKey)
       .update(baseString)
       .digest('base64');
@@ -650,8 +651,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
     const [accessTokenSplit, accessSecretSplit] = accessToken.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -740,8 +741,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
     const [accessTokenSplit, accessSecretSplit] = accessToken.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });
@@ -819,8 +820,8 @@ export class XProvider extends SocialAbstract implements SocialProvider {
   override async mention(token: string, d: { query: string }) {
     const [accessTokenSplit, accessSecretSplit] = token.split(':');
     const client = new TwitterApi({
-      appKey: process.env.X_API_KEY!,
-      appSecret: process.env.X_API_SECRET!,
+      appKey: getEnvOr('X_API_KEY', 'x', 'clientId'),
+      appSecret: getEnvOr('X_API_SECRET', 'x', 'clientSecret'),
       accessToken: accessTokenSplit,
       accessSecret: accessSecretSplit,
     });

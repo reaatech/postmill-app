@@ -211,9 +211,15 @@ export class IntegrationService {
   async refreshTokens() {
     const integrations = await this._integrationRepository.needsToBeRefreshed();
     for (const integration of integrations) {
-      const provider = this._integrationManager.getSocialIntegration(
+      // Unchecked lookup: existing tokens must keep refreshing regardless of
+      // whether the provider is currently enabled for new connections, and a
+      // single disabled/unknown provider must not abort the whole batch.
+      const provider = this._integrationManager.getSocialIntegrationUnchecked(
         integration.providerIdentifier
       );
+      if (!provider) {
+        continue;
+      }
 
       const data = await this.refreshToken(provider, integration.refreshToken!);
 
@@ -293,7 +299,7 @@ export class IntegrationService {
       throw new HttpException('Invalid request', HttpStatus.BAD_REQUEST);
     }
 
-    const provider = this._integrationManager.getSocialIntegration(
+    const provider = await this._integrationManager.getSocialIntegration(
       getIntegration.providerIdentifier
     );
 
@@ -342,7 +348,7 @@ export class IntegrationService {
       return [];
     }
 
-    const integrationProvider = this._integrationManager.getSocialIntegration(
+    const integrationProvider = await this._integrationManager.getSocialIntegration(
       getIntegration.providerIdentifier
     );
 
@@ -442,15 +448,15 @@ export class IntegrationService {
       return;
     }
 
-    const getAllInternalPlugs = this._integrationManager
-      .getInternalPlugs(getIntegration.providerIdentifier)
+    const getAllInternalPlugs = (await this._integrationManager
+      .getInternalPlugs(getIntegration.providerIdentifier))
       .internalPlugs.find((p: any) => p.identifier === data.plugName);
 
     if (!getAllInternalPlugs) {
       return;
     }
 
-    const getSocialIntegration = this._integrationManager.getSocialIntegration(
+    const getSocialIntegration = await this._integrationManager.getSocialIntegration(
       getIntegration.providerIdentifier
     );
 
@@ -477,7 +483,7 @@ export class IntegrationService {
       return true;
     }
 
-    const integration = this._integrationManager.getSocialIntegration(
+    const integration = await this._integrationManager.getSocialIntegration(
       getPlugById.integration.providerIdentifier
     );
 

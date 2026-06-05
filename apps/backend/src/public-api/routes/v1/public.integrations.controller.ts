@@ -314,7 +314,7 @@ export class PublicIntegrationsController {
     }
 
     const integrationProvider =
-      this._integrationManager.getSocialIntegration(integration);
+      await this._integrationManager.getSocialIntegration(integration);
 
     if (integrationProvider.externalUrl) {
       throw new HttpException(

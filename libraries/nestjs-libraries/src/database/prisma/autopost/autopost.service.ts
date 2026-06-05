@@ -116,7 +116,7 @@ export class AutopostService {
               },
             ]),
           });
-      } catch (err) {}
+      } catch (err) { console.error('Failed to start Temporal workflow', err); }
     }
 
     try {
@@ -159,7 +159,7 @@ export class AutopostService {
           .trim(),
       };
     } catch (err) {
-      /** sent **/
+      console.error('RSS feed parsing failed', err);
     }
 
     return { success: false };
@@ -171,7 +171,7 @@ export class AutopostService {
         messages: {
           reducer: (currentState, updateValue) =>
             currentState.concat(updateValue),
-          default: () => [],
+          default: (): any[] => [],
         },
         body: null,
         description: null,

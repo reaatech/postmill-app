@@ -17,7 +17,7 @@ export class RefreshIntegrationService {
     private _temporalService: TemporalService
   ) {}
   async refresh(integration: Integration, cause = ''): Promise<false | AuthTokenDetails> {
-    const socialProvider = this._integrationManager.getSocialIntegration(
+    const socialProvider = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 

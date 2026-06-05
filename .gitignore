@@ -29,7 +29,12 @@ node_modules
 /.sass-cache
 /connect.lock
 /coverage
+coverage/
 /libpeerconnection.log
+
+# agent/editor tooling
+.opencode/
+.claude/
 npm-debug.log
 yarn-error.log
 testem.log

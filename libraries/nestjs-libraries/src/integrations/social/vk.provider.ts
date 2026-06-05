@@ -13,6 +13,7 @@ import FormDataNew from 'form-data';
 import mime from 'mime-types';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class VkProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 2; // VK has moderate API limits
@@ -39,7 +40,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     const formData = new FormData();
     formData.append('grant_type', 'refresh_token');
     formData.append('refresh_token', oldRefreshToken);
-    formData.append('client_id', process.env.VK_ID!);
+    formData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
     formData.append('device_id', device_id);
     formData.append('state', makeId(32));
     formData.append('scope', this.scopes.join(' '));
@@ -52,7 +53,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const newFormData = new FormData();
-    newFormData.append('client_id', process.env.VK_ID!);
+    newFormData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
     newFormData.append('access_token', access_token);
 
     const {
@@ -90,7 +91,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
       url:
         'https://id.vk.com/authorize' +
         `?response_type=code` +
-        `&client_id=${process.env.VK_ID}` +
+        `&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}` +
         `&code_challenge_method=S256` +
         `&code_challenge=${challenge}` +
         `&redirect_uri=${encodeURIComponent(
@@ -115,7 +116,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     const [code, device_id] = params.code.split('&&&&');
 
     const formData = new FormData();
-    formData.append('client_id', process.env.VK_ID!);
+    formData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
     formData.append('grant_type', 'authorization_code');
     formData.append('code_verifier', params.codeVerifier);
     formData.append('device_id', device_id);
@@ -137,7 +138,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const newFormData = new FormData();
-    newFormData.append('client_id', process.env.VK_ID!);
+    newFormData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
     newFormData.append('access_token', access_token);
 
     const {
@@ -248,7 +249,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
 
     const { response } = await (
       await this.fetch(
-        `https://api.vk.com/method/wall.post?v=5.251&access_token=${accessToken}&client_id=${process.env.VK_ID}`,
+        `https://api.vk.com/method/wall.post?v=5.251&access_token=${accessToken}&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}`,
         {
           method: 'POST',
           body,
@@ -292,7 +293,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
 
     const { response } = await (
       await this.fetch(
-        `https://api.vk.com/method/wall.createComment?v=5.251&access_token=${accessToken}&client_id=${process.env.VK_ID}`,
+        `https://api.vk.com/method/wall.createComment?v=5.251&access_token=${accessToken}&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}`,
         {
           method: 'POST',
           body,

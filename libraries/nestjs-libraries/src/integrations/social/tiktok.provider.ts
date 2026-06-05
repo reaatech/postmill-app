@@ -16,6 +16,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment'
@@ -262,8 +263,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
   async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
     const value = {
-      client_key: process.env.TIKTOK_CLIENT_ID!,
-      client_secret: process.env.TIKTOK_CLIENT_SECRET!,
+      client_key: getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId'),
+      client_secret: getEnvOr('TIKTOK_CLIENT_SECRET', 'tiktok', 'clientSecret'),
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
     };
@@ -311,7 +312,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return {
       url:
         'https://www.tiktok.com/v2/auth/authorize/' +
-        `?client_key=${process.env.TIKTOK_CLIENT_ID}` +
+        `?client_key=${getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId')}` +
         `&redirect_uri=${encodeURIComponent(
           `${
             process?.env?.FRONTEND_URL?.indexOf('https') === -1
@@ -333,8 +334,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     refresh?: string;
   }) {
     const value = {
-      client_key: process.env.TIKTOK_CLIENT_ID!,
-      client_secret: process.env.TIKTOK_CLIENT_SECRET!,
+      client_key: getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId'),
+      client_secret: getEnvOr('TIKTOK_CLIENT_SECRET', 'tiktok', 'clientSecret'),
       code: params.code,
       grant_type: 'authorization_code',
       code_verifier: params.codeVerifier,
@@ -550,11 +551,11 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return {
       source_info: {
         source: 'PULL_FROM_URL',
-        video_url: firstPost?.media?.[0]?.path!,
-        ...(firstPost?.media?.[0]?.thumbnailTimestamp!
+        video_url: firstPost?.media?.[0]?.path,
+        ...(firstPost?.media?.[0]?.thumbnailTimestamp
           ? {
               video_cover_timestamp_ms:
-                firstPost?.media?.[0]?.thumbnailTimestamp!,
+                firstPost?.media?.[0]?.thumbnailTimestamp,
             }
           : {}),
       },
@@ -570,10 +571,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     const [firstPost] = postDetails;
     const isPhoto = !hasExtension(firstPost?.media?.[0]?.path, 'mp4');
 
-    console.log({
-      ...this.buildTikokPostInfoBody(firstPost),
-      ...this.buildTikokSourceInfoBody(firstPost),
-    });
     const {
       data: { publish_id },
     } = await (

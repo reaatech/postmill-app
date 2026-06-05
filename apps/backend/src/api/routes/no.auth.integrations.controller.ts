@@ -55,7 +55,7 @@ export class NoAuthIntegrationsController {
     }
 
     const integrationProvider =
-      this._integrationManager.getSocialIntegration(integration);
+      await this._integrationManager.getSocialIntegration(integration);
 
     const getCodeVerifier = integrationProvider.customFields
       ? 'none'
@@ -357,7 +357,7 @@ export class NoAuthIntegrationsController {
     }
 
     const integrationProvider =
-      this._integrationManager.getSocialIntegration(provider);
+      await this._integrationManager.getSocialIntegration(provider);
     if (!integrationProvider?.isChromeExtension) {
       throw new HttpException('Not a Chrome extension integration', 400);
     }

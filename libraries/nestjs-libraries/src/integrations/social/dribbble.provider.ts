@@ -16,6 +16,7 @@ import { DribbbleDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import mime from 'mime-types';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class DribbbleProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Dribbble has moderate API limits
@@ -53,25 +54,25 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
 
   async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
     const { access_token, expires_in } = await (
-      await this.fetch('https://api-sandbox.pinterest.com/v5/oauth/token', {
+      await this.fetch('https://dribbble.com/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${process.env.PINTEREST_CLIENT_ID}:${process.env.PINTEREST_CLIENT_SECRET}`
+            `${getEnvOr('DRIBBBLE_CLIENT_ID', 'dribbble', 'clientId')}:${getEnvOr('DRIBBBLE_CLIENT_SECRET', 'dribbble', 'clientSecret')}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
           scope: `${this.scopes.join(',')}`,
-          redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/pinterest`,
+          redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/dribbble`,
         }),
       })
     ).json();
 
     const { id, profile_image, username } = await (
-      await this.fetch('https://api-sandbox.pinterest.com/v5/user_account', {
+      await this.fetch('https://api.dribbble.com/v2/user', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -113,7 +114,7 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
     const state = makeId(6);
     return {
       url: `https://dribbble.com/oauth/authorize?client_id=${
-        process.env.DRIBBBLE_CLIENT_ID
+        getEnvOr('DRIBBBLE_CLIENT_ID', 'dribbble', 'clientId')
       }&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/dribbble`
       )}&response_type=code&scope=${this.scopes.join('+')}&state=${state}`,
@@ -129,7 +130,7 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
   }) {
     const { access_token, scope } = await (
       await this.fetch(
-        `https://dribbble.com/oauth/token?client_id=${process.env.DRIBBBLE_CLIENT_ID}&client_secret=${process.env.DRIBBBLE_CLIENT_SECRET}&code=${params.code}&redirect_uri=${process.env.FRONTEND_URL}/integrations/social/dribbble`,
+        `https://dribbble.com/oauth/token?client_id=${getEnvOr('DRIBBBLE_CLIENT_ID', 'dribbble', 'clientId')}&client_secret=${getEnvOr('DRIBBBLE_CLIENT_SECRET', 'dribbble', 'clientSecret')}&code=${params.code}&redirect_uri=${process.env.FRONTEND_URL}/integrations/social/dribbble`,
         {
           method: 'POST',
         }
@@ -164,7 +165,7 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails<DribbbleDto>[]
   ): Promise<PostResponse[]> {
     const { data, status } = await axios.get(
-      postDetails?.[0]?.media?.[0]?.path!,
+      postDetails?.[0]?.media?.[0]?.path,
       {
         responseType: 'stream',
       }

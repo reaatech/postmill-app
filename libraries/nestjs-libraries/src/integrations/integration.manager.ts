@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
@@ -36,6 +36,7 @@ import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/skool.provider';
 import { WhopProvider } from '@gitroom/nestjs-libraries/integrations/social/whop.provider';
 import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
+import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new XProvider(),
@@ -76,20 +77,42 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
 
 @Injectable()
 export class IntegrationManager {
+  constructor(private _providerConfigManager: ProviderConfigManager) {}
+
   async getAllIntegrations() {
+    await this._providerConfigManager.ensureFresh();
+    const enabledIdentifiers = await this._providerConfigManager.getEnabledIdentifiers();
+    const allConfigs = await this._providerConfigManager.getAllConfigs();
+    const enabledSet = new Set(enabledIdentifiers);
+    const hasAnyConfigs = allConfigs.length > 0;
+
     return {
       social: await Promise.all(
-        socialIntegrationList.map(async (p) => ({
-          name: p.name,
-          identifier: p.identifier,
-          toolTip: p.toolTip,
-          editor: p.editor,
-          isExternal: !!p.externalUrl,
-          isWeb3: !!p.isWeb3,
-          isChromeExtension: !!p.isChromeExtension,
-          ...(p.extensionCookies ? { extensionCookies: p.extensionCookies } : {}),
-          ...(p.customFields ? { customFields: await p.customFields() } : {}),
-        }))
+        socialIntegrationList
+          .filter((p) => !hasAnyConfigs || enabledSet.has(p.identifier))
+          .map(async (p) => {
+            const config = await this._providerConfigManager.getConfig(
+              p.identifier
+            );
+            return {
+              name: p.name,
+              identifier: p.identifier,
+              toolTip: p.toolTip,
+              editor: p.editor,
+              isExternal: !!p.externalUrl,
+              isWeb3: !!p.isWeb3,
+              isChromeExtension: !!p.isChromeExtension,
+              ...(p.extensionCookies
+                ? { extensionCookies: p.extensionCookies }
+                : {}),
+              ...(p.customFields
+                ? { customFields: await p.customFields() }
+                : {}),
+              ...(config?.setupInstructions
+                ? { setupInstructions: config.setupInstructions }
+                : {}),
+            };
+          })
       ),
       article: [] as any[],
     };
@@ -151,8 +174,16 @@ export class IntegrationManager {
       .filter((f) => f.plugs.length);
   }
 
-  getInternalPlugs(providerName: string) {
-    const p = socialIntegrationList.find((p) => p.identifier === providerName)!;
+  async getInternalPlugs(providerName: string) {
+    const p = socialIntegrationList.find((p) => p.identifier === providerName);
+    if (!p) {
+      console.warn(`IntegrationManager: Unknown provider '${providerName}' requested in getInternalPlugs`);
+      return { internalPlugs: [] };
+    }
+    const enabled = await this._providerConfigManager.isEnabled(providerName);
+    if (!enabled) {
+      throw new NotFoundException(`Integration not available: ${providerName}`);
+    }
     return {
       internalPlugs:
         (
@@ -167,7 +198,34 @@ export class IntegrationManager {
   getAllowedSocialsIntegrations() {
     return socialIntegrationList.map((p) => p.identifier);
   }
-  getSocialIntegration(integration: string): SocialProvider {
-    return socialIntegrationList.find((i) => i.identifier === integration)!;
+  async getSocialIntegration(integration: string): Promise<SocialProvider> {
+    const provider = socialIntegrationList.find((i) => i.identifier === integration);
+    if (!provider) {
+      throw new NotFoundException(`Unknown integration: ${integration}`);
+    }
+    const enabled = await this._providerConfigManager.isEnabled(integration);
+    if (!enabled) {
+      throw new NotFoundException(`Integration not available: ${integration}`);
+    }
+    return provider;
+  }
+
+  // Returns the provider definition WITHOUT checking the enabled state.
+  // Used for listing/maintaining already-connected integrations (channel list,
+  // token refresh), which must keep working even if an admin later disables the
+  // provider for new connections. Returns undefined for genuinely unknown ids.
+  getSocialIntegrationUnchecked(
+    integration: string
+  ): SocialProvider | undefined {
+    return socialIntegrationList.find((i) => i.identifier === integration);
+  }
+
+  // INTERNAL USE ONLY - returns decrypted client credentials
+  async getClientInformation(integration: string) {
+    return this._providerConfigManager.getClientInfo(integration);
+  }
+
+  async isProviderEnabled(integration: string) {
+    return this._providerConfigManager.isEnabled(integration);
   }
 }

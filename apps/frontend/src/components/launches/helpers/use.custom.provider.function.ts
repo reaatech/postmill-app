@@ -6,15 +6,16 @@ export const useCustomProviderFunction = () => {
   const fetch = useFetch();
   const get = useCallback(
     async (funcName: string, customData?: any) => {
+      if (!integration?.id) throw new Error('No integration selected');
       const load = await fetch('/integrations/function', {
         method: 'POST',
         body: JSON.stringify({
           name: funcName,
-          id: integration?.id!,
+          id: integration.id,
           data: customData,
         }),
       });
-      if (load.status > 299 && load.status < 200) {
+      if (load.status > 299 || load.status < 200) {
         throw new Error('Failed to fetch');
       }
       return load.json();
