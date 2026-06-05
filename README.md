@@ -5,82 +5,47 @@
     <img alt="Postiz Logo" src="https://github.com/user-attachments/assets/f0d30d70-dddb-4142-8876-e9aa6ed1cb99" width="280"/>
   </picture>
   </a>
-</p>
-
-<p align="center">
+<br />
+  <a href="https://reaatech.com" target="_blank">
+    <img alt="REAA" src="https://reaatech.com/reaa-icon.500x500.png" width="160"/>
+  </a>
+<br />
 <a href="https://opensource.org/license/agpl-v3">
   <img src="https://img.shields.io/badge/License-AGPL%203.0-blue.svg" alt="License">
 </a>
 </p>
 
-<div align="center" style="border: 2px solid #f59e0b; border-radius: 8px; padding: 16px; margin-bottom: 20px; background: #fffbeb;">
-  <strong>⚠️ This is a modified fork</strong><br />
-  This repository is a fork of <a href="https://github.com/gitroomhq/postiz-app">gitroomhq/postiz-app</a> with the following changes:
-  <ul style="text-align: left; display: inline-block; margin-top: 8px;">
-    <li><strong>Three extra social providers</strong> — Adds <strong>Tumblr</strong> (global OAuth2, NPF posts with image/video), <strong>Pixelfed</strong> (instance URL + access token, Mastodon-compatible, images + comments), and <strong>PeerTube</strong> (instance URL + login, single-video uploads + comments), bringing the channel count to <strong>36</strong>. No database migration required.</li>
-    <li><strong>Persisted analytics dashboard</strong> — Replaced the legacy single-channel live-fetch analytics with a persisted multi-channel dashboard. Stores daily metric snapshots (AnalyticsSnapshot, PostAnalyticsSnapshot) collected via a Temporal workflow (requires <code>RUN_CRON=true</code> on one orchestrator instance), serves real period-over-period comparisons through <code>/analytics/v2</code>, and renders a drill-down UI with date range picker, channel multi-select, KPI cards, line/bar/area/pie charts, and CSV/JSON export. Daily snapshots roll up to weekly after ~18 months and per-post snapshots prune after 90 days (both windows env-configurable).</li>
-    <li><strong>Database-backed provider config</strong> — Channel OAuth/API credentials managed via an admin UI (<code>/admin/channels</code>) instead of environment variables, encrypted at rest. Includes a one-time <code>scripts/migrate-channel-config.ts</code> to import existing env-var credentials into the database.</li>
-    <li><strong>Admin UI for channels</strong> — Super-admins can enable/disable providers, set credentials, and add per-provider setup instructions. Disabling a provider only blocks new connections — already-connected channels keep posting, refreshing tokens, and reporting analytics.</li>
-    <li><strong>Enhanced test suite</strong> — 1000+ Vitest tests across all providers, core services, analytics, and frontend components with 93%+ statement/function/line coverage.</li>
-    <li><strong>Maintenance &amp; fixes</strong> — Fixes across 36 providers (lazy initialization, credential keys, null safety), frontend hook dependency arrays, and the migration script; plus a safe same-major dependency refresh (React, Next, NestJS, Temporal, TipTap, Sentry, and more).</li>
-    <li><strong>Prebuilt image</strong> — Published to <code>ghcr.io/reaatech/postiz-app</code>.</li>
-  </ul>
-  See <a href="https://github.com/reaatech/postiz-app">github.com/reaatech/postiz-app</a> for the full changelog and source.
-</div>
+---
 
-<h3 align="center"><strong><a href="https://github.com/gitroomhq/postiz-agent">NEW: check out Postiz agent CLI! perfect for OpenClaw and other agents</a></strong></h3>
-<div align="center">
-  <strong>
-  <h2>Your ultimate AI social media scheduling tool</h2><br />
-  <a href="https://postiz.com">Postiz</a>: An alternative to: Buffer.com, Hypefury, Twitter Hunter, etc...<br /><br />
-  </strong>
-  Postiz offers everything you need to manage your social media posts,<br />build an audience, capture leads, and grow your business.
-</div>
+**⚠️ This is a modified fork**
 
-<div class="flex" align="center">
-  <br />
-  <img alt="Instagram" src="https://postiz.com/svgs/socials/Instagram.svg" width="32">
-  <img alt="Youtube" src="https://postiz.com/svgs/socials/Youtube.svg" width="32">
-  <img alt="Dribbble" src="https://postiz.com/svgs/socials/Dribbble.svg" width="32">
-  <img alt="Linkedin" src="https://postiz.com/svgs/socials/Linkedin.svg" width="32">
-  <img alt="Reddit" src="https://postiz.com/svgs/socials/Reddit.svg" width="32">
-  <img alt="TikTok" src="https://postiz.com/svgs/socials/TikTok.svg" width="32">
-  <img alt="Facebook" src="https://postiz.com/svgs/socials/Facebook.svg" width="32">
-  <img alt="Pinterest" src="https://postiz.com/svgs/socials/Pinterest.svg" width="32">
-  <img alt="Threads" src="https://postiz.com/svgs/socials/Threads.svg" width="32">
-  <img alt="X" src="https://postiz.com/svgs/socials/X.svg" width="32">
-  <img alt="Slack" src="https://postiz.com/svgs/socials/Slack.svg" width="32">
-  <img alt="Discord" src="https://postiz.com/svgs/socials/Discord.svg" width="32">
-  <img alt="Mastodon" src="https://postiz.com/svgs/socials/Mastodon.svg" width="32">
-  <img alt="Bluesky" src="https://postiz.com/svgs/socials/Bluesky.svg" width="32">
-</div>
+This repository is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) with the following changes:
 
-<p align="center">
-  <br />
-  <a href="https://docs.postiz.com" rel="dofollow"><strong>Explore the docs »</strong></a>
-  <br />
+- **Three extra social providers** — Adds **Tumblr** (global OAuth2, NPF posts with image/video), **Pixelfed** (instance URL + access token, Mastodon-compatible, images + comments), and **PeerTube** (instance URL + login, single-video uploads + comments), bringing the channel count to **36**. No database migration required.
+- **Persisted analytics dashboard** — Replaced the legacy single-channel live-fetch analytics with a persisted multi-channel dashboard. Stores daily metric snapshots (AnalyticsSnapshot, PostAnalyticsSnapshot) collected via a Temporal workflow (requires `RUN_CRON=true` on one orchestrator instance), serves real period-over-period comparisons through `/analytics/v2`, and renders a drill-down UI with date range picker, channel multi-select, KPI cards, line/bar/area/pie charts, and CSV/JSON export. Daily snapshots roll up to weekly after ~18 months and per-post snapshots prune after 90 days (both windows env-configurable).
+- **Database-backed provider config** — Channel OAuth/API credentials managed via an admin UI (`/admin/channels`) instead of environment variables, encrypted at rest. Includes a one-time `scripts/migrate-channel-config.ts` to import existing env-var credentials into the database.
+- **Admin UI for channels** — Super-admins can enable/disable providers, set credentials, and add per-provider setup instructions. Disabling a provider only blocks new connections — already-connected channels keep posting, refreshing tokens, and reporting analytics.
+- **Enhanced test suite** — 1000+ Vitest tests across all providers, core services, analytics, and frontend components with 93%+ statement/function/line coverage.
+- **Maintenance & fixes** — Fixes across 36 providers (lazy initialization, credential keys, null safety), frontend hook dependency arrays, and the migration script; plus a safe same-major dependency refresh (React, Next, NestJS, Temporal, TipTap, Sentry, and more).
+- **Prebuilt image** — Published to `ghcr.io/reaatech/postiz-app`.
 
-  <br />
-  <a href="https://youtube.com/@postizofficial" rel="dofollow"><strong>Watch the YouTube Tutorials»</strong></a>
-  <br />
-</p>
+See [github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app) for the full changelog and source.
 
-<p align="center">
-  <a href="https://platform.postiz.com">Register</a>
-  ·
-  <a href="https://discord.postiz.com">Join Our Discord (devs only)</a>
-  ·
-  <a href="https://docs.postiz.com/public-api">Public API</a><br />
-</p>
-<p align="center">
-  <a href="https://www.npmjs.com/package/@postiz/node">NodeJS SDK</a>
-  ·
-  <a href="https://www.npmjs.com/package/n8n-nodes-postiz">N8N custom node</a>
-  ·
-  <a href="https://apps.make.com/postiz">Make.com integration</a>
-</p>
+---
 
-<br /><br />
+[**NEW: check out Postiz agent CLI — perfect for OpenClaw and other agents**](https://github.com/gitroomhq/postiz-agent)
+
+**Your ultimate AI social media scheduling tool**
+
+[Postiz](https://postiz.com): An alternative to Buffer.com, Hypefury, Twitter Hunter, etc. Postiz offers everything you need to manage your social media posts, build an audience, capture leads, and grow your business.
+
+Instagram · YouTube · Dribbble · LinkedIn · Reddit · TikTok · Facebook · Pinterest · Threads · X · Slack · Discord · Mastodon · Bluesky
+
+[Explore the docs](https://docs.postiz.com) · [Watch the YouTube Tutorials](https://youtube.com/@postizofficial)
+
+[Register](https://platform.postiz.com) · [Join Our Discord (devs only)](https://discord.postiz.com) · [Public API](https://docs.postiz.com/public-api)
+
+[NodeJS SDK](https://www.npmjs.com/package/@postiz/node) · [N8N custom node](https://www.npmjs.com/package/n8n-nodes-postiz) · [Make.com integration](https://apps.make.com/postiz)
 
 ## 🔌 See the leading Postiz features
 
@@ -92,18 +57,11 @@
 
 ## ✨ Features
 
+> **Note:** The screenshots below are legacy upstream images and do not reflect this fork's UI. Features such as the persisted analytics dashboard and the channels admin UI are not pictured here.
+
 | ![Image 1](https://github.com/user-attachments/assets/a27ee220-beb7-4c7e-8c1b-2c44301f82ef) | ![Image 2](https://github.com/user-attachments/assets/eb5f5f15-ed90-47fc-811c-03ccba6fa8a2) |
 | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | ![Image 3](https://github.com/user-attachments/assets/d51786ee-ddd8-4ef8-8138-5192e9cfe7c3) | ![Image 4](https://github.com/user-attachments/assets/91f83c89-22f6-43d6-b7aa-d2d3378289fb) |
-
-### Our Sponsors
-
-| Sponsor |                                  Logo                                   | Description     |
-|---------|:-----------------------------------------------------------------------:|-----------------|
-| [Hostinger](https://www.hostinger.com/vps/docker/postiz?ref=postiz) | <img src=".github/sponsors/hostinger.png" alt="Hostinger" width="500"/> | Hostinger is on a mission to make online success possible for anyone – from developers to aspiring bloggers and business owners |
-| [Virlo](https://dev.virlo.ai/?ref=postiz) | <img src="https://github.com/user-attachments/assets/25182598-5344-45fc-b9cd-e4cfa16aabfd" alt="Virlo" width="500"/> | Virlo is the #1 social media trend spotting and all-in-one GTM tool for teams leveraging short-form video |
-
-
 
 # Intro
 
@@ -127,37 +85,13 @@
 
 To have the project up and running, please follow the [Quick Start Guide](https://docs.postiz.com/quickstart)
 
-## Sponsor Postiz
-
-We now give a few options to Sponsor Postiz:
-- Just a donation: You like what we are building, and want to buy us some coffees so we can build faster.
-- Main Repository: Get your logo with a backlink from the main Postiz repository. Postiz has almost 3m downloads and 20k views per month.
-- Main Repository + Website: Get your logo on the central repository and the main website. Here are some metrics: - Website has 20k hits per month + 65 DR (strong backlink) - Repository has 20k hits per month + Almost 3m docker downloads.
-
-Link: https://opencollective.com/postiz
-
 ## Postiz Compliance
 
 - Postiz is an open-source, self-hosted social media scheduling tool that supports platforms like X (formerly Twitter), Bluesky, Mastodon, Discord, and others.
 - Postiz hosted service uses official, platform-approved OAuth flows.
 - Postiz does not automate or scrape content from social media platforms.
-- Postiz does not collect, store, or proxy API keys or access tokens from users.
-- Postiz never ask users to paste API keys into our hosted product.
 - Postiz Users always authenticate directly with the social platform (e.g., X, Discord, etc.), ensuring platform compliance and data privacy.
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=gitroomhq/postiz-app&type=date&legend=top-left)](https://www.star-history.com/#gitroomhq/postiz-app&type=date&legend=top-left)
 
 ## License
 
 This repository's source code is available under the [AGPL-3.0 license](LICENSE).
-
-<br /><br /><br />
-
-<p align="center">
-  <a href="https://www.g2.com/products/postiz/take_survey" target="blank"><img alt="g2" src="https://github.com/user-attachments/assets/892cb74c-0b49-4589-b2f5-fbdbf7a98f66" /></a>
-</p>
-<p align="center">
-  <img src="https://github.com/snyk-labs/secure-developer-sample-repo/raw/main/badge_full.svg" alt="Secure Developer Badge Full" width="150">
-</p>

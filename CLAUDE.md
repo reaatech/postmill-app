@@ -73,3 +73,18 @@ The analytics system has been refactored from single-channel live-fetch to a per
 - **Legacy fallback**: `IntegrationService.checkAnalytics()` and `PostsService.checkPostAnalytics()` still exist as fallback paths — used by `AnalyticsService` and the public API (`public.integrations.controller.ts`)
 - **Metric normalization**: Metrics are normalized via `PROVIDER_METRIC_MAP` in `libraries/nestjs-libraries/src/analytics/`
 - **Public API**: The legacy public API analytics route (`public.integrations.controller.ts:478`) is kept as-is for n8n/Zapier compatibility — a parallel v2 public route was added in Phase 2
+
+## Calendar & Post Detail
+
+The calendar upgrade (v3.3.0) adds two feature tracks to `/launches`:
+
+### Track A (Calendar reshape — frontend-heavy)
+- **PostDetailModal** — New modal opened by clicking the card body (instead of the edit modal). Shows KPI header from `/analytics/v2/post/:postId` with a live-fallback path in `getPostDetail` for un-snapshotted posts, full post thread from `getPostsRecursively`, and capability-aware comments section.
+- **Settings icon** on the card hover strip opens the edit modal (previously the whole card body).
+- **Scheduled/published indicator** pill and **card stats footer** (views/likes/comments) sourced from `PostAnalyticsSnapshot`.
+
+### Track B (Social comments — backend-heavy, behind capability flags)
+- **`SocialComment` / `PostCommentRead`** Prisma models for persisting synced platform comments and per-user read state.
+- **`ISocialMediaComments`** interface in `social.integrations.interface.ts` with optional `fetchComments`/`replyToComment`/`likeComment` methods.
+- **Social comments Controller → Service → Repository** layer.
+- **Temporal `CommentsActivity` + `commentsCollectionWorkflow`** for periodic comment sync (gated by `RUN_CRON=true`).
