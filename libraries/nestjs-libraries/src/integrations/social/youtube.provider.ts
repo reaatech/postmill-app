@@ -20,11 +20,21 @@ import dayjs from 'dayjs';
 import { GaxiosResponse } from 'gaxios/build/src/common';
 import Schema$Video = youtube_v3.Schema$Video;
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+
+let _clientAndYoutube: {
+  client: OAuth2Client;
+  youtube: (newClient: OAuth2Client) => ReturnType<typeof google.youtube>;
+  oauth2: (newClient: OAuth2Client) => ReturnType<typeof google.oauth2>;
+  youtubeAnalytics: (newClient: OAuth2Client) => ReturnType<typeof google.youtubeAnalytics>;
+} | undefined;
 
 const clientAndYoutube = () => {
+  if (_clientAndYoutube) return _clientAndYoutube;
+
   const client = new google.auth.OAuth2({
-    clientId: process.env.YOUTUBE_CLIENT_ID,
-    clientSecret: process.env.YOUTUBE_CLIENT_SECRET,
+    clientId: getEnvOr('YOUTUBE_CLIENT_ID', 'youtube', 'clientId'),
+    clientSecret: getEnvOr('YOUTUBE_CLIENT_SECRET', 'youtube', 'clientSecret'),
     redirectUri: `${process.env.FRONTEND_URL}/integrations/social/youtube`,
   });
 
@@ -46,7 +56,8 @@ const clientAndYoutube = () => {
       auth: newClient,
     });
 
-  return { client, youtube, oauth2, youtubeAnalytics };
+  _clientAndYoutube = { client, youtube, oauth2, youtubeAnalytics };
+  return _clientAndYoutube;
 };
 
 @Rules('YouTube must have on video attachment, it cannot be empty')
@@ -260,8 +271,14 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     const { client, oauth2 } = clientAndYoutube();
     client.setCredentials({ refresh_token });
     const { credentials } = await client.refreshAccessToken();
+    if (!credentials.access_token) {
+      throw new Error('Failed to refresh YouTube access token');
+    }
+    if (!credentials.expiry_date) {
+      throw new Error('Failed to get YouTube token expiry date');
+    }
     const user = oauth2(client);
-    const expiryDate = new Date(credentials.expiry_date!);
+    const expiryDate = new Date(credentials.expiry_date);
     const unixTimestamp =
       Math.floor(expiryDate.getTime() / 1000) -
       Math.floor(new Date().getTime() / 1000);
@@ -269,11 +286,11 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     const { data } = await user.userinfo.get();
 
     return {
-      accessToken: credentials.access_token!,
-      expiresIn: unixTimestamp!,
+      accessToken: credentials.access_token,
+      expiresIn: unixTimestamp,
       refreshToken: credentials.refresh_token ?? refresh_token,
-      id: data.id!,
-      name: data.name!,
+      id: String(data.id || ''),
+      name: data.name || '',
       picture: data?.picture || '',
       username: '',
     };
@@ -302,24 +319,30 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
   }) {
     const { client, oauth2 } = clientAndYoutube();
     const { tokens } = await client.getToken(params.code);
+    if (!tokens.access_token) {
+      throw new Error('Failed to get YouTube access token');
+    }
+    if (!tokens.expiry_date) {
+      throw new Error('Failed to get YouTube token expiry date');
+    }
     client.setCredentials(tokens);
-    const { scopes } = await client.getTokenInfo(tokens.access_token!);
+    const { scopes } = await client.getTokenInfo(tokens.access_token);
     this.checkScopes(this.scopes, scopes);
 
     const user = oauth2(client);
     const { data } = await user.userinfo.get();
 
-    const expiryDate = new Date(tokens.expiry_date!);
+    const expiryDate = new Date(tokens.expiry_date);
     const unixTimestamp =
       Math.floor(expiryDate.getTime() / 1000) -
       Math.floor(new Date().getTime() / 1000);
 
     return {
-      accessToken: tokens.access_token!,
+      accessToken: tokens.access_token,
       expiresIn: unixTimestamp,
-      refreshToken: tokens.refresh_token!,
-      id: data.id!,
-      name: data.name!,
+      refreshToken: tokens.refresh_token || '',
+      id: String(data.id || ''),
+      name: data.name || '',
       picture: data?.picture || '',
       username: '',
     };

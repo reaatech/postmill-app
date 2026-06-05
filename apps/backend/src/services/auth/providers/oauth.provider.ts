@@ -2,37 +2,38 @@ import {
   AuthProvider,
   AuthProviderAbstract,
 } from '@gitroom/backend/services/auth/providers.interface';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @AuthProvider({ provider: 'GENERIC' })
 export class OauthProvider extends AuthProviderAbstract {
   private getConfig() {
+    const clientId = getEnvOr('POSTIZ_OAUTH_CLIENT_ID', 'oauth_custom', 'clientId');
+    const clientSecret = getEnvOr('POSTIZ_OAUTH_CLIENT_SECRET', 'oauth_custom', 'clientSecret');
     const {
-      POSTIZ_OAUTH_AUTH_URL,
-      POSTIZ_OAUTH_CLIENT_ID,
-      POSTIZ_OAUTH_CLIENT_SECRET,
-      POSTIZ_OAUTH_TOKEN_URL,
-      POSTIZ_OAUTH_USERINFO_URL,
-      FRONTEND_URL,
+      POSTIZ_OAUTH_AUTH_URL: authUrl,
+      POSTIZ_OAUTH_TOKEN_URL: tokenUrl,
+      POSTIZ_OAUTH_USERINFO_URL: userInfoUrl,
+      FRONTEND_URL: frontendUrl,
     } = process.env;
 
     if (
-      !POSTIZ_OAUTH_USERINFO_URL ||
-      !POSTIZ_OAUTH_TOKEN_URL ||
-      !POSTIZ_OAUTH_CLIENT_ID ||
-      !POSTIZ_OAUTH_CLIENT_SECRET ||
-      !POSTIZ_OAUTH_AUTH_URL ||
-      !FRONTEND_URL
+      !userInfoUrl ||
+      !tokenUrl ||
+      !clientId ||
+      !clientSecret ||
+      !authUrl ||
+      !frontendUrl
     ) {
       throw new Error('POSTIZ_OAUTH environment variables are not set');
     }
 
     return {
-      authUrl: POSTIZ_OAUTH_AUTH_URL,
-      clientId: POSTIZ_OAUTH_CLIENT_ID,
-      clientSecret: POSTIZ_OAUTH_CLIENT_SECRET,
-      tokenUrl: POSTIZ_OAUTH_TOKEN_URL,
-      userInfoUrl: POSTIZ_OAUTH_USERINFO_URL,
-      frontendUrl: FRONTEND_URL,
+      authUrl,
+      clientId,
+      clientSecret,
+      tokenUrl,
+      userInfoUrl,
+      frontendUrl,
     };
   }
 

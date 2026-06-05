@@ -9,6 +9,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { setCookie } from '@gitroom/frontend/components/layout/layout.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import { ImportDebugPostModal } from '@gitroom/frontend/components/launches/import-debug-post.modal';
@@ -39,8 +40,9 @@ const useCharges = () => {
 
 const ChargesModal: FC<{ close: () => void }> = ({ close }) => {
   const fetch = useFetch();
+  const toaster = useToaster();
   const t = useT();
-  const { data: charges, mutate } = useCharges();
+  const { data: charges, mutate, isLoading } = useCharges();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [refunding, setRefunding] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -83,7 +85,7 @@ const ChargesModal: FC<{ close: () => void }> = ({ close }) => {
     } finally {
       setRefunding(false);
     }
-  }, [selected]);
+  }, [selected, fetch, mutate, t]);
 
   const handleCancel = useCallback(async () => {
     if (
@@ -108,13 +110,18 @@ const ChargesModal: FC<{ close: () => void }> = ({ close }) => {
       window.location.reload();
     } catch {
       setCancelling(false);
+      toaster.show('Failed to cancel subscription', 'warning');
     }
-  }, []);
+  }, [toaster, fetch, close, t]);
 
   return (
     <div className="flex flex-col gap-[16px] min-w-[500px]">
       <div className="max-h-[400px] overflow-y-auto">
-        {!charges?.length ? (
+        {isLoading ? (
+          <div className="text-center py-[20px] text-newTextColor/60">
+            {t('loading', 'Loading...')}
+          </div>
+        ) : !charges?.length ? (
           <div className="text-center py-[20px] text-newTextColor/60">
             {t('no_charges', 'No charges found')}
           </div>
@@ -246,7 +253,7 @@ const ManageBilling = () => {
       title: t('manage_billing', 'Manage Billing'),
       children: (close) => <ChargesModal close={close} />,
     });
-  }, []);
+  }, [openModal, t]);
 
   return (
     <div
@@ -260,6 +267,7 @@ const ManageBilling = () => {
 
 export const Subscription = () => {
   const fetch = useFetch();
+  const toaster = useToaster();
   const t = useT();
 
   const addSubscription: ChangeEventHandler<HTMLSelectElement> = useCallback(
@@ -271,16 +279,20 @@ export const Subscription = () => {
           'Add'
         )
       ) {
-        await fetch('/billing/add-subscription', {
-          method: 'POST',
-          body: JSON.stringify({
-            subscription: value,
-          }),
-        });
-        window.location.reload();
+        try {
+          await fetch('/billing/add-subscription', {
+            method: 'POST',
+            body: JSON.stringify({
+              subscription: value,
+            }),
+          });
+          window.location.reload();
+        } catch {
+          toaster.show('Failed to add subscription', 'warning');
+        }
       }
     },
-    []
+    [toaster, fetch, t]
   );
   return (
     <Select
@@ -332,7 +344,7 @@ const AddAnnouncementModal: FC<{ close: () => void }> = ({ close }) => {
     } finally {
       setSaving(false);
     }
-  }, [title, description, color]);
+  }, [title, description, color, fetch, mutate, close]);
 
   return (
     <div className="flex flex-col gap-[16px] min-w-[500px]">
@@ -399,7 +411,7 @@ const AddAnnouncement = () => {
       title: t('add_announcement', 'Add Announcement'),
       children: (close) => <AddAnnouncementModal close={close} />,
     });
-  }, []);
+  }, [openModal, t]);
 
   return (
     <div
@@ -415,7 +427,7 @@ const ViewErrors = () => {
   const t = useT();
   const handleClick = useCallback(() => {
     window.location.href = '/admin/errors';
-  }, []);
+  }, [t]);
   return (
     <div
       className="px-[10px] rounded-[4px] bg-blue-700 text-white cursor-pointer whitespace-nowrap"
@@ -430,13 +442,28 @@ const ViewStats = () => {
   const t = useT();
   const handleClick = useCallback(() => {
     window.location.href = '/admin/stats';
-  }, []);
+  }, [t]);
   return (
     <div
       className="px-[10px] rounded-[4px] bg-purple-700 text-white cursor-pointer whitespace-nowrap"
       onClick={handleClick}
     >
       {t('view_stats', 'View Stats')}
+    </div>
+  );
+};
+
+const ConfigureChannels = () => {
+  const t = useT();
+  const handleClick = useCallback(() => {
+    window.location.href = '/admin/channels';
+  }, [t]);
+  return (
+    <div
+      className="px-[10px] rounded-[4px] bg-teal-600 text-white cursor-pointer whitespace-nowrap"
+      onClick={handleClick}
+    >
+      {t('configure_channels', 'Channels')}
     </div>
   );
 };
@@ -451,8 +478,7 @@ const ImportDebugPost = () => {
       maxSize: 800,
       children: (close) => <ImportDebugPostModal close={close} />,
     });
-  }, []);
-
+  }, [openModal, t]);
   return (
     <div
       className="px-[10px] rounded-[4px] bg-yellow-600 text-white cursor-pointer whitespace-nowrap"
@@ -463,18 +489,27 @@ const ImportDebugPost = () => {
   );
 };
 
+const useImpersonateSearch = (name: string) => {
+  const fetch = useFetch();
+  return useSWR(`/impersonate-${name}`, async () => {
+    if (!name) return [];
+    return await (await fetch(`/user/impersonate?name=${name}`)).json();
+  }, {
+    refreshWhenHidden: false,
+    revalidateOnMount: true,
+    revalidateOnReconnect: false,
+    revalidateOnFocus: false,
+    refreshWhenOffline: false,
+    revalidateIfStale: false,
+    refreshInterval: 0,
+  });
+};
+
 export const Impersonate = () => {
   const fetch = useFetch();
   const [name, setName] = useState('');
   const { isSecured, billingEnabled } = useVariables();
   const user = useUser();
-  const load = useCallback(async () => {
-    if (!name) {
-      return [];
-    }
-    const value = await (await fetch(`/user/impersonate?name=${name}`)).json();
-    return value;
-  }, [name]);
   const stopImpersonating = useCallback(async () => {
     if (!isSecured) {
       setCookie('impersonate', '', -10);
@@ -487,7 +522,7 @@ export const Impersonate = () => {
       });
     }
     window.location.reload();
-  }, []);
+  }, [isSecured, fetch]);
   const t = useT();
 
   const setUser = useCallback(
@@ -500,25 +535,16 @@ export const Impersonate = () => {
       });
       window.location.reload();
     },
-    []
+    [fetch]
   );
-  const { data } = useSWR(`/impersonate-${name}`, load, {
-    refreshWhenHidden: false,
-    revalidateOnMount: true,
-    revalidateOnReconnect: false,
-    revalidateOnFocus: false,
-    refreshWhenOffline: false,
-    revalidateIfStale: false,
-    refreshInterval: 0,
-  });
+  const { data } = useImpersonateSearch(name);
   const mapData = useMemo(() => {
     return data?.map(
       (curr: any) => ({
         id: curr.id,
         name: curr.user.name,
         email: curr.user.email,
-      }),
-      []
+      })
     );
   }, [data]);
   return (
@@ -560,6 +586,7 @@ export const Impersonate = () => {
                 <AddAnnouncement />
                 <ViewErrors />
                 <ViewStats />
+                {user?.isSuperAdmin && <ConfigureChannels />}
               </div>
             )}
           </div>

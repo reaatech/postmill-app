@@ -1,0 +1,37 @@
+import { defineConfig } from 'vitest/config';
+import path from 'path';
+
+export default defineConfig({
+  resolve: {
+    alias: {
+      '@gitroom/backend': path.resolve(__dirname, 'src'),
+      '@gitroom/nestjs-libraries': path.resolve(__dirname, '../../libraries/nestjs-libraries/src'),
+      '@gitroom/helpers': path.resolve(__dirname, '../../libraries/helpers/src'),
+      '@gitroom/orchestrator': path.resolve(__dirname, '../../apps/orchestrator/src'),
+    },
+  },
+  test: {
+    globals: true,
+    environment: 'node',
+    include: ['src/**/*.spec.ts', 'src/**/*.test.ts'],
+    exclude: ['node_modules', 'dist'],
+    pool: 'threads',
+    poolOptions: {
+      threads: { singleThread: true },
+    },
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov', 'html'],
+      include: [
+        'src/api/routes/channel.config.controller.ts',
+      ],
+      thresholds: {
+        statements: 90,
+        branches: 90,
+        functions: 90,
+        lines: 90,
+      },
+    },
+    setupFiles: ['./vitest.setup.ts'],
+  },
+});

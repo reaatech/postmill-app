@@ -10,15 +10,12 @@ import {
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { Integration } from '@prisma/client';
 import { FarcasterDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/farcaster.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-
-const client = new NeynarAPIClient({
-  apiKey: process.env.NEYNAR_SECRET_KEY || '00000000-000-0000-000-000000000000',
-});
 
 @Rules(
   'Farcaster/Warpcast can only accept pictures'
@@ -34,6 +31,16 @@ export class FarcasterProvider
   scopes = [] as string[];
   override maxConcurrentJob = 3; // Farcaster has moderate limits
   editor = 'normal' as const;
+
+  private _client: NeynarAPIClient | null = null;
+  private get client(): NeynarAPIClient {
+    if (!this._client) {
+      this._client = new NeynarAPIClient({
+        apiKey: getEnvOr('NEYNAR_SECRET_KEY', 'wrapcast', 'clientSecret') || '00000000-000-0000-000-000000000000',
+      });
+    }
+    return this._client;
+  }
   maxLength() {
     return 800;
   }
@@ -67,7 +74,7 @@ export class FarcasterProvider
   async generateAuthUrl() {
     const state = makeId(17);
     return {
-      url: `${process.env.NEYNAR_CLIENT_ID}||${state}` || '',
+      url: `${getEnvOr('NEYNAR_CLIENT_ID', 'wrapcast', 'clientId')}||${state}`,
       codeVerifier: makeId(10),
       state,
     };
@@ -105,7 +112,7 @@ export class FarcasterProvider
         : firstPost?.settings?.subreddit;
 
     for (const channel of channels) {
-      const data = await client.publishCast({
+      const data = await this.client.publishCast({
         embeds:
           firstPost?.media?.map((media) => ({
             url: media.path,
@@ -147,7 +154,7 @@ export class FarcasterProvider
     const parentIds = (lastCommentId || postId).split(',');
 
     for (const parentHash of parentIds) {
-      const data = await client.publishCast({
+      const data = await this.client.publishCast({
         embeds:
           commentPost?.media?.map((media) => ({
             url: media.path,
@@ -184,7 +191,7 @@ export class FarcasterProvider
     id: string,
     integration: Integration
   ) {
-    const search = await client.searchChannels({
+    const search = await this.client.searchChannels({
       q: data.word,
       limit: 10,
     });

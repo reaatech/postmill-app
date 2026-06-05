@@ -54,7 +54,7 @@ export class IntegrationsController {
   }
 
   @Get('/:identifier/internal-plugs')
-  getInternalPlugs(@Param('identifier') identifier: string) {
+  async getInternalPlugs(@Param('identifier') identifier: string) {
     return this._integrationManager.getInternalPlugs(identifier);
   }
 
@@ -88,13 +88,20 @@ export class IntegrationsController {
   @Get('/list')
   async getIntegrationList(@GetOrgFromRequest() org: Organization) {
     return {
-      integrations: await Promise.all(
+      integrations: (await Promise.all(
         (
           await this._integrationService.getIntegrationsList(org.id)
         ).map(async (p) => {
-          const findIntegration = this._integrationManager.getSocialIntegration(
+          // Use the unchecked lookup so already-connected channels keep
+          // rendering even if an admin disabled the provider for new
+          // connections (the gated getSocialIntegration would throw here and
+          // take down the entire channel list for the org).
+          const findIntegration = this._integrationManager.getSocialIntegrationUnchecked(
             p.providerIdentifier
           );
+          if (!findIntegration) {
+            return null;
+          }
           return {
             name: p.name,
             id: p.id,
@@ -119,7 +126,7 @@ export class IntegrationsController {
             additionalSettings: p.additionalSettings || '[]',
           };
         })
-      ),
+      )).filter(Boolean),
     };
   }
 
@@ -149,7 +156,7 @@ export class IntegrationsController {
       throw new Error('Invalid integration');
     }
 
-    const manager = this._integrationManager.getSocialIntegration(
+    const manager = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
     if (!manager.changeProfilePicture && !manager.changeNickname) {
@@ -209,7 +216,7 @@ export class IntegrationsController {
     }
 
     const integrationProvider =
-      this._integrationManager.getSocialIntegration(integration);
+      await this._integrationManager.getSocialIntegration(integration);
 
     if (integrationProvider.externalUrl && !externalUrl) {
       throw new Error('Missing external url');
@@ -331,7 +338,7 @@ export class IntegrationsController {
       throw new Error('Invalid integration');
     }
 
-    const integrationProvider = this._integrationManager.getSocialIntegration(
+    const integrationProvider = await this._integrationManager.getSocialIntegration(
       getIntegration.providerIdentifier
     );
     if (!integrationProvider) {

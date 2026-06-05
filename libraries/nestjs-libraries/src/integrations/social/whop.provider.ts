@@ -12,6 +12,7 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { WhopDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/whop.dto';
 import { Integration } from '@prisma/client';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class WhopProvider extends SocialAbstract implements SocialProvider {
   identifier = 'whop';
@@ -76,7 +77,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
         body: JSON.stringify({
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
-          client_id: process.env.WHOP_CLIENT_ID,
+          client_id: getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId'),
         }),
       })
     ).json();
@@ -108,7 +109,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
       url:
         'https://api.whop.com/oauth/authorize' +
         `?response_type=code` +
-        `&client_id=${process.env.WHOP_CLIENT_ID}` +
+        `&client_id=${getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId')}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/whop`
         )}` +
@@ -139,7 +140,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
           grant_type: 'authorization_code',
           code: params.code,
           redirect_uri: redirectUri,
-          client_id: process.env.WHOP_CLIENT_ID,
+          client_id: getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId'),
           code_verifier: params.codeVerifier,
         }),
       })

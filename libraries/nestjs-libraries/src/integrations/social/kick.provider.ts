@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { KickDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/kick.dto';
 import { createHash, randomBytes } from 'crypto';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class KickProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3;
@@ -45,8 +46,8 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: process.env.KICK_CLIENT_ID!,
-        client_secret: process.env.KICK_SECRET!,
+        client_id: getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId'),
+        client_secret: getEnvOr('KICK_SECRET', 'kick', 'clientSecret'),
         refresh_token: refreshToken,
       }),
     });
@@ -76,7 +77,7 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
     const url =
       `https://id.kick.com/oauth/authorize` +
       `?response_type=code` +
-      `&client_id=${process.env.KICK_CLIENT_ID}` +
+      `&client_id=${getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId')}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&scope=${encodeURIComponent(this.scopes.join(' '))}` +
       `&state=${state}` +
@@ -106,8 +107,8 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.KICK_CLIENT_ID!,
-        client_secret: process.env.KICK_SECRET!,
+        client_id: getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId'),
+        client_secret: getEnvOr('KICK_SECRET', 'kick', 'clientSecret'),
         redirect_uri: redirectUri,
         code: params.code,
         code_verifier: params.codeVerifier,
@@ -116,6 +117,8 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
 
     const { access_token, refresh_token, expires_in, scope } =
       await tokenResponse.json();
+
+    this.checkScopes(this.scopes, (scope || '').split(' '));
 
     // Get user info
     const userInfo = await this.getUserInfo(access_token);

@@ -11,6 +11,7 @@ import { Integration } from '@prisma/client';
 import { MeweDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/mewe.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class MeweProvider extends SocialAbstract implements SocialProvider {
   identifier = 'mewe';
@@ -21,13 +22,13 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
   dto = MeweDto;
 
   private get meweHost() {
-    return process.env.MEWE_HOST || 'https://mewe.com';
+    return (getEnvOr('MEWE_HOST', 'mewe', 'redirectUri') || 'https://mewe.com');
   }
 
   private authHeaders(apiToken: string) {
     return {
-      'X-App-Id': process.env.MEWE_APP_ID!,
-      'X-Api-Key': process.env.MEWE_API_KEY!,
+      'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
+      'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
       Authorization: `Bearer ${apiToken}`,
       'Content-Type': 'application/json',
     };
@@ -83,7 +84,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     return {
       url:
         `${this.meweHost}/login` +
-        `?client_id=${process.env.MEWE_APP_ID}` +
+        `?client_id=${getEnvOr('MEWE_APP_ID', 'mewe', 'clientId')}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/mewe`
         )}` +
@@ -111,8 +112,8 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
         {
           method: 'GET',
           headers: {
-            'X-App-Id': process.env.MEWE_APP_ID!,
-            'X-Api-Key': process.env.MEWE_API_KEY!,
+            'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
+            'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
           },
         }
       );
@@ -216,8 +217,8 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
       {
         method: 'POST',
         headers: {
-          'X-App-Id': process.env.MEWE_APP_ID!,
-          'X-Api-Key': process.env.MEWE_API_KEY!,
+          'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
+          'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
           Authorization: `Bearer ${accessToken}`,
         },
         body: form,

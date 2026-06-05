@@ -251,9 +251,9 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
         expiresIn: dayjs().add(100, 'years').unix() - dayjs().unix(),
         accessToken: accessJwt,
         id: did,
-        name: profile.data.displayName!,
+        name: profile.data.displayName || '',
         picture: profile?.data?.avatar || '',
-        username: profile.data.handle!,
+        username: profile.data.handle || '',
       };
     } catch (e) {
       console.log(e);
@@ -479,7 +479,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
       return true;
     }
 
-    return true;
+    return false;
   }
 
   @Plug({
@@ -557,7 +557,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
       return true;
     }
 
-    return true;
+    return false;
   }
 
   override async mention(

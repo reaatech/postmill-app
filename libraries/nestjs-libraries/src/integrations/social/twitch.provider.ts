@@ -9,6 +9,7 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { Integration } from '@prisma/client';
 import { TwitchDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/twitch.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class TwitchProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 1;
@@ -31,8 +32,8 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: process.env.TWITCH_CLIENT_ID!,
-        client_secret: process.env.TWITCH_CLIENT_SECRET!,
+        client_id: getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
+        client_secret: getEnvOr('TWITCH_CLIENT_SECRET', 'twitch', 'clientSecret'),
         refresh_token: refreshToken,
       }),
     });
@@ -61,7 +62,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     const url =
       `https://id.twitch.tv/oauth2/authorize` +
       `?response_type=code` +
-      `&client_id=${process.env.TWITCH_CLIENT_ID}` +
+      `&client_id=${getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId')}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&scope=${encodeURIComponent(this.scopes.join(' '))}` +
       `&state=${state}`;
@@ -89,15 +90,17 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: process.env.TWITCH_CLIENT_ID!,
-        client_secret: process.env.TWITCH_CLIENT_SECRET!,
+        client_id: getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
+        client_secret: getEnvOr('TWITCH_CLIENT_SECRET', 'twitch', 'clientSecret'),
         redirect_uri: redirectUri,
         code: params.code,
       }),
     });
 
-    const { access_token, refresh_token, expires_in } =
+    const { access_token, refresh_token, expires_in, scope } =
       await tokenResponse.json();
+
+    this.checkScopes(this.scopes, (scope || '').split(' '));
 
     // Get user info
     const userInfo = await this.getUserInfo(access_token);
@@ -120,7 +123,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': process.env.TWITCH_CLIENT_ID!,
+        'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
       },
     });
 
@@ -147,7 +150,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Client-Id': process.env.TWITCH_CLIENT_ID!,
+          'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -183,7 +186,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Client-Id': process.env.TWITCH_CLIENT_ID!,
+          'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),

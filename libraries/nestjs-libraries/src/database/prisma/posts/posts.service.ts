@@ -91,11 +91,14 @@ export class PostsService {
       return [];
     }
 
-    const integrationProvider = this._integrationManager.getSocialIntegration(
+    // Unchecked lookup: analytics/missing-content operate on an already-connected
+    // channel and must keep working even if the provider was later disabled for
+    // new connections (the gated getSocialIntegration would throw a 404 here).
+    const integrationProvider = this._integrationManager.getSocialIntegrationUnchecked(
       post.integration.providerIdentifier
     );
 
-    if (!integrationProvider.missing) {
+    if (!integrationProvider?.missing) {
       return [];
     }
 
@@ -164,11 +167,13 @@ export class PostsService {
       return { missing: true };
     }
 
-    const integrationProvider = this._integrationManager.getSocialIntegration(
+    // Unchecked lookup: see getMissingContent above — keep analytics working for
+    // already-connected channels whose provider was later disabled.
+    const integrationProvider = this._integrationManager.getSocialIntegrationUnchecked(
       post.integration.providerIdentifier
     );
 
-    if (!integrationProvider.postAnalytics) {
+    if (!integrationProvider?.postAnalytics) {
       return [];
     }
 
@@ -783,7 +788,7 @@ export class PostsService {
           );
         }
 
-        const provider = this._integrationManager.getSocialIntegration(
+        const provider = await this._integrationManager.getSocialIntegration(
           integration.providerIdentifier
         );
 
@@ -880,7 +885,7 @@ export class PostsService {
   ): Promise<any[]> {
     const postList = [];
     for (const post of body.posts) {
-      const provider = this._integrationManager.getSocialIntegration(
+      const provider = await this._integrationManager.getSocialIntegration(
         (post.settings as any)?.__type
       );
       const removeLinks = !!provider?.stripLinks?.();

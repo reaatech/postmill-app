@@ -3,14 +3,16 @@ import {
   AuthProvider,
   AuthProviderAbstract,
 } from '@gitroom/backend/services/auth/providers.interface';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 const defaultRedirect = () =>
   `${process.env.FRONTEND_URL}/integrations/social/youtube`;
 
 const makeClient = (redirectUri: string) =>
   new google.auth.OAuth2({
-    clientId: process.env.YOUTUBE_CLIENT_ID,
-    clientSecret: process.env.YOUTUBE_CLIENT_SECRET,
+    // NOTE: Uses 'youtube' identifier because Google sign-in and YouTube share the same Google Cloud project credentials.
+    clientId: getEnvOr('YOUTUBE_CLIENT_ID', 'youtube', 'clientId'),
+    clientSecret: getEnvOr('YOUTUBE_CLIENT_SECRET', 'youtube', 'clientSecret'),
     redirectUri,
   });
 

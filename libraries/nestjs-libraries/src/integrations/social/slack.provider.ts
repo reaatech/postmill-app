@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { SlackDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/slack.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class SlackProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Slack has moderate API limits
@@ -47,7 +48,7 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
 
     return {
       url: `https://slack.com/oauth/v2/authorize?client_id=${
-        process.env.SLACK_ID
+        getEnvOr('SLACK_ID', 'slack', 'clientId')
       }&redirect_uri=${encodeURIComponent(
         `${
           process?.env?.FRONTEND_URL?.indexOf('https') === -1
@@ -72,8 +73,8 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: process.env.SLACK_ID!,
-          client_secret: process.env.SLACK_SECRET!,
+          client_id: getEnvOr('SLACK_ID', 'slack', 'clientId'),
+          client_secret: getEnvOr('SLACK_SECRET', 'slack', 'clientSecret'),
           code: params.code,
           redirect_uri: `${
             process?.env?.FRONTEND_URL?.indexOf('https') === -1

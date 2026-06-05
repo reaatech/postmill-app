@@ -16,6 +16,7 @@ import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-set
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
@@ -382,9 +383,13 @@ export class InstagramProvider
       (p) => p.id === requiredId
     );
 
+    if (!findPage?.pageId) {
+      throw new Error('Page ID not found for reconnection');
+    }
+
     const information = await this.fetchPageInformation(accessToken, {
       id: requiredId,
-      pageId: findPage?.pageId!,
+      pageId: findPage.pageId,
     });
 
     return {
@@ -401,7 +406,7 @@ export class InstagramProvider
     return {
       url:
         'https://www.facebook.com/v20.0/dialog/oauth' +
-        `?client_id=${process.env.FACEBOOK_APP_ID}` +
+        `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/instagram`
         )}` +
@@ -420,13 +425,13 @@ export class InstagramProvider
     const getAccessToken = await (
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
-          `?client_id=${process.env.FACEBOOK_APP_ID}` +
+          `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
           `&redirect_uri=${encodeURIComponent(
             `${process.env.FRONTEND_URL}/integrations/social/instagram${
               params.refresh ? `?refresh=${params.refresh}` : ''
             }`
           )}` +
-          `&client_secret=${process.env.FACEBOOK_APP_SECRET}` +
+          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'instagram', 'clientSecret')}` +
           `&code=${params.code}`
       )
     ).json();
@@ -435,8 +440,8 @@ export class InstagramProvider
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
-          `&client_id=${process.env.FACEBOOK_APP_ID}` +
-          `&client_secret=${process.env.FACEBOOK_APP_SECRET}` +
+          `&client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
+          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'instagram', 'clientSecret')}` +
           `&fb_exchange_token=${getAccessToken.access_token}`
       )
     ).json();
@@ -588,7 +593,6 @@ export class InstagramProvider
   ): Promise<PostResponse[]> {
     const [accessToken, userToken] = token.split('___');
     const [firstPost] = postDetails;
-    console.log('in progress', id);
     const isStory = firstPost.settings.post_type === 'story';
     const isTrialReel = !!firstPost.settings.is_trial_reel;
     const medias = await Promise.all(
@@ -641,7 +645,6 @@ export class InstagramProvider
             }
           )
         ).json();
-        console.log('in progress2', id);
 
         let status = 'IN_PROGRESS';
         while (status === 'IN_PROGRESS') {
@@ -659,8 +662,6 @@ export class InstagramProvider
           await timer(30000);
           status = status_code;
         }
-        console.log('in progress3', id);
-
         return photoId;
       }) || []
     );

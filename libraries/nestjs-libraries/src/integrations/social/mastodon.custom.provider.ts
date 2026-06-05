@@ -6,6 +6,7 @@ import {
 import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { Integration } from '@prisma/client';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class MastodonCustomProvider extends MastodonProvider {
   override identifier = 'mastodon-custom';
@@ -21,7 +22,7 @@ export class MastodonCustomProvider extends MastodonProvider {
       `${process.env.FRONTEND_URL}/integrations/social/mastodon`
     );
     form.append('scopes', this.scopes.join(' '));
-    form.append('website', process.env.FRONTEND_URL!);
+    form.append('website', process.env.FRONTEND_URL || 'http://localhost:5000');
     const { client_id, client_secret, ...all } = await (
       await fetch(url + '/api/v1/apps', {
         method: 'POST',
@@ -40,10 +41,10 @@ export class MastodonCustomProvider extends MastodonProvider {
   ) {
     const state = makeId(6);
     const url = this.generateUrlDynamic(
-      external?.instanceUrl!,
+      external?.instanceUrl || '',
       state,
-      external?.client_id!,
-      process.env.FRONTEND_URL!,
+      external?.client_id || '',
+      process.env.FRONTEND_URL || 'http://localhost:5000',
       refresh
     );
 
@@ -63,9 +64,9 @@ export class MastodonCustomProvider extends MastodonProvider {
     clientInformation?: ClientInformation
   ) {
     return this.dynamicAuthenticate(
-      clientInformation?.client_id!,
-      clientInformation?.client_secret!,
-      clientInformation?.instanceUrl!,
+      clientInformation?.client_id || '',
+      clientInformation?.client_secret || '',
+      clientInformation?.instanceUrl || '',
       params.code
     );
   }
@@ -78,7 +79,7 @@ export class MastodonCustomProvider extends MastodonProvider {
     return this.dynamicPost(
       id,
       accessToken,
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      (getEnvOr('MASTODON_URL', 'mastodon-custom', 'redirectUri') || 'https://mastodon.social'),
       postDetails
     );
   }
@@ -96,7 +97,7 @@ export class MastodonCustomProvider extends MastodonProvider {
       postId,
       lastCommentId,
       accessToken,
-      process.env.MASTODON_URL || 'https://mastodon.social',
+      (getEnvOr('MASTODON_URL', 'mastodon-custom', 'redirectUri') || 'https://mastodon.social'),
       postDetails
     );
   }

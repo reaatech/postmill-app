@@ -14,7 +14,7 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 
 // @ts-ignore
-global.WebSocket = WebSocket;
+if (!global.WebSocket) global.WebSocket = WebSocket;
 
 const list = [
   'wss://nos.lol',
@@ -24,9 +24,14 @@ const list = [
   'wss://vault.iris.to',
 ];
 
-const pool = new SimplePool();
-
 export class NostrProvider extends SocialAbstract implements SocialProvider {
+  private _pool: SimplePool | undefined;
+  private get pool(): SimplePool {
+    if (!this._pool) {
+      this._pool = new SimplePool();
+    }
+    return this._pool;
+  }
   override maxConcurrentJob = 5;
   identifier = 'nostr';
   name = 'Nostr';
@@ -74,7 +79,7 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
   private async findRelayInformation(pubkey: string) {
     // This queries ALL relays in parallel and resolves with
     // the first matching event from ANY relay.
-    const evt = await pool.get(list, {
+    const evt = await this.pool.get(list, {
       kinds: [0],
       authors: [pubkey],
       limit: 1,

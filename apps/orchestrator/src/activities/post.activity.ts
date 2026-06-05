@@ -153,7 +153,7 @@ export class PostActivity {
 
   @ActivityMethod()
   async isCommentable(integration: Integration) {
-    const getIntegration = this._integrationManager.getSocialIntegration(
+    const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
@@ -167,7 +167,7 @@ export class PostActivity {
     integration: Integration,
     posts: Post[]
   ) {
-    const getIntegration = this._integrationManager.getSocialIntegration(
+    const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
@@ -216,7 +216,7 @@ export class PostActivity {
       }
     }
 
-    const getIntegration = this._integrationManager.getSocialIntegration(
+    const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
@@ -367,7 +367,7 @@ export class PostActivity {
   async refreshToken(
     integration: Integration
   ): Promise<false | AuthTokenDetails> {
-    const getIntegration = this._integrationManager.getSocialIntegration(
+    const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 
@@ -395,7 +395,7 @@ export class PostActivity {
     integration: Integration,
     cause: string
   ): Promise<false | AuthTokenDetails> {
-    const getIntegration = this._integrationManager.getSocialIntegration(
+    const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
 

@@ -12,6 +12,7 @@ import { Integration } from '@prisma/client';
 import { Plug } from '@gitroom/helpers/decorators/plug.decorator';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
+import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
@@ -53,8 +54,8 @@ export class LinkedinPageProvider
         body: new URLSearchParams({
           grant_type: 'refresh_token',
           refresh_token,
-          client_id: process.env.LINKEDIN_CLIENT_ID!,
-          client_secret: process.env.LINKEDIN_CLIENT_SECRET!,
+          client_id: getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin-page', 'clientId'),
+          client_secret: getEnvOr('LINKEDIN_CLIENT_SECRET', 'linkedin-page', 'clientSecret'),
         }),
       })
     ).json();
@@ -124,7 +125,7 @@ export class LinkedinPageProvider
     const state = makeId(6);
     const codeVerifier = makeId(30);
     const url = `https://www.linkedin.com/oauth/v2/authorization?response_type=code&prompt=none&client_id=${
-      process.env.LINKEDIN_CLIENT_ID
+      getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin-page', 'clientId')
     }&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/linkedin-page`
     )}&state=${state}&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -213,8 +214,8 @@ export class LinkedinPageProvider
       'redirect_uri',
       `${process.env.FRONTEND_URL}/integrations/social/linkedin-page`
     );
-    body.append('client_id', process.env.LINKEDIN_CLIENT_ID!);
-    body.append('client_secret', process.env.LINKEDIN_CLIENT_SECRET!);
+    body.append('client_id', getEnvOr('LINKEDIN_CLIENT_ID', 'linkedin-page', 'clientId'));
+    body.append('client_secret', getEnvOr('LINKEDIN_CLIENT_SECRET', 'linkedin-page', 'clientSecret'));
 
     const {
       access_token: accessToken,
