@@ -53,7 +53,7 @@ export interface IAuthenticator {
 export interface AnalyticsData {
   label: string;
   data: Array<{ total: string; date: string }>;
-  percentageChange: number;
+  percentageChange?: number;
 }
 
 

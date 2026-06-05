@@ -9,7 +9,7 @@ export const useIntegrationList = () => {
 
   const load = useCallback(async (path: string) => {
     return (await (await fetch(path)).json()).integrations;
-  }, []);
+  }, [fetch]);
 
   return useSWR('/integrations/list', load, {
     revalidateOnFocus: false,

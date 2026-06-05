@@ -637,7 +637,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         if (userStats.follower_count !== undefined) {
           result.push({
             label: 'Followers',
-            percentageChange: 0,
             data: [{ total: String(userStats.follower_count), date: today }],
           });
         }
@@ -645,7 +644,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         if (userStats.following_count !== undefined) {
           result.push({
             label: 'Following',
-            percentageChange: 0,
             data: [{ total: String(userStats.following_count), date: today }],
           });
         }
@@ -653,7 +651,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         if (userStats.likes_count !== undefined) {
           result.push({
             label: 'Total Likes',
-            percentageChange: 0,
             data: [{ total: String(userStats.likes_count), date: today }],
           });
         }
@@ -661,7 +658,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         if (userStats.video_count !== undefined) {
           result.push({
             label: 'Videos',
-            percentageChange: 0,
             data: [{ total: String(userStats.video_count), date: today }],
           });
         }
@@ -719,25 +715,21 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
 
           result.push({
             label: 'Views',
-            percentageChange: 0,
             data: [{ total: String(totalViews), date: today }],
           });
 
           result.push({
             label: 'Recent Likes',
-            percentageChange: 0,
             data: [{ total: String(totalLikes), date: today }],
           });
 
           result.push({
             label: 'Recent Comments',
-            percentageChange: 0,
             data: [{ total: String(totalComments), date: today }],
           });
 
           result.push({
             label: 'Recent Shares',
-            percentageChange: 0,
             data: [{ total: String(totalShares), date: today }],
           });
         }
@@ -849,7 +841,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       if (video.view_count !== undefined) {
         result.push({
           label: 'Views',
-          percentageChange: 0,
           data: [{ total: String(video.view_count), date: today }],
         });
       }
@@ -857,7 +848,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       if (video.like_count !== undefined) {
         result.push({
           label: 'Likes',
-          percentageChange: 0,
           data: [{ total: String(video.like_count), date: today }],
         });
       }
@@ -865,7 +855,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       if (video.comment_count !== undefined) {
         result.push({
           label: 'Comments',
-          percentageChange: 0,
           data: [{ total: String(video.comment_count), date: today }],
         });
       }
@@ -873,7 +862,6 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       if (video.share_count !== undefined) {
         result.push({
           label: 'Shares',
-          percentageChange: 0,
           data: [{ total: String(video.share_count), date: today }],
         });
       }

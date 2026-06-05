@@ -340,7 +340,9 @@ model Integration {
   webhooks              IntegrationsWebhooks[]
   orderItems            OrderItems[]
   plugs                 Plugs[]
-  posts                 Post[]
+  posts                     Post[]
+  analyticsSnapshots        AnalyticsSnapshot[]
+  postAnalyticsSnapshots    PostAnalyticsSnapshot[]
 
   @@unique([organizationId, internalId])
   @@index([rootInternalId])
@@ -353,6 +355,39 @@ model Integration {
   @@index([inBetweenSteps])
   @@index([refreshNeeded])
   @@index([disabled])
+}
+
+model AnalyticsSnapshot {
+  id              String   @id @default(uuid())
+  organizationId  String
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  metric          String
+  value           Float
+  date            DateTime @db.Date
+  createdAt       DateTime @default(now())
+
+  @@unique([integrationId, metric, date])
+  @@index([organizationId, integrationId, date])
+  @@index([organizationId, metric, date])
+}
+
+model PostAnalyticsSnapshot {
+  id              String   @id @default(uuid())
+  organizationId  String
+  postId          String
+  post            Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  metric          String
+  value           Float
+  date            DateTime @db.Date
+  createdAt       DateTime @default(now())
+
+  @@unique([postId, metric, date])
+  @@index([organizationId, postId, date])
+  @@index([integrationId, date])
+  @@index([organizationId, integrationId, date])
 }
 
 model ProviderConfiguration {
@@ -444,6 +479,7 @@ model Post {
   submittedForOrder          Orders?                   @relation(fields: [submittedForOrderId], references: [id])
   submittedForOrganization   Organization?             @relation("submittedForOrg", fields: [submittedForOrganizationId], references: [id])
   tags                       TagsPosts[]
+  analyticsSnapshots         PostAnalyticsSnapshot[]
 
   @@index([group])
   @@index([deletedAt])

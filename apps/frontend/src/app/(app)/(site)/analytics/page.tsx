@@ -1,11 +1,5 @@
-export const dynamic = 'force-dynamic';
-import { Metadata } from 'next';
-import { PlatformAnalytics } from '@gitroom/frontend/components/platform-analytics/platform.analytics';
-import { isGeneralServerSide } from '@gitroom/helpers/utils/is.general.server.side';
-export const metadata: Metadata = {
-  title: `${isGeneralServerSide() ? 'Postiz' : 'Gitroom'} Analytics`,
-  description: '',
-};
+import { redirect } from 'next/navigation';
+
 export default async function Index() {
-  return <PlatformAnalytics />;
+  redirect('/analytics/v2');
 }

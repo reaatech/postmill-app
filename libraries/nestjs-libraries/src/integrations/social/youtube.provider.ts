@@ -625,7 +625,6 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       if (stats.viewCount !== undefined) {
         result.push({
           label: 'Views',
-          percentageChange: 0,
           data: [{ total: String(stats.viewCount), date: today }],
         });
       }
@@ -633,7 +632,6 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       if (stats.likeCount !== undefined) {
         result.push({
           label: 'Likes',
-          percentageChange: 0,
           data: [{ total: String(stats.likeCount), date: today }],
         });
       }
@@ -641,7 +639,6 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       if (stats.commentCount !== undefined) {
         result.push({
           label: 'Comments',
-          percentageChange: 0,
           data: [{ total: String(stats.commentCount), date: today }],
         });
       }
@@ -649,7 +646,6 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
       if (stats.favoriteCount !== undefined) {
         result.push({
           label: 'Favorites',
-          percentageChange: 0,
           data: [{ total: String(stats.favoriteCount), date: today }],
         });
       }

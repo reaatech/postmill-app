@@ -94,9 +94,10 @@ export class PostsService {
     // Unchecked lookup: analytics/missing-content operate on an already-connected
     // channel and must keep working even if the provider was later disabled for
     // new connections (the gated getSocialIntegration would throw a 404 here).
-    const integrationProvider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
-    );
+    const integrationProvider =
+      this._integrationManager.getSocialIntegrationUnchecked(
+        post.integration.providerIdentifier
+      );
 
     if (!integrationProvider?.missing) {
       return [];
@@ -169,9 +170,10 @@ export class PostsService {
 
     // Unchecked lookup: see getMissingContent above — keep analytics working for
     // already-connected channels whose provider was later disabled.
-    const integrationProvider = this._integrationManager.getSocialIntegrationUnchecked(
-      post.integration.providerIdentifier
-    );
+    const integrationProvider =
+      this._integrationManager.getSocialIntegrationUnchecked(
+        post.integration.providerIdentifier
+      );
 
     if (!integrationProvider?.postAnalytics) {
       return [];
@@ -204,12 +206,12 @@ export class PostsService {
       }
     }
 
-    // const getIntegrationData = await ioRedis.get(
-    //   `integration:${orgId}:${post.id}:${date}`
-    // );
-    // if (getIntegrationData) {
-    //   return JSON.parse(getIntegrationData);
-    // }
+    const getIntegrationData = await ioRedis.get(
+      `integration:${orgId}:${post.id}:${date}`
+    );
+    if (getIntegrationData) {
+      return JSON.parse(getIntegrationData);
+    }
 
     try {
       const loadAnalytics = await integrationProvider.postAnalytics(

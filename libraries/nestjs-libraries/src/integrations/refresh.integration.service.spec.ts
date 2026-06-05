@@ -54,15 +54,17 @@ describe('RefreshIntegrationService', () => {
       refreshNeeded: vi.fn().mockResolvedValue(undefined),
       disconnectChannel: vi.fn().mockResolvedValue(undefined),
     };
+    const mockProvider = {
+      identifier: 'x',
+      name: 'X',
+      refreshToken: mockRefreshToken,
+      reConnect: undefined,
+      refreshCron: true,
+      oneTimeToken: false,
+    };
     mockIntegrationManager = {
-      getSocialIntegration: vi.fn().mockReturnValue({
-        identifier: 'x',
-        name: 'X',
-        refreshToken: mockRefreshToken,
-        reConnect: undefined,
-        refreshCron: true,
-        oneTimeToken: false,
-      }),
+      getSocialIntegration: vi.fn().mockReturnValue(mockProvider),
+      getSocialIntegrationUnchecked: vi.fn().mockReturnValue(mockProvider),
     };
     mockWorkflowStart = vi.fn().mockResolvedValue({ workflowId: 'refresh_integration-1' });
     mockTemporalService = {
@@ -82,7 +84,7 @@ describe('RefreshIntegrationService', () => {
   describe('refresh', () => {
     it('successfully refreshes token and updates integration', async () => {
       const result = await service.refresh(mockIntegration as any);
-      expect(mockIntegrationManager.getSocialIntegration).toHaveBeenCalledWith('x');
+      expect(mockIntegrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('x');
       expect(mockRefreshToken).toHaveBeenCalledWith('old-refresh-token');
       expect(mockIntegrationService.createOrUpdateIntegration).toHaveBeenCalledWith(
         undefined,
@@ -164,7 +166,7 @@ describe('RefreshIntegrationService', () => {
 
     it('calls reConnect when reConnect exists and rootInternalId differs', async () => {
       const reConnectResult = { id: 'reconnected-id', name: 'Reconnected', accessToken: 're-token', username: '@re' };
-      mockIntegrationManager.getSocialIntegration.mockReturnValue({
+      mockIntegrationManager.getSocialIntegrationUnchecked.mockReturnValue({
         identifier: 'x',
         refreshToken: mockRefreshToken,
         reConnect: vi.fn().mockResolvedValue(reConnectResult),
@@ -172,7 +174,7 @@ describe('RefreshIntegrationService', () => {
       });
       const integrationWithDiffRoot = { ...mockIntegration, rootInternalId: 'root-1', internalId: 'child-1' };
       const result = await service.refresh(integrationWithDiffRoot as any);
-      const provider = mockIntegrationManager.getSocialIntegration();
+      const provider = mockIntegrationManager.getSocialIntegrationUnchecked();
       expect(provider.reConnect).toHaveBeenCalledWith('root-1', 'child-1', 'new-access-token');
       expect(result).toMatchObject({ ...mockAuthTokenDetails, ...reConnectResult });
     });
