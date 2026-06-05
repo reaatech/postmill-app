@@ -477,7 +477,6 @@ export class PinterestProvider
         if (lifetimeMetrics.IMPRESSION !== undefined) {
           result.push({
             label: 'Impressions',
-            percentageChange: 0,
             data: [{ total: String(lifetimeMetrics.IMPRESSION), date: today }],
           });
         }
@@ -485,7 +484,6 @@ export class PinterestProvider
         if (lifetimeMetrics.PIN_CLICK !== undefined) {
           result.push({
             label: 'Pin Clicks',
-            percentageChange: 0,
             data: [{ total: String(lifetimeMetrics.PIN_CLICK), date: today }],
           });
         }
@@ -493,7 +491,6 @@ export class PinterestProvider
         if (lifetimeMetrics.OUTBOUND_CLICK !== undefined) {
           result.push({
             label: 'Outbound Clicks',
-            percentageChange: 0,
             data: [
               { total: String(lifetimeMetrics.OUTBOUND_CLICK), date: today },
             ],
@@ -503,7 +500,6 @@ export class PinterestProvider
         if (lifetimeMetrics.SAVE !== undefined) {
           result.push({
             label: 'Saves',
-            percentageChange: 0,
             data: [{ total: String(lifetimeMetrics.SAVE), date: today }],
           });
         }

@@ -17,9 +17,10 @@
   <strong>⚠️ This is a modified fork</strong><br />
   This repository is a fork of <a href="https://github.com/gitroomhq/postiz-app">gitroomhq/postiz-app</a> with the following changes:
   <ul style="text-align: left; display: inline-block; margin-top: 8px;">
+    <li><strong>Persisted analytics dashboard</strong> — Replaced the legacy single-channel live-fetch analytics with a persisted multi-channel dashboard. Stores daily metric snapshots (AnalyticsSnapshot, PostAnalyticsSnapshot) collected via a Temporal workflow (requires <code>RUN_CRON=true</code> on one orchestrator instance), serves real period-over-period comparisons through <code>/analytics/v2</code>, and renders a drill-down UI with date range picker, channel multi-select, KPI cards, line/bar/area/pie charts, and CSV/JSON export. Daily snapshots roll up to weekly after ~18 months and per-post snapshots prune after 90 days (both windows env-configurable).</li>
     <li><strong>Database-backed provider config</strong> — Channel OAuth/API credentials managed via an admin UI (<code>/admin/channels</code>) instead of environment variables, encrypted at rest. Includes a one-time <code>scripts/migrate-channel-config.ts</code> to import existing env-var credentials into the database.</li>
     <li><strong>Admin UI for channels</strong> — Super-admins can enable/disable providers, set credentials, and add per-provider setup instructions. Disabling a provider only blocks new connections — already-connected channels keep posting, refreshing tokens, and reporting analytics.</li>
-    <li><strong>Enhanced test suite</strong> — 630 Vitest tests across all providers and core services with 93%+ statement/function/line coverage.</li>
+    <li><strong>Enhanced test suite</strong> — 1000+ Vitest tests across all providers, core services, analytics, and frontend components with 93%+ statement/function/line coverage.</li>
     <li><strong>Maintenance &amp; fixes</strong> — Fixes across 33 providers (lazy initialization, credential keys, null safety), frontend hook dependency arrays, and the migration script; plus a safe same-major dependency refresh (React, Next, NestJS, Temporal, TipTap, Sentry, and more).</li>
     <li><strong>Prebuilt image</strong> — Published to <code>ghcr.io/reaatech/postiz-app</code>.</li>
   </ul>

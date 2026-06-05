@@ -348,9 +348,10 @@ export class IntegrationService {
       return [];
     }
 
-    const integrationProvider = await this._integrationManager.getSocialIntegration(
-      getIntegration.providerIdentifier
-    );
+    const integrationProvider =
+      this._integrationManager.getSocialIntegrationUnchecked(
+        getIntegration.providerIdentifier
+      );
 
     if (
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
@@ -404,6 +405,10 @@ export class IntegrationService {
         if (e instanceof RefreshToken) {
           return this.checkAnalytics(org, integration, date, true);
         }
+        console.warn(
+          `checkAnalytics failed for integration ${integration}:`,
+          (e as any)?.message
+        );
       }
     }
 
@@ -448,17 +453,20 @@ export class IntegrationService {
       return;
     }
 
-    const getAllInternalPlugs = (await this._integrationManager
-      .getInternalPlugs(getIntegration.providerIdentifier))
-      .internalPlugs.find((p: any) => p.identifier === data.plugName);
+    const getAllInternalPlugs = (
+      await this._integrationManager.getInternalPlugs(
+        getIntegration.providerIdentifier
+      )
+    ).internalPlugs.find((p: any) => p.identifier === data.plugName);
 
     if (!getAllInternalPlugs) {
       return;
     }
 
-    const getSocialIntegration = await this._integrationManager.getSocialIntegration(
-      getIntegration.providerIdentifier
-    );
+    const getSocialIntegration =
+      await this._integrationManager.getSocialIntegration(
+        getIntegration.providerIdentifier
+      );
 
     // @ts-ignore
     await getSocialIntegration?.[getAllInternalPlugs.methodName]?.(

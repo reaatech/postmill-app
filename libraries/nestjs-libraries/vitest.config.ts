@@ -33,6 +33,8 @@ export default defineConfig({
         'src/integrations/social/*.provider.ts',
         'src/database/prisma/provider-configs/provider-config.repository.ts',
         'src/database/prisma/provider-configs/provider-config.service.ts',
+        'src/analytics/analytics.service.ts',
+        'src/integrations/social/analytics.metrics.ts',
       ],
       thresholds: {
         statements: 90,

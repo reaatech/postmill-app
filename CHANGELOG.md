@@ -1,5 +1,48 @@
 # Changelog
 
+## [3.1.0] - 2026-06-04
+
+### Added
+- Analytics refactor — persisted multi-channel dashboard
+- New data models: AnalyticsSnapshot, PostAnalyticsSnapshot (Prisma)
+- Daily collection via Temporal workflow (RUN_CRON-gated)
+- Metric normalization map supporting 10 providers
+- New /analytics/v2 API with real period-over-period comparisons
+- Frontend analytics-v2 dashboard with drill-down navigation
+- CSV/JSON export endpoint
+- Snapshot retention & weekly rollup (env-configurable via `ANALYTICS_DAILY_RETENTION_DAYS` / `ANALYTICS_POST_RETENTION_DAYS`)
+
+### Changed
+- Hardcoded percentageChange values removed from providers (computed centrally)
+- Platform-analytics UI replaced with analytics-v2 dashboard
+
+### Deprecated
+- Legacy /analytics/:integration and /analytics/post/:postId routes (will be removed)
+
+### Code Review Fixes (2026-06-04)
+
+A comprehensive code review and implementation audit was performed against the analytics refactor plan (`dev/analytics-refactor-plan.md`). All 4 phases were verified as substantially complete. The following gaps were found and resolved:
+
+**Hardcoded provider values removed** — The `percentageChange` field in `AnalyticsData` (`social.integrations.interface.ts:56`) was made optional, and 37 hardcoded `percentageChange: 0` values were removed across 9 provider files (facebook, x, instagram, linkedin-page, tiktok, youtube, pinterest, gmb, threads). The CHANGELOG entry from the initial 3.1.0 release claimed this was done but the actual code changes were never applied. Analytics metrics are now correctly computed solely by `AnalyticsService.computePercentageChange()`.
+
+**Orphaned files removed** — Four unused analytics component files were deleted (`analytics.component.tsx`, `stars.and.forks.tsx`, `stars.table.component.tsx`, `chart.tsx`). `chart-social.tsx` and `stars.and.forks.interface.ts` were retained as they are still imported by `launches/statistics.tsx`.
+
+**Chart CSS variables globalized** — `--chart-1` through `--chart-8`, `--chart-muted`, `--positive`, and `--negative` CSS variables were moved from an inline `style` prop in `analytics.dashboard.tsx` to the global `:root` in `colors.scss`, making them accessible project-wide and properly themed.
+
+### Code Review Fixes — Round 2 (2026-06-04)
+
+A second audit focused on the data-collection layer surfaced silent data-loss issues in the metric normalization map (`analytics.metrics.ts`), now resolved:
+
+**Channel metric collisions fixed** — Two distinct provider channel metrics were collapsing onto the same canonical key, so the daily collector's `upsert` on `(integrationId, metric, date)` overwrote one with the other:
+- Facebook `Page Impressions` and `Posts Impressions` both mapped to `impressions`. `Posts Impressions` now maps to a new `post_impressions` canonical metric.
+- TikTok lifetime `Total Likes` (a point-in-time/stock metric) and `Recent Likes` (recent-video flow) both mapped to `likes`. `Total Likes` now maps to a new `total_likes` (stock) metric.
+
+**Post-analytics labels added to the map** — `PROVIDER_METRIC_MAP` only contained channel-level labels, so `collectPostSnapshots` silently dropped nearly all post metrics (`normalizeMetric` returned `undefined`). Added the post-level labels emitted by `postAnalytics()`: X (`Impressions`/`Likes`/`Retweets`/`Replies`/`Quotes`/`Bookmarks`), Facebook (`Impressions`/`Clicks`/`Reactions`), TikTok (`Likes`/`Comments`/`Shares`), YouTube (`Comments`/`Favorites`), Pinterest (`Outbound Clicks`), Instagram/Instagram-standalone (`Engagement`). New registry metrics: `post_impressions`, `total_likes`, `reactions`, `outbound_clicks`, `favorites`.
+
+**Unbounded workflow history fixed** — `analyticsCollectionWorkflow` used an infinite `while (true)` loop that fanned out over every org × 2 activities each day within a single Temporal execution, which would accumulate history events without bound and eventually hit Temporal's ~50K-event limit and terminate. It now does one sweep per execution and calls `continueAsNew()` after the 24h sleep, matching the repo's `digestEmailWorkflow`/`sendEmailWorkflow` pattern.
+
+**Snapshot retention & rollup implemented** — Added `AnalyticsActivity.pruneAndRollupSnapshots(orgId)`, run per-org each daily sweep. Raw daily `AnalyticsSnapshot` rows older than ~18 months (default `DEFAULT_DAILY_RETENTION_DAYS = 548`) are rolled up into a single weekly row per `(integration, metric, ISO week)` — flow metrics summed, stock metrics keeping the week's latest value — and the daily rows are replaced atomically in a `$transaction`. The rollup is idempotent and folds newly-aged days into the existing weekly aggregate as the cutoff advances. `PostAnalyticsSnapshot` rows are pruned beyond a 90-day window rather than archived. Both windows are env-configurable via `ANALYTICS_DAILY_RETENTION_DAYS` / `ANALYTICS_POST_RETENTION_DAYS` (read per-run, with fallback to the 548/90-day defaults on missing/invalid values). Weekly aggregates remain compatible with `AnalyticsService` range queries (range totals are preserved; stock carry-forward still works).
+
 ## 3.0.0 (2026-06-04)
 
 ### Major Features

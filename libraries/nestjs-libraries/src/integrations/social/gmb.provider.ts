@@ -622,7 +622,6 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
         if (dataPoints.length > 0) {
           analytics.push({
             label,
-            percentageChange: 0,
             data: dataPoints,
           });
         }

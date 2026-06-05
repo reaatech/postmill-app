@@ -60,3 +60,16 @@ const useCommunity = () => {
 - Linting of the project can run only from the root.
 - Use only pnpm.
 - The system is in production with many users, if you want to change something, you need to be sure that you are not breaking anything for existing users and a migration might be needed
+
+## Analytics Architecture
+
+The analytics system has been refactored from single-channel live-fetch to a persisted multi-channel dashboard.
+
+### Key components:
+- **Data models**: `AnalyticsSnapshot` and `PostAnalyticsSnapshot` (Prisma) — daily snapshots populated by a Temporal workflow
+- **Collection worker**: The Temporal workflow in `apps/orchestrator` requires `RUN_CRON=true` to activate. It runs one sweep then `continueAsNew`s every 24h (don't reintroduce an unbounded `while(true)` loop).
+- **Retention/rollup**: `AnalyticsActivity.pruneAndRollupSnapshots()` (run per-org each sweep) rolls daily `AnalyticsSnapshot` rows older than ~18 months into one weekly row per `(integration, metric, ISO week)` — flow metrics summed, stock metrics keep the week's latest — and prunes `PostAnalyticsSnapshot` beyond 90 days. Tunable via the `ANALYTICS_DAILY_RETENTION_DAYS` / `ANALYTICS_POST_RETENTION_DAYS` env vars (read per-run; invalid values fall back to the 548/90-day defaults).
+- **API**: New `/analytics/v2` endpoints in `AnalyticsV2Controller` replace the legacy single-channel `/analytics/:integration` and `/analytics/post/:postId`
+- **Legacy fallback**: `IntegrationService.checkAnalytics()` and `PostsService.checkPostAnalytics()` still exist as fallback paths — used by `AnalyticsService` and the public API (`public.integrations.controller.ts`)
+- **Metric normalization**: Metrics are normalized via `PROVIDER_METRIC_MAP` in `libraries/nestjs-libraries/src/analytics/`
+- **Public API**: The legacy public API analytics route (`public.integrations.controller.ts:478`) is kept as-is for n8n/Zapier compatibility — a parallel v2 public route was added in Phase 2

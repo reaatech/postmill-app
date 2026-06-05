@@ -19,6 +19,7 @@ import { Organization } from '@prisma/client';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
@@ -71,7 +72,8 @@ export class PublicIntegrationsController {
     private _mediaService: MediaService,
     private _notificationService: NotificationService,
     private _integrationManager: IntegrationManager,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    private _analyticsService: AnalyticsService
   ) {}
 
   @Post('/upload')
@@ -486,6 +488,24 @@ export class PublicIntegrationsController {
   ) {
     Sentry.metrics.count('public_api-request', 1);
     return this._postsService.checkPostAnalytics(org.id, postId, +date);
+  }
+
+  @Get('/analytics/overview')
+  async getAnalyticsOverview(
+    @GetOrgFromRequest() org: Organization,
+    @Query('from') from: string,
+    @Query('to') to: string,
+    @Query('integrations') integrations: string,
+    @Query('compare') compare: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._analyticsService.getOverview(
+      org,
+      from,
+      to,
+      integrations ? integrations.split(',') : [],
+      compare === 'true'
+    );
   }
 
   @Post('/integration-trigger/:id')

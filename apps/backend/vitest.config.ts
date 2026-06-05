@@ -24,6 +24,7 @@ export default defineConfig({
       reporter: ['text', 'lcov', 'html'],
       include: [
         'src/api/routes/channel.config.controller.ts',
+        'src/api/routes/analytics.v2.controller.ts',
       ],
       thresholds: {
         statements: 90,

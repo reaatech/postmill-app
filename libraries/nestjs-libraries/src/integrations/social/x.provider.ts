@@ -709,7 +709,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
       return Object.entries(metrics).map(([key, value]) => ({
         label: key.replace('_count', '').replace('_', ' ').toUpperCase(),
-        percentageChange: 5,
         data: [
           {
             total: String(0),
@@ -764,7 +763,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.impression_count !== undefined) {
         result.push({
           label: 'Impressions',
-          percentageChange: 0,
           data: [{ total: String(metrics.impression_count), date: today }],
         });
       }
@@ -772,7 +770,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.like_count !== undefined) {
         result.push({
           label: 'Likes',
-          percentageChange: 0,
           data: [{ total: String(metrics.like_count), date: today }],
         });
       }
@@ -780,7 +777,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.retweet_count !== undefined) {
         result.push({
           label: 'Retweets',
-          percentageChange: 0,
           data: [{ total: String(metrics.retweet_count), date: today }],
         });
       }
@@ -788,7 +784,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.reply_count !== undefined) {
         result.push({
           label: 'Replies',
-          percentageChange: 0,
           data: [{ total: String(metrics.reply_count), date: today }],
         });
       }
@@ -796,7 +791,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.quote_count !== undefined) {
         result.push({
           label: 'Quotes',
-          percentageChange: 0,
           data: [{ total: String(metrics.quote_count), date: today }],
         });
       }
@@ -804,7 +798,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
       if (metrics.bookmark_count !== undefined) {
         result.push({
           label: 'Bookmarks',
-          percentageChange: 0,
           data: [{ total: String(metrics.bookmark_count), date: today }],
         });
       }

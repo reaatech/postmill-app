@@ -414,7 +414,6 @@ export class LinkedinPageProvider
       data: analytics[
         key as 'Page Views' | 'Organic Followers' | 'Paid Followers'
       ],
-      percentageChange: 5,
     }));
   }
 
@@ -538,7 +537,6 @@ export class LinkedinPageProvider
       .map(([label, data]) => ({
         label,
         data,
-        percentageChange: 0,
       }));
 
     return result as any;
