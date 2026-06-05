@@ -36,6 +36,9 @@ import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/skool.provider';
 import { WhopProvider } from '@gitroom/nestjs-libraries/integrations/social/whop.provider';
 import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
+import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tumblr.provider';
+import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/pixelfed.provider';
+import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
@@ -72,6 +75,9 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new WhopProvider(),
   new SkoolProvider(),
   new MeweProvider(),
+  new TumblrProvider(),
+  new PixelfedProvider(),
+  new PeerTubeProvider(),
   // new MastodonCustomProvider(),
 ];
 

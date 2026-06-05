@@ -59,7 +59,10 @@ export type AllProvidersSettings =
   | ProviderExtension<'vk', None>
   | ProviderExtension<'skool', SkoolDto>
   | ProviderExtension<'mewe', MeweDto>
-  | ProviderExtension<'whop', WhopDto>;
+  | ProviderExtension<'whop', WhopDto>
+  | ProviderExtension<'tumblr', None>
+  | ProviderExtension<'pixelfed', None>
+  | ProviderExtension<'peertube', None>;
 
 type None = NonNullable<unknown>;
 
@@ -98,6 +101,9 @@ export const allProviders = (setEmpty?: any) => {
     { value: SkoolDto, name: 'skool' },
     { value: WhopDto, name: 'whop' },
     { value: MeweDto, name: 'mewe' },
+    { value: setEmpty, name: 'tumblr' },
+    { value: setEmpty, name: 'pixelfed' },
+    { value: setEmpty, name: 'peertube' },
   ].filter((f) => f.value);
 };
 
