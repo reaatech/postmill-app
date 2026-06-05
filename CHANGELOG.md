@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.2.0] - 2026-06-05
+
+### Added
+
+- **Three new social providers** — channel count goes from 33 → 36:
+  - **Tumblr** — global OAuth2 redirect (same pattern as Mastodon/X), NPF (Neue Post Format) posts with multipart image/video media. Token refresh supported. Credentials via admin `ProviderConfiguration` or `TUMBLR_CLIENT_ID`/`TUMBLR_CLIENT_SECRET`.
+  - **Pixelfed** — `customFields` auth (instance URL + personal access token), Mastodon-compatible REST API, image-only posts (up to 10), with comments.
+  - **PeerTube** — `customFields` auth (instance URL + username + password), password-grant token re-derived per operation (no stored-token reliance), single-`.mp4`-video posts, with comments.
+- No DB migration required — `Integration.customInstanceDetails` and `ProviderConfiguration` already accept any identifier.
+- 64-case provider test file (`providers.deep4.spec.ts`) plus per-provider mock fixtures; `IntegrationManager` provider-count assertions bumped 33 → 36.
+
+### Audit Fixes (2026-06-05)
+
+A code review of the new-provider implementation against the plan (`dev/NEW_PROVIDERS_01.md`) surfaced two Tumblr correctness bugs, now resolved:
+
+- **Editor mismatch** — Tumblr's `editor` was `'html'`, but `post()` writes the message into an NPF `{type:'text'}` block, which renders **plain text only** (formatting is expressed via separate index ranges, never HTML). Any formatted post would have surfaced raw `<strong>`/`<p>`/`<a>` tags. Changed to `'normal'`, consistent with the other plain-text social providers (Mastodon/Bluesky/Threads).
+- **Empty NPF text block** — media-only (no caption) posts emitted an empty text block, which Tumblr rejects. The text block is now only included when a message is present.
+
+### Out of Scope (follow-ups)
+
+- Analytics hooks (`analytics()`/`postAnalytics()`) for the three new providers.
+- PeerTube resumable upload for videos beyond the 10-minute activity window.
+- Tumblr comments / reblogs (the frontend composer sets `comments: false`).
+
 ## [3.1.0] - 2026-06-04
 
 ### Added
