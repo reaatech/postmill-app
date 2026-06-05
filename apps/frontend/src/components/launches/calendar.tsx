@@ -48,6 +48,7 @@ import { isUSCitizen } from './helpers/isuscitizen.utils';
 import { useInterval } from '@mantine/hooks';
 import { StatisticsModal } from '@gitroom/frontend/components/launches/statistics';
 import { MissingReleaseModal } from '@gitroom/frontend/components/launches/missing-release.modal';
+import { PostDetailModal } from '@gitroom/frontend/components/launches/post-detail/post.detail.modal';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import i18next from 'i18next';
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
@@ -257,7 +258,25 @@ const usePostActions = (onMutate?: () => void) => {
     [modal, t, mutate]
   );
 
-  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease };
+  const openPostDetail = useCallback(
+    (post: any) => (e: React.MouseEvent) => {
+      e.stopPropagation();
+      modal.openModal({
+        title: '',
+        closeOnClickOutside: true,
+        closeOnEscape: true,
+        withCloseButton: true,
+        classNames: {
+          modal: 'w-[100%] max-w-[1100px] text-textColor',
+        },
+        children: <PostDetailModal postId={post.id} />,
+        size: '80%',
+      });
+    },
+    [modal]
+  );
+
+  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail };
 };
 
 export const DayView = () => {
@@ -504,7 +523,7 @@ export const ListView = () => {
       : t('no_posts', 'No posts');
 
   // Use shared post actions hook
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
 
   // Group posts by date
   const groupedPosts = useMemo(() => {
@@ -556,6 +575,7 @@ export const ListView = () => {
                   editPost={editPost(post, false)}
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
+                  openPostDetail={openPostDetail(post)}
                   post={post}
                   integrations={integrations}
                   deletePost={deletePost(post)}
@@ -609,7 +629,7 @@ export const CalendarColumn: FC<{
   const fetch = useFetch();
 
   // Use shared post actions hook
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
   const postList = useMemo(() => {
     return posts.filter((post) => {
       const pList = dayjs.utc(post.publishDate).local();
@@ -650,7 +670,7 @@ export const CalendarColumn: FC<{
       if (isBeforeNow) {
         return;
       }
-      setNum(num + 1);
+      setNum((n) => n + 1);
     }, [isBeforeNow]),
     random(120000, 150000)
   );
@@ -660,7 +680,7 @@ export const CalendarColumn: FC<{
     return () => {
       stop();
     };
-  }, []);
+  }, [start, stop]);
   const [{ canDrop }, drop] = useDrop(() => ({
     accept: 'post',
     drop: async (item: any) => {
@@ -748,7 +768,7 @@ export const CalendarColumn: FC<{
     collect: (monitor) => ({
       canDrop: isBeforeNow ? false : !!monitor.canDrop() && !!monitor.isOver(),
     }),
-  }), [posts]);
+  }), [posts, isBeforeNow, changeDate, getDate, fetch, modal, t, reloadCalendarView]);
 
   const addModal = useCallback(async () => {
     const set: any = !sets.length
@@ -876,6 +896,7 @@ export const CalendarColumn: FC<{
                   editPost={editPost(post, false)}
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
+                  openPostDetail={openPostDetail(post)}
                   post={post}
                   integrations={integrations}
                   deletePost={deletePost(post)}
@@ -976,7 +997,62 @@ export const CalendarColumn: FC<{
     </div>
   );
 });
-const CalendarItem: FC<{
+const formatCompactNumber = (n: number) => {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toString();
+};
+
+const ViewsIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M30.9137 15.595C30.87 15.4963 29.8112 13.1475 27.4575 10.7937C24.3212 7.6575 20.36 6 16 6C11.64 6 7.67874 7.6575 4.54249 10.7937C2.18874 13.1475 1.12499 15.5 1.08624 15.595C1.02938 15.7229 1 15.8613 1 16.0012C1 16.1412 1.02938 16.2796 1.08624 16.4075C1.12999 16.5062 2.18874 18.8538 4.54249 21.2075C7.67874 24.3425 11.64 26 16 26C20.36 26 24.3212 24.3425 27.4575 21.2075C29.8112 18.8538 30.87 16.5062 30.9137 16.4075C30.9706 16.2796 31 16.1412 31 16.0012C31 15.8613 30.9706 15.7229 30.9137 15.595ZM16 24C12.1525 24 8.79124 22.6012 6.00874 19.8438C4.86704 18.7084 3.89572 17.4137 3.12499 16C3.89551 14.5862 4.86686 13.2915 6.00874 12.1562C8.79124 9.39875 12.1525 8 16 8C19.8475 8 23.2087 9.39875 25.9912 12.1562C27.1352 13.2912 28.1086 14.5859 28.8812 16C27.98 17.6825 24.0537 24 16 24ZM16 10C14.8133 10 13.6533 10.3519 12.6666 11.0112C11.6799 11.6705 10.9108 12.6075 10.4567 13.7039C10.0026 14.8003 9.88377 16.0067 10.1153 17.1705C10.3468 18.3344 10.9182 19.4035 11.7573 20.2426C12.5965 21.0818 13.6656 21.6532 14.8294 21.8847C15.9933 22.1162 17.1997 21.9974 18.2961 21.5433C19.3924 21.0892 20.3295 20.3201 20.9888 19.3334C21.6481 18.3467 22 17.1867 22 16C21.9983 14.4092 21.3657 12.884 20.2408 11.7592C19.1159 10.6343 17.5908 10.0017 16 10Z" fill="currentColor" />
+  </svg>
+);
+
+const LikesIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.5 4C19.48 4 16.92 5.84 16 8.26C15.08 5.84 12.52 4 9.5 4C5.92 4 3 6.92 3 10.5C3 17.32 9.08 22.46 15.08 27.48L16 28.28L16.92 27.46C22.92 22.46 29 17.32 29 10.5C29 6.92 26.08 4 22.5 4ZM16 25.12C11.02 20.88 5 16.3 5 10.5C5 7.98 6.98 6 9.5 6C12.24 6 14.12 7.94 14.12 10.5H17.88C17.88 7.94 19.76 6 22.5 6C25.02 6 27 7.98 27 10.5C27 16.3 20.98 20.88 16 25.12Z" fill="currentColor" />
+  </svg>
+);
+
+const CommentsIcon = () => (
+  <svg width="15" height="15" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M27 2H5C3.35 2 2 3.35 2 5V30L8 24H27C28.65 24 30 22.65 30 21V5C30 3.35 28.65 2 27 2ZM27 21H7L4 24V5H27V21Z" fill="currentColor" />
+  </svg>
+);
+
+// Accessible wrapper for the icon-only hover actions on a card's top strip.
+// Keyboard-operable (Enter/Space) with an aria-label, since the children are
+// decorative SVGs with no text.
+export const IconButton: FC<{
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  colored?: boolean;
+  children: React.ReactNode;
+}> = ({ label, onClick, colored, children }) => (
+  <div
+    role="button"
+    tabIndex={0}
+    aria-label={label}
+    data-tooltip-id="tooltip"
+    data-tooltip-content={label}
+    onClick={onClick}
+    onKeyDown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onClick(e as unknown as React.MouseEvent);
+      }
+    }}
+    className={clsx(
+      'hidden group-hover:block hover:underline cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-white/70 rounded-[4px]',
+      colored && 'mix-blend-difference'
+    )}
+  >
+    {children}
+  </div>
+);
+
+export const CalendarItem: FC<{
   date: dayjs.Dayjs;
   isBeforeNow: boolean;
   editPost: () => void;
@@ -985,6 +1061,7 @@ const CalendarItem: FC<{
   deletePost: () => void;
   statistics: () => void;
   missingRelease?: () => void;
+  openPostDetail: (e: React.MouseEvent) => void;
   integrations: Integrations[];
   state: State;
   display: 'day' | 'week' | 'month';
@@ -994,6 +1071,11 @@ const CalendarItem: FC<{
     tags: {
       tag: Tags;
     }[];
+    lastViews?: number | null;
+    lastLikes?: number | null;
+    lastComments?: number | null;
+    commentCount?: number;
+    unreadComments?: number;
   };
 }> = memo((props) => {
   const t = useT();
@@ -1010,6 +1092,7 @@ const CalendarItem: FC<{
     deletePost,
     showTime,
     missingRelease,
+    openPostDetail,
   } = props;
   const { disableXAnalytics } = useVariables();
   const user = useUser();
@@ -1032,7 +1115,7 @@ const CalendarItem: FC<{
         opacity: monitor.isDragging() ? 0 : 1,
       }),
     }),
-    []
+    [post.id, post.intervalInDays, date]
   );
   return (
     <div
@@ -1054,6 +1137,15 @@ const CalendarItem: FC<{
           data-tooltip-content={post.error || 'An error occurred while publishing this post'}
         >
           !
+        </div>
+      )}
+      {post.unreadComments > 0 && (
+        <div
+          className="absolute -top-[6px] -end-[6px] z-20 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
+          data-tooltip-id="tooltip"
+          data-tooltip-content={`${post.unreadComments} ${t('unread_comments', 'unread comments')}`}
+        >
+          {post.unreadComments > 99 ? '99+' : post.unreadComments}
         </div>
       )}
       {showCreationMethodBadge && (
@@ -1080,74 +1172,69 @@ const CalendarItem: FC<{
         >
           {post.tags.map((p) => p.tag.name).join(', ')}
         </div>
+        <IconButton
+          label={t('edit_post', 'Edit Post')}
+          onClick={editPost}
+          colored={!!post?.tags?.[0]?.tag?.color}
+        >
+          <EditSettings />
+        </IconButton>
         {copyDebugJson && (
-          <div
-            className={clsx(
-              'hidden group-hover:block hover:underline cursor-pointer',
-              post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-            )}
+          <IconButton
+            label={t('copy_debug_json', 'Copy debug JSON')}
             onClick={copyDebugJson}
+            colored={!!post?.tags?.[0]?.tag?.color}
           >
             <CopyDebug />
-          </div>
+          </IconButton>
         )}
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-          )}
+        <IconButton
+          label={t('duplicate_post', 'Duplicate Post')}
           onClick={duplicatePost}
+          colored={!!post?.tags?.[0]?.tag?.color}
         >
           <Duplicate />
-        </div>
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-          )}
+        </IconButton>
+        <IconButton
+          label={t('preview_post', 'Preview Post')}
           onClick={preview}
+          colored={!!post?.tags?.[0]?.tag?.color}
         >
           <Preview />
-        </div>{' '}
+        </IconButton>{' '}
         {((post.integration.providerIdentifier === 'x' && disableXAnalytics) || !post.releaseId) ? (
           <></>
         ) : post.releaseId === 'missing' && missingRelease ? (
-          <div
-            className={clsx(
-              'hidden group-hover:block hover:underline cursor-pointer',
-              post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-            )}
+          <IconButton
+            label={t('link_release', 'Link to published post')}
             onClick={missingRelease}
+            colored={!!post?.tags?.[0]?.tag?.color}
           >
             <Statistics />
-          </div>
+          </IconButton>
         ) : post.releaseId !== 'missing' ? (
-          <div
-            className={clsx(
-              'hidden group-hover:block hover:underline cursor-pointer',
-              post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-            )}
+          <IconButton
+            label={t('statistics', 'Statistics')}
             onClick={statistics}
+            colored={!!post?.tags?.[0]?.tag?.color}
           >
             <Statistics />
-          </div>
+          </IconButton>
         ) : (
           <></>
         )}{' '}
-        <div
-          className={clsx(
-            'hidden group-hover:block hover:underline cursor-pointer',
-            post?.tags?.[0]?.tag?.color && 'mix-blend-difference'
-          )}
+        <IconButton
+          label={t('delete_post', 'Delete Post')}
           onClick={deletePost}
+          colored={!!post?.tags?.[0]?.tag?.color}
         >
           <DeletePost />
-        </div>
+        </IconButton>
       </div>
       <div
-        onClick={editPost}
+        onClick={openPostDetail}
         className={clsx(
-          'gap-[5px] w-full flex h-full flex-1 rounded-br-[10px] rounded-bl-[10px] p-[8px] text-[14px] bg-newColColor',
+          'gap-[5px] w-full flex h-full flex-1 rounded-br-[10px] rounded-bl-[10px] p-[8px] text-[14px] bg-newColColor cursor-pointer',
           'relative',
           isBeforeNow && '!grayscale'
         )}
@@ -1163,8 +1250,28 @@ const CalendarItem: FC<{
           />
         </div>
         <div className="w-full flex-1 flex flex-col min-h-[40px]">
-          <div className="text-start">
-            {state === 'DRAFT' ? t('draft', 'Draft') + ': ' : ''}
+          <div className="flex items-center gap-[6px] flex-wrap">
+            <div className="text-start text-[12px]">
+              {state === 'DRAFT' ? t('draft', 'Draft') + ': ' : ''}
+            </div>
+            {state === 'PUBLISHED' && (
+              <div className="inline-flex items-center gap-[3px] bg-green-500 text-white text-[10px] px-[5px] py-[1px] rounded-full leading-[14px]">
+                <div className="w-[4px] h-[4px] rounded-full bg-white" />
+                {t('published', 'Published')}
+              </div>
+            )}
+            {state === 'QUEUE' && (
+              <div className="inline-flex items-center gap-[3px] bg-blue-500 text-white text-[10px] px-[5px] py-[1px] rounded-full leading-[14px]">
+                <div className="w-[4px] h-[4px] rounded-full bg-white" />
+                {t('scheduled', 'Scheduled')}
+              </div>
+            )}
+            {state === 'DRAFT' && (
+              <div className="inline-flex items-center gap-[3px] bg-amber-500 text-white text-[10px] px-[5px] py-[1px] rounded-full leading-[14px]">
+                <div className="w-[4px] h-[4px] rounded-full bg-white" />
+                {t('draft', 'Draft')}
+              </div>
+            )}
           </div>
             <div className="w-full relative">
               <div className="absolute top-0 start-0 w-full text-ellipsis break-words line-clamp-1 text-start">
@@ -1172,6 +1279,28 @@ const CalendarItem: FC<{
                   t('no_content', 'no content')}
               </div>
             </div>
+          {state === 'PUBLISHED' &&
+          ((post.lastViews !== undefined && post.lastViews !== null) ||
+          (post.lastLikes !== undefined && post.lastLikes !== null) ||
+          (post.lastComments !== undefined && post.lastComments !== null)) ? (
+            <div className="flex items-center gap-3 mt-2 text-[12px] text-textColor">
+              {post.lastViews !== undefined && post.lastViews !== null && (
+                <span className="flex items-center gap-1">
+                  <ViewsIcon /> {formatCompactNumber(post.lastViews)}
+                </span>
+              )}
+              {post.lastLikes !== undefined && post.lastLikes !== null && (
+                <span className="flex items-center gap-1">
+                  <LikesIcon /> {formatCompactNumber(post.lastLikes)}
+                </span>
+              )}
+              {post.lastComments !== undefined && post.lastComments !== null && (
+                <span className="flex items-center gap-1">
+                  <CommentsIcon /> {formatCompactNumber(post.lastComments)}
+                </span>
+              )}
+            </div>
+          ) : null}
         </div>
         {showTime && (
           <div className="text-textColor/50 text-[12px] whitespace-nowrap flex items-center">
@@ -1182,6 +1311,25 @@ const CalendarItem: FC<{
     </div>
   );
 });
+const EditSettings = () => {
+  const t = useT();
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="15"
+      height="15"
+      viewBox="0 0 32 32"
+      fill="none"
+      data-tooltip-id="tooltip"
+      data-tooltip-content={t('edit_post', 'Edit Post')}
+    >
+      <path
+        d="M26 4L22 8 24 10 28 6 26 4zM20 10L22 12 10 24H8V22L20 10zM6 6V26C6 27.1 6.9 28 8 28H24C25.1 28 26 27.1 26 26V16L22 20V24H8V8H16L20 4H8C6.9 4 6 4.9 6 6z"
+        fill="currentColor"
+      />
+    </svg>
+  );
+};
 const CopyDebug = () => {
   const t = useT();
   return (

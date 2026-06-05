@@ -28,6 +28,8 @@ extend(weekOfYear);
 
 export type ListStateFilter = 'all' | 'scheduled' | 'draft' | 'published';
 
+export type EngagementFilter = 'all' | 'has_comments' | 'errors' | 'top_performers';
+
 export const CalendarContext = createContext({
   startDate: newDayjs().startOf('isoWeek').format('YYYY-MM-DD'),
   endDate: newDayjs().endOf('isoWeek').format('YYYY-MM-DD'),
@@ -82,6 +84,10 @@ export const CalendarContext = createContext({
   },
   listState: 'all' as ListStateFilter,
   setListState: (state: ListStateFilter) => {
+    /** empty **/
+  },
+  engagementFilter: 'all' as EngagementFilter,
+  setEngagementFilter: (filter: EngagementFilter) => {
     /** empty **/
   },
 });
@@ -155,6 +161,8 @@ export const CalendarWeekProvider: FC<{
     setListStateRaw(next);
     setListPage(0);
   }, []);
+
+  const [engagementFilter, setEngagementFilter] = useState<EngagementFilter>('all');
 
   // Initialize with current date range based on URL params or defaults
   const initStartDate = searchParams.get('startDate');
@@ -302,6 +310,33 @@ export const CalendarWeekProvider: FC<{
   const listTotal = listData?.total || 0;
   const listTotalPages = Math.ceil(listTotal / 100);
 
+  const filteredPosts = useMemo(() => {
+    if (engagementFilter === 'all') return internalData;
+
+    let filtered = internalData.filter((post: any) => {
+      switch (engagementFilter) {
+        case 'has_comments':
+          return (post.commentCount || post.lastComments || 0) > 0;
+        case 'errors':
+          return post.state === 'ERROR';
+        case 'top_performers':
+          return true;
+        default:
+          return true;
+      }
+    });
+
+    if (engagementFilter === 'top_performers') {
+      filtered = [...filtered].sort((a: any, b: any) => {
+        const aEng = (a.lastViews || 0) + (a.lastLikes || 0) + (a.lastComments || 0);
+        const bEng = (b.lastViews || 0) + (b.lastLikes || 0) + (b.lastComments || 0);
+        return bEng - aEng;
+      });
+    }
+
+    return filtered;
+  }, [internalData, engagementFilter]);
+
   const changeDate = useCallback(
     (id: string, date: dayjs.Dayjs) => {
       setInternalData((d) =>
@@ -340,7 +375,7 @@ export const CalendarWeekProvider: FC<{
         trendings,
         reloadCalendarView,
         ...filters,
-        posts: calendarIsLoading ? [] : internalData,
+        posts: calendarIsLoading ? [] : filteredPosts,
         loading,
         integrations,
         setFilters: setFiltersWrapper,
@@ -355,6 +390,8 @@ export const CalendarWeekProvider: FC<{
         setListPage,
         listState,
         setListState,
+        engagementFilter,
+        setEngagementFilter,
       }}
     >
       {children}
