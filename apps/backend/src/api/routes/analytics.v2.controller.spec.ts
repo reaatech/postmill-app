@@ -104,8 +104,16 @@ describe('AnalyticsV2Controller', () => {
 
     const result = await controller.getPostDetail(mockOrg, 'p1');
 
-    expect(service.getPostDetail).toHaveBeenCalledWith(mockOrg, 'p1');
+    expect(service.getPostDetail).toHaveBeenCalledWith(mockOrg, 'p1', undefined);
     expect(result).toEqual({ postId: 'p1' });
+  });
+
+  it('getPostDetail passes date param', async () => {
+    (service.getPostDetail as any).mockResolvedValue({ postId: 'p1' });
+
+    await controller.getPostDetail(mockOrg, 'p1', '7');
+
+    expect(service.getPostDetail).toHaveBeenCalledWith(mockOrg, 'p1', '7');
   });
 
   it('getOverview throws when from is missing', async () => {

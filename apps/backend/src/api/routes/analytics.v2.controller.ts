@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  ParseUUIDPipe,
   Query,
   Res,
 } from '@nestjs/common';
@@ -117,9 +118,10 @@ export class AnalyticsV2Controller {
   @Get('/post/:postId')
   async getPostDetail(
     @GetOrgFromRequest() org: Organization,
-    @Param('postId') postId: string
+    @Param('postId', ParseUUIDPipe) postId: string,
+    @Query('date') date?: string
   ) {
-    return this._analyticsService.getPostDetail(org, postId);
+    return this._analyticsService.getPostDetail(org, postId, date);
   }
 
   @Get('/metric/:metric')
