@@ -39,6 +39,9 @@ import MoltbookProvider from '@gitroom/frontend/components/new-launch/providers/
 import SkoolProvider from '@gitroom/frontend/components/new-launch/providers/skool/skool.provider';
 import WhopProvider from '@gitroom/frontend/components/new-launch/providers/whop/whop.provider';
 import MeweProvider from '@gitroom/frontend/components/new-launch/providers/mewe/mewe.provider';
+import TumblrProvider from '@gitroom/frontend/components/new-launch/providers/tumblr/tumblr.provider';
+import PixelfedProvider from '@gitroom/frontend/components/new-launch/providers/pixelfed/pixelfed.provider';
+import PeerTubeProvider from '@gitroom/frontend/components/new-launch/providers/peertube/peertube.provider';
 
 export const Providers = [
   {
@@ -172,6 +175,18 @@ export const Providers = [
   {
     identifier: 'mewe',
     component: MeweProvider,
+  },
+  {
+    identifier: 'tumblr',
+    component: TumblrProvider,
+  },
+  {
+    identifier: 'pixelfed',
+    component: PixelfedProvider,
+  },
+  {
+    identifier: 'peertube',
+    component: PeerTubeProvider,
   },
 ];
 export const ShowAllProviders = forwardRef((props, ref) => {
