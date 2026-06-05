@@ -198,6 +198,18 @@ vi.mock('@gitroom/nestjs-libraries/integrations/social/mewe.provider', () => ({
   MeweProvider: createMockProvider('mewe', 'MeWe'),
 }));
 
+vi.mock('@gitroom/nestjs-libraries/integrations/social/tumblr.provider', () => ({
+  TumblrProvider: createMockProvider('tumblr', 'Tumblr'),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/integrations/social/pixelfed.provider', () => ({
+  PixelfedProvider: createMockProvider('pixelfed', 'Pixelfed'),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/integrations/social/peertube.provider', () => ({
+  PeerTubeProvider: createMockProvider('peertube', 'PeerTube'),
+}));
+
 // Mock SocialAbstract to avoid pulling in sharp, temporalio, etc.
 vi.mock('@gitroom/nestjs-libraries/integrations/social.abstract', () => ({
   SocialAbstract: class {},
@@ -276,7 +288,7 @@ describe('IntegrationManager', () => {
 
       expect(result.article).toEqual([]);
       // all 33 social providers should be returned
-      expect(result.social.length).toBeGreaterThanOrEqual(33);
+      expect(result.social.length).toBeGreaterThanOrEqual(36);
       expect(result.social.map((s: any) => s.identifier)).toContain('x');
       expect(result.social.map((s: any) => s.identifier)).toContain('telegram');
     });
@@ -412,7 +424,7 @@ describe('IntegrationManager', () => {
       // provider without metadata gets empty array
       expect(result.x).toEqual([]);
       // every provider gets a key
-      expect(Object.keys(result).length).toBeGreaterThanOrEqual(33);
+      expect(Object.keys(result).length).toBeGreaterThanOrEqual(36);
     });
 
     it('returns empty arrays for all providers when no tool metadata exists', () => {
@@ -436,7 +448,7 @@ describe('IntegrationManager', () => {
       expect(result.x).toBe('X can have maximum 4 pictures');
       expect(result.linkedin).toBe('LinkedIn supports images and documents');
       expect(result.discord).toBe('');
-      expect(Object.keys(result).length).toBeGreaterThanOrEqual(33);
+      expect(Object.keys(result).length).toBeGreaterThanOrEqual(36);
     });
 
     it('returns empty string for every provider when no rules metadata exists', () => {
@@ -647,7 +659,7 @@ describe('IntegrationManager', () => {
       expect(result).toContain('linkedin');
       expect(result).toContain('discord');
       expect(result).toContain('telegram');
-      expect(result.length).toBeGreaterThanOrEqual(33);
+      expect(result.length).toBeGreaterThanOrEqual(36);
     });
   });
 
@@ -791,6 +803,9 @@ describe('IntegrationManager', () => {
       expect(identifiers).toContain('whop');
       expect(identifiers).toContain('skool');
       expect(identifiers).toContain('mewe');
+      expect(identifiers).toContain('tumblr');
+      expect(identifiers).toContain('pixelfed');
+      expect(identifiers).toContain('peertube');
     });
   });
 });

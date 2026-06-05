@@ -202,6 +202,22 @@ const mocks: Record<string, ProviderMock> = {
     userResponse: { success: true, agent: { id: '123', name: 'Test Agent', display_name: 'Test Agent' } },
     postResponse: { success: true, post: { id: 'post-123' } },
   },
+  tumblr: {
+    tokenResponse: { access_token: 'tok', refresh_token: 'rtok', expires_in: 3600 },
+    userResponse: { response: { user: { blogs: [{ name: 'testblog', title: 'Test Blog', avatar: [{ url: 'https://ex.com/av.jpg' }] }] } } },
+    postResponse: { response: { id_string: 'post-123', id: 123 } },
+  },
+  pixelfed: {
+    tokenResponse: { access_token: 'tok' },
+    userResponse: { id: '123', display_name: 'Test User', username: 'testuser', avatar: 'https://ex.com/av.jpg' },
+    postResponse: { id: 'post-123', url: 'https://pixelfed.social/p/testuser/123' },
+    mediaResponse: { id: 'media-123' },
+  },
+  peertube: {
+    tokenResponse: { access_token: 'tok', refresh_token: 'rtok' },
+    userResponse: { id: '123', account: { displayName: 'Test User', avatar: { path: '/avatar.jpg' } }, username: 'testuser', videoChannels: [{ id: 1 }] },
+    postResponse: { video: { id: 'vid-123', uuid: 'abc-123' } },
+  },
 };
 
 export function getProviderMock(id: string): ProviderMock {
