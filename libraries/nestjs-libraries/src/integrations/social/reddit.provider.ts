@@ -2,11 +2,13 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { RedditSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/reddit.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
+import { decodeHtmlEntities } from '@gitroom/helpers/utils/html.to.text';
 import { groupBy } from 'lodash';
 import {
   RefreshToken,
@@ -16,6 +18,7 @@ import {
 import { lookup } from 'mime-types';
 import axios from 'axios';
 import WebSocket from 'ws';
+import { Logger } from '@nestjs/common';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
@@ -25,6 +28,7 @@ import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 if (!global.WebSocket) global.WebSocket = WebSocket;
 
 export class RedditProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(RedditProvider.name);
   override maxConcurrentJob = 1; // Reddit has strict rate limits (1 request per second)
   identifier = 'reddit';
   name = 'Reddit';
@@ -516,5 +520,163 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
           name: p.text,
         })) || [],
     };
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  private flattenRedditComments(children: any[], depth = 0, maxDepth = 10): SocialCommentDTO[] {
+    if (depth >= maxDepth) return [];
+    const result: SocialCommentDTO[] = [];
+
+    for (const child of children) {
+      if (child.kind !== 't1') continue;
+      const data = child.data;
+
+      result.push({
+        platformCommentId: data.id,
+        parentPlatformCommentId: data.parent_id?.startsWith('t1_')
+          ? data.parent_id.slice(3)
+          : undefined,
+        author: {
+          id: data.author || '',
+          name: data.author || '',
+          username: data.author,
+          profileUrl: `https://www.reddit.com/user/${data.author}/`,
+        },
+        content: decodeHtmlEntities(data.body || ''),
+        createdAt: new Date(data.created_utc * 1000).toISOString(),
+        likeCount: data.score,
+        replyCount: data.replies?.data?.children?.length || 0,
+        likedByMe: !!data.likes,
+        raw: data,
+      });
+
+      if (data.replies && typeof data.replies === 'object' && data.replies.data?.children) {
+        result.push(...this.flattenRedditComments(data.replies.data.children, depth + 1, maxDepth));
+      }
+    }
+
+    return result;
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      const cleanPostId = postId.startsWith('t3_') ? postId.slice(3) : postId;
+
+      const info = await (
+        await this.fetch(
+          `https://oauth.reddit.com/api/info?id=t3_${cleanPostId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json() as any;
+
+      const subreddit = info?.data?.children?.[0]?.data?.subreddit;
+      if (!subreddit) {
+        return { comments: [] };
+      }
+
+      const afterParam = cursor ? `&after=${cursor}` : '';
+      const commentsResponse = await (
+        await this.fetch(
+          `https://oauth.reddit.com/r/${subreddit}/comments/${cleanPostId}?limit=100${afterParam}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+          }
+        )
+      ).json() as any[];
+
+      const commentsListing = commentsResponse?.[1];
+      if (!commentsListing?.data?.children) {
+        return { comments: [] };
+      }
+
+      const after = commentsListing?.data?.after || undefined;
+      const comments = this.flattenRedditComments(commentsListing.data.children);
+
+      return { comments, nextCursor: after };
+    } catch (err) {
+      this.logger.error('Reddit fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    parentCommentId: string,
+    message: string,
+    _integration: Integration
+  ) {
+    try {
+      const thingId = parentCommentId.startsWith('t1_')
+        ? parentCommentId
+        : `t1_${parentCommentId}`;
+
+      const response = await (
+        await this.fetch('https://oauth.reddit.com/api/comment', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            text: message,
+            thing_id: thingId,
+            api_type: 'json',
+          }),
+        })
+      ).json() as any;
+
+      const commentData = response?.json?.data?.things?.[0]?.data;
+
+      return {
+        platformCommentId: commentData?.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: commentData?.author || '',
+          name: commentData?.author || '',
+          username: commentData?.author,
+          profileUrl: commentData?.author
+            ? `https://www.reddit.com/user/${commentData.author}/`
+            : undefined,
+        },
+        content: message,
+        createdAt: commentData?.created_utc
+          ? new Date(commentData.created_utc * 1000).toISOString()
+          : new Date().toISOString(),
+        likeCount: 0,
+        replyCount: 0,
+        likedByMe: false,
+      };
+    } catch (err) {
+      this.logger.error('Reddit replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: '',
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
   }
 }

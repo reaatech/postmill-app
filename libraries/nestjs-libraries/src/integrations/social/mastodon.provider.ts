@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -10,14 +11,21 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { number, string } from 'yup';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { htmlToText } from '@gitroom/helpers/utils/html.to.text';
+import { Logger } from '@nestjs/common';
 
 export class MastodonProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(MastodonProvider.name);
   override maxConcurrentJob = 5; // Mastodon instances typically have generous limits
   identifier = 'mastodon';
   name = 'Mastodon';
   isBetweenSteps = false;
-  scopes = ['write:statuses', 'profile', 'write:media'];
+  scopes = ['read:statuses', 'write:statuses', 'profile', 'write:media'];
   editor = 'normal' as const;
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
   maxLength() {
     return 500;
   }
@@ -273,5 +281,126 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
       (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
       postDetails
     );
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    _cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+
+      const context = await (
+        await this.fetch(`${instanceUrl}/api/v1/statuses/${postId}/context`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      ).json() as { ancestors: any[]; descendants: any[] };
+
+      const comments: SocialCommentDTO[] = (context.descendants || []).map((s: any) => ({
+        platformCommentId: s.id,
+        parentPlatformCommentId: s.in_reply_to_id || undefined,
+        author: {
+          id: s.account?.id || '',
+          name: s.account?.display_name || s.account?.acct || '',
+          username: s.account?.acct || s.account?.username,
+          picture: s.account?.avatar,
+          profileUrl: s.account?.url,
+        },
+        content: htmlToText(s.content),
+        createdAt: s.created_at,
+        likeCount: s.favourites_count,
+        replyCount: s.replies_count,
+        likedByMe: !!s.favourited,
+        raw: s,
+      }));
+
+      return { comments, nextCursor: undefined };
+    } catch (err) {
+      this.logger.error('Mastodon fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    parentCommentId: string,
+    message: string,
+    _integration: Integration
+  ) {
+    try {
+      const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+
+      const form = new FormData();
+      form.append('status', message);
+      form.append('in_reply_to_id', parentCommentId);
+
+      const response = await (
+        await this.fetch(`${instanceUrl}/api/v1/statuses`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: form,
+        })
+      ).json() as any;
+
+      return {
+        platformCommentId: response.id,
+        parentPlatformCommentId: response.in_reply_to_id || undefined,
+        author: {
+          id: response.account?.id || '',
+          name: response.account?.display_name || response.account?.acct || '',
+          username: response.account?.acct || response.account?.username,
+          picture: response.account?.avatar,
+          profileUrl: response.account?.url,
+        },
+        content: htmlToText(response.content) || message,
+        createdAt: response.created_at,
+      };
+    } catch (err) {
+      this.logger.error('Mastodon replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: '',
+          name: '',
+          username: '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    commentId: string,
+    like: boolean,
+    _integration: Integration
+  ) {
+    const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+    const endpoint = like ? 'favourite' : 'unfavourite';
+
+    try {
+      const response = await (
+        await this.fetch(`${instanceUrl}/api/v1/statuses/${commentId}/${endpoint}`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      ).json() as any;
+
+      return { liked: like, likeCount: response.favourites_count };
+    } catch (err: any) {
+      // Surface the failure so the caller (service → UI) can revert the
+      // optimistic toggle and tell the user, rather than reporting a fake state.
+      this.logger.error('Mastodon likeComment error:', err);
+      throw err;
+    }
   }
 }

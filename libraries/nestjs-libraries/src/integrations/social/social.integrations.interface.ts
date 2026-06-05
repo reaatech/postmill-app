@@ -127,6 +127,60 @@ export type MediaContent = {
   thumbnailTimestamp?: number;
 };
 
+export type SocialCommentAuthor = {
+  id: string;
+  name: string;
+  username?: string;
+  picture?: string;
+  profileUrl?: string;
+};
+
+export type SocialCommentDTO = {
+  platformCommentId: string;
+  parentPlatformCommentId?: string;
+  author: SocialCommentAuthor;
+  content: string;
+  createdAt: string;
+  likeCount?: number;
+  replyCount?: number;
+  likedByMe?: boolean;
+  raw?: any;
+};
+
+export interface ISocialMediaComments {
+  commentsCapabilities?: {
+    read: boolean;
+    reply: boolean;
+    like: boolean;
+  };
+
+  fetchComments?(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }>;
+
+  replyToComment?(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO>;
+
+  likeComment?(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }>;
+}
+
 export type FetchPageInformationResult = {
   id: string;
   name: string;
@@ -137,7 +191,8 @@ export type FetchPageInformationResult = {
 
 export interface SocialProvider
   extends IAuthenticator,
-    ISocialMediaIntegration {
+    ISocialMediaIntegration,
+    ISocialMediaComments {
   identifier: string;
   refreshWait?: boolean;
   convertToJPEG?: boolean;

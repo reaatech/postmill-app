@@ -3,6 +3,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -17,6 +18,7 @@ import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { Logger } from '@nestjs/common';
 
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
@@ -41,6 +43,7 @@ export class InstagramProvider
   override maxConcurrentJob = 400;
   editor = 'normal' as const;
   dto = InstagramDto;
+  private readonly logger = new Logger(InstagramProvider.name);
   maxLength() {
     return 2200;
   }
@@ -990,6 +993,135 @@ export class InstagramProvider
     } catch (err) {
       console.error('Error fetching Instagram post analytics:', err);
       return [];
+    }
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      let url = `https://graph.facebook.com/v20.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from{id,name,picture},created_time,like_count,reply_count,user_likes&limit=50`;
+
+      if (cursor) {
+        url += `&after=${cursor}`;
+      }
+
+      const response = await this.fetch(url);
+      const json = await response.json() as any;
+      const data = json?.data || [];
+
+      const comments: SocialCommentDTO[] = data.map((item: any) => ({
+        platformCommentId: item.id,
+        parentPlatformCommentId: undefined,
+        author: {
+          id: item.from?.id || '',
+          name: item.from?.name || '',
+          picture: item.from?.picture?.data?.url,
+          profileUrl: item.from?.id
+            ? `https://www.instagram.com/${item.from.id}`
+            : undefined,
+        },
+        content: item.message || '',
+        createdAt: item.created_time || '',
+        likeCount: item.like_count || 0,
+        replyCount: item.reply_count || 0,
+        likedByMe: !!item.user_likes,
+      }));
+
+      const nextCursor = json?.paging?.cursors?.after;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('Instagram fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ) {
+    try {
+      const response = await this.fetch(
+        `https://graph.facebook.com/v20.0/${parentCommentId}/replies?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message }),
+        }
+      );
+
+      const json = await response.json() as any;
+
+      return {
+        platformCommentId: json.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('Instagram replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration?.internalId || '',
+          name: integration?.name || '',
+          username: integration?.profile || '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    _integration: Integration
+  ) {
+    try {
+      if (like) {
+        await this.fetch(
+          `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
+          { method: 'POST' }
+        );
+
+        return { liked: true };
+      } else {
+        await this.fetch(
+          `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
+          { method: 'DELETE' }
+        );
+
+        return { liked: false };
+      }
+    } catch (err) {
+      this.logger.error('Instagram likeComment error:', err);
+      throw err;
     }
   }
 }

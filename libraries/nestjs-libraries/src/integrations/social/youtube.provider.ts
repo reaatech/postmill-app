@@ -3,6 +3,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -21,6 +22,8 @@ import { GaxiosResponse } from 'gaxios/build/src/common';
 import Schema$Video = youtube_v3.Schema$Video;
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { Integration } from '@prisma/client';
+import { Logger } from '@nestjs/common';
 
 let _clientAndYoutube: {
   client: OAuth2Client;
@@ -77,6 +80,8 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     'https://www.googleapis.com/auth/youtubepartner',
     'https://www.googleapis.com/auth/yt-analytics.readonly',
   ];
+
+  private readonly logger = new Logger(YoutubeProvider.name);
 
   editor = 'normal' as const;
   maxLength() {
@@ -654,6 +659,99 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     } catch (err) {
       console.error('Error fetching YouTube post analytics:', err);
       return [];
+    }
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      const { client, youtube } = clientAndYoutube();
+      client.setCredentials({ access_token: accessToken });
+      const youtubeClient = youtube(client);
+
+      const response = await youtubeClient.commentThreads.list({
+        part: ['snippet', 'replies'],
+        videoId: postId,
+        maxResults: 50,
+        pageToken: cursor,
+      });
+
+      const comments: SocialCommentDTO[] = (response.data.items || []).map(
+        (item: any) => {
+          const snippet = item.snippet?.topLevelComment?.snippet;
+          return {
+            platformCommentId: item.id,
+            author: {
+              id: snippet?.authorChannelId?.value || '',
+              name: snippet?.authorDisplayName || '',
+              username: snippet?.authorChannelUrl || '',
+              picture: snippet?.authorProfileImageUrl || '',
+            },
+            content: snippet?.textOriginal || '',
+            createdAt: snippet?.publishedAt || '',
+            likeCount: snippet?.likeCount || 0,
+            replyCount: item.snippet?.totalReplyCount || 0,
+          };
+        }
+      );
+
+      const nextCursor =
+        response.data.nextPageToken || undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('YouTube fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    parentCommentId: string,
+    message: string,
+    _integration: Integration
+  ) {
+    try {
+      const { client, youtube } = clientAndYoutube();
+      client.setCredentials({ access_token: accessToken });
+      const youtubeClient = youtube(client);
+
+      const response = await youtubeClient.comments.insert({
+        part: ['snippet'],
+        requestBody: {
+          snippet: {
+            parentId: parentCommentId,
+            textOriginal: message,
+          },
+        },
+      });
+
+      return {
+        platformCommentId: response.data.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: response.data.snippet?.authorChannelId?.value || '',
+          name: response.data.snippet?.authorDisplayName || '',
+          username: response.data.snippet?.authorChannelUrl || '',
+          picture: response.data.snippet?.authorProfileImageUrl || '',
+        },
+        content: response.data.snippet?.textOriginal || '',
+        createdAt: response.data.snippet?.publishedAt || '',
+      };
+    } catch (err) {
+      this.logger.error('YouTube replyToComment error:', err);
+      throw err;
     }
   }
 }

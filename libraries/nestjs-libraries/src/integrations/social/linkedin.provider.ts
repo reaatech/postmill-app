@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -17,6 +18,7 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { Integration } from '@prisma/client';
 import { PostPlug } from '@gitroom/helpers/decorators/post.plug';
+import { Logger } from '@nestjs/common';
 import { LinkedinDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/linkedin.dto';
 import imageToPDF from 'image-to-pdf';
 import { Readable } from 'stream';
@@ -27,6 +29,7 @@ import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
   'LinkedIn can have maximum one attachment when selecting video, when choosing a carousel on LinkedIn minimum amount of attachment must be two, and only pictures, if uploading a video, LinkedIn can have only one attachment'
 )
 export class LinkedinProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(LinkedinProvider.name);
   identifier = 'linkedin';
   name = 'LinkedIn';
   oneTimeToken = true;
@@ -962,5 +965,206 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
 
   mentionFormat(idOrHandle: string, name: string) {
     return `@[${name.replace('@', '')}](urn:li:organization:${idOrHandle})`;
+  }
+
+  private get isCompanyContext(): boolean {
+    return this.identifier === 'linkedin-page';
+  }
+
+  private actorUrn(id: string): string {
+    return this.isCompanyContext
+      ? `urn:li:organization:${id}`
+      : `urn:li:person:${id}`;
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    _integration: Integration
+  ) {
+    try {
+      const start = cursor ? parseInt(cursor, 10) : 0;
+
+      const response = await this.fetch(
+        `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(
+          postId
+        )}/comments?q=comments&start=${start}&count=50&projection=(elements*(actor~(id,localizedFirstName,localizedLastName,profilePicture~:playableStreams),id,message,createdAt,parentComment))`,
+        {
+          headers: {
+            'X-Restli-Protocol-Version': '2.0.0',
+            'LinkedIn-Version': '202601',
+            Authorization: `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      const json = await response.json() as any;
+      const elements = json?.elements || [];
+
+      const comments: SocialCommentDTO[] = elements.map((el: any) => {
+        const actorDetails = el?.['actor~'] || {};
+        const firstName = actorDetails?.localizedFirstName || '';
+        const lastName = actorDetails?.localizedLastName || '';
+        const authorName = `${firstName} ${lastName}`.trim() || el.actor?.split(':').pop() || '';
+        const actorPicture = actorDetails?.['profilePicture~']?.elements?.[0]?.identifiers?.[0]?.identifier;
+
+        const actorUrn = el.actor?.replace('urn:li:', '').split(':') || [];
+        const authorType = actorUrn[0] || '';
+        const authorId = actorUrn[1] || el.actor || '';
+
+        return {
+          platformCommentId: el.id,
+          parentPlatformCommentId: el.parentComment || undefined,
+          author: {
+            id: el.actor || '',
+            name: authorName,
+            username: authorId,
+            picture: actorPicture,
+            profileUrl: authorType === 'person'
+              ? `https://www.linkedin.com/in/${authorId}/`
+              : authorType === 'organization'
+                ? `https://www.linkedin.com/company/${authorId}/`
+                : undefined,
+          },
+          content: el.message?.text || '',
+          createdAt: el.createdAt || el.created?.time
+            ? new Date(el.createdAt || el.created.time).toISOString()
+            : '',
+          raw: el,
+        };
+      });
+
+      const nextStart = start + 50;
+      const nextCursor = (elements?.length || 0) >= 50 ? String(nextStart) : undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('LinkedIn fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ) {
+    try {
+      const objectUrn = parentCommentId
+        ? `urn:li:comment:(${postId},${parentCommentId})`
+        : postId;
+
+      const response = await this.fetch(
+        `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(
+          postId
+        )}/comments`,
+        {
+          method: 'POST',
+          headers: {
+            'LinkedIn-Version': '202306',
+            'X-Restli-Protocol-Version': '2.0.0',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            actor: this.actorUrn(id),
+            object: objectUrn,
+            parentComment: parentCommentId,
+            message: {
+              text: this.fixText(message),
+            },
+          }),
+        }
+      );
+
+      const { object } = await response.json() as any;
+
+      return {
+        platformCommentId: object || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('LinkedIn replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration?.internalId || '',
+          name: integration?.name || '',
+          username: integration?.profile || '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    _postId: string,
+    commentId: string,
+    like: boolean,
+    _integration: Integration
+  ) {
+    const actor = this.actorUrn(id);
+
+    try {
+      if (like) {
+        await this.fetch(
+          `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(
+            commentId
+          )}/likes`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Restli-Protocol-Version': '2.0.0',
+              'LinkedIn-Version': '202601',
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ actor }),
+          }
+        );
+
+        return { liked: true };
+      } else {
+        await this.fetch(
+          `https://api.linkedin.com/rest/socialActions/${encodeURIComponent(
+            commentId
+          )}/likes?actor=${encodeURIComponent(actor)}`,
+          {
+            method: 'DELETE',
+            headers: {
+              'X-Restli-Protocol-Version': '2.0.0',
+              'LinkedIn-Version': '202601',
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        );
+
+        return { liked: false };
+      }
+    } catch (err) {
+      this.logger.error('LinkedIn likeComment error:', err);
+      throw err;
+    }
   }
 }

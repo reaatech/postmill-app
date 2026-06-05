@@ -3,6 +3,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -18,6 +19,7 @@ import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { Logger } from '@nestjs/common';
 
 @Rules(
   "Facebook posts can be text only, or include photos or a video. If it's a story, it must have at least one attachment (photo or video), and each media is published as a separate story."
@@ -35,6 +37,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     'read_insights',
   ];
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
+  private readonly logger = new Logger(FacebookProvider.name);
   editor = 'normal' as const;
   maxLength() {
     return 63206;
@@ -793,6 +796,130 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     } catch (err) {
       console.error('Error fetching Facebook post analytics:', err);
       return [];
+    }
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ) {
+    try {
+      let url = `https://graph.facebook.com/v20.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from{{id,name,picture}},created_time,like_count,comment_count,user_likes&limit=50`;
+
+      if (cursor) {
+        url += `&after=${cursor}`;
+      }
+
+      const response = await fetch(url);
+      const json = await response.json() as any;
+      const data = json?.data || [];
+
+      const comments: SocialCommentDTO[] = data.map((el: any) => ({
+        platformCommentId: el.id,
+        author: {
+          id: el.from?.id || '',
+          name: el.from?.name || '',
+          picture: el.from?.picture?.data?.url,
+        },
+        content: el.message || '',
+        createdAt: el.created_time,
+        likeCount: el.like_count,
+        replyCount: el.comment_count,
+        likedByMe: el.user_likes,
+        raw: el,
+      }));
+
+      const nextCursor = json?.paging?.cursors?.after;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      this.logger.error('Facebook fetchComments error:', err);
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ) {
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v20.0/${parentCommentId}/replies?access_token=${accessToken}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ message }),
+        }
+      );
+
+      const json = await response.json() as any;
+
+      return {
+        platformCommentId: json.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      this.logger.error('Facebook replyToComment error:', err);
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration?.internalId || '',
+          name: integration?.name || '',
+          username: integration?.profile || '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ) {
+    try {
+      if (like) {
+        await fetch(
+          `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
+          { method: 'POST' }
+        );
+        return { liked: true };
+      } else {
+        await fetch(
+          `https://graph.facebook.com/v20.0/${commentId}/likes?access_token=${accessToken}`,
+          { method: 'DELETE' }
+        );
+        return { liked: false };
+      }
+    } catch (err) {
+      this.logger.error('Facebook likeComment error:', err);
+      throw err;
     }
   }
 }
