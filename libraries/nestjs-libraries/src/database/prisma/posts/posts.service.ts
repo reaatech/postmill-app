@@ -336,15 +336,15 @@ export class PostsService {
     return this._postRepository.getPosts(orgId, query);
   }
 
-  async getPostsMinified(orgId: string, query: GetPostsDto) {
+  async getPostsMinified(orgId: string, query: GetPostsDto, userId?: string) {
     return minifyPosts({
-      posts: await this._postRepository.getPosts(orgId, query),
+      posts: await this._postRepository.getPosts(orgId, query, userId),
     });
   }
 
-  async getPostsList(orgId: string, query: GetPostsListDto) {
+  async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {
     return minifyPostsList(
-      await this._postRepository.getPostsList(orgId, query)
+      await this._postRepository.getPostsList(orgId, query, userId)
     );
   }
 
