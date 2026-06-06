@@ -4,8 +4,15 @@ How to create the developer app / credentials for each channel and what to enter
 [Channels admin](../admin/channels.md). Scopes, identifiers, and credential keys below are taken
 from the provider implementations.
 
-> **Verified against v3.4.0.** 36 providers. Configure credentials in the admin UI (encrypted at
+> **Verified against v3.5.0.** 36 providers. Configure credentials in the admin UI (encrypted at
 > rest) or via the equivalent environment variables — the admin UI takes precedence.
+
+> **Per-provider capabilities** (comment sync, first comment, polls, video, carousel, alt text, max
+> media, link preview, refresh token, watchlist) are declared in the central capability matrix — the
+> source of truth the composer and admin UI read. See
+> [Provider capabilities](../features/provider-capabilities.md). Notably (v3.5.0): X and LinkedIn
+> support **polls**; Discord, Telegram, Slack, WordPress, dev.to, Hashnode, Medium, and TikTok gain
+> **comment sync**; and most posting providers support a **first comment**.
 
 ---
 

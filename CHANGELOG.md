@@ -1,5 +1,89 @@
 # Changelog
 
+## [3.5.0] - 2026-06-06
+
+A codebase-hardening + feature-expansion release: a 30-item security cluster, 18 new analytics/AI/social features built on existing infrastructure, and several architecture refactors. Every change is additive or a refactor under existing contracts — no breaking changes, no schema renames.
+
+### Added
+
+- **Analytics: Channel Detail panel (2A)** — Slide-out `ChannelDetailPanel` rendering all per-channel KPIs with time-series area charts and a top-posts table; wires the previously-dead `useChannelDetail` hook and new `useChannelMetric` to `GET /analytics/v2/channel/:id` and `/channel/:id/metric/:metric`.
+- **Analytics: Export button (2B)** — Dashboard-header dropdown for the already-wired `GET /analytics/v2/export?format=csv|json`.
+- **Analytics: Post detail time-series + metric picker (2C)** — Post detail slide-out renders each metric's `{date,value}[]` series as charts (not just latest value); Posts tab gains a column picker over the 37 canonical metrics.
+- **AI: Hashtag generator (2D)** — `POST /ai/hashtags` via `AIModelProvider.generateObject()` with platform-aware prompts; new composer tab. Brand voice, guardrails, and budget auto-applied.
+- **AI: Comment sentiment + summary (2E)** — `POST /ai/comment-reply` gains `sentiment`/`summary` modes; sentiment badges and a "summarize comments" action on the comment thread.
+- **Social: First comment (2F)** — Auto-posts a first comment after a successful publish via new workflow `post.workflow.v1.0.6`. Capability-gated on `providerCapabilities.firstComment`, idempotent (records the posted comment id / `firstCommentPostedAt` so retries don't double-post), and non-fatal (a failed first comment warns but never fails the post).
+- **Analytics: Best Time to Post heatmap (2G)** — `GET /analytics/v2/best-time` returns structured day×hour engagement data; new `BestTimeTab` heatmap. Coexists with the composer's LLM-text `ai.best-time.tsx`; shares the underlying timing/engagement query.
+- **Analytics: Recommendations tab (2H)** — `GET /analytics/v2/recommendations` surfaces prioritized actions (underperforming channels, top post patterns, best-time opportunities, missing coverage, comment backlog), each deep-linking into the relevant view.
+- **Social: Cross-channel comment inbox (2I)** — Unified inbox over `SocialComment`/`PostCommentRead` with unread/assigned/status filters, sentiment/priority badges, bulk mark-read, and quick replies; new `/comments` route + nav entry.
+- **Composer: Content QA preflight panel (2J)** — Pre-schedule preflight checking platform limits, missing alt text, unsupported media, unsafe links, link-preview availability, first-comment/poll compatibility, and AI compliance; returns warnings vs blocking results separately without changing create-post contracts.
+- **Notifications: new events wired (2K)** — Reuses the existing notification stack to emit post-publish/first-comment/poll failures, comment-inbox backlog thresholds, AI budget thresholds, and watchlist trend alerts (respecting per-user email prefs).
+- **Composer: Bulk scheduling / CSV import (2L)** — `POST /posts/bulk` with a validated row DTO; upload/paste-rows UI with column mapping and preview. Each row runs through shared post-creation logic + the 2J preflight and returns per-row success/warnings/errors without failing the batch; can target a campaign (3O).
+- **AI: Content compliance checker (3D)** — `POST /ai/compliance` checks content against platform ToS, brand safety, regulatory rules, and the org brand profile; returns structured `{ violations[], passed }`.
+- **Social: Comments for 8 more providers (3E)** — `ISocialMediaComments` (`fetchComments`/`replyToComment`/`likeComment` + capability override) added to Discord, Telegram, Slack, WordPress, dev.to, Hashnode, Medium, and TikTok.
+- **Social: Poll posts (3F)** — Poll creation wired through `post()` for X and LinkedIn (incl. LinkedIn page) when `settings.poll` is set; inline poll builder (2-4 options + duration). Poll validity is checked before publish (never publishes a plain post when a poll was requested) and gated on `providerCapabilities.poll`.
+- **AI: Per-platform brand voice (3G)** — `AIBrandProfile.platformInstructions` JSON field (`{ "x": "...", "linkedin": "..." }`); nullable, falls back to the global `instructions` (backward compatible). Resolved per-platform in `AIModelProvider`.
+- **AI: Brand memory / RAG from top posts (3M)** — "Write like our best posts" generation mode indexing high-performing posts and returning source snippets in the response metadata for transparency.
+- **Analytics: Competitor/watchlist tracking (3N)** — New `WatchedAccount`/`WatchedAccountMetric` models, watchlist service/repo, and analytics tab. Lightweight public-metric probes ride the existing collection sweep (`RUN_CRON=true`), are capability-gated, and gracefully auto-disable (logging `lastError`) on probe failure rather than crashing the sweep.
+- **Campaign folders (3O)** — New `Campaign` model + nullable `Post.campaignId` (existing rows stay `NULL`); campaigns service/repo/controller and page to group posts/assets/analytics/comments by campaign. Grouping for media/analytics/comments derives transitively through the post's campaign.
+- **Admin provider capability matrix (3P)** — Central `provider-capabilities.ts` matrix (analytics, comments, first comment, polls, video, carousel, alt text, max media, link preview, refresh token) exposed via `provider-capabilities.controller.ts` and an admin matrix view; composer controls read it so unsupported options are hidden/disabled consistently. Built early as the foundation for 2F/2J/3E/3F.
+
+### Changed
+
+- **Temporal unbounded-history fixes (1A)** — `missingPostWorkflow`, `autoPostWorkflow`, and `refreshTokenWorkflow` now `continueAsNew()` (24-iteration counter; refresh-token sleep capped at 30 days) so event histories stay bounded, matching `analyticsCollectionWorkflow`.
+- **Missing `@ActivityMethod()` (1B)** — Added to `integrations.activity.ts` `refreshToken()`, which is proxied from `refreshTokenWorkflow`.
+- **`createPopularPosts` field mapping (1C)** — Writes `post.category`/`post.topic`/`post.content`/`post.hook` instead of literal strings.
+- **`AnalyticsService` → repository layer (3A)** — Direct `this.prisma.*` calls moved into a new `AnalyticsRepository` (`getSnapshots`/`getPostSnapshots`/`checkCoverage`/…), restoring the Controller → Service → Repository layering.
+- **`ioRedis` → injectable `RedisService` (3B)** — The module-level singleton is wrapped in an `@Injectable()`; the old export is kept as a deprecated alias.
+- **Analytics Redis cache (3J)** — `getOverview()` results cached in Redis for 60s with key `analytics:overview:{orgId}:{sha256(params)}`, skipped when `endDate` is today (data may still arrive via the collection workflow).
+- **Code deduplication (3C)** — Analytics live-fallback, unread-comments SQL, shared post-creation logic, and `AIModelProvider` brand-voice/guardrail/telemetry assembly each extracted to one shared path.
+- **Dark-mode flash fix + calendar split (3H)** — Theme cookie read server-side in the root layout so the `dark` class applies before first render; the 1,472-line `calendar.tsx` split into ~9 subcomponents behind `CalendarContext`.
+- **DTO validation (3I/3K/3L)** — `class-validator` DTOs replace `@Body() rawBody: any` on `PostsController`/`IntegrationsController` (3I) and across public-API, third-party, webhooks, AI-settings, and no-auth provider-connect bodies (3L); analytics-v2 query params are typed and bounded (capped `limit`, validated `dir`/`sort`/`metric`, `to >= from`) server-side (3K).
+- **AI endpoint throttling (3Q)** — Explicit `@Throttle` on every new AI endpoint (hashtags, compliance, comment modes, brand-memory) — budget caps spend, not request rate.
+- **Webhook events for new surfaces (3R)** — Comment-sync and analytics surfaces emit webhook events; all new emitters dispatch through `safeFetch` (no new SSRF surface).
+- **A11y + i18n sweep (3S)** — Labels, keyboard nav, focus management, and repo-i18n strings (no hardcoded text) across all new frontend (heatmap, inbox, campaigns, watchlist, poll builder, preflight, capability matrix).
+- **AI/workflow Sentry spans (3T)** — `Sentry.addBreadcrumb` around `AIModelProvider.generateText`/`generateObject` (tagged scope/providerId/modelId, no prompt PII) and on the v1.0.6 first-comment step.
+
+### Security
+
+- **SSRF: outbound dispatch hardening (1D)** — New `safeFetch()` (validate via `isSafePublicHttpsUrl` + `ssrfSafeDispatcher` + manual per-hop redirect re-validation, cap 5) replaces bare `fetch` in `sendWebhooks` (post activity), `POST /webhooks/send`, and the no-auth connect-callback POST; the inline `/stream` redirect loop is folded into the same helper. Closes DNS-rebinding and redirect-to-internal (incl. `169.254.169.254`) blind SSRF.
+- **JWT hardening (1E)** — `verifyJWT` pins `algorithms: ['HS256']`; `signJWT` adds `expiresIn` with sliding cookie re-issue in `AuthMiddleware`. Legacy exp-less tokens still verify (no forced re-auth).
+- **CSPRNG `makeId()` (1F)** — `makeId()` and all direct `Math.random()` call sites (local storage, tiktok OAuth state, media job ids, post random time) switched to `crypto.randomBytes`/`randomUUID`, closing predictable OAuth-secret/API-key/auth-code/PKCE generation.
+- **Throttle guard fix (1G)** — `ThrottlerBehindProxyGuard` now applies the default throttle to all routes (inverted from the old bypass that returned `true` for ~99% of routes), so every `@Throttle` decorator (3Q/3AC) actually takes effect.
+- **SSRF: provider fetch sites (1H)** — `safeFetch`/`ssrfSafeDispatcher` applied to Mastodon/Bluesky media downloads, Mastodon-custom/Lemmy/WordPress/Listmonk connect URLs, and `SocialAbstract.fetch()` (default dispatcher, opt-out preserved). Optional `SSRF_ALLOWED_PRIVATE_CIDRS` allowlist for self-hosted instances.
+- **Integration token encryption (1I)** — `Integration.token`/`refreshToken` encrypted at rest (AES-GCM, `v2:` prefix) on create/update; legacy plaintext read transparently and upgraded on next refresh/reconnect.
+- **AES-GCM authenticated-encryption migration (3U)** — At-rest secrets migrate from CBC to AES-GCM via a dedicated `EncryptionService` and optional `ENCRYPTION_KEY` (falls back to deriving from `JWT_SECRET`); expand-contract read-fallback keeps existing secrets working.
+- **Helmet + Sentry scrubbing (3V)** — `helmet()` with HSTS/noSniff/referrerPolicy/frameguard/conservative CSP on all backend responses (skipped under `NOT_SECURED`); `beforeSend`/`beforeBreadcrumb` strips auth/cookie/impersonate headers, `apiKey`, `pos_`/`pca_`/`pcs_` tokens, passwords, and prompt/request bodies.
+- **RAG SQL integer-assert (3W)** — DDL-interpolated RAG inputs are integer-asserted in `ai-rag.repository.ts`, with the parameterization invariant documented.
+- **Global validation pipe (3Y)** — `whitelist` + `forbidNonWhitelisted` enabled globally; unknown fields are rejected (new optional fields must be declared on their DTO).
+- **CSRF for cookie-auth routes (3Z)** — Cookie-authenticated mutating routes require a CSRF header; header/API-key clients remain supported.
+- **OAuth 2.0 hardening (3AA)** — Redirect-URI matching, PKCE, scope checks, and token expiry/hashing with replay coverage; existing clients preserved via fallback paths.
+- **Return-URL allowlisting (3AB)** — Integration/enterprise return URLs are validated against `INTEGRATION_RETURN_URL_ALLOWLIST` before being stored or returned, closing open-redirect paths.
+- **Public/auth abuse throttles (3AC)** — `@Throttle` on login/forgot/activation/OAuth-token/public-tracking/enterprise routes (effective now that 1G is fixed).
+- **Media upload isolation (3AD)** — Multipart/presigned operations are org-bound via an ownership ledger; presign bounds and pre-buffer/Multer size limits enforced (no signing/listing/completing by client-supplied `key`/`uploadId` alone).
+- **XSS sanitization (3AE)** — All `dangerouslySetInnerHTML` render sites sanitized with DOMPurify.
+- **Frontend CSP (3AF)** — Content-Security-Policy header added in `next.config.js`.
+- **HttpOnly auth cookies (3AG)** — Frontend auth tokens migrated from JS-readable `document.cookie` to backend-issued HttpOnly cookies.
+- **postMessage origin (3AH)** — Target origin restricted from `'*'` to specific origins in `standalone.modal.tsx` and `launches.component.tsx`.
+- **Frontend `returnUrl` validation (3AI)** — Trivial `indexOf('http')` check replaced with origin validation.
+- **Production source maps disabled (3AJ)** — `productionBrowserSourceMaps` disabled (maps upload to Sentry only, not served publicly).
+- **Sentry PII capture off (3AK)** — OpenAI integration `recordInputs: false`/`recordOutputs: false`; `consoleLoggingIntegration` gated behind `allowLogs` (warn/error only); `console.log(err)` of raw API responses replaced with `Logger.warn` across X/Nostr providers, posts service, and autopost service.
+- **Error storage redaction (3AL)** — `PostsRepository.changeState` strips `token`/`accessToken`/`refreshToken`/`apiKey`/`secret`/`password`/`Authorization` (and snake_case variants) from error and body payloads before persisting to the `errors` table.
+- **CopilotKit /chat gating (3AM)** — `/copilot/chat` requires `@CheckPolicies([Create, AI])` and a per-request `BudgetService.checkBudget('agent', orgId)` (429 on exceeded); old behaviour behind `NOT_SECURED`.
+- **Nostr private-key encryption (3AN)** — The Nostr private key is encrypted before JWT-encoding and storage in `Integration.token`.
+- **bcrypt cost 12 (3AO)** — bcrypt cost factor raised from 10 to 12 (OWASP 2023 minimum).
+- **Generic auth errors (3AP)** — Auth controller returns generic messages instead of raw `e.message` to clients.
+- **CI vulnerability scanning (3AQ)** — `.github/workflows/security-audit.yml` runs `pnpm audit --audit-level=high` on PRs and weekly (fails on high/critical).
+- **`NOT_SECURED` hardening (3AR)** — `NOT_SECURED` gated for dev use and never exposes JWTs in response headers; it remains the universal dev toggle for HSTS/helmet/CSRF/CopilotKit gating.
+- **Farcaster generic error (3AS)** — Replaced the env-var-leaking `'Set NEYNAR_SECRET_KEY'` message with generic text.
+
+### Docs
+
+- **CHANGELOG.md** — This block (Added/Changed/Security/Docs) covering all v3.5.0 workstreams.
+- **README.md** — `**[v3.5.0]**` fork-notice block covering the headline analytics/AI/social features plus the security hardening.
+- **AGENTS.md / CLAUDE.md** — Added the "Feature surfaces & security (v3.5.0)" architecture note (capability matrix, comment inbox, campaigns, watchlist, polls, first comment, bulk import, best-time/recommendations) and expanded the key security-invariants list.
+- **`.env.example`** — Documented `ENCRYPTION_KEY` (3U), `INTEGRATION_RETURN_URL_ALLOWLIST` (3AB), and `SSRF_ALLOWED_PRIVATE_CIDRS` (1H).
+- **docs/ site** — Refreshed for v3.5.0 (separate workstream).
+
 ## [3.4.0] - 2026-06-05
 
 ### Added

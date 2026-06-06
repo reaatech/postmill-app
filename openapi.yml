@@ -75,7 +75,11 @@ tags:
   - name: Settings
     description: Team members and shortlink preference.
   - name: Webhooks
-    description: Org webhooks CRUD and test send.
+    description: "Org webhooks CRUD and test send. Event types: post.published, comment.new, comment.reply, analytics.snapshot_complete."
+  - name: Campaigns
+    description: "Fork addition: campaign folders grouping posts/assets/analytics/comments."
+  - name: Provider Capabilities
+    description: "Fork addition: per-provider capability matrix (comments / first-comment / poll / analytics)."
   - name: Autopost
     description: RSS/URL-driven automatic posting rules.
   - name: Signatures
@@ -660,6 +664,28 @@ paths:
       responses:
         '200': { description: Split posts, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
 
+  /posts/preflight:
+    post:
+      tags: [Posts]
+      summary: Content QA preflight (warnings + blocking validation, no post created)
+      operationId: postsPreflight
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/CreatePostDto' } } }
+      responses:
+        '200': { description: Preflight results (warnings and blocking validation), content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
+  /posts/bulk:
+    post:
+      tags: [Posts]
+      summary: Bulk / CSV scheduling (per-row success/warnings/errors)
+      operationId: postsBulk
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses:
+        '200': { description: Per-row results, content: { application/json: { schema: { type: object, additionalProperties: true } } } }
+
   /posts/tags:
     get:
       tags: [Posts]
@@ -810,6 +836,37 @@ paths:
       responses: { '200': { description: Deleted } }
 
   # ===================================================================== SOCIAL COMMENTS (fork)
+  /posts/inbox:
+    get:
+      tags: [Social Comments]
+      summary: Cross-channel comment inbox
+      operationId: getCommentInbox
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: assigneeId, in: query, schema: { type: string } }
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: unreadOnly, in: query, schema: { type: string, enum: ['true', 'false'] } }
+      responses: { '200': { description: Inbox page } }
+
+  /posts/inbox/unread-count:
+    get:
+      tags: [Social Comments]
+      summary: Org-wide inbox unread count
+      operationId: getInboxUnreadCount
+      responses: { '200': { description: Unread count } }
+
+  /posts/inbox/bulk-read:
+    post:
+      tags: [Social Comments]
+      summary: Bulk mark comments as read
+      operationId: inboxBulkRead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [commentIds], properties: { commentIds: { type: array, items: { type: string } } } }
+      responses: { '200': { description: Marked } }
+
   /posts/{id}/social-comments:
     get:
       tags: [Social Comments]
@@ -906,6 +963,82 @@ paths:
               type: object
               properties: { assigneeId: { type: [string, 'null'], description: User id, or null to unassign } }
       responses: { '200': { description: Assigned } }
+
+  # ===================================================================== CAMPAIGNS (fork)
+  /campaigns:
+    get:
+      tags: [Campaigns]
+      summary: List campaigns
+      operationId: listCampaigns
+      responses: { '200': { description: Campaigns } }
+    post:
+      tags: [Campaigns]
+      summary: Create a campaign
+      operationId: createCampaign
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string }
+                color: { type: string }
+                description: { type: string }
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+      responses: { '200': { description: Created } }
+
+  /campaigns/{id}:
+    get:
+      tags: [Campaigns]
+      summary: Get a campaign
+      operationId: getCampaign
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: Campaign } }
+    put:
+      tags: [Campaigns]
+      summary: Update a campaign
+      operationId: updateCampaign
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                color: { type: string }
+                description: { type: string }
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+                archived: { type: boolean }
+      responses: { '200': { description: Updated } }
+    delete:
+      tags: [Campaigns]
+      summary: Delete a campaign
+      operationId: deleteCampaign
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessFlag' } } } } }
+
+  # ===================================================================== PROVIDER CAPABILITIES (fork)
+  /provider-capabilities:
+    get:
+      tags: [Provider Capabilities]
+      summary: Provider capability matrix (comments / first-comment / poll / analytics)
+      operationId: getProviderCapabilities
+      responses: { '200': { description: Capability matrix } }
+
+  /admin/provider-capabilities:
+    get:
+      tags: [Provider Capabilities]
+      summary: Provider capability matrix (super-admin)
+      operationId: getAdminProviderCapabilities
+      responses:
+        '200': { description: Capability matrix }
+        '400': { description: Unauthorized (not super-admin) }
 
   # ===================================================================== INTEGRATIONS
   /integrations:
@@ -1448,6 +1581,93 @@ paths:
         - { $ref: '#/components/parameters/IntegrationsCsv' }
       responses: { '200': { description: Day detail } }
 
+  /analytics/v2/best-time:
+    get:
+      tags: [Analytics V2]
+      summary: Best-time-to-post heatmap (structured day×hour engagement)
+      operationId: analyticsBestTime
+      parameters:
+        - { $ref: '#/components/parameters/IntegrationsCsv' }
+      responses:
+        '200':
+          description: Heatmap data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  heatmap:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: { type: integer }
+                        hour: { type: integer }
+                        engagement: { type: number }
+                        postCount: { type: integer }
+                        avgEngagement: { type: number }
+                  bestSlots:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        day: { type: integer }
+                        hour: { type: integer }
+                        avgEngagement: { type: number }
+
+  /analytics/v2/recommendations:
+    get:
+      tags: [Analytics V2]
+      summary: Prioritized analytics recommendations (action cards)
+      operationId: analyticsRecommendations
+      responses: { '200': { description: Recommendation cards } }
+
+  /analytics/v2/watchlist:
+    get:
+      tags: [Analytics V2]
+      summary: List watched (competitor) accounts
+      operationId: analyticsWatchlistList
+      responses: { '200': { description: Watched accounts } }
+    post:
+      tags: [Analytics V2]
+      summary: Add a watched account
+      operationId: analyticsWatchlistAdd
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, handle]
+              properties:
+                provider: { type: string }
+                handle: { type: string }
+                displayName: { type: string }
+      responses: { '200': { description: Created } }
+
+  /analytics/v2/watchlist/{id}:
+    put:
+      tags: [Analytics V2]
+      summary: Update a watched account
+      operationId: analyticsWatchlistUpdate
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                displayName: { type: string }
+                enabled: { type: boolean }
+      responses: { '200': { description: Updated } }
+    delete:
+      tags: [Analytics V2]
+      summary: Remove a watched account
+      operationId: analyticsWatchlistDelete
+      parameters: [{ $ref: '#/components/parameters/PathId' }]
+      responses: { '200': { description: Deleted, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessFlag' } } } } }
+
   /analytics/v2/export:
     get:
       tags: [Analytics V2]
@@ -1836,18 +2056,89 @@ paths:
         '200': { description: Search results }
         '503': { description: Semantic search unavailable }
 
+  /ai/hashtags:
+    post:
+      tags: [AI User]
+      summary: Generate platform-aware hashtags
+      operationId: aiHashtags
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [content, platform], properties: { content: { type: string }, platform: { type: string } } }
+      responses:
+        '200': { description: Generated hashtags, content: { application/json: { schema: { type: object, properties: { hashtags: { type: array, items: { type: string } } } } } } }
+
   /ai/comment-reply:
     post:
       tags: [AI User]
-      summary: Draft an AI reply to a comment
+      summary: Draft an AI reply, or analyze sentiment / summarize a comment thread
       operationId: aiCommentReply
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [commentId, postContent], properties: { commentId: { type: string }, postContent: { type: string } } }
+            schema:
+              type: object
+              required: [commentId, postContent]
+              properties:
+                commentId: { type: string }
+                postContent: { type: string }
+                action: { type: string, enum: [reply, sentiment, summary], default: reply }
       responses:
-        '200': { description: Suggested reply, content: { application/json: { schema: { type: object, properties: { suggestion: { type: string } } } } } }
+        '200':
+          description: "Reply suggestion (action=reply), per-comment sentiment (action=sentiment), or thread summary (action=summary)"
+          content:
+            application/json: { schema: { type: object, additionalProperties: true } }
+
+  /ai/compliance:
+    post:
+      tags: [AI User]
+      summary: Check content compliance & brand safety
+      operationId: aiCompliance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [content], properties: { content: { type: string }, platform: { type: string } } }
+      responses:
+        '200':
+          description: Compliance result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  passed: { type: boolean }
+                  violations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type: { type: string }
+                        severity: { type: string, enum: [high, medium, low] }
+                        description: { type: string }
+                  suggestions: { type: array, items: { type: string } }
+
+  /ai/brand-memory/index:
+    post:
+      tags: [AI User]
+      summary: Index top-performing posts into RAG brand memory
+      operationId: aiBrandMemoryIndex
+      responses: { '200': { description: Index result } }
+
+  /ai/brand-memory/search:
+    post:
+      tags: [AI User]
+      summary: Search brand memory
+      operationId: aiBrandMemorySearch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [prompt], properties: { prompt: { type: string } } }
+      responses:
+        '200': { description: Hits, content: { application/json: { schema: { type: object, properties: { hits: { type: array, items: { type: object, additionalProperties: true } } } } } } }
 
   /ai/best-time:
     post:

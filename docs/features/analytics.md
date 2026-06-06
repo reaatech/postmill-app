@@ -3,7 +3,8 @@
 This fork replaces upstream's single-channel, live-fetch analytics with a **persisted, multi-channel
 dashboard** built from daily snapshots and served through the `/analytics/v2` API.
 
-> **Verified against v3.4.0.** Introduced in v3.1.0.
+> **Verified against v3.5.0.** Introduced in v3.1.0; Channel Detail panel, Export button, post-detail
+> time-series charts, Best Time heatmap, Recommendations, and Watchlist tabs added in v3.5.0.
 
 ---
 
@@ -27,6 +28,48 @@ A multi-channel drill-down with:
 - KPI cards with period-over-period change.
 - Line / bar / area / pie charts.
 - CSV / JSON export.
+- A tab bar covering Overview, Channels, Posts, **Best Time** (heatmap), **Recommendations**, and
+  **Watchlist** — see below.
+
+### Channel Detail panel (v3.5.0)
+
+Clicking a channel in the Channels tab opens a **slide-out Channel Detail panel** showing the full
+per-channel KPI set — every metric the channel reports, each with its own time-series area chart —
+plus a top-posts table for that channel. (Previously the dashboard surfaced only the first KPI per
+channel.) It reads `GET /analytics/v2/channel/:integrationId` and, per metric,
+`GET /analytics/v2/channel/:integrationId/metric/:metric`.
+
+### Export button (v3.5.0)
+
+A header **Export** dropdown downloads the current view as **CSV or JSON** via
+`GET /analytics/v2/export?format=csv|json`. (The backend export was already wired; v3.5.0 adds the
+UI.)
+
+### Post detail charts & metric column picker (v3.5.0)
+
+The Post Detail slide-out now renders each metric's full `{ date, value }[]` **time-series as a
+line/area chart**, not just the latest value. The Posts tab also gains a **metric column picker** so
+you can choose which of the canonical metrics to show as columns (previously a fixed set of
+impressions / engagement / likes / comments / shares).
+
+### Best Time to Post heatmap (v3.5.0)
+
+A **Best Time** tab renders a **day × hour heatmap**, color-coded by engagement, built from ~90 days
+of your post timing and engagement. It reads `GET /analytics/v2/best-time`, which returns structured
+heatmap data. This is the analytics dashboard's structured view; the composer's AI best-time tool
+(LLM text) is a separate surface — the two coexist.
+
+### Recommendations tab (v3.5.0)
+
+A **Recommendations** tab turns analytics from passive reporting into prioritized actions —
+underperforming channels, top post patterns, best-time opportunities, missing analytics coverage,
+and comment-response backlog. Each card carries a concrete action and deep-links into the relevant
+dashboard, channel, post, or comment inbox view. It reads `GET /analytics/v2/recommendations`.
+
+### Watchlist tab (v3.5.0)
+
+A **Watchlist** tab tracks public competitor/peer accounts where the provider's API allows it. See
+[Watchlist & competitor tracking](./watchlist.md) for how it works and its capability gating.
 
 ## API surface (`/analytics/v2`)
 
@@ -40,6 +83,9 @@ A multi-channel drill-down with:
 | `GET /analytics/v2/posts` | Post-level metrics list. |
 | `GET /analytics/v2/post/:postId` | Metrics for a single post (powers the Post Detail KPI header). |
 | `GET /analytics/v2/export` | CSV / JSON export. |
+| `GET /analytics/v2/best-time` | Structured day×hour heatmap data (Best Time tab). |
+| `GET /analytics/v2/recommendations` | Prioritized recommendation cards. |
+| `GET/POST/PUT/DELETE /analytics/v2/watchlist[/:id]` | Manage and read watched accounts — see [Watchlist](./watchlist.md). |
 
 > The Post Detail KPI header uses `/analytics/v2/post/:postId` with a live-fallback for posts that
 > haven't been snapshotted yet. See [Calendar & Post Detail](./calendar-and-posts.md).

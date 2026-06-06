@@ -3,7 +3,7 @@
 This page covers AI content generation — text and media — and is explicit about what works today
 versus what is stubbed for a later phase.
 
-> **Verified against v3.4.0.** Generation resolves its model through the AI facade; with no admin
+> **Verified against v3.5.0.** Generation resolves its model through the AI facade; with no admin
 > config it uses `OPENAI_API_KEY`. See [AI settings admin](../admin/ai-settings.md).
 
 ---
@@ -14,6 +14,20 @@ Text/prompt/slide generation works through the AI facade and is used across the 
 composing/assisting on posts, the `/agents` generator, the chat assistant, and the composer
 assistant. All four resolve their model from the facade, so changing the admin-configured provider
 or per-scope model takes effect without a redeploy.
+
+### Brand voice & per-platform overrides (v3.5.0)
+
+Generations are conditioned on your brand profile's instructions. v3.5.0 adds **per-platform
+overrides**: a brand profile can specify different instructions per platform (for example, witty on
+X, professional on LinkedIn). When generating for a specific platform the facade applies that
+platform's override and falls back to the global brand instructions when none is set — so existing
+single-instruction profiles behave exactly as before.
+
+### Brand memory ("write like our best posts") (v3.5.0)
+
+Using the RAG/indexing layer, you can index your top-performing posts and have generation reflect
+them. The response surfaces the source snippets the model drew on for transparency. See the
+brand-memory tools in [AI features](./ai-features.md).
 
 ## Image generation
 

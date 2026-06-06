@@ -2,7 +2,7 @@
 
 Postiz exposes several HTTP surfaces. This page maps them; each has its own page.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.0.**
 
 ---
 
@@ -31,6 +31,25 @@ Postiz exposes several HTTP surfaces. This page maps them; each has its own page
   [Configuration](../self-hosting/configuration.md).
 - MCP entrypoints are independently rate-limited (Redis-backed) and idempotency-protected. See
   [MCP](./mcp.md).
+- **New AI endpoints (v3.5.0)** carry explicit per-route `@Throttle` caps (e.g. `/ai/hashtags`,
+  `/ai/comment-reply`, `/ai/compliance` at 30/min) — distinct from AI budget governance. As of
+  v3.5.0 the throttle guard applies the default limit to **all** routes, with `@Throttle` overriding
+  per-route (previously most routes bypassed throttling). See
+  [Architecture](../developers/architecture.md).
+
+## New internal-API surfaces (v3.5.0)
+
+v3.5.0 adds several internal app-API surfaces backing new frontend features. These are session/JWT
+authenticated and **not** a stable public contract:
+
+- **AI utilities** — `/ai/hashtags`, `/ai/compliance`, `/ai/best-time`, `/ai/brand-memory/{index,search}`,
+  and an enhanced `/ai/comment-reply` with sentiment/summary action modes.
+- **Posts** — `/posts/preflight` (content QA) and `/posts/bulk` (bulk/CSV scheduling).
+- **Comment inbox** — `/posts/inbox`, `/posts/inbox/unread-count`, `/posts/inbox/bulk-read`.
+- **Campaigns** — `/campaigns` CRUD.
+- **Provider capabilities** — `/provider-capabilities` (and super-admin `/admin/provider-capabilities`).
+
+See [Public API → Internal app API additions](./public-api.md) for the per-endpoint table.
 
 ## Backward-compatibility commitment
 
