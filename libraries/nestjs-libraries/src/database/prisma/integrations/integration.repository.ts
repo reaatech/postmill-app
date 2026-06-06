@@ -6,6 +6,8 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { decryptIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
 
 @Injectable()
 export class IntegrationRepository {
@@ -240,6 +242,13 @@ export class IntegrationRepository {
           ]),
         }
       : {};
+
+    // Encrypt token and refreshToken at rest
+    const encryptedToken = AuthService.fixedEncryption(token);
+    const encryptedRefreshToken = refreshToken
+      ? AuthService.fixedEncryption(refreshToken)
+      : '';
+
     const upsert = await this._integration.model.integration.upsert({
       where: {
         organizationId_internalId: {
@@ -251,11 +260,11 @@ export class IntegrationRepository {
         type: type as any,
         name,
         providerIdentifier: provider,
-        token,
+        token: encryptedToken,
         profile: username,
         ...(picture ? { picture } : {}),
         inBetweenSteps: isBetweenSteps,
-        refreshToken,
+        refreshToken: encryptedRefreshToken,
         ...(expiresIn
           ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
           : {}),
@@ -283,8 +292,8 @@ export class IntegrationRepository {
         ...(picture ? { picture } : {}),
         profile: username,
         providerIdentifier: provider,
-        token,
-        refreshToken,
+        token: encryptedToken,
+        refreshToken: encryptedRefreshToken,
         ...(expiresIn
           ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
           : {}),
@@ -314,8 +323,8 @@ export class IntegrationRepository {
           rootInternalId: rootId,
         },
         data: {
-          token,
-          refreshToken,
+          token: encryptedToken,
+          refreshToken: encryptedRefreshToken,
           refreshNeeded: false,
           ...(expiresIn
             ? { tokenExpiration: new Date(Date.now() + expiresIn * 1000) }
@@ -337,7 +346,7 @@ export class IntegrationRepository {
         deletedAt: null,
         refreshNeeded: false,
       },
-    });
+    }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
   async setBetweenRefreshSteps(id: string) {
@@ -374,13 +383,15 @@ export class IntegrationRepository {
     });
   }
 
-  getIntegrationById(org: string, id: string) {
-    return this._integration.model.integration.findFirst({
+  async getIntegrationById(org: string, id: string) {
+    const result = await this._integration.model.integration.findFirst({
       where: {
         organizationId: org,
         id,
       },
     });
+    if (!result) return null;
+    return decryptIntegrationTokens(result);
   }
 
   async getIntegrationForOrder(
@@ -492,7 +503,7 @@ export class IntegrationRepository {
       include: {
         customer: true,
       },
-    });
+    }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
   async disableChannel(org: string, id: string) {

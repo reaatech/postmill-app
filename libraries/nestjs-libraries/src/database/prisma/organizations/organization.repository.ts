@@ -21,7 +21,7 @@ export class OrganizationRepository {
       },
       data: {
         name: name ? `${name}###${id}` : `Unnamed User###${id}`,
-        apiKey: AuthService.fixedEncryption(makeId(20)),
+        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
         isTrailing: false,
         subscription: {
           create: {
@@ -55,7 +55,7 @@ export class OrganizationRepository {
   getOrgByApiKey(api: string) {
     return this._organization.model.organization.findFirst({
       where: {
-        apiKey: api,
+        apiKey: AuthService.fixedEncryptionDeterministic(api),
       },
       include: {
         subscription: {
@@ -165,7 +165,7 @@ export class OrganizationRepository {
         id: orgId,
       },
       data: {
-        apiKey: AuthService.fixedEncryption(makeId(20)),
+        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
       },
     });
   }
@@ -272,7 +272,7 @@ export class OrganizationRepository {
     return this._organization.model.organization.create({
       data: {
         name: body.company,
-        apiKey: AuthService.fixedEncryption(makeId(20)),
+        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
         allowTrial: true,
         isTrailing: true,
         users: {

@@ -1,10 +1,5 @@
-export const makeId = (length: number) => {
-  let text = '';
-  const possible =
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+import crypto from 'crypto';
 
-  for (let i = 0; i < length; i += 1) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
+export const makeId = (length: number) => {
+  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
 };

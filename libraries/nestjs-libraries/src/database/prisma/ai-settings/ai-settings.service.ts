@@ -296,7 +296,7 @@ export class AiSettingsService {
 
   upsertBrandProfile(
     organizationId: string,
-    data: { instructions?: string; language?: string; enabled?: boolean },
+    data: { instructions?: string; language?: string; enabled?: boolean; platformInstructions?: Record<string, string> },
   ) {
     return this._repository.upsertBrandProfile(organizationId, data);
   }

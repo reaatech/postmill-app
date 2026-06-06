@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 @Injectable()
 export class OAuthRepository {
@@ -128,6 +129,10 @@ export class OAuthRepository {
     organizationId: string;
     authorizationCode: string;
     codeExpiresAt: Date;
+    redirectUri?: string;
+    codeChallenge?: string;
+    codeChallengeMethod?: string | null;
+    scope?: string;
   }) {
     return this._oauthAuth.model.oAuthAuthorization.upsert({
       where: {
@@ -143,26 +148,45 @@ export class OAuthRepository {
         organizationId: data.organizationId,
         authorizationCode: data.authorizationCode,
         codeExpiresAt: data.codeExpiresAt,
+        redirectUri: data.redirectUri,
+        codeChallenge: data.codeChallenge,
+        codeChallengeMethod: data.codeChallengeMethod,
+        scope: data.scope,
       },
       update: {
         authorizationCode: data.authorizationCode,
         codeExpiresAt: data.codeExpiresAt,
+        redirectUri: data.redirectUri,
+        codeChallenge: data.codeChallenge,
+        codeChallengeMethod: data.codeChallengeMethod,
+        scope: data.scope,
         accessToken: null,
         revokedAt: null,
       },
     });
   }
 
-  findByCode(encryptedCode: string) {
+  findByCode(encryptedCode: string | string[]) {
     return this._oauthAuth.model.oAuthAuthorization.findFirst({
       where: {
-        authorizationCode: encryptedCode,
+        authorizationCode: Array.isArray(encryptedCode)
+          ? { in: encryptedCode }
+          : encryptedCode,
         revokedAt: null,
       },
     });
   }
 
-  exchangeCodeForToken(id: string, encryptedToken: string) {
+  exchangeCodeForToken(
+    id: string,
+    encryptedToken: string,
+    options?: {
+      refreshToken?: string;
+      tokenExpiresAt?: Date;
+      refreshTokenExpiresAt?: Date;
+      scope?: string;
+    }
+  ) {
     return this._oauthAuth.model.oAuthAuthorization.update({
       where: { id },
       select: {
@@ -177,14 +201,20 @@ export class OAuthRepository {
         accessToken: encryptedToken,
         authorizationCode: null,
         codeExpiresAt: null,
+        ...(options?.refreshToken ? { refreshToken: options.refreshToken } : {}),
+        ...(options?.tokenExpiresAt ? { tokenExpiresAt: options.tokenExpiresAt } : {}),
+        ...(options?.refreshTokenExpiresAt ? { refreshTokenExpiresAt: options.refreshTokenExpiresAt } : {}),
+        ...(options?.scope ? { scope: options.scope } : {}),
       },
     });
   }
 
-  findByAccessToken(encryptedToken: string) {
+  findByAccessToken(encryptedToken: string | string[]) {
     return this._oauthAuth.model.oAuthAuthorization.findFirst({
       where: {
-        accessToken: encryptedToken,
+        accessToken: Array.isArray(encryptedToken)
+          ? { in: encryptedToken }
+          : encryptedToken,
         revokedAt: null,
       },
       include: {
@@ -202,6 +232,37 @@ export class OAuthRepository {
         user: {
           select: { id: true },
         },
+      },
+    });
+  }
+
+  findByRefreshToken(encryptedRefreshToken: string | string[]) {
+    return this._oauthAuth.model.oAuthAuthorization.findFirst({
+      where: {
+        refreshToken: Array.isArray(encryptedRefreshToken)
+          ? { in: encryptedRefreshToken }
+          : encryptedRefreshToken,
+        revokedAt: null,
+      },
+    });
+  }
+
+  updateTokens(
+    id: string,
+    data: {
+      accessToken: string;
+      refreshToken: string;
+      tokenExpiresAt: Date;
+      refreshTokenExpiresAt: Date;
+    },
+  ) {
+    return this._oauthAuth.model.oAuthAuthorization.update({
+      where: { id },
+      data: {
+        accessToken: data.accessToken,
+        refreshToken: data.refreshToken,
+        tokenExpiresAt: data.tokenExpiresAt,
+        refreshTokenExpiresAt: data.refreshTokenExpiresAt,
       },
     });
   }

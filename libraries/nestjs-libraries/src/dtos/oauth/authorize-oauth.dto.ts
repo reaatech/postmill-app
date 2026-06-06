@@ -1,4 +1,4 @@
-import { IsDefined, IsIn, IsOptional, IsString } from 'class-validator';
+import { IsDefined, IsIn, IsOptional, IsString, IsUrl } from 'class-validator';
 
 export class AuthorizeOAuthQueryDto {
   @IsString()
@@ -13,6 +13,24 @@ export class AuthorizeOAuthQueryDto {
   @IsString()
   @IsOptional()
   state?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  redirect_uri?: string;
+
+  @IsString()
+  @IsOptional()
+  code_challenge?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['S256'])
+  code_challenge_method?: string;
+
+  @IsString()
+  @IsOptional()
+  scope?: string;
 }
 
 export class ApproveOAuthDto {
@@ -28,4 +46,22 @@ export class ApproveOAuthDto {
   @IsDefined()
   @IsIn(['approve', 'deny'])
   action: 'approve' | 'deny';
+
+  @IsString()
+  @IsOptional()
+  @IsUrl({ require_tld: false })
+  redirect_uri?: string;
+
+  @IsString()
+  @IsOptional()
+  code_challenge?: string;
+
+  @IsString()
+  @IsOptional()
+  @IsIn(['S256'])
+  code_challenge_method?: string;
+
+  @IsString()
+  @IsOptional()
+  scope?: string;
 }

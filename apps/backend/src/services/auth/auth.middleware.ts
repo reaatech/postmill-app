@@ -7,6 +7,7 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
+import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
 
 export const removeAuth = (res: Response) => {
   res.cookie('auth', '', {
@@ -106,6 +107,23 @@ export class AuthMiddleware implements NestMiddleware {
       // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       req.org = setOrg;
+      // Sliding re-issue: if token is within 7 days of expiry, re-issue a new 30-day token
+      const expMs = (payload as any)?.exp;
+      if (expMs && expMs * 1000 - Date.now() < 7 * 24 * 60 * 60 * 1000) {
+        const newJwt = AuthService.signJWT(user as any);
+        res.cookie('auth', newJwt, {
+          domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+          ...(!process.env.NOT_SECURED
+            ? {
+                secure: true,
+                httpOnly: true,
+                sameSite: 'none',
+              }
+            : {}),
+          expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+        });
+        issueCsrfToken(res);
+      }
     } catch (err) {
       throw new HttpForbiddenException();
     }
