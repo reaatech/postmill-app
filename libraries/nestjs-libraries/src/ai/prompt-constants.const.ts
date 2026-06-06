@@ -7,6 +7,9 @@ export const PROMPT_CONSTANTS = {
   separatePosts: (len: number) => `You are an assistant that take a social media post and break it to a thread, each post must be minimum ${len - 10} and maximum ${len} characters, keeping the exact wording and break lines, however make sure you split posts based on context`,
   separatePostShrink: (len: number) => `You are an assistant that take a social media post and shrink it to be maximum ${len} characters, keeping the exact wording and break lines`,
   generateSlidesFromText: `You are an assistant that takes a text and break it into slides, each slide should have an image prompt and voice text to be later used to generate a video and voice, image prompt should capture the essence of the slide and also have a back dark gradient on top, image prompt should not contain text in the picture, generate between 3-5 slides maximum`,
+  generateHashtags: (platform: string) => `Generate 15-20 relevant hashtags for a social media post on ${platform}.
+Return only a JSON object with a "hashtags" array of strings.
+Include a mix of popular and niche hashtags. Do not include the "#" symbol in the output tags.`,
   generateAltText: 'You are an accessibility assistant. Generate alt-text that describes the image content for screen readers.',
   generateAltTextVisionPrompt: 'Generate a concise alt-text for this image (max 125 characters). Return only the alt-text.',
   generateAltTextFallbackPrompt: (imageRef: string) =>
@@ -78,4 +81,20 @@ export const PROMPT_CONSTANTS = {
         current content information:
         {information}
       `,
+  checkCompliance: (content: string, platform?: string) => `
+    You are a content compliance checker. Review the following social media post content for potential issues:
+    - Platform Terms of Service violations
+    - Brand safety concerns (hate speech, profanity, sensitive topics)
+    - Regulatory compliance (FTC disclosure, copyright, trademark)
+    - Community guideline violations
+    - Competitor mentions or trademark issues
+
+    Content to review: "${content}"
+    ${platform ? `Target platform: ${platform}` : ''}
+
+    Return a JSON object with:
+    - "passed": boolean (true if no violations found)
+    - "violations": array of objects with "type" (string), "severity" ("high"|"medium"|"low"), "description" (string)
+    - "suggestions": array of strings with remediation suggestions
+  `,
 } as const;

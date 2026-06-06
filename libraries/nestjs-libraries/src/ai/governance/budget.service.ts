@@ -3,6 +3,7 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 
 export interface BudgetSettings {
   monthlyCap?: number;
@@ -99,6 +100,7 @@ export class BudgetService {
     private _subscriptionService: SubscriptionService,
     private _spendLogRepo: PrismaRepository<'aISpendLog'>,
     private _orgRepo: PrismaRepository<'organization'>,
+    private _notificationService: NotificationService,
   ) {}
 
   clearSubCache() {
@@ -330,6 +332,8 @@ export class BudgetService {
     const caps = await this._getCaps();
     const threshold = caps.alertThresholdPct ?? this.DEFAULT_ALERT_THRESHOLD;
 
+    const thresholdPct = this._spendAccum!.globalMonthly / (caps.monthlyCap || 1);
+
     if (caps.monthlyCap && this._spendAccum!.globalMonthly >= caps.monthlyCap * threshold) {
       const alertKey = `global:monthly:${this._getAccumKey()}`;
       if (!this._thresholdFired.has(alertKey)) {
@@ -337,6 +341,11 @@ export class BudgetService {
         this._logger.warn(
           `Budget alert: ${((this._spendAccum!.globalMonthly / caps.monthlyCap) * 100).toFixed(0)}% of global monthly cap ($${caps.monthlyCap}) used`,
         );
+        if (data.organizationId) {
+          try {
+            await this._notificationService.notifyBudgetThreshold(data.organizationId, data.scope, thresholdPct * 100);
+          } catch {}
+        }
       }
     }
 
@@ -350,6 +359,9 @@ export class BudgetService {
           this._logger.warn(
             `Budget alert: Org ${data.organizationId} at ${((orgMonthly / orgCaps.monthly) * 100).toFixed(0)}% of monthly cap`,
           );
+          try {
+            await this._notificationService.notifyBudgetThreshold(data.organizationId, data.scope, (orgMonthly / orgCaps.monthly) * 100);
+          } catch {}
         }
       }
     }
@@ -361,6 +373,11 @@ export class BudgetService {
         this._logger.warn(
           `Daily cap of $${caps.dailyCap} exceeded ($${this._spendAccum!.globalDaily.toFixed(4)})`,
         );
+        if (data.organizationId) {
+          try {
+            await this._notificationService.notifyBudgetThreshold(data.organizationId, 'daily_cap', 100);
+          } catch {}
+        }
       }
     }
 
@@ -374,6 +391,9 @@ export class BudgetService {
           this._logger.warn(
             `Daily cap of $${orgCaps.daily} exceeded for org ${data.organizationId} ($${orgDaily.toFixed(4)})`,
           );
+          try {
+            await this._notificationService.notifyBudgetThreshold(data.organizationId, 'daily_cap', 100);
+          } catch {}
         }
       }
     }

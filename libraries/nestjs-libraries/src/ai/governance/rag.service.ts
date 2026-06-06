@@ -694,4 +694,73 @@ export class RagService implements OnModuleInit {
     const ragSettings = await this._getRagSettings();
     return ragSettings.enabled;
   }
+
+  /**
+   * Indexes the org's top-performing posts into RAG so the "write like our best
+   * posts" feature can retrieve them by semantic similarity. Returns the number
+   * of newly indexed sources.
+   */
+  async indexTopPerformingPosts(
+    organizationId: string,
+    limit: number = 10,
+    userId?: string,
+  ): Promise<{ indexed: number }> {
+    const enabled = await this._isRagEnabled();
+    if (!enabled) {
+      throw new Error('RAG is not enabled for this organization');
+    }
+
+    const posts = await this._aiRagRepository.findTopPerformingPosts(organizationId, limit);
+    let indexed = 0;
+
+    for (const post of posts) {
+      const content = [post.title, post.description, post.content].filter(Boolean).join('\n\n');
+      if (!content.trim()) continue;
+
+      const chunks = this._chunkText(content);
+      if (chunks.length === 0) continue;
+
+      const allContent = chunks.join('\n---CHUNK---\n');
+      const contentHash = this._simpleHash(allContent);
+
+      const existing = await this._aiRagRepository.findContentHash(
+        organizationId,
+        'brand_memory',
+        post.id,
+      );
+
+      if (existing && existing.contentHash === contentHash) continue;
+
+      await this._doIndex(organizationId, 'brand_memory', post.id, chunks, contentHash, 'brand_memory', userId);
+      indexed++;
+    }
+
+    return { indexed };
+  }
+
+  /**
+   * Performs a RAG search scoped to "brand_memory" sources — the org's
+   * top-performing post content. Used by the "write like our best posts"
+   * feature to retrieve relevant snippets.
+   */
+  async searchBrandMemory(
+    organizationId: string,
+    query: string,
+    limit: number = 5,
+  ): Promise<{ text: string; sourceType: string; sourceId: string; score: number }[]> {
+    const enabled = await this._isRagEnabled();
+    if (!enabled) {
+      throw new Error('RAG is not enabled for this organization');
+    }
+
+    if (!organizationId || !query) {
+      throw new Error('searchBrandMemory requires organizationId and query');
+    }
+
+    const allResults = await this.search({ organizationId, query, limit: limit * 3 });
+
+    return allResults
+      .filter((r) => r.sourceType === 'brand_memory')
+      .slice(0, limit);
+  }
 }

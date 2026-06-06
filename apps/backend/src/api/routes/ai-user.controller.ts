@@ -11,6 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { IsString, IsOptional, IsNumber, IsBoolean, Min } from 'class-validator';
 import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
@@ -28,6 +29,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 import dayjs from 'dayjs';
 
 class UpsertBrandProfileDto {
@@ -42,6 +44,18 @@ class UpsertBrandProfileDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  platformInstructions?: Record<string, string>;
+}
+
+class ComplianceCheckDto {
+  @IsString()
+  content!: string;
+
+  @IsOptional()
+  @IsString()
+  platform?: string;
 }
 
 class UpsertPromptTemplateDto {
@@ -102,6 +116,26 @@ class SearchQueryDto {
   @IsNumber()
   @Min(1)
   limit?: number;
+}
+
+class HashtagsDto {
+  @IsString()
+  content!: string;
+
+  @IsString()
+  platform!: string;
+}
+
+class CommentActionDto {
+  @IsString()
+  commentId!: string;
+
+  @IsString()
+  postContent!: string;
+
+  @IsOptional()
+  @IsString()
+  action?: 'reply' | 'sentiment' | 'summary';
 }
 
 class CommentReplyDto {
@@ -383,12 +417,137 @@ export class AiUserController {
     }
   }
 
+  @Post('/hashtags')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  async generateHashtags(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: HashtagsDto,
+  ) {
+    try {
+      const hashtagsSchema = z.object({
+        hashtags: z.array(z.string()).describe('Generated hashtags for the post'),
+      });
+
+      const platformNames: Record<string, string> = {
+        x: 'X/Twitter',
+        twitter: 'X/Twitter',
+        linkedin: 'LinkedIn',
+        instagram: 'Instagram',
+        facebook: 'Facebook',
+        threads: 'Threads',
+        tiktok: 'TikTok',
+        youtube: 'YouTube',
+        pinterest: 'Pinterest',
+      };
+
+      const platformName = platformNames[body.platform.toLowerCase()] || body.platform;
+      const prompt = `Generate 15-20 relevant hashtags for this ${platformName} post.
+
+Post content:
+"${body.content}"
+
+Include a mix of popular and niche hashtags. Return only the hashtags array.`;
+
+      const result = await this._aiModelProvider.generateObject<
+        z.infer<typeof hashtagsSchema>
+      >('utility', prompt, hashtagsSchema, {
+        system: `You are a social media hashtag expert. Generate platform-optimized hashtags for ${platformName}.`,
+        orgId: org.id,
+      });
+
+      return result;
+    } catch (err) {
+      this._logger.error(
+        `hashtags failed for org ${org.id}: ${(err as Error).message}`,
+      );
+      throw new HttpException(
+        'Hashtag generation is temporarily unavailable',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Post('/comment-reply')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async draftCommentReply(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: CommentReplyDto,
+    @Body() body: CommentActionDto,
   ) {
+    const action = body.action || 'reply';
+
+    if (action === 'sentiment') {
+      try {
+        const sentimentSchema = z.object({
+          comments: z.array(z.object({
+            content: z.string(),
+            sentiment: z.enum(['positive', 'negative', 'neutral']),
+            confidence: z.number().min(0).max(1),
+          })).describe('Per-comment sentiment analysis'),
+          overallSentiment: z.enum(['positive', 'negative', 'neutral', 'mixed']),
+        });
+
+        const prompt = `Analyze the sentiment of each comment in this thread and provide an overall sentiment assessment.
+
+Post content:
+"${body.postContent}"
+
+For each comment, determine if the sentiment is positive, negative, or neutral, with a confidence score (0-1).`;
+
+        const result = await this._aiModelProvider.generateObject<
+          z.infer<typeof sentimentSchema>
+        >('agent', prompt, sentimentSchema, {
+          system: 'You are a social media sentiment analysis expert. Analyze comments for positive, negative, or neutral sentiment.',
+          orgId: org.id,
+        });
+
+        return result;
+      } catch (err) {
+        this._logger.error(
+          `comment sentiment failed for org ${org.id}: ${(err as Error).message}`,
+        );
+        throw new HttpException(
+          'Sentiment analysis is temporarily unavailable',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
+    if (action === 'summary') {
+      try {
+        const summarySchema = z.object({
+          summary: z.string().describe('Concise summary of the comment thread discussion'),
+          keyPoints: z.array(z.string()).describe('Key points raised in the discussion'),
+          actionItems: z.array(z.string()).describe('Suggested action items from the discussion'),
+        });
+
+        const prompt = `Summarize the discussion in this comment thread for a social media post.
+
+Post content:
+"${body.postContent}"
+
+Provide a concise summary, key points raised, and suggested action items.`;
+
+        const result = await this._aiModelProvider.generateObject<
+          z.infer<typeof summarySchema>
+        >('agent', prompt, summarySchema, {
+          system: 'You are a social media community manager. Summarize comment discussions and extract actionable insights.',
+          orgId: org.id,
+        });
+
+        return result;
+      } catch (err) {
+        this._logger.error(
+          `comment summary failed for org ${org.id}: ${(err as Error).message}`,
+        );
+        throw new HttpException(
+          'Comment summary is temporarily unavailable',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+      }
+    }
+
     const prompt = `The post content is: "${body.postContent}"
 
 Draft a friendly, professional reply from the social media manager's perspective. Keep the reply concise, engaging, and on-brand.`;
@@ -407,6 +566,7 @@ Draft a friendly, professional reply from the social media manager's perspective
   }
 
   @Post('/best-time')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async bestTimeToPost(@GetOrgFromRequest() org: Organization) {
     try {
@@ -551,6 +711,48 @@ Return exactly ${body.platforms.length} results, one per requested platform.`;
     }
   }
 
+  @Post('/compliance')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  async checkCompliance(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: ComplianceCheckDto,
+  ) {
+    try {
+      const schema = z.object({
+        passed: z.boolean(),
+        violations: z.array(
+          z.object({
+            type: z.string(),
+            severity: z.enum(['high', 'medium', 'low']),
+            description: z.string(),
+          }),
+        ),
+        suggestions: z.array(z.string()),
+      });
+
+      const prompt = PROMPT_CONSTANTS.checkCompliance(body.content, body.platform);
+
+      const result = await this._aiModelProvider.generateObject<
+        z.infer<typeof schema>
+      >('utility', prompt, schema, {
+        system:
+          'You are a content compliance checker. Analyze social media content for policy violations, brand safety concerns, and regulatory issues.',
+        orgId: org.id,
+      });
+
+      return result;
+    } catch (err) {
+      this._logger.error(
+        `compliance check failed for org ${org.id}: ${(err as Error).message}`,
+      );
+      throw new HttpException(
+        'Compliance check is temporarily unavailable',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
   @Post('/translate')
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async translateContent(
@@ -593,6 +795,55 @@ For each locale, provide an accurate translation that preserves the meaning, ton
       );
       throw new HttpException(
         'Translation is temporarily unavailable',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('/brand-memory/index')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  async indexBrandMemory(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+  ) {
+    try {
+      const result = await this._ragService.indexTopPerformingPosts(
+        org.id,
+        10,
+        user?.id,
+      );
+      return result;
+    } catch (err) {
+      this._logger.error(
+        `brand-memory index failed for org ${org.id}: ${(err as Error).message}`,
+      );
+      throw new HttpException(
+        'Brand memory indexing is temporarily unavailable',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  @Post('/brand-memory/search')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  async searchBrandMemory(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: { prompt: string },
+  ) {
+    try {
+      const hits = await this._ragService.searchBrandMemory(
+        org.id,
+        body.prompt,
+      );
+      return { hits };
+    } catch (err) {
+      this._logger.error(
+        `brand-memory search failed for org ${org.id}: ${(err as Error).message}`,
+      );
+      throw new HttpException(
+        'Brand memory search is temporarily unavailable',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }

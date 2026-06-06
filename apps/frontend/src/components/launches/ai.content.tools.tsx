@@ -9,8 +9,9 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AiErrorDisplay } from '@gitroom/frontend/components/ai/ai-error-display';
+import { AiHashtags } from './ai.hashtags';
 
-const tabs = ['Repurpose', 'Translate', 'A/B Variants'] as const;
+const tabs = ['Repurpose', 'Translate', 'A/B Variants', 'Hashtags'] as const;
 type Tab = (typeof tabs)[number];
 
 const platforms = [
@@ -253,6 +254,10 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             ))}
           </div>
         </div>
+      )}
+
+      {activeTab === 'Hashtags' && (
+        <AiHashtags />
       )}
 
       <div className="flex">
