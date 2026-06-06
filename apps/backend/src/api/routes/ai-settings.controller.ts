@@ -18,6 +18,7 @@ import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
+import { SaveGovernanceDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/governance.dto';
 import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
 import { ProviderHealthService } from '@gitroom/nestjs-libraries/ai/governance/provider-health.service';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
@@ -331,7 +332,7 @@ export class AiSettingsController {
   @Put('/governance')
   async saveGovernance(
     @GetUserFromRequest() user: User,
-    @Body() body: any,
+    @Body() body: SaveGovernanceDto,
   ) {
     this.assertSuperAdmin(user);
 

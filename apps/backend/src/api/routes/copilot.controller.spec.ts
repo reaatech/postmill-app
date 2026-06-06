@@ -140,6 +140,12 @@ vi.mock('@gitroom/nestjs-libraries/chat/mastra.service', () => ({
   },
 }));
 
+vi.mock('@gitroom/nestjs-libraries/ai/governance/budget.service', () => ({
+  BudgetService: class {
+    checkBudget = vi.fn().mockResolvedValue({ allowed: true });
+  },
+}));
+
 vi.mock('@ag-ui/mastra', () => ({
   MastraAgent: {
     getLocalAgents: vi.fn().mockReturnValue({}),
@@ -158,6 +164,7 @@ import { CopilotController } from './copilot.controller';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 
 describe('CopilotController', () => {
   let controller: CopilotController;
@@ -177,10 +184,12 @@ describe('CopilotController', () => {
     mastraService = new (MastraService as any)();
     aiModelProvider = new (AIModelProvider as any)();
 
+    const budgetService = new (BudgetService as any)();
     controller = new CopilotController(
       subscriptionService,
       mastraService,
       aiModelProvider,
+      budgetService,
     );
   });
 
@@ -393,16 +402,14 @@ describe('CopilotController', () => {
   });
 
   describe('/chat endpoint', () => {
-    // §3.3 #4: /chat is intentionally ungated to preserve pre-v3.4.0 behaviour
-    // (it was ungated before and wraps the whole app layout). The asymmetry with
-    // /agent (which IS gated) is deliberate — assert NO policy metadata here.
-    it('is intentionally ungated (preserves pre-v3.4.0 behaviour)', () => {
+    // §3.5 #3AM: /chat is now gated with @CheckPolicies and budget check.
+    it('is gated with CheckPolicies', () => {
       const policies = Reflect.getMetadata(
         CHECK_POLICIES_KEY,
         CopilotController.prototype.chatAgent,
       );
 
-      expect(policies).toBeUndefined();
+      expect(policies).toEqual([[AuthorizationActions.Create, Sections.AI]]);
     });
 
     it('calls service adapter builder with organization.id', async () => {

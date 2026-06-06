@@ -20,6 +20,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
@@ -122,7 +123,7 @@ export class UsersController {
 
     response.cookie('impersonate', id, {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -132,7 +133,7 @@ export class UsersController {
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
-    if (process.env.NOT_SECURED) {
+    if (process.env.NODE_ENV === 'development' && process.env.NOT_SECURED) {
       response.header('impersonate', id);
     }
   }
@@ -219,7 +220,7 @@ export class UsersController {
   ) {
     response.cookie('showorg', id, {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -229,7 +230,7 @@ export class UsersController {
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
-    if (process.env.NOT_SECURED) {
+    if (process.env.NODE_ENV === 'development' && process.env.NOT_SECURED) {
       response.header('showorg', id);
     }
 
@@ -241,7 +242,7 @@ export class UsersController {
     response.header('logout', 'true');
     response.cookie('auth', '', {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -254,7 +255,7 @@ export class UsersController {
 
     response.cookie('showorg', '', {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -267,7 +268,7 @@ export class UsersController {
 
     response.cookie('impersonate', '', {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -305,7 +306,7 @@ export class UsersController {
     if (!req.cookies.track) {
       res.cookie('track', uniqueId, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,

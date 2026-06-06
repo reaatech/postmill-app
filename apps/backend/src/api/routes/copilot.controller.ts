@@ -33,6 +33,7 @@ import { RequestContext } from '@mastra/core/di';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 
 export type ChannelsContext = {
   integrations: string;
@@ -46,6 +47,7 @@ export class CopilotController {
     private _subscriptionService: SubscriptionService,
     private _mastraService: MastraService,
     private _aiModelProvider: AIModelProvider,
+    private _budgetService: BudgetService,
   ) {}
 
   private async _buildServiceAdapter(orgId?: string) {
@@ -143,16 +145,19 @@ export class CopilotController {
     });
   }
 
-  // NOTE (§3.3 #4): /copilot/chat is intentionally left WITHOUT a @CheckPolicies
-  // gate to preserve pre-v3.4.0 behaviour — it was ungated before and wraps the
-  // whole app layout, so adding a gate would break current clients. The asymmetry
-  // with /copilot/agent (which IS gated) is deliberate and documented.
   @Post('/chat')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async chatAgent(
     @Req() req: Request,
     @Res() res: Response,
     @GetOrgFromRequest() organization?: Organization,
   ) {
+    if ((!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development') && organization) {
+      const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
+      if (!budgetCheck.allowed) {
+        return res.status(429).json({ error: 'AI budget exceeded', detail: budgetCheck.reason });
+      }
+    }
     try {
       const serviceAdapter = await this._buildServiceAdapter(organization?.id);
       const copilotRuntimeHandler = copilotRuntimeNodeHttpEndpoint({
