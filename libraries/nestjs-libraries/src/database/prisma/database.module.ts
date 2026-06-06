@@ -47,8 +47,12 @@ import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/adm
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { ProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
+import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
+import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
+import { AiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.repository';
+import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-rag/ai-rag.repository';
 
 @Global()
 @Module({
@@ -107,6 +111,10 @@ import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/pri
     ProviderConfigRepository,
     SocialCommentsService,
     SocialCommentsRepository,
+    AiSettingsService,
+    AiSettingsRepository,
+    AiRagRepository,
+    AiSettingsManager,
   ],
   get exports() {
     return this.providers;
