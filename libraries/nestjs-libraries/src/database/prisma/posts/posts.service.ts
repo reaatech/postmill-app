@@ -1,10 +1,15 @@
 import {
   BadRequestException,
+  HttpException,
+  HttpStatus,
   Injectable,
+  Logger,
   ValidationPipe,
 } from '@nestjs/common';
+import { PostValidationException } from '@gitroom/nestjs-libraries/errors/post-validation.exception';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import dayjs from 'dayjs';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
@@ -29,7 +34,6 @@ import {
   minifyPostsList,
   minifyPosts,
 } from '@gitroom/helpers/utils/posts.list.minify';
-import axios from 'axios';
 import sharp from 'sharp';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { Readable } from 'stream';
@@ -50,6 +54,7 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
+import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
@@ -81,6 +86,10 @@ export class PostsService {
 
   updatePost(id: string, postId: string, releaseURL: string) {
     return this._postRepository.updatePost(id, postId, releaseURL);
+  }
+
+  updatePostSettings(id: string, settings: string) {
+    return this._postRepository.updatePostSettings(id, settings);
   }
 
   async getMissingContent(
@@ -138,7 +147,7 @@ export class PostsService {
         getIntegration.token
       );
     } catch (e) {
-      console.log(e);
+      Logger.warn(`getMissingContent error: ${(e as Error)?.message}`);
       if (e instanceof RefreshToken) {
         return this.getMissingContent(orgId, postId, true);
       }
@@ -232,7 +241,7 @@ export class PostsService {
       );
       return loadAnalytics;
     } catch (e) {
-      console.log(e);
+      Logger.warn(`checkPostAnalytics error: ${(e as Error)?.message}`);
       if (e instanceof RefreshToken) {
         return this.checkPostAnalytics(orgId, postId, date, true);
       }
@@ -390,11 +399,7 @@ export class PostsService {
 
             if (hasExtension(m.path, 'png')) {
               imageUpdateNeeded = true;
-              const response = await axios.get(m.url, {
-                responseType: 'arraybuffer',
-              });
-
-              const imageBuffer = Buffer.from(response.data);
+              const imageBuffer = Buffer.from(await readOrFetch(m.path));
 
               // Use sharp to get the metadata of the image
               const buffer = await sharp(imageBuffer)
@@ -733,9 +738,31 @@ export class PostsService {
     }
 
     try {
+      const postData = await this._postRepository.getPostById(
+        orgId,
+        postId
+      );
+      let workflowName = 'postWorkflowV105';
+      if (postData?.settings) {
+        try {
+          const settings = JSON.parse(
+            typeof postData.settings === 'string'
+              ? postData.settings
+              : JSON.stringify(postData.settings)
+          );
+          if (
+            settings?.firstComment &&
+            !settings?.firstCommentPostedAt &&
+            !settings?.firstCommentId
+          ) {
+            workflowName = 'postWorkflowV106';
+          }
+        } catch {}
+      }
+
       await this._temporalService.client
         .getRawClient()
-        ?.workflow.start('postWorkflowV105', {
+        ?.workflow.start(workflowName, {
           workflowId: `post_${postId}`,
           taskQueue: 'main',
           workflowIdConflictPolicy: 'TERMINATE_EXISTING',
@@ -951,6 +978,159 @@ export class PostsService {
     return postList;
   }
 
+  async validateAndCreatePost(
+    orgId: string,
+    rawBody: any,
+    creationMethod: CreationMethod,
+    replaceDraft = false,
+  ): Promise<any[]> {
+    const body = await this.mapTypeToPost(rawBody, orgId, replaceDraft);
+
+    if (replaceDraft) {
+      (body as any).type = rawBody.type;
+    }
+
+    if (
+      replaceDraft &&
+      process.env.RESTRICT_UPLOAD_DOMAINS &&
+      body.posts.some((p) =>
+        p.value.some((a) =>
+          a.image.some(
+            (i) => i.path.indexOf(process.env.RESTRICT_UPLOAD_DOMAINS!) === -1
+          )
+        )
+      )
+    ) {
+      throw new HttpException(
+        {
+          msg: `All media must be uploaded through our upload API route and contain the domain: ${process.env.RESTRICT_UPLOAD_DOMAINS}`,
+        },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const validation = await this.validatePosts(orgId, body.posts || rawBody?.posts || []);
+
+    const fail = (item: (typeof validation)[number], error: string) => {
+      throw new PostValidationException({
+        provider: item.identifier,
+        name: item.name,
+        error,
+      });
+    };
+
+    for (const item of validation) {
+      if (item.emptyContent) {
+        fail(item, 'Your post should have at least one character or one image.');
+      }
+    }
+
+    if (body.type !== 'draft') {
+      for (const item of validation) {
+        if (!item.valid) {
+          fail(item, item.settingsError || 'Please fix your settings');
+        }
+        if (item.errors !== true) {
+          fail(item, item.errors as string);
+        }
+        if (item.tooLong) {
+          fail(item, 'post is too long, please fix it');
+        }
+      }
+    }
+
+    return this.createPost(orgId, body, creationMethod);
+  }
+
+  async preflightCheck(
+    orgId: string,
+    body: CreatePostDto,
+  ) {
+    const results = await this.validatePosts(orgId, body.posts || []);
+
+    const enhanced = await Promise.all(
+      results.map(async (result) => {
+        const warnings: string[] = [];
+        const blocks: string[] = [];
+
+        const integration = await this._integrationService.getIntegrationById(orgId, result.id);
+        const provider = integration
+          ? this._integrationManager.getSocialIntegrationUnchecked(integration.providerIdentifier)
+          : null;
+
+        if (result.emptyContent) {
+          blocks.push('Post has no content or media');
+        }
+
+        if (result.tooLong) {
+          blocks.push(`Post exceeds maximum length of ${result.maximumCharacters} characters`);
+        }
+
+        if (!result.valid) {
+          blocks.push(result.settingsError || 'Invalid settings');
+        }
+
+        if (result.errors !== true) {
+          blocks.push(result.errors as string);
+        }
+
+        // Check alt text on media
+        const post = body.posts?.find((p) => p.integration?.id === result.id);
+        if (post?.value) {
+          for (const val of post.value) {
+            if (val.image?.length) {
+              for (const img of val.image) {
+                if (!(img as any).alt) {
+                  warnings.push('Some media items are missing alt text');
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        // Check unsupported media formats
+        const providerAny = provider as any;
+        if (providerAny?.maxMedia) {
+          for (const val of post?.value || []) {
+            if ((val.image?.length || 0) > providerAny.maxMedia) {
+              warnings.push(`Platform supports max ${providerAny.maxMedia} media items`);
+            }
+          }
+        }
+
+        // Link safety
+        for (const val of post?.value || []) {
+          if (val.content && /https?:\/\//.test(val.content)) {
+            warnings.push('Post contains links — ensure they are safe and functional');
+          }
+        }
+
+        // First comment / poll compatibility
+        const settings: any = post?.settings || {};
+        if (settings.firstComment && !providerAny?.comment) {
+          warnings.push('First comment is not supported on this platform');
+        }
+
+        return {
+          integrationId: result.id,
+          identifier: result.identifier,
+          name: result.name,
+          valid: blocks.length === 0,
+          warnings,
+          blocks,
+          maximumCharacters: result.maximumCharacters,
+        };
+      })
+    );
+
+    return {
+      passed: enhanced.every((r) => r.valid && r.warnings.length === 0),
+      results: enhanced,
+      blocking: enhanced.filter((r) => r.blocks.length > 0),
+    };
+  }
+
   async separatePosts(content: string, len: number) {
     return this._openaiService.separatePosts(content, len);
   }
@@ -1034,7 +1214,7 @@ export class PostsService {
     });
 
     const findTime = (): string => {
-      const totalMinutes = Math.floor(Math.random() * 144) * 10;
+      const totalMinutes = Math.floor(require('crypto').randomInt(144)) * 10;
 
       // Convert total minutes to hours and minutes
       const hours = Math.floor(totalMinutes / 60);
@@ -1188,5 +1368,79 @@ export class PostsService {
     comment: string
   ) {
     return this._postRepository.createComment(orgId, userId, postId, comment);
+  }
+
+  /**
+   * Bulk-create posts from an array of simplified row DTOs. Each row is
+   * validated independently; errors/warnings are returned per row without
+   * failing the whole batch.
+   */
+  async bulkCreate(
+    orgId: string,
+    body: BulkCreatePostsDto,
+  ): Promise<{ rows: Array<{ index: number; success: boolean; postId?: string; error?: string; warnings?: string[] }> }> {
+    const results: Array<{ index: number; success: boolean; postId?: string; error?: string; warnings?: string[] }> = [];
+    const integrations = await this._integrationService.getIntegrationsList(orgId);
+    const activeIntegrations = integrations.filter((f) => !f.disabled && !f.deletedAt);
+
+    for (let i = 0; i < body.rows.length; i++) {
+      const row = body.rows[i];
+      const rowWarnings: string[] = [];
+      let rowError: string | undefined;
+      let postIds: string[] = [];
+
+      try {
+        for (const channelId of row.channels) {
+          const integration = activeIntegrations.find(
+            (int) => int.id === channelId || int.providerIdentifier === channelId,
+          );
+          if (!integration) {
+            rowWarnings.push(`Channel "${channelId}" not found or disabled — skipped`);
+            continue;
+          }
+
+          try {
+            const created = await this.createPost(orgId, {
+              type: 'schedule',
+              date: row.scheduleAt,
+              order: '',
+              shortLink: false,
+              tags: [],
+              posts: [
+                {
+                  group: `bulk-${Date.now()}-${i}`,
+                  integration: { id: integration.id },
+                  settings: { __type: integration.providerIdentifier as any } as any,
+                  value: [{
+                    id: '',
+                    content: row.content,
+                    delay: 0,
+                    image: [],
+                  }],
+                },
+              ],
+            }, 'WEB');
+
+            if (created?.length) {
+              postIds.push(created[0].postId);
+            }
+          } catch (err: any) {
+            rowWarnings.push(`Failed to create post for "${channelId}": ${err.message}`);
+          }
+        }
+      } catch (err: any) {
+        rowError = err.message;
+      }
+
+      results.push({
+        index: i,
+        success: !rowError && postIds.length > 0,
+        postId: postIds[0],
+        error: rowError,
+        warnings: rowWarnings.length > 0 ? rowWarnings : undefined,
+      });
+    }
+
+    return { rows: results };
   }
 }

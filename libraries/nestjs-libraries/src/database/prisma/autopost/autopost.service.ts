@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { AutopostDto } from '@gitroom/nestjs-libraries/dtos/autopost/autopost.dto';
 import dayjs from 'dayjs';
@@ -19,6 +19,7 @@ import { TypedSearchAttributes } from '@temporalio/common';
 import {
   organizationId,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 const parser = new Parser();
 
 interface WorkflowChannelsState {
@@ -106,7 +107,7 @@ export class AutopostService {
               },
             ]),
           });
-      } catch (err) { console.error('Failed to start Temporal workflow', err); }
+      } catch (err) { Logger.warn(`Failed to start Temporal workflow: ${(err as Error)?.message}`); }
     }
 
     try {
@@ -149,7 +150,7 @@ export class AutopostService {
           .trim(),
       };
     } catch (err) {
-      console.error('RSS feed parsing failed', err);
+      Logger.warn(`RSS feed parsing failed: ${(err as Error)?.message}`);
     }
 
     return { success: false };
@@ -174,7 +175,7 @@ export class AutopostService {
 
   async loadUrl(url: string) {
     try {
-      const loadDom = new JSDOM(await (await fetch(url)).text());
+      const loadDom = new JSDOM(await (await safeFetch(url)).text());
       loadDom.window.document
         .querySelectorAll('script')
         .forEach((s) => s.remove());
