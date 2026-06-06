@@ -8,7 +8,6 @@ import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import useSWR from 'swr';
 import { VideoWrapper } from '@gitroom/frontend/components/videos/video.render.component';
 import { FormProvider, useForm } from 'react-hook-form';
-import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { VideoContextWrapper } from '@gitroom/frontend/components/videos/video.context.wrapper';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
@@ -28,27 +27,31 @@ export const Modal: FC<{
   const toaster = useToaster();
 
   const loadCredits = useCallback(async () => {
-    return (
-      await fetch(`/copilot/credits?type=ai_videos`, {
-        method: 'GET',
-      })
-    ).json();
-  }, []);
+    const res = await fetch(`/copilot/credits?type=ai_videos`, {
+      method: 'GET',
+    });
+    if (!res.ok) throw new Error('Failed to load AI video credits');
+    return res.json();
+  }, [fetch]);
 
   const { data } = useSWR('copilot-credits', loadCredits);
 
   const generate = useCallback(async () => {
-    await fetch(`/media/generate-video/${type.identifier}/allowed`);
-    setLoading(true);
-    close();
-    setLocked(true);
-
     const customParams = form.getValues();
     if (!(await form.trigger())) {
       toaster.show('Please fill all required fields', 'warning');
       return;
     }
+    setLoading(true);
+    close();
+    setLocked(true);
+
     try {
+      const allowed = await fetch(`/media/generate-video/${type.identifier}/allowed`);
+      if (!allowed.ok) {
+        toaster.show('Video generation is not available for this provider', 'warning');
+        return;
+      }
       const image = await fetch(`/media/generate-video`, {
         method: 'POST',
         body: JSON.stringify({
@@ -60,12 +63,16 @@ export const Modal: FC<{
 
       if (image.status == 200 || image.status == 201) {
         onChange(await image.json());
+      } else {
+        toaster.show('Failed to generate video', 'warning');
       }
-    } catch (e) {}
-
-    setLocked(false);
-    setLoading(false);
-  }, [type, position]);
+    } catch (e) {
+      toaster.show('Failed to generate video', 'warning');
+    } finally {
+      setLocked(false);
+      setLoading(false);
+    }
+  }, [type, position, form, fetch, setLoading, close, setLocked, toaster, onChange]);
 
   return (
     // Start with an empty prompt — we no longer copy the post's text field.
@@ -166,10 +173,12 @@ export const AiVideo: FC<{
   const modals = useModals();
 
   const loadVideoList = useCallback(async () => {
-    return (await (await fetch('/media/video-options')).json()).filter(
+    const res = await fetch('/media/video-options');
+    if (!res.ok) throw new Error('Failed to load AI video options');
+    return (await res.json()).filter(
       (f: any) => f.placement === 'text-to-image'
     );
-  }, []);
+  }, [fetch]);
 
   const { isLoading, data } = useSWR('load-videos-ai', loadVideoList, {
     revalidateOnFocus: false,
@@ -195,7 +204,7 @@ export const AiVideo: FC<{
         />
       ),
     });
-  }, [loading, data, onChange]);
+  }, [loading, data, onChange, modals]);
 
   if (isLoading || data?.length === 0) {
     return null;

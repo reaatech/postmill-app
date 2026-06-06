@@ -33,6 +33,11 @@ import { ThirdPartyMedia } from '@gitroom/frontend/components/third-parties/thir
 import { ReactSortable } from 'react-sortablejs';
 import { MediaComponentInner } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { AiVideo } from '@gitroom/frontend/components/launches/ai.video';
+import { AiMediaOperations } from '@gitroom/frontend/components/launches/ai.media.operations';
+import { AiBestTime } from '@gitroom/frontend/components/launches/ai.best-time';
+import { AiContentTools } from '@gitroom/frontend/components/launches/ai.content.tools';
+import { AiPromptLibraryInsert } from '@gitroom/frontend/components/launches/ai.prompt-library.insert';
+import { AiSearch } from '@gitroom/frontend/components/launches/ai.search';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { ThirdPartyMediaLibrary } from '@gitroom/frontend/components/third-parties/third-party.media-library';
 import { Dashboard } from '@uppy/react';
@@ -859,6 +864,11 @@ export const MultiMediaComponent: FC<{
                 <>
                   <AiImage value={text} onChange={changeMedia} />
                   <AiVideo value={text} onChange={changeMedia} />
+                  <AiMediaOperations />
+                  <AiContentTools />
+                  <AiBestTime />
+                  <AiPromptLibraryInsert />
+                  <AiSearch />
                 </>
               )}
             </div>

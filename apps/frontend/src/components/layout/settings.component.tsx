@@ -31,6 +31,7 @@ import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
 import { GlobalSettings } from '@gitroom/frontend/components/settings/global.settings';
+import { BrandAISettings } from '@gitroom/frontend/components/settings/brand-ai.settings';
 import { ApprovedAppsComponent } from '@gitroom/frontend/components/approved-apps/approved-apps.component';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
@@ -103,6 +104,7 @@ export const SettingsPopup: FC<{
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'signatures', label: t('signatures', 'Signatures') });
     }
+    arr.push({ tab: 'brand_ai', label: t('brand_ai', 'Brand & AI') });
     if (user?.tier?.public_api && isGeneral && showLogout) {
       arr.push({ tab: 'api', label: t('developers', 'Developers') });
     }
@@ -192,6 +194,12 @@ export const SettingsPopup: FC<{
               {tab === 'signatures' && user?.tier.current !== 'FREE' && (
                 <div>
                   <SignaturesComponent />
+                </div>
+              )}
+
+              {tab === 'brand_ai' && (
+                <div>
+                  <BrandAISettings />
                 </div>
               )}
 

@@ -18,11 +18,15 @@ export default defineConfig({
       'src/components/analytics-v2/**/*.spec.{ts,tsx}',
       'src/components/launches/post-detail/*.spec.{ts,tsx}',
       'src/components/launches/calendar.spec.{ts,tsx}',
+      'src/components/ai/**/*.spec.{ts,tsx}',
     ],
     coverage: {
       provider: 'v8',
       reporter: ['text'],
-      include: ['src/components/analytics-v2/**/*.{ts,tsx}'],
+      include: [
+        'src/components/analytics-v2/**/*.{ts,tsx}',
+        'src/components/admin/ai-settings.component.tsx',
+      ],
       exclude: [
         'src/components/analytics-v2/charts/*.tsx',
       ],
