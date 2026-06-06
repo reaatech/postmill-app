@@ -1,12 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { Agent } from '@mastra/core/agent';
-import { openai } from '@ai-sdk/openai';
 import { Memory } from '@mastra/memory';
 import { pStore } from '@gitroom/nestjs-libraries/chat/mastra.store';
 import { array, object, string } from 'zod';
 import { ModuleRef } from '@nestjs/core';
 import { toolList } from '@gitroom/nestjs-libraries/chat/tools/tool.list';
 import dayjs from 'dayjs';
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { ToolFirewallService } from '@gitroom/nestjs-libraries/ai/governance/tool-firewall.service';
 
 export const AgentState = object({
   proverbs: array(string()).default([]),
@@ -17,9 +18,42 @@ const renderArray = (list: string[], show: boolean) => {
   return list.map((p) => `- ${p}`).join('\n');
 };
 
+const getContextValue = (requestContext: any, key: string) => {
+  if (!requestContext) return undefined;
+  if (typeof requestContext.get === 'function') {
+    return requestContext.get(key);
+  }
+  return requestContext[key];
+};
+
+const resolveOrgIdFromModelContext = (context: any): string | undefined => {
+  const directOrgId = context?.orgId || context?.organizationId || context?.resourceId;
+  if (typeof directOrgId === 'string' && directOrgId) {
+    return directOrgId;
+  }
+
+  const organization = getContextValue(context?.requestContext, 'organization');
+  if (!organization) return undefined;
+
+  if (typeof organization === 'string') {
+    try {
+      const parsed = JSON.parse(organization);
+      return typeof parsed?.id === 'string' ? parsed.id : undefined;
+    } catch {
+      return organization;
+    }
+  }
+
+  return typeof organization?.id === 'string' ? organization.id : undefined;
+};
+
 @Injectable()
 export class LoadToolsService {
-  constructor(private _moduleRef: ModuleRef) {}
+  constructor(
+    private _moduleRef: ModuleRef,
+    private _aiModelProvider: AIModelProvider,
+    private _toolFirewall: ToolFirewallService,
+  ) {}
 
   async loadTools() {
     return (
@@ -28,7 +62,8 @@ export class LoadToolsService {
           .map((p) => this._moduleRef.get(p, { strict: false }))
           .map(async (p) => ({
             name: p.name as string,
-            tool: await p.run(),
+            // Every agent/MCP tool call is firewalled before it executes (section 5/8).
+            tool: this._toolFirewall.wrap(p.name as string, await p.run()),
           }))
       )
     ).reduce(
@@ -87,7 +122,13 @@ export class LoadToolsService {
       )}
 `;
       },
-      model: openai('gpt-5.2'),
+      // Function form ensures admin model changes within settings TTL take effect
+      // without restarting the MCP server or rebuilding the agent.
+      model: (context: any) =>
+        this._aiModelProvider.languageModel(
+          'agent',
+          resolveOrgIdFromModelContext(context),
+        ),
       tools,
       memory: new Memory({
         storage: pStore,

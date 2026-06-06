@@ -39,7 +39,7 @@ const mockProviderConfigManager = {
   refreshCache: vi.fn(),
 };
 
-function createDbConfig(overrides: Record<string, any> = {}) {
+function createDbConfig(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     identifier: 'x',
     name: 'X',
@@ -433,7 +433,10 @@ describe('deleteConfig', () => {
     const config = createDbConfig({ identifier: 'x' });
     mockProviderConfigService.getByIdentifier.mockResolvedValue(config);
     mockProviderConfigService.delete.mockRejectedValue(
-      new Prisma.PrismaClientKnownRequestError('Record not found', { code: 'P2025' }),
+      new Prisma.PrismaClientKnownRequestError('Record not found', {
+        code: 'P2025',
+        clientVersion: '6.5.0',
+      }),
     );
 
     const result = await controller.deleteConfig(adminUser, 'x');

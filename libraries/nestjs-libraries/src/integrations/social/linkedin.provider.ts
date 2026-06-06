@@ -987,7 +987,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       const start = cursor ? parseInt(cursor, 10) : 0;
 

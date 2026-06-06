@@ -1,0 +1,127 @@
+# Postiz REAA Flavor — Documentation
+
+Documentation for the **REAA-flavored fork** of [Postiz](https://github.com/gitroomhq/postiz-app).
+Postiz schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
+team management, a media library, and a pluggable AI layer.
+
+> **Docs version:** verified against **v3.4.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
+> change history.
+>
+> **This is a fork.** The upstream docs at `docs.postiz.com` describe the *original* project and
+> no longer match this fork's behaviour. Start with
+> [What's different from upstream](./CHANGES_FROM_UPSTREAM.md).
+
+---
+
+## I want to…
+
+**…understand what this is**
+- [Overview & architecture](./getting-started/overview.md)
+- [What's different from upstream](./CHANGES_FROM_UPSTREAM.md)
+
+**…run it myself (operators / self-hosters)**
+- [Requirements](./self-hosting/requirements.md) · [Quickstart](./getting-started/quickstart.md)
+- [Run with Docker Compose](./self-hosting/docker.md)
+- [Configuration / environment variables](./self-hosting/configuration.md)
+- [Temporal & background jobs (RUN_CRON)](./self-hosting/temporal-and-cron.md)
+- [Upgrading](./self-hosting/upgrading.md) · [Backup & retention](./self-hosting/backup-and-retention.md)
+
+**…administer an instance (super-admins)**
+- [Admin overview](./admin/overview.md)
+- [Channels admin (provider credentials)](./admin/channels.md)
+- [AI settings admin (providers, models, governance)](./admin/ai-settings.md)
+- [Errors & stats](./admin/errors-and-stats.md) · [Users & impersonation](./admin/users-and-impersonation.md)
+
+**…use the features**
+- [Calendar & Post Detail](./features/calendar-and-posts.md)
+- [Analytics](./features/analytics.md)
+- [Social comments](./features/social-comments.md)
+- [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md)
+
+**…understand the channels**
+- [Channels overview (the 36 providers)](./channels/overview.md)
+- [Per-provider setup](./channels/setup-per-provider.md) · [Tumblr, Pixelfed & PeerTube](./channels/tumblr-pixelfed-peertube.md) · [Comments support](./channels/comments.md)
+
+**…build on it (developers)**
+- [Architecture](./developers/architecture.md) · [Backend](./developers/backend.md) · [Frontend](./developers/frontend.md) · [Database](./developers/database.md)
+- [AI architecture](./developers/ai-architecture.md) · [Add a provider](./developers/adding-a-provider.md) · [Add an AI adapter](./developers/adding-an-ai-adapter.md)
+- [Testing](./developers/testing.md) · [Contributing](./developers/contributing.md)
+
+**…integrate via API**
+- [API overview](./api/overview.md) · [Public API](./api/public-api.md) · [Analytics v2 API](./api/analytics-v2-api.md)
+- [MCP](./api/mcp.md) · [Automation (n8n / Make / SDK)](./api/automation.md)
+
+**…look something up**
+- [Environment variables](./reference/env-vars.md) · [Data model](./reference/data-model.md) · [Glossary](./reference/glossary.md)
+
+---
+
+## Documentation map
+
+> Pages marked _(planned)_ are not written yet — this docs set is being built in phases.
+> Everything else is live.
+
+```
+getting-started/
+  overview.md              ✅ What Postiz REAA is, architecture
+  quickstart.md            ✅ Fastest path to a running local instance
+
+self-hosting/
+  docker.md                ✅ Run with Docker Compose
+  configuration.md         ✅ Environment variable reference
+  temporal-and-cron.md     ✅ Workflows, RUN_CRON, which instance runs what
+  requirements.md          ✅ Services + build toolchain
+  upgrading.md             ✅ Release/upgrade path, schema sync
+  backup-and-retention.md  ✅ What to back up, analytics retention
+
+admin/
+  overview.md              ✅ Super-admin surface map
+  channels.md              ✅ DB-backed provider configuration
+  ai-settings.md           ✅ AI providers, models, governance
+  errors-and-stats.md      ✅ Diagnostics screens
+  users-and-impersonation.md ✅ Impersonation, super-admin vs user
+
+channels/
+  overview.md              ✅ The 36 providers + auth models
+  setup-per-provider.md    ✅ Per-provider app/credential setup
+  tumblr-pixelfed-peertube.md ✅ Fork-added providers
+  comments.md              ✅ Comment-sync capability matrix
+
+features/
+  calendar-and-posts.md    ✅ Calendar, scheduling, Post Detail modal
+  analytics.md             ✅ v2 dashboard, snapshots, export
+  social-comments.md       ✅ Synced comments, read state, reply
+  ai-features.md           ✅ Brand profiles, prompts, usage, search
+  ai-generation.md         ✅ Text/image gen, what works vs stubs
+
+api/
+  overview.md              ✅ Surfaces, auth, rate limits
+  public-api.md            ✅ /public/v1 endpoints (legacy shapes frozen)
+  analytics-v2-api.md      ✅ /analytics/v2 endpoint reference
+  mcp.md                   ✅ Scopes, auth hardening, transports
+  automation.md            ✅ n8n / Make / SDK pointers
+
+developers/
+  architecture.md          ✅ Monorepo layout, layering, subsystems
+  backend.md               ✅ NestJS Controller→Service→Repository
+  frontend.md              ✅ Next.js App Router, SWR/useFetch, Tailwind 3
+  database.md              ✅ Prisma db push, schema-change safety
+  ai-architecture.md       ✅ AIModelProvider facade, registry, governance
+  adding-a-provider.md     ✅ New social provider, step by step
+  adding-an-ai-adapter.md  ✅ New AI adapter, step by step
+  testing.md               ✅ Vitest per-package, CI gate
+  contributing.md          ✅ Ground rules, invariants, process
+
+reference/
+  env-vars.md              ✅ Grouped environment variable table
+  data-model.md            ✅ Prisma models by domain
+  glossary.md              ✅ Terms
+```
+
+---
+
+## About this fork
+
+Maintained by [REAA](https://reaatech.com). Source and full changelog:
+[github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app).
+Licensed under [AGPL-3.0](../LICENSE).

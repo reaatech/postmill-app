@@ -56,7 +56,7 @@ export class SocialCommentsService {
     return { comments: items, nextCursor, unreadCount };
   }
 
-  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false) {
+  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<any> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -121,7 +121,7 @@ export class SocialCommentsService {
     }
   }
 
-  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false) {
+  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<any> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -347,7 +347,7 @@ export class SocialCommentsService {
     await this._postsRepository.updateCommentCount(post.id, count);
   }
 
-  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false) {
+  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<any> {
     const post = await this._postsRepository.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');

@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.4.0] - 2026-06-05
+
+### Added
+
+- **AI provider adapter system** — 12 distinct adapters (OpenAI, Anthropic, Azure, Vercel AI Gateway, Amazon Bedrock, Google, Google Vertex, Groq, Cohere, Mistral, xAI Grok, OpenRouter) plus a generic `OpenAICompatibleAdapter` registered for 14 hub providers (DeepSeek, DeepInfra, Fireworks, Together AI, Perplexity, Qwen, etc). Admin selects provider+model via `/admin/ai-settings`; keys encrypted in the database.
+- **Admin AI Settings** (`/admin/ai-settings`) — Super-admin screen to pick provider/model, enter credentials, test connection, configure governance (guardrails, rate-limits, cost-controls), and view health badges. Includes dry-run preview for guardrail rules and a full AI-settings audit trail (`AISettingsAudit` model).
+- **AIModelProvider facade** — Single injection point with `(scope, orgId?)` resolution. Precedence: per-org (stub) → per-scope → global active → provider default → env-OpenAI fallback. Wrappers: `generateText`, `generateObject`, `imageModel`.
+- **Governance** — `GuardrailService` with input/output guard chains (prompt-injection, PII, brand safety, NSFW), configurable `block | redact | warn` actions. `BudgetService` with monthly/daily caps, per-org/per-scope budgets, budget-threshold alerts (80% warning), and spend tracking to `AISpendLog`. `TelemetryService` with OpenTelemetry GenAI spans (no-op when unconfigured). `ProviderHealthService` with success/error counters and provider failover readiness.
+- **Rate limiting + idempotency** — `AiThrottlerGuard` reads limits from cached settings at runtime. Idempotency factory with Redis adapter for the agent and MCP routes.
+- **RAG / brand memory foundation** — `RagService`, `HybridRag`, `ContextWindowPlanner`, and `AIBrandProfile`/`AIContentIndex` models for retrieval-augmented generation and brand-specific context injection (Phase 5 scaffold).
+- **Media pipeline** — `AiMediaService` with working image generation via the facade, plus stubs for video generation (falls back to image), TTS, STT, upscale, bg-remove, and inpaint (Phase 5 scaffold).
+- **End-user AI features** — Brand profile editor, prompt template builder, shared prompt library, usage dashboard, comment-reply generator, and semantic search over indexed content.
+- **BYOK-ready facade** — Pluggable `(scope, orgId?)` signature supports per-org Bring-Your-Own-Key without redeploy.
+
+### Changed
+
+- All four AI surfaces (`OpenaiService`, `AgentGraphService` LangGraph generator, Mastra chat agent, CopilotKit composer) re-pointed to `AIModelProvider` facade.
+- env-OpenAI backward compatibility preserved — no admin config = byte-for-byte `OPENAI_API_KEY` behaviour. `activeProvider = null` reverts to env fallback.
+- Media cost reconciled with legacy credit meter — `checkMediaCredits()` enforces the stricter of AI budget vs legacy `ai_images`/`ai_videos` credit count.
+
+### Security
+
+- All 5 MCP entrypoints hardened with scope enforcement (`mcp:read`, `mcp:posts:write`, `mcp:admin`), idempotency, rate limiting, and budget controls via `@reaatech` auth packages.
+
 ## [3.3.0] - 2026-06-05
 
 ### Added

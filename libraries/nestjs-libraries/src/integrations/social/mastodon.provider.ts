@@ -289,7 +289,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     _cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
 

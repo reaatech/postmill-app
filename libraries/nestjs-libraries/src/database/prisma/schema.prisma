@@ -44,6 +44,13 @@ model Organization {
   webhooks            Webhooks[]
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
+  aiOrgProviderConfigs AIOrgProviderConfig[]
+  aiBrandProfile      AIBrandProfile?
+  aiPromptTemplates   AIPromptTemplate[]
+  aiSpendLogs         AISpendLog[]     // only includes rows where organizationId IS NOT null (nullable FK means null-org rows are excluded from back-relation)
+  aiMediaJobs         AIMediaJob[]
+  aiPromptLibraryItems AIPromptLibraryItem[]
+  aiContentIndexes    AIContentIndex[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -116,6 +123,9 @@ model User {
   oauthAuthorizations   OAuthAuthorization[]
   commentReads          PostCommentRead[]
   assignedComments      SocialComment[]
+  aiSettingsAudits      AISettingsAudit[]
+  aiSpendLogs           AISpendLog[]
+  aiMediaJobs           AIMediaJob[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1006,6 +1016,195 @@ model OAuthAuthorization {
   @@index([userId])
   @@index([organizationId])
   @@index([revokedAt])
+}
+
+// ── AI Provider Configuration (mirroring ProviderConfiguration pattern) ──
+model AIProviderConfig {
+  id            String   @id @default(cuid())
+  identifier    String   @unique
+  enabled       Boolean  @default(false)
+  credentials   String?
+  defaultModel  String?
+  imageModel    String?
+  extraConfig   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([enabled])
+}
+
+// Singleton — install-wide active selection + governance toggles
+model AISystemSettings {
+  id                   String   @id
+  activeProvider       String?
+  activeModel          String?
+  scopeModels          String?
+  fallbackProvider     String?
+  fallbackImageProvider String?
+  guardrailSettings    String?
+  budgetSettings       String?
+  rateLimitSettings    String?
+  observability        String?
+  mcpSettings          String?
+  ragSettings          String?
+  cacheSettings        String?
+  routingSettings      String?
+  secretSettings       String?
+  updatedAt            DateTime @updatedAt
+
+  @@index([activeProvider])
+}
+
+// Cost-control spend ledger
+model AISpendLog {
+  id             String       @id @default(cuid())
+  organizationId String?
+  userId         String?
+  provider       String
+  model          String
+  scope          String
+  inputTokens    Int          @default(0)
+  outputTokens   Int          @default(0)
+  costUsd        Float        @default(0)
+  createdAt      DateTime     @default(now())
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, scope, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([provider, createdAt])
+  @@index([scope, createdAt])
+  @@index([userId, createdAt])
+}
+
+// Per-org provider config (BYOK scaffold — v3.4.0 stub, v3.5 active)
+model AIOrgProviderConfig {
+  id             String       @id @default(cuid())
+  organizationId String
+  identifier     String
+  enabled        Boolean      @default(false)
+  credentials    String?
+  defaultModel   String?
+  imageModel     String?
+  extraConfig    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+  @@index([enabled])
+}
+
+// Per-org brand voice / custom instructions + localization
+model AIBrandProfile {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  instructions   String?
+  language       String?
+  enabled        Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+}
+
+// Editable prompt templates — NOT seeded; in-code PROMPT_CONSTANTS is canonical
+model AIPromptTemplate {
+  id             String        @id @default(cuid())
+  organizationId String?
+  globalKey      String?       @unique
+  key            String
+  content        String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, key])
+  @@index([organizationId, key])
+  @@index([key])
+}
+
+// Append-only audit of AI-settings changes
+model AISettingsAudit {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([createdAt])
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+}
+
+// Media pipeline jobs/artifacts
+model AIMediaJob {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String?
+  provider       String
+  operation      String
+  status         String       @default("pending")
+  artifactUrl    String?
+  provenance     String?
+  costUsd        Float        @default(0)
+  creditType     String?
+  error          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User?        @relation(fields: [userId], references: [id])
+
+  @@index([organizationId, createdAt])
+  @@index([organizationId, status, createdAt])
+  @@index([userId, createdAt])
+  @@index([provider, createdAt])
+}
+
+// Org prompt library — user-created reusable prompts
+model AIPromptLibraryItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  title          String
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt])
+}
+
+// RAG index — metadata + BM25-text row for each indexed chunk.
+// Embeddings live in a SEPARATE out-of-band side table AIContentEmbedding
+// created via raw SQL (§3.6). NEVER store vector here — Prisma-managed
+// tables get DROPPED by prisma db push --accept-data-loss.
+model AIContentIndex {
+  id             String       @id @default(cuid())
+  organizationId String
+  sourceType     String
+  sourceId       String
+  chunkIndex     Int          @default(0)
+  contentHash    String
+  chunk          String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, sourceType, sourceId, chunkIndex])
+  @@index([organizationId])
+  @@index([organizationId, updatedAt])
+  @@index([organizationId, sourceType, sourceId])
+  @@index([contentHash])
 }
 
 enum OrderStatus {

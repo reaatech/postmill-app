@@ -119,13 +119,16 @@ vi.mock('@gitroom/react/form/button', () => ({
 
 import { CalendarItem, IconButton } from './calendar';
 
-function basePost(overrides?: Record<string, any>) {
+type CalendarItemProps = React.ComponentProps<typeof CalendarItem>;
+type CalendarItemPost = CalendarItemProps['post'];
+
+function basePost(overrides?: Partial<CalendarItemPost> & Record<string, any>): CalendarItemPost {
   return {
     id: 'post-1',
     group: 'group-1',
     content: 'Hello world',
-    publishDate: '2024-01-15T12:00:00.000Z',
-    state: 'PUBLISHED' as const,
+    publishDate: new Date('2024-01-15T12:00:00.000Z'),
+    state: 'PUBLISHED',
     integration: {
       id: 'int-1',
       providerIdentifier: 'twitter',
@@ -136,19 +139,18 @@ function basePost(overrides?: Record<string, any>) {
     releaseId: 'rel-1',
     releaseURL: 'https://twitter.com/status/123',
     error: null,
-    creationMethod: null,
+    creationMethod: 'UNKNOWN',
     lastViews: null,
     lastLikes: null,
     lastComments: null,
     commentCount: 0,
     unreadComments: 0,
     intervalInDays: null,
-    actualDate: undefined,
     ...overrides,
-  };
+  } as CalendarItemPost;
 }
 
-function baseProps(overrides?: Record<string, any>) {
+function baseProps(overrides?: Partial<CalendarItemProps>): CalendarItemProps {
   return {
     date: dayjs('2024-01-15'),
     isBeforeNow: false,
@@ -160,8 +162,8 @@ function baseProps(overrides?: Record<string, any>) {
     missingRelease: undefined,
     openPostDetail: vi.fn(),
     integrations: [],
-    state: 'PUBLISHED' as const,
-    display: 'day' as const,
+    state: 'PUBLISHED',
+    display: 'day',
     showTime: false,
     post: basePost(),
     ...overrides,

@@ -25,6 +25,10 @@ export default defineConfig({
       include: [
         'src/api/routes/channel.config.controller.ts',
         'src/api/routes/analytics.v2.controller.ts',
+        'src/api/routes/ai-settings.controller.ts',
+        'src/api/routes/ai-user.controller.ts',
+        'src/api/routes/ai-moderate.controller.ts',
+        'src/api/routes/copilot.controller.ts',
       ],
       thresholds: {
         statements: 90,

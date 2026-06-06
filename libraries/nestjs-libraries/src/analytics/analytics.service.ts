@@ -1500,4 +1500,68 @@ export class AnalyticsService {
       contentType: 'application/json',
     };
   }
+
+  async getBestTimeAnalyticsContext(orgId: string) {
+    const ninetyDaysAgo = dayjs().subtract(90, 'day').startOf('day').toDate();
+
+    const integrations = await this.prisma.integration.findMany({
+      where: { organizationId: orgId, deletedAt: null, disabled: false },
+      select: {
+        id: true,
+        name: true,
+        providerIdentifier: true,
+        picture: true,
+      },
+    });
+
+    const integrationIds = integrations.map((i) => i.id);
+
+    const [recentPosts, snapshots] = await Promise.all([
+      integrationIds.length > 0
+        ? this.prisma.post.findMany({
+            where: {
+              organizationId: orgId,
+              integrationId: { in: integrationIds },
+              publishDate: { gte: ninetyDaysAgo },
+              deletedAt: null,
+            },
+            select: {
+              id: true,
+              publishDate: true,
+              integrationId: true,
+              lastViews: true,
+              lastLikes: true,
+              lastComments: true,
+            },
+            orderBy: { publishDate: 'desc' },
+            take: 500,
+          })
+        : Promise.resolve([]),
+
+      integrationIds.length > 0
+        ? this.prisma.analyticsSnapshot.findMany({
+            where: {
+              organizationId: orgId,
+              integrationId: { in: integrationIds },
+              date: { gte: ninetyDaysAgo },
+              metric: {
+                in: [
+                  'impressions',
+                  'likes',
+                  'comments',
+                  'shares',
+                  'clicks',
+                  'engagement',
+                  'reach',
+                  'views',
+                ],
+              },
+            },
+            orderBy: { date: 'asc' },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    return { integrations, posts: recentPosts, snapshots };
+  }
 }

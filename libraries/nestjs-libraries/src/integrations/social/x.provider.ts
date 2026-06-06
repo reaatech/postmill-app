@@ -858,7 +858,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       const client = await this.getClient(accessToken);
 

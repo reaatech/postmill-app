@@ -5,7 +5,7 @@ import { MetricDetailPanel } from './metric.detail.panel';
 import { MetricDetailResponse } from '../utils';
 
 vi.mock('../hooks/useMetricDrill', () => ({
-  useMetricDrill: () => ({ data: undefined }),
+  useMetricDrill: () => ({ data: undefined as MetricDetailResponse | undefined }),
 }));
 
 vi.mock('../charts/area.chart', () => ({

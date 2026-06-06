@@ -50,11 +50,10 @@ const AiImageModal: FC<{
     close();
     setLocked(true);
     try {
-      const image = await (
-        await fetch('/media/generate-image-with-prompt', {
-          method: 'POST',
-          body: JSON.stringify({
-            prompt: `
+      const res = await fetch('/media/generate-image-with-prompt', {
+        method: 'POST',
+        body: JSON.stringify({
+          prompt: `
 <!-- description -->
 ${prompt}
 <!-- /description -->
@@ -64,16 +63,23 @@ ${style}
 <!-- /style -->
 
 `,
-          }),
-        })
-      ).json();
+        }),
+      });
+      if (!res.ok) {
+        toaster.show(t('failed_to_generate_image', 'Failed to generate image'), 'warning');
+        return;
+      }
+      const image = await res.json();
       if (image) {
         onChange(image);
       }
-    } catch (e) {}
-    setLocked(false);
-    setLoading(false);
-  }, [prompt, style, onChange]);
+    } catch (e) {
+      toaster.show(t('failed_to_generate_image', 'Failed to generate image'), 'warning');
+    } finally {
+      setLocked(false);
+      setLoading(false);
+    }
+  }, [prompt, style, onChange, fetch, close, setLoading, setLocked, toaster, t]);
 
   return (
     <div className="flex flex-col gap-[16px]">
@@ -140,7 +146,7 @@ export const AiImage: FC<{
         />
       ),
     });
-  }, [loading, onChange]);
+  }, [loading, onChange, modals, t]);
 
   return (
     <div className="relative">

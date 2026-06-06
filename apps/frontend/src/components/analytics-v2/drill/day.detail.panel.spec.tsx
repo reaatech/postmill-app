@@ -5,7 +5,7 @@ import { DayDetailPanel } from './day.detail.panel';
 import { DayDetailResponse } from '../utils';
 
 vi.mock('../hooks/useDayDrill', () => ({
-  useDayDrill: () => ({ data: undefined }),
+  useDayDrill: () => ({ data: undefined as DayDetailResponse | undefined }),
 }));
 
 const fullData: DayDetailResponse = {

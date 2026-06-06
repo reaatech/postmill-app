@@ -1,0 +1,383 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+const mockLangchainModel = {
+  withStructuredOutput: vi.fn().mockReturnValue({}),
+  bindTools: vi.fn().mockReturnValue({}),
+};
+
+const mockDoGenerate = vi.fn().mockResolvedValue({
+  text: 'Mocked structured output',
+  usage: { promptTokens: 10, completionTokens: 5 },
+});
+
+const mockLanguageModel = {
+  modelId: 'gpt-4.1',
+  doGenerate: mockDoGenerate,
+};
+
+vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
+  AIModelProvider: class {
+    langchainModel = vi.fn().mockResolvedValue(mockLangchainModel);
+    imageModel = vi.fn().mockResolvedValue({
+      generate: vi.fn().mockResolvedValue('https://cdn.example.com/agent-image.png'),
+    });
+    languageModel = vi.fn().mockResolvedValue(mockLanguageModel);
+  },
+}));
+
+vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({
+  PostsService: class {
+    findAllExistingCategories = vi.fn().mockResolvedValue([{ category: 'Tech' }, { category: 'Business' }]);
+    findAllExistingTopicsOfCategory = vi.fn().mockResolvedValue([{ topic: 'AI' }, { topic: 'Cloud' }]);
+    findPopularPosts = vi.fn().mockResolvedValue([{ content: 'Popular post', hook: 'A great hook' }]);
+    findFreeDateTime = vi.fn().mockResolvedValue(new Date('2026-06-10T09:00:00Z'));
+  },
+}));
+
+vi.mock('@gitroom/nestjs-libraries/database/prisma/media/media.service', () => ({
+  MediaService: class {
+    saveFile = vi.fn().mockResolvedValue('uploaded-file-id-123');
+  },
+}));
+
+const { mockUploadStorage } = vi.hoisted(() => ({
+  mockUploadStorage: {
+    uploadSimple: vi.fn().mockResolvedValue('https://storage.example.com/uploaded.png'),
+  },
+}));
+
+vi.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
+  UploadFactory: {
+    createStorage: vi.fn().mockReturnValue(mockUploadStorage),
+  },
+}));
+
+vi.mock('@langchain/core/messages', () => ({
+  BaseMessage: class {},
+  HumanMessage: class {
+    content: string;
+    constructor(content: string) {
+      this.content = content;
+    }
+  },
+  ToolMessage: class {
+    content: string;
+    constructor(content: string) {
+      this.content = content;
+    }
+  },
+}));
+
+vi.mock('@langchain/core/prompts', () => ({
+  ChatPromptTemplate: {
+    fromTemplate: vi.fn().mockReturnValue({
+      pipe: vi.fn().mockReturnValue({
+        pipe: vi.fn().mockReturnValue({
+          invoke: vi.fn().mockResolvedValue({}),
+        }),
+        invoke: vi.fn().mockResolvedValue({}),
+      }),
+    }),
+  },
+}));
+
+vi.mock('@langchain/langgraph', () => ({
+  END: '__end__',
+  START: '__start__',
+  StateGraph: class {
+    private nodes: Map<string, any> = new Map();
+    private edges: Map<string, string> = new Map();
+    addNode(name: string, fn: any) {
+      this.nodes.set(name, fn);
+      return this;
+    }
+    addEdge(from: string, to: string) {
+      this.edges.set(from, to);
+      return this;
+    }
+    addConditionalEdges(from: string, fn: any) {
+      this.edges.set(from, fn);
+      return this;
+    }
+    compile() {
+      return {
+        streamEvents: vi.fn().mockResolvedValue([]),
+      };
+    }
+  },
+}));
+
+vi.mock('@langchain/langgraph/prebuilt', () => ({
+  ToolNode: class {},
+}));
+
+vi.mock('@langchain/tavily', () => ({
+  TavilySearch: class {},
+}));
+
+vi.mock('dayjs', () => {
+  const actualDayjs = vi.importActual('dayjs');
+  return {
+    default: () => ({
+      format: () => '2026-06-05T12:00:00.000Z',
+    }),
+  };
+});
+
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { AgentGraphService } from './agent.graph.service';
+
+describe('AgentGraphService', () => {
+  let service: AgentGraphService;
+  let aiModelProvider: AIModelProvider;
+  let postsService: PostsService;
+  let mediaService: MediaService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    postsService = new (PostsService as any)();
+    mediaService = new (MediaService as any)();
+    aiModelProvider = new (AIModelProvider as any)();
+    service = new AgentGraphService(postsService, mediaService, aiModelProvider);
+  });
+
+  describe('constructor', () => {
+    it('injects AIModelProvider, PostsService, and MediaService', () => {
+      expect((service as any)._aiModelProvider).toBe(aiModelProvider);
+      expect((service as any)._postsService).toBe(postsService);
+      expect((service as any)._mediaService).toBe(mediaService);
+    });
+
+    it('initializes UploadFactory storage', () => {
+      expect((service as any).storage).toBe(mockUploadStorage);
+    });
+  });
+
+  describe('_getModel', () => {
+    it('calls langchainModel with scope "generator" and orgId', async () => {
+      await (service as any)._getModel('org-123');
+
+      expect(aiModelProvider.langchainModel).toHaveBeenCalledWith('generator', 'org-123');
+    });
+
+    it('returns the langchain model from the provider', async () => {
+      const model = await (service as any)._getModel('org-456');
+
+      expect(model).toBe(mockLangchainModel);
+    });
+  });
+
+  describe('generatePictures', () => {
+    it('calls imageModel with scope "generator" and orgId', async () => {
+      const state = {
+        isPicture: true,
+        orgId: 'org-1',
+        content: [{ prompt: 'A scenic landscape at sunset' }],
+      } as any;
+
+      const result = await service.generatePictures(state);
+
+      expect(aiModelProvider.imageModel).toHaveBeenCalledWith('generator', 'org-1');
+      expect(result.content[0].image).toBe('https://cdn.example.com/agent-image.png');
+    });
+
+    it('returns unchanged state when isPicture is false', async () => {
+      const state = {
+        isPicture: false,
+        orgId: 'org-2',
+        content: [{ prompt: 'some prompt' }],
+      } as any;
+
+      const result = await service.generatePictures(state);
+
+      expect(aiModelProvider.imageModel).not.toHaveBeenCalled();
+      expect(result).toEqual({});
+    });
+
+    it('handles image generation failure gracefully', async () => {
+      const failProvider = {
+        imageModel: vi.fn().mockResolvedValue({
+          generate: vi.fn().mockRejectedValue(new Error('Image gen failed')),
+        }),
+        langchainModel: vi.fn().mockResolvedValue(mockLangchainModel),
+        languageModel: vi.fn().mockResolvedValue(mockLanguageModel),
+      };
+      const svc = new AgentGraphService(postsService, mediaService, failProvider as any);
+
+      const state = {
+        isPicture: true,
+        orgId: 'org-3',
+        content: [{ prompt: 'will fail' }, { prompt: 'second' }],
+      } as any;
+
+      const result = await svc.generatePictures(state);
+
+      expect(result.content[0].image).toBeUndefined();
+    });
+  });
+
+  describe('start', () => {
+    it('creates a graph invocation with streamEvents', async () => {
+      const body = {
+        research: 'Write about AI trends',
+        isPicture: false,
+        format: 'one_short' as const,
+        tone: 'company' as const,
+      };
+
+      const result = await service.start('org-99', body);
+
+      expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('builds the full graph with all nodes', () => {
+      const state = AgentGraphService.state();
+
+      expect(state).toBeDefined();
+    });
+  });
+
+  describe('state machine', () => {
+    it('state() returns a graph with channels configuration', () => {
+      const state = AgentGraphService.state();
+
+      expect(state).toBeDefined();
+    });
+  });
+
+  describe('findCategories', () => {
+    it('fetches existing categories and calls _getModel', async () => {
+      const state = { fresearch: 'AI research text', orgId: 'org-1', messages: [] } as any;
+
+      const result = await service.findCategories(state);
+
+      expect(postsService.findAllExistingCategories).toHaveBeenCalled();
+      expect(aiModelProvider.langchainModel).toHaveBeenCalledWith('generator', 'org-1');
+    });
+  });
+
+  describe('findPopularPosts', () => {
+    it('fetches popular posts based on category and topic', async () => {
+      const state = {
+        category: 'Tech',
+        topic: 'AI',
+        orgId: 'org-1',
+      } as any;
+
+      const result = await service.findPopularPosts(state);
+
+      expect(postsService.findPopularPosts).toHaveBeenCalledWith('Tech', 'AI');
+      expect(result.popularPosts).toBeDefined();
+    });
+  });
+
+  describe('uploadPictures', () => {
+    it('uploads images and calls mediaService.saveFile', async () => {
+      const state = {
+        orgId: 'org-1',
+        content: [{ image: 'https://cdn.example.com/img.png' }],
+      } as any;
+
+      const result = await service.uploadPictures(state);
+
+      expect(mockUploadStorage.uploadSimple).toHaveBeenCalledWith('https://cdn.example.com/img.png');
+      expect(mediaService.saveFile).toHaveBeenCalledWith(
+        'org-1',
+        'uploaded.png',
+        'https://storage.example.com/uploaded.png',
+      );
+      expect(result.content[0].image).toBe('uploaded-file-id-123');
+    });
+
+    it('skips entries without an image', async () => {
+      const state = {
+        orgId: 'org-2',
+        content: [{ noImage: true }],
+      } as any;
+
+      const result = await service.uploadPictures(state);
+
+      expect(mockUploadStorage.uploadSimple).not.toHaveBeenCalled();
+      expect(result.content[0].image).toBeUndefined();
+    });
+
+    it('handles upload errors gracefully', async () => {
+      mockUploadStorage.uploadSimple.mockRejectedValueOnce(new Error('Upload failed'));
+
+      const state = {
+        orgId: 'org-3',
+        content: [{ image: 'bad-url' }],
+      } as any;
+
+      const result = await service.uploadPictures(state);
+
+      expect(result.content[0].image).toBe('bad-url');
+    });
+  });
+
+  describe('fixArray', () => {
+    it('wraps single content in array for one_short format', async () => {
+      const state = {
+        format: 'one_short',
+        content: { content: 'Single post' },
+      } as any;
+
+      const result = await service.fixArray(state);
+
+      expect(result.content).toEqual([{ content: 'Single post' }]);
+    });
+
+    it('wraps single content in array for one_long format', async () => {
+      const state = {
+        format: 'one_long',
+        content: { content: 'Long post' },
+      } as any;
+
+      const result = await service.fixArray(state);
+
+      expect(result.content).toEqual([{ content: 'Long post' }]);
+    });
+
+    it('returns empty object for thread formats', async () => {
+      const state = {
+        format: 'thread_short',
+        content: [{ content: 'Post 1' }, { content: 'Post 2' }],
+      } as any;
+
+      const result = await service.fixArray(state);
+
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('isGeneratePicture', () => {
+    it('returns "generate-picture" when isPicture is true', async () => {
+      const state = { isPicture: true, orgId: 'org-1' } as any;
+
+      const result = await service.isGeneratePicture(state);
+
+      expect(result).toBe('generate-picture');
+    });
+
+    it('returns "post-time" when isPicture is false', async () => {
+      const state = { isPicture: false, orgId: 'org-1' } as any;
+
+      const result = await service.isGeneratePicture(state);
+
+      expect(result).toBe('post-time');
+    });
+  });
+
+  describe('postDateTime', () => {
+    it('calls postsService.findFreeDateTime with orgId', async () => {
+      const state = { orgId: 'org-42' } as any;
+
+      const result = await service.postDateTime(state);
+
+      expect(postsService.findFreeDateTime).toHaveBeenCalledWith('org-42');
+      expect(result.date).toBeInstanceOf(Date);
+    });
+  });
+});

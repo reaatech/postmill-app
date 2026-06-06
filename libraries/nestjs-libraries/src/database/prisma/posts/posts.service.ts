@@ -36,6 +36,7 @@ import { Readable } from 'stream';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 dayjs.extend(utc);
 import * as Sentry from '@sentry/nestjs';
+import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { TemporalService } from 'nestjs-temporal-core';
 import { TypedSearchAttributes } from '@temporalio/common';
 import {
@@ -70,7 +71,8 @@ export class PostsService {
     private _shortLinkService: ShortLinkService,
     private _openaiService: OpenaiService,
     private _temporalService: TemporalService,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    private _ragService: RagService,
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -931,6 +933,15 @@ export class PostsService {
       }
 
       Sentry.metrics.count('post_created', 1);
+
+      const postText = (post.value || []).map((v: any) => v.content).join('\n');
+      this._ragService.enqueueIndexJob({
+        organizationId: orgId,
+        sourceType: 'post',
+        sourceId: posts[0].id,
+        content: postText,
+      });
+
       postList.push({
         postId: posts[0].id,
         integration: post.integration.id,

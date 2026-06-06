@@ -35,6 +35,12 @@ export default defineConfig({
         'src/database/prisma/provider-configs/provider-config.service.ts',
         'src/analytics/analytics.service.ts',
         'src/integrations/social/analytics.metrics.ts',
+        'src/ai/*.ts',
+        'src/ai/**/*.ts',
+        'src/openai/openai.service.ts',
+        'src/agent/agent.graph.service.ts',
+        'src/database/prisma/ai-settings/*.ts',
+        'src/database/prisma/ai-rag/*.ts',
       ],
       thresholds: {
         statements: 90,

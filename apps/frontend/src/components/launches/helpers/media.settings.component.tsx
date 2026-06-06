@@ -315,6 +315,8 @@ export const MediaComponentInner: FC<{
   const [isEditingThumbnail, setIsEditingThumbnail] = useState(false);
   const [altText, setAltText] = useState<string>(media?.alt || '');
   const [loading, setLoading] = useState(false);
+  const [altTextLoading, setAltTextLoading] = useState(false);
+  const [altTextError, setAltTextError] = useState<string | null>(null);
   const [thumbnail, setThumbnail] = useState<string | null>(
     props.media?.thumbnail || null
   );
@@ -362,6 +364,39 @@ export const MediaComponentInner: FC<{
     onClose();
   }, [altText, newThumbnail, thumbnail, thumbnailTimestamp]);
 
+  const generateAltText = useCallback(async () => {
+    if (!media?.path) {
+      setAltTextError('No media selected');
+      return;
+    }
+
+    setAltTextLoading(true);
+    setAltTextError(null);
+
+    try {
+      const response = await newFetch('/ai/media', {
+        method: 'POST',
+        body: JSON.stringify({
+          operation: 'alt-text',
+          imageUrl: media.path,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setAltTextError(data?.message || data?.error || 'Failed to generate alt text');
+        return;
+      }
+
+      setAltText(data.altText || data.text || data.url || '');
+    } catch (err: any) {
+      setAltTextError(err?.message || 'Failed to generate alt text');
+    } finally {
+      setAltTextLoading(false);
+    }
+  }, [media?.path, newFetch]);
+
   return (
     <div className="mt-[10px] flex flex-col gap-[20px]">
       <div className="flex flex-col space-y-2">
@@ -375,6 +410,41 @@ export const MediaComponentInner: FC<{
           placeholder="Describe the image/video content..."
           className="w-full px-3 py-2 bg-fifth border border-tableBorder rounded-lg text-textColor placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-forth focus:border-transparent"
         />
+        <div className="flex items-center gap-[8px]">
+          <button
+            type="button"
+            disabled={altTextLoading}
+            onClick={generateAltText}
+            className="text-[12px] font-medium px-[12px] py-[6px] rounded-[6px] bg-forth text-white hover:bg-opacity-80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-[6px]"
+          >
+            {altTextLoading ? (
+              <svg
+                className="animate-spin h-[14px] w-[14px]"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            ) : null}
+            {altTextLoading ? 'Generating...' : 'Generate Alt Text'}
+          </button>
+          {altTextError && (
+            <span className="text-[12px] text-red-400">{altTextError}</span>
+          )}
+        </div>
       </div>
       {hasExtension(media?.path, 'mp4') && (
         <>

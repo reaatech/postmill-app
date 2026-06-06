@@ -567,7 +567,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       const cleanPostId = postId.startsWith('t3_') ? postId.slice(3) : postId;
 

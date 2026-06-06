@@ -672,7 +672,7 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       const { client, youtube } = clientAndYoutube();
       client.setCredentials({ access_token: accessToken });

@@ -468,6 +468,21 @@ const ConfigureChannels = () => {
   );
 };
 
+const ViewAiSettings = () => {
+  const t = useT();
+  const handleClick = useCallback(() => {
+    window.location.href = '/admin/ai';
+  }, [t]);
+  return (
+    <div
+      className="px-[10px] rounded-[4px] bg-pink-700 text-white cursor-pointer whitespace-nowrap"
+      onClick={handleClick}
+    >
+      {t('ai_settings', 'AI')}
+    </div>
+  );
+};
+
 const ImportDebugPost = () => {
   const { openModal } = useModals();
   const t = useT();
@@ -586,6 +601,7 @@ export const Impersonate = () => {
                 <AddAnnouncement />
                 <ViewErrors />
                 <ViewStats />
+                <ViewAiSettings />
                 {user?.isSuperAdmin && <ConfigureChannels />}
               </div>
             )}

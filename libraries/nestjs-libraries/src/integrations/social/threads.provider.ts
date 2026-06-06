@@ -622,7 +622,7 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       let url = `https://graph.threads.net/v1.0/${postId}/replies?access_token=${accessToken}&fields=id,text,username,permalink,timestamp,like_count,replies&limit=50`;
 
