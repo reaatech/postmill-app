@@ -128,36 +128,41 @@ export const CommentComposer: FC<CommentComposerProps> = ({
       {error && (
         <div className="text-[12px] text-red-500" role="alert">{error}</div>
       )}
-      <div className="flex gap-[6px] justify-between items-center">
-        <button
-          type="button"
-          onClick={handleAiDraft}
-          disabled={aiLoading || sending}
-          className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
-        >
-          {aiLoading
-            ? t('ai_drafting', '✨ Drafting...')
-            : t('ai_draft', '✨ Draft with AI')}
-        </button>
+      <div className="flex flex-col gap-[6px]">
         <div className="flex gap-[6px]">
           <button
             type="button"
-            onClick={onClose}
-            disabled={sending}
-            className="text-[12px] text-newTableText hover:text-textColor px-[10px] py-[4px] disabled:opacity-50"
+            onClick={handleAiDraft}
+            disabled={aiLoading || sending}
+            className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
           >
-            {t('cancel', 'Cancel')}
+            {aiLoading
+              ? t('ai_drafting', '✨ Drafting...')
+              : t('ai_draft', '✨ Draft with AI')}
           </button>
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={!message.trim() || sending}
-            className="bg-btnPrimary text-white text-[12px] rounded-[6px] px-[14px] py-[4px] disabled:opacity-50"
-          >
-            {sending
-              ? t('sending', 'Sending...')
-              : t('send', 'Send')}
-          </button>
+        </div>
+        <div className="flex gap-[6px] justify-between items-center">
+          <div />
+          <div className="flex gap-[6px]">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={sending}
+              className="text-[12px] text-newTableText hover:text-textColor px-[10px] py-[4px] disabled:opacity-50"
+            >
+              {t('cancel', 'Cancel')}
+            </button>
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={!message.trim() || sending}
+              className="bg-btnPrimary text-white text-[12px] rounded-[6px] px-[14px] py-[4px] disabled:opacity-50"
+            >
+              {sending
+                ? t('sending', 'Sending...')
+                : t('send', 'Send')}
+            </button>
+          </div>
         </div>
       </div>
     </div>
