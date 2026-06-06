@@ -4,6 +4,7 @@ import { render, screen } from '@testing-library/react';
 import { AnalyticsDashboard } from './analytics.dashboard';
 import { useOverview } from './hooks/useOverview';
 import { usePosts } from './hooks/usePosts';
+import type { OverviewResponse, PostsResponse } from './utils';
 
 const mockReplace = vi.fn();
 let mockSearchParams = new URLSearchParams('from=2024-01-01&to=2024-01-07');
@@ -55,7 +56,7 @@ vi.mock('./views/posts.tab', () => ({
 const mockUseOverview = vi.mocked(useOverview);
 const mockUsePosts = vi.mocked(usePosts);
 
-const overviewData = {
+const overviewData: OverviewResponse = {
   range: { from: '2024-01-01', to: '2024-01-07' },
   kpis: [],
   series: {},
@@ -63,7 +64,7 @@ const overviewData = {
   breakdown: { byPlatform: [] },
 };
 
-const postsData = {
+const postsData: PostsResponse = {
   posts: [],
   total: 0,
 };

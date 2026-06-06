@@ -90,7 +90,7 @@ describe('KPICard', () => {
   it('calls onClick when card is clicked', () => {
     const onClick = vi.fn();
     render(<KPICard kpi={baseKpi} onClick={onClick} />);
-    screen.getByText('Impressions').closest('[class*="cursor-pointer"]')!.click();
+    (screen.getByText('Impressions').closest('[class*="cursor-pointer"]') as HTMLElement)!.click();
     expect(onClick).toHaveBeenCalledOnce();
   });
 });
