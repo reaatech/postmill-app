@@ -34,6 +34,8 @@ model Organization {
   post                Post[]               @relation("organization")
   submittedPost       Post[]               @relation("submittedForOrg")
   socialComments      SocialComment[]
+  watchedAccounts     WatchedAccount[]
+  campaigns           Campaign[]
   sets                Sets[]
   signatures          Signatures[]
   subscription        Subscription?
@@ -51,6 +53,7 @@ model Organization {
   aiMediaJobs         AIMediaJob[]
   aiPromptLibraryItems AIPromptLibraryItem[]
   aiContentIndexes    AIContentIndex[]
+  multipartUploads    MultipartUpload[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -497,6 +500,8 @@ model Post {
   lastLikes                  Float?
   lastComments               Float?
   commentCount               Int                       @default(0)
+  campaignId                 String?
+  campaign                   Campaign?                 @relation(fields: [campaignId], references: [id])
   analyticsSnapshots         PostAnalyticsSnapshot[]
   socialComments             SocialComment[]
   commentReads               PostCommentRead[]
@@ -995,19 +1000,26 @@ model OAuthApp {
 }
 
 model OAuthAuthorization {
-  id                String       @id @default(uuid())
-  oauthAppId        String
-  userId            String
-  organizationId    String
-  accessToken       String?
-  authorizationCode String?
-  codeExpiresAt     DateTime?
-  revokedAt         DateTime?
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
-  oauthApp          OAuthApp     @relation(fields: [oauthAppId], references: [id])
-  user              User         @relation(fields: [userId], references: [id])
-  organization      Organization @relation(fields: [organizationId], references: [id])
+  id                    String       @id @default(uuid())
+  oauthAppId            String
+  userId                String
+  organizationId        String
+  accessToken           String?
+  authorizationCode     String?
+  codeExpiresAt         DateTime?
+  redirectUri           String?      // exact redirect URI used in authorize request
+  codeChallenge         String?      // PKCE: S256 hash of code_verifier
+  codeChallengeMethod   String?      // PKCE: "S256"
+  scope                 String?      // requested scopes
+  tokenExpiresAt        DateTime?    // access token expiry
+  refreshToken          String?      // refresh token (encrypted)
+  refreshTokenExpiresAt DateTime?    // refresh token expiry
+  revokedAt             DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  oauthApp              OAuthApp     @relation(fields: [oauthAppId], references: [id])
+  user                  User         @relation(fields: [userId], references: [id])
+  organization          Organization @relation(fields: [organizationId], references: [id])
 
   @@unique([oauthAppId, userId, organizationId])
   @@index([accessToken])
@@ -1100,15 +1112,16 @@ model AIOrgProviderConfig {
 
 // Per-org brand voice / custom instructions + localization
 model AIBrandProfile {
-  id             String       @id @default(cuid())
-  organizationId String       @unique
-  instructions   String?
-  language       String?
-  enabled        Boolean      @default(true)
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  organizationId    String       @unique
+  instructions      String?
+  language          String?
+  platformInstructions Json?    @default("{}")
+  enabled           Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization      Organization @relation(fields: [organizationId], references: [id])
 }
 
 // Editable prompt templates — NOT seeded; in-code PROMPT_CONSTANTS is canonical
@@ -1286,4 +1299,76 @@ model Announcement {
   description String
   color       AnnouncementColor @default(INFO)
   createdAt   DateTime          @default(now())
+}
+
+// Multipart upload ledger — tracks ownership and state of multipart uploads
+model MultipartUpload {
+  id             String   @id @default(uuid())
+  organizationId String
+  uploadId       String
+  key            String
+  fileName       String?
+  fileHash       String?
+  expectedMime   String?
+  totalSize      Int?
+  partCount      Int      @default(0)
+  state          String   @default("created") // created | uploading | completed | failed | aborted
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, uploadId])
+  @@index([organizationId, state])
+  @@index([uploadId])
+  @@index([organizationId, uploadId, state])
+}
+
+model WatchedAccount {
+  id             String   @id @default(uuid())
+  organizationId String
+  provider       String
+  handle         String
+  displayName    String?
+  enabled        Boolean  @default(true)
+  lastError      String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  metrics        WatchedAccountMetric[]
+
+  @@unique([organizationId, provider, handle])
+  @@index([organizationId])
+  @@index([deletedAt])
+}
+
+model WatchedAccountMetric {
+  id               String   @id @default(uuid())
+  watchedAccountId String
+  metric           String
+  value            Float
+  capturedAt       DateTime @default(now())
+  watchedAccount   WatchedAccount @relation(fields: [watchedAccountId], references: [id], onDelete: Cascade)
+
+  @@index([watchedAccountId, metric, capturedAt])
+}
+
+model Campaign {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  color          String?
+  description    String?
+  startDate      DateTime?
+  endDate        DateTime?
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  deletedAt      DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  posts          Post[]
+
+  @@index([organizationId])
+  @@index([deletedAt])
 }
