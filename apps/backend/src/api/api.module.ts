@@ -1,4 +1,4 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { AuthController } from '@gitroom/backend/api/routes/auth.controller';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { UsersController } from '@gitroom/backend/api/routes/users.controller';
@@ -40,6 +40,11 @@ import { AnnouncementsController } from '@gitroom/backend/api/routes/announcemen
 import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
 import { ChannelConfigController } from '@gitroom/backend/api/routes/channel.config.controller';
 import { SocialCommentsController } from '@gitroom/backend/api/routes/social-comments.controller';
+import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
+import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
+import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
+import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
+import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
 import { GithubProvider } from '@gitroom/backend/services/auth/providers/github.provider';
 import { GoogleProvider } from '@gitroom/backend/services/auth/providers/google.provider';
@@ -69,6 +74,9 @@ const authenticatedController = [
   ChannelConfigController,
   AnalyticsV2Controller,
   SocialCommentsController,
+  AiSettingsController,
+  AiModerateController,
+  AiUserController,
 ];
 @Module({
   imports: [UploadModule],
@@ -102,6 +110,7 @@ const authenticatedController = [
     WalletProvider,
     OauthProvider,
     AnalyticsService,
+    AiGuardMiddleware,
   ],
   get exports() {
     return [...this.imports, ...this.providers];
@@ -110,5 +119,20 @@ const authenticatedController = [
 export class ApiModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(AuthMiddleware).forRoutes(...authenticatedController);
+    consumer
+      .apply(BudgetMiddleware)
+      .forRoutes({ path: '/agents*', method: RequestMethod.ALL });
+    consumer
+      .apply(BudgetMiddleware)
+      .forRoutes({ path: '/copilot*', method: RequestMethod.ALL });
+    consumer
+      .apply(BudgetMiddleware)
+      .forRoutes({ path: '/ai*', method: RequestMethod.ALL });
+    consumer
+      .apply(AiGuardMiddleware)
+      .forRoutes({ path: '/copilot/chat', method: RequestMethod.POST });
+    consumer
+      .apply(AiGuardMiddleware)
+      .forRoutes({ path: '/copilot/agent', method: RequestMethod.POST });
   }
 }
