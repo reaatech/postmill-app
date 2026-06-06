@@ -9,6 +9,76 @@ import { URL } from 'node:url';
 import dns from 'node:dns/promises';
 import net from 'node:net';
 
+// Opt-in allowlist (1H risk register): admins may permit specific private CIDRs
+// so self-hosted provider instances (Mastodon custom, self-hosted WordPress/Lemmy)
+// on private networks remain reachable. Off by default — empty env means every
+// private/loopback/link-local range stays blocked. HTTPS is still required.
+let _allowedCidrCacheKey: string | undefined;
+let _allowedCidrList: net.BlockList | null = null;
+
+function getAllowedPrivateCidrs(): net.BlockList | null {
+  const raw = process.env.SSRF_ALLOWED_PRIVATE_CIDRS ?? '';
+  if (raw === _allowedCidrCacheKey) {
+    return _allowedCidrList;
+  }
+  _allowedCidrCacheKey = raw;
+
+  if (!raw.trim()) {
+    _allowedCidrList = null;
+    return null;
+  }
+
+  const list = new net.BlockList();
+  let added = 0;
+  for (const entry of raw.split(',')) {
+    const cidr = entry.trim();
+    if (!cidr) continue;
+    const [addr, prefixStr] = cidr.split('/');
+    const version = net.isIP(addr);
+    if (!version) continue;
+    const family = version === 4 ? 'ipv4' : 'ipv6';
+    try {
+      if (prefixStr === undefined) {
+        list.addAddress(addr, family);
+      } else {
+        const prefix = Number(prefixStr);
+        if (!Number.isInteger(prefix) || prefix < 0) continue;
+        list.addSubnet(addr, prefix, family);
+      }
+      added++;
+    } catch {
+      // ignore malformed entries
+    }
+  }
+
+  _allowedCidrList = added > 0 ? list : null;
+  return _allowedCidrList;
+}
+
+export function isAllowedPrivateIp(ip: string): boolean {
+  const list = getAllowedPrivateCidrs();
+  if (!list) return false;
+
+  // Check the address plus, for an IPv4-mapped IPv6 (::ffff:a.b.c.d), the
+  // extracted IPv4 — so an allowlisted IPv4 CIDR still matches the mapped form.
+  const candidates = [ip];
+  const mapped = ip.toLowerCase().match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+  if (mapped) candidates.push(mapped[1]);
+
+  for (const candidate of candidates) {
+    const version = net.isIP(candidate);
+    if (!version) continue;
+    try {
+      if (list.check(candidate, version === 4 ? 'ipv4' : 'ipv6')) {
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
+}
+
 export function isBlockedIPv4(ip: string): boolean {
   const [a, b] = ip.split('.').map(Number);
 
@@ -41,6 +111,11 @@ export function isBlockedIPv6(ip: string): boolean {
 }
 
 export function isBlockedIp(ip: string): boolean {
+  // Admin opt-in escape hatch for self-hosted instances on private ranges.
+  if (isAllowedPrivateIp(ip)) {
+    return false;
+  }
+
   const version = net.isIP(ip);
   if (version === 4) {
     return isBlockedIPv4(ip);

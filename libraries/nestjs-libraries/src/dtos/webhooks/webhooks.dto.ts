@@ -40,6 +40,8 @@ export class OnlyURL {
   url: string;
 }
 
+export class SendWebhookDto {}
+
 export class UpdateDto {
   @IsString()
   @IsDefined()
