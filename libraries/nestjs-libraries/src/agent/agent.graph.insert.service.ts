@@ -1,18 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
-import { ChatOpenAI } from '@langchain/openai';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { agentCategories } from '@gitroom/nestjs-libraries/agent/agent.categories';
 import { z } from 'zod';
 import { agentTopics } from '@gitroom/nestjs-libraries/agent/agent.topics';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-
-const model = new ChatOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4o-2024-08-06',
-  temperature: 0,
-});
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 
 interface WorkflowChannelsState {
   messages: BaseMessage[];
@@ -36,14 +30,17 @@ const hook = z.object({
 
 @Injectable()
 export class AgentGraphInsertService {
-  constructor(private _postsService: PostsService) {}
+  constructor(
+    private _postsService: PostsService,
+    private _aiModelProvider: AIModelProvider,
+  ) {}
   static state = () =>
     new StateGraph<WorkflowChannelsState>({
       channels: {
         messages: {
           reducer: (currentState, updateValue) =>
             currentState.concat(updateValue),
-          default: () => [],
+          default: (): any[] => [],
         },
         topic: null,
         category: null,
@@ -54,6 +51,7 @@ export class AgentGraphInsertService {
 
   async findCategory(state: WorkflowChannelsState) {
     const { messages } = state;
+    const model = await this._aiModelProvider.langchainModel('utility');
     const structuredOutput = model.withStructuredOutput(category);
     return ChatPromptTemplate.fromTemplate(
       `
@@ -70,8 +68,9 @@ Here is the post:
       });
   }
 
-  findTopic(state: WorkflowChannelsState) {
+  async findTopic(state: WorkflowChannelsState) {
     const { messages } = state;
+    const model = await this._aiModelProvider.langchainModel('utility');
     const structuredOutput = model.withStructuredOutput(topic);
     return ChatPromptTemplate.fromTemplate(
       `
@@ -88,8 +87,9 @@ Here is the post:
       });
   }
 
-  findHook(state: WorkflowChannelsState) {
+  async findHook(state: WorkflowChannelsState) {
     const { messages } = state;
+    const model = await this._aiModelProvider.langchainModel('utility');
     const structuredOutput = model.withStructuredOutput(hook);
     return ChatPromptTemplate.fromTemplate(
       `

@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import {
   BaseMessage,
   HumanMessage,
   ToolMessage,
 } from '@langchain/core/messages';
 import { END, START, StateGraph } from '@langchain/langgraph';
-import { ChatOpenAI, DallEAPIWrapper } from '@langchain/openai';
 import { TavilySearch } from '@langchain/tavily';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
@@ -15,22 +14,16 @@ import { z } from 'zod';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 
 const tools = !process.env.TAVILY_API_KEY
-  ? []
+  ? ((): any[] => {
+      console.warn('TAVILY_API_KEY not set — web search will be unavailable for agent');
+      return [];
+    })()
   : [new TavilySearch({ maxResults: 3 })];
 const toolNode = new ToolNode(tools);
-
-const model = new ChatOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'gpt-4.1',
-  temperature: 0.7,
-});
-
-const dalle = new DallEAPIWrapper({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-  model: 'chatgpt-image-latest',
-});
 
 interface WorkflowChannelsState {
   messages: BaseMessage[];
@@ -103,10 +96,12 @@ const contentZod = (
 
 @Injectable()
 export class AgentGraphService {
+  private readonly _logger = new Logger(AgentGraphService.name);
   private storage = UploadFactory.createStorage();
   constructor(
     private _postsService: PostsService,
-    private _mediaService: MediaService
+    private _mediaService: MediaService,
+    private _aiModelProvider: AIModelProvider,
   ) {}
   static state = () =>
     new StateGraph<WorkflowChannelsState>({
@@ -114,7 +109,7 @@ export class AgentGraphService {
         messages: {
           reducer: (currentState, updateValue) =>
             currentState.concat(updateValue),
-          default: () => [],
+          default: (): any[] => [],
         },
         fresearch: null,
         format: null,
@@ -131,15 +126,15 @@ export class AgentGraphService {
       },
     });
 
+  private async _getModel(orgId: string) {
+    return this._aiModelProvider.langchainModel('generator', orgId);
+  }
+
   async startCall(state: WorkflowChannelsState) {
+    const model = await this._getModel(state.orgId);
     const runTools = model.bindTools(tools);
     const response = await ChatPromptTemplate.fromTemplate(
-      `
-    Today is ${dayjs().format()}, You are an assistant that gets a social media post or requests for a social media post.
-    You research should be on the most possible recent data.
-    You concat the text of the request together with an internet research based on the text.
-    {text}
-    `
+      PROMPT_CONSTANTS.agentStartCall(dayjs().format())
     )
       .pipe(runTools)
       .invoke({
@@ -151,18 +146,15 @@ export class AgentGraphService {
 
   async saveResearch(state: WorkflowChannelsState) {
     const content = state.messages.filter((f) => f instanceof ToolMessage);
-    return { fresearch: content };
+    return { fresearch: content.map(m => m.content).join('\n') };
   }
 
   async findCategories(state: WorkflowChannelsState) {
     const allCategories = await this._postsService.findAllExistingCategories();
+    const model = await this._getModel(state.orgId);
     const structuredOutput = model.withStructuredOutput(category);
     const { category: outputCategory } = await ChatPromptTemplate.fromTemplate(
-      `
-        You are an assistant that gets a text that will be later summarized into a social media post
-        and classify it to one of the following categories: {categories}
-        text: {text}
-      `
+      PROMPT_CONSTANTS.agentFindCategory
     )
       .pipe(structuredOutput)
       .invoke({
@@ -183,13 +175,10 @@ export class AgentGraphService {
       return { topic: null };
     }
 
+    const model = await this._getModel(state.orgId);
     const structuredOutput = model.withStructuredOutput(topic);
     const { topic: outputTopic } = await ChatPromptTemplate.fromTemplate(
-      `
-        You are an assistant that gets a text that will be later summarized into a social media post
-        and classify it to one of the following topics: {topics}
-        text: {text}
-      `
+      PROMPT_CONSTANTS.agentFindTopic
     )
       .pipe(structuredOutput)
       .invoke({
@@ -211,34 +200,11 @@ export class AgentGraphService {
   }
 
   async generateHook(state: WorkflowChannelsState) {
+    const model = await this._getModel(state.orgId);
     const structuredOutput = model.withStructuredOutput(hook);
+    const personMode = state.tone === 'personal' ? '1st' : '3rd';
     const { hook: outputHook } = await ChatPromptTemplate.fromTemplate(
-      `
-        You are an assistant that gets content for a social media post, and generate only the hook.
-        The hook is the 1-2 sentences of the post that will be used to grab the attention of the reader.
-        You will be provided existing hooks you should use as inspiration.
-        - Avoid weird hook that starts with "Discover the secret...", "The best...", "The most...", "The top..."
-        - Make sure it sounds ${state.tone}
-        - Use ${state.tone === 'personal' ? '1st' : '3rd'} person mode
-        - Make sure it's engaging
-        - Don't be cringy
-        - Use simple english
-        - Make sure you add "\n" between the lines
-        - Don't take the hook from "request of the user"
-
-        <!-- BEGIN request of the user -->
-        {request}
-        <!-- END request of the user -->
-        
-        <!-- BEGIN existing hooks -->
-        {hooks}
-        <!-- END existing hooks -->
-        
-        <!-- BEGIN current content -->
-        {text}
-        <!-- END current content -->
-       
-      `
+      PROMPT_CONSTANTS.agentGenerateHook(state.tone, personMode)
     )
       .pipe(structuredOutput)
       .invoke({
@@ -253,43 +219,21 @@ export class AgentGraphService {
   }
 
   async generateContent(state: WorkflowChannelsState) {
+    const model = await this._getModel(state.orgId);
     const structuredOutput = model.withStructuredOutput(
       contentZod(!!state.isPicture, state.format)
     );
+    const personMode = state.tone === 'personal' ? '1st' : '3rd';
+    const lengthInstruction =
+      state.format === 'one_short' || state.format === 'thread_short'
+        ? 'Post should be maximum 200 chars to fit twitter'
+        : 'Post should be long';
+    const countInstruction =
+      state.format === 'one_short' || state.format === 'one_long'
+        ? 'Post should have only 1 item'
+        : 'Post should have minimum 2 items';
     const { content: outputContent } = await ChatPromptTemplate.fromTemplate(
-      `
-        You are an assistant that gets existing hook of a social media, content and generate only the content.
-        - Don't add any hashtags
-        - Make sure it sounds ${state.tone}
-        - Use ${state.tone === 'personal' ? '1st' : '3rd'} person mode
-        - ${
-          state.format === 'one_short' || state.format === 'thread_short'
-            ? 'Post should be maximum 200 chars to fit twitter'
-            : 'Post should be long'
-        }
-        - ${
-          state.format === 'one_short' || state.format === 'one_long'
-            ? 'Post should have only 1 item'
-            : 'Post should have minimum 2 items'
-        }
-        - Use the hook as inspiration
-        - Make sure it's engaging
-        - Don't be cringy
-        - Use simple english
-        - The Content should not contain the hook
-        - Try to put some call to action at the end of the post
-        - Make sure you add "\n" between the lines
-        - Add "\n" after every "."
-        
-        Hook:
-        {hook}
-        
-        User request:
-        {request}
-        
-        current content information:
-        {information}
-      `
+      PROMPT_CONSTANTS.agentGenerateContent(state.tone, personMode, lengthInstruction, countInstruction)
     )
       .pipe(structuredOutput)
       .invoke({
@@ -318,13 +262,16 @@ export class AgentGraphService {
       return {};
     }
 
+    const imageGenerator = await this._aiModelProvider.imageModel('generator', state.orgId);
+
     const newContent = await Promise.all(
       (state.content || []).map(async (p) => {
-        const image = await dalle.invoke(p.prompt!);
-        return {
-          ...p,
-          image,
-        };
+        try {
+          const image = await imageGenerator.generate(p.prompt!);
+          return { ...p, image };
+        } catch {
+          return { ...p, image: undefined };
+        }
       })
     );
 
@@ -337,18 +284,23 @@ export class AgentGraphService {
     const all = await Promise.all(
       (state.content || []).map(async (p) => {
         if (p.image) {
-          const upload = await this.storage.uploadSimple(p.image);
-          const name = upload.split('/').pop()!;
-          const uploadWithId = await this._mediaService.saveFile(
-            state.orgId,
-            name,
-            upload
-          );
+          try {
+            const upload = await this.storage.uploadSimple(p.image);
+            const name = upload.split('/').pop()!;
+            const uploadWithId = await this._mediaService.saveFile(
+              state.orgId,
+              name,
+              upload
+            );
 
-          return {
-            ...p,
-            image: uploadWithId,
-          };
+            return {
+              ...p,
+              image: uploadWithId,
+            };
+          } catch (err) {
+            this._logger.error(`Failed to upload picture: ${err}`);
+            return p;
+          }
         }
 
         return p;

@@ -1,12 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import OpenAI from 'openai';
+import { Injectable, Logger } from '@nestjs/common';
 import { shuffle } from 'lodash';
-import { zodResponseFormat } from 'openai/helpers/zod';
 import { z } from 'zod';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || 'sk-proj-',
-});
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { BudgetExceeded, GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
+import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
+export { PROMPT_CONSTANTS };
 
 const PicturePrompt = z.object({
   prompt: z.string(),
@@ -16,178 +14,118 @@ const VoicePrompt = z.object({
   voice: z.string(),
 });
 
+const SeparatePostsPrompt = z.object({
+  posts: z.array(z.string()),
+});
+
+const SeparatePostPrompt = z.object({
+  post: z.string().max(10000),
+});
+
+const SlidesSchema = z.object({
+  slides: z
+    .array(
+      z.object({
+        imagePrompt: z.string(),
+        voiceText: z.string(),
+      })
+    )
+    .describe('an array of slides'),
+});
+
 @Injectable()
 export class OpenaiService {
-  async generateImage(prompt: string, isVertical = false) {
-    // gpt-image models always return base64 (b64_json) and do not accept the
-    // `response_format` parameter, unlike the deprecated dall-e-3.
-    const generate = (
-      await openai.images.generate({
-        prompt,
-        model: 'chatgpt-image-latest',
-        size: isVertical ? '1024x1536' : '1024x1024',
-      })
-    ).data[0];
+  private readonly _logger = new Logger(OpenaiService.name);
 
-    return generate.b64_json;
+  constructor(private readonly _aiModelProvider: AIModelProvider) {}
+
+  async generateImage(prompt: string, isVertical = false, orgId?: string) {
+    const model = await this._aiModelProvider.imageModel('utility', orgId);
+    const result = await model.generate(prompt, {
+      size: isVertical ? '1024x1536' : '1024x1024',
+    });
+    return result;
   }
 
-  async generatePromptForPicture(prompt: string) {
-    return (
-      (
-        await openai.chat.completions.parse({
-          model: 'gpt-4.1',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an assistant that take a description and style and generate a prompt that will be used later to generate images, make it a very long and descriptive explanation, and write a lot of things for the renderer like, if it${"'"}s realistic describe the camera`,
-            },
-            {
-              role: 'user',
-              content: `prompt: ${prompt}`,
-            },
-          ],
-          response_format: zodResponseFormat(PicturePrompt, 'picturePrompt'),
-        })
-      ).choices[0].message.parsed?.prompt || ''
+  async generatePromptForPicture(prompt: string, orgId?: string) {
+    const result = await this._aiModelProvider.generateObject<{ prompt: string }>(
+      'utility',
+      `prompt: ${prompt}`,
+      PicturePrompt,
+      {
+        system: PROMPT_CONSTANTS.generatePromptForPicture,
+        orgId,
+      },
     );
+    return result?.prompt || '';
   }
 
-  async generateVoiceFromText(prompt: string) {
-    return (
-      (
-        await openai.chat.completions.parse({
-          model: 'gpt-4.1',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an assistant that takes a social media post and convert it to a normal human voice, to be later added to a character, when a person talk they don\'t use "-", and sometimes they add pause with "..." to make it sounds more natural, make sure you use a lot of pauses and make it sound like a real person`,
-            },
-            {
-              role: 'user',
-              content: `prompt: ${prompt}`,
-            },
-          ],
-          response_format: zodResponseFormat(VoicePrompt, 'voice'),
-        })
-      ).choices[0].message.parsed?.voice || ''
+  // TODO: Re-point to AiMediaService.textToSpeech() — currently uses text model as interim approach
+  async generateVoiceFromText(prompt: string, orgId?: string) {
+    const result = await this._aiModelProvider.generateObject<{ voice: string }>(
+      'utility',
+      `prompt: ${prompt}`,
+      VoicePrompt,
+      {
+        system: PROMPT_CONSTANTS.generateVoiceFromText,
+        orgId,
+      },
     );
+    return result?.voice || '';
   }
 
-  async generatePosts(content: string) {
+  async generatePosts(content: string, orgId?: string) {
+    const TwitterPostSchema = z.object({ post: z.string() });
+    const ThreadPostSchema = z.object({ posts: z.array(z.object({ post: z.string() })) });
+
     const posts = (
       await Promise.all([
-        openai.chat.completions.create({
-          messages: [
-            {
-              role: 'assistant',
-              content:
-                'Generate a Twitter post from the content without emojis in the following JSON format: { "post": string } put it in an array with one element',
-            },
-            {
-              role: 'user',
-              content: content!,
-            },
-          ],
-          n: 5,
-          temperature: 1,
-          model: 'gpt-4.1',
-        }),
-        openai.chat.completions.create({
-          messages: [
-            {
-              role: 'assistant',
-              content:
-                'Generate a thread for social media in the following JSON format: Array<{ "post": string }> without emojis',
-            },
-            {
-              role: 'user',
-              content: content!,
-            },
-          ],
-          n: 5,
-          temperature: 1,
-          model: 'gpt-4.1',
-        }),
+        this._aiModelProvider.generateObject<{ post: string }>('utility', content!, TwitterPostSchema, {
+          system: PROMPT_CONSTANTS.generatePostsTwitter,
+          orgId,
+        }).then(r => [r]),
+        this._aiModelProvider.generateObject<{ posts: { post: string }[] }>('utility', content!, ThreadPostSchema, {
+          system: PROMPT_CONSTANTS.generatePostsThread,
+          orgId,
+        }).then(r => r.posts || []),
       ])
-    ).flatMap((p) => p.choices);
+    ).flat();
 
     return shuffle(
-      posts.map((choice) => {
-        const { content } = choice.message;
-        const start = content?.indexOf('[')!;
-        const end = content?.lastIndexOf(']')!;
-        try {
-          return JSON.parse(
-            '[' +
-              content
-                ?.slice(start + 1, end)
-                .replace(/\n/g, ' ')
-                .replace(/ {2,}/g, ' ') +
-              ']'
-          );
-        } catch (e) {
-          return [];
-        }
-      })
+      (Array.isArray(posts) ? posts : [posts]).flat().map((post: any) => {
+        if (post?.post) return [{ post: post.post }];
+        if (Array.isArray(post)) return post;
+        return post;
+      }).flat()
     );
   }
-  async extractWebsiteText(content: string) {
-    const websiteContent = await openai.chat.completions.create({
-      messages: [
-        {
-          role: 'assistant',
-          content:
-            'You take a full website text, and extract only the article content',
-        },
-        {
-          role: 'user',
-          content,
-        },
-      ],
-      model: 'gpt-4.1',
-    });
 
-    const { content: articleContent } = websiteContent.choices[0].message;
+  async extractWebsiteText(content: string, orgId?: string) {
+    const articleContent = await this._aiModelProvider.generateText(
+      'utility',
+      content,
+      {
+        system: PROMPT_CONSTANTS.extractWebsiteText,
+        orgId,
+      },
+    );
 
-    return this.generatePosts(articleContent!);
+    return this.generatePosts(articleContent, orgId);
   }
 
   async separatePosts(content: string, len: number) {
-    const SeparatePostsPrompt = z.object({
-      posts: z.array(z.string()),
-    });
-
-    const SeparatePostPrompt = z.object({
-      post: z.string().max(len),
-    });
-
-    const posts =
-      (
-        await openai.chat.completions.parse({
-          model: 'gpt-4.1',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an assistant that take a social media post and break it to a thread, each post must be minimum ${
-                len - 10
-              } and maximum ${len} characters, keeping the exact wording and break lines, however make sure you split posts based on context`,
-            },
-            {
-              role: 'user',
-              content: content,
-            },
-          ],
-          response_format: zodResponseFormat(
-            SeparatePostsPrompt,
-            'separatePosts'
-          ),
-        })
-      ).choices[0].message.parsed?.posts || [];
+    const posts = await this._aiModelProvider.generateObject<{ posts: string[] }>(
+      'utility',
+      content,
+      SeparatePostsPrompt,
+      {
+        system: PROMPT_CONSTANTS.separatePosts(len),
+      },
+    );
 
     return {
       posts: await Promise.all(
-        posts.map(async (post: any) => {
+        (posts?.posts || []).map(async (post: string) => {
           if (post.length <= len) {
             return post;
           }
@@ -195,34 +133,22 @@ export class OpenaiService {
           let retries = 4;
           while (retries) {
             try {
-              return (
-                (
-                  await openai.chat.completions.parse({
-                    model: 'gpt-4.1',
-                    messages: [
-                      {
-                        role: 'system',
-                        content: `You are an assistant that take a social media post and shrink it to be maximum ${len} characters, keeping the exact wording and break lines`,
-                      },
-                      {
-                        role: 'user',
-                        content: post,
-                      },
-                    ],
-                    response_format: zodResponseFormat(
-                      SeparatePostPrompt,
-                      'separatePost'
-                    ),
-                  })
-                ).choices[0].message.parsed?.post || ''
+              const result = await this._aiModelProvider.generateObject<{ post: string }>(
+                'utility',
+                post,
+                SeparatePostPrompt,
+                {
+                  system: PROMPT_CONSTANTS.separatePostShrink(len),
+                },
               );
-            } catch (e) {
+              return result?.post || post;
+            } catch {
               retries--;
             }
           }
 
           return post;
-        })
+        }),
       ),
     };
   }
@@ -230,43 +156,63 @@ export class OpenaiService {
   async generateSlidesFromText(text: string) {
     for (let i = 0; i < 3; i++) {
       try {
-        const message = `You are an assistant that takes a text and break it into slides, each slide should have an image prompt and voice text to be later used to generate a video and voice, image prompt should capture the essence of the slide and also have a back dark gradient on top, image prompt should not contain text in the picture, generate between 3-5 slides maximum`;
-        const parse =
-          (
-            await openai.chat.completions.parse({
-              model: 'gpt-4.1',
-              messages: [
-                {
-                  role: 'system',
-                  content: message,
-                },
-                {
-                  role: 'user',
-                  content: text,
-                },
-              ],
-              response_format: zodResponseFormat(
-                z.object({
-                  slides: z
-                    .array(
-                      z.object({
-                        imagePrompt: z.string(),
-                        voiceText: z.string(),
-                      })
-                    )
-                    .describe('an array of slides'),
-                }),
-                'slides'
-              ),
-            })
-          ).choices[0].message.parsed?.slides || [];
-
-        return parse;
+        const result = await this._aiModelProvider.generateObject<{ slides: { imagePrompt: string; voiceText: string }[] }>(
+          'utility',
+          text,
+          SlidesSchema,
+          {
+            system: PROMPT_CONSTANTS.generateSlidesFromText,
+          },
+        );
+        return result?.slides || [];
       } catch (err) {
-        console.log(err);
+        if (err instanceof BudgetExceeded || err instanceof GuardrailViolation) {
+          throw err;
+        }
+        this._logger.error(err, OpenaiService.name);
       }
     }
 
+    this._logger.error('generateSlidesFromText failed after 3 retries');
     return [];
+  }
+
+  async generateAltText(imageUrlOrB64: string, orgId?: string) {
+    try {
+      const providerId = await this._aiModelProvider.resolveProviderId('utility', orgId);
+      const hasVision = this._aiModelProvider.hasCapability(providerId, 'vision');
+
+      if (hasVision) {
+        const model = await this._aiModelProvider.languageModel('utility', orgId);
+        const result = await (model as any).doGenerate({
+          prompt: [
+            { role: 'system', content: [{ type: 'text', text: PROMPT_CONSTANTS.generateAltText }] },
+            { role: 'user', content: [
+              { type: 'text', text: PROMPT_CONSTANTS.generateAltTextVisionPrompt },
+              { type: 'image', image: imageUrlOrB64 },
+            ]},
+          ],
+        });
+        const extractText = (r: any): string =>
+          typeof r?.text === 'string'
+            ? r.text
+            : (Array.isArray(r?.content) ? r.content : [])
+                .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
+                .map((p: any) => p.text)
+                .join('');
+        return extractText(result).trim();
+      }
+
+      // Fallback: pass image URL as text hint (no vision capability)
+      const result = await this._aiModelProvider.generateText('utility',
+        PROMPT_CONSTANTS.generateAltTextFallbackPrompt(imageUrlOrB64), {
+        system: PROMPT_CONSTANTS.generateAltText,
+        orgId,
+      });
+      return result.trim();
+    } catch (err) {
+      this._logger.error(`generateAltText failed: ${err}`);
+      return '';
+    }
   }
 }
