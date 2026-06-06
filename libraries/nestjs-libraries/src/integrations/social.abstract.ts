@@ -3,6 +3,7 @@ import { Integration } from '@prisma/client';
 import { ApplicationFailure } from '@temporalio/activity';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import sharp from 'sharp';
+import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 
 export type ValidityMedia = {
   path: string;
@@ -154,7 +155,17 @@ export abstract class SocialAbstract {
     ignoreConcurrency = false,
     message = '',
   ): Promise<Response> {
-    const request = await fetch(url, options);
+    // 1H defense-in-depth: every integration call gets connect-time SSRF
+    // protection (private-IP blocking, incl. redirect hops) via the undici
+    // dispatcher. Callers may override `dispatcher` for trusted first-party
+    // hosts. The heavier `safeFetch` (HTTPS + isSafePublicHttpsUrl pre-check +
+    // per-hop re-validation) is reserved for the dedicated user-URL paths
+    // (mastodon `uploadFile`, bluesky `downloadVideo`, provider connect flows).
+    const request = await fetch(url, {
+      ...options,
+      // @ts-expect-error — undici-only RequestInit option
+      dispatcher: (options as any).dispatcher ?? ssrfSafeDispatcher,
+    } as RequestInit);
 
     if (request.status === 200 || request.status === 201) {
       return request;

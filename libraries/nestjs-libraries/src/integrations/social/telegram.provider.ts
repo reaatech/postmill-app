@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -317,6 +318,110 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
       result.push(media.slice(i, i + size));
     }
     return result;
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      const chatId = accessToken;
+      const offset = cursor ? parseInt(cursor, 10) : undefined;
+      const updates = await this.bot.getUpdates({
+        offset,
+        allowed_updates: ['message'],
+        limit: 100,
+      });
+
+      const comments: SocialCommentDTO[] = updates
+        .filter((u) => {
+          const msg = u.message || u.channel_post;
+          return msg && (msg.reply_to_message?.message_id === parseInt(postId, 10));
+        })
+        .map((u) => {
+          const msg = u.message || u.channel_post!;
+          return {
+            platformCommentId: String(msg.message_id),
+            parentPlatformCommentId: String(postId),
+            author: {
+              id: String(msg.from?.id || ''),
+              name: msg.from?.first_name || '',
+              username: msg.from?.username,
+            },
+            content: msg.text || msg.caption || '',
+            createdAt: new Date((msg.date || 0) * 1000).toISOString(),
+            raw: msg,
+          };
+        });
+
+      const nextCursor = updates.length > 0
+        ? String(updates[updates.length - 1].update_id + 1)
+        : undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const chatId = accessToken;
+      const response = await this.bot.sendMessage(chatId, message, {
+        reply_to_message_id: parseInt(parentCommentId, 10),
+        parse_mode: 'HTML',
+      });
+
+      return {
+        platformCommentId: String(response.message_id),
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration?.internalId || '',
+          name: integration?.name || '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 
   async botIsAdmin(chatId: number, botId: number): Promise<boolean> {

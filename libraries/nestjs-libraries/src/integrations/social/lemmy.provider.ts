@@ -14,8 +14,11 @@ import { Integration } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { LemmySettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/lemmy.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { Logger } from '@nestjs/common';
 
 export class LemmyProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(LemmyProvider.name);
   override maxConcurrentJob = 3; // Lemmy instances typically have moderate limits
   identifier = 'lemmy';
   name = 'Lemmy';
@@ -95,7 +98,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
   }) {
     const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
 
-    const load = await fetch(body.service + '/api/v3/user/login', {
+    const load = await safeFetch(body.service + '/api/v3/user/login', {
       body: JSON.stringify({
         username_or_email: body.identifier,
         password: body.password,
@@ -114,7 +117,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
 
     try {
       const user = await (
-        await fetch(body.service + `/api/v3/user?username=${body.identifier}`, {
+        await safeFetch(body.service + `/api/v3/user?username=${body.identifier}`, {
           headers: {
             Authorization: `Bearer ${jwt}`,
           },
@@ -134,7 +137,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
         username: body.identifier || '',
       };
     } catch (e) {
-      console.log(e);
+      this.logger.warn('Lemmy authentication failed');
       return 'Invalid credentials';
     }
   }
@@ -145,7 +148,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
     );
 
     const { jwt } = await (
-      await fetch(body.service + '/api/v3/user/login', {
+      await safeFetch(body.service + '/api/v3/user/login', {
         body: JSON.stringify({
           username_or_email: body.identifier,
           password: body.password,
@@ -183,7 +186,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
         nsfw: false,
       });
       const { post_view } = await (
-        await fetch(service + '/api/v3/post', {
+        await safeFetch(service + '/api/v3/post', {
           body: JSON.stringify({
             community_id: +lemmy.value.id,
             name: lemmy.value.title,
@@ -244,7 +247,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
 
     for (const singlePostId of postIds) {
       const { comment_view } = await (
-        await fetch(service + '/api/v3/comment', {
+        await safeFetch(service + '/api/v3/comment', {
           body: JSON.stringify({
             post_id: +singlePostId,
             content: commentPost.message,
@@ -294,7 +297,7 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
     const { jwt, service } = await this.getJwtAndService(integration);
 
     const { communities } = await (
-      await fetch(
+      await safeFetch(
         service + `/api/v3/search?type_=Communities&sort=Active&q=${data.word}`,
         {
           headers: {

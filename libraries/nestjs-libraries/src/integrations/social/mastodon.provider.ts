@@ -13,6 +13,7 @@ import { number, string } from 'yup';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { htmlToText } from '@gitroom/helpers/utils/html.to.text';
 import { Logger } from '@nestjs/common';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class MastodonProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(MastodonProvider.name);
@@ -146,7 +147,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     alt?: string
   ) {
     const form = new FormData();
-    form.append('file', await fetch(fileUrl).then((r) => r.blob()));
+    form.append('file', await safeFetch(fileUrl).then((r) => r.blob()));
     if (alt) {
       form.append('description', alt);
     }

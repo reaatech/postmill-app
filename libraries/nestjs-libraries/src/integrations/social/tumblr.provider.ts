@@ -4,6 +4,7 @@ import {
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class TumblrProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tumblr';
@@ -116,7 +117,7 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
     for (let i = 0; i < media.length; i++) {
       const m = media[i];
       const key = `media-${i}`;
-      const blob = await fetch(m.path).then((r) => r.blob());
+      const blob = await safeFetch(m.path).then((r) => r.blob());
       form.append(key, blob);
       content.push({
         type: m.path.endsWith('.mp4') ? 'video' : 'image',

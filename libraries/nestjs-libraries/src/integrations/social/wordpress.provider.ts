@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -14,11 +15,14 @@ import slugify from 'slugify';
 import axios from 'axios';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { string } from 'yup';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { Logger } from '@nestjs/common';
 
 export class WordpressProvider
   extends SocialAbstract
   implements SocialProvider
 {
+  private readonly logger = new Logger(WordpressProvider.name);
   identifier = 'wordpress';
   name = 'WordPress';
   isBetweenSteps = false;
@@ -102,7 +106,7 @@ export class WordpressProvider
         'base64'
       );
       const { id, name, avatar_urls, code } = await (
-        await fetch(`${body.domain}/wp-json/wp/v2/users/me`, {
+        await safeFetch(`${body.domain}/wp-json/wp/v2/users/me`, {
           headers: {
             Authorization: `Basic ${auth}`,
           },
@@ -133,7 +137,7 @@ export class WordpressProvider
         username: body.username,
       };
     } catch (err) {
-      console.log(err);
+      this.logger.warn('WordPress authentication failed');
       return 'Invalid credentials';
     }
   }
@@ -177,6 +181,126 @@ export class WordpressProvider
 
       return all;
     }, []);
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      const body = JSON.parse(Buffer.from(accessToken, 'base64').toString()) as {
+        domain: string;
+        username: string;
+        password: string;
+      };
+      const auth = Buffer.from(`${body.username}:${body.password}`).toString('base64');
+
+      let url = `${body.domain}/wp-json/wp/v2/comments?post=${postId}&per_page=50&orderby=date&order=asc`;
+      if (cursor) {
+        url += `&page=${cursor}`;
+      }
+
+      const response = await this.fetch(url, {
+        headers: {
+          Authorization: `Basic ${auth}`,
+        },
+      });
+      const data = await response.json() as any[];
+
+      const comments: SocialCommentDTO[] = (data || []).map((c: any) => ({
+        platformCommentId: String(c.id),
+        parentPlatformCommentId: c.parent ? String(c.parent) : undefined,
+        author: {
+          id: String(c.author_name),
+          name: c.author_name || '',
+          username: c.author_name,
+          picture: c.author_avatar_urls?.['96'],
+        },
+        content: c.content?.rendered || '',
+        createdAt: c.date,
+        raw: c,
+      }));
+
+      const totalPages = parseInt(response.headers.get('X-WP-TotalPages') || '1', 10);
+      const currentPage = cursor ? parseInt(cursor, 10) : 1;
+      const nextCursor = currentPage < totalPages ? String(currentPage + 1) : undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const body = JSON.parse(Buffer.from(accessToken, 'base64').toString()) as {
+        domain: string;
+        username: string;
+        password: string;
+      };
+      const auth = Buffer.from(`${body.username}:${body.password}`).toString('base64');
+
+      const response = await this.fetch(`${body.domain}/wp-json/wp/v2/comments`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          post: parseInt(postId, 10),
+          parent: parseInt(parentCommentId, 10),
+          content: message,
+        }),
+      });
+      const data = await response.json() as any;
+
+      return {
+        platformCommentId: String(data.id),
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: { id: integration?.internalId || '', name: integration?.name || '' },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 
   async post(

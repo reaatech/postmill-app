@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -274,6 +275,119 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
         status: 'posted',
       },
     ];
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      const channel = id;
+      let url = `https://slack.com/api/conversations.replies?channel=${channel}&ts=${postId}&limit=100`;
+      if (cursor) {
+        url += `&cursor=${cursor}`;
+      }
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const json = await response.json() as any;
+      const messages = json?.messages || [];
+
+      const comments: SocialCommentDTO[] = messages
+        .filter((m: any) => m.ts !== postId)
+        .map((msg: any) => ({
+          platformCommentId: msg.ts,
+          parentPlatformCommentId: postId,
+          author: {
+            id: msg.user || msg.bot_id || '',
+            name: msg.username || msg.bot_id || '',
+            username: msg.username,
+          },
+          content: msg.text || '',
+          createdAt: new Date(parseFloat(msg.ts) * 1000).toISOString(),
+          raw: msg,
+        }));
+
+      const nextCursor = json?.response_metadata?.next_cursor;
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const channel = id;
+      const response = await fetch(`https://slack.com/api/chat.postMessage`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          channel,
+          thread_ts: parentCommentId,
+          text: message,
+          username: integration.name,
+          icon_url: integration.picture,
+        }),
+      });
+      const json = await response.json() as any;
+
+      return {
+        platformCommentId: json.ts || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration?.internalId || '',
+          name: integration?.name || '',
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 
   async changeProfilePicture(id: string, accessToken: string, url: string) {

@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  PollDetails,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -668,24 +669,42 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
     message: string,
     mediaIds: string[],
     isPdf: boolean,
-    pdfTitle?: string
+    pdfTitle?: string,
+    poll?: PollDetails
   ) {
     const author =
       type === 'personal' ? `urn:li:person:${id}` : `urn:li:organization:${id}`;
 
-    return {
+    const content = this.buildPostContent(isPdf, mediaIds, pdfTitle);
+
+    const payload = {
       author,
       commentary: this.fixText(message),
-      visibility: 'PUBLIC',
+      visibility: 'PUBLIC' as const,
       distribution: {
-        feedDistribution: 'MAIN_FEED',
+        feedDistribution: 'MAIN_FEED' as const,
         targetEntities: [] as string[],
         thirdPartyDistributionChannels: [] as string[],
       },
-      ...this.buildPostContent(isPdf, mediaIds, pdfTitle),
-      lifecycleState: 'PUBLISHED',
+      ...content,
+      lifecycleState: 'PUBLISHED' as const,
       isReshareDisabledByAuthor: false,
     };
+
+    if (poll?.options?.length) {
+      const hours = Math.min(Math.max(poll.duration || 24, 1), 168);
+      const duration = hours <= 24 ? 'ONE_DAY' : hours <= 72 ? 'THREE_DAYS' : 'ONE_WEEK';
+
+      payload['content'] = {
+        ...((payload as any).content || {}),
+        poll: {
+          options: poll.options.map((text) => ({ text })),
+          settings: { duration },
+        },
+      };
+    }
+
+    return payload;
   }
 
   private async createMainPost(
@@ -706,7 +725,8 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
       firstPost.message,
       mediaIds,
       isPdf,
-      pdfTitle
+      pdfTitle,
+      firstPost.poll
     );
 
     const response = await this.fetch(`https://api.linkedin.com/rest/posts`, {

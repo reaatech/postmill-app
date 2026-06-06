@@ -513,6 +513,14 @@ export class XProvider extends SocialAbstract implements SocialProvider {
         ? removeLinks(firstPost.message)
         : firstPost.message,
       ...(media_ids.length ? { media: { media_ids } } : {}),
+      ...(firstPost.poll?.options?.length
+        ? {
+            poll: {
+              options: firstPost.poll.options,
+              duration_minutes: Math.min(Math.max(firstPost.poll.duration || 24, 5), 10080),
+            },
+          }
+        : {}),
       made_with_ai: !!firstPost?.settings?.made_with_ai,
       paid_partnership: !!firstPost?.settings?.paid_partnership,
     };
@@ -724,7 +732,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
         ],
       }));
     } catch (err) {
-      console.log(err);
+      Logger.warn(`X analytics error: ${(err as Error)?.message || err}`);
     }
     return [];
   }
@@ -807,7 +815,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      console.log('Error fetching X post analytics:', err);
+      Logger.warn(`X post analytics error: ${(err as Error)?.message}`);
     }
 
     return [];
@@ -839,7 +847,7 @@ export class XProvider extends SocialAbstract implements SocialProvider {
         },
       ];
     } catch (err) {
-      console.log(err);
+      Logger.warn(`X mention error: ${(err as Error)?.message || err}`);
     }
     return [];
   }

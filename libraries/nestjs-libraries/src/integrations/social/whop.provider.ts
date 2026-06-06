@@ -13,6 +13,7 @@ import { WhopDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings
 import { Integration } from '@prisma/client';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class WhopProvider extends SocialAbstract implements SocialProvider {
   identifier = 'whop';
@@ -226,7 +227,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     const attachments: { id: string }[] = [];
 
     for (const item of media) {
-      const fileResponse = await fetch(item.path);
+      const fileResponse = await safeFetch(item.path);
       const fileBuffer = await fileResponse.arrayBuffer();
       const fileName = item.path.split('/').pop() || 'file';
 

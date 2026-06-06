@@ -7,6 +7,7 @@ import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { Integration } from '@prisma/client';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class MastodonCustomProvider extends MastodonProvider {
   override identifier = 'mastodon-custom';
@@ -24,7 +25,7 @@ export class MastodonCustomProvider extends MastodonProvider {
     form.append('scopes', this.scopes.join(' '));
     form.append('website', process.env.FRONTEND_URL || 'http://localhost:5000');
     const { client_id, client_secret, ...all } = await (
-      await fetch(url + '/api/v1/apps', {
+      await safeFetch(url + '/api/v1/apps', {
         method: 'POST',
         body: form,
       })

@@ -14,6 +14,10 @@ vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({
   readOrFetch: vi.fn().mockResolvedValue(Buffer.from('fake-image-data')),
 }));
 
+vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch', () => ({
+  safeFetch: vi.fn((url: string, options?: RequestInit) => fetch(url, options)),
+}));
+
 import {
   SocialAbstract,
   RefreshToken,

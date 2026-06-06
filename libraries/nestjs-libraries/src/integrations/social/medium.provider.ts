@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -42,6 +43,49 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
       picture: '',
       username: '',
     };
+  }
+
+  override get commentsCapabilities() {
+    return { read: false, reply: false, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    return { comments: [] };
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    return {
+      platformCommentId: '',
+      parentPlatformCommentId: parentCommentId,
+      author: { id: integration?.internalId || '', name: integration?.name || '' },
+      content: message,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 
   async customFields() {

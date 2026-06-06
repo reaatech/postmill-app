@@ -3,6 +3,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import dayjs from 'dayjs';
@@ -307,7 +308,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = Math.random().toString(36).substring(2);
+    const state = require('crypto').randomUUID();
 
     return {
       url:
@@ -871,5 +872,115 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       console.error('Error fetching TikTok post analytics:', err);
       return [];
     }
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      let url = `https://open.tiktokapis.com/v2/video/comment/list/?video_id=${postId}&fields=id,text,create_time,user_id,username,like_count,reply_count`;
+      if (cursor) {
+        url += `&cursor=${cursor}`;
+      }
+
+      const response = await this.fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const json = await response.json() as any;
+      const data = json?.data || {};
+      const commentsList = data.comments || [];
+
+      const comments: SocialCommentDTO[] = commentsList.map((c: any) => ({
+        platformCommentId: c.id,
+        author: {
+          id: c.user_id || '',
+          name: c.username || '',
+          username: c.username,
+          picture: c.user?.avatar_url,
+        },
+        content: c.text || '',
+        createdAt: new Date(c.create_time * 1000).toISOString(),
+        likeCount: c.like_count,
+        replyCount: c.reply_count,
+        raw: c,
+      }));
+
+      return { comments, nextCursor: data.cursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const response = await this.fetch(
+        'https://open.tiktokapis.com/v2/video/comment/reply/',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            video_id: postId,
+            comment_id: parentCommentId,
+            text: message,
+          }),
+        }
+      );
+      const json = await response.json() as any;
+      const comment = json?.data?.comment;
+
+      return {
+        platformCommentId: comment?.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: { id: integration?.internalId || '', name: integration?.name || '' },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 }

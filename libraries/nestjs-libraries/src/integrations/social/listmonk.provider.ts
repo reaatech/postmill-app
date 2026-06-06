@@ -12,8 +12,11 @@ import { ListmonkDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import slugify from 'slugify';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { Logger } from '@nestjs/common';
 
 export class ListmonkProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(ListmonkProvider.name);
   override maxConcurrentJob = 100; // ListMonk has moderate rate limits
   identifier = 'listmonk';
   name = 'ListMonk';
@@ -79,14 +82,13 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     const body: { url: string; username: string; password: string } =
       JSON.parse(Buffer.from(params.code, 'base64').toString());
 
-    console.log(body);
     try {
       const basic = Buffer.from(body.username + ':' + body.password).toString(
         'base64'
       );
 
       const { data } = await (
-        await this.fetch(body.url + '/api/settings', {
+        await safeFetch(body.url + '/api/settings', {
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
@@ -105,7 +107,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
         username: data['app.site_name'],
       };
     } catch (e) {
-      console.log(e);
+      this.logger.warn('Listmonk authentication failed');
       return 'Invalid credentials';
     }
   }
@@ -127,7 +129,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     );
 
     const postTypes = await (
-      await this.fetch(`${body.url}/api/lists`, {
+      await safeFetch(`${body.url}/api/lists`, {
         headers: {
           Authorization: `Basic ${auth}`,
         },
@@ -154,7 +156,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     );
 
     const postTypes = await (
-      await this.fetch(`${body.url}/api/templates`, {
+      await safeFetch(`${body.url}/api/templates`, {
         headers: {
           Authorization: `Basic ${auth}`,
         },
@@ -228,7 +230,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
     const {
       data: { uuid: postId, id: campaignId },
     } = await (
-      await this.fetch(body.url + '/api/campaigns', {
+      await safeFetch(body.url + '/api/campaigns', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -253,7 +255,7 @@ export class ListmonkProvider extends SocialAbstract implements SocialProvider {
       })
     ).json();
 
-    await this.fetch(body.url + `/api/campaigns/${campaignId}/status`, {
+    await safeFetch(body.url + `/api/campaigns/${campaignId}/status`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
