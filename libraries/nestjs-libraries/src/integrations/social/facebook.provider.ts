@@ -809,7 +809,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     cursor: string | undefined,
     integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       let url = `https://graph.facebook.com/v20.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from{{id,name,picture}},created_time,like_count,comment_count,user_likes&limit=50`;
 

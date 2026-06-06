@@ -21,7 +21,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('dayjs', () => {
   const fromNow = vi.fn(() => '2 days ago');
-  const dayjsMock = vi.fn(() => ({ fromNow }));
+  const dayjsMock = vi.fn(() => ({ fromNow })) as any;
   dayjsMock.extend = vi.fn();
   return { default: dayjsMock };
 });
@@ -52,7 +52,7 @@ function stubSwr(overrides: Record<string, any>) {
   } as any);
 }
 
-function buildComment(id: string, overrides?: Record<string, any>) {
+function buildComment(id: string, overrides?: Record<string, any>): Record<string, any> {
   return {
     id,
     postId: 'p1',

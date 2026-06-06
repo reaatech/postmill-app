@@ -1006,7 +1006,7 @@ export class InstagramProvider
     postId: string,
     cursor: string | undefined,
     _integration: Integration
-  ) {
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
       let url = `https://graph.facebook.com/v20.0/${postId}/comments?access_token=${accessToken}&fields=id,message,from{id,name,picture},created_time,like_count,reply_count,user_likes&limit=50`;
 
@@ -1020,7 +1020,7 @@ export class InstagramProvider
 
       const comments: SocialCommentDTO[] = data.map((item: any) => ({
         platformCommentId: item.id,
-        parentPlatformCommentId: undefined,
+        parentPlatformCommentId: undefined as string | undefined,
         author: {
           id: item.from?.id || '',
           name: item.from?.name || '',

@@ -29,7 +29,11 @@ describe('SocialCommentsController', () => {
 
   describe('GET /:id/social-comments', () => {
     it('returns comments for a post with cursor query param', async () => {
-      const mockResult = { comments: [{ id: 'c1' }], nextCursor: undefined, unreadCount: 0 };
+      const mockResult: {
+        comments: { id: string }[];
+        nextCursor: string | undefined;
+        unreadCount: number;
+      } = { comments: [{ id: 'c1' }], nextCursor: undefined, unreadCount: 0 };
       (service.getComments as any).mockResolvedValue(mockResult);
 
       const result = await controller.getComments('post-1', 'cursor-value', mockOrg, mockUser);

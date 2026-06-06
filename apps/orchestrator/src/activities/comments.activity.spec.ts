@@ -13,6 +13,10 @@ vi.mock(
   () => ({ SocialCommentsService: vi.fn() })
 );
 
+vi.mock('@gitroom/nestjs-libraries/services/email.service', () => ({
+  EmailService: vi.fn(),
+}));
+
 vi.mock('@temporalio/activity', async (importOriginal) => {
   const actual: any = await importOriginal();
   return {
@@ -38,6 +42,7 @@ describe('CommentsActivity', () => {
   let prisma: any;
   let providerConfigManager: any;
   let socialCommentsService: any;
+  let emailService: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -54,8 +59,14 @@ describe('CommentsActivity', () => {
     };
     providerConfigManager = { ensureFresh: vi.fn().mockResolvedValue(undefined) };
     socialCommentsService = { syncComments: vi.fn().mockResolvedValue(undefined) };
+    emailService = { sendEmailSync: vi.fn().mockResolvedValue(undefined) };
 
-    activity = new CommentsActivity(prisma, providerConfigManager, socialCommentsService);
+    activity = new CommentsActivity(
+      prisma,
+      providerConfigManager,
+      socialCommentsService,
+      emailService
+    );
   });
 
   afterEach(() => {
