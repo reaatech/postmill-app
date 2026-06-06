@@ -6,6 +6,9 @@ import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
+import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
+import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import {
   normalizeMetric,
   METRIC_REGISTRY,
@@ -15,6 +18,7 @@ import isoWeek from 'dayjs/plugin/isoWeek';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { log } from '@temporalio/activity';
+import { decryptIntegrationTokens, decryptPostIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
 
 dayjs.extend(isoWeek);
 
@@ -52,7 +56,9 @@ export class AnalyticsActivity {
     private readonly _providerConfigManager: ProviderConfigManager,
     private readonly _organizationService: OrganizationService,
     private readonly _integrationService: IntegrationService,
-    private readonly _refreshIntegrationService: RefreshIntegrationService
+    private readonly _refreshIntegrationService: RefreshIntegrationService,
+    private readonly _webhooksService: WebhooksService,
+    private readonly _watchlistService: WatchlistService,
   ) {}
 
   @ActivityMethod()
@@ -152,7 +158,7 @@ export class AnalyticsActivity {
     await this._providerConfigManager.ensureFresh();
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    const posts = await this._prisma.post.findMany({
+    const posts = (await this._prisma.post.findMany({
       where: {
         organizationId: orgId,
         releaseId: { not: null },
@@ -161,7 +167,7 @@ export class AnalyticsActivity {
       include: {
         integration: true,
       },
-    });
+    })).map(decryptPostIntegrationTokens);
 
     for (const post of posts) {
       if (!post.releaseId || post.releaseId === 'missing') continue;
@@ -366,12 +372,24 @@ export class AnalyticsActivity {
   }
 
   @ActivityMethod()
+  async notifySnapshotComplete(orgId: string): Promise<void> {
+    try {
+      await this._webhooksService.dispatchEvent(orgId, 'analytics.snapshot_complete', {
+        orgId,
+        timestamp: new Date().toISOString(),
+      });
+    } catch (err) {
+      log.error('notifySnapshotComplete error:', { error: (err as Error)?.message });
+    }
+  }
+
+  @ActivityMethod()
   async backfillIntegration(integrationId: string): Promise<void> {
     await this._providerConfigManager.ensureFresh();
 
-    const integration = await this._prisma.integration.findUnique({
+    const integration = decryptIntegrationTokens(await this._prisma.integration.findUnique({
       where: { id: integrationId },
-    });
+    }));
     if (!integration || integration.type !== 'social') return;
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
@@ -434,6 +452,49 @@ export class AnalyticsActivity {
       log.error(`AnalyticsActivity: Error backfilling ${integration.id}:`, {
         error: err?.message,
       });
+    }
+  }
+
+  @ActivityMethod()
+  async probeWatchedAccounts(orgId: string): Promise<void> {
+    try {
+      const accounts = await this._watchlistService.getEnabledAccounts(orgId);
+      for (const account of accounts) {
+        try {
+          const capabilities =
+            PROVIDER_CAPABILITIES[
+              account.provider as keyof typeof PROVIDER_CAPABILITIES
+            ];
+          if (!capabilities?.watchlist) {
+            await this._watchlistService.markProbeFailed(
+              account.id,
+              `Watchlist probes are not supported for ${account.provider}`
+            );
+            continue;
+          }
+
+          await this._watchlistService.probeAndRecord({
+            watchedAccountId: account.id,
+            provider: account.provider,
+            handle: account.handle,
+            metric: 'followers',
+          });
+        } catch (err: any) {
+          log.error(
+            `AnalyticsActivity: watchlist probe failed for ${account.provider}:${account.handle}`,
+            { error: err?.message }
+          );
+          await this._watchlistService.markProbeFailed(
+            account.id,
+            err?.message || 'Probe failed'
+          );
+        }
+      }
+    } catch (err: any) {
+      log.error(
+        `AnalyticsActivity: probeWatchedAccounts failed for org ${orgId}`,
+        { error: err?.message }
+      );
     }
   }
 }

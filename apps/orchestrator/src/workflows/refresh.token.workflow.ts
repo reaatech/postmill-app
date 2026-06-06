@@ -1,4 +1,4 @@
-import { proxyActivities, sleep } from '@temporalio/workflow';
+import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
 import { IntegrationsActivity } from '@gitroom/orchestrator/activities/integrations.activity';
 
 const { getIntegrationsById, refreshToken } =
@@ -10,6 +10,8 @@ const { getIntegrationsById, refreshToken } =
       initialInterval: '2 minutes',
     },
   });
+
+const MAX_SLEEP_MS = 30 * 24 * 60 * 60 * 1000;
 
 export async function refreshTokenWorkflow({
   organizationId,
@@ -37,7 +39,11 @@ export async function refreshTokenWorkflow({
       return false;
     }
 
-    await sleep(minMax as number);
+    await sleep(Math.min(minMax, MAX_SLEEP_MS));
+
+    if (minMax > MAX_SLEEP_MS) {
+      await continueAsNew({ organizationId, integrationId });
+    }
 
     // while we were sleeping, the integration might have been deleted
     integration = await getIntegrationsById(integrationId, organizationId);
@@ -51,5 +57,6 @@ export async function refreshTokenWorkflow({
     }
 
     await refreshToken(integration);
+    await continueAsNew({ organizationId, integrationId });
   }
 }

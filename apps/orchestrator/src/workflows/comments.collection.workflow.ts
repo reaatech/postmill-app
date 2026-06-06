@@ -1,11 +1,13 @@
 import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
 import type { CommentsActivity } from '@gitroom/orchestrator/activities/comments.activity';
+import type { AnalyticsActivity } from '@gitroom/orchestrator/activities/analytics.activity';
 
 const {
   getAllOrganizationIds,
   syncPostComments,
   pruneComments,
   notifyNewComments,
+  dispatchWebhookForComments,
   getSweepIntervalMinutes,
   getDaysBack,
 } = proxyActivities<CommentsActivity>({
@@ -28,6 +30,11 @@ export async function commentsCollectionWorkflow(): Promise<void> {
           await notifyNewComments(orgId);
         } catch (err) {
           // notifications are best-effort; don't abort the sweep
+        }
+        try {
+          await dispatchWebhookForComments(orgId, daysBack);
+        } catch (err) {
+          // webhook dispatch is best-effort
         }
       })
     );

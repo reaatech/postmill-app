@@ -43,6 +43,8 @@ describe('CommentsActivity', () => {
   let providerConfigManager: any;
   let socialCommentsService: any;
   let emailService: any;
+  let webhooksService: any;
+  let notificationService: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -53,6 +55,7 @@ describe('CommentsActivity', () => {
         updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       post: { findMany: vi.fn().mockResolvedValue([]) },
+      userOrganization: { findMany: vi.fn().mockResolvedValue([]) },
       organization: {
         findMany: vi.fn().mockResolvedValue([{ id: 'org-1' }, { id: 'org-2' }]),
       },
@@ -60,12 +63,16 @@ describe('CommentsActivity', () => {
     providerConfigManager = { ensureFresh: vi.fn().mockResolvedValue(undefined) };
     socialCommentsService = { syncComments: vi.fn().mockResolvedValue(undefined) };
     emailService = { sendEmailSync: vi.fn().mockResolvedValue(undefined) };
+    webhooksService = { dispatchEvent: vi.fn().mockResolvedValue(undefined) };
+    notificationService = { notifyInboxBacklog: vi.fn().mockResolvedValue(undefined) };
 
     activity = new CommentsActivity(
       prisma,
       providerConfigManager,
       socialCommentsService,
-      emailService
+      emailService,
+      webhooksService as any,
+      notificationService as any
     );
   });
 
@@ -149,6 +156,30 @@ describe('CommentsActivity', () => {
 
       expect(socialCommentsService.syncComments).toHaveBeenCalledTimes(2);
       expect(log.error).toHaveBeenCalled();
+    });
+  });
+
+  describe('notifyNewComments', () => {
+    it('uses the notification stack for comment backlog alerts before sending email digests', async () => {
+      prisma.post.findMany.mockResolvedValue([
+        {
+          id: 'post-1',
+          content: 'Published post',
+          socialComments: [{ id: 'c1' }, { id: 'c2' }, { id: 'c3' }, { id: 'c4' }, { id: 'c5' }, { id: 'c6' }],
+          integration: { name: 'Mastodon' },
+        },
+      ]);
+      prisma.userOrganization.findMany.mockResolvedValue([
+        { user: { id: 'u1', email: 'user@example.com', name: 'User' } },
+      ]);
+
+      await activity.notifyNewComments('org-1');
+
+      expect(notificationService.notifyInboxBacklog).toHaveBeenCalledWith(
+        'org-1',
+        6
+      );
+      expect(emailService.sendEmailSync).toHaveBeenCalledTimes(1);
     });
   });
 });
