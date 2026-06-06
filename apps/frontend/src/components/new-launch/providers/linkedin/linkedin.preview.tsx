@@ -4,6 +4,7 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { FC } from 'react';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 
 const Icons = () => {
@@ -317,11 +318,9 @@ export const LinkedinPreview: FC<{
           </div>
         </div>
       </div>
-      <div
+      <SafeContent
         className="text-[14px] font-[400] whitespace-pre-line"
-        dangerouslySetInnerHTML={{
-          __html: renderContent?.[0]?.text,
-        }}
+        content={renderContent?.[0]?.text || ''}
       />
       {!!renderContent?.[0]?.images?.length && (
         <div className="h-[280px] -mx-[15px] overflow-hidden flex">
@@ -451,11 +450,9 @@ export const LinkedinPreview: FC<{
                       Founder
                     </div>
                   </div>
-                  <div
+                  <SafeContent
                     className="whitespace-pre-line text-[14px] font-[400]"
-                    dangerouslySetInnerHTML={{
-                      __html: value.text,
-                    }}
+                    content={value.text}
                   />
                   <div className="flex gap-[6px] font-[400] text-[12px] text-textLinkedin items-center">
                     <div className="font-[700]">Like</div>

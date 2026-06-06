@@ -34,6 +34,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 
 export const AgentChat: FC = () => {
   const { backendUrl } = useVariables();
@@ -136,9 +137,9 @@ const Message: FC<UserMessageProps> = (props) => {
       );
   }, [props.message?.content]);
   return (
-    <div
+    <SafeContent
       className="copilotKitMessage copilotKitUserMessage min-w-[300px]"
-      dangerouslySetInnerHTML={{ __html: convertContentToImagesAndVideo }}
+      content={convertContentToImagesAndVideo}
     />
   );
 };

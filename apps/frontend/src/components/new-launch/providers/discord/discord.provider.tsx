@@ -8,11 +8,13 @@ import { FC } from 'react';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { DiscordChannelSelect } from '@gitroom/frontend/components/new-launch/providers/discord/discord.channel.select';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const DiscordComponent: FC = () => {
   const form = useSettings();
   return (
     <div>
       <DiscordChannelSelect {...form.register('channel')} />
+      <FirstCommentField />
     </div>
   );
 };

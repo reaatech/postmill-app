@@ -16,14 +16,29 @@ const nextConfig = {
             key: 'Document-Policy',
             value: 'js-profiling',
           },
+          {
+            key: 'Content-Security-Policy',
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://www.googletagmanager.com https://plausible.io https://js.stripe.com https://m.stripe.network",
+              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://js.stripe.com",
+              "img-src 'self' data: blob: https:",
+              "font-src 'self' data: https://fonts.gstatic.com",
+              "connect-src 'self' https://plausible.io https://api.stripe.com https://m.stripe.network https://www.googletagmanager.com ws://localhost:* wss://*",
+              "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
+              "frame-ancestors 'none'",
+              "media-src 'self' data: blob: https:",
+              "object-src 'none'",
+            ].join('; '),
+          },
         ],
       },
     ];
   },
   reactStrictMode: false,
   transpilePackages: ['crypto-hash'],
-  // Enable production sourcemaps for Sentry
-  productionBrowserSourceMaps: true,
+  // Sourcemaps disabled for production security; Sentry gets hidden-source-map via webpack
+  productionBrowserSourceMaps: false,
 
   // Custom webpack config to ensure sourcemaps are generated properly
   webpack: (config, { buildId, dev, isServer, defaultLoaders }) => {

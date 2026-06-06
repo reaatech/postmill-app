@@ -41,6 +41,8 @@ import {
 } from '@gitroom/frontend/components/ui/icons';
 import { useHasScroll } from '@gitroom/frontend/components/ui/is.scroll.hook';
 import { useShortlinkPreference } from '@gitroom/frontend/components/settings/shortlink-preference.component';
+import { usePreflight, PreflightResponse } from '@gitroom/frontend/components/new-launch/content-qa/usePreflight';
+import { PreflightPanel } from '@gitroom/frontend/components/new-launch/content-qa/preflight.panel';
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
 
@@ -53,7 +55,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const toaster = useToaster();
   const modal = useModals();
   const [showSettings, setShowSettings] = useState(false);
+  const [showPreflight, setShowPreflight] = useState(false);
+  const [pendingScheduleType, setPendingScheduleType] = useState<'draft' | 'now' | 'schedule' | 'update' | null>(null);
+  const [preflightData, setPreflightData] = useState<PreflightResponse | null>(null);
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
+  const { runPreflight, loading: preflightLoading, reset: resetPreflight } = usePreflight();
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
@@ -233,6 +239,37 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
         if (whatToDo === 'update') {
           type = 'update';
+        }
+      }
+
+      // 2J: Run preflight check for schedule/now (skip for draft)
+      if (type === 'schedule' || type === 'now') {
+        const allValues = await ref.current.getAllValues();
+        const group = existingData.group || makeId(10);
+        const posts = allValues.map((post: any) => ({
+          integration: { id: post.id },
+          group,
+          settings: { ...(post.settings || {}) },
+          value: post.values.map((value: any) => ({
+            ...(value.id ? { id: value.id } : {}),
+            content: value.content,
+            delay: value.delay || 0,
+            image: (value?.media || []).map(
+              ({ id, path, alt, thumbnail, thumbnailTimestamp }: any) => ({
+                id, path, alt, thumbnail, thumbnailTimestamp,
+              })
+            ) || [],
+          })),
+        }));
+
+        const preflightResult = await runPreflight({ type, posts, date: date.utc().format('YYYY-MM-DDTHH:mm:ss') });
+
+        if (preflightResult && preflightResult.blocking.length > 0) {
+          setShowPreflight(true);
+          setPendingScheduleType(type);
+          setPreflightData(preflightResult);
+          setLoading(false);
+          return;
         }
       }
 
@@ -661,6 +698,25 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           </div>
         </div>
       </div>
+      {showPreflight && preflightData && (
+        <PreflightPanel
+          results={preflightData.results}
+          blocking={preflightData.blocking}
+          passed={preflightData.passed}
+          onClose={() => {
+            setShowPreflight(false);
+            setPreflightData(null);
+            setLoading(false);
+          }}
+          onProceed={() => {
+            setShowPreflight(false);
+            setPreflightData(null);
+            if (pendingScheduleType) {
+              schedule(pendingScheduleType)();
+            }
+          }}
+        />
+      )}
       <CopilotPopup
         hitEscapeToClose={false}
         clickOutsideToClose={true}

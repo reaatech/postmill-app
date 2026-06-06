@@ -7,6 +7,7 @@ import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 
 export const GeneralPreviewComponent: FC<{
   maximumCharacters?: number;
@@ -110,11 +111,9 @@ export const GeneralPreviewComponent: FC<{
                     : integration?.display || '@username'}
                 </div>
               </div>
-              <div
+              <SafeContent
                 className={clsx('text-wrap whitespace-pre', 'preview')}
-                dangerouslySetInnerHTML={{
-                  __html: value.text,
-                }}
+                content={value.text}
               />
               {!!value?.images?.length && (
                 <div

@@ -50,7 +50,7 @@ export const StandaloneModal: FC = () => {
           {
             action: 'closeIframe',
           },
-          '*'
+          window.location.origin
         );
       }}
       mutate={() => {}}

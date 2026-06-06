@@ -11,6 +11,8 @@ import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.v
 import { XDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/x.dto';
 import { Input } from '@gitroom/react/form/input';
 import { Checkbox } from '@gitroom/react/form/checkbox';
+import { PollBuilder } from '@gitroom/frontend/components/new-launch/providers/shared/poll.builder';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const whoCanReply = [
   {
@@ -76,6 +78,16 @@ const SettingsComponent = () => {
           {...register('paid_partnership')}
         />
       </div>
+
+      <PollBuilder
+        value={watch('poll')}
+        onChange={(poll) => setValue('poll', poll)}
+        maxOptions={4}
+        minOptions={2}
+        maxDuration={168}
+      />
+
+      <FirstCommentField />
 
       <ThreadFinisher />
     </>

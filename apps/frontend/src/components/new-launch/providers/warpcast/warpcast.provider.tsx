@@ -11,6 +11,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { Button } from '@gitroom/react/form/button';
 import { Subreddit } from './subreddit';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const WrapcastProvider: FC = () => {
   const { register, control } = useSettings();
   const { fields, append, remove } = useFieldArray({
@@ -54,6 +55,7 @@ const WrapcastProvider: FC = () => {
         ))}
       </div>
       <Button onClick={addField}>{t('add_channel', 'Add Channel')}</Button>
+      <FirstCommentField />
     </>
   );
 };

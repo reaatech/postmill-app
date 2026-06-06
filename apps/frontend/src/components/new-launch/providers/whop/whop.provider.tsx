@@ -10,6 +10,7 @@ import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.v
 import { WhopCompanySelect } from '@gitroom/frontend/components/new-launch/providers/whop/whop.company.select';
 import { WhopExperienceSelect } from '@gitroom/frontend/components/new-launch/providers/whop/whop.experience.select';
 import { FC, useState } from 'react';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const WhopSettings: FC = () => {
   const form = useSettings();
@@ -32,6 +33,7 @@ const WhopSettings: FC = () => {
         companyId={selectedCompany}
       />
       <Input label="Title (optional)" {...form.register('title')} />
+      <FirstCommentField />
     </div>
   );
 };

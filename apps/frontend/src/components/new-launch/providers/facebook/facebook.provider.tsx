@@ -10,6 +10,7 @@ import { Select } from '@gitroom/react/form/select';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { FacebookPreview } from '@gitroom/frontend/components/new-launch/providers/facebook/facebook.preview';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const postType = [
   {
@@ -49,6 +50,8 @@ export const FacebookSettings = () => {
           {...register('url')}
         />
       )}
+
+      <FirstCommentField />
     </>
   );
 };
