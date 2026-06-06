@@ -1,8 +1,9 @@
 'use client';
 
 import { FC, useCallback, useState } from 'react';
-import { Post } from '../utils';
+import { Post, CANONICAL_METRICS } from '../utils';
 import { usePostDetail } from '../hooks/usePostDetail';
+import { PostDetailChart } from '../post.detail.chart';
 
 const SortIcon: FC<{ active: boolean; direction: 'asc' | 'desc' }> = ({
   active,
@@ -54,6 +55,14 @@ export const PostsTab: FC<PostsTabProps> = ({
   onSortChange,
 }) => {
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [showMetrics, setShowMetrics] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([
+    'impressions',
+    'engagement',
+    'likes',
+    'comments',
+    'shares',
+  ]);
   const {
     data: postDetail,
     isLoading: postDetailLoading,
@@ -73,13 +82,12 @@ export const PostsTab: FC<PostsTabProps> = ({
     [sort, dir, onSortChange]
   );
 
-  const metricHeaders = [
-    { key: 'impressions', label: 'Impressions' },
-    { key: 'engagement', label: 'Engagement' },
-    { key: 'likes', label: 'Likes' },
-    { key: 'comments', label: 'Comments' },
-    { key: 'shares', label: 'Shares' },
-  ];
+  const metricHeaders = selectedColumns.map((key) => {
+    const found = CANONICAL_METRICS.find((m) => m.key === key);
+    return { key, label: found?.label || key };
+  });
+
+  const METRICS_LIST = CANONICAL_METRICS;
 
   if (loading) {
     return (
@@ -112,6 +120,52 @@ export const PostsTab: FC<PostsTabProps> = ({
 
   return (
     <div>
+      <div className="flex items-center justify-end mb-[8px]">
+        <div className="relative">
+          <button
+            onClick={() => setShowMetrics(!showMetrics)}
+            className="px-[10px] py-[5px] text-[12px] font-medium rounded-[6px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-btnText hover:border-newTableText/30 transition-colors flex items-center gap-[6px]"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="7" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="1" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+              <rect x="7" y="7" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />
+            </svg>
+            Columns ({selectedColumns.length})
+          </button>
+          {showMetrics && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setShowMetrics(false)} />
+              <div className="absolute right-0 top-full mt-[4px] z-50 bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg overflow-hidden min-w-[200px] max-h-[320px] overflow-y-auto">
+                {METRICS_LIST.map((m) => {
+                  const checked = selectedColumns.includes(m.key);
+                  return (
+                    <label
+                      key={m.key}
+                      className="flex items-center gap-[8px] px-[12px] py-[6px] text-[12px] cursor-pointer hover:bg-boxHover transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => {
+                          setSelectedColumns((prev) =>
+                            checked
+                              ? prev.filter((k) => k !== m.key)
+                              : [...prev, m.key]
+                          );
+                        }}
+                        className="accent-forth"
+                      />
+                      {m.label}
+                    </label>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
@@ -309,6 +363,7 @@ export const PostsTab: FC<PostsTabProps> = ({
                       </div>
                     ))}
                   </div>
+                  <PostDetailChart series={postDetail.series} />
                 </>
               )}
             </div>

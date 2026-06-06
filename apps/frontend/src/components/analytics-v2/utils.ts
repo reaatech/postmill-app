@@ -90,8 +90,60 @@ export interface DrillState {
   focusIntegration?: string;
   focusDate?: string;
   focusPost?: string;
-  tab?: 'overview' | 'channels' | 'posts';
+  tab?: 'overview' | 'channels' | 'posts' | 'best-time' | 'recommendations' | 'watchlist';
 }
+
+export interface ChannelMetricResponse {
+  metric: string;
+  label: string;
+  format: 'count' | 'percent' | 'currency';
+  total: number;
+  previousTotal: number;
+  percentageChange: number;
+  series: SeriesPoint[];
+  topPosts: Post[];
+  byDay: { date: string; value: number }[];
+}
+
+export const CANONICAL_METRICS: { key: string; label: string }[] = [
+  { key: 'impressions', label: 'Impressions' },
+  { key: 'unique_impressions', label: 'Unique Impressions' },
+  { key: 'reach', label: 'Reach' },
+  { key: 'engagement', label: 'Engagement' },
+  { key: 'likes', label: 'Likes' },
+  { key: 'comments', label: 'Comments' },
+  { key: 'shares', label: 'Shares' },
+  { key: 'saves', label: 'Saves' },
+  { key: 'replies', label: 'Replies' },
+  { key: 'retweets', label: 'Retweets' },
+  { key: 'quotes', label: 'Quotes' },
+  { key: 'bookmarks', label: 'Bookmarks' },
+  { key: 'views', label: 'Views' },
+  { key: 'clicks', label: 'Clicks' },
+  { key: 'followers', label: 'Followers' },
+  { key: 'page_views', label: 'Page Views' },
+  { key: 'video_views', label: 'Video Views' },
+  { key: 'minutes_watched', label: 'Estimated Minutes Watched' },
+  { key: 'avg_view_duration', label: 'Average View Duration' },
+  { key: 'avg_view_percentage', label: 'Average View Percentage' },
+  { key: 'subscribers_gained', label: 'Subscribers Gained' },
+  { key: 'subscribers_lost', label: 'Subscribers Lost' },
+  { key: 'pin_clicks', label: 'Pin Clicks' },
+  { key: 'pin_click_rate', label: 'Pin Click Rate' },
+  { key: 'website_clicks', label: 'Website Clicks' },
+  { key: 'phone_calls', label: 'Phone Calls' },
+  { key: 'direction_requests', label: 'Direction Requests' },
+  { key: 'desktop_map_views', label: 'Desktop Map Views' },
+  { key: 'mobile_map_views', label: 'Mobile Map Views' },
+  { key: 'organic_followers', label: 'Organic Followers' },
+  { key: 'paid_followers', label: 'Paid Followers' },
+  { key: 'reposts', label: 'Reposts' },
+  { key: 'post_impressions', label: 'Post Impressions' },
+  { key: 'total_likes', label: 'Total Likes' },
+  { key: 'reactions', label: 'Reactions' },
+  { key: 'outbound_clicks', label: 'Outbound Clicks' },
+  { key: 'favorites', label: 'Favorites' },
+];
 
 export function formatCompactNumber(value: number): string {
   if (value >= 1_000_000_000) return (value / 1_000_000_000).toFixed(1) + 'B';

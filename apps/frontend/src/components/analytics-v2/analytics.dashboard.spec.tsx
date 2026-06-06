@@ -107,12 +107,15 @@ describe('AnalyticsDashboard', () => {
     expect(screen.getByText('All channels')).toBeTruthy();
   });
 
-  it('renders tab buttons (overview, channels, posts)', () => {
+  it('renders analytics tab buttons', () => {
     render(<AnalyticsDashboard />);
 
-    expect(screen.getByText('overview')).toBeTruthy();
-    expect(screen.getByText('channels')).toBeTruthy();
-    expect(screen.getByText('posts')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Channels' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Posts' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Best time' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Recommendations' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Watchlist' })).toBeTruthy();
   });
 
   it('shows OverviewTab by default', () => {

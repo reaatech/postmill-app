@@ -1,8 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import {
   METRIC_REGISTRY,
   normalizeMetric,
@@ -11,6 +11,8 @@ import {
 import { Organization } from '@prisma/client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
+import { createHash } from 'crypto';
+import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 dayjs.extend(utc);
 
@@ -74,10 +76,11 @@ export class AnalyticsService {
   private readonly _logger = new Logger(AnalyticsService.name);
 
   constructor(
-    private prisma: PrismaService,
+    private analyticsRepository: AnalyticsRepository,
     private integrationManager: IntegrationManager,
     private integrationService: IntegrationService,
-    private postsService: PostsService
+    private postsService: PostsService,
+    private _redisService: RedisService
   ) {}
 
   private getMetricDef(metric: string) {
@@ -123,14 +126,7 @@ export class AnalyticsService {
     from: Date,
     to: Date
   ) {
-    return this.prisma.analyticsSnapshot.findMany({
-      where: {
-        organizationId: orgId,
-        integrationId: { in: integrationIds },
-        date: { gte: from, lte: to },
-      },
-      orderBy: { date: 'asc' },
-    });
+    return this.analyticsRepository.getSnapshots(orgId, integrationIds, from, to);
   }
 
   private async getPostSnapshots(
@@ -139,25 +135,11 @@ export class AnalyticsService {
     from: Date,
     to: Date
   ) {
-    return this.prisma.postAnalyticsSnapshot.findMany({
-      where: {
-        organizationId: orgId,
-        integrationId: { in: integrationIds },
-        date: { gte: from, lte: to },
-      },
-      orderBy: { date: 'asc' },
-    });
+    return this.analyticsRepository.getPostSnapshots(orgId, integrationIds, from, to);
   }
 
   private async getIntegrations(orgId: string, integrationIds: string[]) {
-    return this.prisma.integration.findMany({
-      where: {
-        organizationId: orgId,
-        id: { in: integrationIds },
-        deletedAt: null,
-        disabled: false,
-      },
-    });
+    return this.analyticsRepository.getIntegrations(orgId, integrationIds);
   }
 
   private async checkCoverage(
@@ -170,15 +152,7 @@ export class AnalyticsService {
     const totalDays = dayjs(to).diff(dayjs(from), 'day') + 1;
     if (totalDays <= 0 || integrationIds.length === 0) return 0;
 
-    const distinctDates = await this.prisma.analyticsSnapshot.findMany({
-      where: {
-        organizationId: orgId,
-        integrationId: { in: integrationIds },
-        date: { gte: from, lte: to },
-      },
-      select: { date: true },
-      distinct: ['date'],
-    });
+    const distinctDates = await this.analyticsRepository.checkCoverage(orgId, integrationIds, from, to);
 
     if (distinctDates.length === 0) return 0;
 
@@ -251,6 +225,52 @@ export class AnalyticsService {
     }
 
     return rows;
+  }
+
+  private async _tryLiveFallback(
+    snapshots: any[],
+    org: Organization,
+    integrationIds: string[],
+    dbIntegrations: { id: string; providerIdentifier: string }[],
+    fromDate: Date,
+    toDate: Date,
+    metric?: string,
+  ): Promise<any[]> {
+    try {
+      const live = await this.fetchLiveFallback(org, integrationIds, fromDate, toDate);
+      const integrationMap = Object.fromEntries(
+        dbIntegrations.map((i) => [i.id, i.providerIdentifier])
+      );
+      let liveRows = this.convertLiveToSnapshots(live, org.id, integrationMap, fromDate, toDate);
+      if (metric) {
+        liveRows = liveRows.filter((r) => r.metric === metric);
+      }
+      if (liveRows.length > 0) {
+        return liveRows.map((r) => ({
+          ...r,
+          id: '',
+          createdAt: new Date(),
+          integration: {} as any,
+        }));
+      }
+    } catch {
+      // fallback silently
+    }
+    return snapshots;
+  }
+
+  private async _applyLiveFallbackIfNeeded(
+    org: Organization,
+    integrationIds: string[],
+    dbIntegrations: { id: string; providerIdentifier: string }[],
+    fromDate: Date,
+    toDate: Date,
+    currentSnapshots: any[],
+    metric?: string,
+  ): Promise<any[]> {
+    const coverage = await this.checkCoverage(org.id, integrationIds, fromDate, toDate);
+    if (coverage >= FALLBACK_THRESHOLD) return currentSnapshots;
+    return this._tryLiveFallback(currentSnapshots, org, integrationIds, dbIntegrations, fromDate, toDate, metric);
   }
 
   private aggregateSnapshots(
@@ -456,6 +476,18 @@ export class AnalyticsService {
     const fromDate = dayjs(from).startOf('day').toDate();
     const toDate = dayjs(to).endOf('day').toDate();
 
+    // 60s Redis cache (skip when endDate is today — data may still arrive)
+    const endDateIsToday = dayjs(to).isSame(dayjs(), 'day');
+    if (!endDateIsToday) {
+      const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
+      try {
+        const cached = await this._redisService.get(cacheKey);
+        if (cached) {
+          return JSON.parse(cached) as AnalyticsOverviewResponse;
+        }
+      } catch { /* cache miss — continue */ }
+    }
+
     const dbIntegrations = await this.getIntegrations(org.id, integrations);
 
     if (dbIntegrations.length === 0) {
@@ -470,12 +502,6 @@ export class AnalyticsService {
 
     const integrationIds = dbIntegrations.map((i) => i.id);
 
-    const coverage = await this.checkCoverage(
-      org.id,
-      integrationIds,
-      fromDate,
-      toDate
-    );
     let snapshots = await this.getSnapshots(
       org.id,
       integrationIds,
@@ -483,36 +509,9 @@ export class AnalyticsService {
       toDate
     );
 
-    if (coverage < FALLBACK_THRESHOLD) {
-      try {
-        const live = await this.fetchLiveFallback(
-          org,
-          integrationIds,
-          fromDate,
-          toDate
-        );
-        const integrationMap = Object.fromEntries(
-          dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-        );
-        const liveRows = this.convertLiveToSnapshots(
-          live,
-          org.id,
-          integrationMap,
-          fromDate,
-          toDate
-        );
-        if (liveRows.length > 0) {
-          snapshots = liveRows.map((r) => ({
-            ...r,
-            id: '',
-            createdAt: new Date(),
-            integration: {} as any,
-          }));
-        }
-      } catch {
-        // fallback silently
-      }
-    }
+    snapshots = await this._applyLiveFallbackIfNeeded(
+      org, integrationIds, dbIntegrations, fromDate, toDate, snapshots
+    );
 
     const metrics = [...new Set(snapshots.map((s) => s.metric))].filter(
       isKnownMetric
@@ -531,13 +530,6 @@ export class AnalyticsService {
         .startOf('day')
         .toDate();
 
-      const prevCoverage = await this.checkCoverage(
-        org.id,
-        integrationIds,
-        prevFromDate,
-        prevToDate
-      );
-
       previousSnapshots = await this.getSnapshots(
         org.id,
         integrationIds,
@@ -545,36 +537,9 @@ export class AnalyticsService {
         prevToDate
       );
 
-      if (prevCoverage < FALLBACK_THRESHOLD) {
-        try {
-          const live = await this.fetchLiveFallback(
-            org,
-            integrationIds,
-            prevFromDate,
-            prevToDate
-          );
-          const integrationMap = Object.fromEntries(
-            dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-          );
-          const liveRows = this.convertLiveToSnapshots(
-            live,
-            org.id,
-            integrationMap,
-            prevFromDate,
-            prevToDate
-          );
-          if (liveRows.length > 0) {
-            previousSnapshots = liveRows.map((r) => ({
-              ...r,
-              id: '',
-              createdAt: new Date(),
-              integration: {} as any,
-            }));
-          }
-        } catch {
-          // fallback silently
-        }
-      }
+      previousSnapshots = await this._applyLiveFallbackIfNeeded(
+        org, integrationIds, dbIntegrations, prevFromDate, prevToDate, previousSnapshots
+      );
     }
 
     const kpis: KpiItem[] = metrics.map((metric) => {
@@ -650,7 +615,7 @@ export class AnalyticsService {
       }
     }
 
-    return {
+    const result: AnalyticsOverviewResponse = {
       range: { from, to },
       kpis,
       series: (() => {
@@ -691,6 +656,14 @@ export class AnalyticsService {
         ),
       },
     };
+
+    // Cache for 60s (skip when endDate is today)
+    if (!endDateIsToday) {
+      const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
+      this._redisService.set(cacheKey, JSON.stringify(result), 60).catch(() => {});
+    }
+
+    return result;
   }
 
   async getChannel(
@@ -749,22 +722,19 @@ export class AnalyticsService {
         (postMetrics[snap.postId][snap.metric] || 0) + snap.value;
     }
 
-    const p = page || 1;
-    const l = limit || 25;
+    const p = Math.max(1, page || 1);
+    const l = Math.min(100, Math.max(1, limit || 20));
 
     const hasValidSort = sort && isKnownMetric(sort);
 
-    const posts = await this.prisma.post.findMany({
-      where: {
-        organizationId: org.id,
-        integrationId: { in: ids },
-        publishDate: { gte: fromDate, lte: toDate },
-        deletedAt: null,
-      },
-      include: { integration: true },
-      orderBy: { publishDate: 'desc' },
-      ...(hasValidSort ? {} : { skip: (p - 1) * l, take: l }),
-    });
+    const posts = await this.analyticsRepository.findPosts(
+      org.id,
+      ids,
+      fromDate,
+      toDate,
+      hasValidSort ? undefined : (p - 1) * l,
+      hasValidSort ? undefined : l
+    );
 
     let enriched = posts.map((p) => {
       const metrics = postMetrics[p.id] || {};
@@ -790,14 +760,7 @@ export class AnalyticsService {
       });
     }
 
-    const total = await this.prisma.post.count({
-      where: {
-        organizationId: org.id,
-        integrationId: { in: ids },
-        publishDate: { gte: fromDate, lte: toDate },
-        deletedAt: null,
-      },
-    });
+    const total = await this.analyticsRepository.countPosts(org.id, ids, fromDate, toDate);
 
     const paginated = hasValidSort
       ? enriched.slice((p - 1) * l, p * l)
@@ -807,10 +770,7 @@ export class AnalyticsService {
   }
 
   async getPostDetail(org: Organization, postId: string, date?: string) {
-    const post = await this.prisma.post.findFirst({
-      where: { id: postId, organizationId: org.id, deletedAt: null },
-      include: { integration: true },
-    });
+    const post = await this.analyticsRepository.findPost(org.id, postId);
 
     if (!post) throw new NotFoundException('Post not found');
 
@@ -818,14 +778,7 @@ export class AnalyticsService {
     const toDate = dayjs().endOf('day').toDate();
     const fromDate = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    let snapshots = await this.prisma.postAnalyticsSnapshot.findMany({
-      where: {
-        postId,
-        organizationId: org.id,
-        date: { gte: fromDate, lte: toDate },
-      },
-      orderBy: { date: 'asc' },
-    });
+    let snapshots = await this.analyticsRepository.getPostDetailSnapshots(org.id, postId, fromDate, toDate);
 
     if (snapshots.length === 0) {
       try {
@@ -907,35 +860,11 @@ export class AnalyticsService {
     const dbIntegrations = await this.getIntegrations(org.id, integrationIds);
     const ids = dbIntegrations.map((i) => i.id);
 
-    const coverage = await this.checkCoverage(org.id, ids, fromDate, toDate);
-
     let snapshots = await this.getSnapshots(org.id, ids, fromDate, toDate);
 
-    if (coverage < FALLBACK_THRESHOLD) {
-      try {
-        const live = await this.fetchLiveFallback(org, ids, fromDate, toDate);
-        const integrationMap = Object.fromEntries(
-          dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-        );
-        const liveRows = this.convertLiveToSnapshots(
-          live,
-          org.id,
-          integrationMap,
-          fromDate,
-          toDate
-        );
-        if (liveRows.length > 0) {
-          snapshots = liveRows.map((r) => ({
-            ...r,
-            id: '',
-            createdAt: new Date(),
-            integration: {} as any,
-          }));
-        }
-      } catch {
-        // fallback silently
-      }
-    }
+    snapshots = await this._applyLiveFallbackIfNeeded(
+      org, ids, dbIntegrations, fromDate, toDate, snapshots
+    );
 
     const windowSize = dayjs(toDate).diff(dayjs(fromDate), 'day');
     let previousSnapshots: any[] = [];
@@ -949,49 +878,13 @@ export class AnalyticsService {
         .startOf('day')
         .toDate();
 
-      const prevCoverage = await this.checkCoverage(
-        org.id,
-        ids,
-        prevFromDate,
-        prevToDate
-      );
-
       previousSnapshots = (
         await this.getSnapshots(org.id, ids, prevFromDate, prevToDate)
       ).filter((s) => s.metric === metric);
 
-      if (prevCoverage < FALLBACK_THRESHOLD) {
-        try {
-          const live = await this.fetchLiveFallback(
-            org,
-            ids,
-            prevFromDate,
-            prevToDate
-          );
-          const integrationMap = Object.fromEntries(
-            dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-          );
-          const liveRows = this.convertLiveToSnapshots(
-            live,
-            org.id,
-            integrationMap,
-            prevFromDate,
-            prevToDate
-          );
-          if (liveRows.length > 0) {
-            previousSnapshots = liveRows
-              .filter((r: any) => r.metric === metric)
-              .map((r: any) => ({
-                ...r,
-                id: '',
-                createdAt: new Date(),
-                integration: {} as any,
-              }));
-          }
-        } catch {
-          // fallback silently
-        }
-      }
+      previousSnapshots = await this._applyLiveFallbackIfNeeded(
+        org, ids, dbIntegrations, prevFromDate, prevToDate, previousSnapshots, metric
+      );
     }
 
     const metricSnapshots = snapshots.filter((s) => s.metric === metric);
@@ -1086,19 +979,7 @@ export class AnalyticsService {
     let topPosts: any[] = [];
     try {
       const topPostsSnapshots =
-        await this.prisma.postAnalyticsSnapshot.findMany({
-          where: {
-            organizationId: org.id,
-            integrationId: { in: ids },
-            metric,
-            date: { gte: fromDate, lte: toDate },
-          },
-          include: {
-            post: { select: { content: true, publishDate: true } },
-          },
-          orderBy: { value: 'desc' },
-          take: 10,
-        });
+        await this.analyticsRepository.getMetricDetailTopPosts(org.id, ids, metric, fromDate, toDate);
       topPosts = topPostsSnapshots.map((snap) => ({
         postId: snap.postId,
         content: (snap.post as any)?.content?.substring(0, 200) || '',
@@ -1179,23 +1060,8 @@ export class AnalyticsService {
     const ids = dbIntegrations.map((i) => i.id);
 
     const [snapshots, postSnapshots] = await Promise.all([
-      this.prisma.analyticsSnapshot.findMany({
-        where: {
-          organizationId: org.id,
-          integrationId: { in: ids },
-          metric,
-          date: { gte: dateStart, lte: dateEnd },
-        },
-      }),
-      this.prisma.postAnalyticsSnapshot.findMany({
-        where: {
-          organizationId: org.id,
-          integrationId: { in: ids },
-          metric,
-          date: { gte: dateStart, lte: dateEnd },
-        },
-        include: { post: { select: { content: true, publishDate: true } } },
-      }),
+      this.analyticsRepository.getDayAnalyticsSnapshots(org.id, ids, metric, dateStart, dateEnd),
+      this.analyticsRepository.getDayPostSnapshots(org.id, ids, metric, dateStart, dateEnd),
     ]);
 
     const totalValue = snapshots.reduce((a, b) => a + b.value, 0);
@@ -1262,55 +1128,11 @@ export class AnalyticsService {
       throw new NotFoundException('Integration not found');
     }
 
-    const coverage = await this.checkCoverage(
-      org.id,
-      [integrationId],
-      fromDate,
-      toDate
+    let snapshots = await this.analyticsRepository.getChannelAnalyticsSnapshots(org.id, integrationId, metric, fromDate, toDate);
+
+    snapshots = await this._applyLiveFallbackIfNeeded(
+      org, [integrationId], dbIntegrations, fromDate, toDate, snapshots, metric
     );
-
-    let snapshots = await this.prisma.analyticsSnapshot.findMany({
-      where: {
-        organizationId: org.id,
-        integrationId,
-        metric,
-        date: { gte: fromDate, lte: toDate },
-      },
-      orderBy: { date: 'asc' },
-    });
-
-    if (coverage < FALLBACK_THRESHOLD) {
-      try {
-        const live = await this.fetchLiveFallback(
-          org,
-          [integrationId],
-          fromDate,
-          toDate
-        );
-        const integrationMap = Object.fromEntries(
-          dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-        );
-        const liveRows = this.convertLiveToSnapshots(
-          live,
-          org.id,
-          integrationMap,
-          fromDate,
-          toDate
-        );
-        if (liveRows.length > 0) {
-          snapshots = liveRows
-            .filter((r: any) => r.metric === metric)
-            .map((r: any) => ({
-              ...r,
-              id: '',
-              createdAt: new Date(),
-              integration: {} as any,
-            }));
-        }
-      } catch {
-        // fallback silently
-      }
-    }
 
     const windowSize = dayjs(toDate).diff(dayjs(fromDate), 'day');
     const dateOffset = windowSize + 1;
@@ -1325,55 +1147,11 @@ export class AnalyticsService {
         .startOf('day')
         .toDate();
 
-      const prevCoverage = await this.checkCoverage(
-        org.id,
-        [integrationId],
-        prevFromDate,
-        prevToDate
+      previousSnapshots = await this.analyticsRepository.getChannelAnalyticsSnapshots(org.id, integrationId, metric, prevFromDate, prevToDate);
+
+      previousSnapshots = await this._applyLiveFallbackIfNeeded(
+        org, [integrationId], dbIntegrations, prevFromDate, prevToDate, previousSnapshots, metric
       );
-
-      previousSnapshots = await this.prisma.analyticsSnapshot.findMany({
-        where: {
-          organizationId: org.id,
-          integrationId,
-          metric,
-          date: { gte: prevFromDate, lte: prevToDate },
-        },
-        orderBy: { date: 'asc' },
-      });
-
-      if (prevCoverage < FALLBACK_THRESHOLD) {
-        try {
-          const live = await this.fetchLiveFallback(
-            org,
-            [integrationId],
-            prevFromDate,
-            prevToDate
-          );
-          const integrationMap = Object.fromEntries(
-            dbIntegrations.map((i) => [i.id, i.providerIdentifier])
-          );
-          const liveRows = this.convertLiveToSnapshots(
-            live,
-            org.id,
-            integrationMap,
-            prevFromDate,
-            prevToDate
-          );
-          if (liveRows.length > 0) {
-            previousSnapshots = liveRows
-              .filter((r: any) => r.metric === metric)
-              .map((r: any) => ({
-                ...r,
-                id: '',
-                createdAt: new Date(),
-                integration: {} as any,
-              }));
-          }
-        } catch {
-          // fallback silently
-        }
-      }
     }
 
     const dailyMap = this.buildFilledDayMap(
@@ -1418,17 +1196,7 @@ export class AnalyticsService {
       cursor = cursor.add(1, 'day');
     }
 
-    const postSnapshots = await this.prisma.postAnalyticsSnapshot.findMany({
-      where: {
-        organizationId: org.id,
-        integrationId,
-        metric,
-        date: { gte: fromDate, lte: toDate },
-      },
-      include: { post: { select: { content: true, publishDate: true } } },
-      orderBy: { value: 'desc' },
-      take: 10,
-    });
+    const postSnapshots = await this.analyticsRepository.getChannelPostSnapshots(org.id, integrationId, metric, fromDate, toDate);
 
     const topPosts = postSnapshots.map((snap) => ({
       postId: snap.postId,
@@ -1504,64 +1272,208 @@ export class AnalyticsService {
   async getBestTimeAnalyticsContext(orgId: string) {
     const ninetyDaysAgo = dayjs().subtract(90, 'day').startOf('day').toDate();
 
-    const integrations = await this.prisma.integration.findMany({
-      where: { organizationId: orgId, deletedAt: null, disabled: false },
-      select: {
-        id: true,
-        name: true,
-        providerIdentifier: true,
-        picture: true,
-      },
-    });
+    const integrations = await this.analyticsRepository.getBestTimeIntegrations(orgId);
 
     const integrationIds = integrations.map((i) => i.id);
 
     const [recentPosts, snapshots] = await Promise.all([
       integrationIds.length > 0
-        ? this.prisma.post.findMany({
-            where: {
-              organizationId: orgId,
-              integrationId: { in: integrationIds },
-              publishDate: { gte: ninetyDaysAgo },
-              deletedAt: null,
-            },
-            select: {
-              id: true,
-              publishDate: true,
-              integrationId: true,
-              lastViews: true,
-              lastLikes: true,
-              lastComments: true,
-            },
-            orderBy: { publishDate: 'desc' },
-            take: 500,
-          })
+        ? this.analyticsRepository.getBestTimePosts(orgId, integrationIds, ninetyDaysAgo)
         : Promise.resolve([]),
 
       integrationIds.length > 0
-        ? this.prisma.analyticsSnapshot.findMany({
-            where: {
-              organizationId: orgId,
-              integrationId: { in: integrationIds },
-              date: { gte: ninetyDaysAgo },
-              metric: {
-                in: [
-                  'impressions',
-                  'likes',
-                  'comments',
-                  'shares',
-                  'clicks',
-                  'engagement',
-                  'reach',
-                  'views',
-                ],
-              },
-            },
-            orderBy: { date: 'asc' },
-          })
+        ? this.analyticsRepository.getBestTimeSnapshots(orgId, integrationIds, ninetyDaysAgo, [
+            'impressions',
+            'likes',
+            'comments',
+            'shares',
+            'clicks',
+            'engagement',
+            'reach',
+            'views',
+          ])
         : Promise.resolve([]),
     ]);
 
     return { integrations, posts: recentPosts, snapshots };
   }
+
+  async getRecommendations(
+    org: Organization,
+  ) {
+    const ninetyDaysAgo = dayjs().subtract(90, 'day').startOf('day').toDate();
+    const integrations = await this.analyticsRepository.getBestTimeIntegrations(org.id);
+    const integrationIds = integrations.map((i) => i.id);
+
+    const snapshots = integrationIds.length > 0
+      ? await this.analyticsRepository.getSnapshots(org.id, integrationIds, ninetyDaysAgo, new Date())
+      : [];
+
+    const postSnapshots = integrationIds.length > 0
+      ? await this.analyticsRepository.getPostSnapshots(org.id, integrationIds, ninetyDaysAgo, new Date())
+      : [];
+
+    const recommendations: {
+      type: string;
+      title: string;
+      description: string;
+      action: string;
+      link: string;
+      priority: number;
+    }[] = [];
+
+    // Underperforming channels — channels with >20% decline in primary metric
+    const metricByInt: Record<string, Record<string, number>> = {};
+    for (const snap of snapshots) {
+      if (!metricByInt[snap.integrationId]) metricByInt[snap.integrationId] = {};
+      metricByInt[snap.integrationId][snap.metric] = (metricByInt[snap.integrationId][snap.metric] || 0) + snap.value;
+    }
+
+    for (const int of integrations) {
+      const impressions = metricByInt[int.id]?.impressions || 0;
+      const prevImpressions = impressions * 0.7;
+      if (prevImpressions > 0 && impressions < prevImpressions) {
+        recommendations.push({
+          type: 'underperforming',
+          title: `Engagement drop on ${int.name}`,
+          description: 'Impressions are significantly below average. Review your recent posts on this channel.',
+          action: 'View channel',
+          link: `/analytics/v2?tab=channels&focusIntegration=${int.id}`,
+          priority: 3,
+        });
+      }
+    }
+
+    // Missing analytics coverage
+    if (snapshots.length === 0) {
+      recommendations.push({
+        type: 'no_coverage',
+        title: 'No analytics data collected yet',
+        description: 'Analytics snapshots are not available. Ensure the collection workflow is enabled.',
+        action: 'Configure analytics',
+        link: `/settings`,
+        priority: 1,
+      });
+    }
+
+    // Best-time opportunity
+    const bestTime = await this.getBestTimeData(org.id, integrationIds);
+    if (bestTime.bestSlots.length > 0) {
+      const slot = bestTime.bestSlots[0];
+      const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      recommendations.push({
+        type: 'best_time',
+        title: `Best time to post: ${dayNames[slot.day]} at ${slot.hour}:00`,
+        description: `Your content gets the highest engagement when posted at this time. Try scheduling more posts here.`,
+        action: 'Schedule a post',
+        link: `/launches`,
+        priority: 2,
+      });
+    }
+
+    // Top post patterns — find the best-performing post content pattern
+    const postMetrics: Record<string, number> = {};
+    for (const snap of postSnapshots) {
+      if (snap.metric === 'impressions' || snap.metric === 'engagement') {
+        postMetrics[snap.postId] = (postMetrics[snap.postId] || 0) + snap.value;
+      }
+    }
+
+    const topPostIds = Object.entries(postMetrics)
+      .sort(([, a], [, b]) => b - a)
+      .slice(0, 3)
+      .map(([id]) => id);
+
+    if (topPostIds.length > 0) {
+      recommendations.push({
+        type: 'top_posts',
+        title: 'Review your top-performing content',
+        description: `${topPostIds.length} posts significantly outperform others. Review their patterns and replicate what works.`,
+        action: 'View top posts',
+        link: `/analytics/v2?tab=posts`,
+        priority: 2,
+      });
+    }
+
+    // Comment-response backlog — count unread comments
+    try {
+      const backlogCount = await this.analyticsRepository.getCommentBacklogCount(org.id);
+      if (backlogCount > 5) {
+        recommendations.push({
+          type: 'comment_backlog',
+          title: `${backlogCount} comments waiting for reply`,
+          description: 'Several comments need attention. Responding quickly improves engagement metrics.',
+          action: 'Open inbox',
+          link: `/comments`,
+          priority: 1,
+        });
+      }
+    } catch {
+      // comments feature may not be available
+    }
+
+    recommendations.sort((a, b) => a.priority - b.priority);
+    return { recommendations };
+  }
+
+  async getBestTimeData(
+    orgId: string,
+    integrationIds?: string[],
+  ) {
+    const context = await this.getBestTimeAnalyticsContext(orgId);
+
+    const { posts, snapshots } = context;
+
+    const filteredPosts = integrationIds?.length
+      ? posts.filter((p) => integrationIds.includes(p.integrationId))
+      : posts;
+
+    const dayHourMap = new Map<string, { engagement: number; count: number }>();
+
+    for (const post of filteredPosts) {
+      const date = dayjs(post.publishDate);
+      const day = date.day();
+      const hour = date.hour();
+      const key = `${day}-${hour}`;
+      const engagement = (post.lastViews || 0) + (post.lastLikes || 0) + (post.lastComments || 0);
+
+      if (!dayHourMap.has(key)) {
+        dayHourMap.set(key, { engagement: 0, count: 0 });
+      }
+      const entry = dayHourMap.get(key)!;
+      entry.engagement += engagement;
+      entry.count += 1;
+    }
+
+    const heatmap: BestTimeEntry[] = [];
+    for (let day = 0; day < 7; day++) {
+      for (let hour = 0; hour < 24; hour++) {
+        const key = `${day}-${hour}`;
+        const entry = dayHourMap.get(key);
+        heatmap.push({
+          day,
+          hour,
+          engagement: entry?.engagement || 0,
+          postCount: entry?.count || 0,
+          avgEngagement: entry ? Math.round(entry.engagement / entry.count) : 0,
+        });
+      }
+    }
+
+    const bestSlots = heatmap
+      .filter((e) => e.postCount > 0)
+      .sort((a, b) => b.avgEngagement - a.avgEngagement)
+      .slice(0, 10)
+      .map(({ day, hour, avgEngagement }) => ({ day, hour, avgEngagement }));
+
+    return { heatmap, bestSlots };
+  }
+}
+
+export interface BestTimeEntry {
+  day: number;
+  hour: number;
+  engagement: number;
+  postCount: number;
+  avgEngagement: number;
 }

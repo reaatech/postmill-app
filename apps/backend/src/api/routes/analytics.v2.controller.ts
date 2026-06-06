@@ -1,9 +1,13 @@
 import {
   BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseUUIDPipe,
+  Post,
+  Put,
   Query,
   Res,
 } from '@nestjs/common';
@@ -11,8 +15,14 @@ import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { ApiTags } from '@nestjs/swagger';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import {
+  AnalyticsDateRangeDto,
+  AnalyticsPostsQueryDto,
+  AnalyticsExportQueryDto,
+} from '@gitroom/nestjs-libraries/dtos/analytics/analytics.query.dto';
 import { Response } from 'express';
 import dayjs from 'dayjs';
+import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 
 export function validateDateRange(from: string, to: string) {
   if (!from || !to) {
@@ -23,53 +33,64 @@ export function validateDateRange(from: string, to: string) {
   }
 }
 
+export function validateToGteFrom(from: string, to: string) {
+  if (dayjs(to).isBefore(dayjs(from))) {
+    throw new BadRequestException('to must be greater than or equal to from');
+  }
+}
+
 export function parseIntegrations(integrations?: string): string[] {
   if (!integrations) return [];
   return integrations.split(',').filter(Boolean);
 }
 
-export function parsePage(page?: string): number {
-  const parsed = parseInt(page || '1', 10);
-  if (isNaN(parsed) || parsed < 1) return 1;
-  return parsed;
+export function parsePage(page?: number): number {
+  return (page || 1);
 }
 
-export function parseLimit(limit?: string): number {
-  const parsed = parseInt(limit || '25', 10);
-  if (isNaN(parsed) || parsed < 1) return 25;
-  return parsed;
+export function parseLimit(limit?: number): number {
+  const l = (limit || 20);
+  return Math.min(l, 100);
 }
 
 export function parseCompare(compare?: string): boolean {
   return compare?.toLowerCase() === 'true';
 }
 
-export function parseFormat(format?: string): 'csv' | 'json' {
-  if (!format || format === 'json') return 'json';
-  if (format === 'csv') return 'csv';
-  throw new BadRequestException('format must be csv or json');
+export interface BestTimeEntry {
+  day: number;
+  hour: number;
+  engagement: number;
+  postCount: number;
+  avgEngagement: number;
+}
+
+export interface BestTimeResponse {
+  heatmap: BestTimeEntry[];
+  bestSlots: { day: number; hour: number; avgEngagement: number }[];
 }
 
 @ApiTags('Analytics V2')
 @Controller('/analytics/v2')
 export class AnalyticsV2Controller {
-  constructor(private _analyticsService: AnalyticsService) {}
+  constructor(
+    private _analyticsService: AnalyticsService,
+    private _watchlistService: WatchlistService,
+  ) {}
 
   @Get('/overview')
   async getOverview(
     @GetOrgFromRequest() org: Organization,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('integrations') integrations: string,
-    @Query('compare') compare: string
+    @Query() query: AnalyticsDateRangeDto
   ) {
-    validateDateRange(from, to);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
     return this._analyticsService.getOverview(
       org,
-      from,
-      to,
-      parseIntegrations(integrations),
-      parseCompare(compare)
+      query.from,
+      query.to,
+      parseIntegrations(query.integrations),
+      parseCompare(query.compare)
     );
   }
 
@@ -77,41 +98,35 @@ export class AnalyticsV2Controller {
   async getChannel(
     @GetOrgFromRequest() org: Organization,
     @Param('integrationId') integrationId: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('compare') compare: string
+    @Query() query: AnalyticsDateRangeDto
   ) {
-    validateDateRange(from, to);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
     return this._analyticsService.getChannel(
       org,
       integrationId,
-      from,
-      to,
-      parseCompare(compare)
+      query.from,
+      query.to,
+      parseCompare(query.compare)
     );
   }
 
   @Get('/posts')
   async getPosts(
     @GetOrgFromRequest() org: Organization,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('integrations') integrations: string,
-    @Query('sort') sort: string,
-    @Query('dir') dir: string,
-    @Query('page') page: string,
-    @Query('limit') limit: string
+    @Query() query: AnalyticsPostsQueryDto
   ) {
-    validateDateRange(from, to);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
     return this._analyticsService.getPosts(
       org,
-      from,
-      to,
-      parseIntegrations(integrations),
-      sort,
-      dir || 'desc',
-      parsePage(page),
-      parseLimit(limit)
+      query.from,
+      query.to,
+      parseIntegrations(query.integrations),
+      query.sort,
+      query.dir || 'desc',
+      parsePage(query.page),
+      parseLimit(query.limit)
     );
   }
 
@@ -128,19 +143,17 @@ export class AnalyticsV2Controller {
   async getMetric(
     @GetOrgFromRequest() org: Organization,
     @Param('metric') metric: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('integrations') integrations: string,
-    @Query('compare') compare: string
+    @Query() query: AnalyticsDateRangeDto
   ) {
-    validateDateRange(from, to);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
     return this._analyticsService.getMetricDetail(
       org,
       metric,
-      from,
-      to,
-      parseIntegrations(integrations),
-      parseCompare(compare)
+      query.from,
+      query.to,
+      parseIntegrations(query.integrations),
+      parseCompare(query.compare)
     );
   }
 
@@ -164,41 +177,58 @@ export class AnalyticsV2Controller {
     @GetOrgFromRequest() org: Organization,
     @Param('integrationId') integrationId: string,
     @Param('metric') metric: string,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('compare') compare: string
+    @Query() query: AnalyticsDateRangeDto
   ) {
-    validateDateRange(from, to);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
     return this._analyticsService.getChannelMetric(
       org,
       integrationId,
       metric,
-      from,
-      to,
-      parseCompare(compare)
+      query.from,
+      query.to,
+      parseCompare(query.compare)
     );
+  }
+
+  @Get('/best-time')
+  async getBestTime(
+    @GetOrgFromRequest() org: Organization,
+    @Query('integrations') integrations: string,
+  ) {
+    return this._analyticsService.getBestTimeData(
+      org.id,
+      parseIntegrations(integrations),
+    );
+  }
+
+  @Get('/recommendations')
+  async getRecommendations(
+    @GetOrgFromRequest() org: Organization,
+  ) {
+    return this._analyticsService.getRecommendations(org);
   }
 
   @Get('/export')
   async exportData(
     @GetOrgFromRequest() org: Organization,
-    @Query('from') from: string,
-    @Query('to') to: string,
-    @Query('integrations') integrations: string,
-    @Query('format') format: string,
-    @Query('compare') compare: string,
+    @Query() query: AnalyticsExportQueryDto,
     @Res({ passthrough: true }) res: Response
   ) {
-    validateDateRange(from, to);
-    const parsedFormat = parseFormat(format);
+    validateDateRange(query.from, query.to);
+    validateToGteFrom(query.from, query.to);
+    if (query.format && !['csv', 'json'].includes(query.format)) {
+      throw new BadRequestException('format must be csv or json');
+    }
+    const parsedFormat = query.format === 'csv' ? 'csv' : 'json';
 
     const result = await this._analyticsService.exportData(
       org,
-      from,
-      to,
-      parseIntegrations(integrations),
+      query.from,
+      query.to,
+      parseIntegrations(query.integrations),
       parsedFormat,
-      parseCompare(compare)
+      parseCompare(query.compare)
     );
 
     res.setHeader('Content-Type', result.contentType);
@@ -209,5 +239,39 @@ export class AnalyticsV2Controller {
       }"`
     );
     return result.data;
+  }
+
+  // ── Watchlist CRUD ──
+
+  @Get('/watchlist')
+  async listWatchlist(@GetOrgFromRequest() org: Organization) {
+    return this._watchlistService.list(org.id);
+  }
+
+  @Post('/watchlist')
+  async addWatchlistEntry(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: { provider: string; handle: string; displayName?: string },
+  ) {
+    return this._watchlistService.add({
+      organizationId: org.id,
+      provider: body.provider,
+      handle: body.handle,
+      displayName: body.displayName,
+    });
+  }
+
+  @Put('/watchlist/:id')
+  async updateWatchlistEntry(
+    @Param('id') id: string,
+    @Body() body: { displayName?: string; enabled?: boolean },
+  ) {
+    return this._watchlistService.update(id, body);
+  }
+
+  @Delete('/watchlist/:id')
+  async deleteWatchlistEntry(@Param('id') id: string) {
+    await this._watchlistService.remove(id);
+    return { success: true };
   }
 }
