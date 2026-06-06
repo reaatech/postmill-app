@@ -14,6 +14,7 @@ import { Request, Response } from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { MultipartUploadService } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.service';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const { fromBuffer } = require('file-type');
 
@@ -52,7 +53,6 @@ const R2 = new S3Client({
   },
 });
 
-// Function to generate a random string
 function generateRandomString() {
   return makeId(20);
 }
@@ -60,21 +60,23 @@ function generateRandomString() {
 export default async function handleR2Upload(
   endpoint: string,
   req: Request,
-  res: Response
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
 ) {
   switch (endpoint) {
     case 'create-multipart-upload':
-      return createMultipartUpload(req, res);
+      return createMultipartUpload(req, res, orgId, multipartService);
     case 'prepare-upload-parts':
-      return prepareUploadParts(req, res);
+      return prepareUploadParts(req, res, orgId, multipartService);
     case 'complete-multipart-upload':
-      return completeMultipartUpload(req, res);
+      return completeMultipartUpload(req, res, orgId, multipartService);
     case 'list-parts':
-      return listParts(req, res);
+      return listParts(req, res, orgId, multipartService);
     case 'abort-multipart-upload':
-      return abortMultipartUpload(req, res);
+      return abortMultipartUpload(req, res, orgId, multipartService);
     case 'sign-part':
-      return signPart(req, res);
+      return signPart(req, res, orgId, multipartService);
   }
   return res.status(404).end();
 }
@@ -105,7 +107,37 @@ export async function simpleUpload(
   return CLOUDFLARE_BUCKET_URL + '/' + randomFilename;
 }
 
-export async function createMultipartUpload(req: Request, res: Response) {
+async function checkMultipartOwnership(
+  orgId: string | undefined,
+  key: string,
+  uploadId: string,
+  multipartService: MultipartUploadService | undefined,
+): Promise<{ allowed: boolean; error?: string }> {
+  if (!orgId || !multipartService) {
+    return { allowed: false, error: 'Multipart context required' };
+  }
+  const record = await multipartService.verifyOwnership(orgId, uploadId, key);
+  if (!record) {
+    return { allowed: false, error: 'Upload not found or access denied' };
+  }
+  if (record.state === 'completed') {
+    return { allowed: false, error: 'Upload already completed' };
+  }
+  if (record.state === 'aborted') {
+    return { allowed: false, error: 'Upload already aborted' };
+  }
+  if (record.state === 'failed') {
+    return { allowed: false, error: 'Upload previously failed' };
+  }
+  return { allowed: true };
+}
+
+export async function createMultipartUpload(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { file, fileHash } = req.body;
   const safeExt = normalizeExtension(file?.name || '');
   if (!safeExt) {
@@ -126,6 +158,21 @@ export async function createMultipartUpload(req: Request, res: Response) {
 
     const command = new CreateMultipartUploadCommand({ ...params });
     const response = await R2.send(command);
+
+    // Record in multipart ledger
+    if (orgId && multipartService && response.UploadId) {
+      await multipartService.create({
+        organizationId: orgId,
+        uploadId: response.UploadId,
+        key: randomFilename,
+        fileName: file?.name,
+        fileHash,
+        expectedMime: safeContentType,
+      }).catch((err) => {
+        console.error('Failed to create multipart ledger entry:', err);
+      });
+    }
+
     return res.status(200).json({
       uploadId: response.UploadId,
       key: response.Key,
@@ -136,16 +183,38 @@ export async function createMultipartUpload(req: Request, res: Response) {
   }
 }
 
-export async function prepareUploadParts(req: Request, res: Response) {
+export async function prepareUploadParts(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { partData } = req.body;
-
   const parts = partData.parts;
 
-  const response = {
+  // Ownership check
+  if (orgId && multipartService && partData.key && partData.uploadId) {
+    const { allowed, error } = await checkMultipartOwnership(orgId, partData.key, partData.uploadId, multipartService);
+    if (!allowed) {
+      return res.status(403).json({ message: error });
+    }
+  }
+
+  // Bound part count
+  if (parts?.length > 1000) {
+    return res.status(400).json({ message: 'Part count exceeds maximum (1000)' });
+  }
+
+  const response: { presignedUrls: Record<string, string> } = {
     presignedUrls: {},
   };
 
   for (const part of parts) {
+    // Bound part number
+    if (!part.number || part.number < 1 || part.number > 10000) {
+      return res.status(400).json({ message: `Invalid part number: ${part.number}` });
+    }
+
     try {
       const params = {
         Bucket: CLOUDFLARE_BUCKETNAME,
@@ -158,6 +227,11 @@ export async function prepareUploadParts(req: Request, res: Response) {
 
       // @ts-ignore
       response.presignedUrls[part.number] = url;
+
+      // Track part count
+      if (orgId && multipartService) {
+        await multipartService.incrementPartCount(orgId, partData.uploadId).catch(() => {});
+      }
     } catch (err) {
       console.log('Error', err);
       return res.status(500).json(err);
@@ -167,8 +241,21 @@ export async function prepareUploadParts(req: Request, res: Response) {
   return res.status(200).json(response);
 }
 
-export async function listParts(req: Request, res: Response) {
+export async function listParts(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { key, uploadId } = req.body;
+
+  // Ownership check
+  if (orgId && multipartService && key && uploadId) {
+    const { allowed, error } = await checkMultipartOwnership(orgId, key, uploadId, multipartService);
+    if (!allowed) {
+      return res.status(403).json({ message: error });
+    }
+  }
 
   try {
     const params = {
@@ -186,8 +273,21 @@ export async function listParts(req: Request, res: Response) {
   }
 }
 
-export async function completeMultipartUpload(req: Request, res: Response) {
+export async function completeMultipartUpload(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { key, uploadId, parts } = req.body;
+
+  // Ownership check
+  if (orgId && multipartService && key && uploadId) {
+    const { allowed, error } = await checkMultipartOwnership(orgId, key, uploadId, multipartService);
+    if (!allowed) {
+      return res.status(403).json({ message: error });
+    }
+  }
 
   try {
     const command = new CompleteMultipartUploadCommand({
@@ -203,6 +303,9 @@ export async function completeMultipartUpload(req: Request, res: Response) {
       await R2.send(
         new DeleteObjectCommand({ Bucket: CLOUDFLARE_BUCKETNAME, Key: key })
       );
+      if (orgId && multipartService) {
+        await multipartService.markFailed(orgId, uploadId).catch(() => {});
+      }
       return res.status(400).json({ message: 'Unsupported file type.' });
     }
     const expectedMime = ALLOWED_EXT_TO_MIME[safeExt];
@@ -226,6 +329,9 @@ export async function completeMultipartUpload(req: Request, res: Response) {
       await R2.send(
         new DeleteObjectCommand({ Bucket: CLOUDFLARE_BUCKETNAME, Key: key })
       );
+      if (orgId && multipartService) {
+        await multipartService.markFailed(orgId, uploadId).catch(() => {});
+      }
       return res
         .status(400)
         .json({ message: 'File contents do not match declared type.' });
@@ -235,15 +341,37 @@ export async function completeMultipartUpload(req: Request, res: Response) {
       process.env.CLOUDFLARE_BUCKET_URL +
       '/' +
       response?.Location?.split('/').at(-1);
+
+    // Mark as completed
+    if (orgId && multipartService) {
+      await multipartService.markCompleted(orgId, uploadId).catch(() => {});
+    }
+
     return response;
   } catch (err) {
+    if (orgId && multipartService) {
+      await multipartService.markFailed(orgId, uploadId).catch(() => {});
+    }
     console.log('Error', err);
     return res.status(500).json(err);
   }
 }
 
-export async function abortMultipartUpload(req: Request, res: Response) {
+export async function abortMultipartUpload(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { key, uploadId } = req.body;
+
+  // Ownership check
+  if (orgId && multipartService && key && uploadId) {
+    const { allowed, error } = await checkMultipartOwnership(orgId, key, uploadId, multipartService);
+    if (!allowed) {
+      return res.status(403).json({ message: error });
+    }
+  }
 
   try {
     const params = {
@@ -254,6 +382,10 @@ export async function abortMultipartUpload(req: Request, res: Response) {
     const command = new AbortMultipartUploadCommand({ ...params });
     const response = await R2.send(command);
 
+    if (orgId && multipartService) {
+      await multipartService.markAborted(orgId, uploadId).catch(() => {});
+    }
+
     return res.status(200).json(response);
   } catch (err) {
     console.log('Error', err);
@@ -261,9 +393,27 @@ export async function abortMultipartUpload(req: Request, res: Response) {
   }
 }
 
-export async function signPart(req: Request, res: Response) {
+export async function signPart(
+  req: Request,
+  res: Response,
+  orgId?: string,
+  multipartService?: MultipartUploadService
+) {
   const { key, uploadId } = req.body;
   const partNumber = parseInt(req.body.partNumber);
+
+  // Ownership check
+  if (orgId && multipartService && key && uploadId) {
+    const { allowed, error } = await checkMultipartOwnership(orgId, key, uploadId, multipartService);
+    if (!allowed) {
+      return res.status(403).json({ message: error });
+    }
+  }
+
+  // Bound part number
+  if (!partNumber || partNumber < 1 || partNumber > 10000) {
+    return res.status(400).json({ message: `Invalid part number: ${partNumber}` });
+  }
 
   const params = {
     Bucket: CLOUDFLARE_BUCKETNAME,
