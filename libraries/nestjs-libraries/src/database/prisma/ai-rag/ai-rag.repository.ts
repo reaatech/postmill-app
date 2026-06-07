@@ -18,8 +18,16 @@ interface RagRow {
  *
  * `PrismaRepository.model` is the underlying PrismaService instance at runtime,
  * so it exposes both the typed `aIContentIndex` model and the raw
- * `$executeRawUnsafe` / `$queryRawUnsafe` / `$transaction` methods. Raw methods
+ * `$executeRawUnsafe` / `$queryRawUnsafe` / $transaction methods. Raw methods
  * are reached through a narrow cast since `model` is typed as a `Pick`.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ * PARAMETERIZATION INVARIANT (3W):
+ * Only integer-validated values may be directly interpolated into RAG SQL
+ * (`vector(${dimension})`, `${terms.length}::float`). All other inputs must be
+ * bound parameters ($1..$n). The runtime assertions in `ensurePgvectorTable`
+ * and `textSearchTerms` enforce that interpolated values are positive integers.
+ * ════════════════════════════════════════════════════════════════════════════
  */
 @Injectable()
 export class AiRagRepository {
@@ -34,8 +42,15 @@ export class AiRagRepository {
    * Idempotently provisions the out-of-band pgvector side table + HNSW index for
    * the given embedding dimension. Throws if pgvector / DDL is unavailable so the
    * caller can fall back to text search.
+   *
+   * SAFETY: `dimension` is interpolated into DDL (`vector(${dimension})`) because
+   * it cannot be a bound parameter. It MUST be validated as a positive integer
+   * before reaching this method — assertions below enforce this at runtime.
    */
   async ensurePgvectorTable(dimension: number): Promise<void> {
+    if (!Number.isInteger(dimension) || dimension <= 0) {
+      throw new Error(`Invalid pgvector dimension: ${dimension} — must be a positive integer`);
+    }
     await this._raw.$executeRawUnsafe(`CREATE EXTENSION IF NOT EXISTS vector`);
 
     await this._raw.$executeRawUnsafe(`
@@ -230,6 +245,12 @@ export class AiRagRepository {
     terms: string[],
     limit: number,
   ): Promise<RagRow[]> {
+    // SAFETY: terms.length is interpolated into SQL (`${terms.length}::float`,
+    // `${terms.length + 1}`, `${terms.length + 2}`). Assert it's a non-negative
+    // integer so this cannot become an injection vector.
+    if (!Number.isInteger(terms.length) || terms.length < 0) {
+      throw new Error(`Invalid terms length: ${terms.length} — must be a non-negative integer`);
+    }
     const likeClauses = terms.map((t, i) => `ci.chunk ILIKE '%' || $${i + 1} || '%'`).join(' OR ');
 
     const rows = (await this._raw.$queryRawUnsafe(
@@ -280,6 +301,36 @@ export class AiRagRepository {
     return this._raw.media.findMany({
       where: { organizationId, deletedAt: null },
       select: { id: true, name: true, originalName: true, alt: true },
+    });
+  }
+
+  /**
+   * Finds the org's top-performing published posts (by engagement) for brand
+   * memory indexing. Returns the top N posts ordered by combined engagement.
+   */
+  findTopPerformingPosts(
+    organizationId: string,
+    limit: number = 10,
+  ): Promise<Array<{ id: string; content: string | null; title: string | null; description: string | null; lastLikes: number | null; lastComments: number | null }>> {
+    return this._raw.post.findMany({
+      where: {
+        organizationId,
+        state: 'PUBLISHED',
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        content: true,
+        title: true,
+        description: true,
+        lastLikes: true,
+        lastComments: true,
+      },
+      orderBy: [
+        { lastLikes: { sort: 'desc', nulls: 'last' } },
+        { lastComments: { sort: 'desc', nulls: 'last' } },
+      ],
+      take: limit,
     });
   }
 }

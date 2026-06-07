@@ -4,8 +4,20 @@ import { render, screen } from '@testing-library/react';
 import { ChannelsTab } from './channels.tab';
 import { OverviewResponse } from '../utils';
 
+vi.mock('../hooks/useChannelDetail', () => ({
+  useChannelDetail: () => ({ data: undefined as any }),
+}));
+
 const baseProps = {
   loading: false,
+  from: '2024-01-01',
+  to: '2024-01-07',
+  compare: false,
+  integrations: ['i1', 'i2'],
+  channels: [
+    { integrationId: 'i1', name: 'Twitter', identifier: '@twitter', picture: '/tw.png' },
+    { integrationId: 'i2', name: 'LinkedIn', identifier: 'linkedin', picture: '/li.png' },
+  ],
   onSelectChannel: vi.fn(),
 };
 

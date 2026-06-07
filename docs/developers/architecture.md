@@ -4,7 +4,7 @@ A developer's tour of the monorepo and how the pieces fit. For the user-facing o
 [Overview](../getting-started/overview.md); for agent-specific guidance the repo also ships
 `AGENTS.md` at the root.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.0.**
 
 ---
 
@@ -76,3 +76,20 @@ files). See [Database](./database.md) and [Data model](../reference/data-model.m
 | Persisted analytics | `analytics/*`, `/analytics/v2`, Temporal | [Analytics](../features/analytics.md) |
 | Social comments | `social-comments.*`, Temporal | [Social comments](../features/social-comments.md) |
 | AI provider system | `ai/*`, `/admin/ai-settings` | [AI architecture](./ai-architecture.md) |
+
+## Cross-cutting infrastructure (v3.5.0)
+
+The v3.5.0 hardening pass added several cross-cutting primitives that new code must use:
+
+| Primitive | Where | What it does |
+|-----------|-------|--------------|
+| **`safeFetch`** | `nestjs-libraries/src/dtos/webhooks/safe.fetch.ts` | SSRF-safe outbound dispatcher: validates the URL with `isSafePublicHttpsUrl`, issues the request with `redirect: 'manual'` and the `ssrfSafeDispatcher`, and re-validates every redirect hop (cap 5). All webhook dispatch and user-influenced provider fetches route through it. Mirrors the `/stream` redirect loop. |
+| **`EncryptionService`** | `nestjs-libraries/src/encryption/encryption.service.ts` (wrapping the AES-GCM helpers in `helpers/src/auth/auth.service.ts`) | Versioned authenticated encryption. New ciphertext carries a `v2:` prefix (AES-256-GCM); legacy plaintext / CBC values read back transparently. Key from `ENCRYPTION_KEY` (32-byte base64/hex) or derived from `JWT_SECRET`. `encryptDeterministic` exists for lookup-by-ciphertext cases. `Integration.token`/`refreshToken` are now encrypted at rest. |
+| **CSRF middleware** | `apps/backend/src/services/auth/csrf.middleware.ts` | Protects cookie-authenticated mutating routes. Header/API-key clients are unaffected. |
+| **Helmet + Sentry scrubbing** | `apps/backend/src/main.ts`, `initialize.sentry.ts` | Helmet (HSTS, CSP, noSniff, frameguard) after CORS; Sentry `beforeSend`/`beforeBreadcrumb` strip auth headers/cookies/tokens/PII. Both bypass under `NOT_SECURED`. |
+| **Throttle guard fix** | `nestjs-libraries/src/throttler/throttler.provider.ts` | `ThrottlerBehindProxyGuard` now applies the default throttle to **all** routes (previously most routes bypassed it), with `@Throttle` overriding per-route. This is what makes the new AI/auth route throttles actually take effect. |
+| **Provider capability matrix** | `nestjs-libraries/src/integrations/social/provider-capabilities.ts` (`PROVIDER_CAPABILITIES`) | Single source of truth for per-provider comments / first-comment / poll / analytics support, served at `/provider-capabilities`. Features gate on it. |
+| **`AnalyticsRepository`** | `nestjs-libraries/src/database/prisma/analytics/analytics.repository.ts` | Moves the direct `this.prisma.*` calls out of `AnalyticsService` to satisfy the repository-only-touches-Prisma rule. |
+| **`RedisService`** | `nestjs-libraries/src/redis/redis.service.ts` | The `ioRedis` module singleton is now wrapped in an injectable (old export kept as a deprecated alias). Backs the analytics overview cache. |
+
+See [Backend conventions](./backend.md) and [Database](./database.md).

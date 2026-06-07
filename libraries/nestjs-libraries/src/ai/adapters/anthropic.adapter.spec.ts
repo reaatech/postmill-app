@@ -7,7 +7,7 @@ vi.mock('@ai-sdk/anthropic', () => ({
 }));
 
 vi.mock('@langchain/anthropic', () => ({
-  ChatAnthropic: vi.fn(() => ({})),
+  ChatAnthropic: vi.fn(function() { return {}; }),
 }));
 
 import { AnthropicAdapter } from './anthropic.adapter';

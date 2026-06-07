@@ -6,6 +6,8 @@ const {
   collectChannelSnapshots,
   collectPostSnapshots,
   pruneAndRollupSnapshots,
+  notifySnapshotComplete,
+  probeWatchedAccounts,
 } = proxyActivities<AnalyticsActivity>({
   startToCloseTimeout: '10 minutes',
   retry: {
@@ -25,6 +27,16 @@ export async function analyticsCollectionWorkflow(): Promise<void> {
     await collectChannelSnapshots(orgId, CHANNEL_DAYS_BACK);
     await collectPostSnapshots(orgId, POST_DAYS_BACK);
     await pruneAndRollupSnapshots(orgId);
+    try {
+      await notifySnapshotComplete(orgId);
+    } catch (err) {
+      // best-effort webhook dispatch
+    }
+    try {
+      await probeWatchedAccounts(orgId);
+    } catch (err) {
+      // best-effort watchlist probe; never fail the sweep
+    }
   }
 
   await sleep('24h');

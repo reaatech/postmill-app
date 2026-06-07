@@ -1,3 +1,20 @@
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]*)/);
+  return match ? match[1] : null;
+}
+
+function hasAuthHeader(options: RequestInit): boolean {
+  if (!options.headers) return false;
+  if (options.headers instanceof Headers) {
+    return options.headers.has('auth');
+  }
+  if (Array.isArray(options.headers)) {
+    return options.headers.some(([key]) => key.toLowerCase() === 'auth');
+  }
+  return 'auth' in (options.headers as Record<string, string>);
+}
+
 export interface Params {
   baseUrl: string;
   beforeRequest?: (url: string, options: RequestInit) => Promise<RequestInit>;
@@ -19,53 +36,25 @@ export const customFetch = (
         ? undefined
         : new URL(window.location.href).searchParams.get('loggedAuth');
     const newRequestObject = await params?.beforeRequest?.(url, options);
-    const authNonSecuredCookie =
-      typeof document === 'undefined'
-        ? null
-        : document.cookie
-            .split(';')
-            .find((p) => p.includes('auth='))
-            ?.split('=')[1];
 
-    const authNonSecuredOrg =
-      typeof document === 'undefined'
-        ? null
-        : document.cookie
-            .split(';')
-            .find((p) => p.includes('showorg='))
-            ?.split('=')[1];
-
-    const authNonSecuredImpersonate =
-      typeof document === 'undefined'
-        ? null
-        : document.cookie
-            .split(';')
-            .find((p) => p.includes('impersonate='))
-            ?.split('=')[1];
+    const method = (options.method || 'GET').toUpperCase();
+    const isMutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    const hasExplicitAuth = !!(auth || loggedAuth || hasAuthHeader(options));
+    const csrfToken = isMutating && !hasExplicitAuth ? getCsrfToken() : null;
 
     const fetchRequest = await fetch(params.baseUrl + url, {
       ...(secured ? { credentials: 'include' } : {}),
       ...(newRequestObject || options),
       headers: {
-        ...(showorg
-          ? { showorg }
-          : authNonSecuredOrg
-          ? { showorg: authNonSecuredOrg }
-          : {}),
+        ...(showorg ? { showorg } : {}),
         ...(options.body instanceof FormData
           ? {}
           : { 'Content-Type': 'application/json' }),
         Accept: 'application/json',
         ...(loggedAuth ? { auth: loggedAuth } : {}),
         ...options?.headers,
-        ...(auth
-          ? { auth }
-          : authNonSecuredCookie
-          ? { auth: authNonSecuredCookie }
-          : {}),
-        ...(authNonSecuredImpersonate
-          ? { impersonate: authNonSecuredImpersonate }
-          : {}),
+        ...(auth ? { auth } : {}),
+        ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}),
       },
       // @ts-ignore
       ...(!options.next && options.cache !== 'force-cache'

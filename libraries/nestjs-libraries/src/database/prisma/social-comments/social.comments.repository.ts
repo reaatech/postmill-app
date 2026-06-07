@@ -1,5 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import { InboxFilterOptions } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 
 @Injectable()
 export class SocialCommentsRepository {
@@ -7,7 +8,77 @@ export class SocialCommentsRepository {
     private _socialComment: PrismaRepository<'socialComment'>,
     private _postCommentRead: PrismaRepository<'postCommentRead'>,
     private _userOrganization: PrismaRepository<'userOrganization'>,
+    private _post: PrismaRepository<'post'>,
   ) {}
+
+  getCommentByPlatformId(integrationId: string, platformCommentId: string) {
+    return this._socialComment.model.socialComment.findUnique({
+      where: { integrationId_platformCommentId: { integrationId, platformCommentId } },
+    });
+  }
+
+  async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
+    const where: any = {
+      organizationId: orgId,
+      deletedAt: null,
+    };
+
+    if (filters.status) {
+      where.status = filters.status;
+    }
+
+    if (filters.assigneeId) {
+      where.assigneeId = filters.assigneeId;
+    }
+
+    if (filters.unreadOnly) {
+      where.isOwn = false;
+      where.status = { not: 'handled' };
+    }
+
+    const comments = await this._socialComment.model.socialComment.findMany({
+      where,
+      orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
+      take: 51,
+      include: {
+        post: {
+          select: {
+            id: true,
+            content: true,
+            publishDate: true,
+            integration: { select: { name: true, providerIdentifier: true, picture: true } },
+          },
+        },
+      },
+    });
+
+    const hasMore = comments.length > 50;
+    const items = hasMore ? comments.slice(0, 50) : comments;
+    const nextCursor = hasMore && items.length
+      ? items[items.length - 1].platformCreatedAt.toISOString()
+      : undefined;
+
+    return { comments: items, nextCursor };
+  }
+
+  async bulkMarkRead(commentIds: string[]) {
+    if (!commentIds.length) return { count: 0 };
+    return this._socialComment.model.socialComment.updateMany({
+      where: { id: { in: commentIds } },
+      data: { status: 'handled' },
+    });
+  }
+
+  async getInboxUnreadCount(orgId: string, userId: string): Promise<number> {
+    return this._socialComment.model.socialComment.count({
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        isOwn: false,
+        status: { not: 'handled' },
+      },
+    });
+  }
 
   getComments(postId: string, cursor?: string, limit: number = 50) {
     return this._socialComment.model.socialComment.findMany({

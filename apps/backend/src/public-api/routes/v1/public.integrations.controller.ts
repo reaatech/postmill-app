@@ -20,6 +20,7 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
@@ -35,8 +36,8 @@ import { UploadDto } from '@gitroom/nestjs-libraries/dtos/media/upload.dto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
 import { Readable } from 'stream';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { fromBuffer } = require('file-type');
 
 const PUBLIC_API_ALLOWED_MIME = new Set<string>([
@@ -57,7 +58,6 @@ import {
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { PostValidationException } from '@gitroom/backend/api/routes/posts.validation.exception';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
@@ -102,10 +102,7 @@ export class PublicIntegrationsController {
     @Body() body: UploadDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    const response = await fetch(body.url, {
-      // @ts-ignore — undici option, not in lib.dom fetch types
-      dispatcher: ssrfSafeDispatcher,
-    });
+    const response = await safeFetch(body.url);
     if (!response.ok) {
       throw new HttpException({ msg: 'Failed to fetch URL' }, 400);
     }
@@ -163,80 +160,21 @@ export class PublicIntegrationsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
-    @Body() rawBody: any
+    @Body() rawBody: CreatePostDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    const body = await this._postsService.mapTypeToPost(
+
+    const creationMethod =
+      rawBody.creationMethod === 'CLI' || rawBody.creationMethod === 'API'
+        ? rawBody.creationMethod
+        : 'API';
+
+    return this._postsService.validateAndCreatePost(
+      org.id,
       rawBody,
-      org.id,
-      rawBody?.type === 'draft' || true
+      creationMethod,
+      true,
     );
-    body.type = rawBody.type;
-
-    if (
-      process.env.RESTRICT_UPLOAD_DOMAINS &&
-      body.posts.some((p) =>
-        p.value.some((a) =>
-          a.image.some(
-            (i) => i.path.indexOf(process.env.RESTRICT_UPLOAD_DOMAINS) === -1
-          )
-        )
-      )
-    ) {
-      throw new HttpException(
-        {
-          msg: `All media must be uploaded through our upload API route and contain the domain: ${process.env.RESTRICT_UPLOAD_DOMAINS}`,
-        },
-        400
-      );
-    }
-
-    // Server-side validation — same rules as the dashboard, surfaced as a
-    // readable 400 (see PostValidationExceptionFilter).
-    const validation = await this._postsService.validatePosts(
-      org.id,
-      body.posts
-    );
-
-    const fail = (item: (typeof validation)[number], error: string) => {
-      throw new PostValidationException({
-        provider: item.identifier,
-        name: item.name,
-        error,
-      });
-    };
-
-    for (const item of validation) {
-      if (item.emptyContent) {
-        fail(
-          item,
-          'Your post should have at least one character or one image.'
-        );
-      }
-    }
-
-    if (body.type !== 'draft') {
-      for (const item of validation) {
-        if (!item.valid) {
-          fail(item, item.settingsError || 'Please fix your settings');
-        }
-        if (item.errors !== true) {
-          fail(item, item.errors as string);
-        }
-        if (item.tooLong) {
-          fail(item, 'post is too long, please fix it');
-        }
-      }
-    }
-
-    const allowedCreationMethods = ['CLI', 'API'] as const;
-    const creationMethod = allowedCreationMethods.includes(
-      rawBody.creationMethod
-    )
-      ? (rawBody.creationMethod as 'CLI' | 'API')
-      : 'API';
-
-    return this._postsService.createPost(org.id, body, creationMethod);
   }
 
   @Delete('/posts/:id')

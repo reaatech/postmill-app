@@ -118,6 +118,13 @@ const CommentItem: FC<{
     return dayjs(comment.platformCreatedAt).fromNow();
   }, [comment.platformCreatedAt]);
 
+  const sentimentLabel = (comment as any).sentiment as string | undefined;
+  const sentimentColors: Record<string, string> = {
+    positive: 'bg-green-500/20 text-green-400 border-green-500/30',
+    negative: 'bg-red-500/20 text-red-400 border-red-500/30',
+    neutral: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+  };
+
   return (
     <div
       className="flex gap-[8px]"
@@ -153,6 +160,11 @@ const CommentItem: FC<{
             className={`inline-block w-[8px] h-[8px] rounded-full ${statusColors[currentStatus]} cursor-pointer hover:opacity-80 transition-opacity`}
             title={currentStatus}
           />
+          {sentimentLabel && (
+            <span className={`text-[10px] px-[6px] py-[1px] rounded-full border ${sentimentColors[sentimentLabel] || sentimentColors.neutral}`}>
+              {sentimentLabel}
+            </span>
+          )}
         </div>
         <div className="text-[13px] mt-[2px] break-words whitespace-pre-wrap">
           {comment.content}
@@ -242,6 +254,9 @@ export const CommentThread: FC<CommentThreadProps> = ({
   const [likeError, setLikeError] = useState('');
   const [expandedDepths, setExpandedDepths] = useState<Record<string, boolean>>({});
 
+  const [summarizing, setSummarizing] = useState(false);
+  const [summary, setSummary] = useState<{ summary: string; keyPoints: string[]; actionItems: string[] } | null>(null);
+
   // A fresh server payload supersedes optimistic/paged local state.
   useEffect(() => {
     setExtraPages([]);
@@ -258,6 +273,29 @@ export const CommentThread: FC<CommentThreadProps> = ({
   const moreCursor = extraPages.length
     ? extraPages[extraPages.length - 1].nextCursor
     : data?.nextCursor;
+
+  const handleSummarize = useCallback(async () => {
+    setSummarizing(true);
+    setSummary(null);
+    try {
+      const commentText = allComments.map((c) => c.content).join('\n');
+      const res = await fetch('/ai/comment-reply', {
+        method: 'POST',
+        body: JSON.stringify({
+          commentId: '',
+          postContent: commentText,
+          action: 'summary',
+        }),
+      });
+      if (res.ok) {
+        setSummary(await res.json());
+      }
+    } catch {
+      // silently fail — summary is optional UX
+    } finally {
+      setSummarizing(false);
+    }
+  }, [allComments, fetch]);
 
   const groupByParent = useMemo(() => {
     if (!allComments.length) return { topLevel: [] as SocialComment[], childrenMap: {} as Record<string, SocialComment[]> };
@@ -440,6 +478,48 @@ export const CommentThread: FC<CommentThreadProps> = ({
 
   return (
     <div className="flex flex-col gap-[12px]">
+      <div className="flex gap-[6px] items-center">
+        <button
+          type="button"
+          onClick={handleSummarize}
+          disabled={summarizing || allComments.length === 0}
+          className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
+        >
+          {summarizing
+            ? t('summarizing', 'Summarizing...')
+            : t('summarize_comments', 'Summarize Comments')}
+        </button>
+      </div>
+
+      {summary && (
+        <div className="bg-newTableHeader border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[8px]">
+          <div className="text-[13px] leading-[20px]">{summary.summary}</div>
+          {summary.keyPoints?.length > 0 && (
+            <div>
+              <div className="text-[12px] font-[600] mb-[4px]">{t('key_points', 'Key Points')}</div>
+              <ul className="list-disc list-inside text-[12px] text-newTableText flex flex-col gap-[2px]">
+                {summary.keyPoints.map((kp, i) => <li key={i}>{kp}</li>)}
+              </ul>
+            </div>
+          )}
+          {summary.actionItems?.length > 0 && (
+            <div>
+              <div className="text-[12px] font-[600] mb-[4px]">{t('action_items', 'Action Items')}</div>
+              <ul className="list-disc list-inside text-[12px] text-newTableText flex flex-col gap-[2px]">
+                {summary.actionItems.map((ai, i) => <li key={i}>{ai}</li>)}
+              </ul>
+            </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setSummary(null)}
+            className="text-[11px] text-newTableText hover:underline self-end"
+          >
+            {t('dismiss', 'Dismiss')}
+          </button>
+        </div>
+      )}
+
       {likeError && (
         <div className="text-[12px] text-red-500" role="alert">{likeError}</div>
       )}

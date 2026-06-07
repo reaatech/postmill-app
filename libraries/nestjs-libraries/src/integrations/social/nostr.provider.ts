@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import {
   AuthTokenDetails,
   PostDetails,
@@ -150,17 +151,18 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
 
       const user = await this.findRelayInformation(pubkey);
 
+      const encryptedKey = AuthService.fixedEncryption(body.password);
       return {
         id: pubkey,
         name: user.display_name || user.displayName || user.name || 'No Name',
-        accessToken: AuthService.signJWT({ password: body.password }),
+        accessToken: AuthService.signJWT({ password: encryptedKey }),
         refreshToken: '',
         expiresIn: dayjs().add(200, 'year').unix() - dayjs().unix(),
         picture: user?.picture || '',
         username: user.name || 'nousername',
       };
     } catch (e) {
-      console.log(e);
+      Logger.warn(`Nostr auth error: ${(e as Error)?.message || e}`);
       return 'Invalid credentials';
     }
   }
@@ -177,7 +179,8 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postDetails: PostDetails[]
   ): Promise<PostResponse[]> {
-    const { password } = AuthService.verifyJWT(accessToken) as any;
+    const { password: encryptedPassword } = AuthService.verifyJWT(accessToken) as any;
+    const password = AuthService.fixedDecryption(encryptedPassword) as any;
     const [firstPost] = postDetails;
 
     const textEvent = finalizeEvent(
@@ -210,7 +213,8 @@ export class NostrProvider extends SocialAbstract implements SocialProvider {
     postDetails: PostDetails[],
     integration: Integration
   ): Promise<PostResponse[]> {
-    const { password } = AuthService.verifyJWT(accessToken) as any;
+    const { password: encryptedPassword } = AuthService.verifyJWT(accessToken) as any;
+    const password = AuthService.fixedDecryption(encryptedPassword) as any;
     const [commentPost] = postDetails;
     const replyToId = lastCommentId || postId;
 

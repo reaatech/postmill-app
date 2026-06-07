@@ -4,10 +4,34 @@ import { CreateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/create-o
 import { UpdateOAuthAppDto } from '@gitroom/nestjs-libraries/dtos/oauth/update-oauth-app.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import crypto from 'crypto';
 
 @Injectable()
 export class OAuthService {
   constructor(private _oauthRepository: OAuthRepository) {}
+
+  private lookupHash(value: string) {
+    return `sha256:${crypto.createHash('sha256').update(value).digest('hex')}`;
+  }
+
+  private lookupCandidates(value: string) {
+    return [
+      this.lookupHash(value),
+      AuthService.fixedEncryptionDeterministic(value),
+    ];
+  }
+
+  private matchesStoredSecret(stored: string, plain: string) {
+    if (stored === this.lookupHash(plain)) {
+      return true;
+    }
+
+    try {
+      return AuthService.fixedDecryption(stored) === plain;
+    } catch {
+      return stored === AuthService.fixedEncryptionDeterministic(plain);
+    }
+  }
 
   async getApp(orgId: string) {
     const app = await this._oauthRepository.getAppByOrgId(orgId);
@@ -27,7 +51,7 @@ export class OAuthService {
 
     const clientId = 'pca_' + makeId(32);
     const clientSecret = 'pcs_' + makeId(48);
-    const encryptedSecret = AuthService.fixedEncryption(clientSecret);
+    const encryptedSecret = this.lookupHash(clientSecret);
 
     const app = await this._oauthRepository.createApp(orgId, {
       name: dto.name,
@@ -67,27 +91,53 @@ export class OAuthService {
     }
 
     const newSecret = 'pcs_' + makeId(48);
-    const encrypted = AuthService.fixedEncryption(newSecret);
+    const encrypted = this.lookupHash(newSecret);
     await this._oauthRepository.updateClientSecret(orgId, encrypted);
     return { clientSecret: newSecret };
   }
 
-  async validateAuthorizationRequest(clientId: string) {
+  async validateAuthorizationRequest(
+    clientId: string,
+    redirectUri?: string,
+  ) {
     const app = await this._oauthRepository.getAppByClientId(clientId);
     if (!app) {
       throw new HttpException('Invalid client_id', HttpStatus.BAD_REQUEST);
     }
+
+    // Exact redirect URI matching when supplied
+    if (redirectUri && app.redirectUrl !== redirectUri) {
+      throw new HttpException(
+        { error: 'invalid_request', error_description: 'redirect_uri mismatch' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     return app;
   }
 
   async createAuthorizationCode(
     oauthAppId: string,
     userId: string,
-    organizationId: string
+    organizationId: string,
+    options?: {
+      redirectUri?: string;
+      codeChallenge?: string;
+      codeChallengeMethod?: string;
+      scope?: string;
+    },
   ) {
     const code = makeId(32);
-    const encryptedCode = AuthService.fixedEncryption(code);
+    const encryptedCode = this.lookupHash(code);
     const codeExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+    // Validate PKCE: require S256 if code_challenge is provided
+    if (options?.codeChallenge && options?.codeChallengeMethod !== 'S256') {
+      throw new HttpException(
+        { error: 'invalid_request', error_description: 'unsupported code_challenge_method' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
 
     await this._oauthRepository.createAuthorization({
       oauthAppId,
@@ -95,6 +145,10 @@ export class OAuthService {
       organizationId,
       authorizationCode: encryptedCode,
       codeExpiresAt,
+      redirectUri: options?.redirectUri,
+      codeChallenge: options?.codeChallenge,
+      codeChallengeMethod: options?.codeChallengeMethod || null,
+      scope: options?.scope,
     });
 
     return code;
@@ -103,7 +157,12 @@ export class OAuthService {
   async exchangeCodeForToken(
     code: string,
     clientId: string,
-    clientSecret: string
+    clientSecret: string,
+    options?: {
+      redirectUri?: string;
+      codeVerifier?: string;
+      scope?: string;
+    },
   ) {
     const app = await this._oauthRepository.getAppByClientId(clientId);
     if (!app) {
@@ -113,14 +172,14 @@ export class OAuthService {
       );
     }
 
-    if (app.clientSecret !== AuthService.fixedEncryption(clientSecret)) {
+    if (!this.matchesStoredSecret(app.clientSecret, clientSecret)) {
       throw new HttpException(
         { error: 'invalid_client' },
         HttpStatus.UNAUTHORIZED
       );
     }
 
-    const encryptedCode = AuthService.fixedEncryption(code);
+    const encryptedCode = this.lookupCandidates(code);
     const auth = await this._oauthRepository.findByCode(encryptedCode);
     if (!auth || auth.oauthAppId !== app.id) {
       throw new HttpException(
@@ -136,14 +195,54 @@ export class OAuthService {
       );
     }
 
+    // Validate redirect_uri if one was stored with the code
+    if (auth.redirectUri && options?.redirectUri !== auth.redirectUri) {
+      throw new HttpException(
+        { error: 'invalid_grant', error_description: 'redirect_uri mismatch' },
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    // Validate PKCE code_verifier
+    if (auth.codeChallenge && auth.codeChallengeMethod === 'S256') {
+      if (!options?.codeVerifier) {
+        throw new HttpException(
+          { error: 'invalid_grant', error_description: 'code_verifier required' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+      const verifierHash = crypto
+        .createHash('sha256')
+        .update(options.codeVerifier)
+        .digest('base64url')
+        .replace(/=+$/, '');
+      if (verifierHash !== auth.codeChallenge) {
+        throw new HttpException(
+          { error: 'invalid_grant', error_description: 'code_verifier mismatch' },
+          HttpStatus.BAD_REQUEST,
+        );
+      }
+    }
+
     const token = 'pos_' + makeId(40);
-    const encryptedToken = AuthService.fixedEncryption(token);
+    const encryptedToken = this.lookupHash(token);
+    const refreshToken = 'posr_' + makeId(48);
+    const encryptedRefreshToken = this.lookupHash(refreshToken);
+    const tokenExpiresAt = new Date(Date.now() + 3600 * 1000); // 1 hour
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000); // 30 days
+
     const {
       organizationId,
       organization: { paymentId },
     } = await this._oauthRepository.exchangeCodeForToken(
       auth.id,
-      encryptedToken
+      encryptedToken,
+      {
+        refreshToken: encryptedRefreshToken,
+        tokenExpiresAt,
+        refreshTokenExpiresAt,
+        scope: auth.scope || options?.scope,
+      },
     );
 
     return {
@@ -151,11 +250,69 @@ export class OAuthService {
       cus: paymentId,
       access_token: token,
       token_type: 'bearer',
+      expires_in: 3600,
+      refresh_token: refreshToken,
+      scope: auth.scope || options?.scope,
+    };
+  }
+
+  async refreshAccessToken(refreshToken: string, clientId: string, clientSecret: string) {
+    const app = await this._oauthRepository.getAppByClientId(clientId);
+    if (!app) {
+      throw new HttpException(
+        { error: 'invalid_client' },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    if (!this.matchesStoredSecret(app.clientSecret, clientSecret)) {
+      throw new HttpException(
+        { error: 'invalid_client' },
+        HttpStatus.UNAUTHORIZED
+      );
+    }
+
+    const encryptedRefresh = this.lookupCandidates(refreshToken);
+    const auth = await this._oauthRepository.findByRefreshToken(encryptedRefresh);
+    if (!auth || auth.oauthAppId !== app.id) {
+      throw new HttpException(
+        { error: 'invalid_grant' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    if (auth.revokedAt || (auth.refreshTokenExpiresAt && new Date() > auth.refreshTokenExpiresAt)) {
+      throw new HttpException(
+        { error: 'invalid_grant', error_description: 'Refresh token expired or revoked' },
+        HttpStatus.BAD_REQUEST
+      );
+    }
+
+    // Rotate tokens
+    const newToken = 'pos_' + makeId(40);
+    const encryptedNewToken = this.lookupHash(newToken);
+    const newRefreshToken = 'posr_' + makeId(48);
+    const encryptedNewRefresh = this.lookupHash(newRefreshToken);
+    const tokenExpiresAt = new Date(Date.now() + 3600 * 1000);
+    const refreshTokenExpiresAt = new Date(Date.now() + 30 * 24 * 3600 * 1000);
+
+    await this._oauthRepository.updateTokens(auth.id, {
+      accessToken: encryptedNewToken,
+      refreshToken: encryptedNewRefresh,
+      tokenExpiresAt,
+      refreshTokenExpiresAt,
+    });
+
+    return {
+      access_token: newToken,
+      token_type: 'bearer',
+      expires_in: 3600,
+      refresh_token: newRefreshToken,
     };
   }
 
   async getOrgByOAuthToken(token: string) {
-    const encrypted = AuthService.fixedEncryption(token);
+    const encrypted = this.lookupCandidates(token);
     return this._oauthRepository.findByAccessToken(encrypted);
   }
 

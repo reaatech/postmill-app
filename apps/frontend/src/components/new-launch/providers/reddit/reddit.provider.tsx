@@ -20,6 +20,8 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFormatting } from '@gitroom/frontend/components/launches/helpers/use.formatting';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const RenderRedditComponent: FC<{
   type: string;
   images?: Array<{
@@ -36,12 +38,9 @@ const RenderRedditComponent: FC<{
   switch (type) {
     case 'self':
       return (
-        <div
-          dangerouslySetInnerHTML={{ __html: firstPost?.content }}
-          style={{
-            whiteSpace: 'pre-wrap',
-            fontSize: '14px',
-          }}
+        <SafeContent
+          className="whitespace-pre-wrap text-[14px]"
+          content={firstPost?.content || ''}
         />
       );
     case 'link':
@@ -138,11 +137,9 @@ const RedditPreview: FC = (props) => {
                       <div className="text-[14px] font-[600]">
                         {integration?.name}
                       </div>
-                      <div
-                        dangerouslySetInnerHTML={{ __html: p.text }}
-                        style={{
-                          whiteSpace: 'pre-wrap',
-                        }}
+                      <SafeContent
+                        className="whitespace-pre-wrap"
+                        content={p.text}
                       />
                     </div>
                   </div>
@@ -205,6 +202,7 @@ const RedditSettings: FC = () => {
           )}
         </div>
       )}
+      <FirstCommentField />
     </>
   );
 };

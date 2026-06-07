@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { LanguageModelV2 } from '@ai-sdk/provider-v5';
+import type { LanguageModelV2, ImageModelV2, EmbeddingModelV2 } from '@ai-sdk/provider-v5';
 import {
   type AIProviderAdapter,
   type CredentialField,
@@ -76,11 +76,11 @@ export class GoogleAdapter implements AIProviderAdapter {
     throw new Error('Google Generative AI LangChain integration is not installed. Use languageModel() instead.');
   }
 
-  createImageModel(creds: Record<string, string>, modelId: string) {
+  createImageModel(creds: Record<string, string>, modelId: string): ImageModelV2 | undefined {
     return this._buildProvider(creds).imageModel?.(modelId);
   }
 
-  createEmbeddingModel(creds: Record<string, string>, modelId: string) {
+  createEmbeddingModel(creds: Record<string, string>, modelId: string): EmbeddingModelV2<string> | undefined {
     return this._buildProvider(creds).textEmbeddingModel?.(modelId);
   }
 }

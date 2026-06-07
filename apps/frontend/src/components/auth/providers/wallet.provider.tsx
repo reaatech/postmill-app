@@ -8,31 +8,29 @@ import {
 } from '@solana/wallet-adapter-react';
 import { useWalletMultiButton } from '@solana/wallet-adapter-base-ui';
 import { WalletAdapterNetwork } from '@solana/wallet-adapter-base';
-import {
-  TorusWalletAdapter,
-  BitgetWalletAdapter,
-  CloverWalletAdapter,
-  Coin98WalletAdapter,
-  FractalWalletAdapter,
-  HyperPayWalletAdapter,
-  KeystoneWalletAdapter,
-  KrystalWalletAdapter,
-  LedgerWalletAdapter,
-  MathWalletAdapter,
-  NightlyWalletAdapter,
-  NufiWalletAdapter,
-  OntoWalletAdapter,
-  ParticleAdapter,
-  PhantomWalletAdapter,
-  SafePalWalletAdapter,
-  SaifuWalletAdapter,
-  SalmonWalletAdapter,
-  SolflareWalletAdapter,
-  TokenaryWalletAdapter,
-  TrustWalletAdapter,
-  XDEFIWalletAdapter,
-  TokenPocketWalletAdapter,
-} from '@postiz/wallets';
+import { BitgetWalletAdapter } from '@solana/wallet-adapter-bitkeep';
+import { CloverWalletAdapter } from '@solana/wallet-adapter-clover';
+import { Coin98WalletAdapter } from '@solana/wallet-adapter-coin98';
+import { FractalWalletAdapter } from '@solana/wallet-adapter-fractal';
+import { HyperPayWalletAdapter } from '@solana/wallet-adapter-hyperpay';
+import { KeystoneWalletAdapter } from '@solana/wallet-adapter-keystone';
+import { KrystalWalletAdapter } from '@solana/wallet-adapter-krystal';
+import { LedgerWalletAdapter } from '@solana/wallet-adapter-ledger';
+import { MathWalletAdapter } from '@solana/wallet-adapter-mathwallet';
+import { NightlyWalletAdapter } from '@solana/wallet-adapter-nightly';
+import { NufiWalletAdapter } from '@solana/wallet-adapter-nufi';
+import { OntoWalletAdapter } from '@solana/wallet-adapter-onto';
+import { ParticleAdapter } from '@solana/wallet-adapter-particle';
+import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
+import { SafePalWalletAdapter } from '@solana/wallet-adapter-safepal';
+import { SaifuWalletAdapter } from '@solana/wallet-adapter-saifu';
+import { SalmonWalletAdapter } from '@solana/wallet-adapter-salmon';
+import { SolflareWalletAdapter } from '@solana/wallet-adapter-solflare';
+import { TokenaryWalletAdapter } from '@solana/wallet-adapter-tokenary';
+import { TokenPocketWalletAdapter } from '@solana/wallet-adapter-tokenpocket';
+import { TorusWalletAdapter } from '@solana/wallet-adapter-torus';
+import { TrustWalletAdapter } from '@solana/wallet-adapter-trust';
+import { XDEFIWalletAdapter } from '@solana/wallet-adapter-xdefi';
 import {
   WalletModalProvider,
   useWalletModal,
@@ -110,10 +108,13 @@ const DisabledAutoConnect = () => {
       /** empty */
     }
     setConnect(true);
-  }, []);
+  }, [wallet]);
   useEffect(() => {
-    toConnect();
-  }, []);
+    const timeout = window.setTimeout(() => {
+      void toConnect();
+    }, 0);
+    return () => window.clearTimeout(timeout);
+  }, [toConnect]);
   if (connect) {
     return <InnerWallet />;
   }
@@ -156,7 +157,7 @@ const InnerWallet = () => {
         /** empty */
       });
     }
-  }, [wallet, buttonState]);
+  }, [buttonState, fetch, wallet, walletModal]);
   useEffect(() => {
     if (buttonState === 'has-wallet') {
       wallet
@@ -172,7 +173,7 @@ const InnerWallet = () => {
     if (buttonState === 'connected') {
       connect();
     }
-  }, [buttonState]);
+  }, [buttonState, connect, wallet]);
   return (
     <div onClick={() => walletModal.setVisible(true)} className="flex-1">
       <WalletUiProvider />

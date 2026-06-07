@@ -12,8 +12,12 @@ export default function LayoutContext(params: { children: ReactNode }) {
   }
   return <></>;
 }
-export function setCookie(cname: string, cvalue: string, exdays: number) {
+export function setClientCookie(cname: string, cvalue: string, exdays: number) {
   if (typeof document === 'undefined') {
+    return;
+  }
+  if (cname === 'auth') {
+    window.location.href = '/auth/logout';
     return;
   }
   const d = new Date();
@@ -21,6 +25,7 @@ export function setCookie(cname: string, cvalue: string, exdays: number) {
   const expires = 'expires=' + d.toUTCString();
   document.cookie = cname + '=' + cvalue + ';' + expires + ';path=/';
 }
+export const setCookie = setClientCookie;
 function LayoutContextInner(params: { children: ReactNode }) {
   const returnUrl = useReturnUrl();
   const { backendUrl, isGeneral, isSecured } = useVariables();
@@ -33,29 +38,12 @@ function LayoutContextInner(params: { children: ReactNode }) {
       ) {
         return true;
       }
-      const headerAuth =
-        response?.headers?.get('auth') || response?.headers?.get('Auth');
-      const showOrg =
-        response?.headers?.get('showorg') || response?.headers?.get('Showorg');
-      const impersonate =
-        response?.headers?.get('impersonate') ||
-        response?.headers?.get('Impersonate');
       const logout =
         response?.headers?.get('logout') || response?.headers?.get('Logout');
-      if (headerAuth) {
-        setCookie('auth', headerAuth, 365);
-      }
-      if (showOrg) {
-        setCookie('showorg', showOrg, 365);
-      }
-      if (impersonate) {
-        setCookie('impersonate', impersonate, 365);
-      }
       if (logout && !isSecured) {
-        setCookie('auth', '', -10);
-        setCookie('showorg', '', -10);
-        setCookie('impersonate', '', -10);
-        window.location.href = '/';
+        setClientCookie('showorg', '', -10);
+        setClientCookie('impersonate', '', -10);
+        window.location.href = '/auth/logout';
         return true;
       }
       const reloadOrOnboarding =
@@ -64,7 +52,16 @@ function LayoutContextInner(params: { children: ReactNode }) {
       if (reloadOrOnboarding) {
         const getAndClear = returnUrl.getAndClear();
         if (getAndClear) {
-          window.location.href = getAndClear;
+          try {
+            const parsed = new URL(getAndClear, window.location.origin);
+            if (parsed.origin !== window.location.origin) {
+              window.location.href = '/';
+            } else {
+              window.location.href = getAndClear;
+            }
+          } catch {
+            window.location.href = '/';
+          }
           return true;
         }
       }
@@ -82,11 +79,10 @@ function LayoutContextInner(params: { children: ReactNode }) {
 
       if (response.status === 401 || response?.headers?.get('logout')) {
         if (!isSecured) {
-          setCookie('auth', '', -10);
-          setCookie('showorg', '', -10);
-          setCookie('impersonate', '', -10);
+          setClientCookie('showorg', '', -10);
+          setClientCookie('impersonate', '', -10);
         }
-        window.location.href = '/';
+        window.location.href = '/auth/logout';
       }
       if (response.status === 406) {
         if (

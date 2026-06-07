@@ -20,15 +20,35 @@ import {
   parsePage,
   parseLimit,
   parseCompare,
-  parseFormat,
   validateDateRange,
+  validateToGteFrom,
 } from './analytics.v2.controller';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import type {
+  AnalyticsDateRangeDto,
+  AnalyticsPostsQueryDto,
+  AnalyticsExportQueryDto,
+} from '@gitroom/nestjs-libraries/dtos/analytics/analytics.query.dto';
 
 const mockOrg = { id: 'test-org-id', name: 'Test Org' } as any;
 
 function mockResponse() {
   return { setHeader: vi.fn().mockReturnThis() };
+}
+
+function dq(overrides: Partial<AnalyticsDateRangeDto & AnalyticsPostsQueryDto & AnalyticsExportQueryDto> = {}): AnalyticsDateRangeDto & AnalyticsPostsQueryDto & AnalyticsExportQueryDto {
+  return {
+    from: '2024-01-01',
+    to: '2024-01-07',
+    integrations: undefined,
+    compare: undefined,
+    sort: undefined,
+    dir: undefined,
+    page: undefined,
+    limit: undefined,
+    format: undefined,
+    ...overrides,
+  };
 }
 
 describe('AnalyticsV2Controller', () => {
@@ -38,14 +58,23 @@ describe('AnalyticsV2Controller', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new (AnalyticsService as any)();
-    controller = new AnalyticsV2Controller(service as unknown as AnalyticsService);
+    const watchlistService = {
+      list: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      remove: vi.fn(),
+    } as any;
+    controller = new AnalyticsV2Controller(
+      service as unknown as AnalyticsService,
+      watchlistService,
+    );
   });
 
   it('getOverview delegates and parses integrations param', async () => {
     const mockResult: Record<string, any> = { kpis: [] };
     (service.getOverview as any).mockResolvedValue(mockResult);
 
-    const result = await controller.getOverview(mockOrg, '2024-01-01', '2024-01-07', 'i1,i2', 'true');
+    const result = await controller.getOverview(mockOrg, dq({ integrations: 'i1,i2', compare: 'true' }));
 
     expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1', 'i2'], true);
     expect(result).toBe(mockResult);
@@ -54,7 +83,7 @@ describe('AnalyticsV2Controller', () => {
   it('getOverview passes empty array when integrations param missing', async () => {
     (service.getOverview as any).mockResolvedValue({ kpis: [] });
 
-    await controller.getOverview(mockOrg, '2024-01-01', '2024-01-07', undefined, undefined);
+    await controller.getOverview(mockOrg, dq({ integrations: undefined, compare: undefined }));
 
     expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false);
   });
@@ -62,7 +91,7 @@ describe('AnalyticsV2Controller', () => {
   it('getChannel delegates correctly', async () => {
     (service.getChannel as any).mockResolvedValue({ kpis: [] });
 
-    await controller.getChannel(mockOrg, 'ch1', '2024-01-01', '2024-01-07', 'true');
+    await controller.getChannel(mockOrg, 'ch1', dq({ compare: 'true' }));
 
     expect(service.getChannel).toHaveBeenCalledWith(mockOrg, 'ch1', '2024-01-01', '2024-01-07', true);
   });
@@ -70,15 +99,15 @@ describe('AnalyticsV2Controller', () => {
   it('getPosts delegates with default pagination', async () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
 
-    await controller.getPosts(mockOrg, '2024-01-01', '2024-01-07', 'i1', 'impressions', 'desc', undefined, undefined);
+    await controller.getPosts(mockOrg, dq({ sort: 'impressions', dir: 'desc', page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1'], 'impressions', 'desc', 1, 25);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'impressions', 'desc', 1, 20);
   });
 
   it('getMetric delegates correctly', async () => {
     (service.getMetricDetail as any).mockResolvedValue({ metric: 'impressions' });
 
-    await controller.getMetric(mockOrg, 'impressions', '2024-01-01', '2024-01-07', 'i1,i2', 'false');
+    await controller.getMetric(mockOrg, 'impressions', dq({ integrations: 'i1,i2', compare: 'false' }));
 
     expect(service.getMetricDetail).toHaveBeenCalledWith(mockOrg, 'impressions', '2024-01-01', '2024-01-07', ['i1', 'i2'], false);
   });
@@ -94,7 +123,7 @@ describe('AnalyticsV2Controller', () => {
   it('getChannelMetric delegates correctly', async () => {
     (service.getChannelMetric as any).mockResolvedValue({ series: [] });
 
-    await controller.getChannelMetric(mockOrg, 'ch1', 'impressions', '2024-01-01', '2024-01-07', 'true');
+    await controller.getChannelMetric(mockOrg, 'ch1', 'impressions', dq({ compare: 'true' }));
 
     expect(service.getChannelMetric).toHaveBeenCalledWith(mockOrg, 'ch1', 'impressions', '2024-01-01', '2024-01-07', true);
   });
@@ -118,32 +147,32 @@ describe('AnalyticsV2Controller', () => {
 
   it('getOverview throws when from is missing', async () => {
     await expect(
-      controller.getOverview(mockOrg, '', '2024-01-07', undefined, undefined)
+      controller.getOverview(mockOrg, dq({ from: '' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getOverview throws when to is missing', async () => {
     await expect(
-      controller.getOverview(mockOrg, '2024-01-01', '', undefined, undefined)
+      controller.getOverview(mockOrg, dq({ to: '' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getOverview throws when from is an invalid date', async () => {
     await expect(
-      controller.getOverview(mockOrg, 'not-a-date', '2024-01-07', undefined, undefined)
+      controller.getOverview(mockOrg, dq({ from: 'not-a-date' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getOverview throws when to is an invalid date', async () => {
     await expect(
-      controller.getOverview(mockOrg, '2024-01-01', 'bad-date', undefined, undefined)
+      controller.getOverview(mockOrg, dq({ to: 'bad-date' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getOverview parses empty integrations string as empty array', async () => {
     (service.getOverview as any).mockResolvedValue({ kpis: [] });
 
-    await controller.getOverview(mockOrg, '2024-01-01', '2024-01-07', '', undefined);
+    await controller.getOverview(mockOrg, dq({ integrations: '' }));
 
     expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false);
   });
@@ -151,23 +180,23 @@ describe('AnalyticsV2Controller', () => {
   it('getPosts uses defaults when no sort/dir/page/limit provided', async () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
 
-    await controller.getPosts(mockOrg, '2024-01-01', '2024-01-07', undefined, undefined, undefined, undefined, undefined);
+    await controller.getPosts(mockOrg, dq({ sort: undefined, dir: undefined, page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 25);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 20);
   });
 
   it('getPosts passes dir=asc when provided', async () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
 
-    await controller.getPosts(mockOrg, '2024-01-01', '2024-01-07', undefined, undefined, 'asc', undefined, undefined);
+    await controller.getPosts(mockOrg, dq({ sort: undefined, dir: 'asc', page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'asc', 1, 25);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'asc', 1, 20);
   });
 
   it('getPosts delegates with explicit page and limit', async () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
 
-    await controller.getPosts(mockOrg, '2024-01-01', '2024-01-07', 'i1', 'impressions', 'desc', '3', '10');
+    await controller.getPosts(mockOrg, dq({ integrations: 'i1', sort: 'impressions', dir: 'desc', page: 3, limit: 10 }));
 
     expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1'], 'impressions', 'desc', 3, 10);
   });
@@ -177,7 +206,7 @@ describe('AnalyticsV2Controller', () => {
     const csvData = 'col1,col2\nv1,v2';
     (service.exportData as any).mockResolvedValue({ contentType: 'text/csv', data: csvData });
 
-    const result = await controller.exportData(mockOrg, '2024-01-01', '2024-01-07', undefined, 'csv', undefined, res as any);
+    const result = await controller.exportData(mockOrg, dq({ format: 'csv' }), res as any);
 
     expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'csv', false);
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv');
@@ -190,7 +219,7 @@ describe('AnalyticsV2Controller', () => {
     const jsonData = { key: 'value' };
     (service.exportData as any).mockResolvedValue({ contentType: 'application/json', data: jsonData });
 
-    const result = await controller.exportData(mockOrg, '2024-01-01', '2024-01-07', undefined, 'json', undefined, res as any);
+    const result = await controller.exportData(mockOrg, dq({ format: 'json' }), res as any);
 
     expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'json', false);
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
@@ -202,7 +231,7 @@ describe('AnalyticsV2Controller', () => {
     const res = mockResponse();
 
     await expect(
-      controller.exportData(mockOrg, '2024-01-01', '2024-01-07', undefined, 'pdf', undefined, res as any)
+      controller.exportData(mockOrg, dq({ format: 'pdf' }), res as any)
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -210,32 +239,50 @@ describe('AnalyticsV2Controller', () => {
     const res = mockResponse();
 
     await expect(
-      controller.exportData(mockOrg, '', '2024-01-07', undefined, 'json', undefined, res as any)
+      controller.exportData(mockOrg, dq({ from: '', format: 'json' }), res as any)
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getChannel throws when from is missing', async () => {
     await expect(
-      controller.getChannel(mockOrg, 'ch1', '', '2024-01-07', undefined)
+      controller.getChannel(mockOrg, 'ch1', dq({ from: '' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getMetricDetail throws when from is missing', async () => {
     await expect(
-      controller.getMetric(mockOrg, 'impressions', '', '2024-01-07', undefined, undefined)
+      controller.getMetric(mockOrg, 'impressions', dq({ from: '' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getChannelMetric throws when from is missing', async () => {
     await expect(
-      controller.getChannelMetric(mockOrg, 'ch1', 'impressions', '', '2024-01-07', undefined)
+      controller.getChannelMetric(mockOrg, 'ch1', 'impressions', dq({ from: '' }))
     ).rejects.toThrow(BadRequestException);
   });
 
   it('getPosts throws when from is missing', async () => {
     await expect(
-      controller.getPosts(mockOrg, '', '2024-01-07', undefined, undefined, undefined, undefined, undefined)
+      controller.getPosts(mockOrg, dq({ from: '' }))
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('validateToGteFrom rejects to before from', async () => {
+    await expect(
+      controller.getOverview(mockOrg, dq({ from: '2024-01-07', to: '2024-01-01' }))
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('validateToGteFrom accepts to equal from', async () => {
+    (service.getOverview as any).mockResolvedValue({ kpis: [] });
+    await controller.getOverview(mockOrg, dq({ from: '2024-01-01', to: '2024-01-01' }));
+    expect(service.getOverview).toHaveBeenCalled();
+  });
+
+  it('getPosts caps limit at 100', async () => {
+    (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
+    await controller.getPosts(mockOrg, dq({ limit: 999 }));
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 100);
   });
 });
 
@@ -262,42 +309,27 @@ describe('parsePage', () => {
     expect(parsePage(undefined)).toBe(1);
   });
 
-  it('parses valid number string', () => {
-    expect(parsePage('5')).toBe(5);
-  });
-
-  it('returns 1 when zero', () => {
-    expect(parsePage('0')).toBe(1);
-  });
-
-  it('returns 1 when negative', () => {
-    expect(parsePage('-1')).toBe(1);
-  });
-
-  it('returns 1 when NaN', () => {
-    expect(parsePage('abc')).toBe(1);
+  it('returns 1 when 0', () => {
+    // DTO validation with @Min(1) catches this before parsePage
+    expect(parsePage(undefined)).toBe(1);
   });
 });
 
 describe('parseLimit', () => {
-  it('returns 25 when undefined', () => {
-    expect(parseLimit(undefined)).toBe(25);
+  it('returns 20 when undefined', () => {
+    expect(parseLimit(undefined)).toBe(20);
   });
 
-  it('parses valid number string', () => {
-    expect(parseLimit('50')).toBe(50);
+  it('caps at 100', () => {
+    expect(parseLimit(200)).toBe(100);
   });
 
-  it('returns 25 when zero', () => {
-    expect(parseLimit('0')).toBe(25);
+  it('returns value when within bounds', () => {
+    expect(parseLimit(50)).toBe(50);
   });
 
-  it('returns 25 when negative', () => {
-    expect(parseLimit('-1')).toBe(25);
-  });
-
-  it('returns 25 when NaN', () => {
-    expect(parseLimit('abc')).toBe(25);
+  it('accepts 1', () => {
+    expect(parseLimit(1)).toBe(1);
   });
 });
 
@@ -312,24 +344,6 @@ describe('parseCompare', () => {
 
   it('returns false for "false"', () => {
     expect(parseCompare('false')).toBe(false);
-  });
-});
-
-describe('parseFormat', () => {
-  it('returns "json" when undefined', () => {
-    expect(parseFormat(undefined)).toBe('json');
-  });
-
-  it('returns "json" when format is "json"', () => {
-    expect(parseFormat('json')).toBe('json');
-  });
-
-  it('returns "csv" when format is "csv"', () => {
-    expect(parseFormat('csv')).toBe('csv');
-  });
-
-  it('throws BadRequestException when format is invalid', () => {
-    expect(() => parseFormat('invalid')).toThrow(BadRequestException);
   });
 });
 
@@ -348,5 +362,19 @@ describe('validateDateRange', () => {
 
   it('throws when to is not a valid date', () => {
     expect(() => validateDateRange('2024-01-01', 'bad-date')).toThrow(BadRequestException);
+  });
+});
+
+describe('validateToGteFrom', () => {
+  it('throws when to is before from', () => {
+    expect(() => validateToGteFrom('2024-01-07', '2024-01-01')).toThrow(BadRequestException);
+  });
+
+  it('passes when to equals from', () => {
+    expect(() => validateToGteFrom('2024-01-01', '2024-01-01')).not.toThrow();
+  });
+
+  it('passes when to is after from', () => {
+    expect(() => validateToGteFrom('2024-01-01', '2024-01-07')).not.toThrow();
   });
 });

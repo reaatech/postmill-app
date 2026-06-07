@@ -5,13 +5,13 @@ vi.mock('@openrouter/ai-sdk-provider', () => ({
     languageModel: vi.fn(() => ({
       doGenerate: vi.fn().mockResolvedValue({}),
     })),
-    imageModel: vi.fn(() => ({})),
-    textEmbeddingModel: vi.fn(() => ({})),
+    imageModel: vi.fn(function() { return {}; }),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { OpenRouterAdapter } from './openrouter.adapter';

@@ -16,8 +16,7 @@ const { mockSpan, mockTracer, mockGetTracer } = vi.hoisted(() => {
   };
 });
 
-const { mockProviderRegister, mockProviderGetTracer } = vi.hoisted(() => ({
-  mockProviderRegister: vi.fn(),
+const { mockProviderGetTracer } = vi.hoisted(() => ({
   mockProviderGetTracer: vi.fn(),
 }));
 
@@ -28,7 +27,6 @@ vi.mock('@opentelemetry/api', () => ({
 
 vi.mock('@opentelemetry/sdk-trace-base', () => ({
   BasicTracerProvider: class {
-    register = mockProviderRegister;
     getTracer = mockProviderGetTracer;
     constructor(opts?: any) {}
   },
@@ -93,10 +91,9 @@ describe('TelemetryService', () => {
       expect(service.isConfigured).toBe(true);
     });
 
-    it('registers the tracer provider when endpoint is provided', () => {
+    it('creates a tracer from provider when endpoint is provided', () => {
       const service = freshService();
       service.configure({ endpoint: 'https://otel.example.com/v1/traces' });
-      expect(mockProviderRegister).toHaveBeenCalled();
       expect(mockProviderGetTracer).toHaveBeenCalledWith('postiz-ai');
     });
 
@@ -104,7 +101,6 @@ describe('TelemetryService', () => {
       const service = freshService();
       service.configure(null);
       expect(service.isConfigured).toBe(false);
-      expect(mockProviderRegister).not.toHaveBeenCalled();
     });
 
     it('is a no-op when observability is undefined', () => {
@@ -130,9 +126,9 @@ describe('TelemetryService', () => {
       service.configure({ endpoint: 'https://first.example.com' });
       expect(service.isConfigured).toBe(true);
 
-      const registerCalls = mockProviderRegister.mock.calls.length;
+      const getTracerCalls = mockProviderGetTracer.mock.calls.length;
       service.configure({ endpoint: 'https://second.example.com' });
-      expect(mockProviderRegister).toHaveBeenCalledTimes(registerCalls);
+      expect(mockProviderGetTracer).toHaveBeenCalledTimes(getTracerCalls);
     });
   });
 

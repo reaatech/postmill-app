@@ -4,14 +4,14 @@ import { OpenAIAdapter } from './openai.adapter';
 vi.mock('@ai-sdk/openai', () => ({
   createOpenAI: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'gpt-4.1' })),
-    imageModel: vi.fn(() => ({})),
-    textEmbeddingModel: vi.fn(() => ({})),
-    speechModel: vi.fn(() => ({})),
+    imageModel: vi.fn(function() { return {}; }),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
+    speechModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 describe('OpenAIAdapter', () => {

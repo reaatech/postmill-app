@@ -4,10 +4,18 @@ import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import dayjs from 'dayjs';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { Post, Integration } from '@prisma/client';
+
+export interface InboxFilterOptions {
+  status?: string;
+  assigneeId?: string;
+  cursor?: string;
+  unreadOnly?: boolean;
+}
 
 @Injectable()
 export class SocialCommentsService {
@@ -17,6 +25,7 @@ export class SocialCommentsService {
     private _integrationManager: IntegrationManager,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _integrationService: IntegrationService,
+    private _webhooksService: WebhooksService,
   ) {}
 
   private async refreshTokenIfExpired(
@@ -317,6 +326,18 @@ export class SocialCommentsService {
             platformCreatedAt: comment.createdAt ? new Date(comment.createdAt) : new Date(),
             raw: comment.raw ? JSON.stringify(comment.raw) : undefined,
           });
+
+          try {
+            await this._webhooksService.dispatchEvent(orgId, 'comment.new', {
+              postId: post.id,
+              commentId: comment.platformCommentId,
+              content: comment.content,
+              authorName: comment.author.name,
+              integrationId: post.integrationId,
+            });
+          } catch {
+            // best-effort webhook dispatch
+          }
         }
 
         cursor = result.nextCursor;
@@ -345,6 +366,19 @@ export class SocialCommentsService {
 
     const count = await this._socialCommentsRepository.countComments(post.id);
     await this._postsRepository.updateCommentCount(post.id, count);
+  }
+
+  async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
+    return this._socialCommentsRepository.getInbox(orgId, userId, filters);
+  }
+
+  async bulkMarkRead(commentIds: string[]) {
+    return this._socialCommentsRepository.bulkMarkRead(commentIds);
+  }
+
+  async getInboxUnreadCount(orgId: string, userId: string) {
+    const count = await this._socialCommentsRepository.getInboxUnreadCount(orgId, userId);
+    return { unreadCount: count };
   }
 
   async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<any> {
@@ -396,6 +430,17 @@ export class SocialCommentsService {
         platformCreatedAt: result.createdAt ? new Date(result.createdAt) : new Date(),
         raw: result.raw ? JSON.stringify(result.raw) : undefined,
       });
+
+      try {
+        await this._webhooksService.dispatchEvent(orgId, 'comment.reply', {
+          postId,
+          commentId: result.platformCommentId,
+          content: result.content,
+          authorName: result.author.name,
+        });
+      } catch {
+        // best-effort webhook dispatch
+      }
 
       return result;
     } catch (err: any) {

@@ -52,6 +52,16 @@ vi.mock(
   })
 );
 
+vi.mock(
+  '@gitroom/nestjs-libraries/integrations/social/provider-capabilities',
+  () => ({
+    PROVIDER_CAPABILITIES: {
+      mastodon: { watchlist: false },
+      x: { watchlist: true },
+    },
+  })
+);
+
 vi.mock('@gitroom/helpers/utils/timer', () => ({
   timer: vi.fn().mockResolvedValue(undefined),
 }));
@@ -90,6 +100,8 @@ describe('AnalyticsActivity', () => {
   let organizationService: Mocked<OrganizationService>;
   let integrationService: Mocked<IntegrationService>;
   let refreshIntegrationService: Mocked<RefreshIntegrationService>;
+  let webhooksService: any;
+  let watchlistService: any;
 
   const mockUpsert = vi.fn();
 
@@ -135,13 +147,22 @@ describe('AnalyticsActivity', () => {
       refresh: vi.fn(),
     } as any;
 
+    webhooksService = { dispatchEvent: vi.fn().mockResolvedValue(undefined) };
+    watchlistService = {
+      getEnabledAccounts: vi.fn().mockResolvedValue([]),
+      probeAndRecord: vi.fn().mockResolvedValue(undefined),
+      markProbeFailed: vi.fn().mockResolvedValue(undefined),
+    };
+
     activity = new AnalyticsActivity(
       prisma as any,
       integrationManager as any,
       providerConfigManager as any,
       organizationService as any,
       integrationService as any,
-      refreshIntegrationService as any
+      refreshIntegrationService as any,
+      webhooksService as any,
+      watchlistService as any
     );
   });
 
@@ -1427,6 +1448,44 @@ describe('AnalyticsActivity', () => {
       const data = (prisma.analyticsSnapshot.createMany as any).mock.calls[0][0]
         .data;
       expect(data).toHaveLength(3);
+    });
+  });
+
+  describe('probeWatchedAccounts', () => {
+    it('disables unsupported providers instead of recording placeholder metrics', async () => {
+      watchlistService.getEnabledAccounts.mockResolvedValue([
+        { id: 'wa-1', provider: 'mastodon', handle: '@competitor' },
+      ]);
+
+      await activity.probeWatchedAccounts('org-1');
+
+      expect(watchlistService.probeAndRecord).not.toHaveBeenCalled();
+      expect(watchlistService.markProbeFailed).toHaveBeenCalledWith(
+        'wa-1',
+        'Watchlist probes are not supported for mastodon'
+      );
+    });
+
+    it('isolates per-account probe failures and marks the account failed', async () => {
+      watchlistService.getEnabledAccounts.mockResolvedValue([
+        { id: 'wa-1', provider: 'x', handle: 'competitor' },
+      ]);
+      watchlistService.probeAndRecord.mockRejectedValueOnce(
+        new Error('provider rejected probe')
+      );
+
+      await activity.probeWatchedAccounts('org-1');
+
+      expect(watchlistService.probeAndRecord).toHaveBeenCalledWith({
+        watchedAccountId: 'wa-1',
+        provider: 'x',
+        handle: 'competitor',
+        metric: 'followers',
+      });
+      expect(watchlistService.markProbeFailed).toHaveBeenCalledWith(
+        'wa-1',
+        'provider rejected probe'
+      );
     });
   });
 });

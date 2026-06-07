@@ -5,7 +5,7 @@ This fork (**Postiz REAA Flavor**) has diverged substantially from
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
 the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.0.**
 
 ---
 
@@ -23,6 +23,45 @@ the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per releas
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
 
 ---
+
+## v3.5.0 — Security hardening + feature expansion
+
+A codebase-hardening and feature-expansion release. Every change is additive or a refactor under
+existing contracts — no breaking changes, no schema renames.
+
+**Security & infrastructure hardening**
+
+- **SSRF-safe outbound dispatch** — a single `safeFetch` helper (validate + manual redirect
+  re-validation via `ssrfSafeDispatcher`) now fronts all webhook dispatch and user-influenced
+  provider fetches, closing blind-SSRF / DNS-rebinding / redirect-to-metadata holes.
+- **Encryption at rest** — versioned AES-GCM `EncryptionService` (`v2:` prefix); `Integration.token`
+  / `refreshToken` are now encrypted, with transparent legacy-plaintext read fallback. Optional
+  dedicated `ENCRYPTION_KEY`, falling back to `JWT_SECRET`.
+- **Response headers & PII scrubbing** — helmet (HSTS, CSP, noSniff, frameguard) plus a Sentry
+  `beforeSend`/`beforeBreadcrumb` scrubber that strips auth headers, cookies, tokens, and PII. CSRF
+  middleware on cookie-authenticated mutating routes. All bypass under `NOT_SECURED` (dev-only).
+- **Throttle guard fix** — the throttler now applies its default limit to all routes (most routes
+  previously bypassed it), so per-route `@Throttle` caps actually take effect.
+- **OAuth 2.0 / PKCE hardening**, JWT algorithm pinning + expiry/renewal, CSPRNG IDs, open-redirect
+  allowlisting (`INTEGRATION_RETURN_URL_ALLOWLIST`), bounded analytics query validation, and a
+  multipart-upload ownership ledger.
+- **CI** — a `pnpm audit --audit-level=high` workflow on PRs and weekly.
+
+**New feature surfaces**
+
+- **Analytics** — best-time-to-post heatmap (`/analytics/v2/best-time`), recommendations action tab
+  (`/analytics/v2/recommendations`), competitor watchlist CRUD (`/analytics/v2/watchlist`), and a 60s
+  Redis cache on the overview endpoint.
+- **AI utilities** — hashtag generator, content-compliance checker, comment sentiment/summary modes,
+  and brand-memory (RAG) index/search — all rate-limited.
+- **Composer** — content-QA preflight (`/posts/preflight`) and bulk/CSV scheduling (`/posts/bulk`).
+- **Social** — cross-channel comment inbox (`/posts/inbox`), first-comment and poll support gated on
+  a new provider **capability matrix** (`/provider-capabilities`).
+- **Campaigns** — campaign folders (`/campaigns`) grouping posts/assets/analytics/comments.
+- **Webhooks** — new event types: `comment.new`, `comment.reply`, `analytics.snapshot_complete`.
+
+See [API overview](./api/overview.md), [Data model](./reference/data-model.md), and the
+[developer architecture notes](./developers/architecture.md).
 
 ## v3.4.0 — Pluggable AI provider system
 

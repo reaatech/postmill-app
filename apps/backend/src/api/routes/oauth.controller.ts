@@ -8,6 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -23,7 +24,8 @@ export class OAuthController {
   @Get('/authorize')
   async authorize(@Query() query: AuthorizeOAuthQueryDto) {
     const app = await this._oauthService.validateAuthorizationRequest(
-      query.client_id
+      query.client_id,
+      query.redirect_uri,
     );
 
     return {
@@ -39,6 +41,7 @@ export class OAuthController {
   }
 
   @Post('/token')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async token(@Body() body: TokenExchangeDto) {
     if (body.grant_type !== 'authorization_code') {
       throw new HttpException(
@@ -50,7 +53,12 @@ export class OAuthController {
     return this._oauthService.exchangeCodeForToken(
       body.code,
       body.client_id,
-      body.client_secret
+      body.client_secret,
+      {
+        redirectUri: body.redirect_uri,
+        codeVerifier: body.code_verifier,
+        scope: body.scope,
+      },
     );
   }
 }
@@ -67,7 +75,8 @@ export class OAuthAuthorizedController {
     @GetOrgFromRequest() org: Organization
   ) {
     const app = await this._oauthService.validateAuthorizationRequest(
-      body.client_id
+      body.client_id,
+      body.redirect_uri,
     );
 
     if (body.action === 'deny') {
@@ -82,10 +91,16 @@ export class OAuthAuthorizedController {
     const code = await this._oauthService.createAuthorizationCode(
       app.id,
       user.id,
-      org.id
+      org.id,
+      {
+        redirectUri: body.redirect_uri,
+        codeChallenge: body.code_challenge,
+        codeChallengeMethod: body.code_challenge_method,
+        scope: body.scope,
+      },
     );
 
-    const redirectUrl = new URL(app.redirectUrl);
+    const redirectUrl = new URL(body.redirect_uri || app.redirectUrl);
     redirectUrl.searchParams.set('code', code);
     if (body.state) {
       redirectUrl.searchParams.set('state', body.state);

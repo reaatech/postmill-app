@@ -99,6 +99,10 @@ export class CreatePostDto {
   @IsString()
   order?: string;
 
+  @IsOptional()
+  @IsString()
+  creationMethod?: string;
+
   @IsDefined()
   @IsBoolean()
   shortLink: boolean;

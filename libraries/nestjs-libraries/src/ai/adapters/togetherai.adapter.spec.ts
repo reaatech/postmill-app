@@ -3,13 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@ai-sdk/togetherai', () => ({
   createTogetherAI: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'meta-llama/Llama-4-Scout' })),
-    imageModel: vi.fn(() => ({})),
-    textEmbeddingModel: vi.fn(() => ({})),
+    imageModel: vi.fn(function() { return {}; }),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { TogetherAIAdapter } from './togetherai.adapter';

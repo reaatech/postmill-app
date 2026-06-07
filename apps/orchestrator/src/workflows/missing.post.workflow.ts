@@ -1,4 +1,4 @@
-import { proxyActivities, sleep } from '@temporalio/workflow';
+import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
 import { PostActivity } from '@gitroom/orchestrator/activities/post.activity';
 
 const { searchForMissingThreeHoursPosts } = proxyActivities<PostActivity>({
@@ -12,8 +12,14 @@ const { searchForMissingThreeHoursPosts } = proxyActivities<PostActivity>({
 
 export async function missingPostWorkflow() {
   await searchForMissingThreeHoursPosts();
+  let iterations = 1;
   while (true) {
     await sleep('1 hour');
     await searchForMissingThreeHoursPosts();
+    iterations += 1;
+
+    if (iterations >= 24) {
+      await continueAsNew();
+    }
   }
 }

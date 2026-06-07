@@ -5,12 +5,9 @@ import mime from 'mime-types';
 // @ts-ignore
 import { getExtension } from 'mime';
 import { IUploadProvider } from './upload.interface';
-import axios from 'axios';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { fromBuffer } = require('file-type');
+import { fromBuffer } from 'file-type';
 
 const ALLOWED_MIME_TYPES = new Set<string>([
   'image/jpeg',
@@ -84,13 +81,7 @@ class CloudflareStorage implements IUploadProvider {
     if (dataUrl) {
       body = dataUrl.buffer;
     } else {
-      if (!(await isSafePublicHttpsUrl(path))) {
-        throw new Error('Unsafe URL');
-      }
-      const loadImage = await fetch(path, {
-        // @ts-ignore — undici option, not in lib.dom fetch types
-        dispatcher: ssrfSafeDispatcher,
-      });
+      const loadImage = await safeFetch(path);
       body = Buffer.from(await loadImage.arrayBuffer());
     }
     const detected = await fromBuffer(body);

@@ -1,0 +1,61 @@
+'use client';
+
+import { FC } from 'react';
+import { SeriesPoint } from './utils';
+import { LineChart } from './charts/line.chart';
+
+interface PostDetailChartProps {
+  series: Record<string, SeriesPoint[]>;
+}
+
+const CHART_COLORS = [
+  'var(--chart-1, #612bd3)',
+  'var(--chart-2, #32d583)',
+  'var(--chart-3, #1d9bf0)',
+  'var(--chart-4, #f97066)',
+  'var(--chart-5, #ffac30)',
+  'var(--chart-6, #8b90ff)',
+];
+
+export const PostDetailChart: FC<PostDetailChartProps> = ({ series }) => {
+  const entries = Object.entries(series).filter(
+    ([, points]) => points.length > 0
+  );
+
+  if (entries.length === 0) return null;
+
+  return (
+    <div>
+      <h4 className="text-[13px] font-medium text-newTableText mb-[12px]">
+        Metric Trends
+      </h4>
+      <div className="space-y-[16px]">
+        {entries.map(([metric, points], i) => (
+          <div
+            key={metric}
+            className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[12px]"
+          >
+            <div className="flex items-center justify-between mb-[8px]">
+              <span className="text-[12px] font-medium text-newTableText capitalize">
+                {metric.replace(/_/g, ' ')}
+              </span>
+              <span className="text-[14px] font-semibold tabular-nums">
+                {new Intl.NumberFormat().format(
+                  Math.round(points[points.length - 1]?.value || 0)
+                )}
+              </span>
+            </div>
+            <div className="h-[120px]">
+              <LineChart
+                series={points}
+                color={CHART_COLORS[i % CHART_COLORS.length]}
+                height={120}
+                format="number"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};

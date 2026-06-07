@@ -16,6 +16,8 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization, User } from '@prisma/client';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
 import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.list.dto';
+import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { BulkCreatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { ApiTags } from '@nestjs/swagger';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
@@ -29,7 +31,6 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { PostValidationException } from '@gitroom/backend/api/routes/posts.validation.exception';
 
 @ApiTags('Posts')
 @Controller('/posts')
@@ -177,56 +178,18 @@ export class PostsController {
   @Post('/valid')
   async validatePosts(
     @GetOrgFromRequest() org: Organization,
-    @Body() rawBody: any
+    @Body() body: CreatePostDto
   ) {
-    return this._postsService.validatePosts(org.id, rawBody?.posts || []);
+    return this._postsService.validatePosts(org.id, body?.posts || []);
   }
 
   @Post('/')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
-    @Body() rawBody: any
+    @Body() body: CreatePostDto
   ) {
-    // Server-side validation — never trust the client to have validated.
-    const validation = await this._postsService.validatePosts(
-      org.id,
-      rawBody?.posts || []
-    );
-
-    const fail = (item: (typeof validation)[number], error: string) => {
-      throw new PostValidationException({
-        provider: item.identifier,
-        name: item.name,
-        error,
-      });
-    };
-
-    for (const item of validation) {
-      if (item.emptyContent) {
-        fail(
-          item,
-          'Your post should have at least one character or one image.'
-        );
-      }
-    }
-
-    if (rawBody?.type !== 'draft') {
-      for (const item of validation) {
-        if (!item.valid) {
-          fail(item, item.settingsError || 'Please fix your settings');
-        }
-        if (item.errors !== true) {
-          fail(item, item.errors as string);
-        }
-        if (item.tooLong) {
-          fail(item, 'post is too long, please fix it');
-        }
-      }
-    }
-
-    const body = await this._postsService.mapTypeToPost(rawBody, org.id);
-    return this._postsService.createPost(org.id, body, 'WEB');
+    return this._postsService.validateAndCreatePost(org.id, body, 'WEB');
   }
 
   @Post('/generator/draft')
@@ -269,6 +232,23 @@ export class PostsController {
     @Body('action') action: 'schedule' | 'update' = 'schedule'
   ) {
     return this._postsService.changeDate(org.id, id, date, action);
+  }
+
+  @Post('/preflight')
+  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  async preflightCheck(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: CreatePostDto
+  ) {
+    return this._postsService.preflightCheck(org.id, body);
+  }
+
+  @Post('/bulk')
+  async bulkCreate(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: BulkCreatePostsDto,
+  ) {
+    return this._postsService.bulkCreate(org.id, body);
   }
 
   @Post('/separate-posts')

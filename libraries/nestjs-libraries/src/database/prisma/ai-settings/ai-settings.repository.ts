@@ -154,7 +154,7 @@ export class AiSettingsRepository {
 
   upsertBrandProfile(
     organizationId: string,
-    data: { instructions?: string; language?: string; enabled?: boolean },
+    data: { instructions?: string; language?: string; enabled?: boolean; platformInstructions?: Record<string, string> },
   ) {
     return this._aiBrandProfile.model.aIBrandProfile.upsert({
       where: { organizationId },

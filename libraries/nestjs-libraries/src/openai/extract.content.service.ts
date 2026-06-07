@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { JSDOM } from 'jsdom';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 function findDepth(element: Element) {
   let depth = 0;
@@ -15,7 +16,7 @@ function findDepth(element: Element) {
 @Injectable()
 export class ExtractContentService {
   async extractContent(url: string) {
-    const load = await (await fetch(url)).text();
+    const load = await (await safeFetch(url)).text();
     const dom = new JSDOM(load);
 
     // only element that has a title

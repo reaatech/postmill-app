@@ -2,24 +2,16 @@ import {
   ArgumentsHost,
   Catch,
   ExceptionFilter,
-  HttpException,
-  HttpStatus,
 } from '@nestjs/common';
+import { PostValidationException } from '@gitroom/nestjs-libraries/errors/post-validation.exception';
 
 export type PostValidationError = {
-  /** Provider identifier, e.g. "x", "linkedin-page". */
   provider: string;
-  /** Human readable provider name, e.g. "X", "LinkedIn Page". */
   name: string;
-  /** The readable validation error. */
   error: string;
 };
 
-export class PostValidationException extends HttpException {
-  constructor(message: PostValidationError) {
-    super(message, HttpStatus.BAD_REQUEST);
-  }
-}
+export { PostValidationException };
 
 @Catch(PostValidationException)
 export class PostValidationExceptionFilter implements ExceptionFilter {

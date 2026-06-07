@@ -456,29 +456,36 @@ export const LaunchesComponent = () => {
       },
     []
   );
+  const isSameOrigin = (opener: Window | null) =>
+    opener?.location?.origin === window.location.origin;
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
     if (search.get('msg')) {
       toast.show(search.get('msg')!, 'success');
-      window?.opener?.postMessage(
-        {
-          msg: search.get('msg')!,
-          success: false,
-        },
-        '*'
-      );
+      if (isSameOrigin(window.opener)) {
+        window.opener.postMessage(
+          {
+            msg: search.get('msg')!,
+            success: false,
+          },
+          window.location.origin
+        );
+      }
     }
     if (search.get('added')) {
       fireEvents('channel_added');
-      window?.opener?.postMessage(
-        {
-          msg: t('channel_added', 'Channel added'),
-          success: true,
-        },
-        '*'
-      );
+      if (isSameOrigin(window.opener)) {
+        window.opener.postMessage(
+          {
+            msg: t('channel_added', 'Channel added'),
+            success: true,
+          },
+          window.location.origin
+        );
+      }
     }
     if (window.opener) {
       window.close();

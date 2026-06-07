@@ -1,15 +1,10 @@
 import { readFileSync } from 'fs';
-import axios from 'axios';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export const readOrFetch = async (path: string) => {
   if (path.indexOf('http') === 0) {
-    return (
-      await axios({
-        url: path,
-        method: 'GET',
-        responseType: 'arraybuffer',
-      })
-    ).data;
+    const response = await safeFetch(path, { method: 'GET' });
+    return Buffer.from(await response.arrayBuffer());
   }
 
   return readFileSync(path);

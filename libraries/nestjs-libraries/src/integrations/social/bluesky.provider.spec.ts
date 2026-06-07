@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import EventEmitter from 'events';
 
 vi.mock('sharp', () => ({ default: vi.fn() }));
 vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
@@ -8,7 +9,7 @@ vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mo
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));
 vi.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: { fixedEncryption: vi.fn((s: string) => s), fixedDecryption: vi.fn((s: string) => s) } }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service', () => ({
-  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(() => ({})), upsert: vi.fn(), delete: vi.fn() })),
+  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(function() { return {}; }), upsert: vi.fn(), delete: vi.fn() })),
 }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository', () => ({
   ProviderConfigRepository: vi.fn(() => ({ getAll: vi.fn(), getByIdentifier: vi.fn(), upsert: vi.fn(), delete: vi.fn(), setEnabled: vi.fn() })),
@@ -20,12 +21,11 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
 vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
   getEnvOr: () => 'mock-value',
   setCredentials: vi.fn(),
-  getCredential: vi.fn(() => undefined),
+  getCredential: vi.fn(function() { return undefined; }),
   clearCredentials: vi.fn(),
   replaceCredentialsMap: vi.fn(),
 }));
 vi.mock('ws', () => {
-  const EventEmitter = require('events');
   return { default: class MockWebSocket extends EventEmitter { close = vi.fn(); } };
 });
 vi.mock('axios', () => ({ default: vi.fn() }));
@@ -65,26 +65,37 @@ const mockAgent = vi.hoisted(() => ({
   post: vi.fn().mockResolvedValue({ uri: 'at://did:plc:123/app.bsky.feed.post/reply-sent', cid: 'cid-sent' }),
   like: vi.fn().mockResolvedValue({}),
   deleteLike: vi.fn().mockResolvedValue({}),
+  uploadBlob: vi.fn().mockResolvedValue({ data: { blob: { ref: { $link: 'ref-123' }, mimeType: 'image/jpeg', size: 12345 } } }),
+  searchActors: vi.fn().mockResolvedValue({ data: { actors: [{ displayName: 'Test Actor', handle: 'testactor', avatar: 'https://ex.com/avatar.jpg' }] } }),
+  repost: vi.fn().mockResolvedValue({}),
   app: {
     bsky: {
       feed: {
         getLikes: vi.fn().mockResolvedValue({ data: { likes: [{ actor: { did: 'did:plc:my-did' }, uri: 'at://like/uri' }] } }),
       },
+      video: { getJobStatus: vi.fn().mockResolvedValue({ data: { jobStatus: { state: 'JOB_STATE_COMPLETED', blob: { ref: { $link: 'vid-ref' } } } } }) },
     },
   },
+  com: { atproto: { server: { getServiceAuth: vi.fn().mockResolvedValue({ data: { token: 'service-token' } }) } } },
   session: { did: 'did:plc:my-did', handle: 'testuser' },
   dispatchUrl: new URL('https://bsky.social'),
 }));
 
-const mockRichText = vi.hoisted(() => vi.fn(() => ({
-  detectFacets: vi.fn().mockResolvedValue(undefined),
-  text: 'Hello!',
-  facets: [],
-})));
+const mockRichText = vi.hoisted(() => vi.fn(function() {
+  return {
+    detectFacets: vi.fn().mockResolvedValue(undefined),
+    text: 'Hello!',
+    facets: [],
+  };
+}));
 
 vi.mock('@atproto/api', () => ({
-  BskyAgent: vi.fn(() => mockAgent),
+  BskyAgent: vi.fn(function() { return mockAgent; }),
+  AtpAgent: vi.fn(function() { return mockAgent; }),
   RichText: mockRichText,
+  AppBskyEmbedVideo: {},
+  AppBskyVideoDefs: {},
+  BlobRef: class {},
 }));
 
 vi.mock('mime', () => ({ default: { getType: vi.fn(() => 'image/jpeg') } }));

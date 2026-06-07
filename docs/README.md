@@ -4,7 +4,7 @@ Documentation for the **REAA-flavored fork** of [Postiz](https://github.com/gitr
 Postiz schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
 team management, a media library, and a pluggable AI layer.
 
-> **Docs version:** verified against **v3.4.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
+> **Docs version:** verified against **v3.5.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
 > change history.
 >
 > **This is a fork.** The upstream docs at `docs.postiz.com` describe the *original* project and
@@ -34,8 +34,10 @@ team management, a media library, and a pluggable AI layer.
 
 **…use the features**
 - [Calendar & Post Detail](./features/calendar-and-posts.md)
-- [Analytics](./features/analytics.md)
+- [Analytics](./features/analytics.md) · [Watchlist & competitor tracking](./features/watchlist.md)
 - [Social comments](./features/social-comments.md)
+- [Campaigns](./features/campaigns.md) · [Bulk scheduling / CSV import](./features/bulk-scheduling.md)
+- [Content QA preflight](./features/content-qa-preflight.md) · [Provider capabilities](./features/provider-capabilities.md)
 - [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md)
 
 **…understand the channels**
@@ -89,10 +91,15 @@ channels/
 
 features/
   calendar-and-posts.md    ✅ Calendar, scheduling, Post Detail modal
-  analytics.md             ✅ v2 dashboard, snapshots, export
-  social-comments.md       ✅ Synced comments, read state, reply
-  ai-features.md           ✅ Brand profiles, prompts, usage, search
-  ai-generation.md         ✅ Text/image gen, what works vs stubs
+  analytics.md             ✅ v2 dashboard, snapshots, export, best-time, recommendations
+  watchlist.md             ✅ Competitor/watchlist tracking
+  social-comments.md       ✅ Synced comments, cross-channel inbox, first comment
+  campaigns.md             ✅ Campaign folders for posts/analytics/comments
+  bulk-scheduling.md       ✅ Bulk CSV import / paste rows
+  content-qa-preflight.md  ✅ Pre-publish QA checks (warnings vs blockers)
+  provider-capabilities.md ✅ Provider capability matrix
+  ai-features.md           ✅ Brand profiles, prompts, hashtags, sentiment, compliance, brand memory
+  ai-generation.md         ✅ Text/image gen, brand voice, what works vs stubs
 
 api/
   overview.md              ✅ Surfaces, auth, rate limits

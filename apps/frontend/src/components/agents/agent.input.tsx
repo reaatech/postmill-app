@@ -1,8 +1,7 @@
 import React, { useMemo, useRef, useState } from 'react';
-import { useCopilotContext, useCopilotReadable } from '@copilotkit/react-core';
+import { useCopilotContext } from '@copilotkit/react-core';
 import AutoResizingTextarea from '@gitroom/frontend/components/agents/agent.textarea';
-import { useChatContext } from '@copilotkit/react-ui';
-import { InputProps } from '@copilotkit/react-ui/dist/components/chat/props';
+import { InputProps, useChatContext } from '@copilotkit/react-ui';
 const MAX_NEWLINES = 6;
 
 export const Input = ({
@@ -50,13 +49,15 @@ export const Input = ({
       : context.icons.sendIcon;
 
   const canSend = useMemo(() => {
-    const interruptEvent = copilotContext.langGraphInterruptAction?.event;
-    const interruptInProgress =
-      interruptEvent?.name === 'LangGraphInterruptEvent' &&
-      !interruptEvent?.response;
-
+    const interruptActions = Object.values(
+      copilotContext.interruptActions || {}
+    ) as Array<{ event?: { name?: string; response?: unknown } }>;
+    const interruptInProgress = interruptActions.some((action) => {
+      const event = action?.event;
+      return event?.name === 'LangGraphInterruptEvent' && !event?.response;
+    });
     return !isInProgress && text.trim().length > 0 && !interruptInProgress;
-  }, [copilotContext.langGraphInterruptAction?.event, isInProgress, text]);
+  }, [copilotContext.interruptActions, isInProgress, text]);
 
   const canStop = useMemo(() => {
     return isInProgress && !hideStopButton;

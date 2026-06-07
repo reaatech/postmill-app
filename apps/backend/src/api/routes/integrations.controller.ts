@@ -7,11 +7,14 @@ import {
   Post,
   Put,
   Query,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 import { Organization, User } from '@prisma/client';
 import { IntegrationFunctionDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.function.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
@@ -19,6 +22,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { SaveProviderPageDto } from '@gitroom/nestjs-libraries/dtos/integrations/provider-page.dto';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -45,11 +49,15 @@ export class IntegrationsController {
 
   @Post('/provider/:id/connect')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+  @UsePipes(new ValidationPipe({ whitelist: false }))
   async saveProviderPage(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: any
+    @Body() body: SaveProviderPageDto
   ) {
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      throw new Error('Invalid body');
+    }
     return this._integrationService.saveProviderPage(org.id, id, body);
   }
 
@@ -242,6 +250,9 @@ export class IntegrationsController {
       }
 
       if (redirectUrl) {
+        if (!isAllowedReturnUrl(redirectUrl)) {
+          throw new Error('Invalid redirect URL');
+        }
         await ioRedis.set(`redirect:${state}`, redirectUrl, 'EX', 3600);
       }
 

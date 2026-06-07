@@ -10,6 +10,7 @@ import {
   StreamableFile,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { RealIP } from 'nestjs-real-ip';
@@ -25,8 +26,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { Readable, pipeline } from 'stream';
 import { promisify } from 'util';
 import { OnlyURL } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 const pump = promisify(pipeline);
 
@@ -40,6 +40,7 @@ export class PublicController {
     private _subscriptionService: SubscriptionService
   ) {}
   @Post('/agent')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async createAgent(@Body() body: { text: string; apiKey: string }) {
     if (
       !body.apiKey ||
@@ -77,6 +78,7 @@ export class PublicController {
   }
 
   @Post('/t')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   async trackEvent(
     @Res() res: Response,
     @Req() req: Request,
@@ -129,6 +131,7 @@ export class PublicController {
   }
 
   @Post('/modify-subscription')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async modifySubscription(@Body('params') params: string) {
     try {
       const load = AuthService.verifyJWT(params) as {
@@ -171,46 +174,17 @@ export class PublicController {
     req.on('aborted', onClose);
     res.on('close', onClose);
 
-    // Manually follow redirects so every hop is re-validated against
-    // the SSRF blocklist (see GHSA-34w8-5j2v-h6ww). `fetch` defaults to
-    // `redirect: 'follow'`, which bypasses the DTO-level URL check.
-    const MAX_REDIRECTS = 5;
-    let currentUrl = url;
     let r: globalThis.Response | undefined;
-    for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
-      if (!(await isSafePublicHttpsUrl(currentUrl))) {
+    try {
+      r = await safeFetch(url, { signal: ac.signal });
+    } catch (err: any) {
+      if (err?.message === 'Blocked URL') {
         return res.status(400).send('Blocked URL');
       }
-
-      r = await fetch(currentUrl, {
-        signal: ac.signal,
-        redirect: 'manual',
-        // @ts-ignore — undici option, not in lib.dom fetch types
-        dispatcher: ssrfSafeDispatcher,
-      });
-
-      if (r.status >= 300 && r.status < 400) {
-        const location = r.headers.get('location');
-        if (!location) {
-          return res.status(502).send('Redirect without Location');
-        }
-        try {
-          currentUrl = new URL(location, currentUrl).toString();
-        } catch {
-          return res.status(400).send('Invalid redirect target');
-        }
-        continue;
+      if (err?.message === 'Too many redirects') {
+        return res.status(508).send('Too many redirects');
       }
-
-      break;
-    }
-
-    if (!r) {
-      return res.status(502).send('No upstream response');
-    }
-
-    if (r.status >= 300 && r.status < 400) {
-      return res.status(508).send('Too many redirects');
+      return res.status(502).send(err?.message || 'Upstream error');
     }
 
     if (!r.ok && r.status !== 206) {

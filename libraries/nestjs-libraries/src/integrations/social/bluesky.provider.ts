@@ -32,6 +32,7 @@ import axios from 'axios';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
@@ -79,7 +80,7 @@ async function uploadVideo(
   async function downloadVideo(
     url: string
   ): Promise<{ video: Buffer; size: number }> {
-    const response = await fetch(url);
+    const response = await safeFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch video: ${response.statusText}`);
     }
@@ -260,7 +261,7 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
         username: profile.data.handle || '',
       };
     } catch (e) {
-      console.log(e);
+      this.logger.warn('Bluesky authentication failed');
       return 'Invalid credentials';
     }
   }

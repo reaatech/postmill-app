@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIProviderRegistry } from './ai-provider.registry';
 import {
@@ -530,12 +531,25 @@ export class AIModelProvider {
     }, scope, orgId);
   }
 
-  private async _loadBrandVoice(orgId?: string): Promise<{ instructions: string; language: string }> {
+  private async _loadBrandVoice(
+    orgId?: string,
+    platform?: string,
+  ): Promise<{ instructions: string; language: string }> {
     if (!orgId) return { instructions: '', language: '' };
     const brand = await this._aiSettings.getBrandProfile(orgId);
     if (!brand?.enabled) return { instructions: '', language: '' };
+
+    let instructions = brand.instructions || '';
+
+    if (platform && brand.platformInstructions) {
+      const platformInstructions = brand.platformInstructions as Record<string, string>;
+      if (platformInstructions[platform]) {
+        instructions = platformInstructions[platform];
+      }
+    }
+
     return {
-      instructions: brand.instructions || '',
+      instructions,
       language: brand.language || '',
     };
   }
@@ -630,21 +644,67 @@ export class AIModelProvider {
     });
   }
 
-  async generateText(
+  private async _prepareGeneration(
     scope: AIScope,
     prompt: string,
-    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string },
-  ): Promise<string> {
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
+  ): Promise<{
+    checkedPrompt: string;
+    brand: { instructions: string; language: string };
+    effectiveSystem: string | undefined;
+  }> {
     const budgetCheck = await this._budget.checkBudget(scope, options?.orgId);
     if (!budgetCheck.allowed) {
       throw new BudgetExceeded(budgetCheck.reason || 'Budget exceeded', scope, options?.orgId);
     }
 
-    const brand = await this._loadBrandVoice(options?.orgId);
+    const brand = await this._loadBrandVoice(options?.orgId, options?.platform);
     const resolvedSystem = options?.promptKey
       ? await this._resolvePromptTemplate(options.promptKey, options?.orgId)
       : undefined;
     const effectiveSystem = resolvedSystem || options?.system;
+
+    const checkedPrompt = await this._guardrails.checkInput(prompt, { orgId: options?.orgId });
+
+    return { checkedPrompt, brand, effectiveSystem };
+  }
+
+  private _buildSystemPrompt(
+    effectiveSystem: string | undefined,
+    brand: { instructions: string; language: string },
+  ): string {
+    const parts: string[] = [];
+    if (effectiveSystem) parts.push(effectiveSystem);
+    if (brand.instructions) parts.push(brand.instructions);
+    if (brand.language) parts.push(`Respond in ${brand.language}.`);
+    return parts.join('\n\n');
+  }
+
+  private async _buildMessages(
+    config: ResolvedConfig,
+    checkedPrompt: string,
+    systemPrompt: string,
+  ): Promise<{ messages: any[]; truncatedPrompt: string; truncatedSystem: string }> {
+    const truncatedPrompt = this._enforceContextWindow(checkedPrompt, config.modelId);
+    const truncatedSystem = systemPrompt
+      ? this._enforceContextWindow(systemPrompt, config.modelId)
+      : '';
+
+    const messages: any[] = [];
+    if (truncatedSystem) {
+      messages.push({ role: 'system', content: [{ type: 'text', text: truncatedSystem }] });
+    }
+    messages.push({ role: 'user', content: [{ type: 'text', text: truncatedPrompt }] });
+
+    return { messages, truncatedPrompt, truncatedSystem };
+  }
+
+  async generateText(
+    scope: AIScope,
+    prompt: string,
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
+  ): Promise<string> {
+    const { checkedPrompt, brand, effectiveSystem } = await this._prepareGeneration(scope, prompt, options);
 
     // Semantic response cache (opt-in, off by default). Keyed per org + scope; the system
     // prompt and brand voice are folded into the cache key so different framing never collides.
@@ -656,40 +716,30 @@ export class AIModelProvider {
       }
     }
 
+    const systemPrompt = this._buildSystemPrompt(effectiveSystem, brand);
+
     const generated = await this._withFallback(
       async (config) => {
-        const checkedPrompt = await this._guardrails.checkInput(prompt, { orgId: options?.orgId });
-
         return this._telemetry.startSpan(
           'ai.generateText',
           async (span) => {
             span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, config.providerId);
             span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, config.modelId);
 
-            const systemParts: string[] = [];
-            if (effectiveSystem) systemParts.push(effectiveSystem);
-            if (brand.instructions) systemParts.push(brand.instructions);
-            if (brand.language) systemParts.push(`Respond in ${brand.language}.`);
-            const systemPrompt = systemParts.join('\n\n');
+            const { messages } = await this._buildMessages(config, checkedPrompt, systemPrompt);
+
+            Sentry.addBreadcrumb({
+              category: 'ai',
+              message: `AI generateText (${config.providerId}/${config.modelId})`,
+              level: 'info',
+              data: { scope, providerId: config.providerId, modelId: config.modelId },
+            });
 
             const model = config.adapter.createLanguageModel(config.creds, config.modelId, {
               temperature: config.defaultSurface?.temperature,
             });
 
-            const truncatedPrompt = this._enforceContextWindow(checkedPrompt, config.modelId);
-            const truncatedSystem = systemPrompt
-              ? this._enforceContextWindow(systemPrompt, config.modelId)
-              : '';
-
-            const messages: any[] = [];
-            if (truncatedSystem) {
-              messages.push({ role: 'system', content: [{ type: 'text', text: truncatedSystem }] });
-            }
-            messages.push({ role: 'user', content: [{ type: 'text', text: truncatedPrompt }] });
-
-            const result = await (model as any).doGenerate({
-              prompt: messages,
-            });
+            const result = await (model as any).doGenerate({ prompt: messages });
 
             const outputText = this._extractText(result);
             const checkedOutput = await this._guardrails.checkOutput(outputText, { orgId: options?.orgId });
@@ -739,56 +789,44 @@ export class AIModelProvider {
     scope: AIScope,
     prompt: string,
     _schema: any,
-    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string },
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
   ): Promise<T> {
-    const budgetCheck = await this._budget.checkBudget(scope, options?.orgId);
-    if (!budgetCheck.allowed) {
-      throw new BudgetExceeded(budgetCheck.reason || 'Budget exceeded', scope, options?.orgId);
-    }
-
-    const brand = await this._loadBrandVoice(options?.orgId);
-    const resolvedSystem = options?.promptKey
-      ? await this._resolvePromptTemplate(options.promptKey, options?.orgId)
-      : undefined;
-    const effectiveSystem = resolvedSystem || options?.system;
+    const { checkedPrompt, brand, effectiveSystem } = await this._prepareGeneration(scope, prompt, options);
+    const systemPrompt = this._buildSystemPrompt(effectiveSystem, brand);
 
     return this._withFallback(
       async (config) => {
-        const checkedPrompt = await this._guardrails.checkInput(prompt, { orgId: options?.orgId });
-
         return this._telemetry.startSpan(
           'ai.generateObject',
           async (span) => {
             span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, config.providerId);
             span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, config.modelId);
 
-            const systemParts: string[] = [];
-            if (effectiveSystem) systemParts.push(effectiveSystem);
-            if (brand.instructions) systemParts.push(brand.instructions);
-            if (brand.language) systemParts.push(`Respond in ${brand.language}.`);
-            const systemPrompt = systemParts.join('\n\n');
+            const { messages } = await this._buildMessages(config, checkedPrompt, systemPrompt);
+
+            const structuredSystem = [
+              messages.find((m: any) => m.role === 'system')?.content?.[0]?.text || '',
+              'Return only valid JSON that matches the requested schema. Do not include markdown, prose, or code fences.',
+            ].filter(Boolean).join('\n\n');
+
+            const finalMessages: any[] = [
+              { role: 'system', content: [{ type: 'text', text: structuredSystem }] },
+              { role: 'user', content: messages.find((m: any) => m.role === 'user')?.content || [] },
+            ];
+
+            Sentry.addBreadcrumb({
+              category: 'ai',
+              message: `AI generateObject (${config.providerId}/${config.modelId})`,
+              level: 'info',
+              data: { scope, providerId: config.providerId, modelId: config.modelId },
+            });
 
             const model = config.adapter.createLanguageModel(config.creds, config.modelId, {
               temperature: config.defaultSurface?.temperature,
             });
 
-            const truncatedPrompt = this._enforceContextWindow(checkedPrompt, config.modelId);
-            const truncatedSystem = systemPrompt
-              ? this._enforceContextWindow(systemPrompt, config.modelId)
-              : '';
-
-            const structuredSystem = [
-              truncatedSystem,
-              'Return only valid JSON that matches the requested schema. Do not include markdown, prose, or code fences.',
-            ].filter(Boolean).join('\n\n');
-
-            const messages: any[] = [
-              { role: 'system', content: [{ type: 'text', text: structuredSystem }] },
-              { role: 'user', content: [{ type: 'text', text: truncatedPrompt }] },
-            ];
-
             const result = await (model as any).doGenerate({
-              prompt: messages,
+              prompt: finalMessages,
               responseFormat: { type: 'json' },
             });
 

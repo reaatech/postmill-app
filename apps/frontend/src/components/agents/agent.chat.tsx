@@ -8,11 +8,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
-import { CopilotChat, CopilotKitCSSProperties } from '@copilotkit/react-ui';
-import {
-  InputProps,
-  UserMessageProps,
-} from '@copilotkit/react-ui/dist/components/chat/props';
+import { CopilotChat, CopilotKitCSSProperties, InputProps, UserMessageProps } from '@copilotkit/react-ui';
 import { Input } from '@gitroom/frontend/components/agents/agent.input';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import {
@@ -34,6 +30,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 
 export const AgentChat: FC = () => {
   const { backendUrl } = useVariables();
@@ -118,27 +115,29 @@ const LoadMessages: FC<{ id: string }> = ({ id }) => {
 
 const Message: FC<UserMessageProps> = (props) => {
   const convertContentToImagesAndVideo = useMemo(() => {
-    return (props.message?.content || '')
-      .replace(/Video: (http.*mp4\n)/g, (match, p1) => {
+    const rawContent = props.message?.content;
+    const contentStr = typeof rawContent === 'string' ? rawContent : '';
+    return contentStr
+      .replace(/Video: (http.*mp4\n)/g, (match: string, p1: string) => {
         return `<video controls class="h-[150px] w-[150px] rounded-[8px] mb-[10px]"><source src="${p1.trim()}" type="video/mp4">Your browser does not support the video tag.</video>`;
       })
-      .replace(/Image: (http.*\n)/g, (match, p1) => {
+      .replace(/Image: (http.*\n)/g, (match: string, p1: string) => {
         return `<img src="${p1.trim()}" class="h-[150px] w-[150px] max-w-full border border-newBgColorInner" />`;
       })
-      .replace(/\[\-\-Media\-\-\](.*)\[\-\-Media\-\-\]/g, (match, p1) => {
+      .replace(/\[\-\-Media\-\-\](.*)\[\-\-Media\-\-\]/g, (match: string, p1: string) => {
         return `<div class="flex justify-center mt-[20px]">${p1}</div>`;
       })
       .replace(
         /(\[--integrations--\][\s\S]*?\[--integrations--\])/g,
-        (match, p1) => {
+        (match: string, p1: string) => {
           return ``;
         }
       );
   }, [props.message?.content]);
   return (
-    <div
+    <SafeContent
       className="copilotKitMessage copilotKitUserMessage min-w-[300px]"
-      dangerouslySetInnerHTML={{ __html: convertContentToImagesAndVideo }}
+      content={convertContentToImagesAndVideo}
     />
   );
 };
@@ -156,7 +155,7 @@ const NewInput: FC<InputProps> = (props) => {
       <Input
         {...props}
         onChange={setValue}
-        onSend={(text) => {
+        onSend={(text: string) => {
           const send = props.onSend(
             text +
               (media.length > 0

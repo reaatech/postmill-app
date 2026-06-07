@@ -7,7 +7,7 @@ vi.mock('@ai-sdk/xai', () => ({
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { XaiAdapter } from './xai.adapter';

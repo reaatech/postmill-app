@@ -112,6 +112,7 @@ export type PostDetails<T = any> = {
   settings: T;
   media?: MediaContent[];
   poll?: PollDetails;
+  firstComment?: string;
 };
 
 export type PollDetails = {

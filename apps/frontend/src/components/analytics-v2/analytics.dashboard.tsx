@@ -14,6 +14,11 @@ import { DrillBreadcrumb } from './drill/drill.breadcrumb';
 import { DrillState } from './utils';
 import { usePosts } from './hooks/usePosts';
 import { ErrorBoundary } from './error.boundary';
+import { ExportButton } from './export.button';
+import { BestTimeTab } from './views/best-time.tab';
+import { RecommendationsTab } from './views/recommendations.tab';
+import { WatchlistTab } from './views/watchlist.tab';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 function getDefaultFrom(): string {
   return dayjs().subtract(30, 'day').format('YYYY-MM-DD');
@@ -24,6 +29,7 @@ function getDefaultTo(): string {
 }
 
 export const AnalyticsDashboard: FC = () => {
+  const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -214,6 +220,14 @@ export const AnalyticsDashboard: FC = () => {
     focusPost,
     tab,
   };
+  const tabLabels: Record<string, string> = {
+    overview: t('analytics_tab_overview', 'Overview'),
+    channels: t('analytics_tab_channels', 'Channels'),
+    posts: t('analytics_tab_posts', 'Posts'),
+    'best-time': t('analytics_tab_best_time', 'Best time'),
+    recommendations: t('analytics_tab_recommendations', 'Recommendations'),
+    watchlist: t('analytics_tab_watchlist', 'Watchlist'),
+  };
 
   return (
     <ErrorBoundary>
@@ -233,6 +247,12 @@ export const AnalyticsDashboard: FC = () => {
             selected={selected}
             onChange={handleChannelChange}
           />
+          <ExportButton
+            from={from}
+            to={to}
+            integrations={activeIntegrations}
+            compare={compare}
+          />
         </div>
 
         <div className="flex-1 overflow-y-auto px-[24px] py-[16px]">
@@ -245,17 +265,18 @@ export const AnalyticsDashboard: FC = () => {
           />
 
           <div className="flex gap-[8px] mb-[16px]">
-            {(['overview', 'channels', 'posts'] as const).map((t) => (
+            {(['overview', 'channels', 'posts', 'best-time', 'recommendations', 'watchlist'] as const).map((tabName) => (
               <button
-                key={t}
-                onClick={() => handleTabChange(t)}
+                key={tabName}
+                onClick={() => handleTabChange(tabName)}
                 className={`px-[14px] py-[6px] text-[13px] font-medium rounded-[8px] transition-colors capitalize ${
-                  tab === t
+                  tab === tabName
                     ? 'bg-forth text-white'
                     : 'text-newTableText hover:text-btnText'
                 }`}
+                aria-pressed={tab === tabName}
               >
-                {t}
+                {tabLabels[tabName]}
               </button>
             ))}
           </div>
@@ -283,8 +304,22 @@ export const AnalyticsDashboard: FC = () => {
               loading={overviewLoading}
               error={overviewError}
               focusIntegration={focusIntegration}
+              from={from}
+              to={to}
+              compare={compare}
+              integrations={activeIntegrations}
+              channels={channels}
               onSelectChannel={handleSelectChannel}
             />
+          )}
+          {tab === 'best-time' && (
+            <BestTimeTab integrations={activeIntegrations} />
+          )}
+          {tab === 'recommendations' && (
+            <RecommendationsTab />
+          )}
+          {tab === 'watchlist' && (
+            <WatchlistTab />
           )}
           {tab === 'posts' && (
             <PostsTab

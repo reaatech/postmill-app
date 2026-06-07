@@ -3,7 +3,7 @@
 How to add a new channel. The three fork-added providers (Tumblr, Pixelfed, PeerTube) are good
 reference implementations.
 
-> **Verified against v3.4.0.** Providers live in
+> **Verified against v3.5.0.** Providers live in
 > `libraries/nestjs-libraries/src/integrations/social/`.
 
 ---
@@ -24,11 +24,29 @@ plain-text editor — Tumblr uses `'normal'` because NPF renders plain text, not
 
 ### Optional capabilities
 
+- **Capability matrix (v3.5.0)** — register the provider's supported features in
+  `PROVIDER_CAPABILITIES` (`integrations/social/provider-capabilities.ts`). This matrix
+  (served at `/provider-capabilities`) is what gates the comment, first-comment, and poll UIs, so a
+  capability the matrix doesn't advertise won't render even if the method exists.
 - **Comments** — implement `ISocialMediaComments` (`commentsCapabilities` + `fetchComments` /
   `replyToComment` / `likeComment`) to participate in comment sync. See
   [Comments support](../channels/comments.md).
+- **First comment** — if the platform's `comment()` supports posting after publish, advertise
+  `firstComment` in the capability matrix; the post workflow auto-posts `settings.firstComment` as a
+  non-fatal, idempotent step.
+- **Polls** — if the platform supports polls, implement poll creation in `post()` (driven by
+  `settings.poll`) and advertise `poll` in the capability matrix. Poll validation happens before
+  publish (a poll is part of the post payload, not a follow-up step).
 - **Analytics** — implement the analytics hooks so the provider feeds snapshots, and add its metric
   labels to the metric map in `integrations/social/analytics.metrics.ts`.
+
+### Outbound fetch & SSRF (v3.5.0)
+
+Any outbound HTTP from a provider that targets a user-influenced URL (instance URLs, media
+download/upload URLs, parsed auth params) **must** be SSRF-safe. Use the base class `this.fetch()`
+(which defaults to the `ssrfSafeDispatcher`) or the `safeFetch` helper directly — never a bare
+`fetch(userUrl)`. This blocks DNS-rebinding and redirect-to-internal attacks
+(e.g. `169.254.169.254` cloud metadata). See [Architecture](./architecture.md).
 
 ## 2. Register it
 

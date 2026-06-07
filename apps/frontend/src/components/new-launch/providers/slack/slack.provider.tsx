@@ -8,11 +8,13 @@ import { FC } from 'react';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { SlackChannelSelect } from '@gitroom/frontend/components/new-launch/providers/slack/slack.channel.select';
 import { SlackDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/slack.dto';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const SlackComponent: FC = () => {
   const form = useSettings();
   return (
     <div>
       <SlackChannelSelect {...form.register('channel')} />
+      <FirstCommentField />
     </div>
   );
 };

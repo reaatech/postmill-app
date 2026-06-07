@@ -5,9 +5,15 @@ import {
   withProvider,
 } from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
 import { ThreadFinisher } from '@gitroom/frontend/components/new-launch/finisher/thread.finisher';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const SettingsComponent = () => {
-  return <ThreadFinisher />;
+  return (
+    <>
+      <ThreadFinisher />
+      <FirstCommentField />
+    </>
+  );
 };
 
 export default withProvider({

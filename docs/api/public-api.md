@@ -2,7 +2,7 @@
 
 The stable, API-key-authenticated surface for automation. Base path: **`/public/v1`**.
 
-> **Verified against v3.4.0.** Endpoints below are taken from the v1 public integrations controller.
+> **Verified against v3.5.0.** Endpoints below are taken from the v1 public integrations controller.
 
 ---
 
@@ -72,3 +72,81 @@ is `API_LIMIT` (default `30`) — see [Configuration](../self-hosting/configurat
 ## Automation tools
 
 n8n, Make, and the Node SDK call this surface. See [Automation](./automation.md).
+
+---
+
+## Internal app API additions (v3.5.0)
+
+The following endpoints live on the **internal app API** (session/JWT, base path `/`), not on
+`/public/v1`. They back the frontend and are documented here for completeness; they are not a stable
+public contract (see [Overview](./overview.md)). The full set is in [`openapi.yml`](../../openapi.yml).
+
+### AI utilities (`AiUserController`)
+
+All new AI endpoints carry an explicit `@Throttle` (rate cap on top of budget governance) and require
+the `Create`/`Read` policy on the `AI` section.
+
+| Method | Path | Purpose | Throttle |
+|--------|------|---------|----------|
+| `POST` | `/ai/hashtags` | Platform-aware hashtag generation (`{ content, platform }`). | 30/min |
+| `POST` | `/ai/comment-reply` | Draft a reply, **or** `action: 'sentiment' \| 'summary'` over a comment thread (`{ commentId, postContent, action? }`). | 30/min |
+| `POST` | `/ai/best-time` | LLM best-time-to-post suggestion (`{ suggestion, hasAnalyticsData }`). | 30/min |
+| `POST` | `/ai/compliance` | Content compliance / brand-safety check (`{ content, platform? }` → `{ passed, violations[], suggestions[] }`). | 30/min |
+| `POST` | `/ai/brand-memory/index` | Index top-performing posts into RAG brand memory. | 10/min |
+| `POST` | `/ai/brand-memory/search` | Search brand memory (`{ prompt }` → `{ hits }`). | 20/min |
+
+(`/ai/repurpose`, `/ai/translate`, `/ai/variants`, `/ai/usage`, `/ai/media`, `/ai/search`, and the
+brand-profile / prompt-template / prompt-library routes pre-date v3.5.0.)
+
+### Posts (`PostsController`)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `POST` | `/posts/preflight` | Content QA preflight — returns warnings + blocking validation without creating the post. |
+| `POST` | `/posts/bulk` | Bulk/CSV scheduling — per-row success/warnings/errors, validated via the shared post-creation logic. |
+
+### Social comment inbox (`SocialCommentsController`)
+
+Cross-channel inbox over the existing `SocialComment` / `PostCommentRead` data (policy: `COMMUNITY_FEATURES`).
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/posts/inbox` | Unified inbox (`status`, `assigneeId`, `cursor`, `unreadOnly` query params). |
+| `GET` | `/posts/inbox/unread-count` | Org-wide unread count for the user. |
+| `POST` | `/posts/inbox/bulk-read` | Bulk mark-read (`{ commentIds[] }`). |
+
+(Per-post comment threads, replies, likes, read-state, status, and assignment remain under
+`/posts/:id/social-comments*`.)
+
+### Campaigns (`CampaignsController`)
+
+Campaign folders grouping posts/assets/analytics/comments. `Post.campaignId` links a post to a campaign.
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/campaigns` | List campaigns. |
+| `GET` | `/campaigns/:id` | Get a campaign. |
+| `POST` | `/campaigns` | Create (`{ name, color?, description?, startDate?, endDate? }`). |
+| `PUT` | `/campaigns/:id` | Update (adds `archived?`). |
+| `DELETE` | `/campaigns/:id` | Soft-delete. |
+
+### Provider capabilities (`ProviderCapabilitiesController`)
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/provider-capabilities` | The capability matrix (comments / first-comment / poll / analytics per provider). |
+| `GET` | `/admin/provider-capabilities` | Same matrix, super-admin gated. |
+
+### Webhook event types (v3.5.0)
+
+The webhook dispatcher (`webhooks.service.ts`, `SUPPORTED_EVENT_TYPES`) now emits, in addition to
+`post.published`:
+
+| Event | Emitted when |
+|-------|--------------|
+| `comment.new` | A new synced social comment arrives. |
+| `comment.reply` | A reply is posted to a comment. |
+| `analytics.snapshot_complete` | An analytics snapshot sweep completes. |
+
+All webhook dispatch goes through the SSRF-safe `safeFetch` helper (validate + manual redirect
+re-validation). See [Architecture](../developers/architecture.md).

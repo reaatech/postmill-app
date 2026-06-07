@@ -1,8 +1,10 @@
 import { Body, Controller, Param, Post, Res } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
@@ -18,6 +20,7 @@ export class EnterpriseController {
   ) {}
 
   @Post('/create-user')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async createUser(@Body('params') params: string) {
     try {
       const { id, name, saasName, email } = AuthService.verifyJWT(params) as {
@@ -43,6 +46,7 @@ export class EnterpriseController {
   }
 
   @Post('/url')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async redirectParams(@Body('params') params: string) {
     try {
       const load = AuthService.verifyJWT(params) as {
@@ -83,6 +87,9 @@ export class EnterpriseController {
       }
 
       await ioRedis.set(`webhookUrl:${state}`, load.webhookUrl, 'EX', 3600);
+      if (!isAllowedReturnUrl(load.redirectUrl)) {
+        throw new Error('Invalid redirect URL');
+      }
       await ioRedis.set(`redirect:${state}`, load.redirectUrl, 'EX', 3600);
       await ioRedis.set(`organization:${state}`, org.id, 'EX', 3600);
       await ioRedis.set(`login:${state}`, codeVerifier, 'EX', 3600);
@@ -92,6 +99,7 @@ export class EnterpriseController {
   }
 
   @Post('/delete-channel')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   async deleteChannel(@Body('params') params: string) {
     try {
       const load = AuthService.verifyJWT(params) as {

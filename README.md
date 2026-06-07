@@ -23,32 +23,35 @@ REAA Flavor
 
 This repository is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) with the following changes:
 
+**[v3.5.0]**
+- **Analytics that tell you what to do next** — See how every channel trends over time, spot your best times to post at a glance, and get a prioritized list of actions to grow faster — and keep an eye on the competitors that matter to you.
+- **AI that does the busy work** — Generate on-brand hashtags, instantly read the mood of your comments, catch compliance problems before you publish, and write new posts in the voice of your best-performing content.
+- **Engage everywhere from one inbox** — Auto-post a first comment for extra reach, run native polls on X and LinkedIn, and reply to comments across all your channels from a single place — now covering even more platforms.
+- **Plan campaigns, not just posts** — Group posts, media, and analytics by campaign, and schedule weeks of content in one move by importing a spreadsheet — with a pre-publish check that flags issues before they go live.
+- **Faster, safer, more dependable** — Your accounts and data are protected by end-to-end encryption and hardened against common web attacks, on a snappier platform that's been re-architected for reliability.
+
 **[v3.4.0]**
-- **AI provider adapter system** — 12 distinct adapters plus a generic `OpenAICompatibleAdapter` for 14 hub providers. Admin selects provider+model via a new `/admin/ai-settings` UI; keys encrypted in the database. All four AI surfaces (utility `OpenaiService`, `/agents` LangGraph generator, Mastra chat agent, and CopilotKit composer assistant) resolve from the `AIModelProvider` facade with `(scope, orgId?)` resolution and env `OPENAI_API_KEY` fallback for backward compatibility.
-- **Governance** — Input/output guardrails (prompt-injection, PII, brand safety, NSFW), budget engine with per-scope caps, budget-threshold alerts, and credit reconciliation, OpenTelemetry GenAI spans with provider health tracking, plus provider failover readiness.
-- **Rate limiting + idempotency** — Hardened across agent and MCP routes using Redis-backed idempotency and runtime-configurable throttling.
-- **MCP auth hardening** — All 5 MCP entrypoints hardened with scope enforcement (`mcp:read`, `mcp:posts:write`, `mcp:admin`), rate limiting, and idempotency using `@reaatech` auth packages.
-- **Media pipeline** — Working image generation via the facade; video generation, TTS, STT, upscale, and inpaint all stubbed for Phase 5.
-- **RAG / brand memory** — `RagService`, `HybridRag`, `AIBrandProfile`, and `AIContentIndex` foundation for retrieval-augmented generation (Phase 5 scaffold).
-- **End-user features** — Brand profile editor, prompt templates, shared prompt library, usage dashboard, comment-reply generator, and semantic search.
-- **Admin AI tools** — Dry-run guardrail preview, AI-settings audit trail, provider health badges, and BYOK-ready facade.
+- **Use any AI provider you want** — You're no longer locked to a single vendor. Choose from 26 providers — 12 first-class (OpenAI, Anthropic, Azure OpenAI, Google, Vertex, Amazon Bedrock, Mistral, Cohere, Groq, xAI Grok, OpenRouter, Vercel AI Gateway) plus hubs like DeepSeek, Together AI, Fireworks, and Perplexity — pick the exact model from an admin screen, test the connection, and watch live health badges. Your existing `OPENAI_API_KEY` keeps working byte-for-byte if you change nothing.
+- **Stay in control of cost and safety** — Set monthly and daily spend caps per org or per use case, get an alert at 80% before you hit the limit, and review every request in a full spend log. Built-in guardrails screen input and output for prompt-injection, sensitive data (PII), brand safety, and NSFW content, with your choice of block, redact, or warn — and a dry-run preview to test a rule before it goes live.
+- **AI that actually sounds like you** — Reusable brand-voice profiles, a prompt-template builder, a shared team prompt library, semantic search across your own content, smart comment replies, and a usage dashboard — so the AI writes in your voice, not a generic one.
+- **One engine behind everything, bring your own keys** — The composer, the agent generator, the chat assistant, and the agent/automation API all run through a single AI provider layer, so switching providers applies everywhere without a redeploy. Teams and self-hosters can plug in their own per-organization keys, and every agent entry point is locked down with scopes, rate limits, and budget checks.
 
 **[v3.3.0]**
-- **Calendar & post-detail upgrade** — Card body opens new Post Detail modal (KPI header, thread view); settings/edit icon on card hover strip; scheduled/published state pill; card stats footer from `PostAnalyticsSnapshot`.
-- **Social comments foundation** — `ISocialMediaComments` provider interface, `SocialComment`/`PostCommentRead` models, comments Controller/Service/Repository, and Temporal `CommentsActivity` + `commentsCollectionWorkflow`.
+- **A calendar that shows performance** — Click any post to open a full detail view: key metrics across the top, the entire post thread in one place, a scheduled-vs-published status pill, and real view/like/comment counts right on each card — plus a dedicated settings control to jump straight into editing.
+- **Conversations on your posts** — A new comment-sync foundation keeps the replies on what you publish up to date on a recurring background schedule, tracks what each teammate has already read, and surfaces it all in the app — so you can stay on top of your audience without bouncing between platforms.
 
 **[v3.2.0]**
-- **Three extra social providers** — Adds **Tumblr** (global OAuth2, NPF posts with image/video), **Pixelfed** (instance URL + access token, Mastodon-compatible, images + comments), and **PeerTube** (instance URL + login, single-video uploads + comments), bringing the channel count to **36**. No database migration required.
+- **Three more places to reach your audience** — Publish to **Tumblr**, **Pixelfed**, and **PeerTube**, taking Postiz to **36** connected channels. Tumblr posts native rich media (images and video) with automatic token refresh; Pixelfed and PeerTube add comment support — all managed from the same dashboard with no extra database setup.
+- **Correct, not just connected** — The new providers shipped with proper formatting (plain-text rendering fixed so posts never leak raw HTML tags) and media-only posting handled correctly, backed by a 64-case provider test suite.
 
 **[v3.1.0]**
-- **Persisted analytics dashboard** — Replaced the legacy single-channel live-fetch analytics with a persisted multi-channel dashboard. Stores daily metric snapshots (AnalyticsSnapshot, PostAnalyticsSnapshot) collected via a Temporal workflow (requires `RUN_CRON=true` on one orchestrator instance), serves real period-over-period comparisons through `/analytics/v2`, and renders a drill-down UI with date range picker, channel multi-select, KPI cards, line/bar/area/pie charts, and CSV/JSON export. Daily snapshots roll up to weekly after ~18 months and per-post snapshots prune after 90 days (both windows env-configurable).
+- **Real analytics across all your channels** — A persisted, multi-channel dashboard that replaces the old one-channel-at-a-time live view. Track genuine period-over-period trends, drill into any channel, metric, or date range with rich charts, and export everything to CSV or JSON — so you can see what's actually working and act on it.
+- **Built to stay accurate over time** — Metrics are snapshotted daily in the background, normalized into a consistent set across providers, and automatically rolled up into long-term weekly history with configurable retention — so collisions between similar platform metrics are eliminated, the numbers stay correct, and the database stays bounded as history grows.
 
 **[v3.0.0+]**
-- **Database-backed provider config** — Channel OAuth/API credentials managed via an admin UI (`/admin/channels`) instead of environment variables, encrypted at rest. Includes a one-time `scripts/migrate-channel-config.ts` to import existing env-var credentials into the database.
-- **Admin UI for channels** — Super-admins can enable/disable providers, set credentials, and add per-provider setup instructions. Disabling a provider only blocks new connections — already-connected channels keep posting, refreshing tokens, and reporting analytics.
-- **Enhanced test suite** — 1000+ Vitest tests across all providers, core services, analytics, and frontend components with 93%+ statement/function/line coverage.
-- **Maintenance & fixes** — Fixes across 36 providers (lazy initialization, credential keys, null safety), frontend hook dependency arrays, and the migration script; plus a safe same-major dependency refresh (React, Next, NestJS, Temporal, TipTap, Sentry, and more).
-- **Prebuilt image** — Published to `ghcr.io/reaatech/postiz-app`.
+- **Manage every channel from one screen** — Set up and control all your social connections from an admin UI instead of editing environment variables, with credentials encrypted at rest. Turn a provider off and your already-connected accounts keep posting, refreshing, and reporting — only new connections are paused. With no database config, everything falls back to environment variables exactly as before.
+- **Dozens of provider fixes for dependable publishing** — A broad hardening pass across all 33 providers fixed real-world publishing bugs (Pinterest and Dribbble token refresh, Bluesky auto-repost thresholds, Telegram bot tokens) and removed unsafe assumptions and import-time side effects — so scheduled posts and token refreshes behave predictably.
+- **A foundation you can trust** — Backed by 1000+ automated tests, a ready-to-run prebuilt image, and a stack migrated to the modern Temporal-based job model with a verified zero-data-loss upgrade path — so self-hosting is stable, predictable, and quick to deploy.
 
 See [github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app) for the full changelog and source.
 

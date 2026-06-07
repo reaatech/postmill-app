@@ -6,8 +6,12 @@ const ReturnUrlComponent: FC = () => {
   const params = useSearchParams();
   const url = params.get('returnUrl');
   useEffect(() => {
-    if (url?.indexOf?.('http')! > -1) {
-      localStorage.setItem('returnUrl', url!);
+    try {
+      const parsed = new URL(url!);
+      if (parsed.origin === window.location.origin) {
+        localStorage.setItem('returnUrl', url!);
+      }
+    } catch {
     }
   }, [url]);
   return null;

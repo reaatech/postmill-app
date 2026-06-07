@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 const useFaqList = () => {
   const { isGeneral } = useVariables();
   const user = useUser();
@@ -114,14 +115,12 @@ export const FAQSection: FC<{
           !show ? 'max-h-[0]' : 'max-h-[500px]'
         )}
       >
-        <div
-          onClick={(e) => {
+        <SafeContent
+          onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
           }}
-          className={`mt-[16px] w-full text-wrap font-[400] text-[16px] text-customColor17 select-text max-w-[450px]`}
-          dangerouslySetInnerHTML={{
-            __html: description,
-          }}
+          className="mt-[16px] w-full text-wrap font-[400] text-[16px] text-customColor17 select-text max-w-[450px]"
+          content={description}
         />
       </div>
     </div>

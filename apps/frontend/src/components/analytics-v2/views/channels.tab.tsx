@@ -1,13 +1,20 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, useMemo } from 'react';
 import { OverviewResponse } from '../utils';
+import { useChannelDetail } from '../hooks/useChannelDetail';
+import { ChannelDetailPanel } from '../drill/channel.detail.panel';
 
 interface ChannelsTabProps {
   data?: OverviewResponse;
   loading: boolean;
   error?: Error;
   focusIntegration?: string;
+  from: string;
+  to: string;
+  compare: boolean;
+  integrations: string[];
+  channels: { integrationId: string; name: string; identifier: string; picture: string }[];
   onSelectChannel: (integrationId: string) => void;
 }
 
@@ -16,8 +23,26 @@ export const ChannelsTab: FC<ChannelsTabProps> = ({
   loading,
   error,
   focusIntegration,
+  from,
+  to,
+  compare,
+  integrations,
+  channels,
   onSelectChannel,
 }) => {
+  const { data: channelDetail } = useChannelDetail({
+    integrationId: focusIntegration || '',
+    from,
+    to,
+    compare,
+  });
+
+  const focusedChannel = useMemo(() => {
+    if (!focusIntegration) return undefined;
+    return channels.find(
+      (c) => c.integrationId === focusIntegration
+    );
+  }, [focusIntegration, channels]);
   if (loading) {
     return (
       <div className="space-y-[12px] animate-pulse">
@@ -91,6 +116,16 @@ export const ChannelsTab: FC<ChannelsTabProps> = ({
           </div>
         );
       })}
+
+      <ChannelDetailPanel
+        channel={focusedChannel || { integrationId: '', name: '', identifier: '', picture: '' }}
+        data={channelDetail}
+        open={!!focusIntegration && !!focusedChannel}
+        onClose={() => onSelectChannel('')}
+        from={from}
+        to={to}
+        compare={compare}
+      />
     </div>
   );
 };

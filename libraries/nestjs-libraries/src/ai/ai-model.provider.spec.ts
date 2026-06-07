@@ -88,6 +88,7 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-settings.manager', () => ({
 vi.mock('@gitroom/nestjs-libraries/ai/governance/telemetry.service', () => ({
   TelemetryService: class MockTelemetry {
     configure = vi.fn();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
     startSpan = vi.fn().mockImplementation((_name: string, fn: Function, _attrs?: any) => fn({ end: vi.fn(), setStatus: vi.fn(), setAttribute: vi.fn() }));
     static ATTR_GEN_AI_SYSTEM = 'gen_ai.system';
     static ATTR_GEN_AI_REQUEST_MODEL = 'gen_ai.request.model';

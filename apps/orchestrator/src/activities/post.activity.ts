@@ -10,6 +10,7 @@ import {
   NotificationType,
 } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { Integration, Post, State } from '@prisma/client';
+import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { AuthTokenDetails } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
@@ -17,6 +18,8 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { timer } from '@gitroom/helpers/utils/timer';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { TypedSearchAttributes } from '@temporalio/common';
 import {
   organizationId,
@@ -74,9 +77,10 @@ export class PostActivity {
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
+      const workflowName = this.getPostWorkflowName(post);
       await this._temporalService.client
         .getRawClient()
-        .workflow.signalWithStart('postWorkflowV105', {
+        .workflow.signalWithStart(workflowName, {
           workflowId: `post_${post.id}`,
           taskQueue: 'main',
           signal: 'poke',
@@ -161,6 +165,23 @@ export class PostActivity {
   }
 
   @ActivityMethod()
+  async supportsFirstComment(integration: Integration) {
+    const capabilities =
+      PROVIDER_CAPABILITIES[
+        integration.providerIdentifier as keyof typeof PROVIDER_CAPABILITIES
+      ];
+    if (!capabilities?.firstComment) {
+      return false;
+    }
+
+    const getIntegration = await this._integrationManager.getSocialIntegration(
+      integration.providerIdentifier
+    );
+
+    return !!getIntegration.comment;
+  }
+
+  @ActivityMethod()
   async postComment(
     postId: string,
     lastPostId: string | undefined,
@@ -200,6 +221,40 @@ export class PostActivity {
           ),
         }))
       ),
+      integration
+    );
+  }
+
+  @ActivityMethod()
+  async postFirstComment(
+    postId: string,
+    integration: Integration,
+    firstComment: string,
+  ) {
+    const getIntegration = await this._integrationManager.getSocialIntegration(
+      integration.providerIdentifier
+    );
+
+    return getIntegration.comment(
+      integration.internalId,
+      postId,
+      undefined,
+      integration.token,
+      [
+        {
+          id: makeId(10),
+          message: stripHtmlValidation(
+            getIntegration.editor,
+            firstComment,
+            true,
+            false,
+            !/<\/?[a-z][\s\S]*>/i.test(firstComment),
+            getIntegration.mentionFormat
+          ),
+          settings: {},
+          media: [],
+        },
+      ],
       integration
     );
   }
@@ -297,6 +352,11 @@ export class PostActivity {
   }
 
   @ActivityMethod()
+  async updatePostSettings(id: string, settings: string) {
+    await this._postService.updatePostSettings(id, settings);
+  }
+
+  @ActivityMethod()
   async changeState(id: string, state: State, err?: any, body?: any) {
     await this._postService.changeState(id, state, err, body);
   }
@@ -326,7 +386,7 @@ export class PostActivity {
     await Promise.all(
       webhooks.map(async (webhook) => {
         try {
-          await fetch(webhook.url, {
+          await safeFetch(webhook.url, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -417,5 +477,28 @@ export class PostActivity {
       await this._refreshIntegrationService.setBetweenSteps(integration, cause);
       return false;
     }
+  }
+
+  private getPostWorkflowName(post: Pick<Post, 'settings'>): string {
+    if (!post.settings) {
+      return 'postWorkflowV105';
+    }
+
+    try {
+      const settings = JSON.parse(
+        typeof post.settings === 'string'
+          ? post.settings
+          : JSON.stringify(post.settings)
+      );
+      if (
+        settings?.firstComment &&
+        !settings?.firstCommentPostedAt &&
+        !settings?.firstCommentId
+      ) {
+        return 'postWorkflowV106';
+      }
+    } catch (err) {}
+
+    return 'postWorkflowV105';
   }
 }

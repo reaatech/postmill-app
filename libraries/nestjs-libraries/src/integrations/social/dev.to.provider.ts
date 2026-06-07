@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -53,6 +54,124 @@ export class DevToProvider extends SocialAbstract implements SocialProvider {
       picture: '',
       username: '',
     };
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      let url = `https://dev.to/api/comments?a_id=${postId}`;
+      if (cursor) {
+        url += `&page=${cursor}`;
+      }
+
+      const response = await this.fetch(url, {
+        headers: {
+          'api-key': accessToken,
+        },
+      });
+      const data = await response.json() as any[];
+
+      const comments: SocialCommentDTO[] = (data || []).map((c: any) => ({
+        platformCommentId: String(c.id_code),
+        parentPlatformCommentId: c.parent_id ? String(c.parent_id) : undefined,
+        author: {
+          id: String(c.user?.user_id || c.user?.username || ''),
+          name: c.user?.name || '',
+          username: c.user?.username,
+          picture: c.user?.profile_image,
+        },
+        content: c.body_html || c.body_text || '',
+        createdAt: c.created_at,
+        likeCount: c.reactions?.sum || 0,
+        raw: c,
+      }));
+
+      const nextCursor = data?.length === 100 ? String((parseInt(cursor || '1', 10)) + 1) : undefined;
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const response = await this.fetch('https://dev.to/api/comments', {
+        method: 'POST',
+        headers: {
+          'api-key': accessToken,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          comment: {
+            body_markdown: message,
+            commentable_id: parseInt(postId, 10),
+            commentable_type: 'Article',
+            parent_id: parseInt(parentCommentId, 10),
+          },
+        }),
+      });
+      const data = await response.json() as any;
+
+      return {
+        platformCommentId: String(data.id_code),
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: { id: integration?.internalId || '', name: integration?.name || '' },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    try {
+      if (like) {
+        await this.fetch(`https://dev.to/api/reactions?reactable_type=comment&reactable_id=${commentId}`, {
+          method: 'POST',
+          headers: {
+            'api-key': accessToken,
+          },
+        });
+      }
+      return { liked: like };
+    } catch (err) {
+      return { liked: like };
+    }
   }
 
   async customFields() {

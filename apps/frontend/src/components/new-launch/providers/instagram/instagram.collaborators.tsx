@@ -12,6 +12,7 @@ import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-set
 import { InstagramCollaboratorsTags } from '@gitroom/frontend/components/new-launch/providers/instagram/instagram.tags';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { InstagramPreview } from '@gitroom/frontend/components/new-launch/providers/instagram/instagram.preview';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const postType = [
   {
     value: 'post',
@@ -90,6 +91,8 @@ const InstagramCollaborators: FC<{
           )}
         </div>
       )}
+
+      <FirstCommentField />
     </>
   );
 };

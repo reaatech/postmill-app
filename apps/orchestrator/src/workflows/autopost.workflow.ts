@@ -1,4 +1,4 @@
-import { proxyActivities, sleep } from '@temporalio/workflow';
+import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
 import { AutopostActivity } from '@gitroom/orchestrator/activities/autopost.activity';
 
 const { autoPost } = proxyActivities<AutopostActivity>({
@@ -18,6 +18,7 @@ export async function autoPostWorkflow({
   id: string;
   immediately: boolean;
 }) {
+  let iterations = 0;
   while (true) {
     try {
       if (immediately) {
@@ -25,6 +26,12 @@ export async function autoPostWorkflow({
       }
     } catch (err) {}
     immediately = true;
+    iterations += 1;
+
+    if (iterations >= 24) {
+      await continueAsNew({ id, immediately });
+    }
+
     await sleep(3600000);
   }
 }

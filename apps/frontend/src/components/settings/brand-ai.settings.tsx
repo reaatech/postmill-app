@@ -12,7 +12,23 @@ interface BrandProfile {
   instructions?: string;
   language?: string;
   enabled?: boolean;
+  platformInstructions?: Record<string, string>;
 }
+
+const PLATFORM_OPTIONS = [
+  { value: 'x', label: 'X/Twitter' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'tiktok', label: 'TikTok' },
+  { value: 'threads', label: 'Threads' },
+  { value: 'bluesky', label: 'Bluesky' },
+  { value: 'mastodon', label: 'Mastodon' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'discord', label: 'Discord' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'slack', label: 'Slack' },
+];
 
 interface ScopeSummary {
   scope: string;
@@ -150,26 +166,45 @@ const BrandVoiceSection = () => {
   const [instructions, setInstructions] = useState('');
   const [language, setLanguage] = useState('en');
   const [enabled, setEnabled] = useState(false);
+  const [platformInstructions, setPlatformInstructions] = useState<Record<string, string>>({});
+  const [selectedPlatform, setSelectedPlatform] = useState('');
 
   useEffect(() => {
     if (data) {
       setInstructions(data.instructions || '');
       setLanguage(data.language || 'en');
       setEnabled(data.enabled ?? false);
+      setPlatformInstructions(data.platformInstructions || {});
     }
   }, [data]);
 
   const handleSave = useCallback(async () => {
     const res = await fetch('/ai/brand-profile', {
       method: 'PUT',
-      body: JSON.stringify({ instructions, language, enabled }),
+      body: JSON.stringify({
+        instructions,
+        language,
+        enabled,
+        platformInstructions,
+      }),
     });
     if (!res.ok) {
       toaster.show(t('brand_profile_save_failed', 'Failed to save brand profile'), 'warning');
       return;
     }
     toaster.show(t('brand_profile_saved', 'Brand profile saved'), 'success');
-  }, [instructions, language, enabled, fetch, toaster, t]);
+  }, [instructions, language, enabled, platformInstructions, fetch, toaster, t]);
+
+  const handlePlatformSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedPlatform(e.target.value);
+  }, []);
+
+  const handlePlatformInstructionChange = useCallback((platform: string, value: string) => {
+    setPlatformInstructions((prev) => ({
+      ...prev,
+      [platform]: value,
+    }));
+  }, []);
 
   if (isLoading) {
     return (
@@ -208,6 +243,73 @@ const BrandVoiceSection = () => {
           onChange={(e) => setInstructions(e.target.value)}
           placeholder={t('brand_instructions_placeholder', 'e.g. Keep a friendly and professional tone. Never use emojis. Always include a call-to-action at the end.')}
         />
+      </div>
+
+      <div className="flex flex-col gap-[12px]">
+        <div className="text-[14px]">{t('platform_overrides', 'Per-Platform Overrides')}</div>
+        <div className="text-[12px] text-customColor18">
+          {t('platform_overrides_description', 'Override brand instructions for specific platforms. Falls back to global instructions when not set.')}
+        </div>
+
+        <div className="w-[250px]">
+          <Select
+            name="platformSelector"
+            label=""
+            disableForm={true}
+            hideErrors={true}
+            value={selectedPlatform}
+            onChange={handlePlatformSelect}
+          >
+            <option value="">{t('select_platform', 'Select platform...')}</option>
+            {PLATFORM_OPTIONS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {selectedPlatform && (
+          <div className="flex flex-col gap-[4px]">
+            <div className="text-[13px] text-newTableText">
+              {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
+            </div>
+            <textarea
+              className="bg-forth border border-tableBorder rounded-[4px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
+              value={platformInstructions[selectedPlatform] || ''}
+              onChange={(e) => handlePlatformInstructionChange(selectedPlatform, e.target.value)}
+              placeholder={t('platform_instructions_placeholder', 'e.g. Be more casual on this platform')}
+            />
+          </div>
+        )}
+
+        {Object.keys(platformInstructions).length > 0 && (
+          <div className="flex flex-wrap gap-[6px]">
+            {Object.entries(platformInstructions).map(([platform, instr]) =>
+              instr ? (
+                <div
+                  key={platform}
+                  className="bg-fifth border border-tableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
+                >
+                  <span className="font-medium">{PLATFORM_OPTIONS.find((p) => p.value === platform)?.label || platform}</span>
+                  <button
+                    onClick={() => {
+                      setPlatformInstructions((prev) => {
+                        const next = { ...prev };
+                        delete next[platform];
+                        return next;
+                      });
+                    }}
+                    className="text-red-500 hover:opacity-80 ml-[4px]"
+                    aria-label={`Remove ${platform} override`}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex items-center justify-between gap-[24px]">

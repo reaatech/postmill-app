@@ -4,6 +4,8 @@ import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/pr
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
+import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
 import { log } from '@temporalio/activity';
 
@@ -15,6 +17,8 @@ export class CommentsActivity {
     private _providerConfigManager: ProviderConfigManager,
     private _socialCommentsService: SocialCommentsService,
     private _emailService: EmailService,
+    private _webhooksService: WebhooksService,
+    private _notificationService: NotificationService,
   ) {}
 
   @ActivityMethod()
@@ -61,6 +65,37 @@ export class CommentsActivity {
   async getSweepIntervalMinutes(): Promise<number> {
     const minutes = parseInt(process.env.COMMENTS_SWEEP_INTERVAL_MINUTES || '30', 10);
     return Number.isFinite(minutes) && minutes > 0 ? minutes : 30;
+  }
+
+  @ActivityMethod()
+  async dispatchWebhookForComments(orgId: string, daysBack: number): Promise<void> {
+    const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
+
+    const posts = await this._prisma.post.findMany({
+      where: {
+        organizationId: orgId,
+        socialComments: {
+          some: {
+            createdAt: { gte: since },
+            isOwn: false,
+            deletedAt: null,
+          },
+        },
+      },
+      select: { id: true },
+      take: 50,
+    });
+
+    if (posts.length === 0) return;
+
+    try {
+      await this._webhooksService.dispatchEvent(orgId, 'comment.new', {
+        batchSize: posts.length,
+        timeframe: 'last_sync',
+      });
+    } catch (err) {
+      log.error('dispatchWebhookForComments error:', { error: (err as Error)?.message });
+    }
   }
 
   @ActivityMethod()
@@ -142,6 +177,10 @@ export class CommentsActivity {
     const totalNewComments = posts.reduce(
       (sum, p) => sum + p.socialComments.length,
       0
+    );
+    await this._notificationService.notifyInboxBacklog(
+      orgId,
+      totalNewComments
     );
 
     const htmlParts: string[] = [];

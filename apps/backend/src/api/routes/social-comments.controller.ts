@@ -14,6 +14,40 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 export class SocialCommentsController {
   constructor(private _socialCommentsService: SocialCommentsService) {}
 
+  @Get('/inbox')
+  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
+  async getInbox(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Query('status') status: string | undefined,
+    @Query('assigneeId') assigneeId: string | undefined,
+    @Query('cursor') cursor: string | undefined,
+    @Query('unreadOnly') unreadOnly: string | undefined,
+  ) {
+    return this._socialCommentsService.getInbox(org.id, user.id, {
+      status,
+      assigneeId,
+      cursor,
+      unreadOnly: unreadOnly === 'true',
+    });
+  }
+
+  @Post('/inbox/bulk-read')
+  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
+  async bulkMarkRead(
+    @Body('commentIds') commentIds: string[],
+  ) {
+    return this._socialCommentsService.bulkMarkRead(commentIds);
+  }
+
+  @Get('/inbox/unread-count')
+  @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
+  async getInboxUnreadCount(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+  ) {
+    return this._socialCommentsService.getInboxUnreadCount(org.id, user.id);
+  }
   @Get('/:id/social-comments')
   @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getComments(

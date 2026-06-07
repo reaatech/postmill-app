@@ -73,6 +73,25 @@ export const useMenuItem = () => {
       path: '/agents',
     },
     {
+      name: t('comments', 'Comments'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      ),
+      path: '/comments',
+    },
+    {
       name: t('analytics', 'Analytics'),
       icon: (
         <svg
@@ -134,6 +153,25 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/plugs',
+    },
+    {
+      name: t('campaigns', 'Campaigns'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2a2 2 0 0 0-1.66-.9H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2Z" />
+        </svg>
+      ),
+      path: '/campaigns',
     },
     {
       name: t('integrations', 'Integrations'),

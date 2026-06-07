@@ -4,7 +4,7 @@ Key Prisma models grouped by domain. The schema is the source of truth:
 `libraries/nestjs-libraries/src/database/prisma/schema.prisma`. See [Database](../developers/database.md)
 for the `db push` model and schema-change rules.
 
-> **Verified against v3.4.0.** Model names below are taken from the schema.
+> **Verified against v3.5.0.** Model names below are taken from the schema.
 
 ---
 
@@ -61,6 +61,30 @@ See [Social comments](../features/social-comments.md).
 | `AIContentIndex` | Indexed content for semantic search / RAG. |
 
 See [AI architecture](../developers/ai-architecture.md).
+
+`AIBrandProfile` gains a nullable `platformInstructions` (JSON, default `{}`) field in v3.5.0 for
+per-platform brand-voice overrides.
+
+## Campaigns, watchlist & uploads (v3.5)
+
+| Model | Role |
+|-------|------|
+| `Campaign` | Campaign folder grouping posts/assets/analytics/comments (`name`, `color?`, `description?`, `startDate?`, `endDate?`, `archived`, soft-delete via `deletedAt`). |
+| `WatchedAccount` | A tracked competitor/external account (`provider`, `handle`, `displayName?`, `enabled`, `lastError?`, soft-delete via `deletedAt`). |
+| `WatchedAccountMetric` | A captured metric for a watched account (`metric`, `value`, `capturedAt`; cascade-deletes with its account). |
+| `MultipartUpload` | Per-org multipart-upload ownership ledger (`uploadId`, `key`, `fileName?`, `fileHash?`, `expectedMime?`, `totalSize?`, `partCount`, `state`) — binds presign/complete/abort to the owning org. |
+
+`Post` gains a nullable `campaignId` (FK to `Campaign`) so a post can belong to a campaign.
+
+See [Public API → Internal app API additions](../api/public-api.md) and
+[Analytics v2 API](../api/analytics-v2-api.md).
+
+## OAuth hardening fields (v3.5)
+
+`OAuthAuthorization` gains additive nullable fields for OAuth 2.0 / PKCE hardening: `redirectUri`
+(exact redirect URI used at authorize), `codeChallenge` + `codeChallengeMethod` (PKCE S256), `scope`,
+`tokenExpiresAt`, `refreshToken` (encrypted) + `refreshTokenExpiresAt`. All nullable, so the `db push`
+stays non-destructive.
 
 ## Billing
 

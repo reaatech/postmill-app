@@ -5,7 +5,7 @@ Curated reference of the environment variables. The authoritative template is
 deployment. This page groups them by purpose — see [Configuration](../self-hosting/configuration.md)
 for the narrative version.
 
-> **Verified against v3.4.0.** When an exact default matters, check `.env.example` directly.
+> **Verified against v3.5.0.** When an exact default matters, check `.env.example` directly.
 
 ---
 
@@ -84,6 +84,14 @@ Additional providers and per-scope models are configured in [AI settings admin](
 ## Short links (optional)
 
 `DUB_*`, `SHORT_IO_SECRET_KEY`, `KUTT_*`, `LINK_DRIP_*`.
+
+## Security (optional, v3.5.0)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ENCRYPTION_KEY` | falls back to `JWT_SECRET` | Optional dedicated key for AES-GCM encryption of secrets at rest (channel/AI/OAuth tokens). Accepts a 32-byte key as base64 (44 chars) or hex (64 chars); other strings are SHA-256-derived. If unset, the key is derived from `JWT_SECRET`, so existing deployments keep working unchanged. |
+| `INTEGRATION_RETURN_URL_ALLOWLIST` | unset (empty) | Comma-separated list of extra allowed origins for integration/enterprise return URLs (open-redirect allowlist). `FRONTEND_URL` is always allowed; private/loopback/metadata hosts are always rejected. |
+| `SSRF_ALLOWED_PRIVATE_CIDRS` | unset (empty) | Comma-separated CIDRs (e.g. `10.0.0.0/8,192.168.5.0/24`, IPv4 or IPv6) the SSRF guard treats as reachable, so self-hosted provider instances (Mastodon custom, self-hosted WordPress/Lemmy) on private networks still work. Off by default — every private/loopback/link-local range stays blocked. Targets must still be HTTPS. |
 
 ## Monitoring (optional)
 

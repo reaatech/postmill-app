@@ -1,10 +1,9 @@
 import { IUploadProvider } from './upload.interface';
 import { mkdirSync, unlink, writeFileSync } from 'fs';
-import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { randomBytes } from 'crypto';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { fromBuffer } = require('file-type');
+import { fromBuffer } from 'file-type';
 
 const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
   'image/jpeg',
@@ -30,13 +29,7 @@ export class LocalStorage implements IUploadProvider {
     if (dataUrl) {
       body = dataUrl.buffer;
     } else {
-      if (!(await isSafePublicHttpsUrl(path))) {
-        throw new Error('Unsafe URL');
-      }
-      const loadImage = await fetch(path, {
-        // @ts-ignore — undici option, not in lib.dom fetch types
-        dispatcher: ssrfSafeDispatcher,
-      });
+      const loadImage = await safeFetch(path);
       body = Buffer.from(await loadImage.arrayBuffer());
     }
 
@@ -60,10 +53,7 @@ export class LocalStorage implements IUploadProvider {
     const dir = `${this.uploadDirectory}${innerPath}`;
     mkdirSync(dir, { recursive: true });
 
-    const randomName = Array(32)
-      .fill(null)
-      .map(() => Math.round(Math.random() * 16).toString(16))
-      .join('');
+    const randomName = randomBytes(16).toString('hex');
 
     const filePath = `${dir}/${randomName}.${findExtension}`;
     const publicPath = `${innerPath}/${randomName}.${findExtension}`;
@@ -91,10 +81,7 @@ export class LocalStorage implements IUploadProvider {
       const dir = `${this.uploadDirectory}${innerPath}`;
       mkdirSync(dir, { recursive: true });
 
-      const randomName = Array(32)
-        .fill(null)
-        .map(() => Math.round(Math.random() * 16).toString(16))
-        .join('');
+      const randomName = randomBytes(16).toString('hex');
 
       const filePath = `${dir}/${randomName}${safeExt}`;
       const publicPath = `${innerPath}/${randomName}${safeExt}`;

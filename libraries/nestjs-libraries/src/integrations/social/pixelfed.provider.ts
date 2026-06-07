@@ -6,6 +6,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class PixelfedProvider extends SocialAbstract implements SocialProvider {
   identifier = 'pixelfed';
@@ -92,7 +93,7 @@ export class PixelfedProvider extends SocialAbstract implements SocialProvider {
 
   private async uploadMedia(base: string, token: string, m: { path: string; alt?: string }) {
     const form = new FormData();
-    form.append('file', await fetch(m.path).then((r) => r.blob()));
+    form.append('file', await safeFetch(m.path).then((r) => r.blob()));
     if (m.alt) form.append('description', m.alt);
     const media = await (
       await this.fetch(`${base}/api/v1/media`, {

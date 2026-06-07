@@ -11,7 +11,7 @@ export class FarcasterProvider extends AuthProviderAbstract {
   private get client(): NeynarAPIClient {
     if (!this._client) {
       const apiKey = getEnvOr('NEYNAR_SECRET_KEY', 'wrapcast', 'clientSecret');
-      if (!apiKey) throw new Error('Neynar API key not configured. Set NEYNAR_SECRET_KEY environment variable or configure via admin panel.');
+      if (!apiKey) throw new Error('Authentication provider not configured.');
       this._client = new NeynarAPIClient({ apiKey });
     }
     return this._client;

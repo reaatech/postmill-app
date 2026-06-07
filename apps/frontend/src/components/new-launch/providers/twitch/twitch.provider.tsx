@@ -9,6 +9,7 @@ import { TwitchDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settin
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { Select } from '@gitroom/react/form/select';
 import { useWatch } from 'react-hook-form';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const messageTypes = [
   {
@@ -79,6 +80,7 @@ const TwitchSettings: FC = () => {
           ))}
         </Select>
       )}
+      <FirstCommentField />
     </div>
   );
 };

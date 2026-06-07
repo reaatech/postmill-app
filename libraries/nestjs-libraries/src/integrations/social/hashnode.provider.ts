@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -44,6 +45,166 @@ export class HashnodeProvider extends SocialAbstract implements SocialProvider {
       picture: '',
       username: '',
     };
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: false };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      const query = `
+        query GetComments($postId: ID!, $first: Int!, $after: String) {
+          post(id: $postId) {
+            comments(first: $first, after: $after) {
+              edges {
+                node {
+                  id
+                  content {
+                    markdown
+                    html
+                  }
+                  author {
+                    id
+                    name
+                    username
+                    profilePicture
+                  }
+                  createdAt
+                  totalReactions
+                  replyCount
+                }
+              }
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
+            }
+          }
+        }
+      `;
+
+      const response = await this.fetch('https://gql.hashnode.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: accessToken,
+        },
+        body: JSON.stringify({
+          query,
+          variables: { postId, first: 50, after: cursor || null },
+        }),
+      });
+      const json = await response.json() as any;
+      const edges = json?.data?.post?.comments?.edges || [];
+
+      const comments: SocialCommentDTO[] = edges.map(({ node }: any) => ({
+        platformCommentId: node.id,
+        author: {
+          id: node.author?.id || '',
+          name: node.author?.name || '',
+          username: node.author?.username,
+          picture: node.author?.profilePicture,
+        },
+        content: node.content?.html || node.content?.markdown || '',
+        createdAt: node.createdAt,
+        likeCount: node.totalReactions,
+        replyCount: node.replyCount,
+        raw: node,
+      }));
+
+      const pageInfo = json?.data?.post?.comments?.pageInfo;
+      const nextCursor = pageInfo?.hasNextPage ? pageInfo.endCursor : undefined;
+
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    try {
+      const mutation = `
+        mutation AddComment($input: AddCommentInput!) {
+          addComment(input: $input) {
+            comment {
+              id
+              content {
+                html
+                markdown
+              }
+              createdAt
+            }
+          }
+        }
+      `;
+
+      const response = await this.fetch('https://gql.hashnode.com', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: accessToken,
+        },
+        body: JSON.stringify({
+          query: mutation,
+          variables: {
+            input: {
+              postId,
+              contentMarkdown: message,
+              parentId: parentCommentId,
+            },
+          },
+        }),
+      });
+      const json = await response.json() as any;
+      const comment = json?.data?.addComment?.comment;
+
+      return {
+        platformCommentId: comment?.id || '',
+        parentPlatformCommentId: parentCommentId,
+        author: {
+          id: integration.internalId,
+          name: integration.name,
+          username: integration.profile,
+          picture: integration.picture,
+        },
+        content: message,
+        createdAt: comment?.createdAt || new Date().toISOString(),
+      };
+    } catch (err) {
+      return {
+        platformCommentId: '',
+        parentPlatformCommentId: parentCommentId,
+        author: { id: integration?.internalId || '', name: integration?.name || '' },
+        content: message,
+        createdAt: new Date().toISOString(),
+      };
+    }
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    // Platform does not support native comment likes
+    return { liked: like };
   }
 
   async customFields() {

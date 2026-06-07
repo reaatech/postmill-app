@@ -3,6 +3,7 @@ import { AuthController } from '@gitroom/backend/api/routes/auth.controller';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { UsersController } from '@gitroom/backend/api/routes/users.controller';
 import { AuthMiddleware } from '@gitroom/backend/services/auth/auth.middleware';
+import { CsrfMiddleware } from '@gitroom/backend/services/auth/csrf.middleware';
 import { StripeController } from '@gitroom/backend/api/routes/stripe.controller';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { AnalyticsV2Controller } from '@gitroom/backend/api/routes/analytics.v2.controller';
@@ -43,6 +44,8 @@ import { SocialCommentsController } from '@gitroom/backend/api/routes/social-com
 import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
 import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
 import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
+import { ProviderCapabilitiesController } from '@gitroom/backend/api/routes/provider-capabilities.controller';
+import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
@@ -77,6 +80,8 @@ const authenticatedController = [
   AiSettingsController,
   AiModerateController,
   AiUserController,
+  ProviderCapabilitiesController,
+  CampaignsController,
 ];
 @Module({
   imports: [UploadModule],
@@ -119,6 +124,7 @@ const authenticatedController = [
 export class ApiModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(AuthMiddleware).forRoutes(...authenticatedController);
+    consumer.apply(CsrfMiddleware).forRoutes(...authenticatedController);
     consumer
       .apply(BudgetMiddleware)
       .forRoutes({ path: '/agents*', method: RequestMethod.ALL });

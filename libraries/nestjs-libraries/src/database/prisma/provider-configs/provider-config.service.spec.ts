@@ -65,9 +65,6 @@ describe('ProviderConfigService', () => {
 
     it('encrypts clientId and clientSecret when truthy', async () => {
       const encryptSpy = vi.spyOn(AuthService, 'fixedEncryption');
-      const expectedEncryptedId = AuthService.fixedEncryption('my-id');
-      const expectedEncryptedSecret = AuthService.fixedEncryption('my-secret');
-      encryptSpy.mockClear();
 
       await service.upsert('test', {
         name: 'Test',
@@ -82,8 +79,8 @@ describe('ProviderConfigService', () => {
       expect(mockRepo.upsert).toHaveBeenCalledWith(
         'test',
         expect.objectContaining({
-          clientId: expectedEncryptedId,
-          clientSecret: expectedEncryptedSecret,
+          clientId: expect.stringMatching(/^v2:/),
+          clientSecret: expect.stringMatching(/^v2:/),
         })
       );
     });

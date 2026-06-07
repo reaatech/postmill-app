@@ -2,6 +2,7 @@ import {
   AuthTokenDetails,
   PostDetails,
   PostResponse,
+  SocialCommentDTO,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -10,6 +11,7 @@ import { Integration } from '@prisma/client';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 5; // Discord has generous rate limits for webhook posting
@@ -161,7 +163,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
     let index = 0;
     for (const media of firstPost.media || []) {
-      const loadMedia = await fetch(media.path);
+      const loadMedia = await safeFetch(media.path);
 
       form.append(
         `files[${index}]`,
@@ -244,7 +246,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
     let index = 0;
     for (const media of commentPost.media || []) {
-      const loadMedia = await fetch(media.path);
+      const loadMedia = await safeFetch(media.path);
 
       form.append(
         `files[${index}]`,
@@ -365,6 +367,120 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       return name;
     }
     return `[[[@${idOrHandle.replace('@', '')}]]]`;
+  }
+
+  override get commentsCapabilities() {
+    return { read: true, reply: true, like: true };
+  }
+
+  async fetchComments(
+    id: string,
+    accessToken: string,
+    postId: string,
+    cursor: string | undefined,
+    integration: Integration
+  ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    try {
+      let url = `https://discord.com/api/channels/${id}/messages?limit=100`;
+      if (cursor) {
+        url += `&before=${cursor}`;
+      }
+
+      const response = await this.fetch(url, {
+        headers: {
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+        },
+      });
+      const messages = await response.json() as any[];
+
+      const comments: SocialCommentDTO[] = (messages || []).map((msg: any) => ({
+        platformCommentId: msg.id,
+        author: {
+          id: msg.author?.id || '',
+          name: msg.author?.global_name || msg.author?.username || '',
+          username: msg.author?.username,
+          picture: msg.author?.avatar
+            ? `https://cdn.discordapp.com/avatars/${msg.author.id}/${msg.author.avatar}.png`
+            : undefined,
+        },
+        content: msg.content || '',
+        createdAt: msg.timestamp,
+        likeCount: msg.reactions?.reduce((sum: number, r: any) => sum + (r.count || 0), 0) || 0,
+        raw: msg,
+      }));
+
+      const nextCursor = messages?.length > 0 ? messages[messages.length - 1].id : undefined;
+      return { comments, nextCursor };
+    } catch (err) {
+      return { comments: [] };
+    }
+  }
+
+  async replyToComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    parentCommentId: string,
+    message: string,
+    integration: Integration
+  ): Promise<SocialCommentDTO> {
+    const channel = id;
+    const response = await this.fetch(
+      `https://discord.com/api/channels/${channel}/messages`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          content: message,
+          message_reference: { message_id: parentCommentId },
+        }),
+      }
+    );
+    const data = await response.json() as any;
+
+    return {
+      platformCommentId: data.id,
+      parentPlatformCommentId: parentCommentId,
+      author: {
+        id: integration.internalId,
+        name: integration.name,
+        username: integration.profile,
+        picture: integration.picture,
+      },
+      content: message,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  async likeComment(
+    id: string,
+    accessToken: string,
+    postId: string,
+    commentId: string,
+    like: boolean,
+    integration: Integration
+  ): Promise<{ liked: boolean; likeCount?: number }> {
+    try {
+      const channel = id;
+      const emoji = '👍';
+      if (like) {
+        await this.fetch(
+          `https://discord.com/api/channels/${channel}/messages/${commentId}/reactions/${encodeURIComponent(emoji)}/@me`,
+          { method: 'PUT' }
+        );
+      } else {
+        await this.fetch(
+          `https://discord.com/api/channels/${channel}/messages/${commentId}/reactions/${encodeURIComponent(emoji)}/@me`,
+          { method: 'DELETE' }
+        );
+      }
+      return { liked: like };
+    } catch (err) {
+      return { liked: like };
+    }
   }
 
   override handleErrors(

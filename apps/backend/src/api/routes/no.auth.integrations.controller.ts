@@ -6,9 +6,13 @@ import {
   Param,
   Post,
   UseFilters,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { ConnectIntegrationDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect.integration.dto';
+import { SaveProviderPageDto } from '@gitroom/nestjs-libraries/dtos/integrations/provider-page.dto';
+import { ExtensionRefreshDto } from '@gitroom/nestjs-libraries/dtos/integrations/extension-refresh.dto';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
@@ -23,6 +27,8 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -269,7 +275,7 @@ export class NoAuthIntegrationsController {
     const webhookUrl = await ioRedis.get(`webhookUrl:${body.state}`);
     if (webhookUrl) {
       try {
-        await fetch(webhookUrl, {
+        await safeFetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -283,9 +289,12 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`webhookUrl:${body.state}`);
     }
 
-    const returnURL = await ioRedis.get(`redirect:${body.state}`);
+    let returnURL = await ioRedis.get(`redirect:${body.state}`);
     if (returnURL) {
       await ioRedis.del(`redirect:${body.state}`);
+      if (!isAllowedReturnUrl(returnURL)) {
+        returnURL = undefined;
+      }
     }
 
     const extensionToken = integrationProvider.isChromeExtension
@@ -317,8 +326,9 @@ export class NoAuthIntegrationsController {
   }
 
   @Post('/public/provider/:id/connect')
-  async saveProviderPage(@Param('id') id: string, @Body() body: any) {
-    if (!body.state) {
+  @UsePipes(new ValidationPipe({ whitelist: false }))
+  async saveProviderPage(@Param('id') id: string, @Body() body: SaveProviderPageDto) {
+    if (!body?.state) {
       throw new Error('Invalid state');
     }
 
@@ -334,7 +344,7 @@ export class NoAuthIntegrationsController {
 
   @Post('/extension-refresh')
   async extensionRefreshCookies(
-    @Body() body: { jwt: string; cookies: string }
+    @Body() body: ExtensionRefreshDto
   ) {
     let payload: any;
     try {

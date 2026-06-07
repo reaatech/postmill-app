@@ -8,6 +8,7 @@ import dayjs from 'dayjs';
 import { useClickAway } from '@uidotdev/usehooks';
 import ReactLoading from '@gitroom/frontend/components/layout/loading';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 function replaceLinks(text: string) {
   const urlRegex =
     /(\bhttps?:\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gi;
@@ -37,11 +38,9 @@ export const ShowNotification: FC<{
         newNotification && 'font-bold bg-seventh animate-newMessages'
       )}
     >
-      <div
+      <SafeContent
         className="break-words"
-        dangerouslySetInnerHTML={{
-          __html: replaceLinks(notification.content),
-        }}
+        content={replaceLinks(notification.content)}
       />
       <div
         className="text-[11px] mt-[4px] opacity-60 font-normal"

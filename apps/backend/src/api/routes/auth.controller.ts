@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -17,12 +18,14 @@ import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/for
 import { ForgotPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot.password.dto';
 import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-activation.dto';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { Provider } from '@prisma/client';
 import * as Sentry from '@sentry/nestjs';
+import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
 
 @ApiTags('Auth')
 @Controller('/auth')
@@ -40,6 +43,7 @@ export class AuthController {
   }
 
   @Post('/register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async register(
     @Req() req: Request,
     @Body() body: CreateOrgUserDto,
@@ -71,7 +75,7 @@ export class AuthController {
 
       response.cookie('auth', jwt, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,
@@ -81,14 +85,12 @@ export class AuthController {
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
       });
 
-      if (process.env.NOT_SECURED) {
-        response.header('auth', jwt);
-      }
+      issueCsrfToken(response);
 
       if (typeof addedOrg !== 'boolean' && addedOrg?.organizationId) {
         response.cookie('showorg', addedOrg.organizationId, {
           domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED
+          ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
             ? {
                 secure: true,
                 httpOnly: true,
@@ -98,9 +100,6 @@ export class AuthController {
           expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
         });
 
-        if (process.env.NOT_SECURED) {
-          response.header('showorg', addedOrg.organizationId);
-        }
       }
 
       Sentry.metrics.count('new_user', 1);
@@ -109,11 +108,13 @@ export class AuthController {
         register: true,
       });
     } catch (e: any) {
-      response.status(400).send(e.message);
+      Logger.error('Registration failed', e instanceof Error ? e.message : String(e), AuthController.name);
+      response.status(400).send('Registration failed');
     }
   }
 
   @Post('/login')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async login(
     @Req() req: Request,
     @Body() body: LoginUserDto,
@@ -136,7 +137,7 @@ export class AuthController {
 
       response.cookie('auth', jwt, {
         domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-        ...(!process.env.NOT_SECURED
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
           ? {
               secure: true,
               httpOnly: true,
@@ -146,14 +147,10 @@ export class AuthController {
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
       });
 
-      if (process.env.NOT_SECURED) {
-        response.header('auth', jwt);
-      }
-
       if (typeof addedOrg !== 'boolean' && addedOrg?.organizationId) {
         response.cookie('showorg', addedOrg.organizationId, {
           domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED
+          ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
             ? {
                 secure: true,
                 httpOnly: true,
@@ -163,21 +160,21 @@ export class AuthController {
           expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
         });
 
-        if (process.env.NOT_SECURED) {
-          response.header('showorg', addedOrg.organizationId);
-        }
       }
 
+      issueCsrfToken(response);
       response.header('reload', 'true');
       response.status(200).json({
         login: true,
       });
     } catch (e: any) {
-      response.status(400).send(e.message);
+      Logger.error('Login failed', e instanceof Error ? e.message : String(e), AuthController.name);
+      response.status(400).send('Invalid credentials');
     }
   }
 
   @Post('/forgot')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async forgot(@Body() body: ForgotPasswordDto) {
     try {
       await this._authService.forgot(body.email);
@@ -192,6 +189,7 @@ export class AuthController {
   }
 
   @Post('/forgot-return')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async forgotReturn(@Body() body: ForgotReturnPasswordDto) {
     const reset = await this._authService.forgotReturn(body);
     return {
@@ -218,6 +216,7 @@ export class AuthController {
   }
 
   @Post('/activate')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async activate(
     @Body('code') code: string,
     @Body('datafast_visitor_id') datafast_visitor_id: string,
@@ -233,7 +232,7 @@ export class AuthController {
 
     response.cookie('auth', activate, {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -243,16 +242,14 @@ export class AuthController {
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
-    if (process.env.NOT_SECURED) {
-      response.header('auth', activate);
-    }
-
+    issueCsrfToken(response);
     response.header('onboarding', 'true');
 
     return response.status(200).json({ can: true });
   }
 
   @Post('/resend-activation')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
   async resendActivation(@Body() body: ResendActivationDto) {
     try {
       await this._authService.resendActivationEmail(body.email);
@@ -260,14 +257,16 @@ export class AuthController {
         success: true,
       };
     } catch (e: any) {
+      console.error('Resend activation failed:', e);
       return {
         success: false,
-        message: e.message,
+        message: 'Resend activation failed',
       };
     }
   }
 
   @Post('/oauth/:provider/exists')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   async oauthExists(
     @Body('code') code: string,
     @Body('redirect_uri') redirect_uri: string,
@@ -286,7 +285,7 @@ export class AuthController {
 
     response.cookie('auth', jwt, {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-      ...(!process.env.NOT_SECURED
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
         ? {
             secure: true,
             httpOnly: true,
@@ -296,9 +295,7 @@ export class AuthController {
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
-    if (process.env.NOT_SECURED) {
-      response.header('auth', jwt);
-    }
+    issueCsrfToken(response);
 
     response.header('reload', 'true');
 

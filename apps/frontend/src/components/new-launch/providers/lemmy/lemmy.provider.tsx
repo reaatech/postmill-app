@@ -12,6 +12,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { Subreddit } from './subreddit';
 import { LemmySettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/lemmy.dto';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 const LemmySettings: FC = () => {
   const { register, control } = useSettings();
   const { fields, append, remove } = useFieldArray({
@@ -63,6 +64,7 @@ const LemmySettings: FC = () => {
           )}
         </div>
       )}
+      <FirstCommentField />
     </>
   );
 };

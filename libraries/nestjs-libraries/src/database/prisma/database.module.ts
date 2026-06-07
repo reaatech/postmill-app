@@ -53,6 +53,15 @@ import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/pri
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.repository';
 import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-rag/ai-rag.repository';
+import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { MultipartUploadRepository } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.repository';
+import { MultipartUploadService } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.service';
+import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.repository';
+import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 
 @Global()
 @Module({
@@ -115,6 +124,15 @@ import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-ra
     AiSettingsRepository,
     AiRagRepository,
     AiSettingsManager,
+    AnalyticsRepository,
+    RedisService,
+    EncryptionService,
+    MultipartUploadRepository,
+    MultipartUploadService,
+    WatchlistRepository,
+    WatchlistService,
+    CampaignsRepository,
+    CampaignsService,
   ],
   get exports() {
     return this.providers;

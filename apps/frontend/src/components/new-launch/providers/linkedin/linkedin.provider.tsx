@@ -10,10 +10,12 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { LinkedinDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/linkedin.dto';
 import { LinkedinPreview } from '@gitroom/frontend/components/new-launch/providers/linkedin/linkedin.preview';
+import { PollBuilder } from '@gitroom/frontend/components/new-launch/providers/shared/poll.builder';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const LinkedInSettings = () => {
   const t = useT();
-  const { watch, register, formState, control } = useSettings();
+  const { watch, register, formState, control, setValue } = useSettings();
   const isCarousel = watch('post_as_images_carousel');
 
   return (
@@ -34,6 +36,16 @@ const LinkedInSettings = () => {
           />
         </div>
       )}
+
+      <PollBuilder
+        value={watch('poll')}
+        onChange={(poll) => setValue('poll', poll)}
+        maxOptions={4}
+        minOptions={2}
+        maxDuration={336}
+      />
+
+      <FirstCommentField />
     </div>
   );
 };

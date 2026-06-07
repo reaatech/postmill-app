@@ -6,6 +6,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
   identifier = 'peertube';
@@ -127,7 +128,7 @@ export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
     if (!channelId) throw new Error('No PeerTube channel found');
 
     const form = new FormData();
-    form.append('videofile', await fetch(first.media![0].path).then((r) => r.blob()));
+    form.append('videofile', await safeFetch(first.media![0].path).then((r) => r.blob()));
     form.append('channelId', String(channelId));
     form.append('name', (first.message || 'Video').slice(0, 120));
     form.append('description', first.message || '');

@@ -6,6 +6,8 @@ import {
   Param,
   Post,
   Delete,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ThirdPartyManager } from '@gitroom/nestjs-libraries/3rdparties/thirdparty.manager';
@@ -15,6 +17,7 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { ImportMediaDto } from '@gitroom/nestjs-libraries/dtos/third-party/import-media.dto';
+import { ThirdPartySubmitDto } from '@gitroom/nestjs-libraries/dtos/third-party/third-party-submit.dto';
 
 @ApiTags('Third Party')
 @Controller('/third-party')
@@ -61,10 +64,11 @@ export class ThirdPartyController {
   }
 
   @Post('/:id/submit')
+  @UsePipes(new ValidationPipe({ whitelist: false }))
   async generate(
     @GetOrgFromRequest() organization: Organization,
     @Param('id') id: string,
-    @Body() data: any
+    @Body() data: ThirdPartySubmitDto
   ) {
     const thirdParty = await this._thirdPartyManager.getIntegrationById(
       organization.id,
@@ -93,11 +97,12 @@ export class ThirdPartyController {
   }
 
   @Post('/function/:id/:functionName')
+  @UsePipes(new ValidationPipe({ whitelist: false }))
   async callFunction(
     @GetOrgFromRequest() organization: Organization,
     @Param('id') id: string,
     @Param('functionName') functionName: string,
-    @Body() data: any
+    @Body() data: ThirdPartySubmitDto
   ) {
     const thirdParty = await this._thirdPartyManager.getIntegrationById(
       organization.id,

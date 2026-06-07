@@ -1,17 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('sharp', () => ({
-  default: vi.fn(() => ({
-    metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-  })),
+  default: vi.fn(function() {
+    return { metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }) };
+  }),
 }));
 
+vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {
+  constructor(message?: string, type?: string, retryable?: boolean, details?: any[]) {
+    this.message = message;
+  }
+} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({
   timer: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({
   readOrFetch: vi.fn().mockResolvedValue(Buffer.from('fake-image-data')),
+}));
+
+vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch', () => ({
+  safeFetch: vi.fn((url: string, options?: RequestInit) => fetch(url, options)),
 }));
 
 import {

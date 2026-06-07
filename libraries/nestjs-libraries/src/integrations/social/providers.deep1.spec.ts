@@ -1,22 +1,25 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import EventEmitter from 'events';
 
-vi.mock('sharp', () => ({ default: vi.fn(() => ({
-  metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-  toFormat: vi.fn(() => ({
-    resize: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')) })),
-    toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
-  })),
-  resize: vi.fn(() => ({ gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })) })),
-  gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
-})) }));
+vi.mock('sharp', () => ({ default: vi.fn(function() {
+  return {
+    metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
+    toFormat: vi.fn(() => ({
+      resize: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')) })),
+      toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')),
+    })),
+    resize: vi.fn(() => ({ gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })) })),
+    gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
+  };
+}) }));
 vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));
 vi.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: { fixedEncryption: vi.fn((s: string) => s), fixedDecryption: vi.fn((s: string) => s) } }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service', () => ({
-  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(() => ({})), upsert: vi.fn(), delete: vi.fn() })),
+  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(function() { return {}; }), upsert: vi.fn(), delete: vi.fn() })),
 }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository', () => ({
   ProviderConfigRepository: vi.fn(() => ({ getAll: vi.fn(), getByIdentifier: vi.fn(), upsert: vi.fn(), delete: vi.fn(), setEnabled: vi.fn() })),
@@ -54,7 +57,6 @@ vi.mock('twitter-api-v2', () => {
   return { TwitterApi: MockTwitterApi };
 });
 vi.mock('ws', () => {
-  const EventEmitter = require('events');
   return { default: class MockWebSocket extends EventEmitter { close = vi.fn(); } };
 });
 const mockAxiosFn = vi.hoisted(() => {
@@ -84,10 +86,10 @@ vi.mock('googleapis', () => {
   const yt = { videos: mockYtVideos, channels: mockYtChannels, thumbnails: mockYtThumbnails };
   return {
     google: {
-      auth: { OAuth2: vi.fn(() => mockYtClient) },
+      auth: { OAuth2: vi.fn(function() { return mockYtClient; }) },
       youtube: vi.fn(() => yt),
-      oauth2: vi.fn(() => mockYtOauth2),
-      youtubeAnalytics: vi.fn(() => mockYtAnalytics),
+      oauth2: vi.fn(function() { return mockYtOauth2; }),
+      youtubeAnalytics: vi.fn(function() { return mockYtAnalytics; }),
     },
   };
 });

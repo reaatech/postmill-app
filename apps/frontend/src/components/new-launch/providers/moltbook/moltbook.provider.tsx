@@ -9,6 +9,7 @@ import { MoltbookDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-sett
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { Input } from '@gitroom/react/form/input';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { FirstCommentField } from '@gitroom/frontend/components/new-launch/providers/shared/first-comment.field';
 
 const MoltbookSettings: FC = () => {
   const form = useSettings();
@@ -21,6 +22,7 @@ const MoltbookSettings: FC = () => {
         placeholder="general"
         {...form.register('submolt')}
       />
+      <FirstCommentField />
     </div>
   );
 };

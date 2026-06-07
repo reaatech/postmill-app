@@ -111,6 +111,36 @@ export class NotificationService {
     await this._emailService.sendEmail(to, subject, html, 'top', replyTo);
   }
 
+  async notifyPostPublishFailure(orgId: string, integrationName: string, postId: string, subStep?: string) {
+    const subject = subStep
+      ? `Post published with ${subStep} failure`
+      : 'Post publish failure';
+    const message = subStep
+      ? `Your post on ${integrationName} was published, but the "${subStep}" step failed. Check the post details for more information.`
+      : `Your post on ${integrationName} could not be published. Please review the error details.`;
+    await this.inAppNotification(orgId, subject, message, true, false, 'fail');
+  }
+
+  async notifyInboxBacklog(orgId: string, backlogCount: number) {
+    if (backlogCount <= 5) return;
+    const subject = 'Comment inbox backlog';
+    const message = `You have ${backlogCount} unhandled comments in your inbox. Responding quickly improves engagement.`;
+    await this.inAppNotification(orgId, subject, message, true, true, 'info');
+  }
+
+  async notifyBudgetThreshold(orgId: string, scope: string, usagePct: number) {
+    const subject = `AI budget alert: ${usagePct.toFixed(0)}% used`;
+    const message = `Your AI budget for "${scope}" has reached ${usagePct.toFixed(0)}% of the cap. Review your usage in AI settings.`;
+    await this.inAppNotification(orgId, subject, message, true, false, 'info');
+  }
+
+  async notifyWatchlistTrend(orgId: string, accountName: string, metric: string, changePct: number) {
+    const direction = changePct > 0 ? 'increased' : 'decreased';
+    const subject = `Watchlist alert: ${accountName}`;
+    const message = `${accountName} ${metric} has ${direction} by ${Math.abs(changePct).toFixed(1)}%.`;
+    await this.inAppNotification(orgId, subject, message, true, true, 'info');
+  }
+
   hasEmailProvider() {
     return this._emailService.hasProvider();
   }

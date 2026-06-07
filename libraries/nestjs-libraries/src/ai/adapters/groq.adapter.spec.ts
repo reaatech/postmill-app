@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@ai-sdk/groq', () => ({
   createGroq: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'llama-4-scout' })),
-    textEmbeddingModel: vi.fn(() => ({})),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { GroqAdapter } from './groq.adapter';

@@ -5,15 +5,17 @@ comments into the [Post Detail](../features/calendar-and-posts.md) view and the
 [Social comments](../features/social-comments.md) feature. This page lists which providers support
 it and what each can do.
 
-> **Verified against v3.4.0.** Derived from the provider implementations of `fetchComments` /
-> `replyToComment` / `likeComment`.
+> **Verified against v3.5.0.** Derived from the provider implementations of `fetchComments` /
+> `replyToComment` / `likeComment` and the central provider capability matrix (`comments` flag).
 
 ---
 
 ## Capability matrix
 
-Providers expose a `commentsCapabilities` object with `read`, `reply`, and `like` flags. The
-providers that implement comment sync are:
+Providers expose a `commentsCapabilities` object with `read`, `reply`, and `like` flags, and the
+central [provider capability matrix](../features/provider-capabilities.md) carries a `comments` flag
+that is the **source of truth** for whether a provider syncs comments. The providers that implement
+comment sync are:
 
 | Provider | Read (fetch) | Reply | Like |
 |----------|:---:|:---:|:---:|
@@ -27,6 +29,14 @@ providers that implement comment sync are:
 | Threads | ✅ | … | … |
 | YouTube | ✅ | … | … |
 | Bluesky | ✅ | … | … |
+| **Discord** _(v3.5.0)_ | ✅ | … | … |
+| **Telegram** _(v3.5.0)_ | ✅ | … | … |
+| **Slack** _(v3.5.0)_ | ✅ | … | … |
+| **WordPress** _(v3.5.0)_ | ✅ | … | … |
+| **Dev.to** _(v3.5.0)_ | ✅ | … | … |
+| **Hashnode** _(v3.5.0)_ | ✅ | … | … |
+| **Medium** _(v3.5.0)_ | ✅ | … | … |
+| **TikTok** _(v3.5.0)_ | ✅ | … | … |
 
 > The exact reply/like support per provider is declared by each provider's `commentsCapabilities`
 > flags. The UI reads those flags and only shows reply/like actions where the provider declares
@@ -43,5 +53,6 @@ not pulled into the app. See [Tumblr, Pixelfed & PeerTube](./tumblr-pixelfed-pee
 Comment collection is a Temporal workflow gated by `RUN_CRON=true` on one orchestrator instance.
 Comments are stored with per-user read state. See:
 
-- [Social comments](../features/social-comments.md) — the feature and its endpoints.
+- [Social comments](../features/social-comments.md) — the feature, the cross-channel inbox, and its endpoints.
+- [Provider capabilities](../features/provider-capabilities.md) — the full capability matrix.
 - [Temporal & background jobs](../self-hosting/temporal-and-cron.md) — how/when sync runs.

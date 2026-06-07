@@ -12,8 +12,11 @@ import { MeweDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { Logger } from '@nestjs/common';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class MeweProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(MeweProvider.name);
   identifier = 'mewe';
   name = 'MeWe';
   isBetweenSteps = false;
@@ -163,7 +166,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
         username: profile.handle || '',
       };
     } catch (e) {
-      console.log(e);
+      this.logger.warn('MeWe authentication failed');
       return 'MeWe authentication failed. Please try again.';
     }
   }
@@ -205,7 +208,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     mediaPath: string
   ): Promise<string> {
-    const mediaResponse = await fetch(mediaPath);
+    const mediaResponse = await safeFetch(mediaPath);
     const blob = await mediaResponse.blob();
     const fileName = mediaPath.split('/').pop() || 'photo.jpg';
 

@@ -17,6 +17,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 import utc from 'dayjs/plugin/utc';
 import { v4 as uuidv4 } from 'uuid';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
+import { decryptPostIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
 
 dayjs.extend(isoWeek);
 dayjs.extend(weekOfYear);
@@ -35,6 +36,38 @@ export class PostsRepository {
     private _socialComment: PrismaRepository<'socialComment'>,
     private _postCommentRead: PrismaRepository<'postCommentRead'>
   ) {}
+
+  private async _enrichWithUnreadComments(posts: any[], userId: string): Promise<void> {
+    const postIds = posts.map(p => p.id);
+    const unreadMap = new Map<string, number>();
+
+    if (postIds.length > 0) {
+      const unreadRows = await this._socialComment.$queryRaw<
+        Array<{ post_id: string; unread: number }>
+      >`
+        SELECT
+          sc."postId" AS post_id,
+          COUNT(*)::int AS unread
+        FROM "SocialComment" sc
+        LEFT JOIN "PostCommentRead" pcr
+          ON pcr."postId" = sc."postId" AND pcr."userId" = ${userId}
+        WHERE
+          sc."postId" IN (${Prisma.join(postIds)})
+          AND sc."deletedAt" IS NULL
+          AND sc."isOwn" = false
+          AND (pcr."lastReadAt" IS NULL OR sc."platformCreatedAt" > pcr."lastReadAt")
+        GROUP BY sc."postId"
+      `;
+
+      for (const { post_id, unread } of unreadRows) {
+        unreadMap.set(post_id, unread);
+      }
+    }
+
+    for (const post of posts) {
+      (post as any).unreadComments = unreadMap.get(post.id) || 0;
+    }
+  }
 
   searchForMissingThreeHoursPosts() {
     return this._post.model.post.findMany({
@@ -62,6 +95,7 @@ export class PostsRepository {
           },
         },
         publishDate: true,
+        settings: true,
       },
     });
   }
@@ -226,37 +260,8 @@ export class PostsRepository {
       return [...all, ...addMorePosts];
     }, [] as any[]);
 
-    // Single-query unread comment counts per post for the given user
     if (userId) {
-      const postIds = posts.map(p => p.id);
-      const unreadMap = new Map<string, number>();
-
-      if (postIds.length > 0) {
-        const unreadRows = await this._socialComment.$queryRaw<
-          Array<{ post_id: string; unread: number }>
-        >`
-          SELECT
-            sc."postId" AS post_id,
-            COUNT(*)::int AS unread
-          FROM "SocialComment" sc
-          LEFT JOIN "PostCommentRead" pcr
-            ON pcr."postId" = sc."postId" AND pcr."userId" = ${userId}
-          WHERE
-            sc."postId" IN (${Prisma.join(postIds)})
-            AND sc."deletedAt" IS NULL
-            AND sc."isOwn" = false
-            AND (pcr."lastReadAt" IS NULL OR sc."platformCreatedAt" > pcr."lastReadAt")
-          GROUP BY sc."postId"
-        `;
-
-        for (const { post_id, unread } of unreadRows) {
-          unreadMap.set(post_id, unread);
-        }
-      }
-
-      for (const post of posts) {
-        (post as any).unreadComments = unreadMap.get(post.id) || 0;
-      }
+      await this._enrichWithUnreadComments(posts, userId);
     }
 
     return posts;
@@ -358,35 +363,7 @@ export class PostsRepository {
     ]);
 
     if (userId) {
-      const postIds = posts.map(p => p.id);
-      const unreadMap = new Map<string, number>();
-
-      if (postIds.length > 0) {
-        const unreadRows = await this._socialComment.$queryRaw<
-          Array<{ post_id: string; unread: number }>
-        >`
-          SELECT
-            sc."postId" AS post_id,
-            COUNT(*)::int AS unread
-          FROM "SocialComment" sc
-          LEFT JOIN "PostCommentRead" pcr
-            ON pcr."postId" = sc."postId" AND pcr."userId" = ${userId}
-          WHERE
-            sc."postId" IN (${Prisma.join(postIds)})
-            AND sc."deletedAt" IS NULL
-            AND sc."isOwn" = false
-            AND (pcr."lastReadAt" IS NULL OR sc."platformCreatedAt" > pcr."lastReadAt")
-          GROUP BY sc."postId"
-        `;
-
-        for (const { post_id, unread } of unreadRows) {
-          unreadMap.set(post_id, unread);
-        }
-      }
-
-      for (const post of posts) {
-        (post as any).unreadComments = unreadMap.get(post.id) || 0;
-      }
+      await this._enrichWithUnreadComments(posts, userId);
     }
 
     return {
@@ -436,16 +413,16 @@ export class PostsRepository {
           },
         },
       },
-    });
+    }).then((posts) => posts.map(decryptPostIntegrationTokens));
   }
 
-  getPost(
+  async getPost(
     id: string,
     includeIntegration = false,
     orgId?: string,
     isFirst?: boolean
   ) {
-    return this._post.model.post.findUnique({
+    const post = await this._post.model.post.findUnique({
       where: {
         id,
         ...(orgId ? { organizationId: orgId } : {}),
@@ -465,6 +442,7 @@ export class PostsRepository {
         childrenPost: true,
       },
     });
+    return decryptPostIntegrationTokens(post);
   }
 
   updatePost(id: string, postId: string, releaseURL: string) {
@@ -477,6 +455,13 @@ export class PostsRepository {
         releaseURL,
         releaseId: postId,
       },
+    });
+  }
+
+  updatePostSettings(id: string, settings: string) {
+    return this._post.model.post.update({
+      where: { id },
+      data: { settings },
     });
   }
 
@@ -493,6 +478,21 @@ export class PostsRepository {
     });
   }
 
+  private _redactSensitive(value: string): string {
+    const SENSITIVE_KEYS = [
+      'token', 'accessToken', 'access_token', 'refreshToken', 'refresh_token',
+      'apiKey', 'api_key', 'secret', 'password', 'Authorization',
+    ];
+    let result = value;
+    for (const key of SENSITIVE_KEYS) {
+      const regex = new RegExp(`("${key}"\\s*:\\s*)"[^"]*"`, 'gi');
+      result = result.replace(regex, `$1"[REDACTED]"`);
+      const regex2 = new RegExp(`(\\b${key}\\b\\s*[:=]\\s*)[^\\s,;&"]+`, 'gi');
+      result = result.replace(regex2, `$1[REDACTED]`);
+    }
+    return result;
+  }
+
   async changeState(id: string, state: State, err?: any, body?: any) {
     const update = await this._post.model.post.update({
       where: {
@@ -501,7 +501,7 @@ export class PostsRepository {
       data: {
         state,
         ...(err
-          ? { error: typeof err === 'string' ? err : JSON.stringify(err) }
+          ? { error: typeof err === 'string' ? this._redactSensitive(err) : this._redactSensitive(JSON.stringify(err)) }
           : {}),
       },
       include: {
@@ -515,13 +515,15 @@ export class PostsRepository {
 
     if (state === 'ERROR' && err && body) {
       try {
+        const safeErr = typeof err === 'string' ? err : this._redactSensitive(JSON.stringify(err));
+        const safeBody = typeof body === 'string' ? body : this._redactSensitive(JSON.stringify(body));
         await this._errors.model.errors.create({
           data: {
-            message: typeof err === 'string' ? err : JSON.stringify(err),
+            message: safeErr,
             organizationId: update.organizationId,
             platform: update.integration.providerIdentifier,
             postId: update.id,
-            body: typeof body === 'string' ? body : JSON.stringify(body),
+            body: safeBody,
           },
         });
       } catch (err) {}
@@ -766,8 +768,8 @@ export class PostsRepository {
     });
   }
 
-  getPostById(id: string, org?: string) {
-    return this._post.model.post.findUnique({
+  async getPostById(id: string, org?: string) {
+    const post = await this._post.model.post.findUnique({
       where: {
         id,
         ...(org ? { organizationId: org } : {}),
@@ -792,6 +794,7 @@ export class PostsRepository {
         },
       },
     });
+    return decryptPostIntegrationTokens(post);
   }
 
   findAllExistingCategories() {
@@ -836,10 +839,10 @@ export class PostsRepository {
   }) {
     return this._popularPosts.model.popularPosts.create({
       data: {
-        category: 'category',
-        topic: 'topic',
-        content: 'content',
-        hook: 'hook',
+        category: post.category,
+        topic: post.topic,
+        content: post.content,
+        hook: post.hook,
       },
     });
   }
