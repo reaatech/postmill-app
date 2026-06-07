@@ -31,24 +31,27 @@ This repository is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq
 - **Faster, safer, more dependable** — Your accounts and data are protected by end-to-end encryption and hardened against common web attacks, on a snappier platform that's been re-architected for reliability.
 
 **[v3.4.0]**
-- **Use the AI you want** — You're no longer locked to a single AI vendor. Pick your own provider and model from an admin screen, and everywhere Postiz uses AI follows your choice — while your existing setup keeps working out of the box.
-- **Stay in control of cost and safety** — Set spending caps, get alerted before you hit them, and keep output on-brand and safe with built-in guardrails for brand safety, sensitive data, and prompt-injection.
-- **AI woven through the product** — A reusable brand-voice profile, prompt templates, a shared team prompt library, smart comment replies, and semantic search across your own content — so the AI actually sounds like you.
-- **Bring your own keys** — Self-hosters and teams can plug in their own AI accounts, with provider health and usage visible to admins.
+- **Use any AI provider you want** — You're no longer locked to a single vendor. Choose from 26 providers — 12 first-class (OpenAI, Anthropic, Azure OpenAI, Google, Vertex, Amazon Bedrock, Mistral, Cohere, Groq, xAI Grok, OpenRouter, Vercel AI Gateway) plus hubs like DeepSeek, Together AI, Fireworks, and Perplexity — pick the exact model from an admin screen, test the connection, and watch live health badges. Your existing `OPENAI_API_KEY` keeps working byte-for-byte if you change nothing.
+- **Stay in control of cost and safety** — Set monthly and daily spend caps per org or per use case, get an alert at 80% before you hit the limit, and review every request in a full spend log. Built-in guardrails screen input and output for prompt-injection, sensitive data (PII), brand safety, and NSFW content, with your choice of block, redact, or warn — and a dry-run preview to test a rule before it goes live.
+- **AI that actually sounds like you** — Reusable brand-voice profiles, a prompt-template builder, a shared team prompt library, semantic search across your own content, smart comment replies, and a usage dashboard — so the AI writes in your voice, not a generic one.
+- **One engine behind everything, bring your own keys** — The composer, the agent generator, the chat assistant, and the agent/automation API all run through a single AI provider layer, so switching providers applies everywhere without a redeploy. Teams and self-hosters can plug in their own per-organization keys, and every agent entry point is locked down with scopes, rate limits, and budget checks.
 
 **[v3.3.0]**
-- **A calendar that shows performance** — Click any post to open its full detail — key metrics up top and the whole thread in view — with live status and engagement stats right on the card.
-- **Conversations on your posts** — Postiz now keeps the comments on what you publish in sync, so you can stay on top of your audience without leaving the app.
+- **A calendar that shows performance** — Click any post to open a full detail view: key metrics across the top, the entire post thread in one place, a scheduled-vs-published status pill, and real view/like/comment counts right on each card — plus a dedicated settings control to jump straight into editing.
+- **Conversations on your posts** — A new comment-sync foundation keeps the replies on what you publish up to date on a recurring background schedule, tracks what each teammate has already read, and surfaces it all in the app — so you can stay on top of your audience without bouncing between platforms.
 
 **[v3.2.0]**
-- **Three more places to reach your audience** — Publish to **Tumblr**, **Pixelfed**, and **PeerTube**, bringing Postiz to **36** connected channels — so your content goes further from the same dashboard.
+- **Three more places to reach your audience** — Publish to **Tumblr**, **Pixelfed**, and **PeerTube**, taking Postiz to **36** connected channels. Tumblr posts native rich media (images and video) with automatic token refresh; Pixelfed and PeerTube add comment support — all managed from the same dashboard with no extra database setup.
+- **Correct, not just connected** — The new providers shipped with proper formatting (plain-text rendering fixed so posts never leak raw HTML tags) and media-only posting handled correctly, backed by a 64-case provider test suite.
 
 **[v3.1.0]**
-- **Real analytics across all your channels** — A true historical dashboard that replaces the old one-channel-at-a-time live view. Track genuine period-over-period trends, drill into any channel or date range with rich charts, and export it all — so you can see what's actually working and act on it.
+- **Real analytics across all your channels** — A persisted, multi-channel dashboard that replaces the old one-channel-at-a-time live view. Track genuine period-over-period trends, drill into any channel, metric, or date range with rich charts, and export everything to CSV or JSON — so you can see what's actually working and act on it.
+- **Built to stay accurate over time** — Metrics are snapshotted daily in the background, normalized into a consistent set across providers, and automatically rolled up into long-term weekly history with configurable retention — so collisions between similar platform metrics are eliminated, the numbers stay correct, and the database stays bounded as history grows.
 
 **[v3.0.0+]**
-- **Manage every channel from one screen** — Set up and control all your social connections from an admin UI instead of editing environment variables, with credentials encrypted at rest. Turn a provider off and your already-connected accounts keep posting, refreshing, and reporting — only new connections are paused.
-- **A foundation you can trust** — Backed by 1000+ automated tests and a ready-to-run prebuilt image, so self-hosting is stable, predictable, and quick to deploy.
+- **Manage every channel from one screen** — Set up and control all your social connections from an admin UI instead of editing environment variables, with credentials encrypted at rest. Turn a provider off and your already-connected accounts keep posting, refreshing, and reporting — only new connections are paused. With no database config, everything falls back to environment variables exactly as before.
+- **Dozens of provider fixes for dependable publishing** — A broad hardening pass across all 33 providers fixed real-world publishing bugs (Pinterest and Dribbble token refresh, Bluesky auto-repost thresholds, Telegram bot tokens) and removed unsafe assumptions and import-time side effects — so scheduled posts and token refreshes behave predictably.
+- **A foundation you can trust** — Backed by 1000+ automated tests, a ready-to-run prebuilt image, and a stack migrated to the modern Temporal-based job model with a verified zero-data-loss upgrade path — so self-hosting is stable, predictable, and quick to deploy.
 
 See [github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app) for the full changelog and source.
 

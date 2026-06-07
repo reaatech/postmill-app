@@ -163,7 +163,7 @@ export abstract class SocialAbstract {
     // (mastodon `uploadFile`, bluesky `downloadVideo`, provider connect flows).
     const request = await fetch(url, {
       ...options,
-      // @ts-expect-error — undici-only RequestInit option
+      // dispatcher is an undici-only RequestInit option, absorbed by the cast below
       dispatcher: (options as any).dispatcher ?? ssrfSafeDispatcher,
     } as RequestInit);
 
