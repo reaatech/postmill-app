@@ -7,6 +7,7 @@ import {
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import dayjs from 'dayjs';
+import { randomUUID } from 'crypto';
 import {
   BadBody,
   SocialAbstract,
@@ -308,7 +309,7 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   async generateAuthUrl() {
-    const state = require('crypto').randomUUID();
+    const state = randomUUID();
 
     return {
       url:

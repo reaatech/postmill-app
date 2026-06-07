@@ -106,14 +106,13 @@ export class ToolFirewallService {
   wrap<T extends { execute?: (...args: any[]) => any }>(toolName: string, tool: T): T {
     if (!tool || typeof tool.execute !== 'function') return tool;
     const original = tool.execute.bind(tool);
-    const firewall = this;
     return {
       ...tool,
       execute: async (...args: any[]) => {
         const input = args?.[0]?.context ?? args?.[0];
-        const verdict = firewall.check(toolName, input);
+        const verdict = this.check(toolName, input);
         if (!verdict.allowed) {
-          firewall._logger.warn(`blocked tool "${toolName}": ${verdict.reason}`);
+          this._logger.warn(`blocked tool "${toolName}": ${verdict.reason}`);
           throw new ToolFirewallBlocked(toolName, verdict.reason || 'blocked');
         }
         return original(...args);

@@ -452,7 +452,10 @@ describe('CopilotController', () => {
         providerId: 'openai',
       });
       const req = { body: { variables: { properties: { integrations: [] } } } } as any;
-      const res = {} as any;
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn(),
+      } as any;
       const org = { id: 'org-agent-1' } as any;
 
       await controller.agent(req, res, org);
@@ -464,7 +467,10 @@ describe('CopilotController', () => {
       process.env.OPENAI_API_KEY = '';
       mockResolveConfigForScope.mockResolvedValue(null);
       const req = { body: { variables: { properties: { integrations: [] } } } } as any;
-      const res = {} as any;
+      const res = {
+        status: vi.fn().mockReturnThis(),
+        json: vi.fn(),
+      } as any;
       const org = { id: 'org-agent-fail' } as any;
 
       await expect(controller.agent(req, res, org)).rejects.toThrow(HttpException);

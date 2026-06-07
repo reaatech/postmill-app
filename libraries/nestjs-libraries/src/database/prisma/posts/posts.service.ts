@@ -11,6 +11,7 @@ import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import dayjs from 'dayjs';
+import { randomInt } from 'crypto';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -1214,7 +1215,7 @@ export class PostsService {
     });
 
     const findTime = (): string => {
-      const totalMinutes = Math.floor(require('crypto').randomInt(144)) * 10;
+      const totalMinutes = Math.floor(randomInt(144)) * 10;
 
       // Convert total minutes to hours and minutes
       const hours = Math.floor(totalMinutes / 60);
@@ -1387,7 +1388,7 @@ export class PostsService {
       const row = body.rows[i];
       const rowWarnings: string[] = [];
       let rowError: string | undefined;
-      let postIds: string[] = [];
+      const postIds: string[] = [];
 
       try {
         for (const channelId of row.channels) {

@@ -7,7 +7,7 @@ vi.mock('@ai-sdk/perplexity', () => ({
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { PerplexityAdapter } from './perplexity.adapter';

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import EventEmitter from 'events';
 
 vi.mock('sharp', () => ({ default: vi.fn() }));
 vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
@@ -8,7 +9,7 @@ vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mo
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));
 vi.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: { fixedEncryption: vi.fn((s: string) => s), fixedDecryption: vi.fn((s: string) => s) } }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service', () => ({
-  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(() => ({})), upsert: vi.fn(), delete: vi.fn() })),
+  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(function() { return {}; }), upsert: vi.fn(), delete: vi.fn() })),
 }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository', () => ({
   ProviderConfigRepository: vi.fn(() => ({ getAll: vi.fn(), getByIdentifier: vi.fn(), upsert: vi.fn(), delete: vi.fn(), setEnabled: vi.fn() })),
@@ -20,12 +21,11 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
 vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
   getEnvOr: () => 'mock-value',
   setCredentials: vi.fn(),
-  getCredential: vi.fn(() => undefined),
+  getCredential: vi.fn(function() { return undefined; }),
   clearCredentials: vi.fn(),
   replaceCredentialsMap: vi.fn(),
 }));
 vi.mock('ws', () => {
-  const EventEmitter = require('events');
   return { default: class MockWebSocket extends EventEmitter { close = vi.fn(); } };
 });
 

@@ -243,7 +243,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
           mediaGroup as any[],
           {
             ...(replyToMessageId && i === 0
-              ? { reply_to_message_id: replyToMessageId }
+              ? { reply_parameters: { message_id: replyToMessageId } }
               : {}),
           }
         );
@@ -382,7 +382,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     try {
       const chatId = accessToken;
       const response = await this.bot.sendMessage(chatId, message, {
-        reply_to_message_id: parseInt(parentCommentId, 10),
+        reply_parameters: { message_id: parseInt(parentCommentId, 10) },
         parse_mode: 'HTML',
       });
 
@@ -432,7 +432,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
         chatMember.status === 'administrator' ||
         chatMember.status === 'creator'
       ) {
-        const permissions = chatMember.can_delete_messages;
+        const permissions = (chatMember as any).can_delete_messages;
         return !!permissions; // Return true if bot can delete messages
       }
 

@@ -67,6 +67,7 @@ async function start() {
   app.use(compression());
 
   if (!isDev() || !process.env.NOT_SECURED) {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const helmet = require('helmet');
     app.use(helmet({
       contentSecurityPolicy: {

@@ -1,7 +1,8 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import EventEmitter from 'events';
 
-vi.mock('sharp', () => ({ default: vi.fn(() => ({
+vi.mock('sharp', () => ({ default: vi.fn(function() { return ({
   metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
   toFormat: vi.fn(() => ({
     resize: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('image')) })),
@@ -9,7 +10,7 @@ vi.mock('sharp', () => ({ default: vi.fn(() => ({
   })),
   resize: vi.fn(() => ({ gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })) })),
   gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
-})) }));
+}); }) }));
 vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
@@ -20,7 +21,7 @@ vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch', () => ({ safeFetch
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));
 vi.mock('@gitroom/helpers/auth/auth.service', () => ({ AuthService: { fixedEncryption: vi.fn((s: string) => s), fixedDecryption: vi.fn((s: string) => s), signJWT: vi.fn(() => 'signed-jwt'), verifyJWT: vi.fn(() => ({ password: 'deadbeef' })) } }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service', () => ({
-  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(() => ({})), upsert: vi.fn(), delete: vi.fn() })),
+  ProviderConfigService: vi.fn(() => ({ getAll: vi.fn().mockResolvedValue([]), getByIdentifier: vi.fn(), decryptConfig: vi.fn(function() { return {}; }), upsert: vi.fn(), delete: vi.fn() })),
 }));
 vi.mock('@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository', () => ({
   ProviderConfigRepository: vi.fn(() => ({ getAll: vi.fn(), getByIdentifier: vi.fn(), upsert: vi.fn(), delete: vi.fn(), setEnabled: vi.fn() })),
@@ -42,7 +43,6 @@ vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
   replaceCredentialsMap: vi.fn(),
 }));
 vi.mock('ws', () => {
-  const EventEmitter = require('events');
   return { default: class MockWebSocket extends EventEmitter { close = vi.fn(); } };
 });
 
@@ -60,22 +60,62 @@ const mockBskyAgent = vi.hoisted(() => ({
   getProfile: vi.fn().mockResolvedValue({ data: { displayName: 'Test User', avatar: 'https://ex.com/avatar.jpg', handle: 'testhandle' } }),
   uploadBlob: vi.fn().mockResolvedValue({ data: { blob: { ref: { $link: 'ref-123' }, mimeType: 'image/jpeg', size: 12345 } } }),
   post: vi.fn().mockResolvedValue({ cid: 'cid-123', uri: 'at://did:plc:123/app.bsky.feed.post/post-123', commit: {} }),
-  getPostThread: vi.fn().mockResolvedValue({ data: { thread: { post: { cid: 'parent-cid', record: { reply: { root: { uri: 'at://root/post-root', cid: 'root-cid' } } }, likeCount: 50 } } } }),
+  getPostThread: vi.fn().mockResolvedValue({
+    data: {
+      thread: {
+        post: {
+          uri: 'at://did:plc:123/app.bsky.feed.post/post-123',
+          cid: 'parent-cid',
+          record: { reply: { root: { uri: 'at://root/post-root', cid: 'root-cid' } } },
+          likeCount: 50,
+          replyCount: 1,
+          viewer: { like: 'at://like/uri' },
+          author: { did: 'did:plc:author', displayName: 'Author', handle: 'author', avatar: 'https://ex.com/author.jpg' },
+        },
+        replies: [
+          {
+            post: {
+              uri: 'at://did:plc:123/app.bsky.feed.post/reply-1',
+              cid: 'cid-reply-1',
+              record: { text: 'Great post!', reply: { parent: { uri: 'at://did:plc:123/app.bsky.feed.post/post-123' } }, createdAt: '2024-01-01T00:00:00.000Z' },
+              likeCount: 3,
+              replyCount: 0,
+              viewer: { like: undefined },
+              author: { did: 'did:plc:reply-author', displayName: 'Reply Author', handle: 'replyauthor', avatar: 'https://ex.com/reply.jpg' },
+              indexedAt: '2024-01-01T00:00:00.000Z',
+            },
+          },
+        ],
+      },
+    },
+  }),
   searchActors: vi.fn().mockResolvedValue({ data: { actors: [{ displayName: 'Test Actor', handle: 'testactor', avatar: 'https://ex.com/avatar.jpg' }] } }),
   repost: vi.fn().mockResolvedValue({}),
+  like: vi.fn().mockResolvedValue({}),
+  deleteLike: vi.fn().mockResolvedValue({}),
+  app: {
+    bsky: {
+      video: { getJobStatus: vi.fn().mockResolvedValue({ data: { jobStatus: { state: 'JOB_STATE_COMPLETED', blob: { ref: { $link: 'vid-ref' } } } } }) },
+      feed: { getLikes: vi.fn().mockResolvedValue({ data: { likes: [{ actor: { did: 'did:plc:123' }, uri: 'at://like/uri' }] } }) },
+    },
+  },
   com: { atproto: { server: { getServiceAuth: vi.fn().mockResolvedValue({ data: { token: 'service-token' } }) } } },
-  app: { bsky: { video: { getJobStatus: vi.fn().mockResolvedValue({ data: { jobStatus: { state: 'JOB_STATE_COMPLETED', blob: { ref: { $link: 'vid-ref' } } } } }) } } },
   dispatchUrl: new URL('https://bsky.social'),
   session: { did: 'did:plc:123' },
 }));
 vi.mock('@atproto/api', () => ({
-  BskyAgent: vi.fn(() => mockBskyAgent),
-  AtpAgent: vi.fn(() => mockBskyAgent),
-  RichText: vi.fn(() => ({
-    detectFacets: vi.fn().mockResolvedValue(undefined),
-    text: 'Hello world',
-    facets: [],
-  })),
+  BskyAgent: vi.fn(function() { return mockBskyAgent; }),
+  AtpAgent: vi.fn(function() { return mockBskyAgent; }),
+  RichText: vi.fn(function() {
+    return {
+      detectFacets: vi.fn().mockResolvedValue(undefined),
+      text: 'Hello world',
+      facets: [],
+    };
+  }),
+  AppBskyEmbedVideo: {},
+  AppBskyVideoDefs: {},
+  BlobRef: class {},
 }));
 
 const mockNostrGetPublicKey = vi.hoisted(() => vi.fn(() => 'pubkey-123'));
@@ -92,17 +132,19 @@ vi.mock('nostr-tools', () => ({
     }),
   },
   finalizeEvent: vi.fn((event: any) => ({ ...event, id: 'event-id-123', sig: 'sig-123' })),
-  SimplePool: vi.fn(() => ({
-    get: vi.fn().mockResolvedValue({ kind: 0, content: JSON.stringify({ name: 'Test User', display_name: 'Test User', picture: 'https://ex.com/pic.jpg' }), id: 'evt-1' }),
-    close: vi.fn(),
-  })),
+  SimplePool: vi.fn(function() {
+    return {
+      get: vi.fn().mockResolvedValue({ kind: 0, content: JSON.stringify({ name: 'Test User', display_name: 'Test User', picture: 'https://ex.com/pic.jpg' }), id: 'evt-1' }),
+      close: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('@neynar/nodejs-sdk', () => ({
-  NeynarAPIClient: vi.fn(() => ({
+  NeynarAPIClient: vi.fn(function() { return ({
     publishCast: vi.fn().mockResolvedValue({ cast: { hash: 'cast-hash-123', author: { username: 'testuser' } } }),
     searchChannels: vi.fn().mockResolvedValue({ channels: [{ id: 'ch-1', name: 'Test Channel', object: 'channel' }] }),
-  })),
+  }); }),
 }));
 
 const mockTelegramBot = vi.hoisted(() => ({
@@ -119,7 +161,7 @@ const mockTelegramBot = vi.hoisted(() => ({
   deleteMessage: vi.fn().mockResolvedValue(true),
 }));
 vi.mock('node-telegram-bot-api', () => ({
-  default: vi.fn(() => mockTelegramBot),
+  default: vi.fn(function() { return mockTelegramBot; }),
 }));
 
 vi.mock('json-to-graphql-query', () => ({

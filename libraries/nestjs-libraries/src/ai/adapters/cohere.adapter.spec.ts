@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@ai-sdk/cohere', () => ({
   createCohere: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'command-r-plus' })),
-    textEmbeddingModel: vi.fn(() => ({})),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { CohereAdapter } from './cohere.adapter';

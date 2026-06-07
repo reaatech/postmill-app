@@ -40,6 +40,7 @@ export class CsrfMiddleware implements NestMiddleware {
 }
 
 export function issueCsrfToken(res: Response) {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const token = require('crypto').randomBytes(32).toString('hex');
   res.cookie(CSRF_COOKIE, token, {
     domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),

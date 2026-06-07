@@ -3,8 +3,7 @@ import { mkdirSync, unlink, writeFileSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { fromBuffer } = require('file-type');
+import { fromBuffer } from 'file-type';
 
 const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
   'image/jpeg',
@@ -54,7 +53,7 @@ export class LocalStorage implements IUploadProvider {
     const dir = `${this.uploadDirectory}${innerPath}`;
     mkdirSync(dir, { recursive: true });
 
-    const randomName = require('crypto').randomBytes(16).toString('hex');
+    const randomName = randomBytes(16).toString('hex');
 
     const filePath = `${dir}/${randomName}.${findExtension}`;
     const publicPath = `${innerPath}/${randomName}.${findExtension}`;

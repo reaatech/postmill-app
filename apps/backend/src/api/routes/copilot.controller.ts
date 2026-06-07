@@ -19,7 +19,7 @@ import {
   LangChainAdapter,
   OpenAIAdapter,
   copilotRuntimeNodeHttpEndpoint,
-  copilotRuntimeNextJSAppRouterEndpoint,
+  copilotRuntimeNestEndpoint,
 } from '@copilotkit/runtime';
 import Anthropic from '@anthropic-ai/sdk';
 import { Groq } from 'groq-sdk';
@@ -204,13 +204,13 @@ export class CopilotController {
         agents,
       });
 
-      const copilotRuntimeHandler = copilotRuntimeNextJSAppRouterEndpoint({
+      const copilotRuntimeHandler = copilotRuntimeNestEndpoint({
         endpoint: '/copilot/agent',
         runtime,
         serviceAdapter,
       });
 
-      return copilotRuntimeHandler.handleRequest(req, res);
+      return copilotRuntimeHandler(req, res);
     } catch (err) {
       if (err instanceof HttpException) throw err;
       Logger.warn('AI configuration not available, agent will not work');

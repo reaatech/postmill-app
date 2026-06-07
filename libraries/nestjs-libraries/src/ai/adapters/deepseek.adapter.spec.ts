@@ -7,7 +7,7 @@ vi.mock('@ai-sdk/deepseek', () => ({
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { DeepSeekAdapter } from './deepseek.adapter';

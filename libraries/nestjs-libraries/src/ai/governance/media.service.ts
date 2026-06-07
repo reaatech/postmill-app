@@ -154,6 +154,7 @@ export class AiMediaService {
     const signer = await this._getProvenanceSigner();
     if (!signer) return undefined;
     try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
       const runId = `media-${Date.now()}-${require('crypto').randomBytes(3).toString('hex')}`;
       const result = await signer.sign(artifactUrl, {
         title: `AI ${operation}`,
@@ -188,6 +189,7 @@ export class AiMediaService {
     if (ledger) {
       try {
         await ledger.charge({
+          // eslint-disable-next-line @typescript-eslint/no-require-imports
           id: `media-${Date.now()}-${require('crypto').randomBytes(3).toString('hex')}`,
           runId: orgId ?? 'system',
           tenantId: orgId,

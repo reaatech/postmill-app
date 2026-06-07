@@ -4,7 +4,7 @@ import { BasicTracerProvider, BatchSpanProcessor } from '@opentelemetry/sdk-trac
 
 let OTLPTraceExporter: new (...args: any[]) => any;
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   OTLPTraceExporter = require('@opentelemetry/exporter-trace-otlp-proto').OTLPTraceExporter;
 } catch {
   // Package not installed — telemetry exports will be a no-op
@@ -48,7 +48,6 @@ export class TelemetryService {
       });
       const processor = new BatchSpanProcessor(exporter);
       const provider = new BasicTracerProvider({ spanProcessors: [processor] });
-      provider.register();
       this._tracer = provider.getTracer('postiz-ai');
       this._logger.log(`OTLP exporter wired to ${observability.endpoint}`);
       this._configured = true;

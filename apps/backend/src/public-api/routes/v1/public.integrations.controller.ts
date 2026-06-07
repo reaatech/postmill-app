@@ -37,7 +37,7 @@ import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/n
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
 import { Readable } from 'stream';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { fromBuffer } = require('file-type');
 
 const PUBLIC_API_ALLOWED_MIME = new Set<string>([

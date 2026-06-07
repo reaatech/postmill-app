@@ -3,12 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('@ai-sdk/mistral', () => ({
   createMistral: vi.fn(() => ({
     languageModel: vi.fn(() => ({ modelId: 'mistral-large-latest' })),
-    textEmbeddingModel: vi.fn(() => ({})),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 
 vi.mock('@langchain/openai', () => ({
-  ChatOpenAI: vi.fn(() => ({})),
+  ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
 import { MistralAdapter } from './mistral.adapter';

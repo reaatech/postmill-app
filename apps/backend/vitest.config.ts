@@ -16,9 +16,8 @@ export default defineConfig({
     include: ['src/**/*.spec.ts', 'src/**/*.test.ts'],
     exclude: ['node_modules', 'dist'],
     pool: 'threads',
-    poolOptions: {
-      threads: { singleThread: true },
-    },
+    maxWorkers: 1,
+    isolate: false,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],

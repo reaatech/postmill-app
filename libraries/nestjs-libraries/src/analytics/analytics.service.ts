@@ -736,7 +736,7 @@ export class AnalyticsService {
       hasValidSort ? undefined : l
     );
 
-    let enriched = posts.map((p) => {
+    const enriched = posts.map((p) => {
       const metrics = postMetrics[p.id] || {};
       return {
         postId: p.id,

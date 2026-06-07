@@ -5,8 +5,8 @@ vi.mock('@ai-sdk/azure', () => ({
     languageModel: vi.fn(() => ({
       doGenerate: vi.fn().mockResolvedValue({}),
     })),
-    imageModel: vi.fn(() => ({})),
-    textEmbeddingModel: vi.fn(() => ({})),
+    imageModel: vi.fn(function() { return {}; }),
+    textEmbeddingModel: vi.fn(function() { return {}; }),
   })),
 }));
 

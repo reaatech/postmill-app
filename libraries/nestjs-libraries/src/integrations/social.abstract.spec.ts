@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('sharp', () => ({
-  default: vi.fn(() => ({
-    metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }),
-  })),
+  default: vi.fn(function() {
+    return { metadata: vi.fn().mockResolvedValue({ width: 800, height: 600 }) };
+  }),
 }));
 
+vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {
+  constructor(message?: string, type?: string, retryable?: boolean, details?: any[]) {
+    this.message = message;
+  }
+} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({
   timer: vi.fn().mockResolvedValue(undefined),
 }));
