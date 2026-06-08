@@ -5,7 +5,6 @@ import {
   Get,
   HttpException,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -16,7 +15,7 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization, User } from '@prisma/client';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
 import { GetPostsListDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.list.dto';
-import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { CreatePostDto, ValidatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { BulkCreatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { ApiTags } from '@nestjs/swagger';
@@ -170,7 +169,7 @@ export class PostsController {
   @Get('/:id')
   getPost(
     @GetOrgFromRequest() org: Organization,
-    @Param('id', ParseUUIDPipe) id: string
+    @Param('id') id: string
   ) {
     return this._postsService.getPost(org.id, id);
   }
@@ -178,7 +177,7 @@ export class PostsController {
   @Post('/valid')
   async validatePosts(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: CreatePostDto
+    @Body() body: ValidatePostsDto
   ) {
     return this._postsService.validatePosts(org.id, body?.posts || []);
   }
@@ -238,9 +237,9 @@ export class PostsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async preflightCheck(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: CreatePostDto
+    @Body() body: ValidatePostsDto
   ) {
-    return this._postsService.preflightCheck(org.id, body);
+    return this._postsService.preflightCheck(org.id, body as any);
   }
 
   @Post('/bulk')

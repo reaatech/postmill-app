@@ -71,7 +71,8 @@ export class MediaService {
   async generateVideoAllowed(org: Organization, type: string) {
     const video = this._videoManager.getVideoByName(type);
     if (!video) {
-      throw new Error(`Video type ${type} not found`);
+      // Unknown/unconfigured video type is a client error, not a 500.
+      throw new HttpException(`Video type ${type} not found`, 404);
     }
 
     if (!video.trial && org.isTrailing) {

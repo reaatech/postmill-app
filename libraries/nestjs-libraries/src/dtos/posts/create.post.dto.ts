@@ -1,4 +1,5 @@
 import {
+  Allow,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -128,4 +129,36 @@ export class CreatePostDto {
   @ValidateNested({ each: true })
   @ArrayMinSize(1)
   posts: Post[];
+}
+
+/**
+ * Lenient DTO for POST /posts/valid and /posts/preflight. The composer sends a
+ * partial body for pre-submit validation (type/date/posts, NO shortLink/tags,
+ * and per-post settings WITHOUT __type). Those endpoints only consume body.posts
+ * and run their own content validation in the service (validatePosts /
+ * preflightCheck). Validating against the strict CreatePostDto here 400s the
+ * composer and blocks all UI publishing, so keep this permissive.
+ */
+export class ValidatePostsDto {
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @IsOptional()
+  @IsString()
+  date?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  shortLink?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  tags?: any[];
+
+  @IsDefined()
+  @IsArray()
+  @ArrayMinSize(1)
+  @Allow()
+  posts: any[];
 }

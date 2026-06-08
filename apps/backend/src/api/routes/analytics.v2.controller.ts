@@ -5,7 +5,6 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
@@ -133,7 +132,7 @@ export class AnalyticsV2Controller {
   @Get('/post/:postId')
   async getPostDetail(
     @GetOrgFromRequest() org: Organization,
-    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param('postId') postId: string,
     @Query('date') date?: string
   ) {
     return this._analyticsService.getPostDetail(org, postId, date);

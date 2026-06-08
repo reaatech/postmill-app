@@ -15,13 +15,11 @@ export class CsrfMiddleware implements NestMiddleware {
       return;
     }
 
-    // CopilotKit's runtime client manages its own transport and cannot attach
-    // the double-submit CSRF header, so its POSTs were 403ing (breaking in-app
-    // AI chat on every page). These routes remain auth- + policy- + budget-gated.
-    if (req.path.includes('/copilot/')) {
-      next();
-      return;
-    }
+    // NOTE: do NOT exempt /copilot/ from CSRF. Doing so lets the CopilotKit
+    // runtime actually execute, which currently throws an uncaught
+    // "lambdaClient.send is not a function" and CRASHES the backend on every
+    // page load. Keep copilot CSRF-gated (it 403s, in-app chat stays disabled)
+    // until the CopilotKit runtime/dependency bug is fixed. See v3.5.5 fix list.
 
     // Determine auth source: only enforce when auth came from cookie
     const authFromCookie = !!req.cookies?.auth;
