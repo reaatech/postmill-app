@@ -46,6 +46,11 @@ export class VideoManager {
       (p: any) => p.identifier === identifier
     );
 
+    // Unknown video type: return undefined (don't deref video.target → 500).
+    if (!video) {
+      return undefined;
+    }
+
     return {
       ...video,
       instance: this._moduleRef.get(video.target, {

@@ -917,6 +917,21 @@ export class PostsService {
   ): Promise<any[]> {
     const postList = [];
     for (const post of body.posts) {
+      // The composer omits settings.__type; derive it from the integration's
+      // providerIdentifier so the provider lookup + workflow start (which read
+      // settings.__type below) resolve correctly.
+      if (!(post.settings as any)?.__type && post.integration?.id) {
+        const integ = await this._integrationService.getIntegrationById(
+          orgId,
+          post.integration.id
+        );
+        if (integ?.providerIdentifier) {
+          (post as any).settings = {
+            ...((post.settings as any) || {}),
+            __type: integ.providerIdentifier,
+          };
+        }
+      }
       const provider = await this._integrationManager.getSocialIntegration(
         (post.settings as any)?.__type
       );

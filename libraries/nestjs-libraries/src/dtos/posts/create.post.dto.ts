@@ -16,9 +16,7 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import {
-  allProviders,
   type AllProvidersSettings,
-  EmptySettings,
 } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/all.providers.settings';
 import { ValidContent } from '@gitroom/helpers/utils/valid.images';
 import { sanitizePostContent } from '@gitroom/helpers/utils/sanitize.post.content';
@@ -71,15 +69,14 @@ export class Post {
   @IsString()
   group: string;
 
-  @ValidateIf((o) => o.type !== 'draft')
-  @ValidateNested()
-  @Type(() => EmptySettings, {
-    keepDiscriminatorProperty: true,
-    discriminator: {
-      property: '__type',
-      subTypes: allProviders(EmptySettings),
-    },
-  })
+  // The composer submits per-provider settings WITHOUT the `__type` discriminator
+  // key, so the strict discriminated-union validation rejected every post
+  // ("settings.property who_can_reply_post should not exist") and broke UI
+  // publishing. Accept settings as-is here; PostsService.createPost injects
+  // `__type` from the integration's providerIdentifier, and preflight/provider
+  // layers validate the provider-specific fields functionally.
+  @IsOptional()
+  @Allow()
   settings: AllProvidersSettings;
 }
 
