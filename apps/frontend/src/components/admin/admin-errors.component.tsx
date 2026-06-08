@@ -173,6 +173,7 @@ export const AdminErrorsComponent: FC = () => {
   const user = useUser();
   const modal = useModals();
   const toaster = useToaster();
+  const fetch = useFetch();
 
   const [page, setPage] = useState(0);
   const [limit, setLimit] = useState(20);
@@ -182,13 +183,36 @@ export const AdminErrorsComponent: FC = () => {
   const [unknownFirst, setUnknownFirst] = useState(true);
 
   const { data: platforms } = usePlatformsList();
-  const { data, isLoading, error } = useErrorsList({
+  const { data, isLoading, error, mutate } = useErrorsList({
     page,
     limit,
     platform,
     email,
     unknownFirst,
   });
+
+  const resolveError = useCallback(
+    (row: ErrorRow) => async () => {
+      await fetch(`/admin/errors/${row.id}`, { method: 'DELETE' });
+      toaster.show('Error resolved', 'success');
+      await mutate();
+    },
+    [fetch, mutate, toaster]
+  );
+
+  const retryError = useCallback(
+    (row: ErrorRow) => async () => {
+      const res = await fetch(`/admin/errors/${row.id}/retry`, {
+        method: 'POST',
+      });
+      toaster.show(
+        res.ok ? 'Post re-queued for publishing' : 'Retry failed',
+        res.ok ? 'success' : 'warning'
+      );
+      await mutate();
+    },
+    [fetch, mutate, toaster]
+  );
 
   const onApplyEmail = useCallback(() => {
     setPage(0);
@@ -378,7 +402,13 @@ export const AdminErrorsComponent: FC = () => {
                   <Button secondary onClick={() => openDetails(row)}>
                     View
                   </Button>
-                  <Button onClick={() => copyRow(row)}>Copy</Button>
+                  <Button secondary onClick={() => copyRow(row)}>
+                    Copy
+                  </Button>
+                  <Button secondary onClick={retryError(row)}>
+                    Retry
+                  </Button>
+                  <Button onClick={resolveError(row)}>Resolve</Button>
                 </div>
               </div>
             );

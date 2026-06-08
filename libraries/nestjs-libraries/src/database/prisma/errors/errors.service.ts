@@ -18,4 +18,13 @@ export class ErrorsService {
   listPlatforms() {
     return this._errorsRepository.listPlatforms();
   }
+
+  getError(id: string) {
+    return this._errorsRepository.getError(id);
+  }
+
+  // Resolve = dismiss the error from the admin log (it's been handled/acknowledged).
+  resolveError(id: string) {
+    return this._errorsRepository.deleteError(id);
+  }
 }
