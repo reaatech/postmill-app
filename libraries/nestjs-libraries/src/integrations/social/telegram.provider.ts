@@ -243,7 +243,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
           mediaGroup as any[],
           {
             ...(replyToMessageId && i === 0
-              ? { reply_parameters: { message_id: replyToMessageId } }
+              ? { reply_to_message_id: replyToMessageId }
               : {}),
           }
         );
@@ -382,7 +382,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     try {
       const chatId = accessToken;
       const response = await this.bot.sendMessage(chatId, message, {
-        reply_parameters: { message_id: parseInt(parentCommentId, 10) },
+        reply_to_message_id: parseInt(parentCommentId, 10),
         parse_mode: 'HTML',
       });
 

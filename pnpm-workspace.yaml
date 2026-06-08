@@ -16,6 +16,11 @@ overrides:
   protobufjs: '>=7.5.6 <8'
   # rollup <2.80.0: high path-traversal, pinned exactly by @crxjs/vite-plugin@2.4.0.
   rollup: '>=2.80.0'
+  # form-data <2.5.4: critical unsafe-random boundary (GHSA-fjxv-7rqg-78g4), pulled by
+  # node-telegram-bot-api@0.66.0 -> @cypress/request-promise -> request@2.88.2 (pins
+  # form-data ~2.3.2). request has no non-`request` successor, so bump the vulnerable 2.3.x
+  # to patched 2.5.x (same major, API-compatible) only where <2.5.4 is requested.
+  'form-data@<2.5.4': '>=2.5.4 <3'
 
 onlyBuiltDependencies:
   - bcrypt
