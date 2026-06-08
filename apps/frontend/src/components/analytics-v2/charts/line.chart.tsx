@@ -69,6 +69,7 @@ export const LineChart: FC<LineChartProps> = ({
       });
 
       chart.current = new DrawChart(ref.current, {
+        type: 'line',
         data: {
           labels,
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
