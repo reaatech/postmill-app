@@ -191,7 +191,7 @@ export const FirstBillingComponent = () => {
             <div className="w-[1px] h-[20px] bg-blockSeparator" />
             <AttachToFeedbackIcon />
             <DeveloperIconComponent />
-            {/*<NotificationComponent />*/}
+            <NotificationComponent />
             <div className="hover:text-newTextColor">
               {user?.tier.current === 'FREE' && (
                 <LogoutComponent isIcon={true} />

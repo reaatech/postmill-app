@@ -152,7 +152,8 @@ export class CopilotController {
     @Res() res: Response,
     @GetOrgFromRequest() organization?: Organization,
   ) {
-    if ((!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development') && organization) {
+    const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
+    if (!inDevMode && organization) {
       const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
       if (!budgetCheck.allowed) {
         return res.status(429).json({ error: 'AI budget exceeded', detail: budgetCheck.reason });

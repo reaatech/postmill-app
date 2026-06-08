@@ -244,6 +244,7 @@ export class PostsController {
   }
 
   @Post('/bulk')
+  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async bulkCreate(
     @GetOrgFromRequest() org: Organization,
     @Body() body: BulkCreatePostsDto,

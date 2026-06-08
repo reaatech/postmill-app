@@ -175,7 +175,7 @@ export const SettingsPopup: FC<{
             >
               {tab === 'global_settings' && (
                 <div>
-                  <GlobalSettings />
+                  <GlobalSettings form={form} isLoading={false} />
                 </div>
               )}
               {tab === 'teams' && !!user?.tier?.team_members && isGeneral && (

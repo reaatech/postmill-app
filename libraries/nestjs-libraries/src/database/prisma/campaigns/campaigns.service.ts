@@ -26,7 +26,7 @@ export class CampaignsService {
     return this._campaignsRepository.create(params);
   }
 
-  update(id: string, data: {
+  update(id: string, organizationId: string, data: {
     name?: string;
     color?: string;
     description?: string;
@@ -34,10 +34,10 @@ export class CampaignsService {
     endDate?: Date;
     archived?: boolean;
   }) {
-    return this._campaignsRepository.update(id, data);
+    return this._campaignsRepository.update(id, organizationId, data);
   }
 
-  remove(id: string) {
-    return this._campaignsRepository.softDelete(id);
+  remove(id: string, organizationId: string) {
+    return this._campaignsRepository.softDelete(id, organizationId);
   }
 }

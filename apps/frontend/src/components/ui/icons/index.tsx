@@ -773,12 +773,13 @@ export const NoMediaIcon: FC = () => {
   const [mode, setMode] = useCookie('mode', 'dark');
 
   useEffect(() => {
-    modeEmitter.on('mode', (value) => {
+    const handler = (value: string) => {
       setMode(value);
-    });
+    };
+    modeEmitter.on('mode', handler);
 
     return () => {
-      modeEmitter.removeAllListeners();
+      modeEmitter.off('mode', handler);
     };
   }, []);
 

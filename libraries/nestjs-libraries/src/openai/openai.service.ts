@@ -60,18 +60,25 @@ export class OpenaiService {
     return result?.prompt || '';
   }
 
-  // TODO: Re-point to AiMediaService.textToSpeech() — currently uses text model as interim approach
   async generateVoiceFromText(prompt: string, orgId?: string) {
-    const result = await this._aiModelProvider.generateObject<{ voice: string }>(
-      'utility',
-      `prompt: ${prompt}`,
-      VoicePrompt,
-      {
-        system: PROMPT_CONSTANTS.generateVoiceFromText,
-        orgId,
-      },
-    );
-    return result?.voice || '';
+    try {
+      const result = await this._aiModelProvider.generateObject<{ voice: string }>(
+        'utility',
+        `prompt: ${prompt}`,
+        VoicePrompt,
+        {
+          system: PROMPT_CONSTANTS.generateVoiceFromText,
+          orgId,
+        },
+      );
+      return result?.voice || '';
+    } catch (err) {
+      if (err instanceof BudgetExceeded || err instanceof GuardrailViolation) {
+        throw err;
+      }
+      this._logger.error(`generateVoiceFromText failed: ${(err as Error)?.message}`);
+      return '';
+    }
   }
 
   async generatePosts(content: string, orgId?: string) {

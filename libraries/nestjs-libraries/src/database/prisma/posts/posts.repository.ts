@@ -402,7 +402,7 @@ export class PostsRepository {
     return this._post.model.post.findMany({
       where: {
         group,
-        ...(orgId ? { organizationId: orgId } : {}),
+        organizationId: orgId,
         deletedAt: null,
       },
       include: {
@@ -418,14 +418,14 @@ export class PostsRepository {
 
   async getPost(
     id: string,
+    organizationId: string,
     includeIntegration = false,
-    orgId?: string,
     isFirst?: boolean
   ) {
     const post = await this._post.model.post.findUnique({
       where: {
         id,
-        ...(orgId ? { organizationId: orgId } : {}),
+        organizationId,
         deletedAt: null,
       },
       include: {
@@ -597,7 +597,8 @@ export class PostsRepository {
     body: PostBody,
     tags: { value: string; label: string }[],
     creationMethod: CreationMethod,
-    inter?: number
+    inter?: number,
+    campaignId?: string
   ) {
     const posts: Post[] = [];
     const uuid = uuidv4();
@@ -652,7 +653,7 @@ export class PostsRepository {
           where: {
             id: value.id || uuidv4(),
           },
-          create: { ...updateData('create') },
+          create: { ...updateData('create'), ...(campaignId ? { campaign: { connect: { id: campaignId } } } : {}) },
           update: {
             ...updateData('update'),
             lastMessage: {
@@ -768,11 +769,11 @@ export class PostsRepository {
     });
   }
 
-  async getPostById(id: string, org?: string) {
+  async getPostById(id: string, org: string) {
     const post = await this._post.model.post.findUnique({
       where: {
         id,
-        ...(org ? { organizationId: org } : {}),
+        organizationId: org,
       },
       include: {
         integration: true,
@@ -881,6 +882,7 @@ export class PostsRepository {
     return this._comments.model.comments.findMany({
       where: {
         postId,
+        deletedAt: null,
       },
       orderBy: {
         createdAt: 'asc',

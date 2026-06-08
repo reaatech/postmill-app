@@ -1,6 +1,6 @@
 import { Controller, Post, Body, HttpCode, HttpStatus, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsIn } from 'class-validator';
 import { Request } from 'express';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
@@ -14,14 +14,6 @@ class ModerateRequest {
   @IsOptional()
   @IsIn(['output', 'input'])
   direction?: 'output' | 'input' = 'output';
-
-  @IsOptional()
-  @IsBoolean()
-  checkImage?: boolean;
-
-  @IsOptional()
-  @IsString()
-  imageUrl?: string;
 }
 
 interface ModerateResponse {
@@ -39,10 +31,8 @@ export class AiModerateController {
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @HttpCode(HttpStatus.OK)
   async moderate(@Body() body: ModerateRequest, @Req() req: Request): Promise<ModerateResponse> {
-    const { content, direction = 'output', checkImage, imageUrl } = body;
+    const { content, direction = 'output' } = body;
     const orgId = (req as any).org?.id;
-
-    const warnings: string[] = [];
 
     let result: string;
 
@@ -70,13 +60,8 @@ export class AiModerateController {
       };
     }
 
-    if (checkImage && imageUrl) {
-      warnings.push('Image moderation requires a vision provider — skipped');
-    }
-
     return {
       passed: true,
-      warnings: warnings.length > 0 ? warnings : undefined,
     };
   }
 }

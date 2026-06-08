@@ -3,7 +3,19 @@
 import { Select } from '@gitroom/react/form/select';
 import React, { useState } from 'react';
 import { isUSCitizen } from '@gitroom/frontend/components/launches/helpers/isuscitizen.utils';
-import timezones from 'timezones-list';
+
+const getTimezones = (): { name: string; tzCode: string; label: string }[] => {
+  try {
+    return require('timezones-list').default || require('timezones-list');
+  } catch {
+    const tzs = (Intl as any).supportedValuesOf?.('timeZone') || [];
+    return tzs.map((tz: string) => ({
+      name: tz,
+      tzCode: tz,
+      label: tz.replace(/_/g, ' '),
+    }));
+  }
+};
 const dateMetrics = [
   { label: 'AM:PM', value: 'US' },
   { label: '24 hours', value: 'GLOBAL' },
@@ -52,7 +64,7 @@ const MetricComponent = () => {
         onChange={changeTimezone}
         value={timezone}
       >
-        {timezones.map((metric) => (
+        {getTimezones().map((metric) => (
           <option
             key={metric.name}
             value={metric.tzCode}

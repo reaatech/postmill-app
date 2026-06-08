@@ -13,7 +13,7 @@ export const Support = () => {
   useEffect(() => {
     supportEmitter.on('change', setShow);
     return () => {
-      supportEmitter.off('state', setShow);
+      supportEmitter.off('change', setShow);
     };
   }, []);
   if (!discordUrl || !show) return null;

@@ -87,7 +87,7 @@ export const CalendarColumn: FC<{
   const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
   const postList = useMemo(() => {
     return posts.filter((post) => {
-      const pList = dayjs.utc(post.publishDate).local();
+      const pList = newDayjs(post.publishDate);
       const check =
         display === 'day'
           ? pList.format('YYYY-MM-DD HH:mm') ===
@@ -147,7 +147,7 @@ export const CalendarColumn: FC<{
       if (
         post &&
         (post.state === 'PUBLISHED' ||
-          (post.state === 'QUEUE' && dayjs().isAfter(dayjs.utc(post.publishDate))))
+          (post.state === 'QUEUE' && newDayjs().isAfter(newDayjs(post.publishDate))))
       ) {
         const whatToDo = await new Promise<'schedule' | 'update' | 'cancel'>(
           (resolve) => {

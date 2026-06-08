@@ -1,5 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
+import dayjs from 'dayjs';
 import { InboxFilterOptions } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 
 @Injectable()
@@ -37,6 +38,7 @@ export class SocialCommentsRepository {
     }
 
     if (filters.cursor) {
+      if (!dayjs(filters.cursor).isValid()) throw new BadRequestException('Invalid cursor format');
       where.platformCreatedAt = { lt: new Date(filters.cursor) };
     }
 
@@ -65,10 +67,10 @@ export class SocialCommentsRepository {
     return { comments: items, nextCursor };
   }
 
-  async bulkMarkRead(commentIds: string[]) {
+  async bulkMarkRead(commentIds: string[], organizationId: string) {
     if (!commentIds.length) return { count: 0 };
     return this._socialComment.model.socialComment.updateMany({
-      where: { id: { in: commentIds } },
+      where: { id: { in: commentIds }, organizationId },
       data: { status: 'handled' },
     });
   }

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import {
   PrismaRepository,
   PrismaTransaction,
+  PrismaService,
 } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import dayjs from 'dayjs';
 import { Organization } from '@prisma/client';
@@ -13,7 +14,8 @@ export class SubscriptionRepository {
     private readonly _organization: PrismaRepository<'organization'>,
     private readonly _user: PrismaRepository<'user'>,
     private readonly _credits: PrismaRepository<'credits'>,
-    private _usedCodes: PrismaRepository<'usedCodes'>
+    private _usedCodes: PrismaRepository<'usedCodes'>,
+    private _prisma: PrismaService,
   ) {}
 
   getUserAccount(userId: string) {
@@ -253,24 +255,26 @@ export class SubscriptionRepository {
     type = 'ai_images',
     func: () => Promise<T>
   ) {
-    const data = await this._credits.model.credits.create({
-      data: {
-        organizationId: org.id,
-        credits: 1,
-        type,
-      },
-    });
-
-    try {
-      return await func();
-    } catch (err) {
-      await this._credits.model.credits.delete({
-        where: {
-          id: data.id,
+    return this._prisma.$transaction(async (tx: any) => {
+      const data = await tx.credits.create({
+        data: {
+          organizationId: org.id,
+          credits: 1,
+          type,
         },
       });
-      throw err;
-    }
+
+      try {
+        return await func();
+      } catch (err) {
+        await tx.credits.delete({
+          where: {
+            id: data.id,
+          },
+        });
+        throw err;
+      }
+    });
   }
 
   setCustomerId(orgId: string, customerId: string) {

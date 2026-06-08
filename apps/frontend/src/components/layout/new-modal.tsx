@@ -388,7 +388,11 @@ export const areYouSure = ({
 export const DecisionEverywhere: FC = () => {
   const decision = useDecisionModal();
   useEffect(() => {
-    decisionModalEmitter.on('open', decision.open);
+    const handler = decision.open;
+    decisionModalEmitter.on('open', handler);
+    return () => {
+      decisionModalEmitter.off('open', handler);
+    };
   }, []);
   return null;
 };

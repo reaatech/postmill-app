@@ -22,6 +22,7 @@ import {
   fallbackLng,
 } from '@gitroom/react/translation/i18n.config';
 import { HtmlComponent } from '@gitroom/frontend/components/layout/html.component';
+import SetTimezone from '@gitroom/frontend/components/layout/set.timezone';
 import Script from 'next/script';
 import { ChangeDirClient } from '@gitroom/frontend/components/new-layout/change.dir.client';
 
@@ -96,7 +97,7 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           }
         >
           <SentryComponent>
-            {/*<SetTimezone />*/}
+            <SetTimezone />
             <HtmlComponent />
             <DubAnalytics />
             <FacebookComponent />

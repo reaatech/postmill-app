@@ -1462,6 +1462,7 @@ describe('AnalyticsActivity', () => {
       expect(watchlistService.probeAndRecord).not.toHaveBeenCalled();
       expect(watchlistService.markProbeFailed).toHaveBeenCalledWith(
         'wa-1',
+        'org-1',
         'Watchlist probes are not supported for mastodon'
       );
     });
@@ -1478,12 +1479,14 @@ describe('AnalyticsActivity', () => {
 
       expect(watchlistService.probeAndRecord).toHaveBeenCalledWith({
         watchedAccountId: 'wa-1',
+        organizationId: 'org-1',
         provider: 'x',
         handle: 'competitor',
         metric: 'followers',
       });
       expect(watchlistService.markProbeFailed).toHaveBeenCalledWith(
         'wa-1',
+        'org-1',
         'provider rejected probe'
       );
     });
