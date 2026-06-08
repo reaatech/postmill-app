@@ -488,6 +488,8 @@ export class AIModelProvider {
                       n: 1,
                       size: _opts?.size || (_opts?.isVertical ? '1024x1536' : '1024x1024'),
                       aspectRatio: undefined,
+                      providerOptions: {},
+                      headers: {},
                     });
                     const images = result.images as Array<string>;
                     return images?.[0] || '';
@@ -506,6 +508,11 @@ export class AIModelProvider {
               n: 1,
               size: _opts?.size || (_opts?.isVertical ? '1024x1536' : '1024x1024'),
               aspectRatio: undefined,
+              // The @ai-sdk/openai image model dereferences providerOptions.openai
+              // in doGenerate; omitting it throws "Cannot read properties of
+              // undefined (reading 'openai')". Always pass an object.
+              providerOptions: {},
+              headers: {},
             });
             const images = result.images as Array<string>;
             return images?.[0] || '';
@@ -846,7 +853,30 @@ export class AIModelProvider {
 
             if (checkedOutput) {
               try {
-                const parsed = JSON.parse(checkedOutput);
+                // Models sometimes wrap JSON in ```json fences or surrounding
+                // prose despite responseFormat:json. Strip fences and fall back
+                // to the first {...}/[...] block before parsing.
+                let jsonText = checkedOutput.trim();
+                const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+                if (fence) jsonText = fence[1].trim();
+                if (jsonText[0] !== '{' && jsonText[0] !== '[') {
+                  const objStart = jsonText.indexOf('{');
+                  const arrStart = jsonText.indexOf('[');
+                  const start =
+                    objStart === -1
+                      ? arrStart
+                      : arrStart === -1
+                      ? objStart
+                      : Math.min(objStart, arrStart);
+                  const end = Math.max(
+                    jsonText.lastIndexOf('}'),
+                    jsonText.lastIndexOf(']')
+                  );
+                  if (start >= 0 && end > start) {
+                    jsonText = jsonText.slice(start, end + 1);
+                  }
+                }
+                const parsed = JSON.parse(jsonText);
                 if (_schema && typeof _schema.parse === 'function') {
                   return _schema.parse(parsed) as T;
                 }
