@@ -390,6 +390,22 @@ export class OrganizationRepository {
     });
   }
 
+  async changeTeamMemberRole(
+    orgId: string,
+    userId: string,
+    role: 'USER' | 'ADMIN'
+  ) {
+    return this._userOrg.model.userOrganization.update({
+      where: {
+        userId_organizationId: {
+          userId,
+          organizationId: orgId,
+        },
+      },
+      data: { role },
+    });
+  }
+
   disableOrEnableNonSuperAdminUsers(orgId: string, disable: boolean) {
     return this._userOrg.model.userOrganization.updateMany({
       where: {

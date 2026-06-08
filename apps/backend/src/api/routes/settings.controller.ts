@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
@@ -34,6 +34,23 @@ export class SettingsController {
     @Body() body: AddTeamMemberDto
   ) {
     return this._organizationService.inviteTeamMember(org.id, body);
+  }
+
+  @Put('/team/:id/role')
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
+    [AuthorizationActions.Create, Sections.ADMIN]
+  )
+  changeTeamMemberRole(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body('role') role: 'USER' | 'ADMIN'
+  ) {
+    return this._organizationService.changeTeamMemberRole(
+      org,
+      id,
+      role === 'ADMIN' ? 'ADMIN' : 'USER'
+    );
   }
 
   @Delete('/team/:id')

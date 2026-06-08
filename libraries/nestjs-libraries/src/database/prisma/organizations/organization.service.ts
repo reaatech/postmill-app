@@ -117,6 +117,36 @@ export class OrganizationService {
     return this._organizationRepository.deleteTeamMember(org.id, userId);
   }
 
+  async changeTeamMemberRole(
+    org: Organization,
+    userId: string,
+    role: 'USER' | 'ADMIN'
+  ) {
+    const userOrgs = await this._organizationRepository.getOrgsByUserId(userId);
+    const findOrg = userOrgs.find((orgUser) => orgUser.id === org.id);
+    if (!findOrg) {
+      throw new Error('User is not part of this organization');
+    }
+
+    // @ts-ignore
+    const myRole = org.users[0].role;
+    // @ts-ignore
+    const userRole = findOrg.users[0].role;
+    const myLevel = myRole === 'USER' ? 0 : myRole === 'ADMIN' ? 1 : 2;
+    const userLevel = userRole === 'USER' ? 0 : userRole === 'ADMIN' ? 1 : 2;
+
+    // Only act on members strictly below you, and never promote above your own level.
+    if (myLevel <= userLevel || myLevel <= (role === 'ADMIN' ? 1 : 0)) {
+      throw new Error('You do not have permission to change this user role');
+    }
+
+    return this._organizationRepository.changeTeamMemberRole(
+      org.id,
+      userId,
+      role
+    );
+  }
+
   disableOrEnableNonSuperAdminUsers(orgId: string, disable: boolean) {
     return this._organizationRepository.disableOrEnableNonSuperAdminUsers(
       orgId,

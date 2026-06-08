@@ -163,6 +163,54 @@ export const TeamsComponent = () => {
     [t]
   );
 
+  const changeRole = useCallback(
+    (member: { user: { id: string } }) =>
+      async (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const role = e.target.value;
+        await fetch(`/settings/team/${member.user.id}/role`, {
+          method: 'PUT',
+          body: JSON.stringify({ role }),
+        });
+        await mutate();
+      },
+    [fetch, mutate]
+  );
+
+  const viewProfile = useCallback(
+    (member: {
+        role: 'SUPERADMIN' | 'ADMIN' | 'USER';
+        user: { id: string; email: string };
+      }) =>
+      () => {
+        modals.openModal({
+          classNames: { modal: 'bg-transparent text-textColor' },
+          title: t('member_profile', 'Member profile'),
+          withCloseButton: true,
+          children: (
+            <div className="flex flex-col gap-[12px] p-[16px] min-w-[320px]">
+              <div className="flex gap-[8px]">
+                <div className="opacity-70 w-[80px]">{t('name', 'Name')}</div>
+                <div>{capitalize(member.user.email.split('@')[0]).split('.')[0]}</div>
+              </div>
+              <div className="flex gap-[8px]">
+                <div className="opacity-70 w-[80px]">{t('email', 'Email')}</div>
+                <div>{member.user.email}</div>
+              </div>
+              <div className="flex gap-[8px]">
+                <div className="opacity-70 w-[80px]">{t('role', 'Role')}</div>
+                <div>{capitalize(member.role)}</div>
+              </div>
+              <div className="flex gap-[8px]">
+                <div className="opacity-70 w-[80px]">{t('user_id', 'User ID')}</div>
+                <div className="text-[12px] opacity-70">{member.user.id}</div>
+              </div>
+            </div>
+          ),
+        });
+      },
+    [modals, t]
+  );
+
   return (
     <div className="flex flex-col">
       <h3 className="text-[20px]">{t('team_members', 'Team Members')}</h3>
@@ -176,15 +224,35 @@ export const TeamsComponent = () => {
         <div className="flex flex-col gap-[16px]">
           {(data || []).map((p) => (
             <div key={p.user.id} className="flex items-center">
-              <div className="flex-1">
+              <button
+                type="button"
+                className="flex-1 text-start cursor-pointer hover:underline"
+                onClick={viewProfile(p)}
+                title={t('view_profile', 'View profile')}
+              >
                 {capitalize(p.user.email.split('@')[0]).split('.')[0]}
-              </div>
+              </button>
               <div className="flex-1">
-                {p.role === 'USER'
-                  ? t('user', 'User')
-                  : p.role === 'ADMIN'
-                  ? t('admin', 'Admin')
-                  : t('super_admin', 'Super Admin')}
+                {+myLevel > +getLevel(p.role) && p.role !== 'SUPERADMIN' ? (
+                  <select
+                    aria-label={t('role', 'Role')}
+                    value={p.role}
+                    onChange={changeRole(p)}
+                    className="bg-newBgColor border border-fifth rounded-[4px] px-[8px] py-[4px] text-[14px] outline-none"
+                  >
+                    {roles.map((role) => (
+                      <option key={role.value} value={role.value}>
+                        {role.name}
+                      </option>
+                    ))}
+                  </select>
+                ) : p.role === 'USER' ? (
+                  t('user', 'User')
+                ) : p.role === 'ADMIN' ? (
+                  t('admin', 'Admin')
+                ) : (
+                  t('super_admin', 'Super Admin')
+                )}
               </div>
               {+myLevel > +getLevel(p.role) ? (
                 <div className="flex-1 flex justify-end">
