@@ -71,11 +71,22 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
   if (!user) return null;
 
+  // CopilotKit's runtime POSTs to /copilot/chat with the auth cookie. Cookie-auth POSTs
+  // require the CSRF header (csrf.middleware) — without it the handshake 403s on every page
+  // (#9). The csrf_token cookie is JS-readable (httpOnly:false), so forward it as the header.
+  const csrfToken =
+    typeof document !== 'undefined'
+      ? decodeURIComponent(
+          (document.cookie.split('; ').find((c) => c.startsWith('csrf_token=')) || '').split('=')[1] || ''
+        )
+      : '';
+
   return (
     <ContextWrapper user={user}>
       <CopilotKit
         credentials="include"
         runtimeUrl={backendUrl + '/copilot/chat'}
+        headers={csrfToken ? { 'x-csrf-token': csrfToken } : undefined}
         showDevConsole={false}
       >
         <MantineWrapper>
