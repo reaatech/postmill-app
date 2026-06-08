@@ -8,6 +8,47 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.5.10] - 2026-06-08
+
+A stabilization release: it gets v3.5.9 **actually booting** and closes a batch of UI/API bugs found
+by a comprehensive end-to-end (Playwright) audit of the real interface. v3.5.9 shipped without ever
+booting — six chained boot blockers (a drifted lockfile plus DI/route/workflow regressions from the
+dependency major-bumps in `7c5a34e`) returned 502 on every `/api/*`. All are fixed; the remainder are
+functional bugs and completeness gaps surfaced by driving the UI. No schema changes.
+
+### Fixed — boot blockers (production was down on v3.5.9)
+
+- **#1** — Regenerate `pnpm-lock.yaml` so `node-telegram-bot-api` resolves to `0.66.x` (the CommonJS API the code targets) instead of the ESM-only `1.0.0-rc.0` the drifted lockfile pinned, which crashed the backend with `ERR_PACKAGE_PATH_NOT_EXPORTED`. `package.json` reverted to `^0.66.0`.
+- **#2** — `ProviderHealthService`: make `_defaultThreshold` a plain field, not a primitive constructor param (Nest tried to DI-resolve it → boot crash).
+- **#3** — Register `IdempotencyFactory` in `AiModule` so `startMcp` can resolve it (unregistered → `UnknownElementException` → process exit).
+- **#4** — Migrate bare `*` middleware routes to `{/*splat}` for path-to-regexp v8 (Express 5 / Nest 11).
+- **#5** — Orchestrator imports `AiModule` + `ThrottlerModule` so `PostsService`'s `RagService` dependency resolves (it is a separate Nest app).
+- **#6** — Temporal workflows use replay-safe `uuid4()` instead of `makeId()` (which imports `crypto`, banned in the workflow sandbox).
+
+### Fixed — API & validation
+
+- **#7** — Composer can save/schedule/publish again: `POST /posts/valid` and `/posts/preflight` now bind a lenient `ValidatePostsDto` (only `posts` required; per-post `settings` pass-through) instead of the strict `CreatePostDto`, which 400'd on the composer's partial pre-check body. Real `POST /posts` still uses the strict DTO.
+- **#8** — Calendar renders posts again: add `display` to `GetPostsDto` (the global `forbidNonWhitelisted` pipe rejected `GET /posts?display=…` → empty calendar).
+- **#9** — CopilotKit no longer 403s on every authenticated page: the `<CopilotKit>` runtime now forwards the `csrf_token` cookie as the `x-csrf-token` header (cookie-auth POSTs require CSRF; the runtime wasn't sending it).
+- **#11** — `GET /user/agent-media-sso` degrades to `{ url: null }` (200) when unconfigured instead of throwing 400.
+- **#20** — `GET /user/subscription/tiers` no longer requires the ADMIN policy (pricing tiers are public; the gate 401'd the Billing page).
+
+### Added
+
+- **#14 — Team management completeness.** Change a member's role (`PUT /settings/team/:id/role`, level-guarded) from an inline selector, and click a member to view their profile. Previously the Teams screen only listed and removed members.
+- **#18 — Admin error actions.** **Retry** a failed post (`POST /admin/errors/:id/retry` — re-queues it into the publish workflow via `changePostStatus`) and **Resolve**/dismiss an error (`DELETE /admin/errors/:id`) directly from `/admin/errors`.
+- **CI boot guard** (`.github/workflows/boot-guard.yml`) — fails on lockfile drift (`--frozen-lockfile`) and boots the backend against ephemeral Postgres + Redis to assert it binds and answers (catches the #1–#6 class of failures that compile but crash-loop, which v3.5.9's build check missed).
+
+### Changed
+
+- **#12** — Global API throttle default raised `90 → 600` requests/hour (`API_LIMIT`). The SPA issues 15–30 calls per page navigation, so a 90/hr limit tripped during normal interactive use and rendered pages blank on 429. Sensitive routes keep their own tight per-minute limits.
+- **#19 / #18 (a11y)** — Settings tabs and the admin channel-config row are now semantic, keyboard-focusable `<button>`s (were `<div onClick>` with no role); the channel row shows an explicit Edit/Close affordance.
+
+### Docs
+
+- `API_LIMIT` default corrected to `600` across the env-vars, configuration, and public-API reference pages.
+- Documented the new admin **Retry/Resolve** error actions.
+
 ## [3.5.9] - 2026-06-08
 
 A bugfix and UI-completeness release following a comprehensive codebase audit. Fixes 4 critical

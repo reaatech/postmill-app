@@ -5,7 +5,7 @@ Curated reference of the environment variables. The authoritative template is
 deployment. This page groups them by purpose — see [Configuration](../self-hosting/configuration.md)
 for the narrative version.
 
-> **Verified against v3.5.9.** When an exact default matters, check `.env.example` directly.
+> **Verified against v3.5.10.** When an exact default matters, check `.env.example` directly.
 
 ---
 
@@ -67,7 +67,7 @@ Additional providers and per-scope models are configured in [AI settings admin](
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `API_LIMIT` | `30` | Public API hourly request limit. |
+| `API_LIMIT` | `600` | Global per-client hourly request cap on the authenticated API (enforced by the global throttler; the public API is subject to it too). Raised from `90` in v3.5.10. |
 
 ## Payments (optional)
 

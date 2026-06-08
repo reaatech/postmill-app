@@ -3,7 +3,7 @@
 Postiz is designed for automation. The [Public API (v1)](./public-api.md) is the surface these tools
 call.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.5.10.**
 
 ---
 
@@ -27,8 +27,9 @@ call.
 
 ## Rate limits
 
-The public API hourly limit is `API_LIMIT` (default `30`). Tune it in
-[Configuration](../self-hosting/configuration.md) for higher-volume automation.
+The public API is subject to the global hourly request cap `API_LIMIT` (default `600`, raised from
+`90` in v3.5.10). Tune it in [Configuration](../self-hosting/configuration.md) for higher-volume
+automation.
 
 ## Compatibility caveat
 

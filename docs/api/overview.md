@@ -2,7 +2,7 @@
 
 Postiz exposes several HTTP surfaces. This page maps them; each has its own page.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.5.10.**
 
 ---
 
@@ -27,8 +27,8 @@ Postiz exposes several HTTP surfaces. This page maps them; each has its own page
 
 ## Rate limiting
 
-- The public API hourly limit is `API_LIMIT` (default `30`). See
-  [Configuration](../self-hosting/configuration.md).
+- The public API is subject to the global hourly request cap `API_LIMIT` (default `600`, raised from
+  `90` in v3.5.10). See [Configuration](../self-hosting/configuration.md).
 - MCP entrypoints are independently rate-limited (Redis-backed) and idempotency-protected. See
   [MCP](./mcp.md).
 - **New AI endpoints (v3.5.0)** carry explicit per-route `@Throttle` caps (e.g. `/ai/hashtags`,

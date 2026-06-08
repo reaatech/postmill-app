@@ -2,14 +2,15 @@
 
 The stable, API-key-authenticated surface for automation. Base path: **`/public/v1`**.
 
-> **Verified against v3.5.9.** Endpoints below are taken from the v1 public integrations controller.
+> **Verified against v3.5.10.** Endpoints below are taken from the v1 public integrations controller.
 
 ---
 
 ## Authentication
 
 Use your organization's API key. Allow-list your public IP for the token. The hourly request limit
-is `API_LIMIT` (default `30`) — see [Configuration](../self-hosting/configuration.md).
+is the global `API_LIMIT` (default `600`, raised from `90` in v3.5.10) — see
+[Configuration](../self-hosting/configuration.md).
 
 ## Endpoints
 
