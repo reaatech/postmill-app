@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Post,
   Put,
@@ -468,7 +469,15 @@ export class IntegrationsController {
 
   @Get('/telegram/updates')
   async getUpdates(@Query() query: { word: string; id?: number }) {
-    return new TelegramProvider().getBotId(query);
+    try {
+      return await new TelegramProvider().getBotId(query);
+    } catch (err) {
+      // Telegram bot not configured (no TELEGRAM_TOKEN) or a transient getUpdates error.
+      // The frontend polls this while waiting for the user's /connect message, so a 500
+      // here just spams errors — return empty so the connect flow degrades gracefully (#10).
+      Logger.warn('telegram getUpdates failed; returning empty');
+      return {};
+    }
   }
 
   @Post('/moltbook/register')
