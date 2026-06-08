@@ -1,6 +1,6 @@
 # Changelog
 
-> **AI-native fork by [REAA](https://reaatech.com).** A governed, multi-provider AI layer (26
+> **AI-native fork by [REAA](https://reaatech.com).** A governed, multi-provider AI layer (25
 > providers, bring-your-own-keys) powers the platform — on-brand content generation, smart comment
 > replies, brand-voice profiles, semantic (RAG) search over your own content, compliance guardrails,
 > and per-org spend caps with a full audit log; every AI entry point scoped, rate-limited, and
@@ -96,7 +96,7 @@ A codebase-hardening + feature-expansion release: a 30-item security cluster, 18
 
 ### Added
 
-- **AI provider adapter system** — 12 distinct adapters (OpenAI, Anthropic, Azure, Vercel AI Gateway, Amazon Bedrock, Google, Google Vertex, Groq, Cohere, Mistral, xAI Grok, OpenRouter) plus a generic `OpenAICompatibleAdapter` registered for 14 hub providers (DeepSeek, DeepInfra, Fireworks, Together AI, Perplexity, Qwen, etc). Admin selects provider+model via `/admin/ai-settings`; keys encrypted in the database.
+- **AI provider adapter system** — 25 providers: 13 direct model providers (OpenAI, Anthropic, Google Gemini, xAI Grok, Meta Llama, Mistral, DeepSeek, Cohere, Perplexity, Groq, Qwen, MiniMax, Azure OpenAI) plus 12 multi-model hubs & gateways (Amazon Bedrock, Google Vertex AI, OpenRouter, Vercel AI Gateway, Together AI, Fireworks AI, DeepInfra, SiliconFlow, Lightning AI, GMI Cloud, Bitdeer, Vultr). Admin selects provider+model via `/admin/ai-settings`; keys encrypted in the database.
 - **Admin AI Settings** (`/admin/ai-settings`) — Super-admin screen to pick provider/model, enter credentials, test connection, configure governance (guardrails, rate-limits, cost-controls), and view health badges. Includes dry-run preview for guardrail rules and a full AI-settings audit trail (`AISettingsAudit` model).
 - **AIModelProvider facade** — Single injection point with `(scope, orgId?)` resolution. Precedence: per-org (stub) → per-scope → global active → provider default → env-OpenAI fallback. Wrappers: `generateText`, `generateObject`, `imageModel`.
 - **Governance** — `GuardrailService` with input/output guard chains (prompt-injection, PII, brand safety, NSFW), configurable `block | redact | warn` actions. `BudgetService` with monthly/daily caps, per-org/per-scope budgets, budget-threshold alerts (80% warning), and spend tracking to `AISpendLog`. `TelemetryService` with OpenTelemetry GenAI spans (no-op when unconfigured). `ProviderHealthService` with success/error counters and provider failover readiness.

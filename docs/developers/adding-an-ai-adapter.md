@@ -10,7 +10,7 @@ How to add a new AI provider to the pluggable AI layer. For the architecture see
 ## Decide: distinct adapter or OpenAI-compatible?
 
 - If the provider exposes an **OpenAI-compatible** API, you may not need a new class — the generic
-  `OpenAICompatibleAdapter` is already registered for ~14 hub providers. Adding another hub provider
+  `OpenAICompatibleAdapter` is already registered for 9 such providers. Adding another one
   can be as simple as registering it with the right base URL/metadata.
 - If the provider needs bespoke wiring (its own SDK, auth, or model construction), implement a
   distinct adapter.

@@ -23,10 +23,10 @@ enforces it.
 
 ## Providers & models
 
-The system ships **12 distinct adapters** — OpenAI, Anthropic, Azure OpenAI, Vercel AI Gateway,
-Amazon Bedrock, Google, Google Vertex, Groq, Cohere, Mistral, xAI Grok, and OpenRouter — plus a
-generic OpenAI-compatible adapter registered for ~14 more hub providers (DeepSeek, DeepInfra,
-Fireworks, Together AI, Perplexity, Qwen, and others).
+The system ships **25 providers** — 13 direct model providers (OpenAI, Anthropic, Google Gemini, xAI
+Grok, Meta Llama, Mistral, DeepSeek, Cohere, Perplexity, Groq, Qwen, MiniMax, Azure OpenAI) plus 12
+multi-model hubs & gateways (Amazon Bedrock, Google Vertex AI, OpenRouter, Vercel AI Gateway,
+Together AI, Fireworks AI, DeepInfra, SiliconFlow, Lightning AI, GMI Cloud, Bitdeer, Vultr).
 
 From the admin screen you can:
 

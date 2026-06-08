@@ -12,11 +12,12 @@ the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per releas
 ## AI at the core
 
 This is an **AI-native** fork. Where upstream ships a single hardcoded OpenAI integration, this fork
-runs a governed, multi-provider AI layer under the entire platform: bring your own keys across **26
-providers** (12 first-class — OpenAI, Anthropic, Azure OpenAI, Google, Vertex, Amazon Bedrock,
-Mistral, Cohere, Groq, xAI Grok, OpenRouter, Vercel AI Gateway — plus hubs like DeepSeek, Together
-AI, Fireworks, Perplexity), pick the exact model from an admin screen, and switch providers
-everywhere without a redeploy. On top of it: on-brand content generation, smart comment replies,
+runs a governed, multi-provider AI layer under the entire platform: bring your own keys across **25
+providers** — 13 direct model providers (OpenAI, Anthropic, Google Gemini, xAI Grok, Meta Llama,
+Mistral, DeepSeek, Cohere, Perplexity, Groq, Qwen, MiniMax, Azure OpenAI) plus 12 multi-model hubs &
+gateways (Amazon Bedrock, Google Vertex AI, OpenRouter, Vercel AI Gateway, Together AI, Fireworks AI,
+DeepInfra, SiliconFlow, Lightning AI, GMI Cloud, Bitdeer, Vultr) — pick the exact model from an admin
+screen, and switch providers everywhere without a redeploy. On top of it: on-brand content generation, smart comment replies,
 brand-voice profiles, a shared prompt library, semantic (RAG) search over your own content,
 compliance guardrails (prompt-injection / PII / brand-safety / NSFW), and per-org spend caps with a
 full audit log — every AI entry point scoped, rate-limited, and budget-checked.
@@ -29,7 +30,7 @@ Everything below builds around that foundation.
 
 | Area | Upstream | This fork |
 |------|----------|-----------|
-| AI | Single hardcoded OpenAI integration | Governed multi-provider system (**26 providers**, BYO keys) with admin config, guardrails, RAG, and per-org spend caps |
+| AI | Single hardcoded OpenAI integration | Governed multi-provider system (**25 providers** — 13 direct + 12 multi-model hubs/gateways, BYO keys) with admin config, guardrails, RAG, and per-org spend caps |
 | Channel credentials | Environment variables only | DB-backed, encrypted, managed in an admin UI (env still works as fallback) |
 | Channel count | Upstream set | **36** providers (adds Tumblr, Pixelfed, PeerTube) |
 | Analytics | Single-channel, live fetch on demand | Persisted multi-channel dashboard from daily snapshots (`/analytics/v2`) |
@@ -84,9 +85,10 @@ See [API overview](./api/overview.md), [Data model](./reference/data-model.md), 
 The AI layer is now an admin-configurable, governed, multi-provider system that replaces the single
 hardcoded OpenAI integration.
 
-- **12 distinct provider adapters** (OpenAI, Anthropic, Azure, Vercel AI Gateway, Amazon Bedrock,
-  Google, Google Vertex, Groq, Cohere, Mistral, xAI Grok, OpenRouter) plus a generic
-  OpenAI-compatible adapter covering 14 more hub providers.
+- **25 providers** — 13 direct model providers (OpenAI, Anthropic, Google Gemini, xAI Grok, Meta
+  Llama, Mistral, DeepSeek, Cohere, Perplexity, Groq, Qwen, MiniMax, Azure OpenAI) plus 12
+  multi-model hubs & gateways (Amazon Bedrock, Google Vertex AI, OpenRouter, Vercel AI Gateway,
+  Together AI, Fireworks AI, DeepInfra, SiliconFlow, Lightning AI, GMI Cloud, Bitdeer, Vultr).
 - **Admin AI Settings** at `/admin/ai` — pick provider/model, store encrypted credentials, test the
   connection, set the active provider, and configure governance.
 - **Governance** — input/output guardrails (prompt-injection, PII, brand safety, NSFW), per-scope

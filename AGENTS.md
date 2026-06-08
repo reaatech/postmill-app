@@ -198,8 +198,9 @@ single hardcoded OpenAI integration).
 - **`AIModelProvider`** (`libraries/nestjs-libraries/src/ai/`) — single injection point,
   `(scope, orgId?)` resolution. Precedence: per-org (stub) → per-scope → global active → provider
   default → env-OpenAI fallback. Wrappers: `generateText`, `generateObject`, `imageModel`.
-- **`AIProviderRegistry`** + **`AIProviderAdapter`** — 12 distinct adapters plus a generic
-  `OpenAICompatibleAdapter` registered for 14 hub providers; each implements
+- **`AIProviderRegistry`** + **`AIProviderAdapter`** — 25 providers: 16 with a bespoke adapter class
+  plus 9 wired through the generic `OpenAICompatibleAdapter` (an implementation split, distinct from
+  the product direct-vs-hub taxonomy); each implements
   `createLanguageModel`, `createLangchainModel`, optional `createImageModel` /
   `createEmbeddingModel` / `createSpeechModel`.
 - **Governance** (`libraries/nestjs-libraries/src/ai/governance/`): `guardrail.service.ts`,

@@ -32,8 +32,9 @@ hardcoded OpenAI integration is replaced by a facade that four surfaces now rout
 - **`AIModelProvider`** (`libraries/nestjs-libraries/src/ai/`) — single injection point,
   `(scope, orgId?)` resolution. Precedence: per-org (stub) → per-scope → global active → provider
   default → env-OpenAI fallback. Wrappers: `generateText`, `generateObject`, `imageModel`.
-- **`AIProviderRegistry`** + **`AIProviderAdapter`** — 12 distinct adapters plus a generic
-  `OpenAICompatibleAdapter` for 14 hub providers; each implements `createLanguageModel`,
+- **`AIProviderRegistry`** + **`AIProviderAdapter`** — 25 providers: 16 with a bespoke adapter class
+  plus 9 wired through the generic `OpenAICompatibleAdapter` (implementation split, not the product
+  direct-vs-hub taxonomy); each implements `createLanguageModel`,
   `createLangchainModel`, optional `createImageModel` / `createEmbeddingModel` / `createSpeechModel`.
 - **Governance** (`libraries/nestjs-libraries/src/ai/governance/`): `guardrail.service.ts`,
   `budget.service.ts`, `telemetry.service.ts` (no-op when unconfigured),

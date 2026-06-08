@@ -40,10 +40,13 @@ without restarting services.
 
 ## Registry & adapters
 
-`AIProviderRegistry` holds `AIProviderAdapter` implementations. There are **12 distinct adapters**
-(OpenAI, Anthropic, Azure, Vercel AI Gateway, Amazon Bedrock, Google, Google Vertex, Groq, Cohere,
-Mistral, xAI Grok, OpenRouter) plus a generic **OpenAI-compatible** adapter registered for ~14 hub
-providers.
+`AIProviderRegistry` holds `AIProviderAdapter` implementations. Of the 25 supported providers, **16
+have a bespoke adapter class** (OpenAI, Anthropic, Azure OpenAI, Vercel AI Gateway, Amazon Bedrock,
+Google, Google Vertex AI, Groq, Cohere, Mistral, xAI Grok, DeepSeek, Together AI, Fireworks,
+Perplexity, OpenRouter) and the remaining **9 are wired through the generic OpenAI-compatible
+adapter**. (This is an *implementation* split — how each provider is wired — not the product
+direct-vs-hub taxonomy used in the user-facing docs; e.g. MiniMax/Qwen are direct models served via
+the generic adapter, while Bedrock/Vertex are hubs with bespoke adapters.)
 
 The adapter contract (`AIProviderAdapter`):
 
