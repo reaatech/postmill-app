@@ -59,7 +59,8 @@ audit of the real interface. No schema changes.
 ### UI/API fixes
 - Composer can save/schedule/publish again (lenient validate DTO on `/posts/valid` + `/preflight`).
 - CopilotKit stops 403-ing on every page (forwards the CSRF token to its runtime).
-- Billing page loads (public pricing tiers no longer gated behind the ADMIN policy).
+- `/analytics/v2` no longer crashes — the line chart was missing its Chart.js `type`, so it threw and tripped the page's error boundary ("Something went wrong").
+- Billing no longer **logs you out of the whole app**: on instances without Stripe, the pricing-tiers call hit Stripe with a placeholder key and got `401 "Invalid API Key"`; the frontend force-logs-out on any `401`, so opening Billing silently logged you out — making every admin page and Settings render as login. `getPackages()` now returns empty tiers (never a 401) when Stripe is unconfigured.
 - `agent-media-sso` degrades gracefully when unconfigured.
 
 ### Completeness & accessibility

@@ -31,8 +31,9 @@ functional bugs and completeness gaps surfaced by driving the UI. No schema chan
 - **#8** — Calendar renders posts again: add `display` to `GetPostsDto` (the global `forbidNonWhitelisted` pipe rejected `GET /posts?display=…` → empty calendar).
 - **#17** — `/analytics/v2` no longer crashes: `LineChart`'s Chart.js config omitted the `type` field, so Chart.js got `type: undefined` and threw `"undefined" is not a registered controller`, tripping the whole dashboard's error boundary ("Something went wrong"). Add `type: 'line'`. (TypeScript missed it — `datasets` was cast to `any[]`.)
 - **#9** — CopilotKit no longer 403s on every authenticated page: the `<CopilotKit>` runtime now forwards the `csrf_token` cookie as the `x-csrf-token` header (cookie-auth POSTs require CSRF; the runtime wasn't sending it).
+- **#10** — `GET /integrations/telegram/updates` no longer 500s when Telegram isn't configured (no `TELEGRAM_TOKEN`): the channel-connect poll wraps `getUpdates()` and returns empty on any error instead of spamming 500s.
 - **#11** — `GET /user/agent-media-sso` degrades to `{ url: null }` (200) when unconfigured instead of throwing 400.
-- **#20** — `GET /user/subscription/tiers` no longer requires the ADMIN policy (pricing tiers are public; the gate 401'd the Billing page).
+- **#20** — **Opening the Billing page logged you out of the entire app.** Root cause (verified by hitting the endpoint): on instances without Stripe, `StripeService` is constructed with the placeholder key `sk_nothing`, so `getPackages()` → `stripe.prices.list()` returns **`401 "Invalid API Key"`**. The frontend force-logs-out on *any* `401` (`layout.context.tsx` → `/auth/logout`), so loading Billing's pricing call silently destroyed the session — which is why every admin page and Settings then rendered as the login screen. **Fix:** `getPackages()` returns empty tiers (and never lets a Stripe error become a 401) when Stripe isn't configured. (Also removed a stray `ADMIN`-policy gate on the tiers route so pricing is readable by any authenticated user — cosmetic; it was not the cause.)
 
 ### Added
 
