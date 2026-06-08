@@ -127,13 +127,13 @@ export class ApiModule implements NestModule {
     consumer.apply(CsrfMiddleware).forRoutes(...authenticatedController);
     consumer
       .apply(BudgetMiddleware)
-      .forRoutes({ path: '/agents*', method: RequestMethod.ALL });
+      .forRoutes({ path: '/agents{/*splat}', method: RequestMethod.ALL });
     consumer
       .apply(BudgetMiddleware)
-      .forRoutes({ path: '/copilot*', method: RequestMethod.ALL });
+      .forRoutes({ path: '/copilot{/*splat}', method: RequestMethod.ALL });
     consumer
       .apply(BudgetMiddleware)
-      .forRoutes({ path: '/ai*', method: RequestMethod.ALL });
+      .forRoutes({ path: '/ai{/*splat}', method: RequestMethod.ALL });
     consumer
       .apply(AiGuardMiddleware)
       .forRoutes({ path: '/copilot/chat', method: RequestMethod.POST });

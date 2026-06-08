@@ -241,11 +241,13 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
         const response = await this.bot.sendMediaGroup(
           accessToken,
           mediaGroup as any[],
+          // node-telegram-bot-api ^0.66.0 (Bot API <7) replies via reply_to_message_id,
+          // not the newer reply_parameters object. Cast to satisfy the older @types.
           {
             ...(replyToMessageId && i === 0
-              ? { reply_parameters: { message_id: replyToMessageId } }
+              ? { reply_to_message_id: replyToMessageId }
               : {}),
-          }
+          } as any
         );
         if (i === 0) {
           messageId = response[0].message_id;
