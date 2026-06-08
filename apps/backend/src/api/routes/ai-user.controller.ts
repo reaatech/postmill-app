@@ -291,12 +291,14 @@ export class AiUserController {
   }
 
   @Get('/prompt-library')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getPromptLibrary(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getPromptLibraryItems(org.id);
   }
 
   @Post('/prompt-library')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createPromptLibraryItem(
     @GetOrgFromRequest() org: Organization,
@@ -310,6 +312,7 @@ export class AiUserController {
   }
 
   @Delete('/prompt-library/:id')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptLibraryItem(
     @GetOrgFromRequest() org: Organization,

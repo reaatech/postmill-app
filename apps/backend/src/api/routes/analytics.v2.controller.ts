@@ -14,7 +14,7 @@ import {
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { ApiTags } from '@nestjs/swagger';
-import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AnalyticsService, BestTimeEntry } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import {
   AnalyticsDateRangeDto,
   AnalyticsPostsQueryDto,
@@ -56,14 +56,6 @@ export function parseLimit(limit?: number): number {
 
 export function parseCompare(compare?: string): boolean {
   return compare?.toLowerCase() === 'true';
-}
-
-export interface BestTimeEntry {
-  day: number;
-  hour: number;
-  engagement: number;
-  postCount: number;
-  avgEngagement: number;
 }
 
 export interface BestTimeResponse {

@@ -370,23 +370,30 @@ export const TopMenu: FC = () => {
                 if (f.requireBilling && !billingEnabled) {
                   return false;
                 }
-                if (f.name === 'Billing' && user?.isLifetime) {
-                  return false;
-                }
                 if (f.role) {
                   return f.role.includes(user?.role!);
                 }
                 return true;
               })
-              .map((item, index) => (
-                <MenuItem
-                  path={item.path}
-                  label={item.name}
-                  icon={item.icon}
-                  key={item.name}
-                  onClick={item.onClick}
-                />
-              ))
+              .map((item, index) => {
+                const path =
+                  item.name === 'Billing' && user?.isLifetime
+                    ? '/billing/lifetime'
+                    : item.path;
+                const label =
+                  item.name === 'Billing' && user?.isLifetime
+                    ? 'Lifetime'
+                    : item.name;
+                return (
+                  <MenuItem
+                    path={path}
+                    label={label}
+                    icon={item.icon}
+                    key={item.name}
+                    onClick={item.onClick}
+                  />
+                );
+              })
         }
         {isAdmin && (
           <div className="mt-[8px] pt-[8px] border-t border-newTableBorder">
@@ -449,23 +456,30 @@ export const TopMenu: FC = () => {
             if (f.requireBilling && !billingEnabled) {
               return false;
             }
-            if (f.name === 'Billing' && user?.isLifetime) {
-              return false;
-            }
             if (f.role) {
               return f.role.includes(user?.role!);
             }
             return true;
           })
-          .map((item, index) => (
-            <MenuItem
-              path={item.path}
-              label={item.name}
-              icon={item.icon}
-              key={item.name}
-              onClick={item.onClick}
-            />
-          ))}
+          .map((item, index) => {
+            const path =
+              item.name === 'Billing' && user?.isLifetime
+                ? '/billing/lifetime'
+                : item.path;
+            const label =
+              item.name === 'Billing' && user?.isLifetime
+                ? 'Lifetime'
+                : item.name;
+            return (
+              <MenuItem
+                path={path}
+                label={label}
+                icon={item.icon}
+                key={item.name}
+                onClick={item.onClick}
+              />
+            );
+          })}
       </div>
     </>
   );

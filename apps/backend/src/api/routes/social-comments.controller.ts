@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
+import { SocialCommentsService, VALID_COMMENT_STATUSES } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import {
@@ -9,6 +9,7 @@ import {
 import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { isUUID, isISO8601 } from 'class-validator';
 
 @Controller('/posts')
 export class SocialCommentsController {
@@ -24,9 +25,14 @@ export class SocialCommentsController {
     @Query('cursor') cursor: string | undefined,
     @Query('unreadOnly') unreadOnly: string | undefined,
   ) {
-    const allowedStatuses = ['needs_reply', 'handled', 'ignored'];
-    if (status && !allowedStatuses.includes(status)) {
-      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${allowedStatuses.join(', ')}`);
+    if (status && !(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
+      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
+    }
+    if (assigneeId && !isUUID(assigneeId)) {
+      throw new BadRequestException('Invalid assigneeId: must be a valid UUID');
+    }
+    if (cursor && !isISO8601(cursor)) {
+      throw new BadRequestException('Invalid cursor: must be a valid ISO 8601 date string');
     }
     return this._socialCommentsService.getInbox(org.id, user.id, {
       status,
@@ -121,9 +127,8 @@ export class SocialCommentsController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    const allowedStatuses = ['needs_reply', 'handled', 'ignored'];
-    if (!allowedStatuses.includes(status)) {
-      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${allowedStatuses.join(', ')}`);
+    if (!(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
+      throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
     }
     return this._socialCommentsService.updateCommentStatus(org.id, user.id, id, commentId, status);
   }

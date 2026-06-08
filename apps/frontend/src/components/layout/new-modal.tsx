@@ -319,15 +319,20 @@ export const ModalManagerEmitter: FC = () => {
     }))
   );
 
-  useEffect(() => {
-    emitter.on('show', (params: OpenModalInterface) => {
+  const handleShow = useCallback(
+    (params: OpenModalInterface) => {
       showModal(params);
-    });
+    },
+    [showModal]
+  );
+
+  useEffect(() => {
+    emitter.on('show', handleShow);
 
     return () => {
-      emitter.removeAllListeners('show');
+      emitter.off('show', handleShow);
     };
-  }, []);
+  }, [handleShow]);
   return null;
 };
 

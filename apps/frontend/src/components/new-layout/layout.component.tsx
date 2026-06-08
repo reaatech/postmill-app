@@ -41,6 +41,7 @@ import { OrganizationSelector } from '@gitroom/frontend/components/layout/organi
 import { StreakComponent } from '@gitroom/frontend/components/layout/streak.component';
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
+import { SettingsComponent } from '@gitroom/frontend/components/layout/settings.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 
@@ -134,6 +135,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           <ChromeExtensionComponent />
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
                           <AttachToFeedbackIcon />
+                          <SettingsComponent />
                           <NotificationComponent />
                           <UserAvatarMenu />
                         </div>

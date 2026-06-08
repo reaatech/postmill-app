@@ -30,31 +30,33 @@ export const MediaSettingsLayout = () => {
       alt: string;
     }) => {},
   } as any);
+  const handleShow = useCallback(
+    (params: {
+      media: any;
+      callback: (url: {
+        id: string;
+        name: string;
+        path: string;
+        thumbnail: string;
+        alt: string;
+      }) => void;
+    }) => {
+      setCallback(params);
+      setMedia(params.media);
+      setShowPostSelector(true);
+    },
+    []
+  );
+
   useEffect(() => {
-    postUrlEmitter.on(
-      'show',
-      (params: {
-        media: any;
-        callback: (url: {
-          id: string;
-          name: string;
-          path: string;
-          thumbnail: string;
-          alt: string;
-        }) => void;
-      }) => {
-        setCallback(params);
-        setMedia(params.media);
-        setShowPostSelector(true);
-      }
-    );
+    postUrlEmitter.on('show', handleShow);
     return () => {
       setShowPostSelector(false);
       setCallback(null);
       setMedia(undefined);
-      postUrlEmitter.removeAllListeners();
+      postUrlEmitter.off('show', handleShow);
     };
-  }, []);
+  }, [handleShow]);
   const close = useCallback(() => {
     setShowPostSelector(false);
     setCallback(null);

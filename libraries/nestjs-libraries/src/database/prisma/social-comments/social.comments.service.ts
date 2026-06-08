@@ -8,6 +8,10 @@ import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webho
 import dayjs from 'dayjs';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import {
+  SocialProvider,
+  SocialCommentDTO,
+} from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Post, Integration } from '@prisma/client';
 
 const CommentStatus = {
@@ -16,7 +20,7 @@ const CommentStatus = {
   IGNORED: 'ignored',
 } as const;
 type CommentStatus = (typeof CommentStatus)[keyof typeof CommentStatus];
-const VALID_COMMENT_STATUSES: readonly string[] = Object.values(CommentStatus);
+export const VALID_COMMENT_STATUSES: readonly string[] = Object.values(CommentStatus);
 
 export interface InboxFilterOptions {
   status?: string;
@@ -38,7 +42,7 @@ export class SocialCommentsService {
 
   private async refreshTokenIfExpired(
     integration: { token: string; tokenExpiration?: Date | null; organizationId: string } & Integration,
-    provider: any
+    provider: SocialProvider
   ): Promise<{ token: string; integration: typeof integration }> {
     let token = integration.token;
     if (integration.tokenExpiration && dayjs(integration.tokenExpiration).isBefore(dayjs())) {
@@ -73,7 +77,7 @@ export class SocialCommentsService {
     return { comments: items, nextCursor, unreadCount };
   }
 
-  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<any> {
+  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<SocialCommentDTO> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -138,7 +142,7 @@ export class SocialCommentsService {
     }
   }
 
-  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<any> {
+  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<{ liked: boolean; likeCount?: number }> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -391,7 +395,7 @@ export class SocialCommentsService {
     return { unreadCount: count };
   }
 
-  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<any> {
+  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<SocialCommentDTO> {
     const post = await this._postsRepository.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');
