@@ -33,6 +33,8 @@ import { SVGLine } from '@gitroom/frontend/components/launches/launches.componen
 import { GlobalSettings } from '@gitroom/frontend/components/settings/global.settings';
 import { BrandAISettings } from '@gitroom/frontend/components/settings/brand-ai.settings';
 import { ApprovedAppsComponent } from '@gitroom/frontend/components/approved-apps/approved-apps.component';
+import { ProviderCapabilityMatrix } from '@gitroom/frontend/components/admin/provider-capability.matrix';
+import { AiSettingsAdmin } from '@gitroom/frontend/components/admin/ai-settings.component';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -109,6 +111,15 @@ export const SettingsPopup: FC<{
       arr.push({ tab: 'api', label: t('developers', 'Developers') });
     }
     arr.push({ tab: 'approved_apps', label: t('approved_apps', 'Approved Apps') });
+
+    if ((user as any)?.admin) {
+      arr.push({ tab: 'admin_heading', label: '── ' + t('admin', 'Admin') + ' ──' });
+      arr.push({ tab: 'admin_ai', label: t('admin_ai_providers', 'AI Providers') });
+      arr.push({ tab: 'admin_capabilities', label: t('admin_capabilities', 'Provider Capabilities') });
+      arr.push({ tab: 'admin_channels', label: t('admin_channels', 'Channel Config') });
+      arr.push({ tab: 'admin_errors', label: t('admin_errors', 'Error Log') });
+      arr.push({ tab: 'admin_stats', label: t('admin_stats', 'Stats') });
+    }
 
     return arr;
   }, [user, isGeneral, showLogout, t]);
@@ -215,6 +226,73 @@ export const SettingsPopup: FC<{
               {tab === 'approved_apps' && (
                 <div>
                   <ApprovedAppsComponent />
+                </div>
+              )}
+
+              {tab === 'admin_heading' && (user as any)?.admin && (
+                <div>
+                  <h3 className="text-[20px]">{t('admin', 'Administration')}</h3>
+                  <p className="text-textColor/60 text-[13px] mt-[8px]">
+                    {t('admin_description', 'Super admin tools for managing the platform')}
+                  </p>
+                  <div className="grid grid-cols-2 gap-[12px] mt-[16px]">
+                    <Link href="/admin/ai" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
+                      <div className="text-[15px] font-semibold">{t('admin_ai_providers', 'AI Providers')}</div>
+                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_ai_providers_desc', 'Manage AI model providers, governance, and media')}</div>
+                    </Link>
+                    <Link href="/admin/channels" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
+                      <div className="text-[15px] font-semibold">{t('admin_channels', 'Channel Config')}</div>
+                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_channels_desc', 'Configure channel-specific settings and limits')}</div>
+                    </Link>
+                    <Link href="/admin/errors" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
+                      <div className="text-[15px] font-semibold">{t('admin_errors', 'Error Log')}</div>
+                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_errors_desc', 'View and triage platform errors')}</div>
+                    </Link>
+                    <Link href="/admin/stats" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
+                      <div className="text-[15px] font-semibold">{t('admin_stats', 'Stats')}</div>
+                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_stats_desc', 'Platform usage statistics and metrics')}</div>
+                    </Link>
+                  </div>
+                </div>
+              )}
+
+              {tab === 'admin_ai' && (user as any)?.admin && (
+                <div>
+                  <AiSettingsAdmin />
+                </div>
+              )}
+
+              {tab === 'admin_capabilities' && (user as any)?.admin && (
+                <div>
+                  <h3 className="text-[20px]">{t('admin_capabilities', 'Provider Capabilities')}</h3>
+                  <ProviderCapabilityMatrix />
+                </div>
+              )}
+
+              {tab === 'admin_channels' && (user as any)?.admin && (
+                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
+                  <p className="text-[14px]">{t('admin_channels_redirect', 'Channel configuration opens in a new view')}</p>
+                  <Link href="/admin/channels" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
+                    {t('open_channel_config', 'Open Channel Config')}
+                  </Link>
+                </div>
+              )}
+
+              {tab === 'admin_errors' && (user as any)?.admin && (
+                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
+                  <p className="text-[14px]">{t('admin_errors_redirect', 'Error log opens in a new view')}</p>
+                  <Link href="/admin/errors" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
+                    {t('open_error_log', 'Open Error Log')}
+                  </Link>
+                </div>
+              )}
+
+              {tab === 'admin_stats' && (user as any)?.admin && (
+                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
+                  <p className="text-[14px]">{t('admin_stats_redirect', 'Stats opens in a new view')}</p>
+                  <Link href="/admin/stats" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
+                    {t('open_stats', 'Open Stats')}
+                  </Link>
                 </div>
               )}
             </div>

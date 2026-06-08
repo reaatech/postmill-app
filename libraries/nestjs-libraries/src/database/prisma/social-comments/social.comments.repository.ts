@@ -36,6 +36,10 @@ export class SocialCommentsRepository {
       where.status = { not: 'handled' };
     }
 
+    if (filters.cursor) {
+      where.platformCreatedAt = { lt: new Date(filters.cursor) };
+    }
+
     const comments = await this._socialComment.model.socialComment.findMany({
       where,
       orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
