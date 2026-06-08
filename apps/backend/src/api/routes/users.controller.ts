@@ -50,7 +50,10 @@ export class UsersController {
     @GetOrgFromRequest() organization: Organization
   ) {
     if (!process.env.AGENT_MEDIA_SSO_KEY) {
-      throw new HttpException('Agent Media SSO is not configured', 400);
+      // Degrade gracefully when the optional integration isn't configured (#11):
+      // the client checks `data.url` and no-ops on null, so a 200 + null URL avoids
+      // a spurious 400/console error instead of throwing.
+      return { url: null };
     }
 
     const token = sign(
@@ -177,7 +180,8 @@ export class UsersController {
   }
 
   @Get('/subscription/tiers')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  // Pricing tiers are public, identical for every user — gating on ADMIN made the
+  // Billing page 401 for non-admins (#20). Keep auth-only (no per-section policy).
   async tiers() {
     return this._stripeService.getPackages();
   }
