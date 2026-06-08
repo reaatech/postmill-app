@@ -50,6 +50,8 @@ export class PostContent {
 }
 
 export class Post {
+  @IsOptional()
+  @IsString()
   type?: string;
 
   @IsDefined()

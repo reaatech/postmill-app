@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { Allow, IsString } from 'class-validator';
 
 export class VideoFunctionDto {
   @IsString()
@@ -7,5 +7,6 @@ export class VideoFunctionDto {
   @IsString()
   functionName: string;
 
+  @Allow()
   params: any;
 }

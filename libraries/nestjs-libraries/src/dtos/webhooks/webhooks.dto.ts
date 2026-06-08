@@ -9,6 +9,8 @@ export class WebhooksIntegrationDto {
 }
 
 export class WebhooksDto {
+  @IsOptional()
+  @IsString()
   id: string;
 
   @IsString()
