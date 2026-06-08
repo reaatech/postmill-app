@@ -4,7 +4,7 @@ Postiz is configured through environment variables. The authoritative template i
 [`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
-> **Verified against v3.5.9.** When a variable's exact default matters, check `.env.example` and
+> **Verified against v3.5.10.** When a variable's exact default matters, check `.env.example` and
 > `docker-compose.yaml` directly; this page documents intent and fork behaviour rather than
 > duplicating every line.
 
@@ -71,7 +71,7 @@ See [Temporal & background jobs](./temporal-and-cron.md) for how these workflows
 
 ## API & rate limiting
 
-- `API_LIMIT` — public API hourly request limit (default `30`).
+- `API_LIMIT` — global per-client hourly request cap on the authenticated API (default `600`, raised from `90` in v3.5.10; the public API is subject to it too). Sensitive routes (auth, public, AI) keep their own tighter per-minute limits.
 
 ## Payments (optional)
 

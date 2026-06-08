@@ -29,6 +29,13 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.5.10]**
+- **It actually starts now** — v3.5.9 shipped without booting (a dependency mix-up took the whole API down). The stack boots cleanly again, and a new automated guard makes sure a non-booting build can never ship.
+- **Posting and your calendar work again** — The composer can save, schedule, and publish, your scheduled posts show up on the calendar, and the in-app AI assistant no longer errors on every page.
+- **Team management you can actually use** — Change a teammate's role and click through to their profile, right from settings — not just add and remove.
+- **Fix failures without leaving the admin screen** — Super-admins can retry a failed post or clear a handled error directly from the error log.
+- **No more "dead app" from rate limits, and a more accessible UI** — The hourly request limit is far more generous so normal use never trips it, billing loads, and settings/admin controls are now proper keyboard-accessible buttons.
+
 **[v3.5.9]**
 - **Your workspaces stay private** — Campaigns, watchlist, and comments are now fully locked to your organization, and every endpoint has proper permission checks — no one can see or touch your data.
 - **A comment inbox that just works** — The inbox loads without 400 errors, comments can be marked read in bulk with org-scoped safety, and a new "Summarize" button lets AI distill the conversation for you.

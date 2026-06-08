@@ -3,7 +3,7 @@
 Two super-admin diagnostic screens: a log of captured integration/posting errors, and instance
 usage statistics.
 
-> **Verified against v3.5.9.** Both are super-admin only — the backing endpoints reject any
+> **Verified against v3.5.10.** Both are super-admin only — the backing endpoints reject any
 > non-super-admin request.
 
 ---
@@ -23,8 +23,14 @@ Backing endpoints:
 - `GET /admin/errors/platforms` — the set of platforms that have recorded errors (to populate the
   platform filter).
 
+Each row also offers two actions (v3.5.10):
+
+- **Retry** — `POST /admin/errors/:id/retry` re-queues the errored post into the publish workflow
+  (reuses `changePostStatus(... 'schedule')`) and then clears the error from the log.
+- **Resolve** — `DELETE /admin/errors/:id` dismisses a handled error from the log.
+
 Use this to spot, for example, a provider whose tokens are failing to refresh or a recurring API
-rejection on a particular channel.
+rejection on a particular channel — then retry the affected post or resolve the entry once handled.
 
 ## View Stats — `/admin/stats`
 

@@ -51,6 +51,14 @@ export class ErrorsRepository {
     } as const;
   }
 
+  getError(id: string) {
+    return this._errors.model.errors.findUnique({ where: { id } });
+  }
+
+  deleteError(id: string) {
+    return this._errors.model.errors.delete({ where: { id } });
+  }
+
   async listPlatforms() {
     const rows = await this._errors.model.errors.findMany({
       distinct: ['platform'],

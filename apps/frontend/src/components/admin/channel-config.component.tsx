@@ -371,8 +371,10 @@ export const ChannelConfigComponent: FC = () => {
                 key={config.identifier}
                 className="flex flex-col bg-newTableHeader rounded-[8px]"
               >
-                <div
-                  className="flex items-center gap-[12px] p-[12px] cursor-pointer hover:bg-newTableHeader/80"
+                <button
+                  type="button"
+                  aria-expanded={isExpanded}
+                  className="w-full text-start flex items-center gap-[12px] p-[12px] cursor-pointer hover:bg-newTableHeader/80"
                   onClick={() =>
                     setExpanded(
                       isExpanded ? null : config.identifier
@@ -417,11 +419,14 @@ export const ChannelConfigComponent: FC = () => {
                         ? 'No Credentials'
                         : 'Disabled'}
                     </span>
+                    <span className="text-[12px] text-forth font-[500]">
+                      {isExpanded ? 'Close' : 'Edit'}
+                    </span>
                     <span className="text-textColor/40">
                       {isExpanded ? '▲' : '▼'}
                     </span>
                   </div>
-                </div>
+                </button>
 
                 {isExpanded && (
                   <ExpandedRow

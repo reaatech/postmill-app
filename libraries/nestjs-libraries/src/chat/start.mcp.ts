@@ -178,8 +178,17 @@ export const startMcp = async (app: INestApplication) => {
   const oauthService = app.get(OAuthService, { strict: false });
   const aiSettingsManager = app.get(AiSettingsManager, { strict: false });
 
-  const idempotencyFactory = app.get(IdempotencyFactory, { strict: false });
-  const idempotencyMiddleware = idempotencyFactory.getMiddleware();
+  // IdempotencyFactory is not registered in every Nest context. app.get() throws
+  // UnknownElementException (even with strict:false) when a provider is absent, so
+  // resolve it defensively and fall back to the in-memory idempotency cache below —
+  // the design already guards every `if (idempotencyMiddleware)` usage for this case.
+  let idempotencyFactory: IdempotencyFactory | null = null;
+  try {
+    idempotencyFactory = app.get(IdempotencyFactory, { strict: false });
+  } catch {
+    idempotencyFactory = null;
+  }
+  const idempotencyMiddleware = idempotencyFactory?.getMiddleware() ?? null;
   const budgetService = app.get(BudgetService, { strict: false });
 
   let mcpSettings: McpSettings | null = null;

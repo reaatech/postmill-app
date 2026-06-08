@@ -9,6 +9,7 @@ import {
 import { PostValidationException } from '@gitroom/nestjs-libraries/errors/post-validation.exception';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
+import { ValidatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/validate.posts.dto';
 import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
@@ -800,7 +801,7 @@ export class PostsService {
     orgId: string,
     posts: Array<{
       integration: { id: string };
-      value: Array<{
+      value?: Array<{
         content?: string;
         image?: Array<{ path: string; thumbnail?: string }>;
       }>;
@@ -1046,7 +1047,7 @@ export class PostsService {
 
   async preflightCheck(
     orgId: string,
-    body: CreatePostDto,
+    body: ValidatePostsDto,
   ) {
     const results = await this.validatePosts(orgId, body.posts || []);
 

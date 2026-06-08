@@ -5,7 +5,7 @@ This fork (**Postiz REAA Flavor**) has diverged substantially from
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
 the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.5.10.**
 
 ---
 
@@ -40,6 +40,35 @@ Everything below builds around that foundation.
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
 
 ---
+
+## v3.5.10 — Stabilization release
+
+Gets v3.5.9 **actually booting** (it shipped with six chained boot blockers that returned 502 on
+every `/api/*`) and closes a batch of UI/API bugs found by a comprehensive end-to-end Playwright
+audit of the real interface. No schema changes.
+
+### Boot & deploy reliability
+- Lockfile regenerated so `node-telegram-bot-api` resolves to the CommonJS `0.66.x` the code targets
+  (the drifted lockfile had pinned an ESM-only `1.0.0-rc.0` that crash-looped the backend).
+- Five further runtime boot crashes fixed (DI on `ProviderHealthService` / `IdempotencyFactory`,
+  path-to-regexp v8 wildcard routes, the orchestrator's `AiModule`/`RagService` wiring, and a
+  `crypto` import banned in the Temporal workflow sandbox).
+- New CI **boot guard** rejects lockfile drift and boots the backend against ephemeral Postgres+Redis
+  — the check that would have stopped v3.5.9 from shipping un-booted.
+
+### UI/API fixes
+- Composer can save/schedule/publish again (lenient validate DTO on `/posts/valid` + `/preflight`).
+- CopilotKit stops 403-ing on every page (forwards the CSRF token to its runtime).
+- `/analytics/v2` no longer crashes — the line chart was missing its Chart.js `type`, so it threw and tripped the page's error boundary ("Something went wrong").
+- Billing no longer **logs you out of the whole app**: on instances without Stripe, the pricing-tiers call hit Stripe with a placeholder key and got `401 "Invalid API Key"`; the frontend force-logs-out on any `401`, so opening Billing silently logged you out — making every admin page and Settings render as login. `getPackages()` now returns empty tiers (never a 401) when Stripe is unconfigured.
+- `agent-media-sso` degrades gracefully when unconfigured.
+
+### Completeness & accessibility
+- **Team management**: change a member's role and view a member's profile (was list + remove only).
+- **Admin errors**: Retry a failed post (re-queues it) and Resolve/dismiss an error from `/admin/errors`.
+- Settings tabs and the admin channel-config row are now keyboard-focusable semantic buttons.
+- Global API throttle default raised `90 → 600`/hour (`API_LIMIT`) so normal interactive use no longer
+  trips it and renders pages blank on 429.
 
 ## v3.5.9 — Bugfix & UI-completeness release
 

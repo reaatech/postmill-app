@@ -133,10 +133,12 @@ export const SettingsPopup: FC<{
       <div className="bg-newBgColorInner p-[20px] flex flex-col transition-all w-[260px]">
         <div className="flex flex-1 flex-col gap-[15px]">
           {list.map(({ tab: tabKey, label }) => (
-            <div
+            <button
+              type="button"
               key={tabKey}
+              aria-current={tabKey === tab ? 'page' : undefined}
               className={clsx(
-                'cursor-pointer flex items-center gap-[12px] group/profile hover:bg-boxHover rounded-e-[8px]',
+                'cursor-pointer flex items-center gap-[12px] group/profile hover:bg-boxHover rounded-e-[8px] text-start w-full',
                 tabKey === tab && 'bg-boxHover'
               )}
               onClick={() => setTab(tabKey)}
@@ -150,7 +152,7 @@ export const SettingsPopup: FC<{
                 <SVGLine />
               </div>
               {label}
-            </div>
+            </button>
           ))}
         </div>
         <div>

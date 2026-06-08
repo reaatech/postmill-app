@@ -30,6 +30,7 @@ import { SemanticCacheService } from './governance/semantic-cache.service';
 import { ModelRouterService } from './governance/model-router.service';
 import { CircuitBreakerService } from './governance/circuit-breaker.service';
 import { ToolFirewallService } from './governance/tool-firewall.service';
+import { IdempotencyFactory } from './governance/idempotency.factory';
 
 @Global()
 @Module({
@@ -64,6 +65,7 @@ import { ToolFirewallService } from './governance/tool-firewall.service';
     ModelRouterService,
     CircuitBreakerService,
     ToolFirewallService,
+    IdempotencyFactory,
   ],
   exports: [
     AIProviderRegistry,
@@ -79,6 +81,7 @@ import { ToolFirewallService } from './governance/tool-firewall.service';
     ModelRouterService,
     CircuitBreakerService,
     ToolFirewallService,
+    IdempotencyFactory,
   ],
 })
 export class AiModule implements OnModuleInit, NestModule {
@@ -93,9 +96,10 @@ export class AiModule implements OnModuleInit, NestModule {
     consumer
       .apply(BudgetMiddleware)
       .forRoutes(
-        { path: 'agents/*', method: RequestMethod.ALL },
+        // path-to-regexp v8 named-wildcard syntax (see api.module.ts note).
+        { path: 'agents{/*splat}', method: RequestMethod.ALL },
         { path: 'posts/generator', method: RequestMethod.ALL },
-        { path: 'copilot/*', method: RequestMethod.ALL },
+        { path: 'copilot{/*splat}', method: RequestMethod.ALL },
       );
   }
 

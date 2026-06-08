@@ -15,8 +15,12 @@ export class ProviderHealthService implements OnModuleInit {
   private _redisKey = 'ai:provider-health';
   private readonly _redisTTL = 604800; // 7 days
   private readonly _pruneInactiveDays = 7;
+  // NOTE: must be a plain field, NOT a constructor parameter-property. A primitive
+  // `constructor(private _defaultThreshold = 5)` on an @Injectable() makes Nest try to
+  // DI-resolve a `number` param (metadata `Object`) → UnknownDependenciesException on boot.
+  private _defaultThreshold = 5;
 
-  constructor(private _defaultThreshold = 5) {}
+  constructor() {}
 
   async recordSuccess(providerId: string) {
     const r = this._getOrCreate(providerId);
