@@ -21,7 +21,13 @@ REAA Flavor
 
 **⚠️ This is a modified fork**
 
-This repository is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) with the following changes:
+This repository is an **AI-native** fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app), built by [REAA](https://reaatech.com).
+
+**🤖 AI at the core** — A governed, multi-provider AI layer powers the whole platform. Bring your own keys across **26 providers** (12 first-class — OpenAI, Anthropic, Azure OpenAI, Google, Vertex, Amazon Bedrock, Mistral, Cohere, Groq, xAI Grok, OpenRouter, Vercel AI Gateway — plus hubs like DeepSeek, Together AI, Fireworks, and Perplexity), pick the exact model from an admin screen, and switch providers everywhere without a redeploy. On top of it: on-brand content generation, smart comment replies, brand-voice profiles, a shared prompt library, semantic (RAG) search over your own content, compliance guardrails (prompt-injection / PII / brand-safety / NSFW), and per-org spend caps with a full audit log — every AI entry point scoped, rate-limited, and budget-checked.
+
+Everything else builds around that: persisted multi-channel analytics, a cross-channel comment inbox, campaigns, native polls, **36+ channels**, and a security-hardened, self-hosted stack.
+
+**Full changelog below (newest first):**
 
 **[v3.5.0]**
 - **Analytics that tell you what to do next** — See how every channel trends over time, spot your best times to post at a glance, and get a prioritized list of actions to grow faster — and keep an eye on the competitors that matter to you.

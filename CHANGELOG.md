@@ -1,5 +1,13 @@
 # Changelog
 
+> **AI-native fork by [REAA](https://reaatech.com).** A governed, multi-provider AI layer (26
+> providers, bring-your-own-keys) powers the platform — on-brand content generation, smart comment
+> replies, brand-voice profiles, semantic (RAG) search over your own content, compliance guardrails,
+> and per-org spend caps with a full audit log; every AI entry point scoped, rate-limited, and
+> budget-checked. Everything else builds around that: persisted multi-channel analytics, a
+> cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
+> self-hosted stack. Full release history below (newest first).
+
 ## [3.5.0] - 2026-06-06
 
 A codebase-hardening + feature-expansion release: a 30-item security cluster, 18 new analytics/AI/social features built on existing infrastructure, and several architecture refactors. Every change is additive or a refactor under existing contracts — no breaking changes, no schema renames.

@@ -9,16 +9,32 @@ the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per releas
 
 ---
 
+## AI at the core
+
+This is an **AI-native** fork. Where upstream ships a single hardcoded OpenAI integration, this fork
+runs a governed, multi-provider AI layer under the entire platform: bring your own keys across **26
+providers** (12 first-class — OpenAI, Anthropic, Azure OpenAI, Google, Vertex, Amazon Bedrock,
+Mistral, Cohere, Groq, xAI Grok, OpenRouter, Vercel AI Gateway — plus hubs like DeepSeek, Together
+AI, Fireworks, Perplexity), pick the exact model from an admin screen, and switch providers
+everywhere without a redeploy. On top of it: on-brand content generation, smart comment replies,
+brand-voice profiles, a shared prompt library, semantic (RAG) search over your own content,
+compliance guardrails (prompt-injection / PII / brand-safety / NSFW), and per-org spend caps with a
+full audit log — every AI entry point scoped, rate-limited, and budget-checked.
+
+Everything below builds around that foundation.
+
+---
+
 ## At a glance
 
 | Area | Upstream | This fork |
 |------|----------|-----------|
+| AI | Single hardcoded OpenAI integration | Governed multi-provider system (**26 providers**, BYO keys) with admin config, guardrails, RAG, and per-org spend caps |
 | Channel credentials | Environment variables only | DB-backed, encrypted, managed in an admin UI (env still works as fallback) |
 | Channel count | Upstream set | **36** providers (adds Tumblr, Pixelfed, PeerTube) |
 | Analytics | Single-channel, live fetch on demand | Persisted multi-channel dashboard from daily snapshots (`/analytics/v2`) |
 | Calendar | Card click opens edit modal | Card body opens a **Post Detail** modal; a settings icon opens edit |
 | Comments | — | Synced social comments foundation with per-user read state |
-| AI | Single hardcoded OpenAI integration | Pluggable multi-provider system with admin config + governance |
 | MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
 
