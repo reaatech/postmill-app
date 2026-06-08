@@ -1301,6 +1301,11 @@ export class PostsService {
       orgId,
       integrationId
     );
+    // No posting times configured → findFreeDateTimeRecursive would recurse
+    // day-by-day forever (the request hangs). Fall back to the next hour.
+    if (!findTimes?.length) {
+      return dayjs.utc().add(1, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm:00');
+    }
     return this.findFreeDateTimeRecursive(
       orgId,
       findTimes,
@@ -1320,8 +1325,13 @@ export class PostsService {
   private async findFreeDateTimeRecursive(
     orgId: string,
     times: number[],
-    date: dayjs.Dayjs
+    date: dayjs.Dayjs,
+    depth = 0
   ): Promise<string> {
+    // Backstop: never recurse more than ~a year ahead (avoid an unbounded loop).
+    if (depth > 366) {
+      return dayjs.utc().add(1, 'hour').startOf('hour').format('YYYY-MM-DDTHH:mm:00');
+    }
     const list = await this._postRepository.getPostsCountsByDates(
       orgId,
       times,
@@ -1329,7 +1339,7 @@ export class PostsService {
     );
 
     if (!list.length) {
-      return this.findFreeDateTimeRecursive(orgId, times, date.add(1, 'day'));
+      return this.findFreeDateTimeRecursive(orgId, times, date.add(1, 'day'), depth + 1);
     }
 
     const num = list.reduce<null | number>((prev, curr) => {

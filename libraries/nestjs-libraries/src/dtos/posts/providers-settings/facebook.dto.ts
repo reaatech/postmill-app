@@ -1,6 +1,7 @@
+import { BaseSettings } from './base.settings';
 import { IsIn, IsOptional, ValidateIf, IsUrl } from 'class-validator';
 
-export class FacebookDto {
+export class FacebookDto extends BaseSettings {
   @IsOptional()
   @ValidateIf(p => p.url)
   @IsUrl()

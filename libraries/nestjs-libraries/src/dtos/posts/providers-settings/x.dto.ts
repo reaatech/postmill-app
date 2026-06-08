@@ -1,6 +1,7 @@
+import { BaseSettings } from './base.settings';
 import { IsBoolean, IsIn, IsOptional, Matches } from 'class-validator';
 
-export class XDto {
+export class XDto extends BaseSettings {
   @IsOptional()
   @Matches(/^(https:\/\/x\.com\/i\/communities\/\d+)?$/, {
     message:

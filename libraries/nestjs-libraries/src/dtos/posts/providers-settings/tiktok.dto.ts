@@ -1,8 +1,9 @@
+import { BaseSettings } from './base.settings';
 import {
   IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional
 } from 'class-validator';
 
-export class TikTokDto {
+export class TikTokDto extends BaseSettings {
   @ValidateIf((p) => p.title)
   @MaxLength(90)
   title: string;

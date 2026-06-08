@@ -1,7 +1,8 @@
+import { BaseSettings } from './base.settings';
 import { IsOptional, IsString, MinLength } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 
-export class ListmonkDto {
+export class ListmonkDto extends BaseSettings {
   @IsString()
   @MinLength(1)
   subject: string;

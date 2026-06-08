@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   IsDefined,
   IsOptional,
@@ -6,7 +7,7 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class DribbbleDto {
+export class DribbbleDto extends BaseSettings {
   @IsString()
   @IsDefined()
   @MinLength(1, {

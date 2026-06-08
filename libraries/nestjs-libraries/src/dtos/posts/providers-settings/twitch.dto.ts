@@ -1,6 +1,7 @@
+import { BaseSettings } from './base.settings';
 import { IsIn, IsOptional, IsString } from 'class-validator';
 
-export class TwitchDto {
+export class TwitchDto extends BaseSettings {
   @IsIn(['message', 'announcement'])
   @IsOptional()
   messageType?: 'message' | 'announcement';

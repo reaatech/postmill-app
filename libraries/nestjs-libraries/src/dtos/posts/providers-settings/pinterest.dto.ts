@@ -1,9 +1,10 @@
+import { BaseSettings } from './base.settings';
 import {
   IsDefined, IsOptional, IsString, IsUrl, MaxLength, MinLength, ValidateIf
 } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 
-export class PinterestSettingsDto {
+export class PinterestSettingsDto extends BaseSettings {
   @IsString()
   @ValidateIf((o) => !!o.title)
   @MaxLength(100)

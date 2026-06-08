@@ -1,7 +1,8 @@
+import { BaseSettings } from './base.settings';
 import { IsIn, IsOptional, IsString, MinLength, ValidateIf } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 
-export class MeweDto {
+export class MeweDto extends BaseSettings {
   @IsIn(['timeline', 'group'])
   @JSONSchema({
     description: 'Where to post: timeline or group',

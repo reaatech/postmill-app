@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   ArrayMinSize,
   IsBoolean,
@@ -73,7 +74,7 @@ export class RedditSettingsValueDto {
   value: RedditSettingsDtoInner;
 }
 
-export class RedditSettingsDto {
+export class RedditSettingsDto extends BaseSettings {
   @Type(() => RedditSettingsValueDto)
   @ValidateNested({ each: true })
   @ArrayMinSize(1)

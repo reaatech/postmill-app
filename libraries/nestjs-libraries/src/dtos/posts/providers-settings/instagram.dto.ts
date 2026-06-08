@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import { Type } from 'class-transformer';
 import {
   IsArray,
@@ -13,7 +14,7 @@ export class Collaborators {
   @IsString()
   label: string;
 }
-export class InstagramDto {
+export class InstagramDto extends BaseSettings {
   @IsIn(['post', 'story'])
   @IsDefined()
   post_type: 'post' | 'story';

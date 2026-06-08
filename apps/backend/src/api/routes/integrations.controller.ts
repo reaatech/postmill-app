@@ -468,7 +468,13 @@ export class IntegrationsController {
 
   @Get('/telegram/updates')
   async getUpdates(@Query() query: { word: string; id?: number }) {
-    return new TelegramProvider().getBotId(query);
+    try {
+      return await new TelegramProvider().getBotId(query);
+    } catch (err) {
+      // Telegram not configured (no TELEGRAM_TOKEN) or transient API failure —
+      // don't 500 the polling endpoint; report a graceful, pollable result.
+      return { error: 'Telegram is not configured or is currently unavailable' };
+    }
   }
 
   @Post('/moltbook/register')

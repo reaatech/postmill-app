@@ -1,7 +1,8 @@
+import { BaseSettings } from './base.settings';
 import { IsDefined, IsOptional, IsString, MinLength } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 
-export class WhopDto {
+export class WhopDto extends BaseSettings {
   @MinLength(1)
   @IsDefined()
   @IsString()

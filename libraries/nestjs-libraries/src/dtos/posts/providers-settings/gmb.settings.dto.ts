@@ -1,6 +1,7 @@
+import { BaseSettings } from './base.settings';
 import { IsOptional, IsString, IsIn, IsUrl, ValidateIf } from 'class-validator';
 
-export class GmbSettingsDto {
+export class GmbSettingsDto extends BaseSettings {
   @IsOptional()
   @IsIn(['STANDARD', 'EVENT', 'OFFER'])
   topicType?: 'STANDARD' | 'EVENT' | 'OFFER';

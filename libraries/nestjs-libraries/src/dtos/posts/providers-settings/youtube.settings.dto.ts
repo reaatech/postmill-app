@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   IsArray,
   IsDefined,
@@ -63,7 +64,7 @@ export class YoutubeTagsSettings {
   label: string;
 }
 
-export class YoutubeSettingsDto {
+export class YoutubeSettingsDto extends BaseSettings {
   @IsString()
   @MinLength(2)
   @MaxLength(100)

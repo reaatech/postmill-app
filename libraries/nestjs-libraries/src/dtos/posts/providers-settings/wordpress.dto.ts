@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   IsDefined,
   IsOptional,
@@ -8,7 +9,7 @@ import {
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
 
-export class WordpressDto {
+export class WordpressDto extends BaseSettings {
   @IsString()
   @MinLength(2)
   @IsDefined()

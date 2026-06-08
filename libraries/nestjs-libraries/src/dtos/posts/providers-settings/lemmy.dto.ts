@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   ArrayMinSize,
   IsDefined,
@@ -38,7 +39,7 @@ export class LemmySettingsValueDto {
   value: LemmySettingsDtoInner;
 }
 
-export class LemmySettingsDto {
+export class LemmySettingsDto extends BaseSettings {
   @Type(() => LemmySettingsValueDto)
   @ValidateNested({ each: true })
   @ArrayMinSize(1)

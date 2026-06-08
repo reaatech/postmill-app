@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   ArrayMaxSize,
   IsArray,
@@ -13,7 +14,7 @@ import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
 import { DevToTagsSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/dev.to.tags.settings.dto';
 
-export class DevToSettingsDto {
+export class DevToSettingsDto extends BaseSettings {
   @IsString()
   @MinLength(2)
   @IsDefined()

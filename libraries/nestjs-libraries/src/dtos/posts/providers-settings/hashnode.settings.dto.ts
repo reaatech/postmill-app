@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   ArrayMinSize,
   IsArray,
@@ -20,7 +21,7 @@ export class HashnodeTagsSettings {
   label: string;
 }
 
-export class HashnodeSettingsDto {
+export class HashnodeSettingsDto extends BaseSettings {
   @IsString()
   @MinLength(6)
   @IsDefined()

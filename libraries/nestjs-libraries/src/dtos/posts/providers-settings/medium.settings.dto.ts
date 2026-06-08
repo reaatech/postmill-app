@@ -1,3 +1,4 @@
+import { BaseSettings } from './base.settings';
 import {
   ArrayMaxSize,
   IsArray,
@@ -19,7 +20,7 @@ export class MediumTagsSettings {
   label: string;
 }
 
-export class MediumSettingsDto {
+export class MediumSettingsDto extends BaseSettings {
   @IsString()
   @MinLength(2)
   @IsDefined()
