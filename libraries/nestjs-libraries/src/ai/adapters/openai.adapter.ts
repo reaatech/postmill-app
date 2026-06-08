@@ -105,7 +105,7 @@ export class OpenAIAdapter implements AIProviderAdapter {
     } catch (origErr) {
       try {
         const provider = this._buildProvider(creds);
-        const model = provider.languageModel('gpt-4o-mini');
+        const model = provider.chat('gpt-4o-mini');
         await (model as any).doGenerate({
           prompt: [
             { role: 'user', content: [{ type: 'text' as const, text: 'ping' }] },
@@ -125,7 +125,12 @@ export class OpenAIAdapter implements AIProviderAdapter {
     _opts?: AIModelOptions,
   ): LanguageModelV2 {
     const provider = this._buildProvider(creds);
-    return provider.languageModel(modelId);
+    // Use the Chat Completions API (.chat), NOT the default Responses API
+    // (.languageModel). @ai-sdk/openai v2's Responses API expects message
+    // content parts of type 'input_text' and rejects the SDK's 'text' parts
+    // ("Invalid value: 'text'. Supported values are: 'input_text'..."), which
+    // 500'd every AI generation feature. Chat Completions accepts 'text'.
+    return provider.chat(modelId);
   }
 
   createLangchainModel(

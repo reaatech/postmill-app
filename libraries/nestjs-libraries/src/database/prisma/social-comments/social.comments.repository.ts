@@ -62,7 +62,7 @@ export class SocialCommentsRepository {
   }
 
   async bulkMarkRead(commentIds: string[]) {
-    if (!commentIds.length) return { count: 0 };
+    if (!commentIds?.length) return { count: 0 };
     return this._socialComment.model.socialComment.updateMany({
       where: { id: { in: commentIds } },
       data: { status: 'handled' },

@@ -66,7 +66,12 @@ async function start() {
   app.use(cookieParser());
   app.use(compression());
 
-  if (!isDev() || !process.env.NOT_SECURED) {
+  // Apply helmet unless NOT_SECURED is explicitly the string 'true'. The old
+  // gate (`!isDev() || !process.env.NOT_SECURED`) silently DISABLED helmet on
+  // prod: NODE_ENV unset → isDev()=true, and NOT_SECURED="false" is a truthy
+  // string → both falsy → helmet skipped (no HSTS/frameguard/noSniff,
+  // x-powered-by exposed). Gate on the explicit opt-out only.
+  if (process.env.NOT_SECURED !== 'true') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const helmet = require('helmet');
     app.use(helmet({
