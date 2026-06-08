@@ -1,5 +1,5 @@
 import Stripe from 'stripe';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
@@ -177,27 +177,41 @@ export class StripeService {
   }
 
   async getPackages() {
-    const products = await stripe.prices.list({
-      active: true,
-      expand: ['data.tiers', 'data.product'],
-      lookup_keys: [
-        'standard_monthly',
-        'standard_yearly',
-        'pro_monthly',
-        'pro_yearly',
-      ],
-    });
+    // On instances without Stripe configured, the client is built with the placeholder
+    // 'sk_nothing' key (see top of file), so any Stripe call returns 401 "Invalid API Key".
+    // That 401 propagated to the Billing page and the frontend force-logs-out on *any* 401
+    // (layout.context.tsx -> /auth/logout) — so simply opening Billing logged the user out of
+    // the whole app. Short-circuit to empty packages, and never let a Stripe error become a 401.
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return {};
+    }
 
-    const productsList = groupBy(
-      products.data.map((p) => ({
-        name: (p.product as Stripe.Product)?.name,
-        recurring: p?.recurring?.interval!,
-        price: p?.tiers?.[0]?.unit_amount! / 100,
-      })),
-      'recurring'
-    );
+    try {
+      const products = await stripe.prices.list({
+        active: true,
+        expand: ['data.tiers', 'data.product'],
+        lookup_keys: [
+          'standard_monthly',
+          'standard_yearly',
+          'pro_monthly',
+          'pro_yearly',
+        ],
+      });
 
-    return { ...productsList };
+      const productsList = groupBy(
+        products.data.map((p) => ({
+          name: (p.product as Stripe.Product)?.name,
+          recurring: p?.recurring?.interval!,
+          price: p?.tiers?.[0]?.unit_amount! / 100,
+        })),
+        'recurring'
+      );
+
+      return { ...productsList };
+    } catch (err) {
+      Logger.warn('Stripe getPackages failed; returning empty tiers');
+      return {};
+    }
   }
 
   async prorate(organizationId: string, body: BillingSubscribeDto) {
