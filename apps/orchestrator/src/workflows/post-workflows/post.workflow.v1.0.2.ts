@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { capitalize, sortBy } from 'lodash';
 import { PostResponse } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { uuid4 } from '@temporalio/workflow';
 import { TypedSearchAttributes } from '@temporalio/common';
 import { postId as postIdSearchParam } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 
@@ -397,7 +397,7 @@ export async function postWorkflowV102({
             postNow: true,
           },
         ],
-        workflowId: `post_${post.id}_${makeId(10)}`,
+        workflowId: `post_${post.id}_${uuid4()}`,
         typedSearchAttributes: new TypedSearchAttributes([
           {
             key: postIdSearchParam,
