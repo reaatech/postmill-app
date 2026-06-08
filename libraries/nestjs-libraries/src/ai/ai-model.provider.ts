@@ -39,8 +39,12 @@ const PROVIDER_PRICING: Record<string, { inputPer1K: number; outputPer1K: number
 };
 
 const SURFACE_DEFAULTS: Record<AIScope, SurfaceDefaults> = {
-  utility: { textModel: 'gpt-4.1', imageModel: 'chatgpt-image-latest' },
-  generator: { textModel: 'gpt-4.1', imageModel: 'chatgpt-image-latest', temperature: 0.7 },
+  // gpt-image-1 (not the non-existent 'chatgpt-image-latest', which the OpenAI
+  // images endpoint rejected with "Unknown parameter: 'response_format'"). The
+  // SDK special-cases gpt-image-1 to omit response_format and it supports the
+  // 1024x1536 vertical size used below.
+  utility: { textModel: 'gpt-4.1', imageModel: 'gpt-image-1' },
+  generator: { textModel: 'gpt-4.1', imageModel: 'gpt-image-1', temperature: 0.7 },
   agent: { textModel: 'gpt-5.2' },
   mcp: { textModel: 'gpt-4.1' },
 };
@@ -811,9 +815,27 @@ export class AIModelProvider {
 
             const { messages } = await this._buildMessages(config, checkedPrompt, systemPrompt);
 
+            // Include the ACTUAL JSON schema in the instruction — previously it
+            // said "matches the requested schema" without ever providing the
+            // schema, so the model guessed the shape (e.g. repurpose returned
+            // {"x":"..."} instead of {platforms:[{platform,content}]}) and
+            // _schema.parse threw.
+            let schemaText = '';
+            try {
+              if (_schema && typeof _schema.parse === 'function') {
+                // eslint-disable-next-line @typescript-eslint/no-require-imports
+                const { zodToJsonSchema } = require('zod-to-json-schema');
+                schemaText = JSON.stringify(zodToJsonSchema(_schema));
+              }
+            } catch {
+              // fall through to the generic instruction
+            }
+
             const structuredSystem = [
               messages.find((m: any) => m.role === 'system')?.content?.[0]?.text || '',
-              'Return only valid JSON that matches the requested schema. Do not include markdown, prose, or code fences.',
+              schemaText
+                ? `Return only valid JSON that conforms to this JSON Schema. Do not include markdown, prose, or code fences.\nJSON Schema:\n${schemaText}`
+                : 'Return only valid JSON that matches the requested schema. Do not include markdown, prose, or code fences.',
             ].filter(Boolean).join('\n\n');
 
             const finalMessages: any[] = [
