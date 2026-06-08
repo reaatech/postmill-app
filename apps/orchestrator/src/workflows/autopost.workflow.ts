@@ -1,5 +1,5 @@
 import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
-import { AutopostActivity } from '@gitroom/orchestrator/activities/autopost.activity';
+import type { AutopostActivity } from '@gitroom/orchestrator/activities/autopost.activity';
 
 const { autoPost } = proxyActivities<AutopostActivity>({
   startToCloseTimeout: '10 minute',

@@ -1,5 +1,5 @@
 import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
-import { PostActivity } from '@gitroom/orchestrator/activities/post.activity';
+import type { PostActivity } from '@gitroom/orchestrator/activities/post.activity';
 
 const { searchForMissingThreeHoursPosts } = proxyActivities<PostActivity>({
   startToCloseTimeout: '10 minute',

@@ -1,5 +1,5 @@
 import { continueAsNew, proxyActivities, sleep } from '@temporalio/workflow';
-import { IntegrationsActivity } from '@gitroom/orchestrator/activities/integrations.activity';
+import type { IntegrationsActivity } from '@gitroom/orchestrator/activities/integrations.activity';
 
 const { getIntegrationsById, refreshToken } =
   proxyActivities<IntegrationsActivity>({

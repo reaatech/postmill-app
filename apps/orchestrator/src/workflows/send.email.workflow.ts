@@ -5,7 +5,7 @@ import {
   sleep,
   continueAsNew,
 } from '@temporalio/workflow';
-import { EmailActivity } from '@gitroom/orchestrator/activities/email.activity';
+import type { EmailActivity } from '@gitroom/orchestrator/activities/email.activity';
 import {
   SendEmail,
   sendEmailSignal,
