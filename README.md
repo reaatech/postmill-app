@@ -29,6 +29,13 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.5.9]**
+- **Your workspaces stay private** — Campaigns, watchlist, and comments are now fully locked to your organization, and every endpoint has proper permission checks — no one can see or touch your data.
+- **A comment inbox that just works** — The inbox loads without 400 errors, comments can be marked read in bulk with org-scoped safety, and a new "Summarize" button lets AI distill the conversation for you.
+- **Your profile and settings, right where you expect them** — A new profile section with your name, bio, and picture lives in settings, your avatar menu in the top bar gives you quick access to settings and logout, and a new Media Providers panel shows at a glance which AI providers power your image, video, and voice generation.
+- **Admin tools you can actually find** — Super-admins see an "Administration" section in the sidebar linking to AI settings, channels, errors, and stats — no more hunting for admin pages.
+- **More dependable, everywhere** — Timezones display correctly on calendars, stats show for every published post, billing forms render completely, and the platform is hardened against memory leaks, race conditions, and N+1 performance pitfalls.
+
 **[v3.5.0]**
 - **Analytics that tell you what to do next** — See how every channel trends over time, spot your best times to post at a glance, and get a prioritized list of actions to grow faster — and keep an eye on the competitors that matter to you.
 - **AI that does the busy work** — Generate on-brand hashtags, instantly read the mood of your comments, catch compliance problems before you publish, and write new posts in the voice of your best-performing content.

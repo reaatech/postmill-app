@@ -3,7 +3,7 @@
 These three providers were added in **v3.2.0**, bringing the channel count to 36. No database
 migration was required to add them.
 
-> **Verified against v3.4.0.** Configure all three in [Channels admin](../admin/channels.md).
+> **Verified against v3.5.9.** Configure all three in [Channels admin](../admin/channels.md).
 
 ---
 

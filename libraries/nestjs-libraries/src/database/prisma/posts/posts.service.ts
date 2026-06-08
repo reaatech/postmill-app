@@ -322,8 +322,8 @@ export class PostsService {
   ): Promise<PostWithConditionals[]> {
     const post = await this._postRepository.getPost(
       id,
+      orgId || '',
       includeIntegration,
-      orgId,
       isFirst
     );
 
@@ -944,7 +944,8 @@ export class PostsService {
         post,
         body.tags,
         creationMethod,
-        body.inter
+        body.inter,
+        body.campaignId
       );
 
       if (!posts?.length) {
@@ -1407,6 +1408,7 @@ export class PostsService {
               order: '',
               shortLink: false,
               tags: [],
+              campaignId: row.campaignId,
               posts: [
                 {
                   group: `bulk-${Date.now()}-${i}`,

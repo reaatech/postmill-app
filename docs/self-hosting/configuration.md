@@ -4,7 +4,7 @@ Postiz is configured through environment variables. The authoritative template i
 [`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
-> **Verified against v3.4.0.** When a variable's exact default matters, check `.env.example` and
+> **Verified against v3.5.9.** When a variable's exact default matters, check `.env.example` and
 > `docker-compose.yaml` directly; this page documents intent and fork behaviour rather than
 > duplicating every line.
 

@@ -59,6 +59,8 @@ const authenticatedController = [
   UsersController,
   IntegrationsController,
   SettingsController,
+  SocialCommentsController,
+  CampaignsController,
   PostsController,
   MediaController,
   BillingController,
@@ -76,12 +78,10 @@ const authenticatedController = [
   AdminController,
   ChannelConfigController,
   AnalyticsV2Controller,
-  SocialCommentsController,
   AiSettingsController,
   AiModerateController,
   AiUserController,
   ProviderCapabilitiesController,
-  CampaignsController,
 ];
 @Module({
   imports: [UploadModule],

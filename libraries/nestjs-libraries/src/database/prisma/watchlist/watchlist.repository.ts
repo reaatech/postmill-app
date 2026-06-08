@@ -30,13 +30,13 @@ export class WatchlistRepository {
     return this._prisma.watchedAccount.create({ data });
   }
 
-  update(id: string, data: { displayName?: string; enabled?: boolean }) {
-    return this._prisma.watchedAccount.update({ where: { id }, data });
+  update(id: string, organizationId: string, data: { displayName?: string; enabled?: boolean }) {
+    return this._prisma.watchedAccount.update({ where: { id, organizationId }, data });
   }
 
-  softDelete(id: string) {
+  softDelete(id: string, organizationId: string) {
     return this._prisma.watchedAccount.update({
-      where: { id },
+      where: { id, organizationId },
       data: { deletedAt: new Date() },
     });
   }
@@ -49,16 +49,16 @@ export class WatchlistRepository {
     return this._prisma.watchedAccountMetric.create({ data });
   }
 
-  setLastError(id: string, error: string | null) {
+  setLastError(id: string, organizationId: string, error: string | null) {
     return this._prisma.watchedAccount.update({
-      where: { id },
+      where: { id, organizationId },
       data: { lastError: error },
     });
   }
 
-  disableWithError(id: string, error: string) {
+  disableWithError(id: string, organizationId: string, error: string) {
     return this._prisma.watchedAccount.update({
-      where: { id },
+      where: { id, organizationId },
       data: { enabled: false, lastError: error },
     });
   }

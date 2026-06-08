@@ -5,7 +5,7 @@ This fork (**Postiz REAA Flavor**) has diverged substantially from
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
 the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.
 
-> **Verified against v3.5.0.**
+> **Verified against v3.5.9.**
 
 ---
 
@@ -38,6 +38,63 @@ Everything below builds around that foundation.
 | Comments | — | Synced social comments foundation with per-user read state |
 | MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
+
+---
+
+## v3.5.9 — Bugfix & UI-completeness release
+
+A comprehensive bugfix and UI-wiring release following a 56-item codebase audit. Focuses on closing
+cross-org security gaps, fixing runtime bugs, re-wiring disconnected UI surfaces, and hardening
+validation and type safety.
+
+### Security & org isolation
+- All campaign update/delete operations now require `organizationId` in the WHERE clause.
+- Watchlist account mutations (update, soft-delete, error management) now scoped to org.
+- Bulk comment mark-read (`POST /posts/inbox/bulk-read`) requires org ownership.
+- Comment assignment verifies post belongs to requesting user's org before reassigning.
+- All five campaign endpoints (`GET/POST/PUT/DELETE`) now carry `@CheckPolicies` and org scoping.
+- Sensitive post reads (`getPost`, `getPostById`, `getPostsByGroup`) now require mandatory `orgId`.
+- `POST /posts/bulk` now gated by `@CheckPolicies([..., Sections.POSTS_PER_MONTH])`.
+
+### Runtime fixes
+- `GET /posts/inbox` now resolves correctly (controller registration order fixed).
+- Calendar stats footer renders for all published posts.
+- `metric.component.tsx` no longer crashes on missing `timezones-list` package.
+- Calendar grid uses timezone-aware `newDayjs` for correct date display.
+- 4 event listener memory leaks fixed (icons, html, support, new-modal components).
+- Helmet middleware condition corrected (`||` → `&&`).
+- CopilotKit budget check logic clarified.
+
+### Data & performance
+- `disableIntegrations()` replaced per-row `update()` loop with single `updateMany()`.
+- `getComments()` now filters soft-deleted rows (`deletedAt: null`).
+- `getBestTimePosts()` pagination now has deterministic id tiebreaker.
+- `useCredit()` wrapped in `$transaction()` to prevent race conditions.
+- Comment sync loop guarded against null `result.comments`.
+
+### Validation hardening
+- 10 new validations: cursor date parsing, array size limits, enum status values,
+  campaign date ordering, watchlist handle format, query parameter whitelists,
+  and null guards on comment status.
+- 11 AI user endpoints now throttled at 30 req/min.
+
+### Feature / contract fixes
+- `campaignId` added to `CreatePostDto` and threaded through `createPost`/`bulkCreate`.
+- Image moderation de-scoped to text-only (image params removed from endpoint).
+- `CommentStatus` const enum introduced; hardcoded string arrays replaced.
+- `any` types in social comments service replaced with proper `Integration` type.
+- TTS generation error handling added (BudgetExceeded/GuardrailViolation patterns).
+
+### UI wiring
+- Sidebar now includes "Administration" section for super-admins.
+- User profile form (name, bio, picture) wired into settings.
+- User avatar dropdown menu added to top navigation bar.
+- `SetTimezone` component uncommented in app layout.
+- Billing address element, notification component, and FAQ heading uncommented.
+- Dead TikTok validity reference removed.
+- Admin dashboard page created at `/admin/dashboard`.
+- Read-only "Media Providers" panel added to Brand & AI settings (`GET /ai/media-providers`).
+- "Summarize comments" button added to comment composer.
 
 ---
 

@@ -147,7 +147,7 @@ export class AnalyticsActivity {
         }
         log.error(
           `AnalyticsActivity: Error collecting analytics for ${integration.id}:`,
-          { error: err?.message }
+          { integrationId: integration.id, providerId: integration.providerIdentifier, error: err?.message }
         );
       }
     }
@@ -265,7 +265,7 @@ export class AnalyticsActivity {
         }
         log.error(
           `AnalyticsActivity: Error collecting post analytics for ${post.id}:`,
-          { error: err?.message }
+          { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
         );
       }
     }
@@ -450,7 +450,7 @@ export class AnalyticsActivity {
     } catch (err: any) {
       if (err instanceof RefreshToken) return;
       log.error(`AnalyticsActivity: Error backfilling ${integration.id}:`, {
-        error: err?.message,
+        integrationId: integration.id, providerId: integration.providerIdentifier, error: err?.message,
       });
     }
   }
@@ -468,6 +468,7 @@ export class AnalyticsActivity {
           if (!capabilities?.watchlist) {
             await this._watchlistService.markProbeFailed(
               account.id,
+              orgId,
               `Watchlist probes are not supported for ${account.provider}`
             );
             continue;
@@ -475,6 +476,7 @@ export class AnalyticsActivity {
 
           await this._watchlistService.probeAndRecord({
             watchedAccountId: account.id,
+            organizationId: orgId,
             provider: account.provider,
             handle: account.handle,
             metric: 'followers',
@@ -486,6 +488,7 @@ export class AnalyticsActivity {
           );
           await this._watchlistService.markProbeFailed(
             account.id,
+            orgId,
             err?.message || 'Probe failed'
           );
         }

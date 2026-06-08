@@ -3,7 +3,7 @@
 Super-admins get an extra set of controls surfaced from the impersonation/admin bar. This page maps
 that surface; each item links to its own page where there's more to say.
 
-> **Verified against v3.4.0.** All admin endpoints are gated server-side: a non-super-admin request
+> **Verified against v3.5.9.** All admin endpoints are gated server-side: a non-super-admin request. v3.5.9 adds an "Administration" section to the sidebar visible to super-admins, linking to AI Settings, Channels, Errors, and Stats; plus a new admin dashboard landing page at `/admin/dashboard`.
 > is rejected (HTTP 400 "Unauthorized"), regardless of what the UI shows.
 
 ---

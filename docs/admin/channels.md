@@ -4,7 +4,7 @@ Channel (social provider) credentials are managed by a **super-admin** in the we
 **`/admin/channels`**, with credentials encrypted at rest. This replaces editing environment
 variables for each provider, though env vars remain a fallback.
 
-> **Verified against v3.4.0.** Introduced in v3.0.0.
+> **Verified against v3.5.9.** Introduced in v3.0.0.
 > UI route: `/admin/channels` · API route: `/admin/channel-configs` (super-admin only).
 
 ---

@@ -99,7 +99,6 @@ const TikTokSettings: FC<{
 
   return (
     <div className="flex flex-col">
-      {/*<CheckTikTokValidity picture={props?.values?.[0]?.image?.[0]?.path} />*/}
       {tiktokRestrictionNotice && (
         <div className="bg-tableBorder p-[10px] mb-[18px] rounded-[10px] flex gap-[10px] items-start text-[13px] text-balance">
           <div className="shrink-0 mt-[2px]">

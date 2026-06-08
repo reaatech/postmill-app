@@ -2,7 +2,7 @@
 
 How to move to a newer release of the fork, and how schema changes are applied.
 
-> **Verified against v3.4.0.** This system runs in production — read the schema-change notes before
+> **Verified against v3.5.9.** This system runs in production — read the schema-change notes before
 > upgrading a live instance.
 
 ---

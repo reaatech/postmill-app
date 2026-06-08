@@ -4,7 +4,7 @@ The AI layer is an admin-configurable, governed, multi-provider system. A **supe
 it in the web UI at **`/admin/ai`**, with provider keys encrypted at rest. This replaces the single
 hardcoded OpenAI integration from upstream.
 
-> **Verified against v3.4.0.** Introduced in v3.4.0.
+> **Verified against v3.5.9.** Introduced in v3.4.0.
 > UI route: `/admin/ai` · API route: `/admin/ai-settings` (super-admin only).
 
 ---

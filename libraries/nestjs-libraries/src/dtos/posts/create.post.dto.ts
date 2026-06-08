@@ -103,6 +103,10 @@ export class CreatePostDto {
   @IsString()
   creationMethod?: string;
 
+  @IsOptional()
+  @IsString()
+  campaignId?: string;
+
   @IsDefined()
   @IsBoolean()
   shortLink: boolean;

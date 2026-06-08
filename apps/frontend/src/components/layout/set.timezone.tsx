@@ -18,7 +18,9 @@ export const getTimezone = () => {
 };
 
 export const newDayjs = (config?: ConfigType) => {
-  return dayjs(config);
+  const d = dayjs(config).tz(getTimezone());
+  (d as any).local = () => d;
+  return d;
 };
 
 const SetTimezone: FC = () => {

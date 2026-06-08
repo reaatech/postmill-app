@@ -14,6 +14,25 @@ interface MediaProviderConfig {
   credentials?: Record<string, string>;
 }
 
+// Read-only, credential-free view of which media providers are active per operation.
+// Surfaced to non-admin users (4F) so they can see what media capabilities the instance
+// has configured without exposing any provider secrets.
+export interface MediaProviderSummaryEntry {
+  operation: MediaOperation;
+  available: boolean;
+  providers: { id: string; enabled: boolean; c2paAvailable: boolean }[];
+}
+
+const ALL_MEDIA_OPERATIONS: MediaOperation[] = [
+  'image',
+  'video',
+  'tts',
+  'stt',
+  'upscale',
+  'bg-remove',
+  'inpaint',
+];
+
 // §6.4 reconciliation — map each media operation back onto the legacy ai_images /
 // ai_videos credit counters so SubscriptionService.getCreditsFrom keeps seeing
 // consumption. TTS/STT have no legacy credit equivalent → undefined.
@@ -82,6 +101,25 @@ export class AiMediaService {
     this._costLedger = null;
     this._artifactStore = null;
     this._provenanceSigner = null;
+  }
+
+  // 4F — read-only summary of configured media providers for the user-facing Brand & AI
+  // settings panel. Returns one entry per media operation listing the enabled providers
+  // (by id) and whether C2PA provenance is available. Never returns credentials.
+  async getMediaProviderSummary(): Promise<MediaProviderSummaryEntry[]> {
+    const configs = await this._getMediaProviderConfigs();
+    return ALL_MEDIA_OPERATIONS.map((operation) => {
+      const providers = Object.entries(configs)
+        .filter(
+          ([, cfg]) => !!cfg?.enabled && (cfg.operations?.includes(operation) ?? false),
+        )
+        .map(([id, cfg]) => ({
+          id,
+          enabled: !!cfg.enabled,
+          c2paAvailable: !!cfg.c2paAvailable,
+        }));
+      return { operation, available: providers.length > 0, providers };
+    });
   }
 
   // ── @reaatech/media-pipeline-mcp-cost — per-call cost ledger (§2.4/§6.4) ──

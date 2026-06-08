@@ -3,7 +3,7 @@
 Two super-admin diagnostic screens: a log of captured integration/posting errors, and instance
 usage statistics.
 
-> **Verified against v3.4.0.** Both are super-admin only — the backing endpoints reject any
+> **Verified against v3.5.9.** Both are super-admin only — the backing endpoints reject any
 > non-super-admin request.
 
 ---

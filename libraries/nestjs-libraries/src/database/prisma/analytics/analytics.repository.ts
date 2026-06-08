@@ -244,7 +244,7 @@ export class AnalyticsRepository {
         lastLikes: true,
         lastComments: true,
       },
-      orderBy: { publishDate: 'desc' },
+      orderBy: [{ publishDate: 'desc' }, { id: 'desc' }],
       take: 500,
     });
   }

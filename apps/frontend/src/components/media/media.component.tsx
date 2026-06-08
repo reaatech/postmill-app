@@ -182,15 +182,17 @@ export const ShowMediaBoxModal: FC = () => {
     setShowModal(false);
     setCallBack(undefined);
   }, []);
-  useEffect(() => {
-    showModalEmitter.on('show-modal', (cCallback) => {
-      setShowModal(true);
-      setCallBack(() => cCallback);
-    });
-    return () => {
-      showModalEmitter.removeAllListeners('show-modal');
-    };
+  const handleShowModal = useCallback((cCallback: any) => {
+    setShowModal(true);
+    setCallBack(() => cCallback);
   }, []);
+
+  useEffect(() => {
+    showModalEmitter.on('show-modal', handleShowModal);
+    return () => {
+      showModalEmitter.off('show-modal', handleShowModal);
+    };
+  }, [handleShowModal]);
   if (!showModal) return null;
   return (
     <div className="text-textColor">

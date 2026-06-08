@@ -3,7 +3,19 @@
 import { Select } from '@gitroom/react/form/select';
 import React, { useState } from 'react';
 import { isUSCitizen } from '@gitroom/frontend/components/launches/helpers/isuscitizen.utils';
-import timezones from 'timezones-list';
+
+const getTimezones = (): { name: string; tzCode: string; label: string }[] => {
+  try {
+    return require('timezones-list').default || require('timezones-list');
+  } catch {
+    const tzs = (Intl as any).supportedValuesOf?.('timeZone') || [];
+    return tzs.map((tz: string) => ({
+      name: tz,
+      tzCode: tz,
+      label: tz.replace(/_/g, ' '),
+    }));
+  }
+};
 const dateMetrics = [
   { label: 'AM:PM', value: 'US' },
   { label: '24 hours', value: 'GLOBAL' },
@@ -26,7 +38,6 @@ const MetricComponent = () => {
 
   const changeTimezone = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const value = event.target.value;
-    console.log(value);
     setTimezone(value);
     localStorage.setItem('timezone', value);
     dayjs.tz.setDefault(value);
@@ -45,23 +56,23 @@ const MetricComponent = () => {
         ))}
       </Select>
 
-      {/*<div className="mt-[4px]">Current Timezone</div>*/}
-      {/*<Select*/}
-      {/*  name="timezone"*/}
-      {/*  disableForm={true}*/}
-      {/*  label=""*/}
-      {/*  onChange={changeTimezone}*/}
-      {/*>*/}
-      {/*  {timezones.map((metric) => (*/}
-      {/*    <option*/}
-      {/*      key={metric.name}*/}
-      {/*      value={metric.tzCode}*/}
-      {/*      selected={metric.tzCode === timezone}*/}
-      {/*    >*/}
-      {/*      {metric.label}*/}
-      {/*    </option>*/}
-      {/*  ))}*/}
-      {/*</Select>*/}
+      <div className="mt-[4px]">Current Timezone</div>
+      <Select
+        name="timezone"
+        disableForm={true}
+        label=""
+        onChange={changeTimezone}
+        value={timezone}
+      >
+        {getTimezones().map((metric) => (
+          <option
+            key={metric.name}
+            value={metric.tzCode}
+          >
+            {metric.label}
+          </option>
+        ))}
+      </Select>
     </div>
   );
 };

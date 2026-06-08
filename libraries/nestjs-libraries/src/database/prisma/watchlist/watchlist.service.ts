@@ -23,12 +23,12 @@ export class WatchlistService {
     return this._watchlistRepository.create(params);
   }
 
-  update(id: string, data: { displayName?: string; enabled?: boolean }) {
-    return this._watchlistRepository.update(id, data);
+  update(id: string, organizationId: string, data: { displayName?: string; enabled?: boolean }) {
+    return this._watchlistRepository.update(id, organizationId, data);
   }
 
-  remove(id: string) {
-    return this._watchlistRepository.softDelete(id);
+  remove(id: string, organizationId: string) {
+    return this._watchlistRepository.softDelete(id, organizationId);
   }
 
   getEnabledAccounts(organizationId: string) {
@@ -42,6 +42,7 @@ export class WatchlistService {
    */
   async probeAndRecord(params: {
     watchedAccountId: string;
+    organizationId: string;
     provider: string;
     handle: string;
     metric: string;
@@ -53,10 +54,10 @@ export class WatchlistService {
         metric: params.metric,
         value,
       });
-      await this._watchlistRepository.setLastError(params.watchedAccountId, null);
+      await this._watchlistRepository.setLastError(params.watchedAccountId, params.organizationId, null);
     } catch (err) {
       const message = (err as Error).message || 'Probe failed';
-      await this.markProbeFailed(params.watchedAccountId, message);
+      await this.markProbeFailed(params.watchedAccountId, params.organizationId, message);
       this._logger.warn(`Failed to probe watched account ${params.watchedAccountId}: ${message}`);
     }
   }
@@ -79,7 +80,12 @@ export class WatchlistService {
       throw new Error(`Public profile probe returned ${response.status}`);
     }
 
-    const body = await response.text();
+    let body: string;
+    try {
+      body = await response.text();
+    } catch {
+      throw new Error('Failed to read response body');
+    }
     const metric = this.extractPublicCount(body);
     if (metric === null) {
       throw new Error('No public metric found');
@@ -123,9 +129,9 @@ export class WatchlistService {
     return null;
   }
 
-  async markProbeFailed(watchedAccountId: string, error: string) {
+  async markProbeFailed(watchedAccountId: string, organizationId: string, error: string) {
     try {
-      await this._watchlistRepository.disableWithError(watchedAccountId, error);
+      await this._watchlistRepository.disableWithError(watchedAccountId, organizationId, error);
     } catch (err) {
       this._logger.warn(
         `Failed to mark probe error for watched account ${watchedAccountId}: ${(err as Error).message}`,

@@ -254,10 +254,7 @@ export const CalendarItem: FC<{
                   t('no_content', 'no content')}
               </div>
             </div>
-          {state === 'PUBLISHED' &&
-          ((post.lastViews !== undefined && post.lastViews !== null) ||
-          (post.lastLikes !== undefined && post.lastLikes !== null) ||
-          (post.lastComments !== undefined && post.lastComments !== null)) ? (
+          {state === 'PUBLISHED' ? (
             <div className="flex items-center gap-3 mt-2 text-[12px] text-textColor">
               {post.lastViews !== undefined && post.lastViews !== null && (
                 <span className="flex items-center gap-1">
@@ -269,11 +266,15 @@ export const CalendarItem: FC<{
                   <LikesIcon /> {formatCompactNumber(post.lastLikes)}
                 </span>
               )}
-              {post.lastComments !== undefined && post.lastComments !== null && (
+              {post.lastComments !== undefined && post.lastComments !== null ? (
                 <span className="flex items-center gap-1">
                   <CommentsIcon /> {formatCompactNumber(post.lastComments)}
                 </span>
-              )}
+              ) : post.commentCount ? (
+                <span className="flex items-center gap-1">
+                  <CommentsIcon /> {formatCompactNumber(post.commentCount)}
+                </span>
+              ) : null}
             </div>
           ) : null}
         </div>

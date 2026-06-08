@@ -3,7 +3,7 @@
 This page covers AI content generation — text and media — and is explicit about what works today
 versus what is stubbed for a later phase.
 
-> **Verified against v3.5.0.** Generation resolves its model through the AI facade; with no admin
+> **Verified against v3.5.9.** Generation resolves its model through the AI facade; with no admin
 > config it uses `OPENAI_API_KEY`. See [AI settings admin](../admin/ai-settings.md).
 
 ---

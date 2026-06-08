@@ -581,14 +581,11 @@ export class IntegrationRepository {
       },
     });
 
-    for (const channel of getChannels) {
-      await this._integration.model.integration.update({
-        where: {
-          id: channel.id,
-        },
-        data: {
-          disabled: true,
-        },
+    const ids = getChannels.map((c) => c.id);
+    if (ids.length) {
+      await this._integration.model.integration.updateMany({
+        where: { id: { in: ids } },
+        data: { disabled: true },
       });
     }
   }

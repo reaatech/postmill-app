@@ -36,6 +36,10 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/media.service', () => ({
     inpaintImage = vi.fn().mockResolvedValue('https://cdn/inpainted.png');
     textToSpeech = vi.fn().mockResolvedValue(Buffer.from('audio-bytes'));
     speechToText = vi.fn().mockResolvedValue('transcribed text');
+    getMediaProviderSummary = vi.fn().mockResolvedValue([
+      { operation: 'image', available: true, providers: [{ id: 'replicate', enabled: true, c2paAvailable: true }] },
+      { operation: 'tts', available: false, providers: [] },
+    ]);
   },
 }));
 
@@ -128,6 +132,18 @@ describe('AiUserController', () => {
       expect(result.budget.remainingMonthly).toBe(8);
       expect(result.budget.remainingDaily).toBe(0.5);
       expect(aiSettings.getSpendSummary).toHaveBeenCalledTimes(3);
+    });
+  });
+
+  describe('getMediaProviders (4F)', () => {
+    it('returns the credential-free media provider summary', async () => {
+      const result = await controller.getMediaProviders();
+      expect(mediaService.getMediaProviderSummary).toHaveBeenCalledTimes(1);
+      expect(result).toEqual([
+        { operation: 'image', available: true, providers: [{ id: 'replicate', enabled: true, c2paAvailable: true }] },
+        { operation: 'tts', available: false, providers: [] },
+      ]);
+      expect(JSON.stringify(result)).not.toContain('credentials');
     });
   });
 

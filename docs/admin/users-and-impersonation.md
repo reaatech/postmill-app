@@ -3,7 +3,7 @@
 Super-admins can act as another user from the admin bar — useful for support and reproducing
 account-specific issues.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.9.**
 
 ---
 

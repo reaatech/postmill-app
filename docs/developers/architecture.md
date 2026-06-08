@@ -4,7 +4,7 @@ A developer's tour of the monorepo and how the pieces fit. For the user-facing o
 [Overview](../getting-started/overview.md); for agent-specific guidance the repo also ships
 `AGENTS.md` at the root.
 
-> **Verified against v3.5.0.**
+> **Verified against v3.5.9.**
 
 ---
 

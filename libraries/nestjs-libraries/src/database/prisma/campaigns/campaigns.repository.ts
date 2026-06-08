@@ -35,6 +35,7 @@ export class CampaignsRepository {
 
   update(
     id: string,
+    organizationId: string,
     data: {
       name?: string;
       color?: string;
@@ -44,12 +45,12 @@ export class CampaignsRepository {
       archived?: boolean;
     },
   ) {
-    return this._prisma.campaign.update({ where: { id }, data });
+    return this._prisma.campaign.update({ where: { id, organizationId }, data });
   }
 
-  softDelete(id: string) {
+  softDelete(id: string, organizationId: string) {
     return this._prisma.campaign.update({
-      where: { id },
+      where: { id, organizationId },
       data: { deletedAt: new Date() },
     });
   }

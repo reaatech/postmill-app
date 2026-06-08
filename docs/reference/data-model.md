@@ -4,7 +4,7 @@ Key Prisma models grouped by domain. The schema is the source of truth:
 `libraries/nestjs-libraries/src/database/prisma/schema.prisma`. See [Database](../developers/database.md)
 for the `db push` model and schema-change rules.
 
-> **Verified against v3.5.0.** Model names below are taken from the schema.
+> **Verified against v3.5.9.** Model names below are taken from the schema.
 
 ---
 

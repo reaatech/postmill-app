@@ -189,6 +189,7 @@ export class AiUserController {
   ) {}
 
   @Get('/usage')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getUsage(@GetOrgFromRequest() org: Organization) {
     const summary = await this._aiSettingsService.getSpendSummary(org.id);
@@ -239,7 +240,15 @@ export class AiUserController {
     };
   }
 
+  @Get('/media-providers')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
+  async getMediaProviders() {
+    return this._aiMediaService.getMediaProviderSummary();
+  }
+
   @Put('/brand-profile')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertBrandProfile(
     @GetOrgFromRequest() org: Organization,
@@ -249,6 +258,7 @@ export class AiUserController {
   }
 
   @Get('/brand-profile')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getBrandProfile(@GetOrgFromRequest() org: Organization) {
     const profile = await this._aiSettingsService.getBrandProfile(org.id);
@@ -256,12 +266,14 @@ export class AiUserController {
   }
 
   @Get('/prompt-templates')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getPromptTemplates(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getPromptTemplates(org.id);
   }
 
   @Put('/prompt-templates')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertPromptTemplate(
     @GetOrgFromRequest() org: Organization,
@@ -275,6 +287,7 @@ export class AiUserController {
   }
 
   @Delete('/prompt-templates/:key')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptTemplate(
     @GetOrgFromRequest() org: Organization,
@@ -285,12 +298,14 @@ export class AiUserController {
   }
 
   @Get('/prompt-library')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async getPromptLibrary(@GetOrgFromRequest() org: Organization) {
     return this._aiSettingsService.getPromptLibraryItems(org.id);
   }
 
   @Post('/prompt-library')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createPromptLibraryItem(
     @GetOrgFromRequest() org: Organization,
@@ -304,6 +319,7 @@ export class AiUserController {
   }
 
   @Delete('/prompt-library/:id')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptLibraryItem(
     @GetOrgFromRequest() org: Organization,
@@ -314,6 +330,7 @@ export class AiUserController {
   }
 
   @Post('/media')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createMediaJob(
     @GetOrgFromRequest() org: Organization,
@@ -398,6 +415,7 @@ export class AiUserController {
   }
 
   @Get('/search')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
   async search(
     @GetOrgFromRequest() org: Organization,
@@ -641,6 +659,7 @@ Draft a friendly, professional reply from the social media manager's perspective
   }
 
   @Post('/repurpose')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async repurposeContent(
     @GetOrgFromRequest() org: Organization,
@@ -754,6 +773,7 @@ Return exactly ${body.platforms.length} results, one per requested platform.`;
   }
 
   @Post('/translate')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async translateContent(
     @GetOrgFromRequest() org: Organization,
@@ -850,6 +870,7 @@ For each locale, provide an accurate translation that preserves the meaning, ton
   }
 
   @Post('/variants')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async generateVariants(
     @GetOrgFromRequest() org: Organization,

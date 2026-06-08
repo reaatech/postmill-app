@@ -14,7 +14,7 @@ import {
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { ApiTags } from '@nestjs/swagger';
-import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AnalyticsService, BestTimeEntry } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import {
   AnalyticsDateRangeDto,
   AnalyticsPostsQueryDto,
@@ -23,6 +23,7 @@ import {
 import { Response } from 'express';
 import dayjs from 'dayjs';
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
+import { IsString, IsOptional, IsIn, MinLength, MaxLength } from 'class-validator';
 
 export function validateDateRange(from: string, to: string) {
   if (!from || !to) {
@@ -57,17 +58,23 @@ export function parseCompare(compare?: string): boolean {
   return compare?.toLowerCase() === 'true';
 }
 
-export interface BestTimeEntry {
-  day: number;
-  hour: number;
-  engagement: number;
-  postCount: number;
-  avgEngagement: number;
-}
-
 export interface BestTimeResponse {
   heatmap: BestTimeEntry[];
   bestSlots: { day: number; hour: number; avgEngagement: number }[];
+}
+
+class AddWatchlistDto {
+  @IsIn(['twitter', 'linkedin', 'instagram', 'facebook', 'youtube', 'tiktok'])
+  provider!: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  handle!: string;
+
+  @IsOptional()
+  @IsString()
+  displayName?: string;
 }
 
 @ApiTags('Analytics V2')
@@ -251,7 +258,7 @@ export class AnalyticsV2Controller {
   @Post('/watchlist')
   async addWatchlistEntry(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { provider: string; handle: string; displayName?: string },
+    @Body() body: AddWatchlistDto,
   ) {
     return this._watchlistService.add({
       organizationId: org.id,
@@ -263,15 +270,19 @@ export class AnalyticsV2Controller {
 
   @Put('/watchlist/:id')
   async updateWatchlistEntry(
+    @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
     @Body() body: { displayName?: string; enabled?: boolean },
   ) {
-    return this._watchlistService.update(id, body);
+    return this._watchlistService.update(id, org.id, body);
   }
 
   @Delete('/watchlist/:id')
-  async deleteWatchlistEntry(@Param('id') id: string) {
-    await this._watchlistService.remove(id);
+  async deleteWatchlistEntry(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    await this._watchlistService.remove(id, org.id);
     return { success: true };
   }
 }

@@ -5,7 +5,7 @@ provider/model the admin has configured (or the `OPENAI_API_KEY` fallback) and a
 governance the admin has set. For generation specifically, see
 [AI generation](./ai-generation.md); for admin setup, see [AI settings admin](../admin/ai-settings.md).
 
-> **Verified against v3.5.0.** Introduced in v3.4.0. User endpoints live under `/ai`. The new
+> **Verified against v3.5.9.** Introduced in v3.4.0. User endpoints live under `/ai`. The AI moderation endpoint (`POST /ai/moderate`) is now text-only — image moderation removed pending a configured vision provider. All 11 AI user endpoints now throttled at 30 req/min. A read-only `GET /ai/media-providers` endpoint surfaces configured media providers (credential-free) for the Brand & AI settings panel.
 > v3.5.0 tools (hashtags, comment sentiment/summary, compliance, brand memory) route through the
 > same `AIModelProvider` facade and each carries an explicit `@Throttle` rate limit.
 
@@ -69,3 +69,9 @@ own explicit `@Throttle` rate limit (request-rate abuse is distinct from spend, 
 
 Image generation works through the facade. Video, TTS, STT, upscale, background-removal, and inpaint
 are stubbed for a later phase (video falls back to image). See [AI generation](./ai-generation.md).
+
+The **Brand & AI** settings tab includes a read-only **Media Providers** panel (v3.5.9) listing which
+media operations (image, video, TTS, STT, upscale, background removal, inpainting) are configured and
+active for your workspace. It is backed by `GET /ai/media-providers`, which returns only provider ids
+and availability — never credentials. Media providers themselves are configured by an administrator in
+**Admin → AI Settings**.

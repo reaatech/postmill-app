@@ -4,7 +4,7 @@ The `/analytics/v2` surface serves the persisted analytics dashboard and the Pos
 For the feature itself (dashboard, retention, charts) see [Analytics](../features/analytics.md);
 this page is the endpoint reference.
 
-> **Verified against v3.5.0.** Endpoints from `AnalyticsV2Controller`.
+> **Verified against v3.5.9.** Endpoints from `AnalyticsV2Controller`.
 
 ---
 

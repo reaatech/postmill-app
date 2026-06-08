@@ -1,6 +1,6 @@
 'use client';
 
-import React, { ReactNode, useCallback } from 'react';
+import React, { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 const ModeComponent = dynamic(
@@ -36,10 +36,12 @@ import { TopMenu } from '@gitroom/frontend/components/layout/top.menu';
 import { LanguageComponent } from '@gitroom/frontend/components/layout/language.component';
 import { ChromeExtensionComponent } from '@gitroom/frontend/components/layout/chrome.extension.component';
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { OrganizationSelector } from '@gitroom/frontend/components/layout/organization.selector';
 import { StreakComponent } from '@gitroom/frontend/components/layout/streak.component';
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
+import { SettingsComponent } from '@gitroom/frontend/components/layout/settings.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 
@@ -133,7 +135,9 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           <ChromeExtensionComponent />
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
                           <AttachToFeedbackIcon />
+                          <SettingsComponent />
                           <NotificationComponent />
+                          <UserAvatarMenu />
                         </div>
                       </div>
                       <div className="flex flex-1 gap-[1px]">{children}</div>
@@ -146,5 +150,73 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
         </MantineWrapper>
       </CopilotKit>
     </ContextWrapper>
+  );
+};
+
+const UserAvatarMenu = () => {
+  const user = useUser();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+
+  if (!user) return null;
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-[8px] hover:text-newTextColor"
+      >
+        {(user as any).picture ? (
+          <img
+            src={(user as any).picture}
+            alt=""
+            className="w-[28px] h-[28px] rounded-full object-cover border border-newTableBorder"
+          />
+        ) : (
+          <div className="w-[28px] h-[28px] rounded-full bg-btnPrimary flex items-center justify-center text-white text-[12px] font-[600]">
+            {(user.name || user.email || '?')[0].toUpperCase()}
+          </div>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-[36px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]">
+          <div className="px-[14px] py-[8px] border-b border-newTableBorder">
+            <div className="text-[13px] font-[600] text-textColor truncate">
+              {user.name || user.email}
+            </div>
+            {user.email && (
+              <div className="text-[11px] text-textColor/60 truncate">
+                {user.email}
+              </div>
+            )}
+          </div>
+          <a
+            href="/settings"
+            className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
+          >
+            Settings
+          </a>
+          <a
+            href="/logout"
+            className="block px-[14px] py-[8px] text-[13px] text-red-500 hover:bg-boxHover"
+          >
+            Logout
+          </a>
+        </div>
+      )}
+    </div>
   );
 };

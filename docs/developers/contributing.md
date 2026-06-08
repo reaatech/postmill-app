@@ -1,6 +1,6 @@
 # Contributing
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.9.**
 
 ---
 

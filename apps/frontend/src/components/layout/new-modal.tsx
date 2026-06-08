@@ -319,15 +319,20 @@ export const ModalManagerEmitter: FC = () => {
     }))
   );
 
-  useEffect(() => {
-    emitter.on('show', (params: OpenModalInterface) => {
+  const handleShow = useCallback(
+    (params: OpenModalInterface) => {
       showModal(params);
-    });
+    },
+    [showModal]
+  );
+
+  useEffect(() => {
+    emitter.on('show', handleShow);
 
     return () => {
-      emitter.removeAllListeners('show');
+      emitter.off('show', handleShow);
     };
-  }, []);
+  }, [handleShow]);
   return null;
 };
 
@@ -388,7 +393,11 @@ export const areYouSure = ({
 export const DecisionEverywhere: FC = () => {
   const decision = useDecisionModal();
   useEffect(() => {
-    decisionModalEmitter.on('open', decision.open);
+    const handler = decision.open;
+    decisionModalEmitter.on('open', handler);
+    return () => {
+      decisionModalEmitter.off('open', handler);
+    };
   }, []);
   return null;
 };

@@ -8,7 +8,19 @@ import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webho
 import dayjs from 'dayjs';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import {
+  SocialProvider,
+  SocialCommentDTO,
+} from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { Post, Integration } from '@prisma/client';
+
+const CommentStatus = {
+  NEEDS_REPLY: 'needs_reply',
+  HANDLED: 'handled',
+  IGNORED: 'ignored',
+} as const;
+type CommentStatus = (typeof CommentStatus)[keyof typeof CommentStatus];
+export const VALID_COMMENT_STATUSES: readonly string[] = Object.values(CommentStatus);
 
 export interface InboxFilterOptions {
   status?: string;
@@ -30,8 +42,8 @@ export class SocialCommentsService {
 
   private async refreshTokenIfExpired(
     integration: { token: string; tokenExpiration?: Date | null; organizationId: string } & Integration,
-    provider: any
-  ): Promise<{ token: string; integration: any }> {
+    provider: SocialProvider
+  ): Promise<{ token: string; integration: typeof integration }> {
     let token = integration.token;
     if (integration.tokenExpiration && dayjs(integration.tokenExpiration).isBefore(dayjs())) {
       const refreshed = await this._refreshIntegrationService.refresh(integration);
@@ -65,7 +77,7 @@ export class SocialCommentsService {
     return { comments: items, nextCursor, unreadCount };
   }
 
-  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<any> {
+  async replyToComment(orgId: string, userId: string, postId: string, commentId: string, message: string, retried = false): Promise<SocialCommentDTO> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -122,7 +134,7 @@ export class SocialCommentsService {
       });
 
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof RefreshToken && !retried) {
         return this.replyToComment(orgId, userId, postId, commentId, message, true);
       }
@@ -130,7 +142,7 @@ export class SocialCommentsService {
     }
   }
 
-  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<any> {
+  async likeComment(orgId: string, userId: string, postId: string, commentId: string, like: boolean, retried = false): Promise<{ liked: boolean; likeCount?: number }> {
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
     if (!comment || comment.postId !== postId) {
       throw new BadRequestException('Comment not found');
@@ -176,7 +188,7 @@ export class SocialCommentsService {
       });
 
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof RefreshToken && !retried) {
         return this.likeComment(orgId, userId, postId, commentId, like, true);
       }
@@ -211,7 +223,7 @@ export class SocialCommentsService {
     commentId: string,
     status: string,
   ) {
-    if (!['needs_reply', 'handled', 'ignored'].includes(status)) {
+    if (!status || !VALID_COMMENT_STATUSES.includes(status)) {
       throw new BadRequestException('Invalid comment status');
     }
 
@@ -302,12 +314,14 @@ export class SocialCommentsService {
           post.integration,
         );
 
-        if (!result.comments?.length) {
+        const comments = result.comments ?? [];
+
+        if (!comments.length) {
           hasMore = false;
           continue;
         }
 
-        for (const comment of result.comments) {
+        for (const comment of comments) {
           syncedIds.add(comment.platformCommentId);
           await this._socialCommentsRepository.upsertComment({
             organizationId: orgId,
@@ -342,7 +356,7 @@ export class SocialCommentsService {
 
         cursor = result.nextCursor;
         if (!cursor) hasMore = false;
-      } catch (err: any) {
+      } catch (err: unknown) {
         fullySynced = false;
         if (err instanceof RefreshToken) {
           break;
@@ -372,8 +386,8 @@ export class SocialCommentsService {
     return this._socialCommentsRepository.getInbox(orgId, userId, filters);
   }
 
-  async bulkMarkRead(commentIds: string[]) {
-    return this._socialCommentsRepository.bulkMarkRead(commentIds);
+  async bulkMarkRead(commentIds: string[], orgId: string) {
+    return this._socialCommentsRepository.bulkMarkRead(commentIds, orgId);
   }
 
   async getInboxUnreadCount(orgId: string, userId: string) {
@@ -381,7 +395,7 @@ export class SocialCommentsService {
     return { unreadCount: count };
   }
 
-  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<any> {
+  async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<SocialCommentDTO> {
     const post = await this._postsRepository.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');
@@ -443,7 +457,7 @@ export class SocialCommentsService {
       }
 
       return result;
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof RefreshToken && !retried) {
         return this.replyToPost(orgId, userId, postId, message, true);
       }

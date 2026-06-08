@@ -3,7 +3,7 @@
 For providers that support it, the app syncs platform comments on your posts, tracks which comments
 each user has read, and (where the provider allows) lets you reply and like from inside Postiz.
 
-> **Verified against v3.5.0.** Foundation introduced in v3.3.0. v3.5.0 adds the cross-channel comment
+> **Verified against v3.5.9.** Foundation introduced in v3.3.0. v3.5.0 adds the cross-channel comment
 > inbox, comment support on 8 more providers, and first-comment auto-posting.
 
 ---

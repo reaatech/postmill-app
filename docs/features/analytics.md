@@ -3,7 +3,7 @@
 This fork replaces upstream's single-channel, live-fetch analytics with a **persisted, multi-channel
 dashboard** built from daily snapshots and served through the `/analytics/v2` API.
 
-> **Verified against v3.5.0.** Introduced in v3.1.0; Channel Detail panel, Export button, post-detail
+> **Verified against v3.5.9.** Introduced in v3.1.0; Channel Detail panel, Export button, post-detail
 > time-series charts, Best Time heatmap, Recommendations, and Watchlist tabs added in v3.5.0.
 
 ---

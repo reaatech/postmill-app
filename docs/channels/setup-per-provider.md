@@ -4,7 +4,7 @@ How to create the developer app / credentials for each channel and what to enter
 [Channels admin](../admin/channels.md). Scopes, identifiers, and credential keys below are taken
 from the provider implementations.
 
-> **Verified against v3.5.0.** 36 providers. Configure credentials in the admin UI (encrypted at
+> **Verified against v3.5.9.** 36 providers. Configure credentials in the admin UI (encrypted at
 > rest) or via the equivalent environment variables — the admin UI takes precedence.
 
 > **Per-provider capabilities** (comment sync, first comment, polls, video, carousel, alt text, max

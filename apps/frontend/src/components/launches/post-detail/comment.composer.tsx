@@ -140,6 +140,39 @@ export const CommentComposer: FC<CommentComposerProps> = ({
               ? t('ai_drafting', '✨ Drafting...')
               : t('ai_draft', '✨ Draft with AI')}
           </button>
+          <button
+            type="button"
+            onClick={async () => {
+              setAiLoading(true);
+              setError('');
+              try {
+                const res = await fetch('/ai/comment-reply', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    postId,
+                    action: 'summary',
+                  }),
+                });
+                if (!res.ok) throw { status: res.status, body: await res.json().catch(() => null) };
+                const data = await res.json();
+                setMessage(data.suggestion || '');
+              } catch (err: any) {
+                if (err.status) {
+                  setError(humanizeAiError(err.status, err.body));
+                } else {
+                  setError(t('summarize_failed', 'Summarize failed. Please try again.'));
+                }
+              } finally {
+                setAiLoading(false);
+              }
+            }}
+            disabled={aiLoading || sending}
+            className="text-[12px] text-btnPrimary hover:underline disabled:opacity-50"
+          >
+            {aiLoading
+              ? t('summarizing', '📋 Summarizing...')
+              : t('summarize', '📋 Summarize')}
+          </button>
         </div>
         <div className="flex gap-[6px] justify-between items-center">
           <div />

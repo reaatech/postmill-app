@@ -2,7 +2,7 @@
 
 import { Stripe } from '@stripe/stripe-js';
 
-import { FC, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import {
   PaymentElement,
   BillingAddressElement,
@@ -26,16 +26,21 @@ export const EmbeddedBilling: FC<{
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useCookie('mode', 'dark');
 
-  useEffect(() => {
-    modeEmitter.on('mode', (value) => {
+  const handleMode = useCallback(
+    (value: string) => {
       setMode(value);
       setLoading(true);
-    });
+    },
+    []
+  );
+
+  useEffect(() => {
+    modeEmitter.on('mode', handleMode);
 
     return () => {
-      modeEmitter.removeAllListeners();
+      modeEmitter.off('mode', handleMode);
     };
-  }, []);
+  }, [handleMode]);
 
   useEffect(() => {
     if (loading) {
@@ -138,14 +143,14 @@ const StripeInputs: FC<{
   const [ready, setReady] = useState(false);
   return (
     <>
-      {/*<div>*/}
-      {/*  <h4 className="mb-[32px] text-[24px] font-[700]">*/}
-      {/*    {checkout.type === 'loading'*/}
-      {/*      ? ''*/}
-      {/*      : t('billing_billing_address', 'Billing Address')}*/}
-      {/*  </h4>*/}
-      {/*  <BillingAddressElement />*/}
-      {/*</div>*/}
+      <div>
+        <h4 className="mb-[32px] text-[24px] font-[700]">
+          {checkout.type === 'loading'
+            ? ''
+            : t('billing_billing_address', 'Billing Address')}
+        </h4>
+        <BillingAddressElement />
+      </div>
       <div>
         <h4 className="mb-[32px] text-[24px] font-[700]">
           {checkout.type === 'loading' ? '' : t('billing_payment', 'Payment')}
