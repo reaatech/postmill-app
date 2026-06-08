@@ -270,11 +270,11 @@ export const CalendarItem: FC<{
                 <span className="flex items-center gap-1">
                   <CommentsIcon /> {formatCompactNumber(post.lastComments)}
                 </span>
-              ) : (
+              ) : post.commentCount ? (
                 <span className="flex items-center gap-1">
-                  <CommentsIcon /> {formatCompactNumber(post.commentCount || 0)}
+                  <CommentsIcon /> {formatCompactNumber(post.commentCount)}
                 </span>
-              )}
+              ) : null}
             </div>
           ) : null}
         </div>
