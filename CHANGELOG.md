@@ -18,7 +18,7 @@ functional bugs and completeness gaps surfaced by driving the UI. No schema chan
 
 ### Fixed — boot blockers (production was down on v3.5.9)
 
-- **#1** — Regenerate `pnpm-lock.yaml` so `node-telegram-bot-api` resolves to `0.66.x` (the CommonJS API the code targets) instead of the ESM-only `1.0.0-rc.0` the drifted lockfile pinned, which crashed the backend with `ERR_PACKAGE_PATH_NOT_EXPORTED`. `package.json` reverted to `^0.66.0`.
+- **#1** — Regenerate `pnpm-lock.yaml` so `node-telegram-bot-api` resolves to `0.66.x` (the CommonJS API the code targets) instead of the ESM-only `1.0.0-rc.0` the drifted lockfile pinned, which crashed the backend with `ERR_PACKAGE_PATH_NOT_EXPORTED`. `package.json` reverted to `^0.66.0`. Also: use `reply_to_message_id` (Bot API <7) instead of `reply_parameters` in `telegram.provider.ts`, and add a pnpm override bumping the deprecated `request` chain's `form-data` to the patched `2.5.x` (closes a critical CVE, GHSA-fjxv-7rqg-78g4).
 - **#2** — `ProviderHealthService`: make `_defaultThreshold` a plain field, not a primitive constructor param (Nest tried to DI-resolve it → boot crash).
 - **#3** — Register `IdempotencyFactory` in `AiModule` so `startMcp` can resolve it (unregistered → `UnknownElementException` → process exit).
 - **#4** — Migrate bare `*` middleware routes to `{/*splat}` for path-to-regexp v8 (Express 5 / Nest 11).
@@ -29,6 +29,7 @@ functional bugs and completeness gaps surfaced by driving the UI. No schema chan
 
 - **#7** — Composer can save/schedule/publish again: `POST /posts/valid` and `/posts/preflight` now bind a lenient `ValidatePostsDto` (only `posts` required; per-post `settings` pass-through) instead of the strict `CreatePostDto`, which 400'd on the composer's partial pre-check body. Real `POST /posts` still uses the strict DTO.
 - **#8** — Calendar renders posts again: add `display` to `GetPostsDto` (the global `forbidNonWhitelisted` pipe rejected `GET /posts?display=…` → empty calendar).
+- **#17** — `/analytics/v2` no longer crashes: `LineChart`'s Chart.js config omitted the `type` field, so Chart.js got `type: undefined` and threw `"undefined" is not a registered controller`, tripping the whole dashboard's error boundary ("Something went wrong"). Add `type: 'line'`. (TypeScript missed it — `datasets` was cast to `any[]`.)
 - **#9** — CopilotKit no longer 403s on every authenticated page: the `<CopilotKit>` runtime now forwards the `csrf_token` cookie as the `x-csrf-token` header (cookie-auth POSTs require CSRF; the runtime wasn't sending it).
 - **#11** — `GET /user/agent-media-sso` degrades to `{ url: null }` (200) when unconfigured instead of throwing 400.
 - **#20** — `GET /user/subscription/tiers` no longer requires the ADMIN policy (pricing tiers are public; the gate 401'd the Billing page).
