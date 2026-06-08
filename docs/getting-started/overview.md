@@ -5,7 +5,7 @@ channels**. You add posts to a calendar; they enter a workflow and publish at th
 Alongside scheduling it provides a persisted analytics dashboard, team management, a media library,
 and a pluggable AI layer.
 
-> **Verified against v3.4.0.** For how this fork differs from the original project, see
+> **Verified against v3.5.9.** For how this fork differs from the original project, see
 > [What's different from upstream](../CHANGES_FROM_UPSTREAM.md).
 
 ---

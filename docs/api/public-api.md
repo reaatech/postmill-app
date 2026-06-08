@@ -2,7 +2,7 @@
 
 The stable, API-key-authenticated surface for automation. Base path: **`/public/v1`**.
 
-> **Verified against v3.5.0.** Endpoints below are taken from the v1 public integrations controller.
+> **Verified against v3.5.9.** Endpoints below are taken from the v1 public integrations controller.
 
 ---
 

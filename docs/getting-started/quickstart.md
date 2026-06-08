@@ -3,7 +3,7 @@
 The fastest path to a running instance. For a production-style single-container deployment, use
 [Docker](../self-hosting/docker.md) instead.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.9.**
 
 ---
 

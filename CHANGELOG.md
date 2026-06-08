@@ -8,6 +8,70 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.5.9] - 2026-06-08
+
+A bugfix and UI-completeness release following a comprehensive codebase audit. Fixes 4 critical
+cross-org security vulnerabilities, 5 runtime bugs, re-wires 6 disconnected UI surfaces, and adds
+type safety and validation hardening across 56 code items. No schema changes — all fixes are
+code-only.
+
+### Security
+
+- **1.0.0** — Add `organizationId` filter to Campaigns repository `update()` and `softDelete()` WHERE clauses, preventing cross-org data manipulation.
+- **1.0.1** — Add `organizationId` filter to Watchlist repository `update()`, `softDelete()`, `setLastError()`, and `disableWithError()` WHERE clauses.
+- **1.0.2** — Add `@CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])` to `POST /posts/bulk`, closing a quota-bypass vulnerability.
+- **1.0.3** — Add `organizationId` filter to `bulkMarkRead()` in SocialComments repository, preventing cross-org comment access.
+- **1.0.4** — Add org-ownership validation to `assignComment()` — verifies the post belongs to the requesting user's org before reassigning.
+- **1.0.5** — Add `@CheckPolicies` to all five Campaigns controller endpoints (GET, POST, PUT, DELETE) and add `@GetOrgFromRequest()` to PUT/DELETE.
+- **1.0.6** — Make `orgId` mandatory (no optional fallback) on `getPost()`, `getPostById()`, and `getPostsByGroup()` in Posts repository.
+- **2.2.2** — Add `deletedAt: null` soft-delete filter to `getComments()` in Posts repository.
+
+### Fixed
+
+- **2B.1** — Fix comment inbox route conflict: move `SocialCommentsController` before `PostsController` in `api.module.ts` so `GET /posts/inbox` resolves to the inbox endpoint instead of failing as a UUID parse error on `GET /posts/:id`.
+- **2B.2** — Calendar card stats footer now renders for all `PUBLISHED` posts regardless of whether analytics have run (individual stats gated on non-null values).
+- **2B.3** — AI controller DI hardened: `api.module.ts` controller ordering + AI module init wrapped in try/catch.
+- **2B.4** — Fix `timezones-list` import crash in `metric.component.tsx`: added `Intl.supportedValuesOf('timeZone')` fallback when the external package is unavailable.
+- **2B.5** — Replace raw `dayjs` imports with `newDayjs` (timezone-aware wrapper) in calendar grid component for correct timezone display.
+- **2.1.0** — Fix Helmet middleware condition: `||` → `&&` so `NOT_SECURED` correctly disables Helmet in production when set.
+- **2.1.1** — Clarify CopilotKit budget check condition with explicit `inDevMode` variable.
+- **2.1.2** — Fix 4 event listener memory leaks: `icons/index.tsx` (use `off` instead of `removeAllListeners`), `html.component.tsx` (add cleanup), `support.tsx` (match event name in cleanup), `new-modal.tsx` (add named handler cleanup).
+- **2.2.1** — Replace per-integration `update()` loop in `disableIntegrations()` with a single `updateMany()` call.
+- **2.2.3** — Add `id` tiebreaker to `getBestTimePosts()` pagination ordering (`[{ publishDate: 'desc' }, { id: 'desc' }]`).
+- **2.2.4** — Wrap `useCredit()` operation in `$transaction()` to prevent concurrent-update race conditions.
+- **2.3.0** — De-scope image moderation to text-only: remove `checkImage`/`imageUrl` parameters from AI moderation endpoint. Image moderation requires a configured vision provider (deferred feature).
+- **2.4.0** — Add `campaignId?: string` field to `CreatePostDto`.
+- **2.4.1** — Thread `campaignId` through `createPost()` and `bulkCreate()` to the repository's `createOrUpdatePost()`.
+- **2.4.2** — Confirm `BestTimeEntry` interface is exported from `analytics.service.ts` (single source of truth).
+- **2.4.3** — Replace `any` type annotations with `Integration` type in social comments service.
+- **2.4.4** — Introduce `CommentStatus` const enum (`needs_reply`, `handled`, `ignored`) in social comments service, replacing hardcoded string arrays.
+- **2.4.5** — Add null guard on comment status validation: `if (!status || !VALID_COMMENT_STATUSES.includes(status))`.
+- **2.4.6** — Verify pricing tier types are consistent (no string-vs-number mismatches found).
+- **2.5.0** — Add cursor date validation in `getInbox()` — throws `BadRequestException` on malformed ISO strings.
+- **2.5.1** — Add array size limit (max 1000) to `bulkMarkRead` comment IDs.
+- **2.5.2** — Create `AddWatchlistDto` with `@IsEnum` and `@MinLength(1)`/`@MaxLength(100)` validation on handle.
+- **2.5.3** — Add `@IsIn` enum validation for comment status at controller level.
+- **2.5.4** — Add `endDate > startDate` cross-field validation in Campaigns controller create/update.
+- **2.5.5** — Wrap `response.text()` in try-catch within `probeAndRecord()` to prevent unhandled promise rejections.
+- **2.5.6** — Add null check on `result.comments` in comment sync loop: `const comments = result.comments ?? []`.
+- **2.5.8** — Add `{ integrationId, providerId }` context to analytics activity error log messages.
+- **2.5.9** — Add status whitelist validation and assigneeId ownership check to inbox query parameters.
+- **2.3.2** — Add proper try/catch with `BudgetExceeded`/`GuardrailViolation` re-throw pattern for TTS generation.
+- **7A** — Add `@Throttle({ default: { limit: 30, ttl: 60000 } })` to 11 AI user endpoints (usage, brand-profile, prompt-templates, media, search, repurpose, translate, variants).
+
+### UI / Frontend
+
+- **2A.0** — Tier-gating in sidebar navigation confirmed correct (upstream behavior); no change needed.
+- **3.0** — Uncomment `<SetTimezone />` in app layout.
+- **3.1** — Uncomment `<BillingAddressElement />` in Stripe checkout.
+- **3.2** — Uncomment `<NotificationComponent />` in billing page.
+- **3.3** — Remove dead `CheckTikTokValidity` reference from TikTok provider (component does not exist).
+- **3.4** — Uncomment FAQ section heading.
+- **4A** — Add "Administration" collapsible section with links to AI Settings, Channels, Errors, and Stats in the sidebar for super-admins.
+- **4B/6.0** — Create `ProfileComponent` with full name, bio, and picture fields; wire into GlobalSettings tab with form props. Add user avatar dropdown menu to the top navigation bar with Settings link and Logout button.
+- **4D** — Create admin dashboard page at `/admin/dashboard` with links to all four admin sections.
+- **7B** — Add "Summarize" button to comment composer that calls the AI comment-reply endpoint with `action: 'summary'`.
+
 ## [3.5.0] - 2026-06-06
 
 A codebase-hardening + feature-expansion release: a 30-item security cluster, 18 new analytics/AI/social features built on existing infrastructure, and several architecture refactors. Every change is additive or a refactor under existing contracts — no breaking changes, no schema renames.

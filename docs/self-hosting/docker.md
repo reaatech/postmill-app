@@ -3,7 +3,7 @@
 The repo ships a self-contained [`docker-compose.yaml`](../../docker-compose.yaml) that runs the
 app together with PostgreSQL, Redis, and a full Temporal stack.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.9.**
 
 ---
 

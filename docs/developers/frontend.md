@@ -1,6 +1,6 @@
 # Frontend Conventions (Next.js App Router)
 
-> **Verified against v3.4.0.** The root `AGENTS.md` is the canonical short form.
+> **Verified against v3.5.9.** The root `AGENTS.md` is the canonical short form.
 
 ---
 

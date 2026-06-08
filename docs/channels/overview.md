@@ -3,7 +3,7 @@
 This fork supports **36 channels**. Providers are registered in the integration manager and offered
 to users based on what a super-admin has enabled in [Channels admin](../admin/channels.md).
 
-> **Verified against v3.5.0.** The count and capability notes below are taken from the provider
+> **Verified against v3.5.9.** The count and capability notes below are taken from the provider
 > registrations and the central capability matrix in the codebase.
 
 ---

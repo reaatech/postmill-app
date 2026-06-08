@@ -3,7 +3,7 @@
 The calendar at `/launches` is where you schedule and manage posts. v3.3.0 reshaped how cards
 behave and added a **Post Detail** modal.
 
-> **Verified against v3.4.0.** Calendar/post-detail behaviour changed in v3.3.0 — see
+> **Verified against v3.5.9.** Calendar/post-detail behaviour changed in v3.3.0 — see
 > [What's different from upstream](../CHANGES_FROM_UPSTREAM.md).
 
 ---

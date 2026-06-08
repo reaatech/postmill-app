@@ -4,7 +4,7 @@ Background work runs on **Temporal** in the `orchestrator` app. This includes sc
 token refresh, email/digests, analytics collection, and comment sync. This page covers what runs,
 and the one setting that trips people up: `RUN_CRON`.
 
-> **Verified against v3.4.0.**
+> **Verified against v3.5.9.**
 
 ---
 

@@ -5,7 +5,7 @@ provider/model the admin has configured (or the `OPENAI_API_KEY` fallback) and a
 governance the admin has set. For generation specifically, see
 [AI generation](./ai-generation.md); for admin setup, see [AI settings admin](../admin/ai-settings.md).
 
-> **Verified against v3.5.0.** Introduced in v3.4.0. User endpoints live under `/ai`. The new
+> **Verified against v3.5.9.** Introduced in v3.4.0. User endpoints live under `/ai`. The AI moderation endpoint (`POST /ai/moderate`) is now text-only — image moderation removed pending a configured vision provider. All 11 AI user endpoints now throttled at 30 req/min.
 > v3.5.0 tools (hashtags, comment sentiment/summary, compliance, brand memory) route through the
 > same `AIModelProvider` facade and each carries an explicit `@Throttle` rate limit.
 

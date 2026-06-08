@@ -3,7 +3,7 @@
 How to add a new channel. The three fork-added providers (Tumblr, Pixelfed, PeerTube) are good
 reference implementations.
 
-> **Verified against v3.5.0.** Providers live in
+> **Verified against v3.5.9.** Providers live in
 > `libraries/nestjs-libraries/src/integrations/social/`.
 
 ---
