@@ -551,4 +551,89 @@ describe('AiMediaService', () => {
       });
     });
   });
+
+  describe('getMediaProviderSummary (4F)', () => {
+    it('returns one entry per media operation, all unavailable when nothing is configured', async () => {
+      mockGetSettings.mockResolvedValue(null);
+      mockGetProviderConfigs.mockResolvedValue([]);
+      const freshService = createService();
+
+      const summary = await freshService.getMediaProviderSummary();
+
+      expect(summary.map((e) => e.operation)).toEqual([
+        'image',
+        'video',
+        'tts',
+        'stt',
+        'upscale',
+        'bg-remove',
+        'inpaint',
+      ]);
+      expect(summary.every((e) => e.available === false)).toBe(true);
+      expect(summary.every((e) => e.providers.length === 0)).toBe(true);
+    });
+
+    it('marks an operation available and lists the enabled provider id', async () => {
+      mockGetSettings.mockResolvedValue({
+        ragSettings: {
+          mediaProviders: {
+            elevenlabs: { enabled: true, operations: ['tts'], c2paAvailable: false },
+          },
+        },
+      });
+      mockGetProviderConfigs.mockResolvedValue([]);
+      const freshService = createService();
+
+      const summary = await freshService.getMediaProviderSummary();
+      const tts = summary.find((e) => e.operation === 'tts')!;
+
+      expect(tts.available).toBe(true);
+      expect(tts.providers).toEqual([
+        { id: 'elevenlabs', enabled: true, c2paAvailable: false },
+      ]);
+    });
+
+    it('excludes disabled providers', async () => {
+      mockGetSettings.mockResolvedValue({
+        ragSettings: {
+          mediaProviders: {
+            replicate: { enabled: false, operations: ['image'], c2paAvailable: true },
+          },
+        },
+      });
+      mockGetProviderConfigs.mockResolvedValue([]);
+      const freshService = createService();
+
+      const summary = await freshService.getMediaProviderSummary();
+      const image = summary.find((e) => e.operation === 'image')!;
+
+      expect(image.available).toBe(false);
+      expect(image.providers).toEqual([]);
+    });
+
+    it('reflects the c2paAvailable flag and never leaks credentials', async () => {
+      mockGetSettings.mockResolvedValue({
+        ragSettings: {
+          mediaProviders: {
+            replicate: { enabled: true, operations: ['image', 'upscale'], c2paAvailable: true },
+          },
+        },
+      });
+      mockGetProviderConfigs.mockResolvedValue([
+        { identifier: 'replicate', credentials: 'encrypted-secret' },
+      ]);
+      const freshService = createService();
+
+      const summary = await freshService.getMediaProviderSummary();
+      const image = summary.find((e) => e.operation === 'image')!;
+
+      expect(image.providers).toEqual([
+        { id: 'replicate', enabled: true, c2paAvailable: true },
+      ]);
+      // No credential material in any returned entry.
+      const serialized = JSON.stringify(summary);
+      expect(serialized).not.toContain('credentials');
+      expect(serialized).not.toContain('encrypted-secret');
+    });
+  });
 });

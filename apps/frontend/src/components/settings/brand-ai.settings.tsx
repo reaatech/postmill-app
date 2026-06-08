@@ -66,6 +66,22 @@ interface PromptLibraryItem {
   createdAt: string;
 }
 
+interface MediaProviderSummaryEntry {
+  operation: string;
+  available: boolean;
+  providers: { id: string; enabled: boolean; c2paAvailable: boolean }[];
+}
+
+const MEDIA_OPERATION_LABELS: Record<string, string> = {
+  image: 'Image generation',
+  video: 'Video generation',
+  tts: 'Text-to-speech',
+  stt: 'Speech-to-text',
+  upscale: 'Image upscale',
+  'bg-remove': 'Background removal',
+  inpaint: 'Inpainting',
+};
+
 const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'fr', label: 'French' },
@@ -148,6 +164,23 @@ const usePromptLibrary = () => {
     return res.json();
   }, [fetch]);
   return useSWR<PromptLibraryItem[]>('ai-prompt-library', load, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+    revalidateOnMount: true,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+  });
+};
+
+const useMediaProviders = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/ai/media-providers');
+    if (!res.ok) throw new Error('Failed to load media providers');
+    return res.json();
+  }, [fetch]);
+  return useSWR<MediaProviderSummaryEntry[]>('ai-media-providers', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     revalidateIfStale: false,
@@ -759,12 +792,84 @@ const PromptLibrarySection = () => {
   );
 };
 
+const MediaProvidersSection = () => {
+  const t = useT();
+  const { data, isLoading } = useMediaProviders();
+
+  if (isLoading) {
+    return (
+      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+      <div className="flex flex-col gap-[4px]">
+        <div className="mt-[4px]">{t('media_providers', 'Media Providers')}</div>
+        <div className="text-[12px] text-customColor18">
+          {t(
+            'media_providers_description',
+            'Read-only view of the media generation providers configured for this workspace. Managed by an administrator in Admin → AI Settings.',
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-[8px]">
+        {data?.map((entry) => (
+          <div
+            key={entry.operation}
+            className="flex items-center justify-between bg-forth border border-tableBorder rounded-[4px] px-[16px] py-[12px]"
+          >
+            <div className="flex flex-col">
+              <span className="text-[13px] font-semibold">
+                {MEDIA_OPERATION_LABELS[entry.operation] || entry.operation}
+              </span>
+              {entry.available ? (
+                <span className="text-[12px] text-customColor18">
+                  {entry.providers
+                    .map(
+                      (p) => `${p.id}${p.c2paAvailable ? ' (C2PA)' : ''}`,
+                    )
+                    .join(', ')}
+                </span>
+              ) : (
+                <span className="text-[12px] text-customColor18">
+                  {t('media_provider_not_configured', 'Not configured')}
+                </span>
+              )}
+            </div>
+            <span
+              className={`text-[11px] rounded-[4px] px-[8px] py-[2px] ${
+                entry.available
+                  ? 'bg-fifth text-newTableText'
+                  : 'bg-forth text-customColor18'
+              }`}
+            >
+              {entry.available
+                ? t('available', 'Available')
+                : t('unavailable', 'Unavailable')}
+            </span>
+          </div>
+        ))}
+        {(!data || data.length === 0) && (
+          <div className="text-[12px] text-customColor18">
+            {t('no_media_providers', 'No media providers configured')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const BrandAISettings = () => {
   const t = useT();
   return (
     <div className="flex flex-col">
       <h3 className="text-[20px]">{t('brand_ai', 'Brand & AI')}</h3>
       <BrandVoiceSection />
+      <MediaProvidersSection />
       <UsageSection />
       <PromptTemplatesSection />
       <PromptLibrarySection />

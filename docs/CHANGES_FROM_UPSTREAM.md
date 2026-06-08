@@ -93,6 +93,7 @@ validation and type safety.
 - Billing address element, notification component, and FAQ heading uncommented.
 - Dead TikTok validity reference removed.
 - Admin dashboard page created at `/admin/dashboard`.
+- Read-only "Media Providers" panel added to Brand & AI settings (`GET /ai/media-providers`).
 - "Summarize comments" button added to comment composer.
 
 ---

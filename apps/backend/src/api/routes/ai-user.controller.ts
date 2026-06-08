@@ -240,6 +240,13 @@ export class AiUserController {
     };
   }
 
+  @Get('/media-providers')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  @CheckPolicies([AuthorizationActions.Read, Sections.AI])
+  async getMediaProviders() {
+    return this._aiMediaService.getMediaProviderSummary();
+  }
+
   @Put('/brand-profile')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])

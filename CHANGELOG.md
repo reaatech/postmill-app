@@ -70,6 +70,7 @@ code-only.
 - **4A** — Add "Administration" collapsible section with links to AI Settings, Channels, Errors, and Stats in the sidebar for super-admins.
 - **4B/6.0** — Create `ProfileComponent` with full name, bio, and picture fields; wire into GlobalSettings tab with form props. Add user avatar dropdown menu to the top navigation bar with Settings link and Logout button.
 - **4D** — Create admin dashboard page at `/admin/dashboard` with links to all four admin sections.
+- **4F** — Add a read-only "Media Providers" section to the Brand & AI settings tab, surfacing which media operations (image, video, TTS, STT, upscale, background removal, inpainting) are configured and active, backed by a new credential-free `GET /ai/media-providers` endpoint.
 - **7B** — Add "Summarize" button to comment composer that calls the AI comment-reply endpoint with `action: 'summary'`.
 
 ## [3.5.0] - 2026-06-06
