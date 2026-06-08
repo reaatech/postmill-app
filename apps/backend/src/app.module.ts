@@ -38,7 +38,13 @@ import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
       throttlers: [
         {
           ttl: 3600000,
-          limit: process.env.API_LIMIT ? Number(process.env.API_LIMIT) : 90,
+          // Global abuse backstop (per client IP, 1h window). The frontend SPA fires
+          // 15-30 /api calls per page navigation, so the old default of 90/hr tripped
+          // during normal interactive use and made the app look dead (blank renders on
+          // 429). Sensitive routes have their own tight per-minute @Throttle() decorators
+          // (auth 5/min, public 20-60/min, AI 10-30/min); this global limit only needs to
+          // catch scraping/abuse. Raised 90 -> 600 default; override via API_LIMIT env.
+          limit: process.env.API_LIMIT ? Number(process.env.API_LIMIT) : 600,
         },
       ],
       storage: new ThrottlerStorageRedisService(ioRedis),
