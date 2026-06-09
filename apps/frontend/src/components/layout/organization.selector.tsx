@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useMemo } from 'react';
+import React, { FC, useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -20,12 +20,12 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
     refreshWhenHidden: false,
     revalidateOnReconnect: false,
   });
-  const current = useMemo(() => {
-    return data?.find((d: any) => d.id === user?.orgId);
-  }, [data]);
-  const withoutCurrent = useMemo(() => {
-    return data?.filter((d: any) => d.id !== user?.orgId);
-  }, [current, data]);
+  // `/user/organizations` can resolve to a NON-array (e.g. an error body when
+  // the endpoint 500s — `.json()` yields `{statusCode,...}`). `data?.find` /
+  // `data?.filter` throw on a non-array, and because this selector lives in the
+  // global top bar that uncaught throw crashes the whole React tree → every
+  // page "loads then flashes to white". Always coerce to an array first.
+  const orgs: any[] = Array.isArray(data) ? data : [];
   const changeOrg = useCallback(
     (org: { name: string; id: string }) => async () => {
       await fetch('/user/change-org', {
@@ -38,7 +38,7 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
     },
     []
   );
-  if (isLoading || (!isLoading && data?.length === 1)) {
+  if (isLoading || orgs.length <= 1) {
     return null;
   }
   return (
@@ -65,14 +65,14 @@ export const OrganizationSelector: FC<{ asOpenSelect?: boolean }> = ({
               </svg>
             </div>
           )}
-          {data?.length > 1 && (
+          {orgs.length > 1 && (
             <div
               className={clsx(
                 'hidden py-[12px] px-[12px] group-hover:flex absolute top-[100%] end-0 bg-third border-tableBorder border gap-[12px] cursor-pointer flex-col',
                 asOpenSelect ? '!flex !relative max-w-[500px] mx-auto mb-[10px]' : '',
               )}
             >
-              {data?.map((org: { name: string; id: string }) => (
+              {orgs.map((org: { name: string; id: string }) => (
                 <div key={org.id} onClick={changeOrg(org)}>
                   {org.name}
                 </div>
