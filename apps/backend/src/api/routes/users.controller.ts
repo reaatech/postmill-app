@@ -222,8 +222,12 @@ export class UsersController {
 
   @Get('/organizations')
   async getOrgs(@GetUserFromRequest() user: User) {
+    // Guard `users[0]`: an org row with an empty `users` relation would throw
+    // here → 500 → the frontend org selector receives a non-array error body
+    // and crashes the whole tree (white screen on every page). Treat a missing
+    // membership row as not-disabled rather than 500ing.
     return (await this._orgService.getOrgsByUserId(user.id)).filter(
-      (f) => !f.users[0].disabled
+      (f) => !f.users?.[0]?.disabled
     );
   }
 
