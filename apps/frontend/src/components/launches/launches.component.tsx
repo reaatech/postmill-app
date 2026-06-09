@@ -361,7 +361,14 @@ export const LaunchesComponent = () => {
   const [reload, setReload] = useState(false);
   const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
   const [mode] = useCookie('mode', 'dark');
-  const { isLoading, data: integrations, mutate } = useIntegrationList();
+  const { isLoading, data: integrationsRaw, mutate } = useIntegrationList();
+  // Guard at the consumer: `integrations` is iterated in render `useMemo`s
+  // (`?.filter`, `orderBy`, `.map`), so a non-array value (error/edge response)
+  // throws during render and white-screens the page. Coerce to an array here so
+  // every downstream usage is safe regardless of what the fetch returns.
+  const integrations: any[] = Array.isArray(integrationsRaw)
+    ? integrationsRaw
+    : [];
 
   const totalNonDisabledChannels = useMemo(() => {
     return (
