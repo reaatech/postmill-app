@@ -31,6 +31,7 @@ import { ExistingDataContextProvider } from '@gitroom/frontend/components/launch
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { csrfHeader } from '@gitroom/helpers/utils/csrf.header';
 
 export const AgentChat: FC = () => {
   const { backendUrl } = useVariables();
@@ -43,6 +44,7 @@ export const AgentChat: FC = () => {
       {...(params.id === 'new' ? {} : { threadId: params.id })}
       credentials="include"
       runtimeUrl={backendUrl + '/copilot/agent'}
+      headers={csrfHeader()}
       showDevConsole={false}
       agent="postiz"
       properties={{
