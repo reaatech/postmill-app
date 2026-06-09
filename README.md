@@ -1,9 +1,8 @@
-
 <p align="center">
   <a href="https://postiz.com/" target="_blank">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/765e9d72-3ee7-4a56-9d59-a2c9befe2311">
-    <img alt="Postmill Logo" src="https://github.com/user-attachments/assets/dece1bba-5703-408c-a712-02f7a7953f02" width="280"/>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/user-attachments/assets/dece1bba-5703-408c-a712-02f7a7953f02">
+    <img alt="Postmill Logo" src="https://github.com/user-attachments/assets/f5861b90-f71f-4ff7-90e4-6eb308023f17" width="280"/>
   </picture>
   </a>
 <br />
