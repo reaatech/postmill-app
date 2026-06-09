@@ -223,14 +223,15 @@ describe('AIModelProvider', () => {
       }
     });
 
-    it('falls back to env OPENAI_API_KEY when the org has no active provider (backward-compat invariant)', async () => {
+    it('returns null (AI off) when the org has no active provider — env OPENAI_API_KEY is NOT used (v3.6.3)', async () => {
+      // No per-org provider means AI is off for that tenant. A deployment's env
+      // OPENAI_API_KEY must never be silently used as the tenant's AI.
       mockGetActiveProvider.mockResolvedValue(null);
       const prev = process.env.OPENAI_API_KEY;
       process.env.OPENAI_API_KEY = 'sk-env-key';
       try {
         const resolved = await provider.resolveConfigForScope('utility', 'org-123');
-        expect(resolved?.providerId).toBe('openai');
-        expect(resolved?.creds.apiKey).toBe('sk-env-key');
+        expect(resolved).toBeNull();
       } finally {
         if (prev === undefined) delete process.env.OPENAI_API_KEY;
         else process.env.OPENAI_API_KEY = prev;

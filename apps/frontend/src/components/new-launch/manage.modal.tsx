@@ -30,6 +30,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { capitalize } from 'lodash';
 import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
 import { CopilotPopup } from '@copilotkit/react-ui';
+import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { DummyCodeComponent } from '@gitroom/frontend/components/new-launch/dummy.code.component';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
 import {
@@ -48,6 +49,7 @@ import { Button } from '@gitroom/react/form/button';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
+  const aiActive = useAiActive();
   const fetch = useFetch();
   const ref = useRef(null);
   const existingData = useExistingData();
@@ -717,6 +719,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           }}
         />
       )}
+      {aiActive && (
       <CopilotPopup
         hitEscapeToClose={false}
         clickOutsideToClose={true}
@@ -739,6 +742,7 @@ After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} f
           ),
         }}
       />
+      )}
     </div>
   );
 };

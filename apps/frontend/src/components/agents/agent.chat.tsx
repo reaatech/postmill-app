@@ -32,12 +32,47 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 import { csrfHeader } from '@gitroom/helpers/utils/csrf.header';
+import Link from 'next/link';
+import {
+  useAiActive,
+  AI_SETUP_HREF,
+} from '@gitroom/frontend/components/layout/use-ai-active';
 
 export const AgentChat: FC = () => {
   const { backendUrl } = useVariables();
   const params = useParams<{ id: string }>();
   const { properties } = useContext(PropertiesContext);
   const t = useT();
+  const aiActive = useAiActive();
+
+  // No AI provider configured → CopilotKit's /copilot/agent handshake would
+  // 403 and the "postiz" agent wouldn't resolve. Send the user to set one up.
+  if (aiActive === false) {
+    return (
+      <div className="bg-newBgColorInner flex flex-1 flex-col items-center justify-center gap-[16px] text-center p-[40px]">
+        <div className="text-[18px] font-[600]">
+          {t('ai_not_configured_title', 'AI is not configured')}
+        </div>
+        <div className="text-[14px] opacity-80 max-w-[420px]">
+          {t(
+            'ai_not_configured_agent',
+            'Configure an AI provider to use the assistant and build agents.'
+          )}
+        </div>
+        <Link
+          href={AI_SETUP_HREF}
+          className="bg-newColorBtn text-newColorText rounded-[8px] px-[16px] py-[10px] text-[14px] font-[600]"
+        >
+          {t('configure_ai_provider', 'Configure AI provider')}
+        </Link>
+      </div>
+    );
+  }
+
+  // Still resolving AI config — don't mount CopilotKit (and handshake) yet.
+  if (aiActive !== true) {
+    return null;
+  }
 
   return (
     <CopilotKit

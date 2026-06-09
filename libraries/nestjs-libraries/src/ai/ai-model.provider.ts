@@ -153,16 +153,13 @@ export class AIModelProvider {
       ? await this._orgAiSettings.getActiveProvider(orgId)
       : null;
 
-    // Backward-compat invariant (CLAUDE.md): when an org has no active AI
-    // provider configured, fall back to the env OPENAI_API_KEY path so
-    // pre-v3.6.0 / self-hosted instances keep working. _envFallback throws
-    // AI_NOT_CONFIGURED_MESSAGE only when neither a per-org provider nor
-    // OPENAI_API_KEY is available.
+    // No per-org active AI provider ⟹ AI is OFF for this org. The pre-v3.6.0
+    // env-OPENAI_API_KEY fallback was removed (v3.6.3): a deployment's env key
+    // must NEVER be silently used as a tenant's AI. Callers
+    // (resolveConfigForScope) get null and surface "AI not configured"; the UI
+    // routes the user to Settings → AI to configure a provider.
     if (!orgActive) {
-      const scopeModelOverride = this._isValidScopedModels(settings?.scopeModels)
-        ? settings?.scopeModels?.[scope]?.model
-        : undefined;
-      return this._envFallback(scope, settings, scopeModelOverride);
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
     }
 
     const selectedProviderId = orgActive.identifier;
@@ -200,38 +197,6 @@ export class AIModelProvider {
     }
 
     return resolvedConfig;
-  }
-
-  // Env-OpenAI fallback — the pre-v3.6.0 path. Used when no per-org active
-  // provider is configured. Throws AI_NOT_CONFIGURED_MESSAGE if OPENAI_API_KEY
-  // is also absent, so callers (e.g. resolveConfigForScope) surface "not
-  // configured" only when there is genuinely no provider and no env key.
-  private _envFallback(
-    scope: AIScope,
-    settings?: any,
-    modelOverride?: string
-  ): ResolvedConfig {
-    const defaults = SURFACE_DEFAULTS[scope];
-    const adapter = this._registry.getAdapter('openai');
-    const envKey = process.env.OPENAI_API_KEY;
-
-    if (!adapter) {
-      throw new Error(`OpenAI adapter not registered — cannot fall back for ${scope}`);
-    }
-    if (!envKey) {
-      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
-    }
-
-    return {
-      adapter,
-      modelId: modelOverride || defaults.textModel,
-      creds: { apiKey: envKey },
-      providerId: 'openai',
-      defaultSurface: defaults,
-      providerImageModel: undefined,
-      orgImageModel: undefined,
-      settings,
-    };
   }
 
   private async _resolveWithRetry(scope: AIScope, orgId?: string): Promise<ResolvedConfig> {

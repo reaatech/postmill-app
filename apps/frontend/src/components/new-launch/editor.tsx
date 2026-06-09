@@ -29,7 +29,8 @@ import { MultiMediaComponent } from '@gitroom/frontend/components/media/media.co
 import { UpDownArrow } from '@gitroom/frontend/components/launches/up.down.arrow';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useExistingData } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
-import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core';
+import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
+import { EditorCopilotBridge } from '@gitroom/frontend/components/launches/copilot-bridges';
 import { useDropzone } from 'react-dropzone';
 import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
 import { Dashboard } from '@uppy/react';
@@ -216,25 +217,9 @@ export const EditorWrapper: FC<{
     [internal, items]
   );
 
-  useCopilotReadable({
-    description: 'Current content of posts',
-    value: items.map((p) => p.content),
-  });
-
-  useCopilotAction({
-    name: 'setPosts',
-    description: 'a thread of posts',
-    parameters: [
-      {
-        name: 'content',
-        type: 'string[]',
-        description: 'a thread of posts',
-      },
-    ],
-    handler: async ({ content }) => {
-      setValue(content);
-    },
-  });
+  // CopilotKit context is only mounted when an AI provider is configured; the
+  // readable/action registration lives in a bridge rendered only when active.
+  const aiActive = useAiActive();
 
   const changeValue = useCallback(
     (index: number) => (value: string) => {
@@ -366,6 +351,7 @@ export const EditorWrapper: FC<{
           'bg-newSettings rounded-[12px]'
       )}
     >
+      {aiActive && <EditorCopilotBridge items={items} setValue={setValue} />}
       {isCreateSet && current !== 'global' && (
         <>
           <div className="text-center absolute w-full h-full left-0 top-0 items-center justify-center flex z-[101] flex-col gap-[16px]">
