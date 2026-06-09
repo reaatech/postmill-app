@@ -191,13 +191,14 @@ single hardcoded OpenAI integration).
 3. **Mastra chat agent** (`LoadToolsService`) — function-form `model: () =>
    facade.languageModel('agent')` so provider changes apply without restarting the MCP server.
 4. **CopilotKit runtime** (`copilot.controller.ts`) — `/copilot/chat` and `/copilot/agent` build
-   `OpenAIAdapter` from facade-resolved credentials; env guard short-circuits only when neither admin
-   config nor `OPENAI_API_KEY` exists.
+   `OpenAIAdapter` from facade-resolved credentials; short-circuits when the org has no active
+   provider (no env-`OPENAI_API_KEY` fallback — removed v3.6.3). The frontend does not mount
+   CopilotKit when AI is off, and routes the user to Settings → AI.
 
 ### Architecture
 - **`AIModelProvider`** (`libraries/nestjs-libraries/src/ai/`) — single injection point,
   `(scope, orgId?)` resolution. Precedence: per-org (stub) → per-scope → global active → provider
-  default → env-OpenAI fallback. Wrappers: `generateText`, `generateObject`, `imageModel`.
+  default. **No env-OpenAI fallback** (removed v3.6.3). Wrappers: `generateText`, `generateObject`, `imageModel`.
 - **`AIProviderRegistry`** + **`AIProviderAdapter`** — 25 providers: 16 with a bespoke adapter class
   plus 9 wired through the generic `OpenAICompatibleAdapter` (an implementation split, distinct from
   the product direct-vs-hub taxonomy); each implements
@@ -215,9 +216,12 @@ single hardcoded OpenAI integration).
   set active, governance settings, spend log, audit log, health.
 - **MCP auth** — `start.mcp.ts` enforces `@reaatech/a2a-reference-auth` scopes on all 5 entrypoints.
 
-### Backward compatibility
-No admin AI config = byte-for-byte today's `OPENAI_API_KEY` behaviour. `activeProvider = null`
-reverts all four surfaces to the env-OpenAI path. **Preserve this invariant.**
+### No-provider behaviour (v3.6.3)
+No active AI provider for an org = AI is **off** for that org across all four surfaces
+(`resolveConfigForScope` returns null; surfaces report "AI not configured"). The pre-v3.6.0
+env-`OPENAI_API_KEY` fallback was **removed**: a deployment's env key must never be silently used
+as a tenant's AI. The frontend does not mount CopilotKit when AI is off and routes the user to
+Settings → AI (`/settings?tab=ai`). **Preserve this — do not reintroduce an env-key fallback.**
 
 ### Data model
 10 Prisma models in `schema.prisma`: `AIProviderConfig`, `AISystemSettings`, `AISpendLog`,
