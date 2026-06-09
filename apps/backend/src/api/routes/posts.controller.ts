@@ -5,12 +5,12 @@ import {
   Get,
   HttpException,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
   Res,
 } from '@nestjs/common';
+import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization, User } from '@prisma/client';
@@ -171,7 +171,7 @@ export class PostsController {
   @Get('/:id')
   getPost(
     @GetOrgFromRequest() org: Organization,
-    @Param('id', ParseUUIDPipe) id: string
+    @Param('id', ParseCuidPipe) id: string
   ) {
     return this._postsService.getPost(org.id, id);
   }

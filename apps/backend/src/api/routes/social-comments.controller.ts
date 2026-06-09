@@ -1,4 +1,5 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { ParseCuidPipe, isCuid } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { SocialCommentsService, VALID_COMMENT_STATUSES } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -9,7 +10,7 @@ import {
 import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { isUUID, isISO8601 } from 'class-validator';
+import { isISO8601 } from 'class-validator';
 
 @Controller('/posts')
 export class SocialCommentsController {
@@ -28,8 +29,8 @@ export class SocialCommentsController {
     if (status && !(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
       throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
     }
-    if (assigneeId && !isUUID(assigneeId)) {
-      throw new BadRequestException('Invalid assigneeId: must be a valid UUID');
+    if (assigneeId && !isCuid(assigneeId)) {
+      throw new BadRequestException('Invalid assigneeId');
     }
     if (cursor && !isISO8601(cursor)) {
       throw new BadRequestException('Invalid cursor: must be a valid ISO 8601 date string');
@@ -65,7 +66,7 @@ export class SocialCommentsController {
   @Get('/:id/social-comments')
   @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getComments(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Query('cursor') cursor: string | undefined,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -76,7 +77,7 @@ export class SocialCommentsController {
   @Post('/:id/social-comments')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async addComment(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @Body() body: ReplyCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -87,8 +88,8 @@ export class SocialCommentsController {
   @Post('/:id/social-comments/:commentId/reply')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async replyToComment(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @Param('id', ParseCuidPipe) id: string,
+    @Param('commentId', ParseCuidPipe) commentId: string,
     @Body() body: ReplyCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -99,8 +100,8 @@ export class SocialCommentsController {
   @Post('/:id/social-comments/:commentId/like')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async likeComment(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @Param('id', ParseCuidPipe) id: string,
+    @Param('commentId', ParseCuidPipe) commentId: string,
     @Body() body: LikeCommentDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -111,7 +112,7 @@ export class SocialCommentsController {
   @Post('/:id/social-comments/read')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async markAsRead(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
@@ -121,8 +122,8 @@ export class SocialCommentsController {
   @Post('/:id/social-comments/:commentId/status')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async updateCommentStatus(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @Param('id', ParseCuidPipe) id: string,
+    @Param('commentId', ParseCuidPipe) commentId: string,
     @Body('status') status: string,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -136,8 +137,8 @@ export class SocialCommentsController {
   @Post('/:id/social-comments/:commentId/assign')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async assignComment(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Param('commentId', ParseUUIDPipe) commentId: string,
+    @Param('id', ParseCuidPipe) id: string,
+    @Param('commentId', ParseCuidPipe) commentId: string,
     @Body('assigneeId') assigneeId: string | null,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
@@ -148,7 +149,7 @@ export class SocialCommentsController {
   @Get('/:id/social-comments/unread-count')
   @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getUnreadCount(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
