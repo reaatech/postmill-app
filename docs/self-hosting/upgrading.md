@@ -37,7 +37,7 @@ a helper:
 ./scripts/postiz-migrate.sh --accept-data-loss  # allow drops/retypes (DESTRUCTIVE — back up first!)
 ```
 
-It runs `prisma db push` for the schema baked into the running image. Set `POSTIZ_CONTAINER=<name>`
+It runs `prisma db push` for the schema baked into the running image. Set `POSTMILL_CONTAINER=<name>`
 if your container isn't the default name.
 
 > **Warning:** `--accept-data-loss` allows destructive diffs (drops/retypes). Only use it with a

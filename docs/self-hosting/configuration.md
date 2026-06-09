@@ -86,7 +86,7 @@ See [Temporal & background jobs](./temporal-and-cron.md) for how these workflows
 
 ## Generic OAuth / SSO (optional)
 
-`POSTIZ_GENERIC_OAUTH` plus `POSTIZ_OAUTH_*` and `NEXT_PUBLIC_POSTIZ_OAUTH_*` enable a generic OIDC
+`POSTMILL_GENERIC_OAUTH` plus `POSTMILL_OAUTH_*` and `NEXT_PUBLIC_POSTMILL_OAUTH_*` enable a generic OIDC
 login provider (e.g. Authentik). `IS_GENERAL="true"` is required for now.
 
 ## Short-link services (optional)

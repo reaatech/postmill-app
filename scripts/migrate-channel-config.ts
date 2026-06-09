@@ -45,7 +45,7 @@ const PROVIDER_MAPPINGS: ProviderMapping[] = [
   { identifier: 'gmb', name: 'Google My Business', clientIdEnv: 'GOOGLE_GMB_CLIENT_ID', clientSecretEnv: 'GOOGLE_GMB_CLIENT_SECRET' },
   { identifier: 'wrapcast', name: 'Farcaster', clientIdEnv: 'NEYNAR_CLIENT_ID', clientSecretEnv: 'NEYNAR_SECRET_KEY' },
   { identifier: 'telegram', name: 'Telegram', clientIdEnv: 'TELEGRAM_TOKEN' },
-  { identifier: 'oauth_custom', name: 'Custom OAuth', clientIdEnv: 'POSTIZ_OAUTH_CLIENT_ID', clientSecretEnv: 'POSTIZ_OAUTH_CLIENT_SECRET' },
+  { identifier: 'oauth_custom', name: 'Custom OAuth', clientIdEnv: 'POSTMILL_OAUTH_CLIENT_ID', clientSecretEnv: 'POSTMILL_OAUTH_CLIENT_SECRET' },
 ];
 
 const CUSTOM_FIELDS_PROVIDERS = [

@@ -380,7 +380,7 @@ const ciCliSteps = [
   },
   {
     label: 'Set your API key as an environment variable',
-    code: 'export POSTIZ_API_KEY="{API_KEY}"',
+    code: 'export POSTMILL_API_KEY="{API_KEY}"',
   },
   {
     label: 'Install the Postmill skill for your AI agent',
