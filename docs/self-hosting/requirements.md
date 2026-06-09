@@ -50,5 +50,5 @@ OAuth redirect URLs for channels are derived from `FRONTEND_URL` — see
 
 ## Container images
 
-The fork publishes to `ghcr.io/reaatech/postiz-app`. The bundled compose file references the
+The fork publishes to `ghcr.io/reaatech/postmill-app`. The bundled compose file references the
 upstream image by default — repoint it to the fork image. See [Docker](./docker.md).

@@ -13,8 +13,8 @@ are encrypted at rest using the `EncryptionService`.
 ## Default Setup (Local Storage)
 
 Out of the box, Postmill uses **Local Storage** — files are written to the directory specified by the
-`UPLOAD_DIRECTORY` environment variable (default: `/tmp/postiz-uploads` inside the container, or
-`/var/lib/postiz/uploads` in self-hosted setups).
+`UPLOAD_DIRECTORY` environment variable (default: `/tmp/postmill-uploads` inside the container, or
+`/var/lib/postmill/uploads` in self-hosted setups).
 
 Each organization has a **5 GB quota by default** (`Organization.localStorageQuotaBytes`). To change
 the per-org quota, update the `localStorageQuotaBytes` value in the database:

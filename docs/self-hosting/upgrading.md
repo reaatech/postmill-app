@@ -11,7 +11,7 @@ How to move to a newer release of the fork, and how schema changes are applied.
 
 - Versions are tagged on the repo and reflected in `package.json` (`version`) and
   [`CHANGELOG.md`](../../CHANGELOG.md).
-- The fork image is published to `ghcr.io/reaatech/postiz-app`.
+- The fork image is published to `ghcr.io/reaatech/postmill-app`.
 - On boot, the container runs `prisma db push` to sync the database to the schema baked into that
   image. So **deploying a new image applies its schema** automatically.
 
@@ -27,14 +27,50 @@ How to move to a newer release of the fork, and how schema changes are applied.
 > The fork's schema changes through v3.4.0 have been **additive** (new tables / nullable-or-defaulted
 > columns), so these pushes are non-destructive. See [Database](../developers/database.md).
 
+## Migrating from a Postiz-branded deployment
+
+The Postmill rebrand renamed the env vars (`POSTIZ_*` → `POSTMILL_*`) and, in
+`docker-compose.yaml`, the Docker volumes and the Postgres role/database. A
+**fresh** install needs none of this. For an **existing** Compose install,
+do the following **before** `docker compose up` with the new file:
+
+1. **Env vars** — rename any `POSTIZ_*` variables you set to `POSTMILL_*`
+   (e.g. `POSTIZ_OAUTH_CLIENT_ID` → `POSTMILL_OAUTH_CLIENT_ID`). The old names
+   are no longer read.
+2. **Uploads / config volumes** — the named volumes changed
+   (`postiz-uploads` → `postmill-uploads`, `postiz-config` → `postmill-config`;
+   `postiz-redis-data` is just cache and can be dropped). Either keep your old
+   names by editing the new compose back to them, or copy the data across:
+   ```bash
+   docker volume create postmill-uploads
+   docker run --rm -v postiz-uploads:/from -v postmill-uploads:/to alpine \
+     sh -c 'cp -a /from/. /to/'
+   # repeat for postiz-config -> postmill-config
+   ```
+3. **Postgres role/database** — the Postgres **data** volume (`postgres-volume`)
+   is unchanged, so your data persists, but the role/db were renamed. Either
+   keep the old credentials (set `POSTGRES_USER`/`POSTGRES_DB`/`DATABASE_URL`
+   back to `postiz-*`), or rename them in-place once:
+   ```sql
+   ALTER ROLE "postiz-user" RENAME TO "postmill-user";
+   ALTER DATABASE "postiz-db-local" RENAME TO "postmill-db-local";
+   ```
+   (Changing `POSTGRES_USER`/`POSTGRES_DB` alone does **not** rename them — Postgres
+   only initializes those on an empty data dir.)
+
+> Simplest path if you don't want to migrate: keep your existing volume names and
+> DB credentials by editing them back into the new `docker-compose.yaml`. The
+> rebrand of those identifiers is cosmetic — only the `POSTMILL_*` env-var rename
+> is mandatory.
+
 ## Manual in-place schema sync
 
 If you need to push the schema into a **running** container without a full redeploy, the repo ships
 a helper:
 
 ```bash
-./scripts/postiz-migrate.sh                     # safe additive sync (refuses data loss)
-./scripts/postiz-migrate.sh --accept-data-loss  # allow drops/retypes (DESTRUCTIVE — back up first!)
+./scripts/postmill-migrate.sh                     # safe additive sync (refuses data loss)
+./scripts/postmill-migrate.sh --accept-data-loss  # allow drops/retypes (DESTRUCTIVE — back up first!)
 ```
 
 It runs `prisma db push` for the schema baked into the running image. Set `POSTMILL_CONTAINER=<name>`

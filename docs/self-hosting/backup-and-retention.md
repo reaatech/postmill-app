@@ -12,7 +12,7 @@ pruned/rolled up.
 | Data | Where | Notes |
 |------|-------|-------|
 | **Application database** | PostgreSQL (`postgres-volume` in compose) | The source of truth — accounts, channels, posts, encrypted credentials, analytics snapshots, AI config. |
-| **Uploads / media** | Local `UPLOAD_DIRECTORY` (`postiz-uploads`) or Cloudflare R2 | Back up the volume, or rely on R2's durability. |
+| **Uploads / media** | Local `UPLOAD_DIRECTORY` (`postmill-uploads`) or Cloudflare R2 | Back up the volume, or rely on R2's durability. |
 | **`JWT_SECRET`** | Your env config | **Critical:** it encrypts stored channel/AI credentials. Lose it and those credentials become undecryptable. |
 
 > Temporal's own database (separate Postgres in the compose stack) holds in-flight workflow state.
@@ -24,7 +24,7 @@ Schema is applied with `prisma db push` (no SQL migration files). A push reconci
 the schema and, with `--accept-data-loss`, **will drop/alter** to do so.
 
 > **Warning:** always take a database backup before any `db push --accept-data-loss` or before
-> running `./scripts/postiz-migrate.sh --accept-data-loss`. See [Upgrading](./upgrading.md) and
+> running `./scripts/postmill-migrate.sh --accept-data-loss`. See [Upgrading](./upgrading.md) and
 > [Database](../developers/database.md).
 
 ## Backing up Postgres
@@ -32,7 +32,7 @@ the schema and, with `--accept-data-loss`, **will drop/alter** to do so.
 A standard logical dump works. For the bundled compose Postgres:
 
 ```bash
-docker exec postiz-postgres pg_dump -U postiz-user postiz-db-local > postiz-backup.sql
+docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > postmill-backup.sql
 ```
 
 Restore into a fresh database with `psql`. Adapt the container name / credentials to your setup.
