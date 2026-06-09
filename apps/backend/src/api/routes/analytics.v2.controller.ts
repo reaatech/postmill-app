@@ -5,12 +5,12 @@ import {
   Delete,
   Get,
   Param,
-  ParseUUIDPipe,
   Post,
   Put,
   Query,
   Res,
 } from '@nestjs/common';
+import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { Organization } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { ApiTags } from '@nestjs/swagger';
@@ -140,7 +140,7 @@ export class AnalyticsV2Controller {
   @Get('/post/:postId')
   async getPostDetail(
     @GetOrgFromRequest() org: Organization,
-    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param('postId', ParseCuidPipe) postId: string,
     @Query('date') date?: string
   ) {
     return this._analyticsService.getPostDetail(org, postId, date);
