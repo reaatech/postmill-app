@@ -1098,12 +1098,15 @@ describe('AnalyticsActivity', () => {
       ...overrides,
     });
 
-    it('calls ensureFresh on ProviderConfigManager', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(null);
+    it('calls ensureFresh on ProviderConfigManager for the integration org', async () => {
+      (prisma.integration.findUnique as any).mockResolvedValue(buildIntegration());
 
       await activity.backfillIntegration(integrationId);
 
+      // Per-tenant refresh needs the org id, so it runs after the integration
+      // is loaded — and is skipped entirely when the integration is absent.
       expect(providerConfigManager.ensureFresh).toHaveBeenCalledOnce();
+      expect(providerConfigManager.ensureFresh).toHaveBeenCalledWith('org-1');
     });
 
     it('fetches integration by ID', async () => {
