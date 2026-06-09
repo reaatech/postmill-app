@@ -8,6 +8,84 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.7.0] - 2026-06-09
+
+Brand cutover: the fork is renamed **Postiz → Postmill**. This release rebrands every
+user-facing surface and most internal identifiers, publishes a renamed SDK, and carries
+several **breaking** infrastructure renames (env vars, Docker stack, chat-agent id) for
+self-hosters. No application schema changes. Website/domain URLs (`*.postiz.com`) are
+intentionally left in place until the new site/domain is live.
+
+### Changed — Branding
+
+- **Product name** — `Postiz` → `Postmill` across all UI copy, page `<title>` metadata,
+  email/notification text, the OpenAPI title, and every translation locale JSON.
+- **Display toggle collapsed** — the `isGeneralServerSide()` / `isGeneral` "Postiz vs Gitroom"
+  title/label toggles now always render **Postmill**; the now-unused helper imports were removed.
+- **Brand color** — primary `#612bd3` → `#2b5cd3` (CSS vars, chart palettes, logos). The MCP
+  creation badge and media "video" operation chip were given distinct non-colliding colors.
+- **Logos/assets** — Postiz logo assets replaced with Postmill; design sources (`*.psd`) and
+  font archives (`*.zip`) are now gitignored out of the web-served `public/` directory.
+- **Browser extension** — manifest name/description rebranded to Postmill.
+
+### Changed — Packages & SDK
+
+- **Workspace package names** — root `gitroom` → `postmill`; `postiz-*` app packages →
+  `postmill-*`. (Internal only; scripts target apps by path, so no functional impact.)
+- **Node SDK** — renamed `@postiz/node` → **`@reaatech/postmill-sdk`** (published to npm at
+  `0.1.0`) and its install/import docs updated. The SDK's `publish` script was renamed to
+  `release` (+ added `release:dry` / `build`) to avoid recursing through npm's `publish`
+  lifecycle hook.
+
+### Changed — Configuration (BREAKING)
+
+- **Env vars** — all `POSTIZ_*` variables hard-renamed to `POSTMILL_*`
+  (`POSTMILL_GENERIC_OAUTH`, `POSTMILL_OAUTH_*`, `POSTMILL_API_KEY`, `POSTMILL_CONTAINER`),
+  including the `NEXT_PUBLIC_POSTMILL_OAUTH_*` build-time vars. **The old names are no longer
+  read** — existing deployments must rename their env vars. Updated in `.env.example` and the
+  self-hosting/reference docs.
+
+### Changed — Self-hosting / Docker (BREAKING)
+
+- **Image** — published image is now `ghcr.io/reaatech/postmill-app`; the bundled
+  `docker-compose.yaml` and CI build target updated to match.
+- **Compose identifiers** — services, container names, network, volumes, and the Postgres
+  role/database renamed `postiz-*` → `postmill-*`. The Postgres **data** volume
+  (`postgres-volume`) is unchanged, so data persists. Existing installs must migrate their
+  uploads/config volumes and rename the Postgres role/db (or keep the old names) — see the new
+  **"Migrating from a Postiz-branded deployment"** section in `docs/self-hosting/upgrading.md`.
+- **Helper script** — `scripts/postiz-migrate.sh` → `scripts/postmill-migrate.sh`.
+- The throwaway `docker-compose.dev.yaml` stack and local image build tags were fully rebranded.
+
+### Changed — Internal identifiers (BREAKING for chat memory)
+
+- **Mastra chat agent** — agent id/name `postiz` → `postmill` and memory store
+  `postiz-store` → `postmill-store`, wired through the chat/copilot/MCP surfaces. **Persisted
+  chat memory keyed under the old id is orphaned** (effectively a one-time reset).
+- **MCP server** — server display name and the in-app setup snippets (Claude/Cursor/VS Code/
+  Windsurf/Amp/Codex/Gemini/Warp) now use `postmill`.
+- **Observability** — OpenTelemetry tracer/logger `postiz-ai` → `postmill-ai`; C2PA media
+  provenance claim generator `postiz/ai-media` → `postmill/ai-media`.
+
+### Changed — Legal / governance
+
+- Product name rebranded to Postmill in `LICENSE`, `CONTRIBUTING.md`, `CCLA.md`, `ICLA.md`,
+  and `SECURITY.md`, preserving original copyright (Nevo David), AGPL text, and CLA links.
+- `SECURITY.md` scope and reporting target retargeted to the fork (repo
+  `reaatech/postmill-app`, `@reaatech` npm, `reaatech` GHCR org).
+
+### Not yet changed (intentional)
+
+- **Website/domain URLs** (`postiz.com`, `docs/discord/api/platform.postiz.com`, the Plausible
+  `data-domain`, the domain toggle, upstream `gitroomhq/postiz-app` references) — pending the
+  new site/domain going live.
+- **CLI install snippets** (`npm install -g postiz`) — pending the CLI being published under the
+  new name.
+- **Translation keys** (e.g. `faq_can_i_trust_postiz`) — internal identifiers, never displayed.
+- **`@gitroom/*` TypeScript path aliases** — internal-only; a separate effort from this rename.
+- `SECURITY.md` urgent-contact email and the CCLA/ICLA contribution-assignment entity still
+  point upstream — left for a deliberate legal decision.
+
 ## [3.6.0] - 2026-06-08
 
 A major user-facing release: a proper user profile page, per-tenant storage/adapter system,
