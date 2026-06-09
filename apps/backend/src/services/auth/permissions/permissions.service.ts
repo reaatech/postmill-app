@@ -134,6 +134,14 @@ export class PermissionsService {
         continue;
       }
 
+      // Media management is not a billed dimension — any authenticated org
+      // member may manage their org's media. The guard still enforces auth +
+      // org resolution; this branch just keeps MEDIA from being paywalled.
+      if (section === Sections.MEDIA) {
+        can(action, section);
+        continue;
+      }
+
       if (
         section === Sections.COMMUNITY_FEATURES &&
         options.community_features

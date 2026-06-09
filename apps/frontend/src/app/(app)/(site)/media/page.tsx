@@ -1,4 +1,4 @@
-import { MediaLayoutComponent } from '@gitroom/frontend/components/new-layout/layout.media.component';
+import { MediaManager } from '@gitroom/frontend/components/media/media-manager';
 import { Metadata } from 'next';
 import { isGeneralServerSide } from '@gitroom/helpers/utils/is.general.server.side';
 
@@ -8,5 +8,9 @@ export const metadata: Metadata = {
 };
 
 export default async function Page() {
-  return <MediaLayoutComponent />
+  return (
+    <div className="bg-newBgColorInner p-[20px] flex flex-1 flex-col gap-[15px] transition-all min-h-0">
+      <MediaManager standalone />
+    </div>
+  );
 }
