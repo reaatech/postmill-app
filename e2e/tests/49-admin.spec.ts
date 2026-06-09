@@ -78,7 +78,8 @@ const itemCountHeuristic = async (page: any): Promise<number> => {
   return n;
 };
 
-test('super-admin surface audit', async ({ page }) => {
+// v3.6.0: Admin pages deleted — skipped to preserve test logic for future reference.
+test.skip('super-admin surface audit', async ({ page }) => {
   test.setTimeout(240_000);
   const auditor = new PageAuditor(page).attach();
 

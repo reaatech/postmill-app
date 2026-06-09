@@ -407,10 +407,9 @@ export class AiSettingsController {
     this.assertSuperAdmin(user);
     const settings = await this._aiSettingsManager.getSettings();
     return {
-      hasActiveConfig: !!settings?.activeProvider,
+      hasActiveGlobalConfig: !!settings?.activeProvider,
       activeProvider: settings?.activeProvider || null,
       activeModel: settings?.activeModel || null,
-      envFallback: !!process.env.OPENAI_API_KEY,
       providerHealth: this._providerHealth.getAllHealth(),
     };
   }

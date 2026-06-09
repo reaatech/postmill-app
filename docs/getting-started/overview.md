@@ -59,12 +59,12 @@ needs another domain calls that domain's **service**, not its repository.
 
 ## Key feature areas (and where they're documented)
 
-- **Channels / providers** — connect and publish to 36 platforms.
-  Admin setup: [Channels admin](../admin/channels.md).
+- **Channels / providers** — connect and publish to 36 platforms. Configure per-tenant credentials in
+  **Settings → Channels**. See [Per-provider setup](../channels/setup-per-provider.md).
 - **Analytics** — persisted multi-channel dashboard from daily snapshots, served via `/analytics/v2`.
   Collection: [Temporal & background jobs](../self-hosting/temporal-and-cron.md).
-- **AI** — pluggable multi-provider system powering text/image generation and assistants.
-  Admin setup: [AI settings admin](../admin/ai-settings.md).
+- **AI** — pluggable multi-provider system powering text/image generation and assistants. Configure
+  in **Settings → AI**. See [AI features](../features/ai-features.md).
 
 ## Next steps
 

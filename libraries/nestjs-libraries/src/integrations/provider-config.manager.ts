@@ -102,7 +102,7 @@ export class ProviderConfigManager implements OnModuleInit {
 
     this.cache = newCache;
     this.allEnabled = newEnabled;
-    replaceCredentialsMap(newCredentials);
+    replaceCredentialsMap('__global__', newCredentials);
     this.lastRefresh = Date.now();
   }
 

@@ -18,6 +18,8 @@ import { InfiniteWorkflowRegisterModule } from '@gitroom/nestjs-libraries/tempor
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
+import { AiEnvMigrationService } from '@gitroom/nestjs-libraries/ai/env-migration.service';
+import { ChannelEnvMigrationService } from '@gitroom/nestjs-libraries/integrations/env-migration.service';
 
 @Global()
 @Module({
@@ -53,6 +55,8 @@ import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
   controllers: [],
   providers: [
     FILTER,
+    AiEnvMigrationService,
+    ChannelEnvMigrationService,
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,

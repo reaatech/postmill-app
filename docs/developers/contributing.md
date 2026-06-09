@@ -1,6 +1,6 @@
 # Contributing
 
-> **Verified against v3.5.9.**
+> **Verified against v3.6.0.**
 
 ---
 
@@ -24,7 +24,7 @@
 
 ## Invariants you must not break
 
-- **AI env fallback** — no admin AI config = unchanged `OPENAI_API_KEY` behaviour.
+- **AI provider config is per-tenant** — AI settings live in **Settings → AI**, not env vars.
 - **Legacy public analytics route** — keep its response shape (n8n/Zapier/Make compatibility).
 - **Provider enablement** — disabling a provider must not break already-connected channels.
 

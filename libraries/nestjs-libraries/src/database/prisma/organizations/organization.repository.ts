@@ -1,5 +1,5 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Role, ShortLinkPreference, SubscriptionTier } from '@prisma/client';
+import { Role, ShortLinkPreference, SubscriptionTier, Provider } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -333,6 +333,28 @@ export class OrganizationRepository {
     } catch (err) {}
   }
 
+  async createTeamUser(orgId: string, email: string, password: string, role: Role) {
+    const user = await this._user.model.user.create({
+      data: {
+        email,
+        password: AuthService.hashPassword(password),
+        providerName: Provider.LOCAL,
+        timezone: 0,
+        activated: true,
+      },
+    });
+
+    await this._userOrg.model.userOrganization.create({
+      data: {
+        userId: user.id,
+        organizationId: orgId,
+        role,
+      },
+    });
+
+    return { id: user.id, email: user.email, role };
+  }
+
   async getTeam(orgId: string) {
     return this._organization.model.organization.findUnique({
       where: {
@@ -346,6 +368,8 @@ export class OrganizationRepository {
               select: {
                 email: true,
                 id: true,
+                name: true,
+                pictureId: true,
                 sendSuccessEmails: true,
                 sendFailureEmails: true,
                 sendStreakEmails: true,

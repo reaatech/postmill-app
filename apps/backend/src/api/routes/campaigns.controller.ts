@@ -125,6 +125,15 @@ export class CampaignsController {
     });
   }
 
+  @Get('/:id/engagement')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async getEngagement(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    return this._campaignsService.getEngagement(id, org.id);
+  }
+
   @Delete('/:id')
   @CheckPolicies([AuthorizationActions.Delete, Sections.POSTS_PER_MONTH])
   async delete(

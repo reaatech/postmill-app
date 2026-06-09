@@ -132,28 +132,4 @@ export const FEATURE_EXPECTATIONS: FeatureExpectation[] = [
       { what: 'Watchlist tab', name: /watchlist/i, soft: true },
     ],
   },
-  // ---- Admin: AI providers ----
-  {
-    area: 'Admin → AI providers',
-    route: '/admin/ai',
-    controls: [
-      { what: 'Provider list / configure', name: /configure|edit|provider|set active|test/i, soft: true },
-    ],
-  },
-  // ---- Admin: Channels config ----
-  {
-    area: 'Admin → Channels',
-    route: '/admin/channels',
-    controls: [
-      { what: 'Channel edit/config', name: /edit|configure|save|channel/i, soft: true },
-    ],
-  },
-  // ---- Admin: Errors ----
-  {
-    area: 'Admin → Errors',
-    route: '/admin/errors',
-    controls: [
-      { what: 'Error log content or empty-state', text: /error|no errors|resolved|channel/i, soft: true },
-    ],
-  },
 ];

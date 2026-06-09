@@ -40,6 +40,7 @@ import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tu
 import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/pixelfed.provider';
 import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
+import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new XProvider(),
@@ -83,12 +84,23 @@ export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
 
 @Injectable()
 export class IntegrationManager {
-  constructor(private _providerConfigManager: ProviderConfigManager) {}
+  constructor(
+    private _providerConfigManager: ProviderConfigManager,
+    private _orgProviderConfigManager: OrgProviderConfigManager
+  ) {}
 
-  async getAllIntegrations() {
-    await this._providerConfigManager.ensureFresh();
-    const enabledIdentifiers = await this._providerConfigManager.getEnabledIdentifiers();
-    const allConfigs = await this._providerConfigManager.getAllConfigs();
+  async getAllIntegrations(orgId?: string) {
+    if (orgId) {
+      await this._orgProviderConfigManager.ensureFresh(orgId);
+    } else {
+      await this._providerConfigManager.ensureFresh();
+    }
+    const enabledIdentifiers = orgId
+      ? await this._orgProviderConfigManager.getEnabledIdentifiers(orgId)
+      : await this._providerConfigManager.getEnabledIdentifiers();
+    const allConfigs = orgId
+      ? await this._orgProviderConfigManager.getAllConfigs(orgId)
+      : await this._providerConfigManager.getAllConfigs();
     const enabledSet = new Set(enabledIdentifiers);
     const hasAnyConfigs = allConfigs.length > 0;
 
@@ -97,9 +109,9 @@ export class IntegrationManager {
         socialIntegrationList
           .filter((p) => !hasAnyConfigs || enabledSet.has(p.identifier))
           .map(async (p) => {
-            const config = await this._providerConfigManager.getConfig(
-              p.identifier
-            );
+            const config = orgId
+              ? await this._orgProviderConfigManager.getConfig(orgId, p.identifier)
+              : await this._providerConfigManager.getConfig(p.identifier);
             return {
               name: p.name,
               identifier: p.identifier,
@@ -114,8 +126,11 @@ export class IntegrationManager {
               ...(p.customFields
                 ? { customFields: await p.customFields() }
                 : {}),
-              ...(config?.setupInstructions
-                ? { setupInstructions: config.setupInstructions }
+              ...('setupInstructions' in (config || {}) && (config as any)?.setupInstructions
+                ? { setupInstructions: (config as any).setupInstructions }
+                : {}),
+              ...('setupNotes' in (config || {}) && (config as any)?.setupNotes
+                ? { setupInstructions: (config as any).setupNotes }
                 : {}),
             };
           })
@@ -180,13 +195,15 @@ export class IntegrationManager {
       .filter((f) => f.plugs.length);
   }
 
-  async getInternalPlugs(providerName: string) {
+  async getInternalPlugs(providerName: string, orgId?: string) {
     const p = socialIntegrationList.find((p) => p.identifier === providerName);
     if (!p) {
       console.warn(`IntegrationManager: Unknown provider '${providerName}' requested in getInternalPlugs`);
       return { internalPlugs: [] };
     }
-    const enabled = await this._providerConfigManager.isEnabled(providerName);
+    const enabled = orgId
+      ? await this._orgProviderConfigManager.isEnabled(orgId, providerName)
+      : await this._providerConfigManager.isEnabled(providerName);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${providerName}`);
     }
@@ -204,12 +221,14 @@ export class IntegrationManager {
   getAllowedSocialsIntegrations() {
     return socialIntegrationList.map((p) => p.identifier);
   }
-  async getSocialIntegration(integration: string): Promise<SocialProvider> {
+  async getSocialIntegration(integration: string, orgId?: string): Promise<SocialProvider> {
     const provider = socialIntegrationList.find((i) => i.identifier === integration);
     if (!provider) {
       throw new NotFoundException(`Unknown integration: ${integration}`);
     }
-    const enabled = await this._providerConfigManager.isEnabled(integration);
+    const enabled = orgId
+      ? await this._orgProviderConfigManager.isEnabled(orgId, integration)
+      : await this._providerConfigManager.isEnabled(integration);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${integration}`);
     }
@@ -227,11 +246,17 @@ export class IntegrationManager {
   }
 
   // INTERNAL USE ONLY - returns decrypted client credentials
-  async getClientInformation(integration: string) {
+  async getClientInformation(integration: string, orgId?: string) {
+    if (orgId) {
+      return this._orgProviderConfigManager.getClientInfo(orgId, integration);
+    }
     return this._providerConfigManager.getClientInfo(integration);
   }
 
-  async isProviderEnabled(integration: string) {
+  async isProviderEnabled(integration: string, orgId?: string) {
+    if (orgId) {
+      return this._orgProviderConfigManager.isEnabled(orgId, integration);
+    }
     return this._providerConfigManager.isEnabled(integration);
   }
 }

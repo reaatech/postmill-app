@@ -11,7 +11,7 @@ import { OverviewTab } from './views/overview.tab';
 import { ChannelsTab } from './views/channels.tab';
 import { PostsTab } from './views/posts.tab';
 import { DrillBreadcrumb } from './drill/drill.breadcrumb';
-import { DrillState } from './utils';
+import { DrillState, OverviewResponse } from './utils';
 import { usePosts } from './hooks/usePosts';
 import { ErrorBoundary } from './error.boundary';
 import { ExportButton } from './export.button';
@@ -19,6 +19,7 @@ import { BestTimeTab } from './views/best-time.tab';
 import { RecommendationsTab } from './views/recommendations.tab';
 import { WatchlistTab } from './views/watchlist.tab';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useVariables } from '@gitroom/react/helpers/variable.context';
 
 function getDefaultFrom(): string {
   return dayjs().subtract(30, 'day').format('YYYY-MM-DD');
@@ -28,10 +29,19 @@ function getDefaultTo(): string {
   return dayjs().format('YYYY-MM-DD');
 }
 
+function isDataEmpty(data: OverviewResponse | undefined): boolean {
+  if (!data) return true;
+  const hasKpis = !!data.kpis?.length;
+  const hasSeries = !!data.series && Object.keys(data.series).length > 0;
+  const hasChannels = !!data.byChannel?.length;
+  return !hasKpis && !hasSeries && !hasChannels;
+}
+
 export const AnalyticsDashboard: FC = () => {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { runCron } = useVariables();
 
   const from = searchParams.get('from') || getDefaultFrom();
   const to = searchParams.get('to') || getDefaultTo();
@@ -280,6 +290,21 @@ export const AnalyticsDashboard: FC = () => {
               </button>
             ))}
           </div>
+
+          {!overviewLoading && !overviewError && (tab === 'overview' || tab === 'channels') && isDataEmpty(overviewData) && (
+            <div className="flex items-center gap-[8px] mb-[16px] px-[16px] py-[10px] bg-amber-500/10 border border-amber-500/30 rounded-[8px] text-[12px] text-amber-400">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                <line x1="12" y1="9" x2="12" y2="13" />
+                <line x1="12" y1="17" x2="12.01" y2="17" />
+              </svg>
+              <span>
+                {!runCron
+                  ? t('analytics_no_cron', 'Analytics data requires the background cron worker. Set RUN_CRON=true to enable automatic snapshot collection.')
+                  : t('analytics_no_data', 'No analytics snapshots yet for the selected period. Data appears once the Temporal collection workflow runs.')}
+              </span>
+            </div>
+          )}
 
           {tab === 'overview' && (
             <OverviewTab

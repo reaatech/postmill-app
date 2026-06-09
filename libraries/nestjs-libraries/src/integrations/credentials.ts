@@ -6,38 +6,60 @@ export type CredentialEntry = {
   scopes?: string[];
 };
 
-let credentialsCache: Map<string, CredentialEntry> = new Map();
+const credentialsCache: Map<string, Map<string, CredentialEntry>> = new Map();
 
 export function setCredentials(
+  orgId: string,
   identifier: string,
   entry: CredentialEntry
 ) {
-  credentialsCache.set(identifier, entry);
+  let orgCache = credentialsCache.get(orgId);
+  if (!orgCache) {
+    orgCache = new Map();
+    credentialsCache.set(orgId, orgCache);
+  }
+  orgCache.set(identifier, entry);
 }
 
 export function getCredential(
+  orgId: string,
   identifier: string,
   key: 'clientId' | 'clientSecret' | 'redirectUri' | 'token'
 ): string | undefined {
-  return credentialsCache.get(identifier)?.[key];
+  return credentialsCache.get(orgId)?.get(identifier)?.[key];
 }
 
-export function getEnvOr(
-  envKey: string,
-  providerIdentifier: string,
-  credentialKey: 'clientId' | 'clientSecret' | 'redirectUri' | 'token'
-): string {
-  const dbValue = getCredential(providerIdentifier, credentialKey);
-  if (dbValue) {
-    return dbValue;
-  }
-  return process.env[envKey] || '';
+export function clearOrgCredentials(orgId: string) {
+  credentialsCache.delete(orgId);
 }
 
-export function clearCredentials() {
+export function clearAllCredentials() {
   credentialsCache.clear();
 }
 
-export function replaceCredentialsMap(newMap: Map<string, CredentialEntry>) {
-  credentialsCache = new Map(newMap);
+export function clearCredentials() {
+  clearAllCredentials();
+}
+
+export function replaceCredentialsMap(orgId: string, newMap: Map<string, CredentialEntry>) {
+  credentialsCache.set(orgId, new Map(newMap));
+}
+
+export function getOrgCredential(
+  orgId: string,
+  identifier: string,
+  key: 'clientId' | 'clientSecret' | 'redirectUri' | 'token'
+): string | undefined {
+  return getCredential(orgId, identifier, key);
+}
+
+// Deprecated: use getOrgCredential(orgId, identifier, key) instead.
+// Only returns env var fallback — does NOT scan other org caches (security).
+// Thread orgId through your provider calls and switch to getOrgCredential.
+export function getEnvOr(
+  envKey: string,
+  _providerIdentifier: string,
+  _credentialKey: 'clientId' | 'clientSecret' | 'redirectUri' | 'token'
+): string {
+  return process.env[envKey] || '';
 }

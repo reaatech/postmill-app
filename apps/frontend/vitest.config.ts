@@ -25,7 +25,6 @@ export default defineConfig({
       reporter: ['text'],
       include: [
         'src/components/analytics-v2/**/*.{ts,tsx}',
-        'src/components/admin/ai-settings.component.tsx',
       ],
       exclude: [
         'src/components/analytics-v2/charts/*.tsx',

@@ -29,6 +29,19 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.6.0]**
+- **Your own profile page with password and notification controls** — Set your avatar, bio, and name in a new settings profile tab, change your password, see your active sessions, and manage email notification preferences — all in `/settings/profile`.
+- **Bring your own storage — S3, R2, Backblaze, IDrive** — Every organization can mount its own storage provider (S3, R2, Backblaze B2, IDrive e2, or local disk) with 5 GB of free space by default. Migrate files between providers at any time. The old global `STORAGE_PROVIDER` env var is gone.
+  - **Storage health & quota dashboard** — See which providers are connected (with last-checked timestamp), view your storage usage as a % of quota (warning at 80%+), and drill into usage by folder or provider.
+  - **Folder-level provider routing** — Assign a specific storage provider to a folder, so all uploads to that folder automatically use that provider.
+  - **Full storage audit log** — Every storage operation (mount, unmount, test, migrate, default-folder config) is logged with timestamp, user, and action.
+- **Connect channels with your own OAuth apps** — Configure per-tenant OAuth credentials in the Channels settings tab with a live health dashboard showing connection status — no more global environment variables for every provider's client ID and secret.
+- **A real media library with folders, tags, bulk actions, and trash** — Browse media in a folder tree, drag files between folders, tag and describe files, select multiple assets for batch operations, and search/sort/paginate through your library. Deleted files go to trash (soft-delete); restore them from the trash modal or permanently purge.
+- **Manage your AI provider and model in-app** — Configure AI providers, models, and API keys per organization in the AI settings tab; set up brand voice profiles and a RAG knowledge base (with file upload support) in the Brand tab. `OPENAI_API_KEY` is deprecated for model resolution — existing keys are auto-migrated on first boot.
+- **Datatable rebuilds for Teams, Webhooks, Auto Post, Sets, Signatures** — Each of these settings screens is now a real datatable with search, sort, pagination, educational empty states, and proper CRUD flows. Campaigns get archive/unarchive toggles and engagement stats.
+- **Comments inbox fixes, analytics dark mode, calendar improvements** — Comments inbox shows proper error and permission states; analytics charts work in dark mode with skeleton loaders; calendar cards reliably display stats and comment badges.
+- **Get started faster** — A new onboarding checklist guides first-time users through connecting channels, configuring AI, creating their first post, and inviting teammates. Channel health monitoring catches token expiry before it breaks publishing.
+
 **[v3.5.10]**
 - **It actually starts now** — v3.5.9 shipped without booting (a dependency mix-up took the whole API down). The stack boots cleanly again, and a new automated guard makes sure a non-booting build can never ship.
 - **Posting and your calendar work again** — The composer can save, schedule, and publish, your scheduled posts show up on the calendar, and the in-app AI assistant no longer errors on every page.

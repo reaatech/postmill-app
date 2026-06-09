@@ -51,6 +51,11 @@ export const CalendarContext = createContext({
       tags: {
         tag: Tags;
       }[];
+      lastViews?: number | null;
+      lastLikes?: number | null;
+      lastComments?: number | null;
+      commentCount?: number;
+      unreadComments?: number;
     }
   >,
   reloadCalendarView: () => {
@@ -75,6 +80,11 @@ export const CalendarContext = createContext({
       tags: {
         tag: Tags;
       }[];
+      lastViews?: number | null;
+      lastLikes?: number | null;
+      lastComments?: number | null;
+      commentCount?: number;
+      unreadComments?: number;
     }
   >,
   listPage: 0,

@@ -1,6 +1,6 @@
 # Backend Conventions (NestJS)
 
-> **Verified against v3.5.9.** These conventions are enforced across the codebase; the root
+> **Verified against v3.6.0.** These conventions are enforced across the codebase; the root
 > `AGENTS.md` is the canonical short form.
 
 ---
@@ -73,6 +73,6 @@ This runs in production. Before changing anything:
 
 - Prefer **backward-compatible** changes; a data/schema change may need a migration story.
 - Don't change the **legacy public analytics route** response shape (n8n/Zapier compatibility).
-- Preserve the **AI env fallback** (`OPENAI_API_KEY` behaviour with no admin AI config).
+- AI provider config is **per-tenant** through **Settings → AI**; no env fallback.
 
 See [Database](./database.md) for schema-change safety under `db push`.

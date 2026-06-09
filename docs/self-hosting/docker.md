@@ -3,7 +3,7 @@
 The repo ships a self-contained [`docker-compose.yaml`](../../docker-compose.yaml) that runs the
 app together with PostgreSQL, Redis, and a full Temporal stack.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.6.0.**
 
 ---
 
@@ -59,8 +59,9 @@ than as environment variables — see [Channels admin](../admin/channels.md) and
 
 ### Storage
 
-The compose file defaults to `STORAGE_PROVIDER: 'local'` with an `/uploads` volume. To use
-Cloudflare R2 instead, uncomment the `CLOUDFLARE_*` block and set `STORAGE_PROVIDER: 'cloudflare'`.
+The compose file uses a local `/uploads` volume. Storage is configured per-tenant in-app via
+**Settings → Storage** (S3, R2, B2, IDrive e2, or local disk). The global `STORAGE_PROVIDER` and
+`CLOUDFLARE_*` env vars are removed in v3.6.0.
 
 ### Persistent volumes
 

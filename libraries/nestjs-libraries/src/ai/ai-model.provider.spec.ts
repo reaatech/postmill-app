@@ -1,11 +1,7 @@
-import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AIModelProvider } from './ai-model.provider';
 import { BudgetExceeded } from './governance/errors';
 import { createChaosEngine, createStandardInjectors, TimeoutInjector } from '@reaatech/agent-chaos-core';
-
-beforeAll(() => {
-  process.env.OPENAI_API_KEY = 'sk-test-for-env-fallback';
-});
 
 // AI SDK V2 result shape: text lives in a `content` array of parts, and usage uses
 // `inputTokens`/`outputTokens` (NOT the V1 `text` / `promptTokens` / `completionTokens`).
@@ -44,6 +40,19 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
       }
       return undefined;
     });
+  },
+}));
+
+const mockGetActiveProvider = vi.fn().mockResolvedValue({
+  identifier: 'openai',
+  defaultModel: 'gpt-4.1',
+  imageModel: undefined,
+  credentials: { apiKey: 'sk-test-key' },
+});
+
+vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service', () => ({
+  OrgAiSettingsService: class MockOrgAiSettings {
+    getActiveProvider = mockGetActiveProvider;
   },
 }));
 
@@ -122,6 +131,7 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/guardrail.service', () => ({
 
 import { AIProviderRegistry } from './ai-provider.registry';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AiSettingsManager } from './ai-settings.manager';
 import { TelemetryService } from './governance/telemetry.service';
 import { ProviderHealthService } from './governance/provider-health.service';
@@ -132,6 +142,7 @@ describe('AIModelProvider', () => {
   let provider: AIModelProvider;
   let registry: AIProviderRegistry;
   let aiSettings: AiSettingsService;
+  let orgAiSettings: OrgAiSettingsService;
   let settingsManager: AiSettingsManager;
   let telemetry: TelemetryService;
   let health: ProviderHealthService;
@@ -142,8 +153,16 @@ describe('AIModelProvider', () => {
     vi.clearAllMocks();
     budgetAllowed = true;
 
+    mockGetActiveProvider.mockResolvedValue({
+      identifier: 'openai',
+      defaultModel: 'gpt-4.1',
+      imageModel: undefined,
+      credentials: { apiKey: 'sk-test-key' },
+    });
+
     registry = new (AIProviderRegistry as any)();
     aiSettings = new (AiSettingsService as any)();
+    orgAiSettings = new (OrgAiSettingsService as any)();
     settingsManager = new (AiSettingsManager as any)();
     telemetry = new (TelemetryService as any)();
     health = new (ProviderHealthService as any)();
@@ -153,6 +172,7 @@ describe('AIModelProvider', () => {
     provider = new AIModelProvider(
       registry as any,
       aiSettings as any,
+      orgAiSettings as any,
       settingsManager as any,
       telemetry as any,
       health as any,
@@ -192,83 +212,67 @@ describe('AIModelProvider', () => {
       expect(model).toBeDefined();
     });
 
-    it('falls back to env OpenAI when no active config', async () => {
-      (settingsManager.getSettings as any).mockResolvedValue(null);
-      const model = await provider.languageModel('utility');
-      expect(model).toBeDefined();
-      expect(model.modelId).toBe('gpt-4.1');
+    it('returns null from resolveConfigForScope when no orgId (no env fallback)', async () => {
+      const resolved = await provider.resolveConfigForScope('utility');
+      expect(resolved).toBeNull();
     });
 
-    it('falls back to env OpenAI when the active provider row is disabled', async () => {
-      (aiSettings.getProviderConfigByIdentifier as any).mockResolvedValue({
+    it('returns the resolved config with active provider credentials', async () => {
+      mockGetActiveProvider.mockResolvedValue({
         identifier: 'openai',
-        enabled: false,
-        defaultModel: 'gpt-4o',
-        credentials: 'disabled-encrypted',
+        defaultModel: 'gpt-4.1',
+        credentials: { apiKey: 'sk-org-key' },
       });
 
       const resolved = await provider.resolveConfigForScope('utility', 'org-123');
 
       expect(resolved?.providerId).toBe('openai');
       expect(resolved?.modelId).toBe('gpt-4.1');
-      expect(resolved?.creds.apiKey).toBe('sk-test-for-env-fallback');
+      expect(resolved?.creds.apiKey).toBe('sk-org-key');
     });
 
-    it('lets org-level credentials override global provider credentials', async () => {
-      (aiSettings.getProviderConfigByIdentifier as any).mockResolvedValue({
+    it('returns the active provider config with its credentials and model', async () => {
+      mockGetActiveProvider.mockResolvedValue({
         identifier: 'openai',
-        enabled: true,
-        defaultModel: 'gpt-4.1',
-        credentials: 'global-encrypted',
+        defaultModel: 'gpt-4o-mini',
+        credentials: { apiKey: 'sk-org-key' },
       });
-      (aiSettings.getOrgProviderConfigs as any).mockResolvedValue([
-        {
-          identifier: 'openai',
-          enabled: true,
-          defaultModel: 'gpt-4o-mini',
-          credentials: 'org-encrypted',
-        },
-      ]);
-      (aiSettings.decryptProviderConfig as any).mockImplementation((config: any) => ({
-        credentials: {
-          apiKey: config.credentials === 'org-encrypted' ? 'sk-org' : 'sk-global',
-        },
-      }));
 
       const resolved = await provider.resolveConfigForScope('utility', 'org-123');
 
-      expect(resolved?.creds.apiKey).toBe('sk-org');
+      expect(resolved?.creds.apiKey).toBe('sk-org-key');
       expect(resolved?.modelId).toBe('gpt-4o-mini');
     });
 
-    it('ignores disabled org-level provider overrides', async () => {
-      (aiSettings.getProviderConfigByIdentifier as any).mockResolvedValue({
-        identifier: 'openai',
-        enabled: true,
-        defaultModel: 'gpt-4.1',
-        credentials: 'global-encrypted',
+    it('returns the active provider when it differs from the surface default', async () => {
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'anthropic',
+        defaultModel: 'claude-sonnet-4-20250514',
+        credentials: { apiKey: 'sk-anthropic' },
       });
-      (aiSettings.getOrgProviderConfigs as any).mockResolvedValue([
-        {
-          identifier: 'openai',
-          enabled: false,
-          defaultModel: 'gpt-4o-mini',
-          credentials: 'org-encrypted',
-        },
-      ]);
-      (aiSettings.decryptProviderConfig as any).mockImplementation((config: any) => ({
-        credentials: {
-          apiKey: config.credentials === 'org-encrypted' ? 'sk-org' : 'sk-global',
-        },
-      }));
+      (registry.getAdapter as any).mockImplementation((id: string) => {
+        if (id === 'openai') return mockOpenaiAdapter;
+        if (id === 'anthropic') {
+          return {
+            identifier: 'anthropic',
+            name: 'Anthropic',
+            credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
+            capabilities: { text: true, image: false },
+            createLanguageModel: vi.fn().mockReturnValue({ modelId: 'claude-sonnet', doGenerate: vi.fn() }),
+            createLangchainModel: vi.fn(),
+          };
+        }
+        return undefined;
+      });
 
       const resolved = await provider.resolveConfigForScope('utility', 'org-123');
 
-      expect(resolved?.creds.apiKey).toBe('sk-global');
-      expect(resolved?.modelId).toBe('gpt-4.1');
+      expect(resolved?.providerId).toBe('anthropic');
+      expect(resolved?.creds.apiKey).toBe('sk-anthropic');
+      expect(resolved?.modelId).toBe('claude-sonnet-4-20250514');
     });
 
-    it('does not merge encrypted governance secret settings into provider credentials', async () => {
+    it('does not merge governance settings into provider credentials', async () => {
       (settingsManager.getSettings as any).mockResolvedValue({
         ...mockSettings,
         secretSettings: {
@@ -276,19 +280,15 @@ describe('AIModelProvider', () => {
           otelHeaders: '{"authorization":"Bearer otel"}',
         },
       });
-      (aiSettings.getProviderConfigByIdentifier as any).mockResolvedValue({
+      mockGetActiveProvider.mockResolvedValue({
         identifier: 'openai',
-        enabled: true,
         defaultModel: 'gpt-4.1',
-        credentials: 'global-encrypted',
-      });
-      (aiSettings.decryptProviderConfig as any).mockReturnValue({
-        credentials: { apiKey: 'sk-global' },
+        credentials: { apiKey: 'sk-org-key' },
       });
 
       const resolved = await provider.resolveConfigForScope('utility', 'org-123');
 
-      expect(resolved?.creds).toEqual({ apiKey: 'sk-global' });
+      expect(resolved?.creds).toEqual({ apiKey: 'sk-org-key' });
     });
   });
 
@@ -335,39 +335,19 @@ describe('AIModelProvider', () => {
         activeModel: 'claude-sonnet-4-20250514',
         fallbackImageProvider: 'openai',
       });
-      (aiSettings.getProviderConfigByIdentifier as any).mockImplementation((identifier: string) => {
-        if (identifier === 'anthropic') {
-          return Promise.resolve({
-            identifier: 'anthropic',
-            enabled: true,
-            defaultModel: 'claude-sonnet-4-20250514',
-            credentials: 'anthropic-encrypted',
-          });
-        }
-        if (identifier === 'openai') {
-          return Promise.resolve({
-            identifier: 'openai',
-            enabled: true,
-            defaultModel: 'gpt-4.1',
-            imageModel: 'chatgpt-image-latest',
-            credentials: 'openai-encrypted',
-          });
-        }
-        return Promise.resolve(null);
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'anthropic',
+        defaultModel: 'claude-sonnet-4-20250514',
+        credentials: { apiKey: 'sk-anthropic' },
       });
-      (aiSettings.decryptProviderConfig as any).mockImplementation((config: any) => ({
-        credentials: {
-          apiKey: config.identifier === 'openai' ? 'sk-openai' : 'sk-anthropic',
-        },
-      }));
 
       const model = await provider.imageModel('utility', 'org-123');
       const result = await model.generate('test prompt');
 
       expect(result).toBe('fallback-image');
       expect(createFallbackImageModel).toHaveBeenCalledWith(
-        { apiKey: 'sk-openai' },
-        'chatgpt-image-latest',
+        { apiKey: 'sk-anthropic' },
+        'claude-sonnet-4-20250514',
       );
     });
   });
@@ -441,37 +421,18 @@ describe('AIModelProvider', () => {
           },
         },
       });
-      (aiSettings.getProviderConfigByIdentifier as any).mockImplementation((identifier: string) => {
-        if (identifier === 'anthropic') {
-          return Promise.resolve({
-            identifier: 'anthropic',
-            enabled: true,
-            defaultModel: 'claude-sonnet-4-20250514',
-            credentials: 'anthropic-encrypted',
-          });
-        }
-        if (identifier === 'openai') {
-          return Promise.resolve({
-            identifier: 'openai',
-            enabled: true,
-            defaultModel: 'gpt-4.1',
-            credentials: 'openai-encrypted',
-          });
-        }
-        return Promise.resolve(null);
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'anthropic',
+        defaultModel: 'claude-sonnet-4-20250514',
+        credentials: { apiKey: 'sk-anthropic' },
       });
-      (aiSettings.decryptProviderConfig as any).mockImplementation((config: any) => ({
-        credentials: {
-          apiKey: config.identifier === 'openai' ? 'sk-openai' : 'sk-anthropic',
-        },
-      }));
 
       const result = await provider.generateText('utility', 'Hello world', { orgId: 'org-123' });
 
       expect(result).toBe('Fallback response');
       expect(createFallbackLanguageModel).toHaveBeenCalledWith(
-        { apiKey: 'sk-openai' },
-        'gpt-4.1',
+        { apiKey: 'sk-anthropic' },
+        'claude-sonnet-4-20250514',
         expect.any(Object),
       );
     });
@@ -528,6 +489,7 @@ describe('AIModelProvider', () => {
       return new AIModelProvider(
         registry as any,
         aiSettings as any,
+        orgAiSettings as any,
         settingsManager as any,
         telemetry as any,
         health as any,
@@ -594,15 +556,11 @@ describe('AIModelProvider', () => {
     });
 
     it('routing-on: router selects a different model id', async () => {
-      // A real (enabled) provider config is needed so resolution reaches the routing seam
-      // rather than short-circuiting to the env fallback.
-      (aiSettings.getProviderConfigByIdentifier as any).mockResolvedValue({
+      mockGetActiveProvider.mockResolvedValue({
         identifier: 'openai',
-        enabled: true,
         defaultModel: 'gpt-4.1',
-        credentials: 'enc',
+        credentials: { apiKey: 'sk-x' },
       });
-      (aiSettings.decryptProviderConfig as any).mockReturnValue({ credentials: { apiKey: 'sk-x' } });
       const router = makeRouter('gpt-4o-mini');
       const p = makeProvider(makeCache(), router);
       const resolved = await p.resolveConfigForScope('utility', 'org-123');

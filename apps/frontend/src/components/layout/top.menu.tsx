@@ -312,6 +312,27 @@ export const useMenuItem = () => {
       requireBilling: true,
     },
     {
+      name: t('profile', 'Profile'),
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="21"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+          <circle cx="12" cy="7" r="4" />
+        </svg>
+      ),
+      path: '/settings/profile',
+      role: ['ADMIN', 'USER', 'SUPERADMIN'],
+    },
+    {
       name: t('settings', 'Settings'),
       icon: (
         <svg
@@ -353,7 +374,6 @@ export const TopMenu: FC = () => {
   const user = useUser();
   const { firstMenu, secondMenu } = useMenuItem();
   const { isGeneral, billingEnabled } = useVariables();
-  const isAdmin = (user as any)?.admin;
   return (
     <>
       <div className="flex flex-1 flex-col minCustom:gap-[16px] blurMe">
@@ -395,57 +415,7 @@ export const TopMenu: FC = () => {
                 );
               })
         }
-        {isAdmin && (
-          <div className="mt-[8px] pt-[8px] border-t border-newTableBorder">
-            <div className="text-[11px] text-textColor/50 uppercase tracking-wider px-[8px] mb-[4px]">
-              Administration
-            </div>
-            <MenuItem
-              path="/admin/ai"
-              label="AI Settings"
-              icon={
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2a10 10 0 1 0 10 10H12V2z" />
-                  <path d="M12 2a10 10 0 0 1 10 10h-10V2z" />
-                  <path d="M2 12h20M12 2v20" />
-                </svg>
-              }
-            />
-            <MenuItem
-              path="/admin/channels"
-              label="Channels"
-              icon={
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                  <line x1="8" y1="21" x2="16" y2="21" />
-                  <line x1="12" y1="17" x2="12" y2="21" />
-                </svg>
-              }
-            />
-            <MenuItem
-              path="/admin/errors"
-              label="Errors"
-              icon={
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              }
-            />
-            <MenuItem
-              path="/admin/stats"
-              label="Stats"
-              icon={
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="20" x2="18" y2="10" />
-                  <line x1="12" y1="20" x2="12" y2="4" />
-                  <line x1="6" y1="20" x2="6" y2="14" />
-                </svg>
-              }
-            />
-          </div>
-        )}
+
       </div>
       <div className="flex flex-col minCustom:gap-[20px] custom:gap-[8px] blurMe">
         {secondMenu

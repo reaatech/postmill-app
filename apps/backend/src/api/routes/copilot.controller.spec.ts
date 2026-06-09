@@ -195,29 +195,27 @@ describe('CopilotController', () => {
 
   describe('_buildServiceAdapter', () => {
     describe('no admin config', () => {
-      it('creates OpenAIAdapter with env key when OPENAI_API_KEY is set (byte-for-byte fallback)', async () => {
-        process.env.OPENAI_API_KEY = 'sk-env-fallback-key';
+      it('creates OpenAIAdapter with resolved credentials via resolveConfigForScope', async () => {
         mockResolveConfigForScope.mockResolvedValue({
           adapter: mockOpenaiAdapter,
           modelId: 'gpt-5.2',
-          creds: { apiKey: 'sk-env-fallback-key' },
+          creds: { apiKey: 'sk-resolved-key' },
           providerId: 'openai',
         });
 
         const result = await (controller as any)._buildServiceAdapter(undefined);
 
-        expect(mockOpenAIClass).toHaveBeenCalledWith({ apiKey: 'sk-env-fallback-key' });
+        expect(mockOpenAIClass).toHaveBeenCalledWith({ apiKey: 'sk-resolved-key' });
         expect(result).toBe(mockOpenAIAdapterInstance);
         expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', undefined);
       });
 
-      it('throws 422 "AI provider not configured" when no OPENAI_API_KEY', async () => {
-        process.env.OPENAI_API_KEY = '';
+      it('throws 422 "AI is not configured" when resolveConfigForScope returns null', async () => {
         mockResolveConfigForScope.mockResolvedValue(null);
 
         await expect((controller as any)._buildServiceAdapter(undefined)).rejects.toThrow(
           expect.objectContaining({
-            message: 'AI provider not configured',
+            message: 'AI is not configured for this organization. Go to Settings → AI to configure a provider.',
             status: HttpStatus.UNPROCESSABLE_ENTITY,
           }),
         );
@@ -330,23 +328,12 @@ describe('CopilotController', () => {
     });
 
     describe('resolveConfigForScope returns null (facade could not resolve)', () => {
-      it('falls back to env key when env key is set', async () => {
-        process.env.OPENAI_API_KEY = 'sk-fallback-adapter-missing';
-        mockResolveConfigForScope.mockResolvedValue(null);
-
-        const result = await (controller as any)._buildServiceAdapter('org-1');
-
-        expect(mockOpenAIClass).toHaveBeenCalledWith({ apiKey: 'sk-fallback-adapter-missing' });
-        expect(result).toBe(mockOpenAIAdapterInstance);
-      });
-
-      it('throws 422 when no env key either', async () => {
-        process.env.OPENAI_API_KEY = '';
+      it('throws 422 when no config resolved (no env fallback)', async () => {
         mockResolveConfigForScope.mockResolvedValue(null);
 
         await expect((controller as any)._buildServiceAdapter('org-1')).rejects.toThrow(
           expect.objectContaining({
-            message: 'AI provider not configured',
+            message: 'AI is not configured for this organization. Go to Settings → AI to configure a provider.',
             status: HttpStatus.UNPROCESSABLE_ENTITY,
           }),
         );

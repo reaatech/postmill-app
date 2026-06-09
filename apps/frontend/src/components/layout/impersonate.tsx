@@ -423,66 +423,6 @@ const AddAnnouncement = () => {
   );
 };
 
-const ViewErrors = () => {
-  const t = useT();
-  const handleClick = useCallback(() => {
-    window.location.href = '/admin/errors';
-  }, [t]);
-  return (
-    <div
-      className="px-[10px] rounded-[4px] bg-blue-700 text-white cursor-pointer whitespace-nowrap"
-      onClick={handleClick}
-    >
-      {t('view_errors', 'View Errors')}
-    </div>
-  );
-};
-
-const ViewStats = () => {
-  const t = useT();
-  const handleClick = useCallback(() => {
-    window.location.href = '/admin/stats';
-  }, [t]);
-  return (
-    <div
-      className="px-[10px] rounded-[4px] bg-purple-700 text-white cursor-pointer whitespace-nowrap"
-      onClick={handleClick}
-    >
-      {t('view_stats', 'View Stats')}
-    </div>
-  );
-};
-
-const ConfigureChannels = () => {
-  const t = useT();
-  const handleClick = useCallback(() => {
-    window.location.href = '/admin/channels';
-  }, [t]);
-  return (
-    <div
-      className="px-[10px] rounded-[4px] bg-teal-600 text-white cursor-pointer whitespace-nowrap"
-      onClick={handleClick}
-    >
-      {t('configure_channels', 'Channels')}
-    </div>
-  );
-};
-
-const ViewAiSettings = () => {
-  const t = useT();
-  const handleClick = useCallback(() => {
-    window.location.href = '/admin/ai';
-  }, [t]);
-  return (
-    <div
-      className="px-[10px] rounded-[4px] bg-pink-700 text-white cursor-pointer whitespace-nowrap"
-      onClick={handleClick}
-    >
-      {t('ai_settings', 'AI')}
-    </div>
-  );
-};
-
 const ImportDebugPost = () => {
   const { openModal } = useModals();
   const t = useT();
@@ -599,10 +539,6 @@ export const Impersonate = () => {
                 </div>
                 <ImportDebugPost />
                 <AddAnnouncement />
-                <ViewErrors />
-                <ViewStats />
-                <ViewAiSettings />
-                {user?.isSuperAdmin && <ConfigureChannels />}
               </div>
             )}
           </div>

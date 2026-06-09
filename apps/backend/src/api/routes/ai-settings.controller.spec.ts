@@ -267,8 +267,9 @@ describe('AiSettingsController', () => {
   describe('getHealth', () => {
     it('returns health status', async () => {
       const result = await controller.getHealth(superAdmin);
-      expect(result).toHaveProperty('hasActiveConfig');
-      expect(result).toHaveProperty('envFallback');
+      expect(result).toHaveProperty('hasActiveGlobalConfig');
+      expect(result).toHaveProperty('activeProvider');
+      expect(result).toHaveProperty('providerHealth');
     });
   });
 

@@ -30,7 +30,59 @@ export class ConfigurationChecker {
     this.checkIsValidUrl('FRONTEND_URL');
     this.checkIsValidUrl('NEXT_PUBLIC_BACKEND_URL');
     this.checkIsValidUrl('BACKEND_INTERNAL_URL');
-    this.checkNonEmpty('STORAGE_PROVIDER', 'Needed to setup storage.');
+    this.checkDeprecatedStorageVars();
+    this.checkDeprecatedChannelVars();
+    this.checkDeprecatedAiVars();
+  }
+
+  checkDeprecatedStorageVars() {
+    const deprecatedStorageVars = [
+      'STORAGE_PROVIDER',
+      'CLOUDFLARE_ACCOUNT_ID',
+      'CLOUDFLARE_ACCESS_KEY',
+      'CLOUDFLARE_SECRET_ACCESS_KEY',
+      'CLOUDFLARE_BUCKETNAME',
+      'CLOUDFLARE_BUCKET_URL',
+      'CLOUDFLARE_REGION',
+    ];
+
+    for (const key of deprecatedStorageVars) {
+      if (this.get(key)) {
+        this.issues.push(key + ' is deprecated. Use per-tenant storage config instead (Settings → Storage tab).');
+      }
+    }
+  }
+
+  checkDeprecatedChannelVars() {
+    const deprecatedChannelVars = [
+      'LINKEDIN_CLIENT_ID', 'LINKEDIN_CLIENT_SECRET',
+      'REDDIT_CLIENT_ID', 'REDDIT_CLIENT_SECRET',
+      'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET',
+      'THREADS_APP_ID', 'THREADS_APP_SECRET',
+      'FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET',
+      'YOUTUBE_CLIENT_ID', 'YOUTUBE_CLIENT_SECRET',
+      'TIKTOK_CLIENT_ID', 'TIKTOK_CLIENT_SECRET',
+      'PINTEREST_CLIENT_ID', 'PINTEREST_CLIENT_SECRET',
+      'DRIBBBLE_CLIENT_ID', 'DRIBBBLE_CLIENT_SECRET',
+      'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_BOT_TOKEN_ID',
+      'SLACK_ID', 'SLACK_SECRET', 'SLACK_SIGNING_SECRET',
+      'MASTODON_CLIENT_ID', 'MASTODON_CLIENT_SECRET',
+      'INSTAGRAM_APP_ID', 'INSTAGRAM_APP_SECRET',
+      'BEEHIIVE_API_KEY', 'BEEHIIVE_PUBLICATION_ID',
+      'X_API_KEY', 'X_API_SECRET',
+    ];
+
+    for (const key of deprecatedChannelVars) {
+      if (this.get(key)) {
+        this.issues.push(key + ' is deprecated. Use per-tenant channel config instead (Settings → Channels tab).');
+      }
+    }
+  }
+
+  checkDeprecatedAiVars() {
+    if (this.get('OPENAI_API_KEY')) {
+      this.issues.push('OPENAI_API_KEY is deprecated. Use per-tenant AI config instead (Settings → AI tab).');
+    }
   }
 
   checkNonEmpty(key: string, description?: string): boolean {

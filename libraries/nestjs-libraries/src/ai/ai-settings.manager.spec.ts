@@ -170,12 +170,12 @@ describe('AiSettingsManager', () => {
       expect(manager.hasActiveConfig()).toBe(false);
     });
 
-    it('returns true when OPENAI_API_KEY env fallback is set', async () => {
+    it('returns false when only env var is set (no env fallback)', async () => {
       process.env.OPENAI_API_KEY = 'sk-test-key';
       mockGetSystemSettings.mockResolvedValue({ ...baseSettings, activeProvider: null });
       manager = new AiSettingsManager(new (AiSettingsService as any)());
       await manager.getSettings();
-      expect(manager.hasActiveConfig()).toBe(true);
+      expect(manager.hasActiveConfig()).toBe(false);
     });
 
     it('returns false when no active provider and no env key', async () => {
@@ -201,12 +201,12 @@ describe('AiSettingsManager', () => {
       expect(result).toBe(true);
     });
 
-    it('returns true when OPENAI_API_KEY env fallback is set', async () => {
+    it('returns false when only env var is set (no env fallback)', async () => {
       process.env.OPENAI_API_KEY = 'sk-test-key';
       mockGetSystemSettings.mockResolvedValue({ ...baseSettings, activeProvider: null });
       manager = new AiSettingsManager(new (AiSettingsService as any)());
       const result = await manager.hasActiveConfigAsync();
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it('returns false when no active provider and no env key', async () => {

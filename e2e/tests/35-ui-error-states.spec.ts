@@ -106,15 +106,7 @@ test('error states and edge cases', async ({ page }) => {
   // Test 4: Try navigation to protected route
   try {
     findings.edgeCases.push('test-4: protected-routes');
-    const routes = ['/admin', '/admin/ai-settings'];
-    for (const route of routes) {
-      const r = await page.goto(route, { timeout: 10000 });
-      const status = r?.status() ?? 0;
-      const redirected = page.url().includes('/auth/') || status === 403;
-      findings.edgeCases.push(
-        `${route}: ${status}${redirected ? ' (redirected/forbidden)' : ' (accessible)'}`
-      );
-    }
+    // Removed: /admin and /admin/ai-settings routes were deleted in v3.6.0
   } catch (e: any) {
     findings.edgeCases.push(`error-test-4: ${e.message.slice(0, 60)}`);
   }

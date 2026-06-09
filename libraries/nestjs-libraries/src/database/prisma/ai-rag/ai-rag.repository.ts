@@ -281,6 +281,28 @@ export class AiRagRepository {
   }
 
   /**
+   * Returns all content index entries for an org (for dashboard/status views).
+   */
+  getOrgContentIndexEntries(
+    organizationId: string,
+  ): Promise<Array<{ id: string; sourceType: string; sourceId: string; chunk: string | null; createdAt: Date; updatedAt: Date }>> {
+    return this._aiContentIndex.model.aIContentIndex.findMany({
+      where: { organizationId },
+      select: { id: true, sourceType: true, sourceId: true, chunk: true, createdAt: true, updatedAt: true },
+    }) as any;
+  }
+
+  /**
+   * Deletes all content index entries for a given source, org-scoped.
+   * Embedding side table rows are cascade-deleted by the FK constraint.
+   */
+  deleteContentIndexEntries(organizationId: string, sourceType: string, sourceId: string) {
+    return this._aiContentIndex.model.aIContentIndex.deleteMany({
+      where: { organizationId, sourceType, sourceId },
+    });
+  }
+
+  /**
    * Loads an org's non-deleted posts for the backfill sweep.
    */
   findPostsForBackfill(

@@ -190,7 +190,7 @@ const useMediaProviders = () => {
   });
 };
 
-const BrandVoiceSection = () => {
+export const BrandVoiceSection = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -382,7 +382,7 @@ const BrandVoiceSection = () => {
   );
 };
 
-const UsageSection = () => {
+export const UsageSection = () => {
   const t = useT();
   const { data, isLoading } = useUsage();
 
@@ -468,7 +468,7 @@ const UsageSection = () => {
   );
 };
 
-const PromptTemplatesSection = () => {
+export const PromptTemplatesSection = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -665,7 +665,7 @@ const PromptTemplatesSection = () => {
   );
 };
 
-const PromptLibrarySection = () => {
+export const PromptLibrarySection = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -792,7 +792,7 @@ const PromptLibrarySection = () => {
   );
 };
 
-const MediaProvidersSection = () => {
+export const MediaProvidersSection = () => {
   const t = useT();
   const { data, isLoading } = useMediaProviders();
 

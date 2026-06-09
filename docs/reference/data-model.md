@@ -4,7 +4,7 @@ Key Prisma models grouped by domain. The schema is the source of truth:
 `libraries/nestjs-libraries/src/database/prisma/schema.prisma`. See [Database](../developers/database.md)
 for the `db push` model and schema-change rules.
 
-> **Verified against v3.5.9.** Model names below are taken from the schema.
+> **Verified against v3.6.0.** Model names below are taken from the schema.
 
 ---
 
@@ -12,20 +12,28 @@ for the `db push` model and schema-change rules.
 
 | Model | Role |
 |-------|------|
-| `Organization` | Tenant boundary. |
+| `Organization` | Tenant boundary. Gains `localStorageQuotaBytes` (default 5 GB) in v3.6.0. |
 | `User`, `UserOrganization` | Accounts and their org membership. |
 | `Integration` | A connected channel (provider account). |
 | `Post` | A scheduled/published post (with denormalized stats fields). |
-| `Media` | Uploaded media. |
+| `Media` | Uploaded media. Gains `folderId` (nullable FK to `MediaFolder`), `tags` (JSON), and `description` (text) in v3.6.0. |
 | `Tags`, `TagsPosts` | Tagging. |
 | `Comments` | In-app post comments (distinct from synced social comments). |
 | `Signatures`, `Sets`, `AutoPost`, `Plugs`, `ThirdParty` | Composition helpers and automations. |
 
-## Provider configuration (v3.0)
+## Provider configuration (v3.0 / deprecated in v3.6.0)
 
 | Model | Role |
 |-------|------|
-| `ProviderConfiguration` | Encrypted, admin-managed channel credentials + enablement. See [Channels admin](../admin/channels.md). |
+| `ProviderConfiguration` | **Deprecated.** Encrypted, admin-managed channel credentials + enablement. Replaced by `OrgProviderConfiguration` (per-tenant) in v3.6.0. |
+
+## Per-tenant provider configuration (v3.6.0)
+
+| Model | Role |
+|-------|------|
+| `OrgProviderConfiguration` | Per-tenant channel/AI/storage provider credentials and settings, replacing `ProviderConfiguration`, `AIProviderConfig`, and `AISystemSettings`. |
+| `StorageProviderConfig` | Per-tenant storage mount (S3, R2, B2, IDrive e2, or local disk). Encrypted credentials. |
+| `MediaFolder` | Hierarchical folder tree for the media library. |
 
 ## Analytics (v3.1)
 
@@ -45,14 +53,14 @@ See [Analytics](../features/analytics.md).
 
 See [Social comments](../features/social-comments.md).
 
-## AI system (v3.4) — 10 models
+## AI system (v3.4) — deprecated/updated in v3.6.0
 
 | Model | Role |
 |-------|------|
-| `AIProviderConfig` | A configured AI provider (encrypted credentials, model). |
-| `AISystemSettings` | Global AI/governance settings + active provider. |
+| `AIProviderConfig` | **Deprecated in v3.6.0.** Replaced by `OrgProviderConfiguration`. |
+| `AISystemSettings` | **Deprecated in v3.6.0.** Replaced by `OrgProviderConfiguration`. |
 | `AISpendLog` | Recorded AI spend. |
-| `AIOrgProviderConfig` | Per-org provider config (BYOK). |
+| `AIOrgProviderConfig` | Per-org provider config. Gains `isActive` (boolean, default `false`) in v3.6.0. |
 | `AIBrandProfile` | Brand voice/context for generation. |
 | `AIPromptTemplate` | Saved prompt templates. |
 | `AIPromptLibraryItem` | Shared prompt library entries. |

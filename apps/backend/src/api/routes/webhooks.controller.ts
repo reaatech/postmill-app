@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Post,
   Put,
@@ -44,6 +45,34 @@ export class WebhookController {
     @Body() body: UpdateDto
   ) {
     return this._webhooksService.createWebhook(org.id, body);
+  }
+
+  @Post('/test-ping/:id')
+  @CheckPolicies([AuthorizationActions.Create, Sections.WEBHOOKS])
+  async testPing(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    const webhooks = await this._webhooksService.getWebhooks(org.id);
+    const webhook = webhooks.find(w => w.id === id);
+    if (!webhook) {
+      throw new HttpException('Webhook not found', 404);
+    }
+
+    try {
+      const response = await safeFetch(webhook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event: 'ping',
+          timestamp: new Date().toISOString(),
+          message: 'This is a test ping from Postiz',
+        }),
+      });
+      return { success: true, status: response.status };
+    } catch (err: any) {
+      return { success: false, status: 0, error: err?.message || 'Connection failed' };
+    }
   }
 
   @Delete('/:id')

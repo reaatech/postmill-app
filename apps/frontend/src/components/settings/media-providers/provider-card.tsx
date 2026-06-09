@@ -1,0 +1,111 @@
+'use client';
+
+import React from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+
+interface ProviderData {
+  identifier: string;
+  name: string;
+  supportedOperations: string[];
+  isConfigured: boolean;
+  enabled: boolean;
+  type?: string;
+}
+
+const OPERATION_LABELS: Record<string, string> = {
+  image: 'Image',
+  video: 'Video',
+  tts: 'TTS',
+  stt: 'STT',
+  upscale: 'Upscale',
+  'bg-remove': 'Bg Remove',
+  inpaint: 'Inpaint',
+  embedding: 'Embedding',
+};
+
+const OPERATION_COLORS: Record<string, string> = {
+  image: 'bg-blue-500/20 text-blue-400',
+  video: 'bg-purple-500/20 text-purple-400',
+  tts: 'bg-green-500/20 text-green-400',
+  stt: 'bg-emerald-500/20 text-emerald-400',
+  upscale: 'bg-orange-500/20 text-orange-400',
+  'bg-remove': 'bg-pink-500/20 text-pink-400',
+  inpaint: 'bg-cyan-500/20 text-cyan-400',
+  embedding: 'bg-yellow-500/20 text-yellow-400',
+};
+
+interface ProviderCardProps {
+  provider: ProviderData;
+  onConfigure: (identifier: string) => void;
+  onToggle: (identifier: string, enabled: boolean) => void;
+}
+
+export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardProps) => {
+  const t = useT();
+
+  return (
+    <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[12px]">
+      <div className="flex items-start justify-between">
+        <div className="flex flex-col gap-[4px]">
+          <span className="text-[15px] font-semibold">{provider.name}</span>
+          {provider.type && (
+            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+              {provider.type}
+            </span>
+          )}
+        </div>
+        <span
+          className={`text-[11px] rounded-[4px] px-[8px] py-[3px] font-medium ${
+            provider.enabled && provider.isConfigured
+              ? 'bg-green-500/20 text-green-400'
+              : provider.isConfigured
+                ? 'bg-yellow-500/20 text-yellow-400'
+                : 'bg-fifth text-customColor18'
+          }`}
+        >
+          {provider.enabled && provider.isConfigured
+            ? t('active', 'Active')
+            : provider.isConfigured
+              ? t('disabled', 'Disabled')
+              : t('not_configured', 'Not Configured')}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap gap-[4px]">
+        {provider.supportedOperations.map((op) => (
+          <span
+            key={op}
+            className={`text-[11px] rounded-[4px] px-[6px] py-[2px] ${
+              OPERATION_COLORS[op] || 'bg-fifth text-customColor18'
+            }`}
+          >
+            {OPERATION_LABELS[op] || op}
+          </span>
+        ))}
+      </div>
+
+      <div className="flex items-center justify-between pt-[8px] border-t border-tableBorder">
+        <button
+          className="text-[13px] text-customColor4 hover:underline"
+          onClick={() => onConfigure(provider.identifier)}
+        >
+          {provider.isConfigured ? t('edit_config', 'Edit Config') : t('configure', 'Configure')}
+        </button>
+
+        {provider.isConfigured && (
+          <label className="flex items-center gap-[6px] cursor-pointer">
+            <span className="text-[12px] text-customColor18">
+              {t('enabled', 'Enabled')}
+            </span>
+            <input
+              type="checkbox"
+              className="accent-customColor4"
+              checked={provider.enabled}
+              onChange={(e) => onToggle(provider.identifier, e.target.checked)}
+            />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+};
