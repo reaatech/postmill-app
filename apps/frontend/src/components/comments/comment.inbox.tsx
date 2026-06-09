@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CommentInboxFilters, InboxFilters } from './comment.inbox.filters';
+import { useVariables } from '@gitroom/react/helpers/variable.context';
 
 interface InboxComment {
   id: string;
@@ -34,8 +35,10 @@ interface InboxResponse {
 export const CommentInbox: FC = () => {
   const t = useT();
   const fetch = useFetch();
+  const { runCron } = useVariables();
   const [filters, setFilters] = useState<InboxFilters>({ unreadOnly: false });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [statusCode, setStatusCode] = useState<number | null>(null);
 
   const buildKey = useCallback(() => {
     const params = new URLSearchParams();
@@ -50,7 +53,8 @@ export const CommentInbox: FC = () => {
     buildKey(),
     async (key: string) => {
       const res = await fetch(key);
-      if (!res.ok) throw new Error('Failed to fetch inbox');
+      setStatusCode(res.status);
+      if (!res.ok) throw new Error(res.status === 402 ? 'UPGRADE_REQUIRED' : 'Failed to fetch inbox');
       return res.json();
     },
     { revalidateOnFocus: false }
@@ -78,10 +82,64 @@ export const CommentInbox: FC = () => {
     setCursor(undefined);
   }, []);
 
+  if (error && statusCode === 402) {
+    return (
+      <div className="flex flex-col items-center justify-center py-[48px] text-center">
+        <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-[var(--negative,#f97066)]/10 flex items-center justify-center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--negative,#f97066)]">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <p className="text-textColor text-[14px] font-medium mb-[8px]">
+          {t('comment_inbox.upgrade_required', 'Comments not available on your current plan')}
+        </p>
+        <p className="text-newTableText text-[12px] mb-[16px] max-w-[360px]">
+          {t('comment_inbox.upgrade_description', 'Upgrade your plan to access the unified comment inbox across all your social channels.')}
+        </p>
+        <a
+          href="/billing"
+          className="px-[20px] py-[8px] bg-forth text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
+        >
+          {t('comment_inbox.upgrade_cta', 'Upgrade Plan')}
+        </a>
+      </div>
+    );
+  }
+
   if (error) {
     return (
-      <div className="flex items-center justify-center h-[200px] text-[#F97066]">
-        {t('comment_inbox.failed_to_load', 'Failed to load inbox')}
+      <div className="flex flex-col items-center justify-center py-[48px] text-center">
+        <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-[var(--negative,#f97066)]/10 flex items-center justify-center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[var(--negative,#f97066)]">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M12 8v4m0 4h.01" />
+          </svg>
+        </div>
+        <p className="text-newTableText text-[14px] mb-[12px]">
+          {t('comment_inbox.failed_to_load', 'Failed to load inbox')}
+        </p>
+        <p className="text-[12px] text-newTableText/60">{error.message}</p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-[16px]">
+        <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
+        <div className="space-y-[8px] animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]">
+              <div className="w-[36px] h-[36px] rounded-full bg-newTableHeader flex-shrink-0" />
+              <div className="flex-1 space-y-[8px]">
+                <div className="h-[14px] w-[180px] bg-newTableHeader rounded-[4px]" />
+                <div className="h-[12px] w-full bg-newTableHeader rounded-[4px]" />
+                <div className="h-[12px] w-3/4 bg-newTableHeader rounded-[4px]" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -90,13 +148,20 @@ export const CommentInbox: FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
-
-      {isLoading && (
-        <div className="flex items-center justify-center h-[200px] text-newTableText">
-          {t('comment_inbox.loading', 'Loading comments...')}
+      {!runCron && (
+        <div className="flex items-center gap-[8px] px-[16px] py-[10px] bg-amber-500/10 border border-amber-500/30 rounded-[8px] text-[12px] text-amber-400">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>
+            {t('comment_inbox.cron_banner', 'Comment sync requires the background cron worker to be running. Set RUN_CRON=true in your environment to enable automatic comment collection.')}
+          </span>
         </div>
       )}
+
+      <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
 
       {!isLoading && comments.length === 0 && (
         <div className="flex items-center justify-center h-[200px] text-newTableText">

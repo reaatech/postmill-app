@@ -58,6 +58,8 @@ export function Login() {
         });
       }
       setLoading(false);
+    } else {
+      localStorage.setItem('lastLogin', new Date().toISOString());
     }
   };
   return (

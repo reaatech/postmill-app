@@ -1,18 +1,43 @@
 'use client';
 
-import { FC, useEffect, useRef } from 'react';
+import { FC, useEffect, useRef, useState } from 'react';
 import DrawChart from 'chart.js/auto';
 
-const CHART_COLORS = [
-  'var(--chart-1, #612bd3)',
-  'var(--chart-2, #32d583)',
-  'var(--chart-3, #1d9bf0)',
-  'var(--chart-4, #f97066)',
-  'var(--chart-5, #ffac30)',
-  'var(--chart-6, #8b90ff)',
-  'var(--chart-7, #b69dec)',
-  'var(--chart-8, #e4b895)',
-];
+function resolveCSSVar(value: string): string {
+  if (typeof document === 'undefined') return value;
+  const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
+  if (match) {
+    const cssVar = `--${match[1]}`;
+    const computed = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
+    return computed || match[2]?.trim() || value;
+  }
+  return value;
+}
+
+function useCSSToken(token: string, fallback: string): string {
+  const [resolved, setResolved] = useState(() => resolveCSSVar(token) || fallback);
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setResolved(resolveCSSVar(token) || fallback);
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, [token, fallback]);
+  return resolved;
+}
+
+function resolveChartColors(): string[] {
+  return [
+    resolveCSSVar('var(--chart-1, #612bd3)'),
+    resolveCSSVar('var(--chart-2, #32d583)'),
+    resolveCSSVar('var(--chart-3, #1d9bf0)'),
+    resolveCSSVar('var(--chart-4, #f97066)'),
+    resolveCSSVar('var(--chart-5, #ffac30)'),
+    resolveCSSVar('var(--chart-6, #8b90ff)'),
+    resolveCSSVar('var(--chart-7, #b69dec)'),
+    resolveCSSVar('var(--chart-8, #e4b895)'),
+  ];
+}
 
 interface PieChartProps {
   data: { label: string; value: number }[];
@@ -30,8 +55,21 @@ export const PieChart: FC<PieChartProps> = ({
   onSliceClick,
 }) => {
   const ref = useRef<HTMLCanvasElement>(null);
-  const chart = useRef<DrawChart | null>(null);
+  const chartRef = useRef<DrawChart | null>(null);
   const centerRef = useRef<HTMLDivElement>(null);
+  const bgColor = useCSSToken('var(--new-bgColorInner)', '#1a1919');
+  const textColor = useCSSToken('var(--new-btn-text)', '#ffffff');
+  const tableText = useCSSToken('var(--new-table-text)', '#9c9c9c');
+  const borderColor = useCSSToken('var(--new-table-border)', '#2b2b2b');
+  const [chartColors, setChartColors] = useState(resolveChartColors);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setChartColors(resolveChartColors());
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   const processed = (() => {
     const sorted = [...data].sort((a, b) => b.value - a.value);
@@ -45,7 +83,7 @@ export const PieChart: FC<PieChartProps> = ({
   useEffect(() => {
     if (!ref.current || !processed.length) return;
 
-    chart.current = new DrawChart(ref.current, {
+    chartRef.current = new DrawChart(ref.current, {
       type: 'doughnut',
       data: {
         labels: processed.map((p) => p.label),
@@ -53,9 +91,9 @@ export const PieChart: FC<PieChartProps> = ({
           {
             data: processed.map((p) => p.value),
             backgroundColor: processed.map(
-              (_, i) => CHART_COLORS[i % CHART_COLORS.length]
+              (_, i) => chartColors[i % chartColors.length]
             ),
-            borderColor: 'var(--new-bgColorInner)',
+            borderColor: bgColor,
             borderWidth: 2,
             hoverOffset: 6,
           },
@@ -77,7 +115,7 @@ export const PieChart: FC<PieChartProps> = ({
           legend: {
             position: 'bottom',
             labels: {
-              color: 'var(--new-table-text)',
+              color: tableText,
               font: { size: 11 },
               padding: 12,
               usePointStyle: true,
@@ -88,10 +126,10 @@ export const PieChart: FC<PieChartProps> = ({
           },
           tooltip: {
             enabled: true,
-            backgroundColor: 'var(--new-bgColorInner)',
-            titleColor: 'var(--new-btn-text)',
-            bodyColor: 'var(--new-table-text)',
-            borderColor: 'var(--new-table-border)',
+            backgroundColor: bgColor,
+            titleColor: textColor,
+            bodyColor: tableText,
+            borderColor,
             borderWidth: 1,
             padding: 8,
             cornerRadius: 6,
@@ -116,9 +154,9 @@ export const PieChart: FC<PieChartProps> = ({
     });
 
     return () => {
-      chart.current?.destroy();
+      chartRef.current?.destroy();
     };
-  }, [processed, height]);
+  }, [processed, height, bgColor, textColor, tableText, borderColor, chartColors]);
 
   const total = processed.reduce((s, i) => s + i.value, 0);
 

@@ -114,7 +114,7 @@ export const CalendarItem: FC<{
           !
         </div>
       )}
-      {post.unreadComments > 0 && (
+      {(post.unreadComments || 0) > 0 && (
         <div
           className="absolute -top-[6px] -end-[6px] z-20 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
           data-tooltip-id="tooltip"
@@ -254,7 +254,10 @@ export const CalendarItem: FC<{
                   t('no_content', 'no content')}
               </div>
             </div>
-          {state === 'PUBLISHED' ? (
+          {(post.lastViews !== undefined && post.lastViews !== null) ||
+          (post.lastLikes !== undefined && post.lastLikes !== null) ||
+          (post.lastComments !== undefined && post.lastComments !== null) ||
+          post.commentCount ? (
             <div className="flex items-center gap-3 mt-2 text-[12px] text-textColor">
               {post.lastViews !== undefined && post.lastViews !== null && (
                 <span className="flex items-center gap-1">
