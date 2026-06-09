@@ -155,21 +155,21 @@ describe('LoadToolsService', () => {
       expect(spy).toHaveBeenCalledTimes(1);
     });
 
-    it('creates an Agent with id "postiz"', async () => {
+    it('creates an Agent with id "postmill"', async () => {
       vi.spyOn(service, 'loadTools').mockResolvedValue({});
 
       const agent = await service.agent();
 
       expect(agent).toBeInstanceOf(Agent as any);
-      expect(agent.id).toBe('postiz');
+      expect(agent.id).toBe('postmill');
     });
 
-    it('creates an Agent with name "postiz" and correct description', async () => {
+    it('creates an Agent with name "postmill" and correct description', async () => {
       vi.spyOn(service, 'loadTools').mockResolvedValue({});
 
       const agent = await service.agent();
 
-      expect(agent.name).toBe('postiz');
+      expect(agent.name).toBe('postmill');
       expect(agent.description).toBe(
         'Agent that helps manage and schedule social media posts for users',
       );
