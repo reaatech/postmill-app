@@ -27,8 +27,7 @@ import { NewSubscription } from '@gitroom/frontend/components/layout/new.subscri
 import { Support } from '@gitroom/frontend/components/layout/support';
 import { ContinueProvider } from '@gitroom/frontend/components/layout/continue.provider';
 import { ContextWrapper } from '@gitroom/frontend/components/layout/user.context';
-import { CopilotKit } from '@copilotkit/react-core';
-import { csrfHeader } from '@gitroom/helpers/utils/csrf.header';
+import { CopilotProvider } from '@gitroom/frontend/components/layout/copilot.provider';
 import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { Impersonate } from '@gitroom/frontend/components/layout/impersonate';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
@@ -56,7 +55,7 @@ const jakartaSans = Plus_Jakarta_Sans({
 export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   const fetch = useFetch();
 
-  const { backendUrl, billingEnabled, isGeneral } = useVariables();
+  const { billingEnabled, isGeneral } = useVariables();
 
   // Feedback icon component attaches Sentry feedback to a top-bar icon when DSN is present
   const searchParams = useSearchParams();
@@ -75,12 +74,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
   return (
     <ContextWrapper user={user}>
-      <CopilotKit
-        credentials="include"
-        runtimeUrl={backendUrl + '/copilot/chat'}
-        headers={csrfHeader()}
-        showDevConsole={false}
-      >
+      <CopilotProvider>
         <MantineWrapper>
           <ToolTip />
           <Toaster />
@@ -152,7 +146,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
             </div>
           </CheckPayment>
         </MantineWrapper>
-      </CopilotKit>
+      </CopilotProvider>
     </ContextWrapper>
   );
 };
