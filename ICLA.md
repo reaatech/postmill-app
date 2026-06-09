@@ -4,7 +4,7 @@ Based on the
 
 ## Individual Contributor License Agreement (ICLA)
 
-Thank you for your interest in contributing to GitroomHQ's Postiz ("We" or "Us").
+Thank you for your interest in contributing to GitroomHQ's Postmill ("We" or "Us").
 
 The purpose of this contributor agreement ("Agreement") is to clarify and document the rights granted by contributors to Us. To make this document effective, please follow the instructions at https://contribute.postiz.com/p/postiz/cla.
 
@@ -36,7 +36,7 @@ If You are an employee and have created the Contribution as part of Your employm
 
 **"Copyright"** means all rights protecting works of authorship, including copyright, moral and neighboring rights, as appropriate, for the full term of their existence.
 
-**"Material"** means the software and/or documentation of Postiz that We make available to third parties.
+**"Material"** means the software and/or documentation of Postmill that We make available to third parties.
 
 **"Submit"** means any act by which a Contribution is transferred to Us by You by means of tangible or intangible media, including but not limited to electronic mailing lists, source code control systems, and issue tracking systems, but excluding any transfer that is conspicuously marked or otherwise designated in writing by You as "Not a Contribution."
 
