@@ -175,7 +175,11 @@ export const ThirdPartyMedia: FC<{
     refreshWhenOffline: false,
   });
 
-  if (isLoading || !data.length) {
+  // `data` is undefined while loading and also if the fetch errors/returns a
+  // non-array (SWR leaves data undefined, isLoading false) — guard with `?.`
+  // so the media third-party selector silently no-ops instead of throwing
+  // "Cannot read properties of undefined (reading 'length')" on /media.
+  if (isLoading || !data?.length) {
     return null;
   }
 
