@@ -31,10 +31,12 @@ import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
 import { GlobalSettings } from '@gitroom/frontend/components/settings/global.settings';
-import { BrandAISettings } from '@gitroom/frontend/components/settings/brand-ai.settings';
 import { ApprovedAppsComponent } from '@gitroom/frontend/components/approved-apps/approved-apps.component';
-import { ProviderCapabilityMatrix } from '@gitroom/frontend/components/admin/provider-capability.matrix';
-import { AiSettingsAdmin } from '@gitroom/frontend/components/admin/ai-settings.component';
+import { BrandTab } from '@gitroom/frontend/components/settings/brand/brand.tab';
+import { AITab } from '@gitroom/frontend/components/settings/ai/ai.tab';
+import { MediaProvidersTab } from '@gitroom/frontend/components/settings/media-providers/media-providers.tab';
+import { StorageTab } from '@gitroom/frontend/components/settings/storage/storage.tab';
+import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/channels.tab';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -84,16 +86,28 @@ export const SettingsPopup: FC<{
     close();
   }, []);
 
-  const [tab, setTab] = useState('global_settings');
+  const [tab, setTab] = useState(url.get('tab') || 'settings');
+
+  useEffect(() => {
+    const tabParam = url.get('tab');
+    if (tabParam && tabParam !== tab) {
+      setTab(tabParam);
+    }
+  }, [url, tab]);
 
   const t = useT();
   const list = useMemo(() => {
     const arr = [];
-    arr.push({ tab: 'global_settings', label: t('global_settings', 'Global Settings') });
-    // Populate tabs based on user permissions
+    arr.push({ tab: 'settings', label: t('settings', 'Settings') });
+    arr.push({ tab: 'profile', label: t('profile', 'Profile') });
     if (user?.tier?.team_members && isGeneral) {
       arr.push({ tab: 'teams', label: t('teams', 'Teams') });
     }
+    arr.push({ tab: 'channels', label: t('channels', 'Channels') });
+    arr.push({ tab: 'ai', label: t('ai', 'AI') });
+    arr.push({ tab: 'brand', label: t('brand', 'Brand') });
+    arr.push({ tab: 'media_providers', label: t('media_providers', 'Media') });
+    arr.push({ tab: 'storage', label: t('storage', 'Storage') });
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks') });
     }
@@ -106,23 +120,19 @@ export const SettingsPopup: FC<{
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'signatures', label: t('signatures', 'Signatures') });
     }
-    arr.push({ tab: 'brand_ai', label: t('brand_ai', 'Brand & AI') });
     if (user?.tier?.public_api && isGeneral && showLogout) {
       arr.push({ tab: 'api', label: t('developers', 'Developers') });
     }
     arr.push({ tab: 'approved_apps', label: t('approved_apps', 'Approved Apps') });
 
-    if ((user as any)?.admin) {
-      arr.push({ tab: 'admin_heading', label: '── ' + t('admin', 'Admin') + ' ──' });
-      arr.push({ tab: 'admin_ai', label: t('admin_ai_providers', 'AI Providers') });
-      arr.push({ tab: 'admin_capabilities', label: t('admin_capabilities', 'Provider Capabilities') });
-      arr.push({ tab: 'admin_channels', label: t('admin_channels', 'Channel Config') });
-      arr.push({ tab: 'admin_errors', label: t('admin_errors', 'Error Log') });
-      arr.push({ tab: 'admin_stats', label: t('admin_stats', 'Stats') });
-    }
-
     return arr;
   }, [user, isGeneral, showLogout, t]);
+
+  useEffect(() => {
+    if (list.length > 0 && !list.some((item) => item.tab === tab)) {
+      setTab('settings');
+    }
+  }, [list, tab]);
 
   useEffect(() => {
     loadProfile();
@@ -175,14 +185,56 @@ export const SettingsPopup: FC<{
                 !getRef && 'rounded-[4px]'
               )}
             >
-              {tab === 'global_settings' && (
+              {tab === 'settings' && (
                 <div>
                   <GlobalSettings form={form} isLoading={false} />
                 </div>
               )}
+
+              {tab === 'profile' && (
+                <div>
+                  <Link
+                    href="/settings/profile"
+                    className="text-customColor4 hover:underline text-[14px]"
+                  >
+                    {t('open_profile_settings', 'Open Profile Settings →')}
+                  </Link>
+                </div>
+              )}
+
               {tab === 'teams' && !!user?.tier?.team_members && isGeneral && (
                 <div>
                   <TeamsComponent />
+                </div>
+              )}
+
+              {tab === 'channels' && (
+                <div>
+                  <ChannelsTab />
+                </div>
+              )}
+
+              {tab === 'ai' && (
+                <div>
+                  <AITab />
+                </div>
+              )}
+
+              {tab === 'brand' && (
+                <div>
+                  <BrandTab />
+                </div>
+              )}
+
+              {tab === 'media_providers' && (
+                <div>
+                  <MediaProvidersTab />
+                </div>
+              )}
+
+              {tab === 'storage' && (
+                <div>
+                  <StorageTab />
                 </div>
               )}
 
@@ -210,12 +262,6 @@ export const SettingsPopup: FC<{
                 </div>
               )}
 
-              {tab === 'brand_ai' && (
-                <div>
-                  <BrandAISettings />
-                </div>
-              )}
-
               {tab === 'api' &&
                 !!user?.tier?.public_api &&
                 isGeneral &&
@@ -228,73 +274,6 @@ export const SettingsPopup: FC<{
               {tab === 'approved_apps' && (
                 <div>
                   <ApprovedAppsComponent />
-                </div>
-              )}
-
-              {tab === 'admin_heading' && (user as any)?.admin && (
-                <div>
-                  <h3 className="text-[20px]">{t('admin', 'Administration')}</h3>
-                  <p className="text-textColor/60 text-[13px] mt-[8px]">
-                    {t('admin_description', 'Super admin tools for managing the platform')}
-                  </p>
-                  <div className="grid grid-cols-2 gap-[12px] mt-[16px]">
-                    <Link href="/admin/ai" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
-                      <div className="text-[15px] font-semibold">{t('admin_ai_providers', 'AI Providers')}</div>
-                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_ai_providers_desc', 'Manage AI model providers, governance, and media')}</div>
-                    </Link>
-                    <Link href="/admin/channels" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
-                      <div className="text-[15px] font-semibold">{t('admin_channels', 'Channel Config')}</div>
-                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_channels_desc', 'Configure channel-specific settings and limits')}</div>
-                    </Link>
-                    <Link href="/admin/errors" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
-                      <div className="text-[15px] font-semibold">{t('admin_errors', 'Error Log')}</div>
-                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_errors_desc', 'View and triage platform errors')}</div>
-                    </Link>
-                    <Link href="/admin/stats" className="bg-newBgColor border border-tableBorder rounded-[8px] p-[16px] hover:bg-boxHover transition-colors">
-                      <div className="text-[15px] font-semibold">{t('admin_stats', 'Stats')}</div>
-                      <div className="text-[12px] text-textColor/60 mt-[4px]">{t('admin_stats_desc', 'Platform usage statistics and metrics')}</div>
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              {tab === 'admin_ai' && (user as any)?.admin && (
-                <div>
-                  <AiSettingsAdmin />
-                </div>
-              )}
-
-              {tab === 'admin_capabilities' && (user as any)?.admin && (
-                <div>
-                  <h3 className="text-[20px]">{t('admin_capabilities', 'Provider Capabilities')}</h3>
-                  <ProviderCapabilityMatrix />
-                </div>
-              )}
-
-              {tab === 'admin_channels' && (user as any)?.admin && (
-                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
-                  <p className="text-[14px]">{t('admin_channels_redirect', 'Channel configuration opens in a new view')}</p>
-                  <Link href="/admin/channels" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
-                    {t('open_channel_config', 'Open Channel Config')}
-                  </Link>
-                </div>
-              )}
-
-              {tab === 'admin_errors' && (user as any)?.admin && (
-                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
-                  <p className="text-[14px]">{t('admin_errors_redirect', 'Error log opens in a new view')}</p>
-                  <Link href="/admin/errors" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
-                    {t('open_error_log', 'Open Error Log')}
-                  </Link>
-                </div>
-              )}
-
-              {tab === 'admin_stats' && (user as any)?.admin && (
-                <div className="flex flex-col items-center justify-center h-[400px] text-textColor/60">
-                  <p className="text-[14px]">{t('admin_stats_redirect', 'Stats opens in a new view')}</p>
-                  <Link href="/admin/stats" className="mt-[12px] px-[20px] py-[8px] bg-customColor4 text-white rounded-[8px] text-[13px] hover:opacity-90">
-                    {t('open_stats', 'Open Stats')}
-                  </Link>
                 </div>
               )}
             </div>

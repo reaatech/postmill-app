@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, HttpException } from '@nestjs/common';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { Provider } from '@prisma/client';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
 @Injectable()
 export class UsersService {
@@ -50,5 +51,19 @@ export class UsersService {
 
   updateEmailNotifications(userId: string, body: EmailNotificationsDto) {
     return this._usersRepository.updateEmailNotifications(userId, body);
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this._usersRepository.getUserById(userId);
+
+    if (!user?.password) {
+      throw new HttpException('Password not set for this account', 400);
+    }
+
+    if (!AuthService.comparePassword(currentPassword, user.password)) {
+      throw new HttpException('Current password is incorrect', 400);
+    }
+
+    return this._usersRepository.updatePassword(userId, newPassword);
   }
 }

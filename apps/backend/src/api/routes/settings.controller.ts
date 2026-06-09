@@ -7,6 +7,21 @@ import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.te
 import { ShortlinkPreferenceDto } from '@gitroom/nestjs-libraries/dtos/settings/shortlink-preference.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { IsDefined, IsEmail, IsString, MinLength } from 'class-validator';
+
+class CreateTeamUserDto {
+  @IsDefined()
+  @IsEmail()
+  email!: string;
+
+  @IsDefined()
+  @IsString()
+  @MinLength(6)
+  password!: string;
+
+  @IsString()
+  role: 'USER' | 'ADMIN' = 'USER';
+}
 
 @ApiTags('Settings')
 @Controller('/settings')
@@ -51,6 +66,18 @@ export class SettingsController {
       id,
       role === 'ADMIN' ? 'ADMIN' : 'USER'
     );
+  }
+
+  @Post('/team/create-user')
+  @CheckPolicies(
+    [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
+    [AuthorizationActions.Create, Sections.ADMIN]
+  )
+  async createTeamUser(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: CreateTeamUserDto
+  ) {
+    return this._organizationService.createTeamUser(org.id, body.email, body.password, body.role);
   }
 
   @Delete('/team/:id')

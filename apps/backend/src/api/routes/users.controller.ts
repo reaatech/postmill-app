@@ -25,6 +25,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
+import { ChangePasswordDto } from '@gitroom/nestjs-libraries/dtos/users/change-password.dto';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
@@ -160,6 +161,15 @@ export class UsersController {
     @Body() body: EmailNotificationsDto
   ) {
     return this._userService.updateEmailNotifications(user.id, body);
+  }
+
+  @Post('/change-password')
+  async changePassword(
+    @GetUserFromRequest() user: User,
+    @Body() body: ChangePasswordDto
+  ) {
+    await this._userService.changePassword(user.id, body.currentPassword, body.newPassword);
+    return { success: true };
   }
 
   @Post('/api-key/rotate')
