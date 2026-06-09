@@ -21,6 +21,17 @@ import { ConfigurationChecker } from '@gitroom/helpers/configuration/configurati
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
 import { isDev } from '@gitroom/helpers/utils/is.dev';
 
+// v3.6.0 added BigInt columns (e.g. Organization.localStorageQuotaBytes,
+// StorageProviderConfig.quotaBytes). Express serializes responses with
+// JSON.stringify, which throws on BigInt ("Do not know how to serialize a
+// BigInt") — 500ing every endpoint that returns such an entity (e.g.
+// /user/organizations). Serialize BigInt as a JS number, matching the
+// numeric shape the frontend already expects from storage endpoints.
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+(BigInt.prototype as any).toJSON = function () {
+  return Number(this);
+};
+
 async function start() {
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
