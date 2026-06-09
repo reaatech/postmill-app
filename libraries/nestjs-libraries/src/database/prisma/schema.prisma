@@ -54,6 +54,11 @@ model Organization {
   aiPromptLibraryItems AIPromptLibraryItem[]
   aiContentIndexes    AIContentIndex[]
   multipartUploads    MultipartUpload[]
+  localStorageQuotaBytes BigInt @default(5368709120) // 5 GB default
+  mediaFolders        MediaFolder[]
+  storageProviders    StorageProviderConfig[]
+  orgProviderConfigs  OrgProviderConfiguration[]
+  auditLogs           AuditLog[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -236,6 +241,10 @@ model Media {
   thumbnail          String?
   alt                String?
   thumbnailTimestamp Int?
+  folderId           String?
+  tags               String?    // JSON: string[]
+  description        String?
+  folder             MediaFolder? @relation(fields: [folderId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id])
   agencies           SocialMediaAgency[]
   userPicture        User[]
@@ -244,6 +253,7 @@ model Media {
   @@index([name])
   @@index([organizationId])
   @@index([type])
+  @@index([folderId])
 }
 
 model SocialMediaAgency {
@@ -407,6 +417,8 @@ model PostAnalyticsSnapshot {
   @@index([organizationId, integrationId, date])
 }
 
+// DEPRECATED (v3.6.0): ProviderConfiguration is replaced by OrgProviderConfiguration (above).
+// Keep model for backward-compatible db-push; drop after migration helper runs.
 model ProviderConfiguration {
   id                String   @id @default(cuid())
   identifier        String   @unique
@@ -820,6 +832,101 @@ model Mentions {
   @@index([createdAt])
 }
 
+// ── v3.6.0: MediaFolder for the media manager rebuild ──
+model MediaFolder {
+  id                String        @id @default(uuid())
+  organizationId    String
+  parentId          String?
+  name              String
+  description       String?
+  tags              String?       // JSON: string[]
+  color             String?
+  storageProviderId String?       // foreign key to StorageProviderConfig (mounted cloud root)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  parent            MediaFolder?  @relation("FolderTree", fields: [parentId], references: [id])
+  children          MediaFolder[] @relation("FolderTree")
+  media             Media[]
+  storageProvider   StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
+  organization      Organization  @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([parentId])
+}
+
+// ── v3.6.0: Storage provider config (per-tenant) ──
+enum StorageProviderType {
+  LOCAL
+  S3
+  CLOUDFLARE_R2
+  BACKBLAZE_B2
+  IDRIVE_E2
+}
+
+model StorageProviderConfig {
+  id               String              @id @default(cuid())
+  organizationId   String
+  type             StorageProviderType
+  name             String              // display name (e.g. "My R2 Bucket")
+  credentials      String?             // encrypted JSON; schema varies by type
+  region           String?
+  bucket           String?
+  endpoint         String?             // custom endpoint (R2, B2, IDrive)
+  publicUrl        String?             // base CDN/public URL
+  mounted          Boolean             @default(false)
+  isDefault        Boolean             @default(false) // receives new uploads when multiple providers exist
+  quotaBytes       BigInt?             // null = org default
+  lastHealthCheck  DateTime?           // last successful testConnection
+  lastHealthError  String?             // error message from last failed testConnection
+  defaultFolderId  String?             // default folder for uploads to this provider
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  organization     Organization        @relation(fields: [organizationId], references: [id])
+  folders          MediaFolder[]
+
+  @@index([organizationId])
+  @@index([organizationId, mounted])
+}
+
+// ── v3.6.0: Per-tenant channel provider OAuth credentials (replaces ProviderConfiguration) ──
+model OrgProviderConfiguration {
+  id               String       @id @default(cuid())
+  organizationId   String
+  identifier       String       // 'linkedin', 'x', 'discord', 'slack', etc.
+  name             String       // human readable, e.g. "LinkedIn"
+  enabled          Boolean      @default(false)
+  clientId         String?      // AES-GCM encrypted
+  clientSecret     String?      // AES-GCM encrypted
+  additionalConfig String?      // AES-GCM encrypted JSON (Discord bot token, Slack signing secret, etc.)
+  redirectUri      String?      // if null, platform default is used
+  scopes           String?
+  setupNotes       String?      // per-provider instructions for the admin
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+}
+
+// ── v3.6.0: DB-backed audit log for credential & storage mutations ──
+model AuditLog {
+  id               String   @id @default(cuid())
+  organizationId   String
+  userId           String?
+  action           String   // 'create', 'update', 'delete', 'mount', 'unmount'
+  entity           String   // 'storage_provider', 'channel_provider'
+  entityId         String?  // provider config ID or provider identifier
+  entityName       String?  // display name
+  details          String?  // JSON-encoded context (never credentials)
+  createdAt        DateTime @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([organizationId, entity])
+}
+
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
 model mastra_ai_spans {
   traceId      String
@@ -1030,7 +1137,8 @@ model OAuthAuthorization {
   @@index([revokedAt])
 }
 
-// ── AI Provider Configuration (mirroring ProviderConfiguration pattern) ──
+// DEPRECATED (v3.6.0): AIProviderConfig is replaced by AIOrgProviderConfig (per-tenant, see below).
+// Keep model for backward-compatible db-push; drop after migration helper runs.
 model AIProviderConfig {
   id            String   @id @default(cuid())
   identifier    String   @unique
@@ -1045,7 +1153,8 @@ model AIProviderConfig {
   @@index([enabled])
 }
 
-// Singleton — install-wide active selection + governance toggles
+// DEPRECATED (v3.6.0): Active provider selection is now per-tenant via AIOrgProviderConfig.
+// Kept for scope models, fallback config, telemetry, and governance toggles.
 model AISystemSettings {
   id                   String   @id
   activeProvider       String?
@@ -1090,12 +1199,13 @@ model AISpendLog {
   @@index([userId, createdAt])
 }
 
-// Per-org provider config (BYOK scaffold — v3.4.0 stub, v3.5 active)
+// Per-org provider config (BYOK scaffold — v3.4.0 stub, v3.5 active, v3.6 full)
 model AIOrgProviderConfig {
   id             String       @id @default(cuid())
   organizationId String
   identifier     String
   enabled        Boolean      @default(false)
+  isActive       Boolean      @default(false) // only one can be active per org
   credentials    String?
   defaultModel   String?
   imageModel     String?
@@ -1108,6 +1218,7 @@ model AIOrgProviderConfig {
   @@unique([organizationId, identifier])
   @@index([organizationId])
   @@index([enabled])
+  @@index([organizationId, isActive])
 }
 
 // Per-org brand voice / custom instructions + localization
