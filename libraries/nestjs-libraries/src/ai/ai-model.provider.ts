@@ -6,6 +6,7 @@ import {
   type AICapabilities,
   type AIScope,
 } from './ai-provider.interface';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from './ai-settings.manager';
 import type { LanguageModel } from './ai-provider.interface';
@@ -82,14 +83,17 @@ const CONTEXT_WINDOW_LIMITS: Record<string, number> = {
   'command-r-plus': 128000,
 };
 
+const AI_NOT_CONFIGURED_MESSAGE =
+  'AI is not configured for this organization. Go to Settings → AI to configure a provider.';
+
 @Injectable()
 export class AIModelProvider {
   private readonly _logger = new Logger(AIModelProvider.name);
-  private _warnedMissingOrgId = false;
 
   constructor(
     private readonly _registry: AIProviderRegistry,
     private readonly _aiSettings: AiSettingsService,
+    private readonly _orgAiSettings: OrgAiSettingsService,
     private readonly _aiSettingsManager: AiSettingsManager,
     private readonly _telemetry: TelemetryService,
     private readonly _health: ProviderHealthService,
@@ -99,14 +103,9 @@ export class AIModelProvider {
     private readonly _modelRouter?: ModelRouterService,
     private readonly _circuitBreaker: CircuitBreakerService = new CircuitBreakerService(),
   ) {
-    // Wire the embedding tier of the semantic cache without creating a Nest circular dep.
     this._semanticCache?.setModelProvider(this);
   }
 
-  /**
-   * Quality-based routing (opt-in, off by default). Returns the configured model id unchanged
-   * unless routing is enabled and selects a different candidate. Never throws.
-   */
   private async _routeModel(scope: AIScope, orgId: string | undefined, configuredModel: string): Promise<string> {
     if (!this._modelRouter) return configuredModel;
     try {
@@ -146,93 +145,51 @@ export class AIModelProvider {
   }
 
   private async _resolveConfig(scope: AIScope, _orgId?: string): Promise<ResolvedConfig> {
-    if (!_orgId && !this._warnedMissingOrgId) {
-      this._warnedMissingOrgId = true;
-      this._logger.warn('No orgId provided — org-level spend tracking will be lost');
-    }
     const settings = await this._aiSettingsManager.getSettings();
-
     this._ensureTelemetryConfigured(settings);
 
-    if (!settings || !settings.activeProvider) {
-      return this._envFallback(scope);
+    const orgId = _orgId;
+    if (!orgId) {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
     }
 
-    let adapter = this._registry.getAdapter(settings.activeProvider);
+    const orgActive = await this._orgAiSettings.getActiveProvider(orgId);
+    if (!orgActive) {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
+    }
+
+    const selectedProviderId = orgActive.identifier;
+    let adapter = this._registry.getAdapter(selectedProviderId);
     if (!adapter) {
-      return this._envFallback(scope);
+      throw new Error(
+        `AI provider adapter "${selectedProviderId}" is not registered. ` +
+        `Available providers: ${this._registry.list().map((a) => a.identifier).join(', ')}`,
+      );
     }
 
-    const rawScopedModels = settings.scopeModels;
+    const rawScopedModels = settings?.scopeModels;
     const scopedModels = this._isValidScopedModels(rawScopedModels) ? rawScopedModels : undefined;
-
     const scopeConfig = scopedModels?.[scope];
-    const selectedProviderId = scopeConfig?.provider || settings.activeProvider;
 
-    const providerConfig = await this._aiSettings.getProviderConfigByIdentifier(selectedProviderId);
-
-    let orgOverrideCredentials: Record<string, string> | undefined;
-    let orgOverrideModel: string | undefined;
-    let orgImageModel: string | undefined;
-    if (_orgId) {
-      try {
-        const orgConfigs = await this._aiSettings.getOrgProviderConfigs(_orgId);
-        const matchedOrgConfig = orgConfigs?.find(
-          (o: any) => o.identifier === selectedProviderId && o.enabled !== false,
-        );
-        if (matchedOrgConfig?.enabled) {
-          const decryptedOrg = this._aiSettings.decryptProviderConfig(matchedOrgConfig);
-          if (decryptedOrg?.credentials) {
-            orgOverrideCredentials = decryptedOrg.credentials;
-          }
-          if ((matchedOrgConfig as any).defaultModel) {
-            orgOverrideModel = (matchedOrgConfig as any).defaultModel;
-          }
-          if ((matchedOrgConfig as any).imageModel) {
-            orgImageModel = (matchedOrgConfig as any).imageModel;
-          }
-        }
-      } catch (err) {
-        this._logger.warn(`Failed to resolve org provider config for org ${_orgId}: ${(err as Error).message}`);
-      }
-    }
-
-    const baseModel = orgOverrideModel || scopeConfig?.model || settings.activeModel || providerConfig?.defaultModel || SURFACE_DEFAULTS[scope].textModel;
-    // Quality-based routing (opt-in, off by default) may select a cheaper candidate first.
-    const selectedModel = await this._routeModel(scope, _orgId, baseModel);
-
-    const resolvedAdapter = this._registry.getAdapter(selectedProviderId);
-    if (!resolvedAdapter) {
-      return this._envFallback(scope);
-    }
-
-    if (!providerConfig || providerConfig.enabled === false) {
-      return this._envFallback(scope);
-    }
-
-    adapter = resolvedAdapter;
-    const providerImageModel = providerConfig.imageModel || undefined;
-    const decrypted = this._aiSettings.decryptProviderConfig(providerConfig);
-
-    const creds: Record<string, string> = {
-      ...(decrypted?.credentials || {}),
-      ...(orgOverrideCredentials || {}),
-    };
+    const baseModel = scopeConfig?.model || orgActive.defaultModel || SURFACE_DEFAULTS[scope].textModel;
+    const selectedModel = await this._routeModel(scope, orgId, baseModel);
 
     const resolvedConfig = {
       adapter,
       modelId: selectedModel,
-      creds,
+      creds: orgActive.credentials || {},
       providerId: selectedProviderId,
       defaultSurface: SURFACE_DEFAULTS[scope],
-      providerImageModel,
-      orgImageModel,
+      providerImageModel: undefined as string | undefined,
+      orgImageModel: orgActive.imageModel || undefined,
       settings,
     };
 
-    const hasEnabledProvider = !!providerConfig?.enabled || !!orgOverrideCredentials;
-    if (!hasEnabledProvider || !this._hasRequiredCredentials(resolvedConfig)) {
-      return this._envFallback(scope);
+    if (!this._hasRequiredCredentials(resolvedConfig)) {
+      throw new Error(
+        `AI provider "${selectedProviderId}" is missing required credentials for this organization. ` +
+        `Go to Settings → AI to configure it.`,
+      );
     }
 
     return resolvedConfig;
@@ -266,8 +223,7 @@ export class AIModelProvider {
     let attemptedFallbackProvider: string | null = null;
     try {
       const config = await this._resolveWithRetry(scope, orgId);
-      // Governance rejections (budget/guardrail) are not provider faults — they must
-      // never trip the circuit breaker nor be "retried" against a fallback provider.
+
       const isGovernanceError = (e: unknown) =>
         e instanceof BudgetExceeded || e instanceof GuardrailViolation;
 
@@ -285,51 +241,47 @@ export class AIModelProvider {
           }
         }
       } else {
-        // Breaker OPEN for the primary provider — skip the call and route to fallback.
         primaryErr = new Error(
           `Circuit breaker open for provider "${config.providerId}" — routing to fallback`,
         );
       }
 
-      const settings = config.settings || await this._aiSettingsManager.getSettings();
-      if (settings?.fallbackProvider && settings.fallbackProvider !== config.providerId) {
-        const fallbackAdapter = this._registry.getAdapter(settings.fallbackProvider);
+      const globalSettings = config.settings || await this._aiSettingsManager.getSettings();
+      if (globalSettings?.fallbackProvider && globalSettings.fallbackProvider !== config.providerId) {
+        const fallbackAdapter = this._registry.getAdapter(globalSettings.fallbackProvider);
         if (fallbackAdapter) {
-          const fallbackProviderConfig = await this._aiSettings.getProviderConfigByIdentifier(settings.fallbackProvider);
-          if (fallbackProviderConfig?.enabled === false) {
+          if (!this._circuitBreaker.canAttempt(globalSettings.fallbackProvider)) {
             throw primaryErr;
           }
-          // Don't pile onto a fallback whose own breaker is already open.
-          if (!this._circuitBreaker.canAttempt(settings.fallbackProvider)) {
-            throw primaryErr;
-          }
-          attemptedFallbackProvider = settings.fallbackProvider;
-          const fallbackDecrypted = fallbackProviderConfig
-            ? this._aiSettings.decryptProviderConfig(fallbackProviderConfig)
-            : undefined;
-          const fallbackCreds = fallbackDecrypted?.credentials || await this._resolveFallbackCreds(settings.fallbackProvider);
-          const fallbackRawModels = settings.scopeModels;
+          attemptedFallbackProvider = globalSettings.fallbackProvider;
+
+          const fallbackOrgActive = orgId
+            ? await this._orgAiSettings.getActiveProvider(orgId)
+            : null;
+          const fallbackCreds = fallbackOrgActive?.credentials || {};
+
+          const fallbackRawModels = globalSettings.scopeModels;
           const fallbackScopedModels = this._isValidScopedModels(fallbackRawModels) ? fallbackRawModels : undefined;
           const fallbackScopeConfig = fallbackScopedModels?.[scope];
           const fallbackScopedModel =
-            fallbackScopeConfig?.provider === settings.fallbackProvider
+            fallbackScopeConfig?.provider === globalSettings.fallbackProvider
               ? fallbackScopeConfig.model
               : undefined;
-          const fallbackModel = fallbackScopedModel || fallbackProviderConfig?.defaultModel || SURFACE_DEFAULTS[scope].textModel;
+          const fallbackModel = fallbackScopedModel || fallbackOrgActive?.defaultModel || SURFACE_DEFAULTS[scope].textModel;
           const fallbackConfig: ResolvedConfig = {
             adapter: fallbackAdapter,
             modelId: fallbackModel,
             creds: fallbackCreds,
-            providerId: settings.fallbackProvider,
+            providerId: globalSettings.fallbackProvider,
             defaultSurface: SURFACE_DEFAULTS[scope],
           };
           try {
             const result = await fn(fallbackConfig);
-            this._circuitBreaker.recordSuccess(settings.fallbackProvider);
+            this._circuitBreaker.recordSuccess(globalSettings.fallbackProvider);
             return result;
           } catch (fallbackErr) {
             if (!isGovernanceError(fallbackErr)) {
-              this._circuitBreaker.recordFailure(settings.fallbackProvider);
+              this._circuitBreaker.recordFailure(globalSettings.fallbackProvider);
             }
             if (isGovernanceError(primaryErr)) {
               throw primaryErr;
@@ -349,47 +301,6 @@ export class AIModelProvider {
       }
       throw err;
     }
-  }
-
-  private async _resolveFallbackCreds(providerId: string): Promise<Record<string, string>> {
-    const providerConfig = await this._aiSettings.getProviderConfigByIdentifier(providerId);
-    const decrypted = providerConfig
-      ? this._aiSettings.decryptProviderConfig(providerConfig)
-      : undefined;
-    if (decrypted?.credentials) {
-      return decrypted.credentials;
-    }
-    if (providerId === 'openai' && process.env.OPENAI_API_KEY) {
-      return { apiKey: process.env.OPENAI_API_KEY };
-    }
-    return {};
-  }
-
-  private _envFallback(scope: AIScope): ResolvedConfig {
-    const defaults = SURFACE_DEFAULTS[scope];
-    const adapter = this._registry.getAdapter('openai');
-    const envKey = process.env.OPENAI_API_KEY;
-
-    if (!adapter) {
-      throw new Error(`OpenAI adapter not registered — cannot fall back for ${scope}`);
-    }
-
-    if (!envKey) {
-      throw new Error(
-        `No AI provider configured in admin settings and no OPENAI_API_KEY environment variable set. ` +
-        `Configure an AI provider or set the OPENAI_API_KEY environment variable to use the fallback.`,
-      );
-    }
-
-    // `defaultSurface` is the full SURFACE_DEFAULTS[scope] which includes `imageModel`,
-    // so imageModel() resolves correctly via config.defaultSurface?.imageModel at the call site.
-    return {
-      adapter,
-      modelId: defaults.textModel,
-      creds: { apiKey: envKey },
-      providerId: 'openai',
-      defaultSurface: defaults,
-    };
   }
 
   private _resolveImageModelId(config: ResolvedConfig): string {
@@ -461,21 +372,18 @@ export class AIModelProvider {
           imageModel = config.adapter.createImageModel(config.creds, imageModelId);
         }
         if (!imageModel) {
-          const settings = config.settings || await this._aiSettingsManager.getSettings();
-          const fallbackImageProvider = settings?.fallbackImageProvider;
+          const globalSettings = config.settings || await this._aiSettingsManager.getSettings();
+          const fallbackImageProvider = globalSettings?.fallbackImageProvider;
           if (fallbackImageProvider && fallbackImageProvider !== config.providerId) {
             const fallbackAdapter = this._registry.getAdapter(fallbackImageProvider);
             if (fallbackAdapter?.createImageModel) {
-              const fallbackProviderConfig = await this._aiSettings.getProviderConfigByIdentifier(fallbackImageProvider);
-              if (fallbackProviderConfig?.enabled === false) {
-                throw new CapabilityNotAvailable('Image generation is not available on the current AI provider', 'image');
-              }
-              const fallbackCreds = fallbackProviderConfig
-                ? this._aiSettings.decryptProviderConfig(fallbackProviderConfig).credentials || await this._resolveFallbackCreds(fallbackImageProvider)
-                : await this._resolveFallbackCreds(fallbackImageProvider);
+              const fallbackOrgActive = orgId
+                ? await this._orgAiSettings.getActiveProvider(orgId)
+                : null;
+              const fallbackCreds = fallbackOrgActive?.credentials || {};
               const fallbackModelId =
-                fallbackProviderConfig?.imageModel ||
-                fallbackProviderConfig?.defaultModel ||
+                fallbackOrgActive?.imageModel ||
+                fallbackOrgActive?.defaultModel ||
                 SURFACE_DEFAULTS[scope].imageModel ||
                 imageModelId;
               imageModel = fallbackAdapter.createImageModel(fallbackCreds, fallbackModelId);
@@ -593,14 +501,8 @@ export class AIModelProvider {
     return (inputTokens * pricing.inputPer1K + outputTokens * pricing.outputPer1K) / 1000;
   }
 
-  /**
-   * Extracts the generated text from an AI SDK doGenerate() result. V2 models return a
-   * `content` array of parts ({ type: 'text', text } | reasoning | tool-call | ...); there is
-   * no top-level `result.text`. We concatenate the text parts. The `typeof result.text` guard
-   * tolerates V1-shaped adapters and test stubs that still return a top-level `text`.
-   */
   private _extractText(result: any): string {
-    if (typeof result?.text === 'string') return result.text; // tolerate V1-shaped mocks
+    if (typeof result?.text === 'string') return result.text;
     const parts = Array.isArray(result?.content) ? result.content : [];
     return parts
       .filter((p: any) => p?.type === 'text' && typeof p.text === 'string')
@@ -610,10 +512,8 @@ export class AIModelProvider {
 
   private async _recordUsage(args: {
     usage?: {
-      // AI SDK V2 usage fields
       inputTokens?: number;
       outputTokens?: number;
-      // AI SDK V1 usage fields (tolerated for back-compat / test stubs)
       promptTokens?: number;
       completionTokens?: number;
     };
@@ -626,7 +526,6 @@ export class AIModelProvider {
   }) {
     if (!args.usage) return;
 
-    // Read V2 fields first; fall back to V1 names for older adapters / mocks.
     const promptTokens = args.usage.inputTokens ?? args.usage.promptTokens ?? 0;
     const completionTokens = args.usage.outputTokens ?? args.usage.completionTokens ?? 0;
     args.span.setAttribute(TelemetryService.ATTR_GEN_AI_USAGE_INPUT_TOKENS, promptTokens);
@@ -706,8 +605,6 @@ export class AIModelProvider {
   ): Promise<string> {
     const { checkedPrompt, brand, effectiveSystem } = await this._prepareGeneration(scope, prompt, options);
 
-    // Semantic response cache (opt-in, off by default). Keyed per org + scope; the system
-    // prompt and brand voice are folded into the cache key so different framing never collides.
     const cacheKeyPrompt = this._buildCacheKeyPrompt(prompt, effectiveSystem, brand);
     if (this._semanticCache) {
       const cached = await this._semanticCache.get(options?.orgId, scope, cacheKeyPrompt);
@@ -764,7 +661,6 @@ export class AIModelProvider {
       options?.orgId,
     );
 
-    // Populate the cache after a successful generation (no-op when disabled).
     if (this._semanticCache && typeof generated === 'string' && generated.length > 0) {
       await this._semanticCache.set(options?.orgId, scope, cacheKeyPrompt, generated);
     }
@@ -772,10 +668,6 @@ export class AIModelProvider {
     return generated;
   }
 
-  /**
-   * Builds the prompt string used as the semantic-cache key input. Folds in the effective
-   * system prompt and brand voice so different framing of the same user prompt never collides.
-   */
   private _buildCacheKeyPrompt(
     prompt: string,
     effectiveSystem: string | undefined,
@@ -871,26 +763,15 @@ export class AIModelProvider {
     );
   }
 
-  /**
-   * Resolves the active provider ID for a given scope and org.
-   * Returns the adapter identifier (e.g. 'openai', 'anthropic').
-   * Falls back to 'openai' when no config is available (env-based fallback).
-   */
   async resolveProviderId(scope: AIScope, orgId?: string): Promise<string> {
     try {
       const config = await this._resolveConfig(scope, orgId);
       return config.providerId;
     } catch {
-      return 'openai';
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
     }
   }
 
-  /**
-   * Resolves the full AI config for a scope and org without creating a model instance.
-   * Returns null when no configuration is available (no admin config AND no OPENAI_API_KEY).
-   * This delegates to the private `_resolveConfig` which is the single source of truth
-   * for model/provider resolution, including per-org BYOK overrides.
-   */
   async resolveConfigForScope(scope: AIScope, orgId?: string): Promise<ResolvedConfig | null> {
     try {
       return await this._resolveConfig(scope, orgId);
@@ -900,21 +781,11 @@ export class AIModelProvider {
     }
   }
 
-  /**
-   * Checks whether the adapter registered under `adapterId` declares the given capability.
-   * This is adapter-level only — a specific model may support features (e.g. image generation)
-   * even if the adapter's static capability flags don't reflect it, or vice versa.
-   */
   hasCapability(adapterId: string, capability: keyof AICapabilities): boolean {
     const caps = this._registry.capabilitiesFor(adapterId);
     return caps?.[capability] === true;
   }
 
-  /**
-   * Checks whether a specific model on the given adapter declares the given capability.
-   * Returns `null` when the model is not found in the adapter's model list (caller
-   * should fall back to adapter-level capabilities if desired).
-   */
   async modelHasCapability(
     adapterId: string,
     modelId: string,

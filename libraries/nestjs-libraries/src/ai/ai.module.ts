@@ -1,4 +1,4 @@
-import { Module, Global, OnModuleInit, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module, Global, OnModuleInit, NestModule, MiddlewareConsumer, RequestMethod, Logger } from '@nestjs/common';
 import { AIProviderRegistry } from './ai-provider.registry';
 import { OpenAIAdapter } from './adapters/openai.adapter';
 import { OpenAICompatibleAdapter } from './adapters/openai-compatible.adapter';
@@ -31,6 +31,8 @@ import { ModelRouterService } from './governance/model-router.service';
 import { CircuitBreakerService } from './governance/circuit-breaker.service';
 import { ToolFirewallService } from './governance/tool-firewall.service';
 import { IdempotencyFactory } from './governance/idempotency.factory';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 
 @Global()
 @Module({
@@ -66,6 +68,8 @@ import { IdempotencyFactory } from './governance/idempotency.factory';
     CircuitBreakerService,
     ToolFirewallService,
     IdempotencyFactory,
+    OrgAiSettingsService,
+    OrgAiSettingsRepository,
   ],
   exports: [
     AIProviderRegistry,
@@ -82,9 +86,13 @@ import { IdempotencyFactory } from './governance/idempotency.factory';
     CircuitBreakerService,
     ToolFirewallService,
     IdempotencyFactory,
+    OrgAiSettingsService,
+    OrgAiSettingsRepository,
   ],
 })
 export class AiModule implements OnModuleInit, NestModule {
+  private readonly _logger = new Logger(AiModule.name);
+
   constructor(
     private readonly _registry: AIProviderRegistry,
   ) {}
@@ -104,6 +112,15 @@ export class AiModule implements OnModuleInit, NestModule {
   }
 
   onModuleInit() {
+    if (process.env.OPENAI_API_KEY) {
+      this._logger.warn(
+        'DEPRECATION: OPENAI_API_KEY environment variable is deprecated. ' +
+        'AI provider config is now per-tenant via the database. ' +
+        'Go to Settings → AI in each organization to configure a provider. ' +
+        'The OPENAI_API_KEY env var will be ignored for model resolution starting in v3.6.0.',
+      );
+    }
+
     this._registry.register(new OpenAIAdapter());
     this._registry.register(new GatewayAdapter());
     this._registry.register(new OpenRouterAdapter());

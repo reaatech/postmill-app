@@ -43,11 +43,9 @@ export interface AiSettingsResult {
 @Injectable()
 export class AiSettingsManager implements OnModuleInit {
   private readonly _logger = new Logger(AiSettingsManager.name);
-  // Cache stores the RAW (encrypted) settings from the repository.
-  // Decryption happens at access time in getSettings().
   private cache: CachedSettings | null = null;
   private lastRefresh = 0;
-  private refreshIntervalMs = 60_000;
+  private readonly refreshIntervalMs = 60_000;
   private refreshPromise: Promise<void> | null = null;
 
   constructor(private _aiSettingsService: AiSettingsService) {}
@@ -71,8 +69,6 @@ export class AiSettingsManager implements OnModuleInit {
   }
 
   async #doRefresh() {
-    // Store the raw encrypted settings from the repository — do NOT decrypt here.
-    // Decryption is deferred to getSettings() at access time (review11 #5).
     const settings = await this._aiSettingsService.getSystemSettings();
     this.cache = settings;
     this.lastRefresh = Date.now();
@@ -92,7 +88,6 @@ export class AiSettingsManager implements OnModuleInit {
     await this.ensureFresh();
     if (!this.cache) return null;
 
-    // Decrypt cached raw (encrypted) settings in-memory — no DB call.
     const settings = this.cache;
     let secretSettings: Record<string, string> | undefined;
     if (settings.secretSettings) {
@@ -105,7 +100,6 @@ export class AiSettingsManager implements OnModuleInit {
       }
     }
 
-    // Parse all JSON blob fields
     const parsed: any = { ...settings, secretSettings };
     for (const field of ['scopeModels', 'guardrailSettings', 'budgetSettings', 'rateLimitSettings', 'observability', 'mcpSettings', 'ragSettings', 'cacheSettings', 'routingSettings']) {
       if (typeof parsed[field] === 'string') {
@@ -121,18 +115,16 @@ export class AiSettingsManager implements OnModuleInit {
   }
 
   /**
-   * Sync check — fires ensureFresh() in the background to trigger a cache refresh,
-   * but returns the current (possibly stale) result immediately without awaiting it.
-   * Use hasActiveConfigAsync() for a guaranteed up-to-date answer.
+   * Checks whether at least one org has configured an active AI provider
+   * (or if global settings still have an activeProvider from a previous admin setup).
    */
   hasActiveConfig(): boolean {
-    // Fire-and-forget: triggers background refresh but returns current (possibly stale) state
     this.ensureFresh().catch(() => {});
-    return !!(this.cache?.activeProvider || process.env.OPENAI_API_KEY);
+    return !!(this.cache?.activeProvider);
   }
 
   async hasActiveConfigAsync(): Promise<boolean> {
     await this.ensureFresh();
-    return !!(this.cache?.activeProvider || process.env.OPENAI_API_KEY);
+    return !!(this.cache?.activeProvider);
   }
 }

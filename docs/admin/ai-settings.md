@@ -1,25 +1,17 @@
 # AI Settings Admin
 
-The AI layer is an admin-configurable, governed, multi-provider system. A **super-admin** configures
-it in the web UI at **`/admin/ai`**, with provider keys encrypted at rest. This replaces the single
-hardcoded OpenAI integration from upstream.
+The AI layer is a governed, multi-provider system configured per-tenant in **Settings → AI**, with
+provider keys encrypted at rest. This replaces the single hardcoded OpenAI integration from upstream.
 
-> **Verified against v3.5.9.** Introduced in v3.4.0.
-> UI route: `/admin/ai` · API route: `/admin/ai-settings` (super-admin only).
+> **Verified against v3.6.0.** Introduced in v3.4.0; converted to per-tenant config in v3.6.0.
+> UI route: `/settings/ai` · API route: `/settings/ai` (org-scoped).
 
 ---
 
-## The one thing to know first: it's optional
-
-> **Backward compatibility:** with **no** admin AI configuration, every AI surface behaves exactly
-> like today's `OPENAI_API_KEY` path — byte for byte. Setting the active provider to none reverts
-> all AI features to the environment-variable fallback. You only need this screen if you want to use
-> a non-OpenAI provider, per-scope models, or governance.
-
 ## Access
 
-Only `isSuperAdmin` users can view or change AI settings; every `/admin/ai-settings` endpoint
-enforces it.
+Any organization admin can configure AI settings for their org in **Settings → AI**. Super-admins
+can set a global fallback provider that applies to orgs without their own config.
 
 ## Providers & models
 
@@ -42,11 +34,11 @@ From the admin screen you can:
 When any AI surface needs a model, a single facade resolves it in this order of precedence:
 
 ```
-per-org (BYOK)  →  per-scope model  →  global active provider  →  provider default  →  env OPENAI_API_KEY
+per-org config  →  per-scope model  →  global active provider  →  provider default
 ```
 
-This means the four AI surfaces — utility text/image generation, the `/agents` generator, the chat
-assistant, and the composer assistant — all pick up provider changes without a redeploy.
+The four AI surfaces — utility text/image generation, the `/agents` generator, the chat assistant,
+and the composer assistant — all pick up provider changes without a redeploy.
 
 ## Governance
 
@@ -76,8 +68,8 @@ inpaint are **stubbed** (video falls back to image) pending a later phase — do
 Brand profiles and a content index underpin retrieval-augmented generation and brand-specific
 context injection. This is a foundation/scaffold in v3.4.0 — present but not the primary path yet.
 
-## Relationship to the env fallback
+## Org-level override
 
-Even with the admin system configured, if resolution falls all the way through (no per-org,
-per-scope, active, or default match), the facade uses `OPENAI_API_KEY`. Keeping that variable set is
-a safe backstop. See [Configuration](../self-hosting/configuration.md).
+Orgs can override the global active provider in **Settings → AI**. If no org-level config exists,
+the global active provider (set by a super-admin) applies. If no global provider is set, the
+provider default model is used. `OPENAI_API_KEY` is no longer a fallback in v3.6.0.

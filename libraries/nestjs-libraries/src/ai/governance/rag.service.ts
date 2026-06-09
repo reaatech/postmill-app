@@ -5,17 +5,21 @@ import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-ra
 import { AIModelProvider } from '../ai-model.provider';
 import { AiSettingsManager } from '../ai-settings.manager';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { PgVectorStoreAdapter } from '../rag/pgvector.adapter';
+import { QdrantVectorStoreAdapter } from '../rag/qdrant.adapter';
+import { VectorStoreAdapter } from '../rag/vector-store.adapter';
 
-interface RagSettings {
+export interface RagSettings {
   enabled: boolean;
   embeddingDimension?: number;
   chunkSize?: number;
   chunkOverlap?: number;
-  // §3.6 / §12 #25 — pluggable vector store. Default 'pgvector' (no new infra).
+  // Pluggable vector store via hybrid-rag adapter architecture.
   vectorStore?: 'pgvector' | 'qdrant';
   qdrantUrl?: string;
   qdrantCollection?: string;
   qdrantApiKey?: string;
+  distance?: 'Cosine' | 'Euclid' | 'Dot';
 }
 
 const DEFAULT_EMBEDDING_DIMENSION = 1536;
@@ -31,81 +35,6 @@ interface RagHit {
   score: number;
 }
 
-// §3.6 / §12 #25 — Qdrant store adapter (alternative to pgvector for installs that
-// can't CREATE EXTENSION). Wraps @reaatech/hybrid-rag-qdrant's QdrantClientWrapper.
-// Org-scoping is enforced by a mandatory `filter: { organizationId }` on every search
-// and an organizationId in every point payload — the same invariant pgvector enforces
-// with `WHERE "organizationId" = $org`.
-class QdrantVectorStore {
-  private _client: any | null = null;
-
-  constructor(
-    private _cfg: { url: string; apiKey?: string; collection: string; dimension: number },
-  ) {}
-
-  private async _getClient(): Promise<any> {
-    if (this._client) return this._client;
-    const { QdrantClientWrapper } = await import('@reaatech/hybrid-rag-qdrant');
-    this._client = new QdrantClientWrapper({
-      url: this._cfg.url,
-      apiKey: this._cfg.apiKey,
-      collectionName: this._cfg.collection,
-      vectorSize: this._cfg.dimension,
-      distance: 'Cosine',
-    });
-    await this._client.initialize();
-    return this._client;
-  }
-
-  async probe(): Promise<boolean> {
-    try {
-      const client = await this._getClient();
-      return await client.healthCheck();
-    } catch {
-      return false;
-    }
-  }
-
-  async upsert(
-    organizationId: string,
-    points: { id: string; vector: number[]; text: string; sourceType: string; sourceId: string }[],
-  ): Promise<void> {
-    if (points.length === 0) return;
-    const client = await this._getClient();
-    await client.upsertBatch(
-      points.map((p) => ({
-        id: p.id,
-        vector: p.vector,
-        // organizationId is part of the payload so the search filter can enforce isolation.
-        payload: {
-          organizationId,
-          text: p.text,
-          sourceType: p.sourceType,
-          sourceId: p.sourceId,
-        },
-      })),
-    );
-  }
-
-  async search(organizationId: string, vector: number[], limit: number): Promise<RagHit[]> {
-    const client = await this._getClient();
-    // MANDATORY org filter — never query without it (multi-tenant isolation).
-    const results: any[] = await client.search({
-      vector,
-      topK: limit,
-      filter: { organizationId },
-    });
-    return (results || [])
-      .filter((r) => r?.metadata?.organizationId === organizationId)
-      .map((r) => ({
-        text: String(r?.content ?? r?.metadata?.text ?? ''),
-        sourceType: String(r?.metadata?.sourceType ?? ''),
-        sourceId: String(r?.metadata?.sourceId ?? ''),
-        score: typeof r?.score === 'number' ? r.score : 0,
-      }));
-  }
-}
-
 @Injectable()
 export class RagService implements OnModuleInit {
   private _logger = new Logger(RagService.name);
@@ -117,6 +46,7 @@ export class RagService implements OnModuleInit {
     private _aiRagRepository: AiRagRepository,
     private _aiModelProvider: AIModelProvider,
     private _aiSettingsManager: AiSettingsManager,
+    private _pgVectorAdapter: PgVectorStoreAdapter,
   ) {}
 
   private _ragSettingsCache: { value: RagSettings; expiry: number } | null = null;
@@ -274,10 +204,8 @@ export class RagService implements OnModuleInit {
     userId?: string,
   ): Promise<void> {
     const store = await this._resolveStore();
-    const useQdrant = store.kind === 'qdrant' && !!store.qdrant;
+    const useQdrant = store.kind === 'qdrant';
 
-    // For qdrant the embedding goes to Qdrant; for pgvector it goes to the side table.
-    // Either way we still write AIContentIndex chunk rows (BM25 / hybrid fusion arm).
     const { pgvectorAvailable } = useQdrant
       ? { pgvectorAvailable: false }
       : await this._ensureSideTable();
@@ -298,9 +226,7 @@ export class RagService implements OnModuleInit {
       formatVector: (arr) => this._formatVector(arr),
     });
 
-    // Qdrant upsert happens after the Prisma transaction commits (Qdrant is not part of
-    // the DB transaction). Org id is on every point payload for isolation.
-    if (useQdrant && store.qdrant && embeddings.length === created.length) {
+    if (useQdrant && embeddings.length === created.length) {
       const points = created
         .map((idx, i) => ({
           id: idx.id,
@@ -310,7 +236,7 @@ export class RagService implements OnModuleInit {
           sourceId,
         }))
         .filter((p) => Array.isArray(p.vector) && p.vector.length > 0);
-      await store.qdrant.upsert(organizationId, points as any);
+      await store.adapter.upsertBatch(organizationId, points);
     }
 
     this._logger.log(
@@ -394,37 +320,39 @@ export class RagService implements OnModuleInit {
     return '[' + arr.join(',') + ']';
   }
 
-  private _qdrantStore: QdrantVectorStore | null = null;
+  private _qdrantAdapter: QdrantVectorStoreAdapter | null = null;
   private _qdrantProbed: boolean | null = null;
 
-  // Returns the effective store: 'qdrant' only when selected AND reachable; otherwise
-  // 'pgvector'. A qdrant selection that fails its probe degrades to pgvector/text rather
-  // than crashing (capability-probe, §3.6).
-  private async _resolveStore(): Promise<{ kind: 'pgvector' | 'qdrant'; qdrant?: QdrantVectorStore }> {
+  private _buildQdrantAdapter(rag: RagSettings): QdrantVectorStoreAdapter {
+    return new QdrantVectorStoreAdapter({
+      url: rag.qdrantUrl || '',
+      apiKey: rag.qdrantApiKey,
+      collectionName: rag.qdrantCollection || 'postiz_rag',
+      dimension: rag.embeddingDimension || DEFAULT_EMBEDDING_DIMENSION,
+      distance: rag.distance || 'Cosine',
+    });
+  }
+
+  private async _resolveStore(): Promise<{ kind: 'pgvector' | 'qdrant'; adapter: VectorStoreAdapter }> {
     const rag = await this._getRagSettings();
     if (rag.vectorStore !== 'qdrant' || !rag.qdrantUrl) {
-      return { kind: 'pgvector' };
+      return { kind: 'pgvector', adapter: this._pgVectorAdapter };
     }
     try {
-      if (!this._qdrantStore) {
-        this._qdrantStore = new QdrantVectorStore({
-          url: rag.qdrantUrl,
-          apiKey: rag.qdrantApiKey,
-          collection: rag.qdrantCollection || 'postiz_rag',
-          dimension: await this._getEmbeddingDimension(),
-        });
+      if (!this._qdrantAdapter) {
+        this._qdrantAdapter = this._buildQdrantAdapter(rag);
       }
       if (this._qdrantProbed === null) {
-        this._qdrantProbed = await this._qdrantStore.probe();
+        this._qdrantProbed = await this._qdrantAdapter.probe();
       }
       if (this._qdrantProbed) {
-        return { kind: 'qdrant', qdrant: this._qdrantStore };
+        return { kind: 'qdrant', adapter: this._qdrantAdapter };
       }
       this._logger.warn('Qdrant selected but unreachable — falling back to pgvector/text');
     } catch (err) {
       this._logger.warn('Qdrant store resolution failed: ' + (err as Error).message);
     }
-    return { kind: 'pgvector' };
+    return { kind: 'pgvector', adapter: this._pgVectorAdapter };
   }
 
   // §3.6 — BM25 (Okapi) arm fused with the vector arm via reciprocal-rank fusion
@@ -491,12 +419,11 @@ export class RagService implements OnModuleInit {
 
     const store = await this._resolveStore();
 
-    // Qdrant store path (org-scoped via mandatory payload filter).
-    if (store.kind === 'qdrant' && store.qdrant) {
+    if (store.kind === 'qdrant') {
       try {
         const embeddings = await this._computeEmbeddings([params.query], params.organizationId);
         if (embeddings.length && embeddings[0]?.length) {
-          const vectorHits = await store.qdrant.search(params.organizationId, embeddings[0], limit);
+          const vectorHits = await store.adapter.search(params.organizationId, embeddings[0], limit);
           const fused = await this._bm25Fuse(params.organizationId, params.query, vectorHits, limit);
           return fused ?? vectorHits;
         }
@@ -620,6 +547,28 @@ export class RagService implements OnModuleInit {
 
     await this._doIndex(organizationId, sourceType, sourceId, chunks, contentHash, 'backfill', userId);
     return 1;
+  }
+
+  async testConnection(settings: RagSettings): Promise<{ ok: boolean; error?: string }> {
+    if (settings.vectorStore === 'qdrant') {
+      if (!settings.qdrantUrl) {
+        return { ok: false, error: 'Qdrant URL is required' };
+      }
+      try {
+        const adapter = this._buildQdrantAdapter(settings);
+        const ok = await adapter.probe();
+        return ok
+          ? { ok: true }
+          : { ok: false, error: 'Qdrant endpoint unreachable' };
+      } catch (err) {
+        return { ok: false, error: (err as Error).message };
+      }
+    }
+
+    const ok = await this._pgVectorAdapter.probe();
+    return ok
+      ? { ok: true }
+      : { ok: false, error: 'pgvector extension is not available in PostgreSQL' };
   }
 
   async onModuleInit(): Promise<void> {
@@ -762,5 +711,107 @@ export class RagService implements OnModuleInit {
     return allResults
       .filter((r) => r.sourceType === 'brand_memory')
       .slice(0, limit);
+  }
+
+  async getStatus(organizationId: string): Promise<{
+    enabled: boolean;
+    indexedItems: number;
+    lastIndexed: string | null;
+    embeddingModel: string;
+    vectorStore: string;
+  }> {
+    if (!organizationId) {
+      throw new Error('getStatus requires a valid organizationId');
+    }
+
+    const enabled = await this._isRagEnabled();
+
+    let indexedItems = 0;
+    let lastIndexed: string | null = null;
+    if (enabled) {
+      const entries = await this._aiRagRepository.getOrgContentIndexEntries(organizationId);
+      indexedItems = entries.length;
+      if (entries.length > 0) {
+        lastIndexed = entries.reduce((latest, e) =>
+          new Date(e.updatedAt) > new Date(latest.updatedAt) ? e : latest,
+        ).updatedAt.toISOString();
+      }
+    }
+
+    const settings = await this._aiSettingsManager.getSettings();
+    const rag = settings?.ragSettings as any;
+    const scopeModels = settings?.scopeModels as any;
+    const utilityModel = scopeModels?.utility;
+    const activeProvider = settings?.activeProvider || 'openai';
+    const activeModel =
+      rag?.embeddingModel ||
+      utilityModel?.model ||
+      settings?.activeModel ||
+      'text-embedding-3-small';
+
+    return {
+      enabled,
+      indexedItems,
+      lastIndexed,
+      embeddingModel: `${activeProvider}/${activeModel}`,
+      vectorStore: rag?.vectorStore || 'pgvector',
+    };
+  }
+
+  async getItems(
+    organizationId: string,
+    params: { sourceType?: string; limit?: number; offset?: number },
+  ): Promise<{
+    items: Array<{ sourceId: string; sourceType: string; indexedDate: string; chunkCount: number; charCount: number }>;
+    total: number;
+    offset: number;
+    limit: number;
+  }> {
+    if (!organizationId) {
+      throw new Error('getItems requires a valid organizationId');
+    }
+
+    const parsedOffset = Math.max(0, params.offset ?? 0);
+    const parsedLimit = Math.min(100, Math.max(1, params.limit ?? 20));
+
+    const entries = await this._aiRagRepository.getOrgContentIndexEntries(organizationId);
+
+    const filtered = params.sourceType
+      ? entries.filter((e) => e.sourceType === params.sourceType)
+      : entries;
+
+    const grouped = new Map<
+      string,
+      { sourceId: string; sourceType: string; indexedDate: string; chunkCount: number; charCount: number }
+    >();
+
+    for (const entry of filtered) {
+      const key = `${entry.sourceType}:${entry.sourceId}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          sourceId: entry.sourceId,
+          sourceType: entry.sourceType,
+          indexedDate: entry.createdAt.toISOString(),
+          chunkCount: 0,
+          charCount: 0,
+        });
+      }
+      const group = grouped.get(key)!;
+      group.chunkCount++;
+      group.charCount += entry.chunk?.length || 0;
+      if (new Date(entry.createdAt) > new Date(group.indexedDate)) {
+        group.indexedDate = entry.createdAt.toISOString();
+      }
+    }
+
+    const items = Array.from(grouped.values());
+    const total = items.length;
+    const paged = items.slice(parsedOffset, parsedOffset + parsedLimit);
+
+    return { items: paged, total, offset: parsedOffset, limit: parsedLimit };
+  }
+
+  async deleteItem(organizationId: string, sourceType: string, sourceId: string): Promise<void> {
+    await this._aiRagRepository.deleteContentIndexEntries(organizationId, sourceType, sourceId);
   }
 }

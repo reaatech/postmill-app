@@ -1,0 +1,886 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import useSWR from 'swr';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { Slider } from '@gitroom/react/form/slider';
+
+interface RagStatus {
+  enabled: boolean;
+  indexedItems: number;
+  lastIndexed: string | null;
+  embeddingModel: string;
+  vectorStore: string;
+}
+
+interface RagItem {
+  sourceId: string;
+  sourceType: string;
+  indexedDate: string;
+  chunkCount: number;
+  charCount: number;
+}
+
+interface RagItemsResponse {
+  items: RagItem[];
+  total: number;
+  offset: number;
+  limit: number;
+}
+
+interface RagSearchHit {
+  text: string;
+  sourceType: string;
+  sourceId: string;
+  score: number;
+}
+
+const useRagStatus = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/rag/status');
+    if (!res.ok) return { enabled: false, indexedItems: 0, lastIndexed: null, embeddingModel: '', vectorStore: 'pgvector' };
+    return res.json();
+  }, [fetch]);
+  return useSWR<RagStatus>('rag-status', load, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+  });
+};
+
+const useRagItems = (sourceType?: string, offset = 0, limit = 20) => {
+  const fetch = useFetch();
+  const paramsStr = React.useMemo(() => {
+    const params = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+    if (sourceType) params.set('sourceType', sourceType);
+    return params.toString();
+  }, [sourceType, offset, limit]);
+  const load = useCallback(async () => {
+    const res = await fetch(`/rag/items?${paramsStr}`);
+    if (!res.ok) return { items: [], total: 0, offset, limit };
+    return res.json();
+  }, [fetch, paramsStr, offset, limit]);
+  return useSWR<RagItemsResponse>(`rag-items-${paramsStr}`, load, {
+    revalidateOnFocus: false,
+  });
+};
+
+export const KnowledgeBase = () => {
+  const t = useT();
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const { data: status, isLoading: statusLoading, mutate: mutateStatus } = useRagStatus();
+  const [itemsPage, setItemsPage] = useState(0);
+  const { data: itemsData, isLoading: itemsLoading, mutate: mutateItems } = useRagItems(undefined, itemsPage * 20, 20);
+
+  const [showAddContent, setShowAddContent] = useState(false);
+  const [addSourceType, setAddSourceType] = useState<'text' | 'url' | 'file'>('text');
+  const [addContent, setAddContent] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<RagSearchHit[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  const [backfilling, setBackfilling] = useState(false);
+
+  const [vectorStore, setVectorStore] = useState('pgvector');
+  const [qdrantUrl, setQdrantUrl] = useState('');
+  const [qdrantApiKey, setQdrantApiKey] = useState('');
+  const [qdrantCollection, setQdrantCollection] = useState('postiz_rag');
+  const [distance, setDistance] = useState('Cosine');
+  const [embeddingDimension, setEmbeddingDimension] = useState(1536);
+  const [chunkStrategy, setChunkStrategy] = useState('fixed-size');
+  const [chunkSize, setChunkSize] = useState(500);
+  const [chunkOverlap, setChunkOverlap] = useState(100);
+  const [fusionStrategy, setFusionStrategy] = useState('rrf');
+  const [rrfK, setRrfK] = useState(60);
+  const [vectorWeight, setVectorWeight] = useState(0.5);
+  const [bm25Weight, setBm25Weight] = useState(0.5);
+  const [bm25K1, setBm25K1] = useState(1.2);
+  const [bm25B, setBm25B] = useState(0.75);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [autoIndex, setAutoIndex] = useState(false);
+  const [autoIndexSources, setAutoIndexSources] = useState<string[]>([]);
+  const [newAutoIndexSource, setNewAutoIndexSource] = useState('');
+  const [vecSaving, setVecSaving] = useState(false);
+  const [vecTesting, setVecTesting] = useState(false);
+  const [vecTestResult, setVecTestResult] = useState<{ ok: boolean; error?: string } | null>(null);
+  const loadVecSettings = useCallback(async () => {
+    const res = await fetch('/rag/settings');
+    if (!res.ok) return;
+    const data = await res.json();
+    setVectorStore(data.vectorStore || 'pgvector');
+    setQdrantUrl(data.qdrantUrl || '');
+    setQdrantCollection(data.qdrantCollection || 'postiz_rag');
+    setDistance(data.distance || 'Cosine');
+    setEmbeddingDimension(data.embeddingDimension || 1536);
+    setChunkStrategy(data.chunkStrategy || 'fixed-size');
+    setChunkSize(data.chunkSize || 500);
+    setChunkOverlap(data.chunkOverlap || 100);
+    setFusionStrategy(data.fusionStrategy || 'rrf');
+    setRrfK(data.rrfK || 60);
+    setVectorWeight(data.vectorWeight ?? 0.5);
+    setBm25Weight(data.bm25Weight ?? 0.5);
+    setBm25K1(data.bm25K1 ?? 1.2);
+    setBm25B(data.bm25B ?? 0.75);
+    setAutoIndex(!!data.autoIndex);
+    setAutoIndexSources(Array.isArray(data.autoIndexSources) ? data.autoIndexSources : []);
+  }, [fetch]);
+  useEffect(() => { loadVecSettings(); }, [loadVecSettings]);
+  const handleSaveVecSettings = useCallback(async () => {
+    setVecSaving(true);
+    try {
+      const res = await fetch('/rag/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          vectorStore,
+          qdrantUrl: vectorStore === 'qdrant' ? qdrantUrl : undefined,
+          qdrantApiKey: vectorStore === 'qdrant' && qdrantApiKey ? qdrantApiKey : undefined,
+          qdrantCollection: vectorStore === 'qdrant' ? qdrantCollection : undefined,
+          distance: vectorStore === 'qdrant' ? distance : undefined,
+          embeddingDimension,
+          chunkStrategy,
+          chunkSize,
+          chunkOverlap,
+          fusionStrategy,
+          rrfK: fusionStrategy === 'rrf' ? rrfK : undefined,
+          vectorWeight: fusionStrategy === 'weighted-sum' ? vectorWeight : undefined,
+          bm25Weight: fusionStrategy === 'weighted-sum' ? bm25Weight : undefined,
+      bm25K1,
+      bm25B,
+      autoIndex,
+      autoIndexSources,
+    }),
+      });
+      if (!res.ok) {
+        toaster.show('Failed to save vector store settings', 'warning');
+        return;
+      }
+      toaster.show(t('vec_settings_saved', 'Vector store settings saved'), 'success');
+      mutateStatus();
+    } catch {
+      toaster.show('Failed to save vector store settings', 'warning');
+    } finally {
+      setVecSaving(false);
+    }
+  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, distance, embeddingDimension, chunkStrategy, chunkSize, chunkOverlap, fusionStrategy, rrfK, vectorWeight, bm25Weight, bm25K1, bm25B, autoIndex, autoIndexSources, toaster, t, mutateStatus]);
+  const handleTestConnection = useCallback(async () => {
+    setVecTesting(true);
+    setVecTestResult(null);
+    try {
+      const res = await fetch('/rag/settings/test-connection', {
+        method: 'POST',
+        body: JSON.stringify({
+          vectorStore,
+          qdrantUrl: vectorStore === 'qdrant' ? qdrantUrl : undefined,
+          qdrantApiKey: vectorStore === 'qdrant' && qdrantApiKey ? qdrantApiKey : undefined,
+          qdrantCollection: vectorStore === 'qdrant' ? qdrantCollection : undefined,
+          embeddingDimension,
+        }),
+      });
+      const data = await res.json();
+      setVecTestResult(data);
+    } catch {
+      setVecTestResult({ ok: false, error: 'Connection test failed' });
+    } finally {
+      setVecTesting(false);
+    }
+  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, embeddingDimension]);
+
+  const handleAddContent = useCallback(async () => {
+    if (!addContent.trim()) return;
+    setAdding(true);
+    try {
+      const res = await fetch('/rag/index', {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceType: addSourceType,
+          content: addContent.trim(),
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        toaster.show(err.message || 'Failed to index content', 'warning');
+        return;
+      }
+      toaster.show(t('content_indexed', 'Content indexed successfully'), 'success');
+      setShowAddContent(false);
+      setAddContent('');
+      mutateStatus();
+      mutateItems();
+    } catch {
+      toaster.show('Failed to index content', 'warning');
+    } finally {
+      setAdding(false);
+    }
+  }, [addContent, addSourceType, fetch, toaster, t, mutateStatus, mutateItems]);
+
+  const handleDelete = useCallback(async (sourceType: string, sourceId: string) => {
+    try {
+      const res = await fetch(`/rag/items/${encodeURIComponent(sourceType)}/${encodeURIComponent(sourceId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        toaster.show('Failed to delete item', 'warning');
+        return;
+      }
+      toaster.show(t('item_deleted', 'Item deleted'), 'success');
+      mutateStatus();
+      mutateItems();
+    } catch {
+      toaster.show('Failed to delete item', 'warning');
+    }
+  }, [fetch, toaster, t, mutateStatus, mutateItems]);
+
+  const handleSearch = useCallback(async () => {
+    if (!searchQuery.trim()) return;
+    setSearching(true);
+    setSearchResults(null);
+    try {
+      const res = await fetch('/rag/search', {
+        method: 'POST',
+        body: JSON.stringify({ query: searchQuery.trim(), limit: 10 }),
+      });
+      if (!res.ok) {
+        toaster.show('Search failed', 'warning');
+        return;
+      }
+      const data = await res.json();
+      setSearchResults(data.results || []);
+    } catch {
+      toaster.show('Search failed', 'warning');
+    } finally {
+      setSearching(false);
+    }
+  }, [searchQuery, fetch, toaster]);
+
+  const handleBackfill = useCallback(async () => {
+    setBackfilling(true);
+    try {
+      const res = await fetch('/rag/backfill', {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        toaster.show('Backfill failed', 'warning');
+        return;
+      }
+      const data = await res.json();
+      toaster.show(
+        t('backfill_completed', `Backfill completed — indexed ${data.indexed || 0} new sources`),
+        'success',
+      );
+      mutateStatus();
+      mutateItems();
+    } catch {
+      toaster.show('Backfill failed', 'warning');
+    } finally {
+      setBackfilling(false);
+    }
+  }, [fetch, toaster, t, mutateStatus, mutateItems]);
+
+  if (statusLoading) {
+    return (
+      <div className="my-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+        <div className="animate-pulse">{t('loading', 'Loading...')}</div>
+      </div>
+    );
+  }
+
+  const sourceTypeLabels: Record<string, string> = {
+    text: t('text', 'Text'),
+    url: t('url', 'URL'),
+    file: t('file', 'File'),
+    post: t('post', 'Post'),
+    media: t('media', 'Media'),
+    brand_memory: t('brand_memory', 'Brand Memory'),
+  };
+
+  return (
+    <div className="flex flex-col gap-[16px]">
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+        <div className="flex items-center justify-between">
+          <div className="flex flex-col">
+            <div className="text-[14px]">{t('knowledge_base', 'Knowledge Base')}</div>
+            <div className="text-[12px] text-customColor18">
+              {t('knowledge_base_description', 'Manage your RAG knowledge base for AI-powered content generation')}
+            </div>
+          </div>
+          <button
+            className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            onClick={handleBackfill}
+            disabled={backfilling}
+          >
+            {backfilling ? t('indexing', 'Indexing...') : t('backfill', 'Backfill')}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px]">
+          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+              {t('status', 'Status')}
+            </span>
+            <span className="text-[14px] font-semibold">
+              {status?.enabled ? (
+                <span className="text-green-500">{t('enabled', 'Enabled')}</span>
+              ) : (
+                <span className="text-customColor18">{t('disabled', 'Disabled')}</span>
+              )}
+            </span>
+          </div>
+          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+              {t('indexed_items', 'Indexed Items')}
+            </span>
+            <span className="text-[14px] font-semibold">{status?.indexedItems || 0}</span>
+          </div>
+          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+              {t('last_indexed', 'Last Indexed')}
+            </span>
+            <span className="text-[14px] font-semibold">
+              {status?.lastIndexed
+                ? new Date(status.lastIndexed).toLocaleDateString()
+                : t('never', 'Never')}
+            </span>
+          </div>
+          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+              {t('embedding_model', 'Embedding Model')}
+            </span>
+            <span className="text-[14px] font-semibold break-all">
+              {status?.embeddingModel || '—'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+        <div className="text-[14px]">{t('vector_store', 'Vector Database')}</div>
+        <div className="text-[12px] text-customColor18">
+          {t('vector_store_description', 'Configure the hybrid-RAG vector store adapter.')}
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <label className="text-[12px] text-newTableText">{t('adapter_type', 'Adapter')}</label>
+            <select
+              value={vectorStore}
+              onChange={(e) => setVectorStore(e.target.value)}
+              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            >
+              <option value="pgvector">pgvector (built-in PostgreSQL)</option>
+              <option value="qdrant">Qdrant (external)</option>
+            </select>
+          </div>
+          {vectorStore === 'qdrant' && (
+            <>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('qdrant_url', 'URL')}</label>
+                <input
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={qdrantUrl}
+                  onChange={(e) => setQdrantUrl(e.target.value)}
+                  placeholder="http://qdrant:6333"
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('qdrant_api_key', 'API Key')}</label>
+                <input
+                  type="password"
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={qdrantApiKey}
+                  onChange={(e) => setQdrantApiKey(e.target.value)}
+                  placeholder={t('optional', '(optional)')}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('qdrant_collection', 'Collection')}</label>
+                <input
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={qdrantCollection}
+                  onChange={(e) => setQdrantCollection(e.target.value)}
+                  placeholder="postiz_rag"
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('distance', 'Distance')}</label>
+                <select
+                  value={distance}
+                  onChange={(e) => setDistance(e.target.value)}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                >
+                  <option value="Cosine">Cosine</option>
+                  <option value="Euclid">Euclidean</option>
+                  <option value="Dot">Dot Product</option>
+                </select>
+              </div>
+            </>
+          )}
+          <div className="flex flex-col gap-[4px]">
+            <label className="text-[12px] text-newTableText">{t('embedding_dimension', 'Embedding Dimension')}</label>
+            <input
+              type="number"
+              min={128}
+              max={4096}
+              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              value={embeddingDimension}
+              onChange={(e) => setEmbeddingDimension(parseInt(e.target.value, 10) || 1536)}
+            />
+          </div>
+        </div>
+
+        <button
+          className="text-[12px] text-customColor4 hover:underline self-start"
+          onClick={() => setShowAdvanced(!showAdvanced)}
+        >
+          {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
+        </button>
+
+        {showAdvanced && (
+          <div className="flex flex-col gap-[16px]">
+            <div className="text-[13px] font-medium">{t('chunking', 'Chunking')}</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('chunk_strategy', 'Strategy')}</label>
+                <select
+                  value={chunkStrategy}
+                  onChange={(e) => setChunkStrategy(e.target.value)}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                >
+                  <option value="fixed-size">Fixed Size</option>
+                  <option value="semantic">Semantic</option>
+                  <option value="recursive">Recursive</option>
+                  <option value="sliding-window">Sliding Window</option>
+                </select>
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('chunk_size', 'Chunk Size')}</label>
+                <input
+                  type="number"
+                  min={100}
+                  max={2000}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={chunkSize}
+                  onChange={(e) => setChunkSize(parseInt(e.target.value, 10) || 500)}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('chunk_overlap', 'Overlap')}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={500}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={chunkOverlap}
+                  onChange={(e) => setChunkOverlap(parseInt(e.target.value, 10) || 100)}
+                />
+              </div>
+            </div>
+
+            <div className="text-[13px] font-medium">{t('fusion', 'Fusion')}</div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('fusion_strategy', 'Strategy')}</label>
+                <select
+                  value={fusionStrategy}
+                  onChange={(e) => setFusionStrategy(e.target.value)}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                >
+                  <option value="rrf">Reciprocal Rank Fusion (RRF)</option>
+                  <option value="weighted-sum">Weighted Sum</option>
+                  <option value="normalized">Normalized Score</option>
+                </select>
+              </div>
+              {fusionStrategy === 'rrf' && (
+                <div className="flex flex-col gap-[4px]">
+                  <label className="text-[12px] text-newTableText">{t('rrf_k', 'RRF K')}</label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={200}
+                    className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                    value={rrfK}
+                    onChange={(e) => setRrfK(parseInt(e.target.value, 10) || 60)}
+                  />
+                </div>
+              )}
+              {fusionStrategy === 'weighted-sum' && (
+                <>
+                  <div className="flex flex-col gap-[4px]">
+                    <label className="text-[12px] text-newTableText">{t('vector_weight', 'Vector Weight')}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                      value={vectorWeight}
+                      onChange={(e) => setVectorWeight(parseFloat(e.target.value) || 0.5)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-[4px]">
+                    <label className="text-[12px] text-newTableText">{t('bm25_weight', 'BM25 Weight')}</label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                      value={bm25Weight}
+                      onChange={(e) => setBm25Weight(parseFloat(e.target.value) || 0.5)}
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="text-[13px] font-medium">{t('bm25', 'BM25')}</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('bm25_k1', 'k1')}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={5}
+                  step={0.05}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={bm25K1}
+                  onChange={(e) => setBm25K1(parseFloat(e.target.value) || 1.2)}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('bm25_b', 'b')}</label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  value={bm25B}
+                  onChange={(e) => setBm25B(parseFloat(e.target.value) || 0.75)}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {vecTestResult && (
+          <div className={`text-[12px] ${vecTestResult.ok ? 'text-green-500' : 'text-red-500'}`}>
+            {vecTestResult.ok ? t('connection_ok', 'Connection successful') : (vecTestResult.error || t('connection_failed', 'Connection failed'))}
+          </div>
+        )}
+        <div className="flex gap-[8px]">
+          <button
+            className="bg-forth border border-tableBorder text-textColor rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            onClick={handleTestConnection}
+            disabled={vecTesting}
+          >
+            {vecTesting ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
+          </button>
+          <button
+            className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            onClick={handleSaveVecSettings}
+            disabled={vecSaving}
+          >
+            {vecSaving ? t('saving', 'Saving...') : t('save', 'Save')}
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+        <div className="text-[14px] font-medium">{t('auto_index', 'Auto-Index')}</div>
+        <p className="text-[12px] text-newTableText">
+          {t('auto_index_description', 'Enable automatic indexing of content from specified URL patterns during crawl/sync operations.')}
+        </p>
+        <div className="flex items-center gap-[12px]">
+          <Slider value={autoIndex ? 'on' : 'off'} onChange={(val) => setAutoIndex(val === 'on')} />
+          <span className="text-[13px]">
+            {autoIndex ? t('auto_index_enabled', 'Enabled') : t('auto_index_disabled', 'Disabled')}
+          </span>
+        </div>
+        {autoIndex && (
+          <div className="flex flex-col gap-[8px]">
+            <div className="text-[13px]">{t('auto_index_sources', 'URL Patterns')}</div>
+            <div className="flex gap-[8px]">
+              <input
+                type="text"
+                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] flex-1"
+                placeholder={t('auto_index_source_placeholder', 'e.g. https://example.com/blog/*')}
+                value={newAutoIndexSource}
+                onChange={(e) => setNewAutoIndexSource(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && newAutoIndexSource.trim()) {
+                    setAutoIndexSources([...autoIndexSources, newAutoIndexSource.trim()]);
+                    setNewAutoIndexSource('');
+                  }
+                }}
+              />
+              <button
+                className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[8px] text-[13px] hover:opacity-90"
+                onClick={() => {
+                  if (newAutoIndexSource.trim()) {
+                    setAutoIndexSources([...autoIndexSources, newAutoIndexSource.trim()]);
+                    setNewAutoIndexSource('');
+                  }
+                }}
+              >
+                {t('add', 'Add')}
+              </button>
+            </div>
+            {autoIndexSources.length > 0 && (
+              <div className="flex flex-col gap-[4px]">
+                {autoIndexSources.map((src, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-forth rounded-[4px] px-[12px] py-[6px] text-[13px]">
+                    <code className="text-customColor4">{src}</code>
+                    <button
+                      className="text-red-500 hover:underline ml-[8px] text-[12px]"
+                      onClick={() => setAutoIndexSources(autoIndexSources.filter((_, i) => i !== idx))}
+                    >
+                      {t('remove', 'Remove')}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+        <div className="flex items-center justify-between">
+          <div className="text-[14px]">{t('add_content', 'Add Content')}</div>
+          <button
+            className="text-[13px] text-customColor4 hover:underline"
+            onClick={() => setShowAddContent(!showAddContent)}
+          >
+            {showAddContent ? t('cancel', 'Cancel') : t('add_content_button', '+ Add Content')}
+          </button>
+        </div>
+
+        {showAddContent && (
+          <div className="flex flex-col gap-[12px] bg-forth border border-tableBorder rounded-[4px] p-[16px]">
+            <div className="flex gap-[8px]">
+              <button
+                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                  addSourceType === 'text'
+                    ? 'bg-customColor4 text-white border-customColor4'
+                    : 'border-tableBorder hover:bg-boxHover'
+                }`}
+                onClick={() => setAddSourceType('text')}
+              >
+                {t('text', 'Text')}
+              </button>
+              <button
+                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                  addSourceType === 'url'
+                    ? 'bg-customColor4 text-white border-customColor4'
+                    : 'border-tableBorder hover:bg-boxHover'
+                }`}
+                onClick={() => setAddSourceType('url')}
+              >
+                {t('url', 'URL')}
+              </button>
+              <button
+                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                  addSourceType === 'file'
+                    ? 'bg-customColor4 text-white border-customColor4'
+                    : 'border-tableBorder hover:bg-boxHover'
+                }`}
+                onClick={() => setAddSourceType('file')}
+              >
+                {t('file', 'File')}
+              </button>
+            </div>
+
+            {addSourceType === 'url' && (
+              <input
+                className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                placeholder={t('url_placeholder', 'Enter URL to index...')}
+                value={addContent}
+                onChange={(e) => setAddContent(e.target.value)}
+              />
+            )}
+
+            {addSourceType === 'text' && (
+              <textarea
+                className="bg-newBgColor border border-tableBorder rounded-[4px] min-h-[100px] p-[8px] text-textColor text-[13px] resize-y"
+                placeholder={t('text_placeholder', 'Paste or type content to index...')}
+                value={addContent}
+                onChange={(e) => setAddContent(e.target.value)}
+              />
+            )}
+
+            {addSourceType === 'file' && (
+              <div className="flex flex-col gap-[8px]">
+                <input
+                  type="file"
+                  accept=".txt,.pdf,.md,.csv"
+                  className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] file:mr-[12px] file:bg-customColor4 file:text-white file:border-0 file:rounded-[4px] file:px-[12px] file:py-[6px] file:text-[13px] file:cursor-pointer cursor-pointer"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      setAddContent(ev.target?.result as string || '');
+                    };
+                    reader.readAsText(file);
+                  }}
+                />
+                {addContent && (
+                  <div className="text-[12px] text-customColor18">
+                    {t('file_loaded', 'File loaded:')} {addContent.length} {t('chars', 'chars')}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <button
+                className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+                onClick={handleAddContent}
+                disabled={adding || !addContent.trim()}
+              >
+                {adding ? t('indexing', 'Indexing...') : t('index', 'Index')}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+        <div className="text-[14px]">{t('indexed_content', 'Indexed Content')}</div>
+
+        {itemsLoading ? (
+          <div className="animate-pulse text-[13px] text-customColor18">{t('loading', 'Loading...')}</div>
+        ) : itemsData?.items.length === 0 ? (
+          <div className="text-[13px] text-customColor18">{t('no_indexed_content', 'No indexed content yet')}</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-tableBorder">
+                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('source', 'Source')}
+                  </th>
+                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('type', 'Type')}
+                  </th>
+                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('chunks', 'Chunks')}
+                  </th>
+                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('chars', 'Chars')}
+                  </th>
+                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('indexed_date', 'Indexed Date')}
+                  </th>
+                  <th className="text-right py-[8px] px-[8px] text-customColor18 font-medium">
+                    {t('actions', 'Actions')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {itemsData?.items.map((item) => (
+                  <tr key={`${item.sourceType}:${item.sourceId}`} className="border-b border-tableBorder hover:bg-boxHover">
+                    <td className="py-[8px] px-[8px] max-w-[200px] truncate">
+                      {item.sourceId}
+                    </td>
+                    <td className="py-[8px] px-[8px]">
+                      <span className="bg-fifth rounded-[4px] px-[6px] py-[2px] text-[11px]">
+                        {sourceTypeLabels[item.sourceType] || item.sourceType}
+                      </span>
+                    </td>
+                    <td className="py-[8px] px-[8px]">{item.chunkCount}</td>
+                    <td className="py-[8px] px-[8px]">{item.charCount.toLocaleString()}</td>
+                    <td className="py-[8px] px-[8px] text-customColor18">
+                      {new Date(item.indexedDate).toLocaleDateString()}
+                    </td>
+                    <td className="py-[8px] px-[8px] text-right">
+                      <button
+                        className="text-[12px] text-red-500 hover:underline"
+                        onClick={() => handleDelete(item.sourceType, item.sourceId)}
+                      >
+                        {t('delete', 'Delete')}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {itemsData && itemsData.total > 20 && (
+          <div className="flex items-center justify-center gap-[8px]">
+            <button
+              className="text-[13px] text-customColor4 hover:underline disabled:opacity-50"
+              disabled={itemsPage === 0}
+              onClick={() => setItemsPage((p) => Math.max(0, p - 1))}
+            >
+              {t('previous', 'Previous')}
+            </button>
+            <span className="text-[13px] text-customColor18">
+              {itemsPage + 1} / {Math.ceil(itemsData.total / 20)}
+            </span>
+            <button
+              className="text-[13px] text-customColor4 hover:underline disabled:opacity-50"
+              disabled={(itemsPage + 1) * 20 >= itemsData.total}
+              onClick={() => setItemsPage((p) => p + 1)}
+            >
+              {t('next', 'Next')}
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+        <div className="text-[14px]">{t('search_knowledge_base', 'Search Knowledge Base')}</div>
+        <div className="flex gap-[8px]">
+          <input
+            className="flex-1 bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            placeholder={t('search_placeholder', 'Search your knowledge base...')}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+          />
+          <button
+            className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            onClick={handleSearch}
+            disabled={searching || !searchQuery.trim()}
+          >
+            {searching ? t('searching', 'Searching...') : t('search', 'Search')}
+          </button>
+        </div>
+
+        {searchResults !== null && (
+          <div className="flex flex-col gap-[8px]">
+            {searchResults.length === 0 ? (
+              <div className="text-[13px] text-customColor18">
+                {t('no_results', 'No results found')}
+              </div>
+            ) : (
+              searchResults.map((hit, i) => (
+                <div
+                  key={i}
+                  className="bg-forth border border-tableBorder rounded-[4px] p-[12px] flex flex-col gap-[4px]"
+                >
+                  <div className="flex items-center gap-[8px]">
+                    <span className="bg-fifth rounded-[4px] px-[6px] py-[2px] text-[11px]">
+                      {sourceTypeLabels[hit.sourceType] || hit.sourceType}
+                    </span>
+                    <span className="text-[11px] text-customColor18">
+                      {t('relevance', 'Relevance')}: {(hit.score * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-[12px] text-textColor line-clamp-3">{hit.text}</p>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

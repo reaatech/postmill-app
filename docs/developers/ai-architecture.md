@@ -4,7 +4,7 @@ The AI layer is a pluggable, admin-configurable, governed multi-provider system 
 old single hardcoded OpenAI integration. This page is the developer view; for admin configuration
 see [AI settings admin](../admin/ai-settings.md).
 
-> **Verified against v3.5.9.** Code under `libraries/nestjs-libraries/src/ai`.
+> **Verified against v3.6.0.** Code under `libraries/nestjs-libraries/src/ai`.
 
 ---
 
@@ -18,7 +18,7 @@ A single injection point. Every AI surface resolves its model through it, parame
 **Resolution precedence:**
 
 ```
-per-org (BYOK)  →  per-scope model  →  global active provider  →  provider default  →  env OPENAI_API_KEY
+per-org config  →  per-scope model  →  global active provider  →  provider default
 ```
 
 **Public methods** (selected): `languageModel(scope, orgId?)`, `langchainModel(scope, orgId?)`,
@@ -81,10 +81,11 @@ TTS/STT/upscale/bg-remove/inpaint are stubs. `RagService`/`HybridRag` plus `AIBr
 `AIContentIndex` are a retrieval-augmented-generation foundation. See
 [AI generation](../features/ai-generation.md).
 
-## Backward compatibility (preserve this)
+## Backward compatibility
 
-No admin AI config = byte-for-byte today's `OPENAI_API_KEY` behaviour. Setting the active provider to
-none reverts all four surfaces to the env-OpenAI path. **Do not break this invariant.**
+The `OPENAI_API_KEY` env-var fallback was removed in v3.6.0. All AI configuration is now in-app:
+orgs configure their own providers in **Settings → AI**, and super-admins can set a global fallback.
+The resolution chain ends at the provider default model — there is no env-var backstop.
 
 ## Data model
 
