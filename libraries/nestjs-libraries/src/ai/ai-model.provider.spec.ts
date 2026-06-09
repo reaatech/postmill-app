@@ -212,9 +212,29 @@ describe('AIModelProvider', () => {
       expect(model).toBeDefined();
     });
 
-    it('returns null from resolveConfigForScope when no orgId (no env fallback)', async () => {
-      const resolved = await provider.resolveConfigForScope('utility');
-      expect(resolved).toBeNull();
+    it('returns null from resolveConfigForScope when no orgId and no OPENAI_API_KEY', async () => {
+      const prev = process.env.OPENAI_API_KEY;
+      delete process.env.OPENAI_API_KEY;
+      try {
+        const resolved = await provider.resolveConfigForScope('utility');
+        expect(resolved).toBeNull();
+      } finally {
+        if (prev !== undefined) process.env.OPENAI_API_KEY = prev;
+      }
+    });
+
+    it('falls back to env OPENAI_API_KEY when the org has no active provider (backward-compat invariant)', async () => {
+      mockGetActiveProvider.mockResolvedValue(null);
+      const prev = process.env.OPENAI_API_KEY;
+      process.env.OPENAI_API_KEY = 'sk-env-key';
+      try {
+        const resolved = await provider.resolveConfigForScope('utility', 'org-123');
+        expect(resolved?.providerId).toBe('openai');
+        expect(resolved?.creds.apiKey).toBe('sk-env-key');
+      } finally {
+        if (prev === undefined) delete process.env.OPENAI_API_KEY;
+        else process.env.OPENAI_API_KEY = prev;
+      }
     });
 
     it('returns the resolved config with active provider credentials', async () => {
