@@ -11,6 +11,7 @@ const mockAnthropicAdapterInstance = { mock: 'AnthropicAdapter' };
 const mockGoogleAdapterInstance = { mock: 'GoogleGenerativeAIAdapter' };
 const mockGroqAdapterInstance = { mock: 'GroqAdapter' };
 const mockLangChainAdapterInstance = { mock: 'LangChainAdapter' };
+const mockEmptyAdapterInstance = { mock: 'EmptyAdapter' };
 vi.mock('@copilotkit/runtime', () => ({
   AnthropicAdapter: class {
     constructor(opts: any) {
@@ -19,6 +20,11 @@ vi.mock('@copilotkit/runtime', () => ({
     }
   },
   CopilotRuntime: class {},
+  EmptyAdapter: class {
+    constructor() {
+      return mockEmptyAdapterInstance;
+    }
+  },
   GoogleGenerativeAIAdapter: class {
     constructor(opts: any) {
       Object.assign(this, opts);
@@ -44,6 +50,7 @@ vi.mock('@copilotkit/runtime', () => ({
     }
   },
   copilotRuntimeNodeHttpEndpoint: vi.fn().mockReturnValue(vi.fn()),
+  copilotRuntimeNestEndpoint: vi.fn().mockReturnValue(vi.fn()),
   copilotRuntimeNextJSAppRouterEndpoint: vi.fn().mockReturnValue({
     handleRequest: vi.fn(),
   }),
@@ -161,6 +168,10 @@ vi.mock('@mastra/core/di', () => ({
 }));
 
 import { CopilotController } from './copilot.controller';
+import {
+  copilotRuntimeNodeHttpEndpoint,
+  copilotRuntimeNestEndpoint,
+} from '@copilotkit/runtime';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
@@ -419,13 +430,16 @@ describe('CopilotController', () => {
       expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', 'org-chat-1');
     });
 
-    it('re-throws HttpException when adapter resolution fails', async () => {
+    it('serves EmptyAdapter (no throw) when AI is unconfigured, so the runtime-info handshake succeeds', async () => {
       process.env.OPENAI_API_KEY = '';
       mockResolveConfigForScope.mockResolvedValue(null);
       const req = { body: {} } as any;
-      const res = {} as any;
+      const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
 
-      await expect(controller.chatAgent(req, res)).rejects.toThrow(HttpException);
+      await controller.chatAgent(req, res);
+
+      const lastCall = (copilotRuntimeNodeHttpEndpoint as any).mock.calls.at(-1)[0];
+      expect(lastCall.serviceAdapter).toBe(mockEmptyAdapterInstance);
     });
   });
 
@@ -450,7 +464,7 @@ describe('CopilotController', () => {
       expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', 'org-agent-1');
     });
 
-    it('re-throws HttpException when adapter fails for agent', async () => {
+    it('serves EmptyAdapter (no throw) when AI is unconfigured, so the runtime-info handshake succeeds', async () => {
       process.env.OPENAI_API_KEY = '';
       mockResolveConfigForScope.mockResolvedValue(null);
       const req = { body: { variables: { properties: { integrations: [] } } } } as any;
@@ -458,9 +472,38 @@ describe('CopilotController', () => {
         status: vi.fn().mockReturnThis(),
         json: vi.fn(),
       } as any;
-      const org = { id: 'org-agent-fail' } as any;
+      const org = { id: 'org-agent-empty' } as any;
 
-      await expect(controller.agent(req, res, org)).rejects.toThrow(HttpException);
+      await controller.agent(req, res, org);
+
+      const lastCall = (copilotRuntimeNestEndpoint as any).mock.calls.at(-1)[0];
+      expect(lastCall.serviceAdapter).toBe(mockEmptyAdapterInstance);
+    });
+  });
+
+  describe('_serviceAdapterOrEmpty', () => {
+    it('returns an EmptyAdapter when adapter build fails with 422 (AI unconfigured)', async () => {
+      const spy = vi
+        .spyOn(controller as any, '_buildServiceAdapter')
+        .mockRejectedValue(
+          new HttpException('AI not configured', HttpStatus.UNPROCESSABLE_ENTITY),
+        );
+
+      const result = await (controller as any)._serviceAdapterOrEmpty('org-x');
+
+      expect(result).toBe(mockEmptyAdapterInstance);
+      spy.mockRestore();
+    });
+
+    it('re-throws non-422 HttpExceptions (never masks a real adapter error)', async () => {
+      const spy = vi
+        .spyOn(controller as any, '_buildServiceAdapter')
+        .mockRejectedValue(new HttpException('bad', HttpStatus.BAD_REQUEST));
+
+      await expect(
+        (controller as any)._serviceAdapterOrEmpty('org-x'),
+      ).rejects.toThrow(HttpException);
+      spy.mockRestore();
     });
   });
 });
