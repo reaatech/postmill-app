@@ -68,7 +68,7 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 - **Conversations on your posts** — A new comment-sync foundation keeps the replies on what you publish up to date on a recurring background schedule, tracks what each teammate has already read, and surfaces it all in the app — so you can stay on top of your audience without bouncing between platforms.
 
 **[v3.2.0]**
-- **Three more places to reach your audience** — Publish to **Tumblr**, **Pixelfed**, and **PeerTube**, taking Postiz to **36** connected channels. Tumblr posts native rich media (images and video) with automatic token refresh; Pixelfed and PeerTube add comment support — all managed from the same dashboard with no extra database setup.
+- **Three more places to reach your audience** — Publish to **Tumblr**, **Pixelfed**, and **PeerTube**, taking Postmill to **36** connected channels. Tumblr posts native rich media (images and video) with automatic token refresh; Pixelfed and PeerTube add comment support — all managed from the same dashboard with no extra database setup.
 - **Correct, not just connected** — The new providers shipped with proper formatting (plain-text rendering fixed so posts never leak raw HTML tags) and media-only posting handled correctly, backed by a 64-case provider test suite.
 
 **[v3.1.0]**
@@ -84,11 +84,11 @@ See [github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app) for
 
 ---
 
-[**NEW: check out Postiz agent CLI — perfect for OpenClaw and other agents**](https://github.com/gitroomhq/postiz-agent)
+[**NEW: check out Postmill agent CLI — perfect for OpenClaw and other agents**](https://github.com/gitroomhq/postiz-agent)
 
 **Your ultimate AI social media scheduling tool**
 
-[Postiz](https://postiz.com): An alternative to Buffer.com, Hypefury, Twitter Hunter, etc. Postiz offers everything you need to manage your social media posts, build an audience, capture leads, and grow your business.
+[Postmill](https://postiz.com): An alternative to Buffer.com, Hypefury, Twitter Hunter, etc. Postmill offers everything you need to manage your social media posts, build an audience, capture leads, and grow your business.
 
 Instagram · YouTube · Dribbble · LinkedIn · Reddit · TikTok · Facebook · Pinterest · Threads · X · Slack · Discord · Mastodon · Bluesky
 
@@ -96,13 +96,13 @@ Instagram · YouTube · Dribbble · LinkedIn · Reddit · TikTok · Facebook · 
 
 [Register](https://platform.postiz.com) · [Join Our Discord (devs only)](https://discord.postiz.com) · [Public API](https://docs.postiz.com/public-api)
 
-[NodeJS SDK](https://www.npmjs.com/package/@postiz/node) · [N8N custom node](https://www.npmjs.com/package/n8n-nodes-postiz) · [Make.com integration](https://apps.make.com/postiz)
+[NodeJS SDK](https://www.npmjs.com/package/@reaatech/postmill-sdk) · [N8N custom node](https://www.npmjs.com/package/n8n-nodes-postiz) · [Make.com integration](https://apps.make.com/postiz)
 
-## 🔌 See the leading Postiz features
+## 🔌 See the leading Postmill features
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=BdsCVvEYgHU" target="_blank">
-    <img alt="Postiz" src="https://github.com/user-attachments/assets/8b9b7939-da1a-4be5-95be-42c6fce772de" />
+    <img alt="Postmill" src="https://github.com/user-attachments/assets/8b9b7939-da1a-4be5-95be-42c6fce772de" />
   </a>
 </p>
 
@@ -136,12 +136,12 @@ Instagram · YouTube · Dribbble · LinkedIn · Reddit · TikTok · Facebook · 
 
 To have the project up and running, please follow the [Quick Start Guide](https://docs.postiz.com/quickstart)
 
-## Postiz Compliance
+## Postmill Compliance
 
-- Postiz is an open-source, self-hosted social media scheduling tool that supports platforms like X (formerly Twitter), Bluesky, Mastodon, Discord, and others.
-- Postiz hosted service uses official, platform-approved OAuth flows.
-- Postiz does not automate or scrape content from social media platforms.
-- Postiz Users always authenticate directly with the social platform (e.g., X, Discord, etc.), ensuring platform compliance and data privacy.
+- Postmill is an open-source, self-hosted social media scheduling tool that supports platforms like X (formerly Twitter), Bluesky, Mastodon, Discord, and others.
+- Postmill hosted service uses official, platform-approved OAuth flows.
+- Postmill does not automate or scrape content from social media platforms.
+- Postmill Users always authenticate directly with the social platform (e.g., X, Discord, etc.), ensuring platform compliance and data privacy.
 
 ## License
 

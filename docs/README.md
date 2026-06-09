@@ -1,7 +1,7 @@
-# Postiz REAA Flavor — Documentation
+# Postmill REAA Flavor — Documentation
 
-Documentation for the **REAA-flavored fork** of [Postiz](https://github.com/gitroomhq/postiz-app).
-Postiz schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
+Documentation for the **REAA-flavored fork** of [Postmill](https://github.com/gitroomhq/postiz-app).
+Postmill schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
 team management, a media library, and a pluggable AI layer.
 
 > **Docs version:** verified against **v3.6.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
@@ -66,7 +66,7 @@ team management, a media library, and a pluggable AI layer.
 
 ```
 getting-started/
-  overview.md              ✅ What Postiz REAA is, architecture
+  overview.md              ✅ What Postmill REAA is, architecture
   quickstart.md            ✅ Fastest path to a running local instance
 
 self-hosting/

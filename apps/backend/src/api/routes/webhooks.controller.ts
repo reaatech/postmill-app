@@ -66,7 +66,7 @@ export class WebhookController {
         body: JSON.stringify({
           event: 'ping',
           timestamp: new Date().toISOString(),
-          message: 'This is a test ping from Postiz',
+          message: 'This is a test ping from Postmill',
         }),
       });
       return { success: true, status: response.status };

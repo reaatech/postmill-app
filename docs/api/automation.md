@@ -1,6 +1,6 @@
 # Automation (n8n / Make / SDK)
 
-Postiz is designed for automation. The [Public API (v1)](./public-api.md) is the surface these tools
+Postmill is designed for automation. The [Public API (v1)](./public-api.md) is the surface these tools
 call.
 
 > **Verified against v3.5.10.**
@@ -9,9 +9,9 @@ call.
 
 ## Tools
 
-- **n8n** — a custom Postiz node exists (`n8n-nodes-postiz`).
-- **Make.com** — a Postiz integration is available on Make.
-- **Node SDK** — `@postiz/node` for programmatic access.
+- **n8n** — a custom Postmill node exists (`n8n-nodes-postiz`).
+- **Make.com** — a Postmill integration is available on Make.
+- **Node SDK** — `@reaatech/postmill-sdk` for programmatic access.
 - **MCP** — for AI agents/tools; see [MCP](./mcp.md).
 
 > **Note:** these client packages are maintained upstream. They target the public API contract; this

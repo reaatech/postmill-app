@@ -37,7 +37,7 @@ export const FileGrid: FC<{
             onDragStart={(e) => handleDragStart(e, file.id)}
             className={clsx(
               'group relative w-[calc(12.5%-3px)] min-w-[120px] aspect-square rounded-[8px] overflow-hidden cursor-grab active:cursor-grabbing border-[3px] transition-all',
-              isSelected ? 'border-[#612BD3]' : 'border-transparent hover:border-[#612BD3]/40'
+              isSelected ? 'border-[#2B5CD3]' : 'border-transparent hover:border-[#2B5CD3]/40'
             )}
             onClick={() => onToggleSelect(file)}
             onDoubleClick={() => onFileClick(file)}
@@ -62,7 +62,7 @@ export const FileGrid: FC<{
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all pointer-events-none" />
 
               {isSelected && (
-                <div className="absolute top-[6px] right-[6px] w-[22px] h-[22px] bg-[#612BD3] rounded-full flex items-center justify-center">
+                <div className="absolute top-[6px] right-[6px] w-[22px] h-[22px] bg-[#2B5CD3] rounded-full flex items-center justify-center">
                   <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                     <path d="M2.5 6L5 8.5L9.5 3.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
@@ -74,7 +74,7 @@ export const FileGrid: FC<{
                 {tags.length > 0 && (
                   <div className="flex gap-[4px] mt-[2px] flex-wrap">
                     {tags.slice(0, 2).map((tag: string, i: number) => (
-                      <span key={i} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-[#612BD3]/40 text-white/80">{tag}</span>
+                      <span key={i} className="text-[9px] px-[4px] py-[1px] rounded-[3px] bg-[#2B5CD3]/40 text-white/80">{tag}</span>
                     ))}
                   </div>
                 )}

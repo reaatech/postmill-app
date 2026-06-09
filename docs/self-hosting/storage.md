@@ -12,7 +12,7 @@ are encrypted at rest using the `EncryptionService`.
 
 ## Default Setup (Local Storage)
 
-Out of the box, Postiz uses **Local Storage** — files are written to the directory specified by the
+Out of the box, Postmill uses **Local Storage** — files are written to the directory specified by the
 `UPLOAD_DIRECTORY` environment variable (default: `/tmp/postiz-uploads` inside the container, or
 `/var/lib/postiz/uploads` in self-hosted setups).
 
@@ -217,7 +217,7 @@ CLOUDFLARE_REGION
 STORAGE_PROVIDER
 ```
 
-If these are set and no `StorageProviderConfig` is configured in the database, Postiz creates a
+If these are set and no `StorageProviderConfig` is configured in the database, Postmill creates a
 fallback local or Cloudflare R2 provider on startup. **A deprecation warning is logged at boot.**
 
 **Migrate to database configuration** by:

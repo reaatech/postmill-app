@@ -1,13 +1,13 @@
 openapi: 3.1.0
 
 info:
-  title: Postiz API (reaatech fork)
+  title: Postmill API (reaatech fork)
   version: 3.4.0
   description: |
-    Comprehensive OpenAPI description of the **Postiz** backend (NestJS) as it exists in this
+    Comprehensive OpenAPI description of the **Postmill** backend (NestJS) as it exists in this
     heavily-modified `reaatech` fork.
 
-    Postiz schedules social-media and chat posts to 28+ channels, with a calendar, analytics, team
+    Postmill schedules social-media and chat posts to 28+ channels, with a calendar, analytics, team
     management, a media library, and — in this fork — a pluggable multi-provider **AI layer**,
     **Analytics v2** persisted dashboards, **social comments** sync/moderation, admin-configurable
     **channel OAuth credentials**, and an OAuth2 authorization-code provider.
@@ -16,7 +16,7 @@ info:
 
     There are three distinct authentication surfaces:
 
-    1. **Dashboard API** (the bulk of routes). Requires a Postiz user session JWT supplied either as
+    1. **Dashboard API** (the bulk of routes). Requires a Postmill user session JWT supplied either as
        the `auth` **cookie** or the `auth` **request header**. The active organization is selected
        with the `showorg` cookie/header. Many routes are further gated by RBAC policies
        (`@CheckPolicies`) or by `isSuperAdmin`.
@@ -35,7 +35,7 @@ info:
     proxy-aware). Some routes apply tighter per-route throttles (e.g. AI provider connection tests).
 
   contact:
-    name: Postiz (gitroom)
+    name: Postmill (gitroom)
     url: https://postiz.com
   license:
     name: AGPL-3.0
@@ -3662,7 +3662,7 @@ components:
         posts:
           - integration: { id: clt_integration_123 }
             value:
-              - content: 'Hello from the Postiz API 👋'
+              - content: 'Hello from the Postmill API 👋'
                 image: []
             settings: { __type: twitter }
     CreatePostResult:

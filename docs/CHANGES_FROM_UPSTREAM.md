@@ -1,6 +1,6 @@
 # What's Different From Upstream
 
-This fork (**Postiz REAA Flavor**) has diverged substantially from
+This fork (**Postmill REAA Flavor**) has diverged substantially from
 [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app). The upstream documentation at
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
 the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.

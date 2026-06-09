@@ -85,7 +85,7 @@ export const FileList: FC<{
                 key={file.id}
                 className={clsx(
                   'border-b border-newBorder/50 transition-all cursor-pointer',
-                  isSelected ? 'bg-[#612BD3]/10' : 'hover:bg-newColColor/30'
+                  isSelected ? 'bg-[#2B5CD3]/10' : 'hover:bg-newColColor/30'
                 )}
                 onClick={() => onToggleSelect(file)}
                 onDoubleClick={() => onFileClick(file)}
@@ -94,7 +94,7 @@ export const FileList: FC<{
                   <div
                     className={clsx(
                       'w-[18px] h-[18px] rounded-[4px] border-2 flex items-center justify-center transition-all',
-                      isSelected ? 'bg-[#612BD3] border-[#612BD3]' : 'border-newColColor'
+                      isSelected ? 'bg-[#2B5CD3] border-[#2B5CD3]' : 'border-newColColor'
                     )}
                   >
                     {isSelected && (
@@ -124,12 +124,12 @@ export const FileList: FC<{
                         if (e.key === 'Enter') handleRename(file.id);
                         if (e.key === 'Escape') setRenamingId(null);
                       }}
-                      className="bg-transparent border-b border-[#612BD3] text-[13px] text-textColor outline-none"
+                      className="bg-transparent border-b border-[#2B5CD3] text-[13px] text-textColor outline-none"
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
                     <div
-                      className="text-[13px] text-textColor cursor-pointer hover:text-[#612BD3] truncate max-w-[200px]"
+                      className="text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate max-w-[200px]"
                       onDoubleClick={(e) => { e.stopPropagation(); setRenamingId(file.id); setRenamingName(file.name); }}
                     >
                       {file.originalName || file.name}

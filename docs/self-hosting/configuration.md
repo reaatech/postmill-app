@@ -1,6 +1,6 @@
 # Configuration
 
-Postiz is configured through environment variables. The authoritative template is
+Postmill is configured through environment variables. The authoritative template is
 [`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
@@ -17,7 +17,7 @@ explains the important groups and the fork-specific behaviour.
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `REDIS_URL` | Redis connection string (cache, queues, rate limiting/idempotency). |
 | `JWT_SECRET` | Signs JWTs **and is the encryption key** for stored channel/AI credentials. Make it long and stable — changing it invalidates encrypted DB credentials and sessions. |
-| `FRONTEND_URL` | The exact URL you access Postiz on. |
+| `FRONTEND_URL` | The exact URL you access Postmill on. |
 | `NEXT_PUBLIC_BACKEND_URL` | Public URL the browser uses to reach the backend API. |
 | `BACKEND_INTERNAL_URL` | Internal URL the frontend server uses to reach the backend. |
 

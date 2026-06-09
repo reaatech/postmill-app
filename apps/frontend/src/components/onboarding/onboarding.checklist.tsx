@@ -114,7 +114,7 @@ export const OnboardingChecklist: FC = () => {
           </svg>
         </button>
 
-        <div className="text-[22px] font-semibold text-center text-textColor">Welcome to Postiz!</div>
+        <div className="text-[22px] font-semibold text-center text-textColor">Welcome to Postmill!</div>
         <div className="text-[13px] text-customColor18 text-center mt-[4px] mb-[24px]">
           Let&apos;s get you set up
         </div>

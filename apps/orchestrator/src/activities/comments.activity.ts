@@ -211,7 +211,7 @@ export class CommentsActivity {
       try {
         await this._emailService.sendEmailSync(
           member.email,
-          `[Postiz] ${totalNewComments} new comment${totalNewComments === 1 ? '' : 's'} on your posts`,
+          `[Postmill] ${totalNewComments} new comment${totalNewComments === 1 ? '' : 's'} on your posts`,
           html
         );
       } catch (err: any) {

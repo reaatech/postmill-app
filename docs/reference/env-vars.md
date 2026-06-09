@@ -16,7 +16,7 @@ for the narrative version.
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `REDIS_URL` | Redis connection string. |
 | `JWT_SECRET` | Signs JWTs **and encrypts stored channel/AI credentials**. Keep long & stable. |
-| `FRONTEND_URL` | Exact URL Postiz is accessed on. |
+| `FRONTEND_URL` | Exact URL Postmill is accessed on. |
 | `NEXT_PUBLIC_BACKEND_URL` | Public backend URL the browser uses. |
 | `BACKEND_INTERNAL_URL` | Internal backend URL the frontend server uses. |
 

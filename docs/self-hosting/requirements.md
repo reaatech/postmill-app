@@ -1,6 +1,6 @@
 # Requirements
 
-What you need to build and run Postiz REAA Flavor.
+What you need to build and run Postmill REAA Flavor.
 
 > **Verified against v3.6.0.**
 
@@ -41,7 +41,7 @@ Only needed if you build from source rather than running the prebuilt image.
 
 ## Network / URLs
 
-Set these to the URL users actually reach Postiz on (behind your reverse proxy/TLS):
+Set these to the URL users actually reach Postmill on (behind your reverse proxy/TLS):
 
 - `FRONTEND_URL`, `NEXT_PUBLIC_BACKEND_URL`, `BACKEND_INTERNAL_URL`.
 

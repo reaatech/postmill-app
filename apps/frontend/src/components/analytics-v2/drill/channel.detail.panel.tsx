@@ -21,7 +21,7 @@ interface ChannelDetailPanelProps {
 }
 
 const CHART_COLORS = [
-  'var(--chart-1, #612bd3)',
+  'var(--chart-1, #2b5cd3)',
   'var(--chart-2, #32d583)',
   'var(--chart-3, #1d9bf0)',
   'var(--chart-4, #f97066)',

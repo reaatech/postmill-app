@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run a Prisma schema sync inside the live Postiz container.
+# Run a Prisma schema sync inside the live Postmill container.
 #
 #   ./scripts/postiz-migrate.sh                     # safe additive sync (refuses data loss)
 #   ./scripts/postiz-migrate.sh --accept-data-loss  # allow drops/retypes (DESTRUCTIVE — back up first!)

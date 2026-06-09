@@ -231,7 +231,7 @@ export const startMcp = async (app: INestApplication) => {
   const tools = await agent.listTools();
 
   const serverConfig = {
-    name: 'Postiz MCP',
+    name: 'Postmill MCP',
     version: '1.0.0',
     tools,
     agents: { postiz: agent },
@@ -838,7 +838,7 @@ export const startMcp = async (app: INestApplication) => {
       const a2aServer = new A2aAsMcpServer({
         tools: toolAdapter,
         auth: resolveAuth,
-        serverInfo: { name: 'Postiz A2A', version: '1.0.0' },
+        serverInfo: { name: 'Postmill A2A', version: '1.0.0' },
       });
 
       app.use('/a2a', async (req: Request, res: Response) => {

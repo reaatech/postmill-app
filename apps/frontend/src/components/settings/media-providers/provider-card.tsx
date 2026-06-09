@@ -25,7 +25,7 @@ const OPERATION_LABELS: Record<string, string> = {
 
 const OPERATION_COLORS: Record<string, string> = {
   image: 'bg-blue-500/20 text-blue-400',
-  video: 'bg-purple-500/20 text-purple-400',
+  video: 'bg-red-500/20 text-red-400',
   tts: 'bg-green-500/20 text-green-400',
   stt: 'bg-emerald-500/20 text-emerald-400',
   upscale: 'bg-orange-500/20 text-orange-400',

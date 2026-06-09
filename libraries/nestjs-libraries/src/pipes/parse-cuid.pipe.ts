@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 
 /**
- * Postiz primary keys are Prisma `cuid()` / `cuid2()` values (e.g.
+ * Postmill primary keys are Prisma `cuid()` / `cuid2()` values (e.g.
  * `cmpz4vjqd0000ol7p9t6ofk10`), NOT UUIDs. Validating route `:id` params with
  * Nest's `ParseUUIDPipe` therefore rejected every real id with
  * `400 "Validation failed (uuid is expected)"` — which silently broke the post

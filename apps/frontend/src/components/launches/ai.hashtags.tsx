@@ -124,7 +124,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
               className={clsx(
                 'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                 selectedPlatform === p
-                  ? 'bg-[#612BD3] border-[#612BD3] text-white'
+                  ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                   : 'bg-newColColor border-newBgLineColor',
               )}
             >
@@ -159,7 +159,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
             <button
               type="button"
               onClick={copyAll}
-              className="text-[12px] text-[#612BD3] hover:underline"
+              className="text-[12px] text-[#2B5CD3] hover:underline"
             >
               {t('copy_selected', 'Copy Selected')}
             </button>
@@ -167,7 +167,7 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
               <button
                 type="button"
                 onClick={applySelected}
-                className="text-[12px] text-[#612BD3] hover:underline"
+                className="text-[12px] text-[#2B5CD3] hover:underline"
               >
                 {t('apply_to_post', 'Apply to Post')}
               </button>
@@ -183,8 +183,8 @@ const HashtagsModal: FC<{ close: () => void; onSelect?: (hashtags: string[]) => 
                   className={clsx(
                     'cursor-pointer rounded-[4px] px-[8px] h-[28px] flex items-center text-[12px] border transition-all',
                     isSelected
-                      ? 'bg-[#612BD3] border-[#612BD3] text-white'
-                      : 'bg-newColColor border-newBgLineColor hover:border-[#612BD3]',
+                      ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
+                      : 'bg-newColColor border-newBgLineColor hover:border-[#2B5CD3]',
                   )}
                 >
                   #{tag}

@@ -1,9 +1,12 @@
 {
-  "name": "@postiz/node",
-  "version": "1.0.8",
+  "name": "@reaatech/postmill-sdk",
+  "version": "0.1.0",
   "description": "The ultimate social media scheduling tool",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "publish": "tsup && pnpm publish --access public"
   },

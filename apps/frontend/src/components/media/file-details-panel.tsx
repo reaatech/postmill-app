@@ -143,11 +143,11 @@ export const FileDetailsPanel: FC<{
                 onChange={(e) => setName(e.target.value)}
                 onBlur={handleSaveName}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSaveName(); if (e.key === 'Escape') { setName(file.name); setEditingName(false); } }}
-                className="w-full mt-[4px] bg-transparent border-b border-[#612BD3] text-[13px] text-textColor outline-none"
+                className="w-full mt-[4px] bg-transparent border-b border-[#2B5CD3] text-[13px] text-textColor outline-none"
               />
             ) : (
               <div
-                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-[#612BD3] truncate"
+                className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate"
                 onClick={() => setEditingName(true)}
               >
                 {name}
@@ -163,7 +163,7 @@ export const FileDetailsPanel: FC<{
               onBlur={handleSaveDescription}
               placeholder="Add a description..."
               rows={3}
-              className="w-full mt-[4px] bg-newBgColor border border-newColColor rounded-[6px] px-[10px] py-[8px] text-[13px] text-textColor outline-none focus:border-[#612BD3] resize-none placeholder:text-textColor/30"
+              className="w-full mt-[4px] bg-newBgColor border border-newColColor rounded-[6px] px-[10px] py-[8px] text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none placeholder:text-textColor/30"
             />
           </div>
 
@@ -173,7 +173,7 @@ export const FileDetailsPanel: FC<{
               {tags.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#612BD3]/15 text-[12px] text-[#612BD3]"
+                  className="inline-flex items-center gap-[4px] px-[8px] py-[3px] rounded-[12px] bg-[#2B5CD3]/15 text-[12px] text-[#2B5CD3]"
                 >
                   {tag}
                   <button
@@ -194,7 +194,7 @@ export const FileDetailsPanel: FC<{
                   if (e.key === ',' || e.key === 'Tab') { e.preventDefault(); handleAddTag(tagsInput.replace(',', '')); }
                 }}
                 placeholder="Add tag..."
-                className="flex-1 min-w-[80px] bg-transparent border-b border-newColColor text-[12px] text-textColor outline-none focus:border-[#612BD3] placeholder:text-textColor/30"
+                className="flex-1 min-w-[80px] bg-transparent border-b border-newColColor text-[12px] text-textColor outline-none focus:border-[#2B5CD3] placeholder:text-textColor/30"
               />
             </div>
           </div>

@@ -132,7 +132,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search files by name, tags..."
-              className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#612BD3] text-textColor"
+              className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
             />
             <svg
               className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/40"
@@ -147,7 +147,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
             <select
               value={filterType}
               onChange={e => setFilterType(e.target.value)}
-              className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#612BD3]"
+              className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
             >
               <option value="">All types</option>
               <option value="image">Images</option>
@@ -159,7 +159,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
             <button
               onClick={() => setViewMode('grid')}
               className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
-                ? 'border-[#612BD3] text-[#612BD3] bg-[#612BD3]/10'
+                ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
                 : 'border-newColColor text-textColor hover:bg-forth')}
             >
               <GridIcon />
@@ -167,7 +167,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
             <button
               onClick={() => setViewMode('list')}
               className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
-                ? 'border-[#612BD3] text-[#612BD3] bg-[#612BD3]/10'
+                ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
                 : 'border-newColColor text-textColor hover:bg-forth')}
             >
               <ListViewIcon />
@@ -264,7 +264,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
                   onClick={() => setPage(pageNum)}
                   className={clsx('w-[36px] h-[36px] rounded-[6px] text-[13px] font-medium transition-all',
                     page === pageNum
-                      ? 'bg-[#612BD3] text-white'
+                      ? 'bg-[#2B5CD3] text-white'
                       : 'text-textColor hover:bg-forth border border-newColColor')}
                 >
                   {pageNum + 1}

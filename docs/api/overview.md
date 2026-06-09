@@ -1,6 +1,6 @@
 # API Overview
 
-Postiz exposes several HTTP surfaces. This page maps them; each has its own page.
+Postmill exposes several HTTP surfaces. This page maps them; each has its own page.
 
 > **Verified against v3.5.10.**
 
