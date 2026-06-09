@@ -8,7 +8,9 @@
     "access": "public"
   },
   "scripts": {
-    "publish": "tsup && pnpm publish --access public"
+    "build": "tsup",
+    "release": "tsup && pnpm publish --access public",
+    "release:dry": "tsup && pnpm publish --access public --dry-run --no-git-checks"
   },
   "files": [
     "dist"
