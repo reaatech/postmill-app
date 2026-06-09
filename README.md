@@ -6,12 +6,6 @@
   </picture>
   </a>
 <br />
-REAA Flavor
-<br />
-  <a href="https://reaatech.com" target="_blank">
-    <img alt="REAA" src="https://reaatech.com/reaa-icon.500x500.png" width="160"/>
-  </a>
-<br />
 <a href="https://opensource.org/license/agpl-v3">
   <img src="https://img.shields.io/badge/License-AGPL%203.0-blue.svg" alt="License">
 </a>
