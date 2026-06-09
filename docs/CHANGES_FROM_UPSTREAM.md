@@ -5,7 +5,7 @@ This fork (**Postiz REAA Flavor**) has diverged substantially from
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
 the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.
 
-> **Verified against v3.5.10.**
+> **Verified against v3.6.0.**
 
 ---
 
@@ -31,13 +31,74 @@ Everything below builds around that foundation.
 | Area | Upstream | This fork |
 |------|----------|-----------|
 | AI | Single hardcoded OpenAI integration | Governed multi-provider system (**25 providers** — 13 direct + 12 multi-model hubs/gateways, BYO keys) with admin config, guardrails, RAG, and per-org spend caps |
-| Channel credentials | Environment variables only | DB-backed, encrypted, managed in an admin UI (env still works as fallback) |
+| Channel credentials | Environment variables only | Per-tenant OAuth credentials in **Settings → Channels** (no env fallback) |
+| Storage | Single cloud storage via env vars | Per-tenant storage adapters (S3/R2/B2/IDrive/local) in **Settings → Storage** |
+| AI provider config | Single `OPENAI_API_KEY` | Per-tenant providers in **Settings → AI** (no env fallback) |
+| Admin UI | Separate `/admin/*` routes | Admin functionality moved to per-tenant settings tabs |
+| Media library | Basic upload/list | Media manager with folders, tags, bulk actions, search |
 | Channel count | Upstream set | **36** providers (adds Tumblr, Pixelfed, PeerTube) |
 | Analytics | Single-channel, live fetch on demand | Persisted multi-channel dashboard from daily snapshots (`/analytics/v2`) |
 | Calendar | Card click opens edit modal | Card body opens a **Post Detail** modal; a settings icon opens edit |
 | Comments | — | Synced social comments foundation with per-user read state |
 | MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
+
+---
+
+## v3.6.0 — User profile, per-tenant storage/OAuth/AI, media manager, datatable rebuilds
+
+The settings surface is fundamentally reorganized: admin-only pages are gone, and every org manages
+its own storage, channel OAuth credentials, and AI provider configuration from the settings sidebar.
+
+### User-facing features
+- **User profile page** (`/settings/profile`) with Profile (avatar/name/bio), Security (password change),
+  and Notifications (email prefs) tabs.
+- **Settings re-tabbed** — Settings, Profile, Teams, Channels, AI, Brand, Media, Storage, Webhooks,
+  Auto Post, Sets, Signatures, Developers, Approved Apps. Admin routes are removed.
+- **Teams datatable** — search, sort, paginate, invite, and create users inline.
+- **Webhooks datatable** — educational header, test ping, event selection, HMAC signing.
+- **Auto Post / Sets / Signatures datatables** — educational empty states and proper CRUD.
+- **Media manager** — folder tree, file details panel, bulk actions, search/sort/pagination, tags,
+  descriptions, **trash & restore** (soft-delete + recovery).
+- **Campaigns page** — educational header + aggregate stats row.
+
+### Per-tenant infrastructure
+- **Storage adapter system** — each org mounts S3/R2/B2/IDrive e2/local disk via `StorageProviderConfig`.
+  5 GB default quota per org (`localStorageQuotaBytes`). Four-panel Storage settings tab:
+  - **Providers** — cards showing type, mount status, usage
+  - **Quota Status** — usage meter with 80%+ warning banner
+  - **Usage Breakdown** — pie charts / tables by folder and provider
+  - **Audit Log** — all storage operations (mount, unmount, test, migrate, set-default-folder) with
+    pagination
+- **Storage health tracking** — last-checked timestamp and error messages on each provider card
+  (`lastHealthCheck`, `lastHealthError` columns in `StorageProviderConfig`).
+- **Folder-level provider routing** — assign a storage provider to a folder; uploads to that folder
+  automatically use the assigned provider. Configured via `POST /settings/storage/:id/set-default-folder`,
+  stored in `StorageProviderConfig.defaultFolderId`.
+- **Per-tenant channel OAuth** — orgs provide their own OAuth app credentials in the Channels tab.
+  All per-provider env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.) deprecated (kept as
+  fallback; ~185 `getEnvOr()` calls to be migrated in subsequent releases).
+- **Per-tenant AI provider config** — orgs configure providers/models/keys in the AI tab.
+  `OPENAI_API_KEY` deprecated for model resolution (no longer read by `AIModelProvider`;
+  deprecation warning logged at boot if set).
+- **Brand voice + RAG knowledge base** (Brand tab) — brand voice profiles and content-index UI.
+- **Media provider settings** (Media tab) — per-tenant media pipeline config.
+
+### Bugfixes
+- Comments inbox: proper error/permission states + `RUN_CRON` banner.
+- Analytics v2: dark mode charts (CSS vars) + skeleton loader performance.
+- Calendar: card stats and comment badge fixes.
+
+### Schema (additive)
+- **New:** `MediaFolder`, `StorageProviderConfig`, `OrgProviderConfiguration`, `AuditLog`.
+- **Added columns:** `Media.folderId` (nullable), `Media.tags` (JSON), `Media.description` (text),
+  `Media.deletedAt` (soft-delete for trash); `Organization.localStorageQuotaBytes` (default 5 GB);
+  `StorageProviderConfig.lastHealthCheck`, `lastHealthError`, `defaultFolderId`; 
+  `AIOrgProviderConfig.isActive`.
+- **Deprecated** but kept: `ProviderConfiguration`, `AIProviderConfig`, `AISystemSettings`.
+
+### Deprecated env vars (kept as fallback; deprecation warning on boot)
+`STORAGE_PROVIDER`, all `CLOUDFLARE_*` vars, all per-provider OAuth env vars, `OPENAI_API_KEY`.
 
 ---
 
@@ -216,10 +277,28 @@ existing env credentials into the database. See [Channels admin](./admin/channel
 
 ---
 
+### v3.6.0 — Per-tenant credentials, media manager, data migration helpers
+
+Credentials for channel OAuth, AI providers, and storage backends moved from environment variables
+to the database, with per-tenant isolation. All deprecated env vars are auto-migrated on first boot:
+- `OPENAI_API_KEY` → `AIOrgProviderConfig` (one per org)
+- Channel OAuth env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.) → `OrgProviderConfiguration`
+- Storage env vars (`CLOUDFLARE_*`, `STORAGE_PROVIDER`) → `StorageProviderConfig`
+
+The media manager was rebuilt with folder tree, tags, bulk actions, search, and drag-and-drop between
+folders. Files can be migrated between storage providers from the Storage settings tab.
+
+A channel health dashboard shows per-provider connection status with expiry warnings.
+An onboarding checklist guides first-time users through initial setup.
+The admin section (`/admin/*`) was deleted — all settings are now tenant-scoped.
+
+---
+
 ## Backward compatibility commitments
 
 This fork is run in production. Two invariants are deliberately preserved:
 
-1. **AI env fallback** — no admin AI config means the original `OPENAI_API_KEY` behaviour, unchanged.
-2. **Legacy public analytics route** — the original public API analytics route keeps its response
+1. **Legacy public analytics route** — the original public API analytics route keeps its response
    shape for n8n/Zapier/Make compatibility; a parallel v2 route was added rather than changing it.
+2. **Schema changes are additive** — new tables, nullable-or-defaulted columns. The `db push` model
+   never drops or renames columns without a manual backfill plan.

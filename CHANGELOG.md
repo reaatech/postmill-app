@@ -8,6 +8,152 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.6.0] - 2026-06-08
+
+A major user-facing release: a proper user profile page, per-tenant storage/adapter system,
+per-tenant OAuth and AI provider credentials, a rebuilt media manager, and full-suite datatable
+rebuilds. The admin section moves into tenant settings; admin-only pages are removed and most global
+env vars are deprecated (kept as fallback; new per-tenant DB config takes precedence). Schema
+migration is additive (nullable columns, new models).
+
+### Added — User profile & settings
+
+- **User profile page** (`/settings/profile`) — three tabs: **Profile** (avatar, name, bio), **Security**
+  (password change), and **Notifications** (email preferences).
+- **Settings reorganization** — the settings sidebar now follows the tab order: Settings, Profile, Teams,
+  Channels, AI, Brand, Media, Storage, Webhooks, Auto Post, Sets, Signatures, Developers, Approved
+  Apps. The old admin-level pages are gone — every setting is now tenant-scoped.
+
+### Added — Datatable rebuilds
+
+- **Teams** — full datatable rebuild with search, sort, pagination, an inline invite flow, and inline
+  create-user. No more bare list.
+- **Webhooks** — rebuilt datatable with an educational header (explains what webhooks are), test ping
+  button, event-type selection, and HMAC signing support.
+- **Auto Post / Sets / Signatures** — each rebuilt as a proper datatable with educational empty states
+  and guidance for first-time users.
+
+### Added — Media manager
+
+- **Folder tree** — browse and organize media in a hierarchical folder structure.
+- **Drag-and-drop between folders** — drag file thumbnails onto folder tree items to move them.
+- **Bulk actions** — select multiple files for batch operations (move, delete, tag).
+- **File details panel** — view metadata, tags, description, and preview for each file.
+- **Search, sort, and pagination** — find assets by name/tag, sort by date/size/name, paginate
+  through results.
+- **Trash & restore** — delete files with soft-delete (`Media.deletedAt` set); view them in a trash
+  modal (🗑️ button in toolbar); restore to original folder or permanently delete. Restored files
+  bypass permanent deletion until explicitly purged again.
+
+### Added — Storage adapter system
+
+- **Per-tenant storage** — each organization mounts its own storage provider: S3, R2, Backblaze B2,
+  IDrive e2, or local disk.
+- **Storage settings tab** (`/settings/storage`) — mount and unmount providers per tenant with a
+  four-panel interface: Providers (cards showing type, mount status, usage %), Quota Status (usage
+  meter with 80%+ warning), Usage Breakdown (by folder and by provider), and Audit Log (all storage
+  operations with pagination).
+- **`StorageProviderConfig` model** — per-tenant storage credentials stored encrypted in the database.
+  `localStorageQuotaBytes` defaulted to 5 GB per organization. New fields: `lastHealthCheck` (timestamp
+  of last test), `lastHealthError` (error message if failed), `defaultFolderId` (folder-level routing
+  for uploads).
+- **Storage health tracking** — the UI shows green/amber/red badges (Last checked: <time>) and all
+  health checks are timestamped for audit purposes. `GET /settings/storage/audit-log` lists all
+  storage mutations (create, update, delete, mount, unmount, health-check, migrate, set-default-folder).
+- **Quota status API** — `GET /settings/storage/quota-status` returns used bytes, quota bytes, percentage,
+  and warning flag (true when ≥80% used). The UI shows an amber warning banner when approaching limit.
+- **Usage breakdown API** — `GET /settings/storage/usage-breakdown` returns storage by folder and by
+  provider (bytes), powering the breakdown tab with pie charts or tables.
+- **Folder-aware upload routing** — files uploaded to a folder use that folder's assigned provider
+  if set, otherwise fall back to a mounted provider. `POST /settings/storage/:id/set-default-folder`
+  configures the mapping per provider, stored in `StorageProviderConfig.defaultFolderId`.
+
+### Added — Per-tenant provider credentials
+
+- **Channel provider OAuth** — each org can now use their own OAuth app credentials (client ID/secret)
+  for channel providers. Configured in the **Channels** settings tab (`/settings/channels`). Eliminates
+  the need for global env vars like `LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.
+- **AI provider config** — each org configures their own AI provider, model, and API keys in the **AI**
+  settings tab (`/settings/ai`). Org-level active provider takes precedence. `OPENAI_API_KEY` is
+  **deprecated** for model resolution (no longer read by `AIModelProvider`; deprecation warning
+  logged at boot if set).
+- **Brand voice + RAG knowledge base** — **Brand** settings tab (`/settings/brand`) with brand voice
+  profiles and a RAG knowledge base UI for uploading and indexing org content by text, URL, or
+  file upload (`.txt`, `.pdf`, `.md`, `.csv`).
+- **Media provider settings** — **Media** settings tab (`/settings/media`) for configuring per-tenant
+  media pipeline providers (image, video, TTS, STT, etc.).
+
+### Fixed — Comments inbox
+
+- Proper error and permission states now render instead of crashing or showing blank screens.
+- A **`RUN_CRON` banner** informs users when background comment sync is not active.
+
+### Fixed — Analytics v2
+
+- **Dark mode fix** — Chart.js now reads CSS custom properties (`--chart-*`) properly in dark mode,
+  so charts are visible on dark backgrounds.
+- **Performance** — skeleton loaders replace the full-page spinner; charts and stats load progressively.
+
+### Added — Post-audit UX enhancements
+
+- **Channel health dashboard** — the Channels tab now shows a Connection Status panel with
+  color-coded badges for each provider (connected, token expiring, expired, or error) and a
+  "Reconnect" link. Backed by `GET /channels/health`.
+- **Storage migration** — migrate files between storage providers (e.g., local → S3) from the
+  Storage tab with a progress bar and per-file error reporting. `POST /settings/storage/:id/migrate/:targetId`.
+- **Session management** — the Profile Security tab shows your current device, last login timestamp,
+  and a "Log out all sessions" button.
+- **Onboarding checklist** — new users see a 4-step setup overlay (connect channel, configure AI,
+  create post, invite team) with auto-detected progress.
+- **Env migration helpers** — on first boot after upgrade, `OPENAI_API_KEY` and all 24 channel OAuth
+  env vars are automatically seeded into the database as per-org configs. No silent breakage on upgrade.
+
+### Fixed — Calendar
+
+- Card stats footer now reliably displays for all published posts (views/likes/comments).
+- Comment badge on calendar cards shows correct unread count.
+
+### Changed — Campaigns
+
+- Educational header added with campaign management guidance.
+- Stats summary row shows aggregate metrics across all campaigns.
+- Archive/unarchive toggle on each campaign card.
+- Engagement data panel (total views, likes, comments) and top-performing post displayed
+  per campaign.
+
+### Changed — Admin pages removed
+
+- All admin-only routes and pages (`/admin/channels`, `/admin/ai`, `/admin/dashboard`, etc.) are
+  deleted. Their functionality has moved to the per-tenant settings tabs. The settings sidebar now
+  serves both regular users and super-admins equally.
+
+### Schema changes
+
+- **New models:** `MediaFolder`, `StorageProviderConfig`, `OrgProviderConfiguration`.
+- **Media additions:** `Media.folderId` (nullable FK), `Media.tags` (JSON), `Media.description` (text).
+- **Organization addition:** `Organization.localStorageQuotaBytes` (default `5368709120` = 5 GB).
+- **AI addition:** `AIOrgProviderConfig.isActive` (boolean, default `false`).
+- **Deprecated models:** `ProviderConfiguration`, `AIProviderConfig`, `AISystemSettings` — kept for
+  backward compatibility during migration; new code uses `OrgProviderConfiguration`.
+
+### Deprecated env vars (kept as fallback; deprecation warning logged at boot)
+
+- **Storage:** `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_ACCESS_KEY`,
+  `CLOUDFLARE_BUCKETNAME`, `CLOUDFLARE_BUCKET_URL`, `CLOUDFLARE_REGION`, `STORAGE_PROVIDER`.
+- **Channel OAuth:** All per-provider OAuth env vars (`LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`,
+  `FACEBOOK_APP_ID`, `FACEBOOK_APP_SECRET`, `X_API_KEY`, `X_API_SECRET`, `GITHUB_CLIENT_ID`,
+  `GITHUB_CLIENT_SECRET`, `TIKTOK_CLIENT_ID`, `TIKTOK_CLIENT_SECRET`, `PINTEREST_CLIENT_ID`,
+  `PINTEREST_CLIENT_SECRET`, `DRIBBBLE_CLIENT_ID`, `DRIBBBLE_CLIENT_SECRET`, `DISCORD_CLIENT_ID`,
+  `DISCORD_CLIENT_SECRET`, `SLACK_ID`, `SLACK_SECRET`, `MASTODON_CLIENT_ID`,
+  `MASTODON_CLIENT_SECRET`, `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET`, `KICK_CLIENT_ID`,
+  `KICK_SECRET`, `TUMBLR_CLIENT_ID`, `TUMBLR_CLIENT_SECRET`, `THREADS_APP_ID`,
+  `THREADS_APP_SECRET`, `INSTAGRAM_APP_ID`, `INSTAGRAM_APP_SECRET`, `YOUTUBE_CLIENT_ID`,
+  `YOUTUBE_CLIENT_SECRET`, `GOOGLE_GMB_CLIENT_ID`, `GOOGLE_GMB_CLIENT_SECRET`, `REDDIT_CLIENT_ID`,
+  `REDDIT_CLIENT_SECRET`, `NEYNAR_CLIENT_ID`, `NEYNAR_SECRET_KEY`, `TELEGRAM_TOKEN`, and others).
+  These are still read by ~185 `getEnvOr()` calls in provider implementations and remain
+  functional. Migrate to in-app per-tenant credentials incrementally.
+- **AI:** `OPENAI_API_KEY` — deprecation warning logged at boot; no longer used for model resolution.
+
 ## [3.5.10] - 2026-06-08
 
 A stabilization release: it gets v3.5.9 **actually booting** and closes a batch of UI/API bugs found

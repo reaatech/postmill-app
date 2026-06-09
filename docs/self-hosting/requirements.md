@@ -2,7 +2,7 @@
 
 What you need to build and run Postiz REAA Flavor.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.6.0.**
 
 ---
 
@@ -13,7 +13,7 @@ What you need to build and run Postiz REAA Flavor.
 | **PostgreSQL** | Primary database. The compose files use Postgres 17. |
 | **Redis** | Cache, queues, rate limiting / idempotency. Compose uses Redis 7. |
 | **Temporal** | Durable background jobs. The bundled stack uses `temporalio/auto-setup` 1.28.1 with Elasticsearch 7.17 for visibility. |
-| **Object storage** | Local disk **or** Cloudflare R2 — set `STORAGE_PROVIDER`. See [Configuration](./configuration.md). |
+| **Object storage** | Per-tenant storage adapters (S3, R2, B2, IDrive e2, or local disk). Configured in-app via **Settings → Storage**. See [Configuration](./configuration.md). |
 | **SMTP/email (optional)** | Resend, for activation/notifications. Without it, users auto-activate. |
 
 For how these fit together see [Architecture](../developers/architecture.md). For running them all

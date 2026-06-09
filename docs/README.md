@@ -4,7 +4,7 @@ Documentation for the **REAA-flavored fork** of [Postiz](https://github.com/gitr
 Postiz schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
 team management, a media library, and a pluggable AI layer.
 
-> **Docs version:** verified against **v3.5.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
+> **Docs version:** verified against **v3.6.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
 > change history.
 >
 > **This is a fork.** The upstream docs at `docs.postiz.com` describe the *original* project and
@@ -23,22 +23,23 @@ team management, a media library, and a pluggable AI layer.
 - [Requirements](./self-hosting/requirements.md) · [Quickstart](./getting-started/quickstart.md)
 - [Run with Docker Compose](./self-hosting/docker.md)
 - [Configuration / environment variables](./self-hosting/configuration.md)
+- [Storage provider setup (S3, R2, B2, IDrive)](./self-hosting/storage.md)
 - [Temporal & background jobs (RUN_CRON)](./self-hosting/temporal-and-cron.md)
 - [Upgrading](./self-hosting/upgrading.md) · [Backup & retention](./self-hosting/backup-and-retention.md)
 
-**…administer an instance (super-admins)**
-- [Admin overview](./admin/overview.md)
-- [Channels admin (provider credentials)](./admin/channels.md)
-- [AI settings admin (providers, models, governance)](./admin/ai-settings.md)
-- [Errors & stats](./admin/errors-and-stats.md) · [Users & impersonation](./admin/users-and-impersonation.md)
+**…administer an instance (organization admins)**
+- [Channel provider setup (per-tenant OAuth)](./admin/channels.md) — moved to org-level in v3.6.0
+- [AI provider setup (per-tenant configuration)](./admin/ai-settings.md) — moved to org-level in v3.6.0
+- [Users & impersonation](./admin/users-and-impersonation.md) · [Errors & stats](./admin/errors-and-stats.md)
 
 **…use the features**
 - [Calendar & Post Detail](./features/calendar-and-posts.md)
 - [Analytics](./features/analytics.md) · [Watchlist & competitor tracking](./features/watchlist.md)
 - [Social comments](./features/social-comments.md)
 - [Campaigns](./features/campaigns.md) · [Bulk scheduling / CSV import](./features/bulk-scheduling.md)
+- [Media manager](./media/README.md) · [Storage settings](./self-hosting/storage.md)
 - [Content QA preflight](./features/content-qa-preflight.md) · [Provider capabilities](./features/provider-capabilities.md)
-- [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md)
+- [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md) · [AI settings & RAG](./ai/README.md)
 
 **…understand the channels**
 - [Channels overview (the 36 providers)](./channels/overview.md)
@@ -71,6 +72,7 @@ getting-started/
 self-hosting/
   docker.md                ✅ Run with Docker Compose
   configuration.md         ✅ Environment variable reference
+  storage.md               ✅ Storage provider setup (S3, R2, B2, IDrive e2)
   temporal-and-cron.md     ✅ Workflows, RUN_CRON, which instance runs what
   requirements.md          ✅ Services + build toolchain
   upgrading.md             ✅ Release/upgrade path, schema sync
@@ -100,6 +102,12 @@ features/
   provider-capabilities.md ✅ Provider capability matrix
   ai-features.md           ✅ Brand profiles, prompts, hashtags, sentiment, compliance, brand memory
   ai-generation.md         ✅ Text/image gen, brand voice, what works vs stubs
+
+media/
+  README.md                ✅ Media manager guide (folders, tags, bulk actions, drag-drop)
+
+ai/
+  README.md                ✅ Per-tenant AI provider + model guide; Brand/RAG knowledge-base
 
 api/
   overview.md              ✅ Surfaces, auth, rate limits

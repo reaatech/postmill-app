@@ -3,7 +3,7 @@
 The fastest path to a running instance. For a production-style single-container deployment, use
 [Docker](../self-hosting/docker.md) instead.
 
-> **Verified against v3.5.9.**
+> **Verified against v3.6.0.**
 
 ---
 
@@ -80,10 +80,10 @@ Open **http://localhost:4200** and register the first account.
 
 ## After it's up
 
-- **Connect channels** — channel credentials are configured by a super-admin in the admin UI, not
-  only via env vars. See [Channels admin](../admin/channels.md).
-- **Configure AI (optional)** — with no AI config the app uses `OPENAI_API_KEY` if set; for the
-  multi-provider system see [AI settings admin](../admin/ai-settings.md).
+- **Connect channels** — channel OAuth credentials are configured per-tenant in **Settings → Channels**.
+  See [Per-provider setup](../channels/setup-per-provider.md).
+- **Configure AI** — set up your AI provider in **Settings → AI** (required; no env fallback).
+  See [AI settings admin](../admin/ai-settings.md).
 - **Enable background collection** — analytics and comment sync run in Temporal and require
   `RUN_CRON=true` on exactly one orchestrator instance. See
   [Temporal & background jobs](../self-hosting/temporal-and-cron.md).

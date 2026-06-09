@@ -4,7 +4,7 @@ Postiz is configured through environment variables. The authoritative template i
 [`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
-> **Verified against v3.5.10.** When a variable's exact default matters, check `.env.example` and
+> **Verified against v3.6.0.** When a variable's exact default matters, check `.env.example` and
 > `docker-compose.yaml` directly; this page documents intent and fork behaviour rather than
 > duplicating every line.
 
@@ -26,12 +26,19 @@ explains the important groups and the fork-specific behaviour.
 
 ## Storage
 
-`STORAGE_PROVIDER` selects where uploaded media and social avatars are saved:
+> **Fork behaviour (v3.6.0):** storage is now configured per-tenant through the **Settings → Storage**
+> UI rather than a global env var. Each organization mounts its own provider: S3, Cloudflare R2,
+> Backblaze B2, IDrive e2, or local disk. Credentials are stored encrypted in the database
+> (`StorageProviderConfig` model). Each org defaults to 5 GB of local disk space
+> (`localStorageQuotaBytes`, adjustable per org).
 
-- `local` — store on disk. Set `UPLOAD_DIRECTORY` (and the matching public path).
-- `cloudflare` — store in Cloudflare R2. Set `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`,
-  `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKETNAME`, `CLOUDFLARE_BUCKET_URL`,
-  `CLOUDFLARE_REGION`.
+The only remaining storage-related environment variable:
+
+| Variable | Purpose |
+|----------|---------|
+| `UPLOAD_DIRECTORY` / `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | Local upload path (used for the local disk adapter). |
+
+The old `STORAGE_PROVIDER` env var and all `CLOUDFLARE_*` vars are removed in v3.6.0.
 
 ## Email & registration
 
@@ -41,22 +48,21 @@ explains the important groups and the fork-specific behaviour.
 
 ## Social provider credentials
 
-`.env.example` lists per-provider client IDs/secrets (X, LinkedIn, Reddit, GitHub, Threads,
-Facebook, YouTube, TikTok, Pinterest, Dribbble, Discord, Slack, Mastodon, and more).
-
-> **Fork behaviour (v3.0+):** these env vars are now a **fallback**. The preferred way to configure
-> channels is the encrypted admin UI at `/admin/channels`. Credential reads check the database
-> first, then fall back to `process.env`. With no DB configs present, all providers fall back to
-> env vars. See [Channels admin](../admin/channels.md).
+> **Fork behaviour (v3.6.0):** channel provider OAuth credentials are configured per-tenant through
+> **Settings → Channels**. Each organization provides their own client ID/secret per provider.
+> The old global env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, `X_API_KEY`, etc.) are removed.
+>
+> See [Per-provider setup](../channels/setup-per-provider.md).
 
 ## AI
 
-- `OPENAI_API_KEY` — the legacy/default AI key.
-
-> **Fork behaviour (v3.4+):** with no admin AI configuration, every AI surface uses `OPENAI_API_KEY`
-> exactly as before. The multi-provider system (additional providers, per-scope models, governance)
-> is configured in the admin UI at `/admin/ai`, with keys encrypted in the database. See
-> [AI settings admin](../admin/ai-settings.md).
+> **Fork behaviour (v3.6.0):** AI provider configuration is per-tenant through **Settings → AI**.
+> Each organization configures its own provider, model, and API keys. A super-admin fallback can be
+> set in the global AI settings for orgs that have not configured their own.
+>
+> `OPENAI_API_KEY` is removed in v3.6.0 — all AI configuration is in-app.
+>
+> See [AI features](../features/ai-features.md).
 
 ## Analytics & background jobs
 

@@ -25,10 +25,6 @@ test('settings pages full coverage', async ({ page }) => {
     { label: 'Settings', path: '/settings' },
     { label: 'Integrations', path: '/third-party' },
     { label: 'Billing', path: '/billing' },
-    { label: 'Admin Channels', path: '/admin/channels' },
-    { label: 'Admin AI', path: '/admin/ai' },
-    { label: 'Admin Errors', path: '/admin/errors' },
-    { label: 'Admin Stats', path: '/admin/stats' },
   ];
 
   page.on('response', (r) => {

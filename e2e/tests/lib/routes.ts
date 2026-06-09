@@ -26,12 +26,6 @@ export const ROUTES: RouteDef[] = [
   { name: 'Integrations', path: '/third-party', expectsContent: true, minActionables: 1 },
   { name: 'Billing', path: '/billing', expectsContent: true, minActionables: 1 },
   { name: 'Settings', path: '/settings', expectsContent: true, minActionables: 2 },
-  // Admin (super-admin gated; the test account is SUPERADMIN)
-  { name: 'Admin: AI', path: '/admin/ai', adminOnly: true, expectsContent: true, minActionables: 2 },
-  { name: 'Admin: Channels', path: '/admin/channels', adminOnly: true, expectsContent: true, minActionables: 2 },
-  { name: 'Admin: Errors', path: '/admin/errors', adminOnly: true, expectsContent: true, minActionables: 1 },
-  { name: 'Admin: Stats', path: '/admin/stats', adminOnly: true, expectsContent: true, minActionables: 1 },
-  { name: 'Admin: Dashboard', path: '/admin/dashboard', adminOnly: true, expectsContent: true },
 ];
 
 /** Main sidebar nav labels → destination (from top.menu.tsx). */

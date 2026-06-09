@@ -2,7 +2,7 @@
 
 How to move to a newer release of the fork, and how schema changes are applied.
 
-> **Verified against v3.5.9.** This system runs in production — read the schema-change notes before
+> **Verified against v3.6.0.** This system runs in production — read the schema-change notes before
 > upgrading a live instance.
 
 ---
@@ -66,6 +66,7 @@ Match the toolchain in [Requirements](./requirements.md) (Node `>=22.12.0 <23`, 
 | → v3.2 | Adds Tumblr/Pixelfed/PeerTube. No migration required. |
 | → v3.3 | Calendar/post-detail reshape + social-comments models (additive). |
 | → v3.4 | AI provider system (10 additive models). No action needed unless you want non-OpenAI providers; the `OPENAI_API_KEY` fallback keeps prior behaviour. See [AI settings admin](../admin/ai-settings.md). |
+| → v3.6 | **Per-tenant everything.** Admin pages removed; settings moved to sidebar tabs. `OPENAI_API_KEY` and all per-provider OAuth env vars removed — configure providers in-app. Storage is per-tenant (S3/R2/B2/IDrive/local). New models: `MediaFolder`, `StorageProviderConfig`, `OrgProviderConfiguration`. `Organization` gains `localStorageQuotaBytes` (default 5 GB). **Additive schema** — no destructive changes. |
 
 ## Tracking upstream
 

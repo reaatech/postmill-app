@@ -6,7 +6,7 @@ const ROUTES: [string, string][] = [
   ['Calendar', '/launches'], ['Analytics', '/analytics'], ['Media', '/media'],
   ['Campaigns', '/campaigns'], ['Comments', '/comments'], ['Plugs', '/plugs'],
   ['Third-party', '/third-party'], ['Settings', '/settings'], ['Billing', '/billing'],
-  ['Agents', '/agents'], ['Admin', '/admin'],
+  ['Agents', '/agents'],
 ];
 
 test('render every real page + capture errors', async ({ page }) => {

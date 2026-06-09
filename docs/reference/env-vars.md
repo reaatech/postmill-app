@@ -5,7 +5,7 @@ Curated reference of the environment variables. The authoritative template is
 deployment. This page groups them by purpose — see [Configuration](../self-hosting/configuration.md)
 for the narrative version.
 
-> **Verified against v3.5.10.** When an exact default matters, check `.env.example` directly.
+> **Verified against v3.6.0.** When an exact default matters, check `.env.example` directly.
 
 ---
 
@@ -24,9 +24,10 @@ for the narrative version.
 
 | Variable | Purpose |
 |----------|---------|
-| `STORAGE_PROVIDER` | `local` or `cloudflare`. |
 | `UPLOAD_DIRECTORY` / `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | Local upload paths. |
-| `CLOUDFLARE_ACCOUNT_ID` / `CLOUDFLARE_ACCESS_KEY` / `CLOUDFLARE_SECRET_ACCESS_KEY` / `CLOUDFLARE_BUCKETNAME` / `CLOUDFLARE_BUCKET_URL` / `CLOUDFLARE_REGION` | R2 storage. |
+
+> **v3.6.0:** Storage is configured per-tenant via **Settings → Storage** (S3, R2, B2, IDrive e2, or
+> local disk). The old `STORAGE_PROVIDER` and `CLOUDFLARE_*` env vars are removed.
 
 ## Email & registration
 
@@ -36,23 +37,16 @@ for the narrative version.
 | `EMAIL_FROM_ADDRESS` / `EMAIL_FROM_NAME` | Sender identity. |
 | `DISABLE_REGISTRATION` | Close signups when `true`. |
 
-## Social providers (fallback)
+## Social providers
 
-Per-provider client IDs/secrets and tokens: `X_*`, `LINKEDIN_*`, `REDDIT_*`, `GITHUB_*`,
-`THREADS_*`, `FACEBOOK_*`, `YOUTUBE_*`, `TIKTOK_*`, `PINTEREST_*`, `DRIBBBLE_*`, `DISCORD_*`,
-`SLACK_*`, `MASTODON_*`, `BEEHIIVE_*`, `LISTMONK_*`, `TELEGRAM_TOKEN`, `TUMBLR_*`, `EXTENSION_ID`,
-and others.
-
-> **Fork behaviour:** these are a **fallback**. Prefer the encrypted admin UI — see
-> [Channels admin](../admin/channels.md).
+> **v3.6.0:** Channel OAuth credentials are configured per-tenant via **Settings → Channels**.
+> Per-provider env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, `X_API_KEY`, etc.) are **removed**.
+> See [Per-provider setup](../channels/setup-per-provider.md).
 
 ## AI
 
-| Variable | Purpose |
-|----------|---------|
-| `OPENAI_API_KEY` | Default/fallback AI key. With no admin AI config, all AI surfaces use this. |
-
-Additional providers and per-scope models are configured in [AI settings admin](../admin/ai-settings.md).
+> **v3.6.0:** AI providers are configured per-tenant via **Settings → AI**. `OPENAI_API_KEY` is
+> removed — all AI configuration is in-app. See [AI features](../features/ai-features.md).
 
 ## Analytics & background jobs
 
