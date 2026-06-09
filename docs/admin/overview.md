@@ -3,7 +3,10 @@
 Super-admins get an extra set of controls surfaced from the impersonation/admin bar. This page maps
 that surface; each item links to its own page where there's more to say.
 
-> **Verified against v3.5.9.** All admin endpoints are gated server-side: a non-super-admin request. v3.5.9 adds an "Administration" section to the sidebar visible to super-admins, linking to AI Settings, Channels, Errors, and Stats; plus a new admin dashboard landing page at `/admin/dashboard`.
+> **Verified against v3.6.0.** v3.6.0 removes the admin-only routes and pages — all settings are now
+> tenant-scoped from the settings sidebar. The admin bar (impersonation) remains, but the admin
+> Channels, AI, Dashboard, and Errors pages are deleted. Their functionality moved to per-tenant
+> settings tabs (Settings → Channels, Settings → AI, etc.).
 > is rejected (HTTP 400 "Unauthorized"), regardless of what the UI shows.
 
 ---
@@ -18,25 +21,23 @@ backing endpoints enforce the super-admin check themselves.
 
 | Control | Where | What it does | Docs |
 |---------|-------|--------------|------|
-| **Channels** | `/admin/channels` | Configure provider credentials (encrypted), enable/disable providers, add setup instructions. | [Channels admin](./channels.md) |
-| **AI** | `/admin/ai` | Configure AI providers/models, test connections, governance, spend, audit, health. | [AI settings admin](./ai-settings.md) |
-| **View Errors** | `/admin/errors` | Browse captured posting/integration errors by platform/user. | [Errors & stats](./errors-and-stats.md) |
-| **View Stats** | `/admin/stats` | Instance usage statistics over a date range. | [Errors & stats](./errors-and-stats.md) |
+| **Channels** | Settings → Channels | Configure per-tenant OAuth credentials (encrypted), enable/disable providers, add setup instructions. | [Channels admin](./channels.md) |
+| **AI** | Settings → AI | Configure per-tenant AI providers/models, test connections, governance, spend, audit, health. | [AI settings admin](./ai-settings.md) |
+| **Errors & Stats** | Settings → Settings (error logs) | Browse captured posting/integration errors and instance usage statistics. | [Errors & stats](./errors-and-stats.md) |
 | **Impersonation** | admin bar | Act as another user for support/debugging. | [Users & impersonation](./users-and-impersonation.md) |
 
-## Backend routes behind these screens
+## Backend routes
 
-- `/admin/channel-configs` — channel configuration (super-admin).
-- `/admin/ai-settings` — AI provider, governance, spend, audit, health (super-admin).
-- `/admin/errors`, `/admin/errors/platforms`, `/admin/stats` — diagnostics (super-admin).
+- `/settings/channel-configs` — channel configuration (org-scoped).
+- `/settings/ai` — AI provider, governance, spend, audit, health (org-scoped).
+- `/settings/errors`, `/admin/stats` — diagnostics.
 
 ## First-run admin checklist
 
 1. **Set credentials safely** — confirm `JWT_SECRET` is a long, stable secret; it encrypts every
    credential you store below. See [Configuration](../self-hosting/configuration.md).
 2. **Configure channels** — enable the providers you want and enter their app credentials in
-   [Channels admin](./channels.md).
-3. **(Optional) Configure AI** — only needed for non-OpenAI providers or governance; otherwise the
-   `OPENAI_API_KEY` fallback applies. See [AI settings admin](./ai-settings.md).
+   **Settings → Channels**.
+3. **Configure AI** — set up your AI provider and model in **Settings → AI** (no env fallback).
 4. **Enable background collection** — set `RUN_CRON=true` on one orchestrator instance so analytics
    and comment sync populate. See [Temporal & background jobs](../self-hosting/temporal-and-cron.md).

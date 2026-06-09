@@ -1,46 +1,29 @@
-# Errors & Stats
+# Errors & Stats (Deprecated in v3.6.0)
 
-Two super-admin diagnostic screens: a log of captured integration/posting errors, and instance
-usage statistics.
-
-> **Verified against v3.5.10.** Both are super-admin only — the backing endpoints reject any
-> non-super-admin request.
+> **Verified against v3.6.0.** The `/admin/errors` and `/admin/stats` super-admin pages were removed
+> in v3.6.0. All admin functionality moved to per-tenant settings tabs. Error tracking and diagnostics
+> are currently limited to looking at logs or the Temporal UI for background job status.
 
 ---
 
-## View Errors — `/admin/errors`
+## Error Monitoring (Removed)
 
-A browsable log of errors captured from posting and integration operations, useful for diagnosing
-why a channel or post failed.
+The error diagnostic page at `/admin/errors` is no longer available. In v3.5.10 and earlier, it
+provided:
 
-Backing endpoints:
+- A browsable log of captured integration/posting errors.
+- Filter by platform (provider) or user.
+- Retry and resolve actions on individual errors.
 
-- `GET /admin/errors` — paginated list. Query parameters:
-  - `page`, `limit` — pagination (defaults: page `0`, limit `20`).
-  - `platform` — filter to a specific provider.
-  - `email` — filter to a specific user.
-  - `unknownFirst` — surface errors not yet attributed to a known platform first.
-- `GET /admin/errors/platforms` — the set of platforms that have recorded errors (to populate the
-  platform filter).
+**Workaround:** Monitor logs for error messages or use the Temporal UI to inspect failed workflows.
 
-Each row also offers two actions (v3.5.10):
+## Stats & Usage (Removed)
 
-- **Retry** — `POST /admin/errors/:id/retry` re-queues the errored post into the publish workflow
-  (reuses `changePostStatus(... 'schedule')`) and then clears the error from the log.
-- **Resolve** — `DELETE /admin/errors/:id` dismisses a handled error from the log.
+The usage stats page at `/admin/stats` is no longer available. In v3.5.10 and earlier, it showed
+instance-level usage across a date range.
 
-Use this to spot, for example, a provider whose tokens are failing to refresh or a recurring API
-rejection on a particular channel — then retry the affected post or resolve the entry once handled.
-
-## View Stats — `/admin/stats`
-
-Instance-level usage statistics over a date range.
-
-Backing endpoint:
-
-- `GET /admin/stats` — query parameters:
-  - `from`, `to` — date range bounds.
-  - `unknownOnly` — restrict to unattributed/unknown records.
+**Workaround:** Each organization can view their own analytics in **Settings → Analytics**. For
+cross-organization statistics, query the database directly or use per-organization analytics APIs.
 
 ## Related
 
