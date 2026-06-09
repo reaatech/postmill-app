@@ -23,6 +23,12 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.7.0]**
+- **Postiz is now Postmill** — the fork has a new name, logo, and brand color. It's the same app and your data is untouched; only the branding changed across the UI, page titles, emails, and every language.
+- **A renamed Node SDK** — the SDK is now published as [`@reaatech/postmill-sdk`](https://www.npmjs.com/package/@reaatech/postmill-sdk) (was `@postiz/node`). Update your `npm install` and import if you use it.
+- **Self-hosters: a few one-time renames** — environment variables changed from `POSTIZ_*` to `POSTMILL_*`, and the Docker image is now `ghcr.io/reaatech/postmill-app` with `postmill-*` services/volumes. Your database is preserved; follow the **"Migrating from a Postiz-branded deployment"** steps in the upgrading guide before redeploying.
+- **In-app AI chat starts fresh** — the rename resets the assistant's saved conversation memory (a one-time reset); scheduling, posts, analytics, and all other data are unaffected.
+
 **[v3.6.0]**
 - **Your own profile page with password and notification controls** — Set your avatar, bio, and name in a new settings profile tab, change your password, see your active sessions, and manage email notification preferences — all in `/settings/profile`.
 - **Bring your own storage — S3, R2, Backblaze, IDrive** — Every organization can mount its own storage provider (S3, R2, Backblaze B2, IDrive e2, or local disk) with 5 GB of free space by default. Migrate files between providers at any time. The old global `STORAGE_PROVIDER` env var is gone.
