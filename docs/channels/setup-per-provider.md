@@ -4,8 +4,9 @@ How to create the developer app / credentials for each channel and what to enter
 [Channels admin](../admin/channels.md). Scopes, identifiers, and credential keys below are taken
 from the provider implementations.
 
-> **Verified against v3.5.9.** 36 providers. Configure credentials in the admin UI (encrypted at
-> rest) or via the equivalent environment variables — the admin UI takes precedence.
+> **Verified against v3.6.0.** 36 providers. Configure per-tenant credentials via
+> **Settings → Channels** (encrypted at rest). The global env var fallback is removed in v3.6.0 —
+> all credentials are managed in-app.
 
 > **Per-provider capabilities** (comment sync, first comment, polls, video, carousel, alt text, max
 > media, link preview, refresh token, watchlist) are declared in the central capability matrix — the
@@ -50,8 +51,7 @@ Register that exact URL as an allowed redirect/callback in the provider's develo
 ## OAuth-app providers
 
 Register an app on the platform, set the redirect URL (`…/integrations/social/<identifier>`), and
-enter the client ID/secret. The **credentials** column lists the environment-variable equivalents;
-in the admin UI these map to the client ID / client secret fields.
+enter the client ID/secret in **Settings → Channels**.
 
 ### X (Twitter)
 
@@ -62,7 +62,7 @@ in the admin UI these map to the client ID / client secret fields.
 ### LinkedIn (profile) & LinkedIn Page
 
 - **Identifiers:** `linkedin`, `linkedin-page` · **Register at:** LinkedIn Developers.
-- **Credentials:** `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET` (shared by both).
+- **Credentials:** Client ID and Client Secret from your LinkedIn app (shared by both).
 - **Scopes:** `openid`, `profile`, `w_member_social`, `r_basicprofile`, `rw_organization_admin`,
   `w_organization_social`, `r_organization_social`.
 - **Redirect:** `…/integrations/social/linkedin` and `…/integrations/social/linkedin-page`.

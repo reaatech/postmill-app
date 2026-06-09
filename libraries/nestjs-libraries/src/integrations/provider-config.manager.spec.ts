@@ -431,7 +431,9 @@ describe('ProviderConfigManager', () => {
       await manager.refreshCache();
 
       expect(replaceSpy).toHaveBeenCalled();
-      const mapArg = replaceSpy.mock.calls[0][0];
+      const mapArg = replaceSpy.mock.calls[0][0] === '__global__'
+        ? replaceSpy.mock.calls[0][1]
+        : replaceSpy.mock.calls[0][0];
       const entry = mapArg.get('test');
       expect(entry?.scopes).toEqual(['read', 'write', 'admin']);
     });
@@ -453,7 +455,9 @@ describe('ProviderConfigManager', () => {
       await manager.refreshCache();
 
       expect(replaceSpy).toHaveBeenCalled();
-      const mapArg = replaceSpy.mock.calls[0][0];
+      const mapArg = replaceSpy.mock.calls[0][0] === '__global__'
+        ? replaceSpy.mock.calls[0][1]
+        : replaceSpy.mock.calls[0][0];
       const entry = mapArg.get('telegram');
       expect(entry?.token).toBe(decryptedToken);
     });
@@ -478,7 +482,9 @@ describe('ProviderConfigManager', () => {
       await manager.refreshCache();
 
       expect(replaceSpy).toHaveBeenCalled();
-      const mapArg = replaceSpy.mock.calls[0][0];
+      const mapArg = replaceSpy.mock.calls[0][0] === '__global__'
+        ? replaceSpy.mock.calls[0][1]
+        : replaceSpy.mock.calls[0][0];
       expect(mapArg.has('test')).toBe(false);
     });
   });

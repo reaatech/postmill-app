@@ -7,6 +7,8 @@ import {
   replaceCredentialsMap,
 } from './credentials';
 
+const ORG = 'test-org';
+
 describe('credentials', () => {
   beforeEach(() => {
     clearCredentials();
@@ -15,68 +17,72 @@ describe('credentials', () => {
 
   describe('setCredentials / getCredential', () => {
     it('sets and retrieves a credential entry', () => {
-      setCredentials('github', { clientId: 'abc', clientSecret: 'secret' });
-      expect(getCredential('github', 'clientId')).toBe('abc');
-      expect(getCredential('github', 'clientSecret')).toBe('secret');
+      setCredentials(ORG, 'github', { clientId: 'abc', clientSecret: 'secret' });
+      expect(getCredential(ORG, 'github', 'clientId')).toBe('abc');
+      expect(getCredential(ORG, 'github', 'clientSecret')).toBe('secret');
     });
 
     it('returns undefined for all keys when identifier is missing', () => {
-      expect(getCredential('nonexistent', 'clientId')).toBeUndefined();
-      expect(getCredential('nonexistent', 'clientSecret')).toBeUndefined();
-      expect(getCredential('nonexistent', 'redirectUri')).toBeUndefined();
-      expect(getCredential('nonexistent', 'token')).toBeUndefined();
+      expect(getCredential(ORG, 'nonexistent', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'nonexistent', 'clientSecret')).toBeUndefined();
+      expect(getCredential(ORG, 'nonexistent', 'redirectUri')).toBeUndefined();
+      expect(getCredential(ORG, 'nonexistent', 'token')).toBeUndefined();
     });
 
     it('overwrites an existing entry', () => {
-      setCredentials('twitter', { clientId: 'old' });
-      setCredentials('twitter', { clientId: 'new' });
-      expect(getCredential('twitter', 'clientId')).toBe('new');
+      setCredentials(ORG, 'twitter', { clientId: 'old' });
+      setCredentials(ORG, 'twitter', { clientId: 'new' });
+      expect(getCredential(ORG, 'twitter', 'clientId')).toBe('new');
     });
 
     it('returns undefined for keys not present in entry', () => {
-      setCredentials('slack', { clientId: '123' });
-      expect(getCredential('slack', 'clientSecret')).toBeUndefined();
-      expect(getCredential('slack', 'redirectUri')).toBeUndefined();
-      expect(getCredential('slack', 'token')).toBeUndefined();
+      setCredentials(ORG, 'slack', { clientId: '123' });
+      expect(getCredential(ORG, 'slack', 'clientSecret')).toBeUndefined();
+      expect(getCredential(ORG, 'slack', 'redirectUri')).toBeUndefined();
+      expect(getCredential(ORG, 'slack', 'token')).toBeUndefined();
     });
 
     it('handles all four credential key types', () => {
-      setCredentials('all-keys', {
+      setCredentials(ORG, 'all-keys', {
         clientId: 'cid',
         clientSecret: 'cs',
         redirectUri: 'ru',
         token: 'tok',
       });
-      expect(getCredential('all-keys', 'clientId')).toBe('cid');
-      expect(getCredential('all-keys', 'clientSecret')).toBe('cs');
-      expect(getCredential('all-keys', 'redirectUri')).toBe('ru');
-      expect(getCredential('all-keys', 'token')).toBe('tok');
+      expect(getCredential(ORG, 'all-keys', 'clientId')).toBe('cid');
+      expect(getCredential(ORG, 'all-keys', 'clientSecret')).toBe('cs');
+      expect(getCredential(ORG, 'all-keys', 'redirectUri')).toBe('ru');
+      expect(getCredential(ORG, 'all-keys', 'token')).toBe('tok');
     });
 
     it('stores and retrieves entries with empty string values', () => {
-      setCredentials('empty', { clientId: '' });
-      expect(getCredential('empty', 'clientId')).toBe('');
+      setCredentials(ORG, 'empty', { clientId: '' });
+      expect(getCredential(ORG, 'empty', 'clientId')).toBe('');
     });
 
     it('handles entries with undefined field values', () => {
-      setCredentials('undef', { clientId: undefined });
-      expect(getCredential('undef', 'clientId')).toBeUndefined();
+      setCredentials(ORG, 'undef', { clientId: undefined });
+      expect(getCredential(ORG, 'undef', 'clientId')).toBeUndefined();
     });
 
     it('supports multiple independent providers', () => {
-      setCredentials('a', { clientId: 'a-id' });
-      setCredentials('b', { clientId: 'b-id' });
-      expect(getCredential('a', 'clientId')).toBe('a-id');
-      expect(getCredential('b', 'clientId')).toBe('b-id');
+      setCredentials(ORG, 'a', { clientId: 'a-id' });
+      setCredentials(ORG, 'b', { clientId: 'b-id' });
+      expect(getCredential(ORG, 'a', 'clientId')).toBe('a-id');
+      expect(getCredential(ORG, 'b', 'clientId')).toBe('b-id');
+    });
+
+    it('isolates credentials across organizations', () => {
+      setCredentials('org-a', 'github', { clientId: 'a-id' });
+      setCredentials('org-b', 'github', { clientId: 'b-id' });
+      setCredentials('org-b', 'slack', { clientId: 'b-slack' });
+      expect(getCredential('org-a', 'github', 'clientId')).toBe('a-id');
+      expect(getCredential('org-b', 'github', 'clientId')).toBe('b-id');
+      expect(getCredential('org-b', 'slack', 'clientId')).toBe('b-slack');
     });
   });
 
   describe('getEnvOr', () => {
-    it('returns the cached value when it exists', () => {
-      setCredentials('github', { clientId: 'cached-id' });
-      expect(getEnvOr('GITHUB_CLIENT_ID', 'github', 'clientId')).toBe('cached-id');
-    });
-
     it('falls back to process.env when cache is missing', () => {
       vi.stubEnv('MY_VAR', 'env-value');
       expect(getEnvOr('MY_VAR', 'missing', 'clientId')).toBe('env-value');
@@ -86,18 +92,6 @@ describe('credentials', () => {
       expect(getEnvOr('NONEXISTENT_VAR', 'missing', 'clientId')).toBe('');
     });
 
-    it('falls through to env when cached value is empty string (falsy)', () => {
-      vi.stubEnv('FALLBACK', 'from-env');
-      setCredentials('test', { clientId: '' });
-      expect(getEnvOr('FALLBACK', 'test', 'clientId')).toBe('from-env');
-    });
-
-    it('prefers cached value over process.env', () => {
-      vi.stubEnv('GITHUB_CLIENT_ID', 'env-id');
-      setCredentials('github', { clientId: 'cached-id' });
-      expect(getEnvOr('GITHUB_CLIENT_ID', 'github', 'clientId')).toBe('cached-id');
-    });
-
     it('returns empty string when env var is undefined', () => {
       expect(getEnvOr('SOME_UNDEFINED_KEY', 'nope', 'clientId')).toBe('');
     });
@@ -105,54 +99,54 @@ describe('credentials', () => {
 
   describe('clearCredentials', () => {
     it('removes all entries', () => {
-      setCredentials('a', { clientId: '1' });
-      setCredentials('b', { clientId: '2' });
+      setCredentials(ORG, 'a', { clientId: '1' });
+      setCredentials(ORG, 'b', { clientId: '2' });
       clearCredentials();
-      expect(getCredential('a', 'clientId')).toBeUndefined();
-      expect(getCredential('b', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'a', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'b', 'clientId')).toBeUndefined();
     });
 
     it('is idempotent', () => {
       clearCredentials();
       clearCredentials();
-      expect(getCredential('anything', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'anything', 'clientId')).toBeUndefined();
     });
   });
 
   describe('replaceCredentialsMap', () => {
-    it('replaces the entire credentials map atomically', () => {
-      setCredentials('old', { clientId: 'old-value' });
-      const newMap = new Map();
+    it('replaces the entire credentials map atomically for an org', () => {
+      setCredentials(ORG, 'old', { clientId: 'old-value' });
+      const newMap = new Map<string, { clientId?: string }>();
       newMap.set('new', { clientId: 'new-value' });
-      replaceCredentialsMap(newMap);
-      expect(getCredential('old', 'clientId')).toBeUndefined();
-      expect(getCredential('new', 'clientId')).toBe('new-value');
+      replaceCredentialsMap(ORG, newMap);
+      expect(getCredential(ORG, 'old', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'new', 'clientId')).toBe('new-value');
     });
 
     it('does not share reference with the passed-in map after replacement', () => {
-      const external = new Map();
+      const external = new Map<string, { clientId?: string }>();
       external.set('ext', { clientId: 'ext-value' });
-      replaceCredentialsMap(external);
+      replaceCredentialsMap(ORG, external);
       external.set('later', { clientId: 'later-value' });
-      expect(getCredential('later', 'clientId')).toBeUndefined();
+      expect(getCredential(ORG, 'later', 'clientId')).toBeUndefined();
     });
 
     it('works with an empty map', () => {
-      setCredentials('a', { clientId: '1' });
-      replaceCredentialsMap(new Map());
-      expect(getCredential('a', 'clientId')).toBeUndefined();
+      setCredentials(ORG, 'a', { clientId: '1' });
+      replaceCredentialsMap(ORG, new Map());
+      expect(getCredential(ORG, 'a', 'clientId')).toBeUndefined();
     });
   });
 
   describe('integration scenarios', () => {
     it('supports a full lifecycle: set, get, replace, clear', () => {
-      setCredentials('x', { token: 'tok1' });
-      expect(getCredential('x', 'token')).toBe('tok1');
-      replaceCredentialsMap(new Map([['y', { token: 'tok2' }]]));
-      expect(getCredential('x', 'token')).toBeUndefined();
-      expect(getCredential('y', 'token')).toBe('tok2');
+      setCredentials(ORG, 'x', { token: 'tok1' });
+      expect(getCredential(ORG, 'x', 'token')).toBe('tok1');
+      replaceCredentialsMap(ORG, new Map([['y', { token: 'tok2' }]]));
+      expect(getCredential(ORG, 'x', 'token')).toBeUndefined();
+      expect(getCredential(ORG, 'y', 'token')).toBe('tok2');
       clearCredentials();
-      expect(getCredential('y', 'token')).toBeUndefined();
+      expect(getCredential(ORG, 'y', 'token')).toBeUndefined();
     });
   });
 });
