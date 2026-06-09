@@ -23,7 +23,7 @@ export class TelemetryService {
   private _configured = false;
 
   constructor() {
-    this._tracer = trace.getTracer('postiz-ai');
+    this._tracer = trace.getTracer('postmill-ai');
   }
 
   configure(observability: any, _secretSettings?: Record<string, string>) {
@@ -48,7 +48,7 @@ export class TelemetryService {
       });
       const processor = new BatchSpanProcessor(exporter);
       const provider = new BasicTracerProvider({ spanProcessors: [processor] });
-      this._tracer = provider.getTracer('postiz-ai');
+      this._tracer = provider.getTracer('postmill-ai');
       this._logger.log(`OTLP exporter wired to ${observability.endpoint}`);
       this._configured = true;
     } catch (err) {
@@ -96,7 +96,7 @@ export class TelemetryService {
     if (this._obsLogger !== null) return this._obsLogger || null;
     try {
       const { createLogger } = await import('@reaatech/a2a-reference-observability');
-      this._obsLogger = createLogger({ name: 'postiz-ai' } as any);
+      this._obsLogger = createLogger({ name: 'postmill-ai' } as any);
     } catch (err) {
       this._logger.warn(`a2a-reference-observability unavailable: ${(err as Error).message}`);
       this._obsLogger = false;

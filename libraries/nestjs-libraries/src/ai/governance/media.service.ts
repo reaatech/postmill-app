@@ -197,7 +197,7 @@ export class AiMediaService {
       const result = await signer.sign(artifactUrl, {
         title: `AI ${operation}`,
         format: 'application/octet-stream',
-        claimGenerator: 'postiz/ai-media',
+        claimGenerator: 'postmill/ai-media',
         pipelineDefHash: 'na',
         runId,
         generatedAt: new Date().toISOString(),

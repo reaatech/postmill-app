@@ -1,37 +1,37 @@
 # Do **not** use this yml for production. It is not up-to-date.
-# Use https://docs.postiz.com/installation/docker-compose
+# Use https://docs.postmill.com/installation/docker-compose
 # This is only for the dev enviroment
 
 services:
-  postiz-postgres:
+  postmill-postgres:
     # ref: https://hub.docker.com/_/postgres
     image: postgres:17-alpine # 17.0
-    container_name: postiz-postgres
+    container_name: postmill-postgres
     restart: always
     environment:
-      POSTGRES_PASSWORD: postiz-local-pwd
-      POSTGRES_USER: postiz-local
-      POSTGRES_DB: postiz-db-local
+      POSTGRES_PASSWORD: postmill-local-pwd
+      POSTGRES_USER: postmill-local
+      POSTGRES_DB: postmill-db-local
       TEMPORAL_ADDRESS: "temporal:7233"
     volumes:
       - postgres-volume:/var/lib/postgresql/data
     ports:
       - 5432:5432
     networks:
-      - postiz-network
-  postiz-redis:
+      - postmill-network
+  postmill-redis:
     # ref: https://hub.docker.com/_/redis
     image: redis:7-alpine # 7.4.0
-    container_name: postiz-redis
+    container_name: postmill-redis
     restart: always
     ports:
       - 6379:6379
     networks:
-      - postiz-network
-  postiz-pg-admin:
+      - postmill-network
+  postmill-pg-admin:
     # ref: https://hub.docker.com/r/dpage/pgadmin4/tags
     image: dpage/pgadmin4:latest
-    container_name: postiz-pg-admin
+    container_name: postmill-pg-admin
     restart: always
     ports:
       - 8081:80
@@ -39,19 +39,19 @@ services:
       PGADMIN_DEFAULT_EMAIL: admin@admin.com
       PGADMIN_DEFAULT_PASSWORD: admin
     networks:
-      - postiz-network
-  postiz-redisinsight:
+      - postmill-network
+  postmill-redisinsight:
     # ref: https://hub.docker.com/r/redis/redisinsight
     image: redis/redisinsight:latest
-    container_name: postiz-redisinsight
+    container_name: postmill-redisinsight
     links:
-      - postiz-redis
+      - postmill-redis
     ports:
       - '5540:5540'
     volumes:
       - redisinsight:/data
     networks:
-      - postiz-network
+      - postmill-network
     restart: always
 
   temporal-elasticsearch:
@@ -141,7 +141,7 @@ volumes:
     external: false
 
 networks:
-  postiz-network:
+  postmill-network:
     external: false
   temporal-network:
     driver: bridge
