@@ -34,7 +34,12 @@ export class SocialCommentsRepository {
 
     if (filters.unreadOnly) {
       where.isOwn = false;
-      where.status = { not: 'handled' };
+      if (where.status) {
+        where.AND = [{ status: where.status }, { status: { not: 'handled' } }];
+        delete where.status;
+      } else {
+        where.status = { not: 'handled' };
+      }
     }
 
     if (filters.cursor) {

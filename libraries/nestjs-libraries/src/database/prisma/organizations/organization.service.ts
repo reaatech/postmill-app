@@ -6,7 +6,7 @@ import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.te
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { Organization, ShortLinkPreference } from '@prisma/client';
+import { Organization, Role, ShortLinkPreference } from '@prisma/client';
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 
 @Injectable()
@@ -71,6 +71,11 @@ export class OrganizationService {
 
   getTeam(orgId: string) {
     return this._organizationRepository.getTeam(orgId);
+  }
+
+  async createTeamUser(orgId: string, email: string, password: string, userRole: string) {
+    const role = userRole === 'ADMIN' ? Role.ADMIN : Role.USER;
+    return this._organizationRepository.createTeamUser(orgId, email, password, role);
   }
 
   async setStreak(organizationId: string, type: 'start' | 'end') {

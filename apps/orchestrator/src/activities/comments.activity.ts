@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Activity, ActivityMethod } from 'nestjs-temporal-core';
-import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
+import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
@@ -14,7 +14,7 @@ import { log } from '@temporalio/activity';
 export class CommentsActivity {
   constructor(
     private _prisma: PrismaService,
-    private _providerConfigManager: ProviderConfigManager,
+    private _orgProviderConfigManager: OrgProviderConfigManager,
     private _socialCommentsService: SocialCommentsService,
     private _emailService: EmailService,
     private _webhooksService: WebhooksService,
@@ -23,7 +23,7 @@ export class CommentsActivity {
 
   @ActivityMethod()
   async syncPostComments(orgId: string, daysBack: number): Promise<void> {
-    await this._providerConfigManager.ensureFresh();
+    await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
     let cursor: string | undefined;

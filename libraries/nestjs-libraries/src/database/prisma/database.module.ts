@@ -40,19 +40,21 @@ import { OAuthRepository } from '@gitroom/nestjs-libraries/database/prisma/oauth
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
 import { AnnouncementsRepository } from '@gitroom/nestjs-libraries/database/prisma/announcements/announcements.repository';
 import { AnnouncementsService } from '@gitroom/nestjs-libraries/database/prisma/announcements/announcements.service';
-import { ErrorsRepository } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.repository';
-import { ErrorsService } from '@gitroom/nestjs-libraries/database/prisma/errors/errors.service';
-import { AdminStatsRepository } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.repository';
-import { AdminStatsService } from '@gitroom/nestjs-libraries/database/prisma/admin-stats/admin-stats.service';
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { ProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.repository';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
+import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
+import { OrgProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.repository';
+import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.repository';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-rag/ai-rag.repository';
+import { PgVectorStoreAdapter } from '@gitroom/nestjs-libraries/ai/rag/pgvector.adapter';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
@@ -62,6 +64,7 @@ import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/w
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 
 @Global()
 @Module({
@@ -111,10 +114,6 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
     VideoManager,
     AnnouncementsRepository,
     AnnouncementsService,
-    ErrorsRepository,
-    ErrorsService,
-    AdminStatsRepository,
-    AdminStatsService,
     ProviderConfigManager,
     ProviderConfigService,
     ProviderConfigRepository,
@@ -122,7 +121,10 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
     SocialCommentsRepository,
     AiSettingsService,
     AiSettingsRepository,
+    OrgAiSettingsService,
+    OrgAiSettingsRepository,
     AiRagRepository,
+    PgVectorStoreAdapter,
     AiSettingsManager,
     AnalyticsRepository,
     RedisService,
@@ -133,6 +135,10 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
     WatchlistService,
     CampaignsRepository,
     CampaignsService,
+    OrgProviderConfigService,
+    OrgProviderConfigRepository,
+    OrgProviderConfigManager,
+    AuditRepository,
   ],
   get exports() {
     return this.providers;

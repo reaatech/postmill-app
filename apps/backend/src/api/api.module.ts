@@ -38,14 +38,17 @@ import { OAuthAppController } from '@gitroom/backend/api/routes/oauth-app.contro
 import { ApprovedAppsController } from '@gitroom/backend/api/routes/approved-apps.controller';
 import { OAuthController, OAuthAuthorizedController } from '@gitroom/backend/api/routes/oauth.controller';
 import { AnnouncementsController } from '@gitroom/backend/api/routes/announcements.controller';
-import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
 import { ChannelConfigController } from '@gitroom/backend/api/routes/channel.config.controller';
+import { ChannelConfigPerTenantController } from '@gitroom/backend/api/routes/channel-config.per-tenant.controller';
 import { SocialCommentsController } from '@gitroom/backend/api/routes/social-comments.controller';
 import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
 import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
 import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
 import { ProviderCapabilitiesController } from '@gitroom/backend/api/routes/provider-capabilities.controller';
 import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
+import { RagController } from '@gitroom/backend/api/routes/rag.controller';
+import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
+import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
@@ -75,13 +78,16 @@ const authenticatedController = [
   ApprovedAppsController,
   OAuthAuthorizedController,
   AnnouncementsController,
-  AdminController,
   ChannelConfigController,
   AnalyticsV2Controller,
   AiSettingsController,
   AiModerateController,
   AiUserController,
   ProviderCapabilitiesController,
+  StorageController,
+  ChannelConfigPerTenantController,
+  OrgAiSettingsController,
+  RagController,
 ];
 @Module({
   imports: [UploadModule],

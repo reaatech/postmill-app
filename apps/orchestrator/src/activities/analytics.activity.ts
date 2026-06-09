@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Activity, ActivityMethod } from 'nestjs-temporal-core';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
+import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -53,7 +53,7 @@ export class AnalyticsActivity {
   constructor(
     private readonly _prisma: PrismaService,
     private readonly _integrationManager: IntegrationManager,
-    private readonly _providerConfigManager: ProviderConfigManager,
+    private readonly _orgProviderConfigManager: OrgProviderConfigManager,
     private readonly _organizationService: OrganizationService,
     private readonly _integrationService: IntegrationService,
     private readonly _refreshIntegrationService: RefreshIntegrationService,
@@ -72,7 +72,7 @@ export class AnalyticsActivity {
     orgId: string,
     daysBack: number = CHANNEL_DAYS_BACK
   ): Promise<void> {
-    await this._providerConfigManager.ensureFresh();
+    await this._orgProviderConfigManager.ensureFresh(orgId);
 
     const integrations = await this._integrationService.getIntegrationsList(
       orgId
@@ -155,7 +155,7 @@ export class AnalyticsActivity {
 
   @ActivityMethod()
   async collectPostSnapshots(orgId: string, daysBack: number): Promise<void> {
-    await this._providerConfigManager.ensureFresh();
+    await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
     const posts = (await this._prisma.post.findMany({
@@ -385,12 +385,12 @@ export class AnalyticsActivity {
 
   @ActivityMethod()
   async backfillIntegration(integrationId: string): Promise<void> {
-    await this._providerConfigManager.ensureFresh();
-
     const integration = decryptIntegrationTokens(await this._prisma.integration.findUnique({
       where: { id: integrationId },
     }));
     if (!integration || integration.type !== 'social') return;
+
+    await this._orgProviderConfigManager.ensureFresh(integration.organizationId);
 
     const provider = this._integrationManager.getSocialIntegrationUnchecked(
       integration.providerIdentifier

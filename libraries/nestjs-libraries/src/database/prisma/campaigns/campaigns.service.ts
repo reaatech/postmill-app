@@ -40,4 +40,8 @@ export class CampaignsService {
   remove(id: string, organizationId: string) {
     return this._campaignsRepository.softDelete(id, organizationId);
   }
+
+  getEngagement(id: string, organizationId: string) {
+    return this._campaignsRepository.getEngagement(id, organizationId);
+  }
 }

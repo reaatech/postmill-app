@@ -54,4 +54,48 @@ export class CampaignsRepository {
       data: { deletedAt: new Date() },
     });
   }
+
+  async getEngagement(id: string, organizationId: string) {
+    const result = await this._prisma.post.aggregate({
+      where: { campaignId: id, organizationId, deletedAt: null },
+      _sum: { lastViews: true, lastLikes: true, lastComments: true },
+      _avg: { lastViews: true, lastLikes: true, lastComments: true },
+    });
+
+    const topPost = await this._prisma.post.findFirst({
+      where: { campaignId: id, organizationId, deletedAt: null },
+      orderBy: [
+        { lastLikes: { sort: 'desc', nulls: 'last' } },
+        { lastComments: { sort: 'desc', nulls: 'last' } },
+      ],
+      select: {
+        id: true,
+        content: true,
+        title: true,
+        lastViews: true,
+        lastLikes: true,
+        lastComments: true,
+        integration: { select: { name: true } },
+      },
+    });
+
+    return {
+      totalViews: result._sum.lastViews || 0,
+      totalLikes: result._sum.lastLikes || 0,
+      totalComments: result._sum.lastComments || 0,
+      avgViews: result._avg.lastViews || 0,
+      avgLikes: result._avg.lastLikes || 0,
+      avgComments: result._avg.lastComments || 0,
+      topPost: topPost
+        ? {
+            id: topPost.id,
+            title: topPost.title || topPost.content?.slice(0, 100) || '',
+            lastViews: topPost.lastViews,
+            lastLikes: topPost.lastLikes,
+            lastComments: topPost.lastComments,
+            integration: topPost.integration?.name || '',
+          }
+        : null,
+    };
+  }
 }

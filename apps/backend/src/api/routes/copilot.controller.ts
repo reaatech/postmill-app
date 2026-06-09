@@ -51,18 +51,10 @@ export class CopilotController {
   ) {}
 
   private async _buildServiceAdapter(orgId?: string) {
-    const envKey = process.env.OPENAI_API_KEY;
     const resolved = await this._aiModelProvider.resolveConfigForScope('agent', orgId);
 
     if (!resolved) {
-      if (envKey) {
-        const surfaceDefaults = this._aiModelProvider.getSurfaceDefaults('agent');
-        return new OpenAIAdapter({
-          model: surfaceDefaults.textModel,
-          openai: new OpenAI({ apiKey: envKey }) as any,
-        });
-      }
-      throw new HttpException('AI provider not configured', HttpStatus.UNPROCESSABLE_ENTITY);
+      throw new HttpException('AI is not configured for this organization. Go to Settings → AI to configure a provider.', HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     const isOpenAICompatible = resolved.adapter.identifier === 'openai' ||
