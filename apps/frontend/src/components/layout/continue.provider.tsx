@@ -48,7 +48,10 @@ export const ContinueProvider: FC = () => {
     );
   }, [added]);
 
-  if (!added || !continueId || !integrations) {
+  // `integrations` is iterated with `.map` below; a truthy non-array (error/edge
+  // response) would throw and crash the tree. Require a real array, not just
+  // truthy.
+  if (!added || !continueId || !Array.isArray(integrations)) {
     return null;
   }
 
