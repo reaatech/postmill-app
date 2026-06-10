@@ -174,7 +174,6 @@ vi.mock('striptags', () => ({ default: vi.fn((s: string, allowed?: string[]) => 
 vi.mock('slugify', () => ({ default: vi.fn((s: string) => s.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '')) }));
 
 process.env.FRONTEND_URL = 'http://localhost:5000';
-process.env.STORAGE_PROVIDER = 'local';
 process.env.NEXT_PUBLIC_BACKEND_URL = 'http://localhost:5000';
 process.env.NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY = '/uploads';
 

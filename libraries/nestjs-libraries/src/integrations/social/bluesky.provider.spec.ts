@@ -101,7 +101,6 @@ vi.mock('@atproto/api', () => ({
 vi.mock('mime', () => ({ default: { getType: vi.fn(() => 'image/jpeg') } }));
 
 process.env.FRONTEND_URL = 'http://localhost:5000';
-process.env.STORAGE_PROVIDER = 'local';
 
 import { BlueskyProvider } from './bluesky.provider';
 

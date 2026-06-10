@@ -95,7 +95,6 @@ vi.mock('googleapis', () => {
 });
 
 process.env.FRONTEND_URL = 'http://localhost:5000';
-process.env.STORAGE_PROVIDER = 'local';
 
 import { XProvider } from './x.provider';
 import { FacebookProvider } from './facebook.provider';

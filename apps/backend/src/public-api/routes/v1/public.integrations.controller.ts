@@ -22,7 +22,7 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
 import { ChangePostStatusDto } from '@gitroom/nestjs-libraries/dtos/posts/change.post.status.dto';
@@ -64,8 +64,6 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 @ApiTags('Public API')
 @Controller('/public/v1')
 export class PublicIntegrationsController {
-  private storage = UploadFactory.createStorage();
-
   constructor(
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
@@ -73,7 +71,8 @@ export class PublicIntegrationsController {
     private _notificationService: NotificationService,
     private _integrationManager: IntegrationManager,
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _analyticsService: AnalyticsService
+    private _analyticsService: AnalyticsService,
+    private _storageService: StorageService
   ) {}
 
   @Post('/upload')
@@ -88,7 +87,8 @@ export class PublicIntegrationsController {
       throw new HttpException({ msg: 'No file provided' }, 400);
     }
 
-    const getFile = await this.storage.uploadFile(file);
+    const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+    const getFile = await adapter.uploadFile(file);
     return this._mediaService.saveFile(
       org.id,
       getFile.originalname,
@@ -114,7 +114,8 @@ export class PublicIntegrationsController {
     const mimetype = detected.mime;
     const ext = detected.ext;
 
-    const getFile = await this.storage.uploadFile({
+    const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+    const getFile = await adapter.uploadFile({
       buffer,
       mimetype,
       size: buffer.length,

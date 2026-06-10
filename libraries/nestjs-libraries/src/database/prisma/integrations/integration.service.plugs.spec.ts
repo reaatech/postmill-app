@@ -6,8 +6,10 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
   ioRedis: { get: vi.fn(), set: vi.fn(), del: vi.fn() },
   RedisService: class {},
 }));
-vi.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
-  UploadFactory: { createStorage: () => ({}) },
+vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
+  StorageService: class {
+    getLocalAdapterForOrg = vi.fn().mockResolvedValue({ uploadSimple: vi.fn(), uploadFile: vi.fn() });
+  },
 }));
 
 import { IntegrationService } from './integration.service';

@@ -18,8 +18,8 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { difference, uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
@@ -30,7 +30,6 @@ dayjs.extend(utc);
 
 @Injectable()
 export class IntegrationService {
-  private storage = UploadFactory.createStorage();
   constructor(
     private _integrationRepository: IntegrationRepository,
     private _autopostsRepository: AutopostRepository,
@@ -38,7 +37,8 @@ export class IntegrationService {
     private _notificationService: NotificationService,
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _temporalService: TemporalService
+    private _temporalService: TemporalService,
+    private _storageService: StorageService
   ) {}
 
   async changeActiveCron(orgId: string) {
@@ -111,9 +111,7 @@ export class IntegrationService {
     customInstanceDetails?: string
   ) {
     const uploadedPicture = picture
-      ? picture?.indexOf('imagedelivery.net') > -1
-        ? picture
-        : await this.storage.uploadSimple(picture)
+      ? await (await this._storageService.getLocalAdapterForOrg(org)).uploadSimple(picture)
       : undefined;
 
     return this._integrationRepository.createOrUpdateIntegration(
@@ -203,7 +201,7 @@ export class IntegrationService {
     await this._notificationService.inAppNotification(
       orgId,
       `Could not refresh your ${integration.providerIdentifier} channel ${err}`,
-      `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/launches`,
+      `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/schedule`,
       true,
       false,
       'info'
@@ -329,8 +327,16 @@ export class IntegrationService {
       org,
       String(getIntegrationInformation.id)
     );
+
+    let picture = getIntegrationInformation.picture;
+    const localBase = `${process.env.FRONTEND_URL || ''}/uploads`;
+    if (picture && picture.indexOf(localBase) === -1) {
+      const adapter = await this._storageService.getLocalAdapterForOrg(org);
+      picture = await adapter.uploadSimple(picture);
+    }
+
     await this._integrationRepository.updateIntegration(id, {
-      picture: getIntegrationInformation.picture,
+      picture,
       internalId: String(getIntegrationInformation.id),
       organizationId: org,
       name: getIntegrationInformation.name,
