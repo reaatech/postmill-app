@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   setCredentials,
   getCredential,
-  getEnvOr,
   clearCredentials,
   replaceCredentialsMap,
 } from './credentials';
@@ -79,21 +78,6 @@ describe('credentials', () => {
       expect(getCredential('org-a', 'github', 'clientId')).toBe('a-id');
       expect(getCredential('org-b', 'github', 'clientId')).toBe('b-id');
       expect(getCredential('org-b', 'slack', 'clientId')).toBe('b-slack');
-    });
-  });
-
-  describe('getEnvOr', () => {
-    it('falls back to process.env when cache is missing', () => {
-      vi.stubEnv('MY_VAR', 'env-value');
-      expect(getEnvOr('MY_VAR', 'missing', 'clientId')).toBe('env-value');
-    });
-
-    it('returns empty string when neither cache nor env exists', () => {
-      expect(getEnvOr('NONEXISTENT_VAR', 'missing', 'clientId')).toBe('');
-    });
-
-    it('returns empty string when env var is undefined', () => {
-      expect(getEnvOr('SOME_UNDEFINED_KEY', 'nope', 'clientId')).toBe('');
     });
   });
 

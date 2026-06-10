@@ -65,6 +65,7 @@ describe('RefreshIntegrationService', () => {
     mockIntegrationManager = {
       getSocialIntegration: vi.fn().mockReturnValue(mockProvider),
       getSocialIntegrationUnchecked: vi.fn().mockReturnValue(mockProvider),
+      requireClientInformation: vi.fn().mockResolvedValue({ client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' }),
     };
     mockWorkflowStart = vi.fn().mockResolvedValue({ workflowId: 'refresh_integration-1' });
     mockTemporalService = {
@@ -85,7 +86,7 @@ describe('RefreshIntegrationService', () => {
     it('successfully refreshes token and updates integration', async () => {
       const result = await service.refresh(mockIntegration as any);
       expect(mockIntegrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('x');
-      expect(mockRefreshToken).toHaveBeenCalledWith('old-refresh-token');
+      expect(mockRefreshToken).toHaveBeenCalledWith('old-refresh-token', expect.any(Object));
       expect(mockIntegrationService.createOrUpdateIntegration).toHaveBeenCalledWith(
         undefined,
         false,

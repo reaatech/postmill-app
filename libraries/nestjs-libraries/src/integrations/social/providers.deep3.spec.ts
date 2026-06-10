@@ -31,10 +31,9 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
   PrismaService: class {},
 }));
 vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
-  getEnvOr: (key: string, integration: string, field: string) => {
-    if (key === 'NEYNAR_CLIENT_ID') return 'neynar-client-id';
-    if (key === 'NEYNAR_SECRET_KEY') return 'neynar-secret-key';
-    if (key === 'TELEGRAM_TOKEN') return 'telegram-token';
+  getOrgCredential: (_orgId: string, identifier: string, key: string) => {
+    if (identifier === 'farcaster' && key === 'clientSecret') return 'neynar-secret-key';
+    if (identifier === 'farcaster' && key === 'clientId') return 'neynar-client-id';
     return 'mock-value';
   },
   setCredentials: vi.fn(),
@@ -548,7 +547,7 @@ describe('farcaster deep', () => {
   });
 
   it('generateAuthUrl returns URL with client ID', async () => {
-    const r = await provider.generateAuthUrl();
+    const r = await provider.generateAuthUrl({ client_id: 'neynar-client-id', client_secret: '', instanceUrl: '' });
     expect(r.url).toContain('neynar-client-id');
     expect(r).toHaveProperty('state');
     expect(r).toHaveProperty('codeVerifier');
