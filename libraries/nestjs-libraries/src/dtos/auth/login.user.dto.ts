@@ -1,6 +1,7 @@
 import {
   IsDefined,
   IsEmail,
+  IsOptional,
   IsString,
   MinLength,
   ValidateIf,
@@ -27,5 +28,9 @@ export class LoginUserDto {
   @IsDefined()
   email: string;
 
+  // Optional analytics cookie sent by the frontend; must be declared so the global
+  // forbidNonWhitelisted pipe (3Y) doesn't 400 the request.
+  @IsOptional()
+  @IsString()
   datafast_visitor_id: string;
 }
