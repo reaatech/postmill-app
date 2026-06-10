@@ -69,3 +69,15 @@ export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3
     </div>
   );
 };
+
+// Lightweight label/value stat card (no chart/sparkline) for simple KPIs.
+export const KpiCard: FC<{ label: string; value: string }> = ({ label, value }) => (
+  <div className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[12px] px-[16px] py-[14px] flex flex-col gap-[6px]">
+    <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">
+      {label}
+    </span>
+    <span className="text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
+      {value}
+    </span>
+  </div>
+);
