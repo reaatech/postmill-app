@@ -7,8 +7,7 @@ import {
   Matches,
   MinLength,
   ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+  ValidateNested, Allow } from 'class-validator';
 import { Type } from 'class-transformer';
 import { JSONSchema } from 'class-validator-jsonschema';
 
@@ -74,6 +73,11 @@ export class RedditSettingsValueDto {
 }
 
 export class RedditSettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @Type(() => RedditSettingsValueDto)
   @ValidateNested({ each: true })
   @ArrayMinSize(1)

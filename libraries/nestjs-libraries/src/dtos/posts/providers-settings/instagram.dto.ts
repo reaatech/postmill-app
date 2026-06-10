@@ -5,8 +5,7 @@ import {
   IsIn,
   IsString,
   ValidateNested,
-  IsOptional,
-} from 'class-validator';
+  IsOptional, Allow } from 'class-validator';
 
 export class Collaborators {
   @IsDefined()
@@ -14,6 +13,11 @@ export class Collaborators {
   label: string;
 }
 export class InstagramDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsIn(['post', 'story'])
   @IsDefined()
   post_type: 'post' | 'story';

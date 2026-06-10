@@ -3,10 +3,14 @@ import {
   IsOptional,
   IsString,
   IsUrl,
-  MinLength,
-} from 'class-validator';
+  MinLength, Allow } from 'class-validator';
 
 export class DribbbleDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsString()
   @IsDefined()
   @MinLength(1, {

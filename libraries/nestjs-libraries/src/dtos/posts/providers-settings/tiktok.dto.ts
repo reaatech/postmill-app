@@ -1,8 +1,12 @@
 import {
-  IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional
-} from 'class-validator';
+  IsBoolean, ValidateIf, IsIn, IsString, MaxLength, IsOptional, Allow } from 'class-validator';
 
 export class TikTokDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @ValidateIf((p) => p.title)
   @MaxLength(90)
   title: string;
