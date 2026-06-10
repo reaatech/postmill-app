@@ -1,37 +1,22 @@
-import { Injectable } from '@nestjs/common';
-import { EmailInterface } from '@gitroom/nestjs-libraries/emails/email.interface';
-import { ResendProvider } from '@gitroom/nestjs-libraries/emails/resend.provider';
-import { EmptyProvider } from '@gitroom/nestjs-libraries/emails/empty.provider';
-import { NodeMailerProvider } from '@gitroom/nestjs-libraries/emails/node.mailer.provider';
+import { Injectable, Logger } from '@nestjs/common';
+import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
+import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 import { TemporalService } from 'nestjs-temporal-core';
 import { timer } from '@gitroom/helpers/utils/timer';
 
 @Injectable()
 export class EmailService {
-  emailService: EmailInterface;
-  constructor(private _temporalService: TemporalService) {
-    this.emailService = this.selectProvider(process.env.EMAIL_PROVIDER!);
-    console.log('Email service provider:', this.emailService.name);
-    for (const key of this.emailService.validateEnvKeys) {
-      if (!process.env[key]) {
-        console.error(`Missing environment variable: ${key}`);
-      }
-    }
-  }
+  private readonly _logger = new Logger(EmailService.name);
+
+  constructor(
+    private _registry: EmailAdapterRegistry,
+    private _emailLogService: EmailLogService,
+    private _temporalService: TemporalService,
+  ) {}
 
   hasProvider() {
-    return !(this.emailService instanceof EmptyProvider);
-  }
-
-  selectProvider(provider: string) {
-    switch (provider) {
-      case 'resend':
-        return new ResendProvider();
-      case 'nodemailer':
-        return new NodeMailerProvider();
-      default:
-        return new EmptyProvider();
-    }
+    const adapter = this._registry.getActiveAdapter();
+    return adapter.name !== 'empty' && adapter.isConfigured();
   }
 
   async sendEmail(
@@ -39,7 +24,7 @@ export class EmailService {
     subject: string,
     html: string,
     addTo: 'top' | 'bottom',
-    replyTo?: string
+    replyTo?: string,
   ) {
     return this._temporalService.client
       .getRawClient()
@@ -57,16 +42,14 @@ export class EmailService {
     to: string,
     subject: string,
     html: string,
-    replyTo?: string
+    replyTo?: string,
   ) {
     if (to.indexOf('@') === -1) {
       return;
     }
 
     if (!process.env.EMAIL_FROM_ADDRESS || !process.env.EMAIL_FROM_NAME) {
-      console.log(
-        'Email sender information not found in environment variables'
-      );
+      this._logger.warn('Email sender information not found in environment variables');
       return;
     }
 
@@ -124,27 +107,55 @@ export class EmailService {
     </div>
     `;
 
+    const adapter = this._registry.getActiveAdapter();
+    const log = await this._emailLogService.createLog({
+      provider: adapter.name,
+      toAddress: to,
+      fromAddress: process.env.EMAIL_FROM_ADDRESS!,
+      subject,
+      replyTo,
+    });
+
+    // At-least-once semantics: retry up to 3 times on connection-level errors.
+    // Business-level rejections (e.g. invalid address, rate-limit) are not retried.
     let lastErr: unknown;
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const sends = await this.emailService.sendEmail(
+        const result = await adapter.send({
           to,
           subject,
-          modifiedHtml,
-          process.env.EMAIL_FROM_NAME,
-          process.env.EMAIL_FROM_ADDRESS,
-          replyTo
-        );
-        console.log(sends);
+          html: modifiedHtml,
+          fromName: process.env.EMAIL_FROM_NAME!,
+          fromAddress: process.env.EMAIL_FROM_ADDRESS!,
+          replyTo,
+        });
+
+        if (result.providerMessageId) {
+          await this._emailLogService.markSent(log.id, result.providerMessageId);
+        } else {
+          await this._emailLogService.markSent(log.id, 'no-id');
+        }
+
         return;
       } catch (err) {
+        const isConnectionError = (err as Error)?.message && (
+          /(ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|socket|network|connect|timeout)/i.test((err as Error).message)
+        );
+        if (!isConnectionError) {
+          this._logger.warn(`Non-retryable email error on attempt ${attempt + 1}: ${(err as Error).message}`);
+          lastErr = err;
+          break;
+        }
         lastErr = err;
-        console.log(`Email attempt ${attempt + 1}/3 failed:`, err);
+        this._logger.warn(`Email attempt ${attempt + 1}/3 failed: ${(err as Error).message}`);
         if (attempt < 2) {
           await timer(700);
         }
       }
     }
-    console.log(`Email to ${to} failed after 3 attempts:`, lastErr);
+
+    const errorMsg = (lastErr as Error)?.message || 'Unknown error';
+    this._logger.warn(`Email to ${to} failed after 3 attempts: ${errorMsg}`);
+    await this._emailLogService.markFailed(log.id, errorMsg);
   }
 }
