@@ -8,21 +8,17 @@ const storageMock = {
 
 const storageSvcMock = {
   assertWithinQuota: vi.fn(),
+  getLocalAdapterForOrg: vi.fn().mockResolvedValue(storageMock),
 };
 
 const mediaSvcMock = {
   saveFile: vi.fn(),
 };
 
-vi.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
-  UploadFactory: {
-    createStorage: () => storageMock,
-  },
-}));
-
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
     assertWithinQuota = storageSvcMock.assertWithinQuota;
+    getLocalAdapterForOrg = storageSvcMock.getLocalAdapterForOrg;
   },
 }));
 
@@ -34,11 +30,8 @@ function makeController() {
   const ctrl = new MediaController(
     mediaSvcMock as any,
     {} as any,
-    {} as any,
     storageSvcMock as any
   );
-  // Override the private storage field with our mock
-  (ctrl as any).storage = storageMock;
   return ctrl;
 }
 

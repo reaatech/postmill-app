@@ -1,3 +1,4 @@
+'use client';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 // @ts-ignore
 import Uppy, { BasePlugin, UploadResult, UppyFile } from '@uppy/core';
@@ -44,7 +45,7 @@ export function useUppyUploader(props: {
 }) {
   const setLocked = useLaunchStore((state) => state.setLocked);
   const toast = useToaster();
-  const { storageProvider, backendUrl, disableImageCompression, transloadit } =
+  const { backendUrl, disableImageCompression, transloadit } =
     useVariables();
   const { onUploadSuccess, allowedFileTypes } = props;
   const fetch = useFetch();
@@ -168,7 +169,7 @@ export function useUppyUploader(props: {
     });
 
     const { plugin, options } = getUppyUploadPlugin(
-      transloadit.length > 0 ? 'transloadit' : storageProvider,
+      transloadit.length > 0 ? 'transloadit' : 'local',
       fetch,
       backendUrl,
       transloadit
@@ -187,7 +188,6 @@ export function useUppyUploader(props: {
     uppy2.on('file-added', (file) => {
       setLocked(true);
       uppy2.setFileMeta(file.id, {
-        useCloudflare: storageProvider === 'cloudflare' ? 'true' : 'false', // Example of adding a custom field
         addedOrder: fileOrderIndex++, // Track original order for sorting after upload
         // Add more fields as needed
       });
@@ -215,22 +215,16 @@ export function useUppyUploader(props: {
         return orderA - orderB;
       });
 
-      if (storageProvider === 'local') {
-        setLocked(false);
-        fileOrderIndex = 0;
-        onUploadSuccess(sortedSuccessful.map((p) => p.response.body));
-        return;
-      }
-
       if (transloadit.length > 0) {
         // @ts-ignore
         const allRes = result.transloadit[0].results;
-        const toSave = uniqBy<{ name: string; originalName: string; order: number }>(
+        const toSave = uniqBy<{ name: string; originalName: string; path: string; order: number }>(
           // @ts-ignore
           Object.values(allRes).flatMap((p: any[]) => {
             return p.flatMap((item) => ({
               name: item.url.split('/').pop(),
               originalName: item.name || '',
+              path: item.url,
               order: +item.user_meta.addedOrder,
             }));
           }),
@@ -239,13 +233,14 @@ export function useUppyUploader(props: {
 
         const loadAllMedia = (
           await Promise.all(
-            toSave.map(async ({ name, originalName, order }) => ({
+            toSave.map(async ({ name, path, originalName, order }) => ({
               file: await (
                 await fetch('/media/save-media', {
                   method: 'POST',
                   body: JSON.stringify({
                     name,
                     originalName,
+                    path,
                   }),
                 })
               ).json(),
@@ -266,7 +261,7 @@ export function useUppyUploader(props: {
 
       setLocked(false);
       fileOrderIndex = 0;
-      onUploadSuccess(sortedSuccessful.map((p) => p.response.body.saved));
+      onUploadSuccess(sortedSuccessful.map((p) => p.response.body));
     });
     uppy2.on('upload-success', (file, response) => {
       // @ts-ignore

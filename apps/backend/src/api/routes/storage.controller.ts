@@ -124,18 +124,6 @@ export class StorageController {
     return { success: true };
   }
 
-  @Post('/:id/set-default')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  async setDefaultProvider(
-    @GetOrgFromRequest() org: Organization,
-    @GetUserFromRequest() user: User,
-    @Param('id') id: string
-  ) {
-    return this.#stripBigInts(
-      await this._storageService.setDefault(id, org.id, user.id)
-    );
-  }
-
   @Post('/:id/test')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(

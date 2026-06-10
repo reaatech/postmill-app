@@ -29,7 +29,6 @@ interface ProviderCardProps {
     type: string;
     name: string;
     mounted: boolean;
-    isDefault?: boolean;
     quotaBytes?: string | null;
     bucket?: string | null;
     region?: string | null;
@@ -42,7 +41,6 @@ interface ProviderCardProps {
   onDelete: (id: string) => void;
   onTest: (id: string) => void;
   onMigrate?: (id: string) => void;
-  onSetDefault?: (id: string) => void;
 }
 
 export const ProviderCard: React.FC<ProviderCardProps> = ({
@@ -55,7 +53,6 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   onDelete,
   onTest,
   onMigrate,
-  onSetDefault,
 }) => {
   const Icon = typeIcons[provider.type] || LocalIcon;
   const quota = provider.quotaBytes ? BigInt(provider.quotaBytes) : null;
@@ -80,20 +77,21 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
           </p>
         </div>
         <div className="flex items-center gap-[6px]">
-          {provider.isDefault && (
-            <div className="px-[8px] py-[2px] rounded-full text-[11px] font-medium bg-[#2a2a1a] text-[#f59e0b]">
-              Default
+          {provider.type === 'LOCAL' ? (
+            <div className="px-[8px] py-[2px] rounded-full text-[11px] font-medium bg-[#1a3a1a] text-customColor4">
+              Always on
+            </div>
+          ) : (
+            <div
+              className={`px-[8px] py-[2px] rounded-full text-[11px] font-medium ${
+                provider.mounted
+                  ? 'bg-[#1a3a1a] text-customColor4'
+                  : 'bg-[#3a1a1a] text-[#f87171]'
+              }`}
+            >
+              {provider.mounted ? 'Mounted' : 'Unmounted'}
             </div>
           )}
-          <div
-            className={`px-[8px] py-[2px] rounded-full text-[11px] font-medium ${
-              provider.mounted
-                ? 'bg-[#1a3a1a] text-customColor4'
-                : 'bg-[#3a1a1a] text-[#f87171]'
-            }`}
-          >
-            {provider.mounted ? 'Mounted' : 'Unmounted'}
-          </div>
         </div>
       </div>
 
@@ -113,20 +111,24 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
       )}
 
       <div className="flex gap-[8px] flex-wrap">
-        {provider.mounted ? (
-          <button
-            onClick={() => onUnmount(provider.id)}
-            className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-[#f87171] hover:bg-[#3a2a2a] transition-colors"
-          >
-            Unmount
-          </button>
-        ) : (
-          <button
-            onClick={() => onMount(provider.id)}
-            className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-customColor4 hover:bg-[#1a3a1a] transition-colors"
-          >
-            Mount
-          </button>
+        {provider.type !== 'LOCAL' && (
+          <>
+            {provider.mounted ? (
+              <button
+                onClick={() => onUnmount(provider.id)}
+                className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-[#f87171] hover:bg-[#3a2a2a] transition-colors"
+              >
+                Unmount
+              </button>
+            ) : (
+              <button
+                onClick={() => onMount(provider.id)}
+                className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-customColor4 hover:bg-[#1a3a1a] transition-colors"
+              >
+                Mount
+              </button>
+            )}
+          </>
         )}
         <button
           onClick={() => onEdit(provider.id)}
@@ -140,20 +142,12 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
         >
           Test
         </button>
-        {hasOtherProviders && (
+        {provider.type !== 'LOCAL' && hasOtherProviders && (
           <button
             onClick={() => onMigrate?.(provider.id)}
             className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-[#f59e0b] hover:bg-[#3a2a1a] transition-colors"
           >
             Migrate
-          </button>
-        )}
-        {!provider.isDefault && onSetDefault && (
-          <button
-            onClick={() => onSetDefault(provider.id)}
-            className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-fifth text-customColor18 hover:bg-[#3a3a3a] transition-colors"
-          >
-            Set Default
           </button>
         )}
         {provider.type !== 'LOCAL' && (

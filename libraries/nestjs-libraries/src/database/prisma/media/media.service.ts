@@ -6,7 +6,7 @@ import { Organization } from '@prisma/client';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import {
   AuthorizationActions,
   Sections,
@@ -15,13 +15,12 @@ import {
 
 @Injectable()
 export class MediaService {
-  private storage = UploadFactory.createStorage();
-
   constructor(
     private _mediaRepository: MediaRepository,
     private _openAi: OpenaiService,
     private _subscriptionService: SubscriptionService,
-    private _videoManager: VideoManager
+    private _videoManager: VideoManager,
+    private _storageService: StorageService
   ) {}
 
   async deleteMedia(org: string, id: string) {
@@ -123,10 +122,11 @@ export class MediaService {
       async () => {
         const loadedData = await video.instance.process(
           body.output,
-          body.customParams
+          body.customParams,
+          org.id
         );
 
-        const file = await this.storage.uploadSimple(loadedData);
+        const file = await (await this._storageService.getLocalAdapterForOrg(org.id)).uploadSimple(loadedData);
         return this.saveFile(org.id, file.split('/').pop(), file);
       }
     );

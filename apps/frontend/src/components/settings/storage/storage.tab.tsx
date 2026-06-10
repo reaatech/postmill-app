@@ -87,7 +87,12 @@ export const StorageTab: React.FC = () => {
 
   const handleMount = async (id: string) => {
     try {
-      await fetch('/settings/storage/' + id + '/mount', { method: 'POST' });
+      const res = await fetch('/settings/storage/' + id + '/mount', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.show(body?.message || 'Failed to mount storage provider', 'warning');
+        return;
+      }
       loadProviders();
       loadUsage();
       loadQuotaStatus();
@@ -99,7 +104,12 @@ export const StorageTab: React.FC = () => {
 
   const handleUnmount = async (id: string) => {
     try {
-      await fetch('/settings/storage/' + id + '/unmount', { method: 'POST' });
+      const res = await fetch('/settings/storage/' + id + '/unmount', { method: 'POST' });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        toast.show(body?.message || 'Failed to unmount storage provider', 'warning');
+        return;
+      }
       loadProviders();
       loadUsage();
       loadQuotaStatus();
@@ -144,22 +154,6 @@ export const StorageTab: React.FC = () => {
     }
   };
 
-  const handleSetDefault = async (id: string) => {
-    try {
-      const res = await fetch('/settings/storage/' + id + '/set-default', {
-        method: 'POST',
-      });
-      if (res.ok) {
-        loadProviders();
-        toast.show('Default storage provider updated', 'success');
-      } else {
-        toast.show('Failed to set default provider', 'warning');
-      }
-    } catch {
-      toast.show('Failed to set default provider', 'warning');
-    }
-  };
-
   const handleTest = async (id: string) => {
     try {
       const res = await fetch('/settings/storage/' + id + '/test', {
@@ -188,8 +182,8 @@ export const StorageTab: React.FC = () => {
   const formatBytes = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
     return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
   };
 
@@ -240,28 +234,60 @@ export const StorageTab: React.FC = () => {
 
           {loading ? (
             <div className="text-[14px] text-customColor18">Loading...</div>
-          ) : providers.length === 0 ? (
-            <div className="text-[14px] text-customColor18 text-center py-[40px]">
-              No storage providers configured yet.
-            </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
-              {providers.map((provider) => (
-                <ProviderCard
-                  key={provider.id}
-                  provider={provider}
-                  usageBytes={usage[provider.id] || null}
-                  hasOtherProviders={providers.length > 1}
-                  onMount={handleMount}
-                  onUnmount={handleUnmount}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onTest={handleTest}
-                  onMigrate={handleMigrate}
-                  onSetDefault={handleSetDefault}
-                />
-              ))}
-            </div>
+            <>
+              <div className="flex flex-col gap-[12px]">
+                <h3 className="text-[16px] text-textColor font-medium">
+                  Base Storage (always on)
+                </h3>
+                {providers
+                  .filter((p) => p.type === 'LOCAL')
+                  .map((provider) => (
+                    <ProviderCard
+                      key={provider.id}
+                      provider={provider}
+                      usageBytes={usage[provider.id] || null}
+                      hasOtherProviders={providers.filter((p) => p.type !== 'LOCAL').length > 0}
+                      onMount={handleMount}
+                      onUnmount={handleUnmount}
+                      onEdit={handleEdit}
+                      onDelete={handleDelete}
+                      onTest={handleTest}
+                      onMigrate={handleMigrate}
+                    />
+                  ))}
+              </div>
+
+              {providers.filter((p) => p.type !== 'LOCAL').length > 0 ? (
+                <div className="flex flex-col gap-[12px]">
+                  <h3 className="text-[16px] text-textColor font-medium">
+                    Additional Providers
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
+                    {providers
+                      .filter((p) => p.type !== 'LOCAL')
+                      .map((provider) => (
+                        <ProviderCard
+                          key={provider.id}
+                          provider={provider}
+                          usageBytes={usage[provider.id] || null}
+                          hasOtherProviders={providers.filter((p) => p.type !== 'LOCAL').length > 1}
+                          onMount={handleMount}
+                          onUnmount={handleUnmount}
+                          onEdit={handleEdit}
+                          onDelete={handleDelete}
+                          onTest={handleTest}
+                          onMigrate={handleMigrate}
+                        />
+                      ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-[14px] text-customColor18 text-center py-[40px]">
+                  No additional storage providers configured yet.
+                </div>
+              )}
+            </>
           )}
         </>
       )}
@@ -356,6 +382,8 @@ export const StorageTab: React.FC = () => {
           onComplete={() => {
             loadProviders();
             loadUsage();
+            loadQuotaStatus();
+            loadUsageBreakdown();
           }}
         />
       )}

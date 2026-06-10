@@ -8,7 +8,7 @@ import { IdriveIcon } from '@gitroom/frontend/components/settings/storage/icons/
 import { LocalIcon } from '@gitroom/frontend/components/settings/storage/icons/local-icon';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 
-const providerTypes = [
+const allProviderTypes = [
   { value: 'LOCAL', label: 'Local Storage', Icon: LocalIcon },
   { value: 'S3', label: 'AWS S3', Icon: S3Icon },
   { value: 'CLOUDFLARE_R2', label: 'Cloudflare R2', Icon: R2Icon },
@@ -47,8 +47,20 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
     setTesting(true);
     setTestResult(null);
     try {
+      const testBody: any = {};
+      if (type !== 'LOCAL' && (accessKeyId || secretAccessKey)) {
+        testBody.credentials = { accessKeyId, secretAccessKey };
+      }
+      if (region) testBody.region = region;
+      if (bucket) testBody.bucket = bucket;
+      if (endpoint) testBody.endpoint = endpoint;
+
       const res = await fetch('/settings/storage/' + (editProvider?.id || 'temp') + '/test', {
         method: 'POST',
+        ...(Object.keys(testBody).length > 0 && {
+          body: JSON.stringify(testBody),
+          headers: { 'Content-Type': 'application/json' },
+        }),
       });
       const data = await res.json();
       setTestResult(data);
@@ -63,7 +75,6 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
     setSaving(true);
     try {
       const body: any = {
-        type,
         name,
         region,
         bucket,
@@ -71,7 +82,11 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
         publicUrl,
       };
 
-      if (type !== 'LOCAL') {
+      if (!editProvider?.id) {
+        body.type = type;
+      }
+
+      if (type !== 'LOCAL' && (accessKeyId || secretAccessKey)) {
         body.credentials = { accessKeyId, secretAccessKey };
       }
 
@@ -113,13 +128,19 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               Provider Type
             </label>
             <div className="grid grid-cols-3 gap-[8px]">
-              {providerTypes.map(({ value, label, Icon }) => (
+              {(editProvider
+                ? allProviderTypes.filter((t) => t.value === editProvider.type)
+                : allProviderTypes.filter((t) => t.value !== 'LOCAL')
+              ).map(({ value, label, Icon }) => (
                 <button
                   key={value}
                   onClick={() => {
-                    setType(value);
-                    setTestResult(null);
+                    if (!editProvider) {
+                      setType(value);
+                      setTestResult(null);
+                    }
                   }}
+                  disabled={!!editProvider}
                   className={`flex flex-col items-center gap-[4px] p-[8px] rounded-[8px] border transition-colors ${
                     type === value
                       ? 'border-customColor4 bg-[#1a3a1a]'

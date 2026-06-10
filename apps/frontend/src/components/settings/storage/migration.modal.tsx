@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 
 interface ProviderSummary {
@@ -48,6 +48,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
     errors: string[];
   } | null>(null);
   const [error, setError] = useState('');
+  const abortRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,6 +71,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
   const handleMigrate = useCallback(async () => {
     if (!targetId) return;
     setRunning(true);
+    abortRef.current = false;
     setError('');
 
     let cursor: string | undefined = undefined;
@@ -87,6 +89,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
           `/settings/storage/${source.id}/migrate/${targetId}`,
           {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ cursor, limit: BATCH_SIZE }),
           }
         );
@@ -105,6 +108,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
         });
         if (data.done || !data.nextCursor) break;
         cursor = data.nextCursor;
+        if (abortRef.current) break;
       }
       setResult({
         migrated: totalMigrated,
@@ -122,8 +126,6 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
   const percent =
     progress && progress.total > 0
       ? Math.min(100, Math.round((processed / progress.total) * 100))
-      : running
-      ? 100
       : 0;
 
   return (
@@ -185,8 +187,9 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
               <div className="mb-[16px]">
                 <div className="flex justify-between text-[12px] text-customColor18 mb-[4px]">
                   <span>
-                    Migrating… {processed}
-                    {progress && progress.total > 0 ? ` / ${progress.total}` : ''}
+                    {progress && progress.total > 0
+                      ? `Migrating\u2026 ${processed} / ${progress.total}`
+                      : 'Migrating\u2026'}
                   </span>
                   <span>{percent}%</span>
                 </div>
@@ -201,9 +204,11 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
 
             <div className="flex gap-[12px] justify-end">
               <button
-                onClick={onClose}
-                disabled={running}
-                className="px-[16px] py-[8px] rounded-[8px] bg-fifth text-customColor18 text-[13px] hover:bg-[#3A3A3A] transition-colors disabled:opacity-50"
+                onClick={() => {
+                  abortRef.current = true;
+                  onClose();
+                }}
+                className="px-[16px] py-[8px] rounded-[8px] bg-fifth text-customColor18 text-[13px] hover:bg-[#3A3A3A] transition-colors"
               >
                 Cancel
               </button>

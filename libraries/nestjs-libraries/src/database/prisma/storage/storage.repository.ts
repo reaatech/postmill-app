@@ -49,7 +49,6 @@ export class StorageRepository {
       publicUrl?: string;
       quotaBytes?: bigint;
       mounted?: boolean;
-      isDefault?: boolean;
     }
   ) {
     return this._storage.model.storageProviderConfig.update({
@@ -71,34 +70,9 @@ export class StorageRepository {
     });
   }
 
-  findDefault(orgId: string) {
-    return this._storage.model.storageProviderConfig.findFirst({
-      where: { organizationId: orgId, isDefault: true },
-    });
-  }
-
   countByOrg(orgId: string) {
     return this._storage.model.storageProviderConfig.count({
       where: { organizationId: orgId },
-    });
-  }
-
-  // ── Default-provider selection (#56) ──
-  async setDefault(orgId: string, id: string) {
-    await this._storage.model.storageProviderConfig.updateMany({
-      where: { organizationId: orgId, isDefault: true },
-      data: { isDefault: false },
-    });
-    return this._storage.model.storageProviderConfig.update({
-      where: { id },
-      data: { isDefault: true },
-    });
-  }
-
-  async clearDefaultIfMatches(orgId: string, id: string) {
-    await this._storage.model.storageProviderConfig.updateMany({
-      where: { organizationId: orgId, id, isDefault: true },
-      data: { isDefault: false },
     });
   }
 
