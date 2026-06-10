@@ -90,7 +90,7 @@ export interface DrillState {
   focusIntegration?: string;
   focusDate?: string;
   focusPost?: string;
-  tab?: 'overview' | 'channels' | 'posts' | 'best-time' | 'recommendations' | 'watchlist';
+  tab?: 'overview' | 'channels' | 'posts' | 'best-time' | 'recommendations' | 'watchlist' | 'shortlinks';
 }
 
 export interface ChannelMetricResponse {
