@@ -49,6 +49,8 @@ import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.contr
 import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
+import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
@@ -88,6 +90,7 @@ const authenticatedController = [
   ChannelConfigPerTenantController,
   OrgAiSettingsController,
   RagController,
+  OrgShortLinkSettingsController,
 ];
 @Module({
   imports: [UploadModule],
@@ -100,6 +103,7 @@ const authenticatedController = [
     EnterpriseController,
     NoAuthIntegrationsController,
     OAuthController,
+    EmailWebhooksController,
     ...authenticatedController,
   ],
   providers: [

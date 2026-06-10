@@ -12,6 +12,7 @@ import { VideoModule } from '@gitroom/nestjs-libraries/videos/video.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { FILTER } from '@gitroom/nestjs-libraries/sentry/sentry.exception';
 import { PROVIDER_NOT_CONFIGURED_FILTER } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.filter';
+import { SHORT_LINK_PROVIDER_FILTER } from '@gitroom/nestjs-libraries/short-linking/short-link-provider.filter';
 import { ChatModule } from '@gitroom/nestjs-libraries/chat/chat.module';
 import { getTemporalModule } from '@gitroom/nestjs-libraries/temporal/temporal.module';
 import { TemporalRegisterMissingSearchAttributesModule } from '@gitroom/nestjs-libraries/temporal/temporal.register';
@@ -55,6 +56,7 @@ import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
   providers: [
     FILTER,
     PROVIDER_NOT_CONFIGURED_FILTER,
+    SHORT_LINK_PROVIDER_FILTER,
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
