@@ -23,6 +23,8 @@ import {
 import { Response } from 'express';
 import dayjs from 'dayjs';
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
+import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { IsString, IsOptional, IsIn, MinLength, MaxLength } from 'class-validator';
 
 export function validateDateRange(from: string, to: string) {
@@ -284,5 +286,58 @@ export class AnalyticsV2Controller {
   ) {
     await this._watchlistService.remove(id, org.id);
     return { success: true };
+  }
+
+  @Get('/shortlinks')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async getShortLinks(
+    @GetOrgFromRequest() org: Organization,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const from = fromStr ? new Date(fromStr) : dayjs().subtract(30, 'day').toDate();
+    const to = toStr ? new Date(toStr) : dayjs().toDate();
+
+    const links = await this._analyticsService.getLinksForOrg(org.id);
+    const snapshots = await this._analyticsService.getAggregatedClicks(org.id, from, to);
+
+    const clickMap = new Map<string, number>();
+    for (const snap of snapshots) {
+      const current = clickMap.get(snap.shortLinkId) || 0;
+      clickMap.set(snap.shortLinkId, current + snap.clicks);
+    }
+
+    return links.map((link) => ({
+      id: link.id,
+      shortUrl: link.shortUrl,
+      originalUrl: link.originalUrl,
+      provider: link.provider,
+      clicks: clickMap.get(link.id) || 0,
+      createdAt: link.createdAt,
+    }));
+  }
+
+  @Get('/shortlinks/timeseries')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async getShortLinkTimeseries(
+    @GetOrgFromRequest() org: Organization,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const from = fromStr ? new Date(fromStr) : dayjs().subtract(30, 'day').toDate();
+    const to = toStr ? new Date(toStr) : dayjs().toDate();
+
+    const snapshots = await this._analyticsService.getAggregatedClicks(org.id, from, to);
+
+    const dateMap = new Map<string, number>();
+    for (const snap of snapshots) {
+      const dateKey = dayjs(snap.date).format('YYYY-MM-DD');
+      const current = dateMap.get(dateKey) || 0;
+      dateMap.set(dateKey, current + snap.clicks);
+    }
+
+    return Array.from(dateMap.entries())
+      .map(([date, clicks]) => ({ date, clicks }))
+      .sort((a, b) => a.date.localeCompare(b.date));
   }
 }

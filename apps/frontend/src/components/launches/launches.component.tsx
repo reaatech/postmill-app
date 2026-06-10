@@ -439,7 +439,7 @@ export const LaunchesComponent = () => {
   const continueIntegration = useCallback(
     (integration: any) => async () => {
       router.push(
-        `/launches?added=${integration.identifier}&continue=${integration.id}`
+        `/schedule?added=${integration.identifier}&continue=${integration.id}`
       );
     },
     []

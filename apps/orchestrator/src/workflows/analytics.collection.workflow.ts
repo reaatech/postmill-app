@@ -8,6 +8,9 @@ const {
   pruneAndRollupSnapshots,
   notifySnapshotComplete,
   probeWatchedAccounts,
+  collectShortLinkSnapshots,
+  pruneShortLinkSnapshots,
+  pruneEmailLogs,
 } = proxyActivities<AnalyticsActivity>({
   startToCloseTimeout: '10 minutes',
   retry: {
@@ -37,6 +40,22 @@ export async function analyticsCollectionWorkflow(): Promise<void> {
     } catch (err) {
       // best-effort watchlist probe; never fail the sweep
     }
+    try {
+      await collectShortLinkSnapshots(orgId);
+    } catch (err) {
+      // best-effort short-link snapshot collection; never fail the sweep
+    }
+    try {
+      await pruneShortLinkSnapshots(orgId);
+    } catch (err) {
+      // best-effort prune; never fail the sweep
+    }
+  }
+
+  try {
+    await pruneEmailLogs();
+  } catch (err) {
+    // best-effort email log prune; never fail the sweep
   }
 
   await sleep('24h');

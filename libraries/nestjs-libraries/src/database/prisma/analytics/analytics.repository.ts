@@ -192,6 +192,18 @@ export class AnalyticsRepository {
     });
   }
 
+  getLatestPostSnapshotsByPostIds(orgId: string, postIds: string[]) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: {
+        organizationId: orgId,
+        postId: { in: postIds },
+        metric: { in: ['views', 'likes', 'comments'] },
+      },
+      orderBy: { date: 'desc' },
+      select: { postId: true, metric: true, value: true },
+    });
+  }
+
   getChannelPostSnapshots(
     orgId: string,
     integrationId: string,

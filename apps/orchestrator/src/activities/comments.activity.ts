@@ -204,7 +204,7 @@ export class CommentsActivity {
       </p>
       ${htmlParts.join('')}
       <p style="margin-top:16px;font-size:13px;color:#6b7280;">
-        <a href="${process.env.FRONTEND_URL || ''}/launches" style="color:#6366f1;">View all posts</a>
+        <a href="${process.env.FRONTEND_URL || ''}/schedule" style="color:#6366f1;">View all posts</a>
       </p>`;
 
     for (const member of members) {
