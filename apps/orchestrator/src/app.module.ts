@@ -12,6 +12,7 @@ import { IntegrationsActivity } from '@gitroom/orchestrator/activities/integrati
 import { AnalyticsActivity } from '@gitroom/orchestrator/activities/analytics.activity';
 import { CommentsActivity } from '@gitroom/orchestrator/activities/comments.activity';
 import { HealthController } from '@gitroom/orchestrator/health.controller';
+import { UploadModule } from '@gitroom/nestjs-libraries/upload/upload.module';
 
 const activities = [
   PostActivity,
@@ -29,6 +30,11 @@ const activities = [
     // AI-layer deps) to resolve. AiModule's AiThrottlerGuard needs ThrottlerModule's
     // tokens, so ThrottlerModule.forRoot must be present too (mirrors backend AppModule).
     AiModule,
+    // UploadModule is @Global but only registers within the app that imports it. The backend gets
+    // it via ApiModule; the orchestrator imports neither, so IntegrationService (now depends on
+    // StorageService, v3.8.x) fails to resolve here. Import it so the orchestrator's shared
+    // services that touch storage resolve (mirrors the AiModule rationale above).
+    UploadModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
