@@ -1,11 +1,11 @@
 # Overview & Architecture
 
-Postmill REAA Flavor is a self-hosted tool to schedule social media and chat posts across **36
+Postmill is a self-hosted tool to schedule social media and chat posts across **36
 channels**. You add posts to a calendar; they enter a workflow and publish at the scheduled time.
 Alongside scheduling it provides a persisted analytics dashboard, team management, a media library,
 and a pluggable AI layer.
 
-> **Verified against v3.5.9.** For how this fork differs from the original project, see
+> For how this fork differs from the original project, see
 > [What's different from upstream](../CHANGES_FROM_UPSTREAM.md).
 
 ---

@@ -1,9 +1,7 @@
 # Run With Docker Compose
 
-The repo ships a self-contained [`docker-compose.yaml`](../../docker-compose.yaml) that runs the
+The repo ships a self-contained [`docker-compose.yaml`](https://github.com/reaatech/postmill-app/blob/main/docker-compose.yaml) that runs the
 app together with PostgreSQL, Redis, and a full Temporal stack.
-
-> **Verified against v3.6.0.**
 
 ---
 

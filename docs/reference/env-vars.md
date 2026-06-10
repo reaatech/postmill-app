@@ -1,11 +1,11 @@
 # Environment Variable Reference
 
 Curated reference of the environment variables. The authoritative template is
-[`.env.example`](../../.env.example); `docker-compose.yaml` shows them set inline for the container
+[`.env.example`](https://github.com/reaatech/postmill-app/blob/main/.env.example); `docker-compose.yaml` shows them set inline for the container
 deployment. This page groups them by purpose — see [Configuration](../self-hosting/configuration.md)
 for the narrative version.
 
-> **Verified against v3.6.0.** When an exact default matters, check `.env.example` directly.
+> When an exact default matters, check `.env.example` directly.
 
 ---
 

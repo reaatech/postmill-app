@@ -1,10 +1,10 @@
 # Configuration
 
 Postmill is configured through environment variables. The authoritative template is
-[`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
+[`.env.example`](https://github.com/reaatech/postmill-app/blob/main/.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
-> **Verified against v3.6.0.** When a variable's exact default matters, check `.env.example` and
+> When a variable's exact default matters, check `.env.example` and
 > `docker-compose.yaml` directly; this page documents intent and fork behaviour rather than
 > duplicating every line.
 

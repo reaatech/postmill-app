@@ -3,8 +3,6 @@
 Postmill is designed for automation. The [Public API (v1)](./public-api.md) is the surface these tools
 call.
 
-> **Verified against v3.5.10.**
-
 ---
 
 ## Tools

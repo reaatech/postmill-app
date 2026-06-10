@@ -3,8 +3,6 @@
 The preflight panel runs a set of pre-publish checks on a draft before it's scheduled, surfacing
 problems (and outright blockers) while you can still fix them.
 
-> **Verified against v3.5.9.** Introduced in v3.5.0.
-
 ---
 
 ## What it checks

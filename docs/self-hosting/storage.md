@@ -1,7 +1,5 @@
 # Storage Provider Setup
 
-> **Verified against v3.6.0**
-
 Each organization can mount its own storage provider for media uploads. Supported providers: **S3**,
 **Cloudflare R2**, **Backblaze B2**, **IDrive e2**, and **Local** (default, filesystem-based).
 

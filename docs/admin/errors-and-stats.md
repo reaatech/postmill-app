@@ -1,6 +1,6 @@
 # Errors & Stats (Deprecated in v3.6.0)
 
-> **Verified against v3.6.0.** The `/admin/errors` and `/admin/stats` super-admin pages were removed
+> The `/admin/errors` and `/admin/stats` super-admin pages were removed
 > in v3.6.0. All admin functionality moved to per-tenant settings tabs. Error tracking and diagnostics
 > are currently limited to looking at logs or the Temporal UI for background job status.
 

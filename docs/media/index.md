@@ -1,7 +1,5 @@
 # Media Manager
 
-> **Verified against v3.6.0**
-
 The Media Manager provides a full file management interface for your social media assets, organized
 in folders with tags, bulk operations, and a trash bin.
 

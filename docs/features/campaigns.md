@@ -4,8 +4,6 @@ Campaigns let you group scheduled and published posts (and, transitively, their 
 and comments) into named folders so you can plan and review work by initiative rather than as one
 flat calendar.
 
-> **Verified against v3.5.9.** Introduced in v3.5.0. v3.5.9 adds org-isolation hardened UPDATE/DELETE (cross-org protection), campaignId wiring through post creation and bulk import, cross-field date validation (endDate > startDate), and @CheckPolicies on all endpoints.
-
 ---
 
 ## What it does

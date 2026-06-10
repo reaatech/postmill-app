@@ -2,7 +2,7 @@
 
 How to move to a newer release of the fork, and how schema changes are applied.
 
-> **Verified against v3.6.0.** This system runs in production — read the schema-change notes before
+> This system runs in production — read the schema-change notes before
 > upgrading a live instance.
 
 ---
@@ -10,14 +10,14 @@ How to move to a newer release of the fork, and how schema changes are applied.
 ## How releases work
 
 - Versions are tagged on the repo and reflected in `package.json` (`version`) and
-  [`CHANGELOG.md`](../../CHANGELOG.md).
+  [`CHANGELOG.md`](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md).
 - The fork image is published to `ghcr.io/reaatech/postmill-app`.
 - On boot, the container runs `prisma db push` to sync the database to the schema baked into that
   image. So **deploying a new image applies its schema** automatically.
 
 ## The clean upgrade path (container deployments)
 
-1. **Read the [CHANGELOG](../../CHANGELOG.md)** for the target version — note any schema changes or
+1. **Read the [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md)** for the target version — note any schema changes or
    new required env vars.
 2. **Back up first** — see [Backup & retention](./backup-and-retention.md).
 3. **Bump the image tag** to the new version (e.g. in Coolify / your compose file) and redeploy.

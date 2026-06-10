@@ -1,7 +1,5 @@
 # AI Configuration
 
-> **Verified against v3.6.0**
-
 The AI layer supports 25 providers configured per-tenant through the **AI** settings tab.
 
 ## Provider & Model

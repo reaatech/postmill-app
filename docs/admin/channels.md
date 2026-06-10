@@ -4,7 +4,7 @@ Channel (social provider) credentials are now configured **per-tenant** in **Set
 not globally. Each organization provides their own OAuth app credentials (client ID, secret, redirect
 URI, scopes) for the providers they use. Credentials are encrypted at rest.
 
-> **Verified against v3.6.0.** Organization-level setup (v3.6.0+).
+> Organization-level setup (v3.6.0+).
 > API route: `/settings/channels` (organization-scoped).
 >
 > **Note:** The old `/admin/channels` super-admin UI was removed in v3.6.0. All provider configuration

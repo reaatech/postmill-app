@@ -3,8 +3,6 @@
 What to back up, why `db push` makes backups non-optional, and how analytics data is automatically
 pruned/rolled up.
 
-> **Verified against v3.5.9.**
-
 ---
 
 ## What to back up

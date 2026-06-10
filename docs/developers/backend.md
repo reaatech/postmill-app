@@ -1,6 +1,6 @@
 # Backend Conventions (NestJS)
 
-> **Verified against v3.6.0.** These conventions are enforced across the codebase; the root
+> These conventions are enforced across the codebase; the root
 > `AGENTS.md` is the canonical short form.
 
 ---

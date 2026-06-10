@@ -3,8 +3,6 @@
 The watchlist tracks public competitor/peer accounts where the provider's API allows it, collecting
 lightweight public metrics over time and surfacing trend prompts in analytics.
 
-> **Verified against v3.5.9.** Introduced in v3.5.0.
-
 ---
 
 ## What it does

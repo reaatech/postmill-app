@@ -1,8 +1,6 @@
 # Requirements
 
-What you need to build and run Postmill REAA Flavor.
-
-> **Verified against v3.6.0.**
+What you need to build and run Postmill.
 
 ---
 

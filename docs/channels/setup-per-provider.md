@@ -4,7 +4,7 @@ How to create the developer app / credentials for each channel and what to enter
 [Channels admin](../admin/channels.md). Scopes, identifiers, and credential keys below are taken
 from the provider implementations.
 
-> **Verified against v3.6.0.** 36 providers. Configure per-tenant credentials via
+> 36 providers. Configure per-tenant credentials via
 > **Settings → Channels** (encrypted at rest). The global env var fallback is removed in v3.6.0 —
 > all credentials are managed in-app.
 

@@ -5,7 +5,7 @@ comments into the [Post Detail](../features/calendar-and-posts.md) view and the
 [Social comments](../features/social-comments.md) feature. This page lists which providers support
 it and what each can do.
 
-> **Verified against v3.5.9.** Derived from the provider implementations of `fetchComments` /
+> Derived from the provider implementations of `fetchComments` /
 > `replyToComment` / `likeComment` and the central provider capability matrix (`comments` flag).
 
 ---

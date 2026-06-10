@@ -1,10 +1,10 @@
-# Postmill REAA Flavor — Documentation
+# Postmill Documentation
 
-Documentation for the **REAA-flavored fork** of [Postmill](https://github.com/gitroomhq/postiz-app).
+Documentation for **Postmill**, a fork of [Postiz](https://github.com/gitroomhq/postiz-app).
 Postmill schedules social media and chat posts to 36 channels, with a calendar, persisted analytics,
 team management, a media library, and a pluggable AI layer.
 
-> **Docs version:** verified against **v3.6.0**. See [CHANGELOG.md](../CHANGELOG.md) for the full
+> See the [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md) for the full
 > change history.
 >
 > **This is a fork.** The upstream docs at `docs.postiz.com` describe the *original* project and
@@ -37,9 +37,9 @@ team management, a media library, and a pluggable AI layer.
 - [Analytics](./features/analytics.md) · [Watchlist & competitor tracking](./features/watchlist.md)
 - [Social comments](./features/social-comments.md)
 - [Campaigns](./features/campaigns.md) · [Bulk scheduling / CSV import](./features/bulk-scheduling.md)
-- [Media manager](./media/README.md) · [Storage settings](./self-hosting/storage.md)
+- [Media manager](./media/) · [Storage settings](./self-hosting/storage.md)
 - [Content QA preflight](./features/content-qa-preflight.md) · [Provider capabilities](./features/provider-capabilities.md)
-- [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md) · [AI settings & RAG](./ai/README.md)
+- [AI features](./features/ai-features.md) · [AI generation](./features/ai-generation.md) · [AI settings & RAG](./ai/)
 
 **…understand the channels**
 - [Channels overview (the 36 providers)](./channels/overview.md)
@@ -66,7 +66,7 @@ team management, a media library, and a pluggable AI layer.
 
 ```
 getting-started/
-  overview.md              ✅ What Postmill REAA is, architecture
+  overview.md              ✅ What Postmill is, architecture
   quickstart.md            ✅ Fastest path to a running local instance
 
 self-hosting/
@@ -104,10 +104,10 @@ features/
   ai-generation.md         ✅ Text/image gen, brand voice, what works vs stubs
 
 media/
-  README.md                ✅ Media manager guide (folders, tags, bulk actions, drag-drop)
+  index.md                 ✅ Media manager guide (folders, tags, bulk actions, drag-drop)
 
 ai/
-  README.md                ✅ Per-tenant AI provider + model guide; Brand/RAG knowledge-base
+  index.md                 ✅ Per-tenant AI provider + model guide; Brand/RAG knowledge-base
 
 api/
   overview.md              ✅ Surfaces, auth, rate limits
@@ -138,5 +138,5 @@ reference/
 ## About this fork
 
 Maintained by [REAA](https://reaatech.com). Source and full changelog:
-[github.com/reaatech/postiz-app](https://github.com/reaatech/postiz-app).
-Licensed under [AGPL-3.0](../LICENSE).
+[github.com/reaatech/postmill-app](https://github.com/reaatech/postmill-app).
+Licensed under [AGPL-3.0](https://github.com/reaatech/postmill-app/blob/main/LICENSE).
