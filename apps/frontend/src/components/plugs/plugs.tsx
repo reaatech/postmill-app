@@ -109,7 +109,7 @@ export const Plugs = () => {
             'You have to add: X or LinkedIn or Threads'
           )}
         </div>
-        <Button onClick={() => router.push('/launches')}>
+        <Button onClick={() => router.push('/schedule')}>
           {t(
             'go_to_the_calendar_to_add_channels',
             'Go to the calendar to add channels'

@@ -9,7 +9,7 @@ import clsx from 'clsx';
 const STEPS_CONFIG = [
   { key: 'channel' as const, label: 'Connect your first channel', href: '/third-party' },
   { key: 'ai' as const, label: 'Configure AI provider', href: '/settings?tab=ai' },
-  { key: 'post' as const, label: 'Create your first post', href: '/launches' },
+  { key: 'post' as const, label: 'Create your first post', href: '/schedule' },
   { key: 'team' as const, label: 'Invite team members', href: '/settings?tab=teams' },
 ];
 
