@@ -53,13 +53,4 @@ export function getOrgCredential(
   return getCredential(orgId, identifier, key);
 }
 
-// Deprecated: use getOrgCredential(orgId, identifier, key) instead.
-// Only returns env var fallback — does NOT scan other org caches (security).
-// Thread orgId through your provider calls and switch to getOrgCredential.
-export function getEnvOr(
-  envKey: string,
-  _providerIdentifier: string,
-  _credentialKey: 'clientId' | 'clientSecret' | 'redirectUri' | 'token'
-): string {
-  return process.env[envKey] || '';
-}
+

@@ -3,14 +3,14 @@ import {
   AuthProviderAbstract,
 } from '@gitroom/backend/services/auth/providers.interface';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { getLoginEnv } from './get-login-env';
 
 @AuthProvider({ provider: 'FARCASTER' })
 export class FarcasterProvider extends AuthProviderAbstract {
   private _client: NeynarAPIClient | undefined;
   private get client(): NeynarAPIClient {
     if (!this._client) {
-      const apiKey = getEnvOr('NEYNAR_SECRET_KEY', 'wrapcast', 'clientSecret');
+      const apiKey = getLoginEnv('NEYNAR_SECRET_KEY');
       if (!apiKey) throw new Error('Authentication provider not configured.');
       this._client = new NeynarAPIClient({ apiKey });
     }
