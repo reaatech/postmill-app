@@ -31,3 +31,16 @@ jobs:
 
       - name: Run pnpm audit (high/critical only)
         run: pnpm audit --audit-level=high
+
+      - name: Check for reintroduced channel env reads
+        run: |
+          if grep -rn 'getEnvOr(' libraries/nestjs-libraries/src/integrations/social/; then
+            echo "ERROR: getEnvOr() must not be used in social providers. Use getOrgCredential or clientInformation instead."
+            exit 1
+          fi
+          for VAR in X_API_KEY X_API_SECRET LINKEDIN_CLIENT_ID LINKEDIN_CLIENT_SECRET REDDIT_CLIENT_ID REDDIT_CLIENT_SECRET FACEBOOK_APP_ID FACEBOOK_APP_SECRET INSTAGRAM_APP_ID INSTAGRAM_APP_SECRET THREADS_APP_ID THREADS_APP_SECRET YOUTUBE_CLIENT_ID YOUTUBE_CLIENT_SECRET TIKTOK_CLIENT_ID TIKTOK_CLIENT_SECRET PINTEREST_CLIENT_ID PINTEREST_CLIENT_SECRET DRIBBBLE_CLIENT_ID DRIBBBLE_CLIENT_SECRET DISCORD_CLIENT_ID DISCORD_CLIENT_SECRET DISCORD_BOT_TOKEN_ID SLACK_ID SLACK_SECRET MASTODON_CLIENT_ID MASTODON_CLIENT_SECRET MASTODON_URL MEWE_APP_ID MEWE_API_KEY MEWE_HOST KICK_CLIENT_ID KICK_SECRET TWITCH_CLIENT_ID TWITCH_CLIENT_SECRET VK_ID WHOP_CLIENT_ID TUMBLR_CLIENT_ID TUMBLR_CLIENT_SECRET TELEGRAM_TOKEN GOOGLE_GMB_CLIENT_ID GOOGLE_GMB_CLIENT_SECRET NEYNAR_CLIENT_ID NEYNAR_SECRET_KEY; do
+            if grep -rn "process\.env\.$VAR" libraries/nestjs-libraries/src/integrations/social/; then
+              echo "ERROR: process.env.$VAR must not be read in social providers. Use DB-backed config instead."
+              exit 1
+            fi
+          done

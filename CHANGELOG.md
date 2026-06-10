@@ -8,6 +8,69 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.7.1] - 2026-06-09
+
+Removes the last remaining `process.env` credential reads from social providers, deletes the
+env-migration helpers (no longer needed since all credentials are DB-backed), and prunes the
+configuration surface (`.env.example`, `docker-compose.yaml`, docs). The env var fallback for
+channel and AI credentials is now **gone** — every provider reads from the database, encrypted
+at rest.
+
+### Removed — Env var fallbacks from 3 providers
+
+- **YouTube** (`youtube.provider.ts:35-37`) — removed `process.env.YOUTUBE_CLIENT_ID` /
+  `process.env.YOUTUBE_CLIENT_SECRET` fallback from `clientAndYoutube`. All callers pass
+  `clientInformation?.client_id` / `clientInformation?.client_secret` already.
+- **GMB** (`gmb.provider.ts:25-28`) — removed `process.env.GOOGLE_GMB_CLIENT_ID` /
+  `process.env.GOOGLE_GMB_CLIENT_SECRET` (and the secondary `YOUTUBE_*` fallback chain) from
+  `clientAndGmb`.
+- **Telegram** (`telegram.provider.ts:91,187,439`) — removed 3 remaining `process.env.TELEGRAM_TOKEN`
+  fallbacks from `getBotId`, `sendMessage`, and `botIsAdmin`. All paths now rely on
+  `getOrgCredential(orgId, 'telegram', 'clientId')` or the explicitly-passed `botToken`.
+
+### Removed — Migration services
+
+- **`ChannelEnvMigrationService`** — the `OnModuleInit` service that seeded `OrgProviderConfiguration`
+  rows from per-provider env vars (24 providers) on first boot after upgrade. Credentials are now
+  DB-only, so the migration path is history.
+- **`AiEnvMigrationService`** — the equivalent service that seeded `AIOrgProviderConfig` rows from
+  `OPENAI_API_KEY`. Removed for the same reason.
+- **Registrations** — both services removed from `app.module.ts` imports and providers array.
+
+### Removed — `getEnvOr()` function
+
+- **`credentials.ts`** — the `getEnvOr(envKey, ...)` function (deprecated since v3.6.0) is deleted.
+  All credential reads must go through `getOrgCredential(orgId, identifier, key)` or via
+  `clientInformation` passed from `OrgProviderConfiguration`.
+
+### Changed — Configuration surface
+
+- **`.env.example`** — all per-tenant channel/AI provider keys removed. Kept: infra vars, login-SSO
+  (GITHUB_* for GitHub OAuth), storage Cloudflare, email, Stripe, OIDC SSO, short-link services, and
+  misc/developer vars. Added header noting channel/AI config is now in-app.
+- **`docker-compose.yaml`** — all per-tenant channel/AI env vars removed (was ~30 vars), plus dead
+  `NEXT_PUBLIC_UPLOAD_DIRECTORY` and `STRIPE_SIGNING_KEY_CONNECT` / `FEE_AMOUNT` / `NX_ADD_PLUGINS`.
+  Kept: infra vars, SSO, storage, Stripe, misc. Container still boots correctly.
+
+### Changed — Docs
+
+- **`configuration.md`**, **`env-vars.md`** — social-provider and AI sections updated to v3.7.1:
+  removed env var lists, noted DB-only encrypted credentials.
+- **`channels.md`** — "Credential Resolution & Fallback" section rewritten: no more env var fallback
+  description. Migration script section removed (script no longer exists).
+- **`setup-per-provider.md`** — GMB fallback note removed from Google family table; env var removal
+  version updated from v3.6.0 to v3.7.1.
+- **`AGENTS.md`** — added "Channel credentials" architecture note: DB-only, encrypted, no env fallback,
+  no `getEnvOr`/`ChannelEnvMigrationService`.
+- **`CHANGES_FROM_UPSTREAM.md`** — added v3.7.1 section covering the env-var removal.
+- **`CHANGELOG.md`** — this section.
+
+### Added — CI guard
+
+- **`security-audit.yml`** — added a check step that greps for `getEnvOr(` calls and any
+  `process.env.<CHANNEL_VAR>` reads in `libraries/nestjs-libraries/src/integrations/social/`,
+  failing the workflow if any are found.
+
 ## [3.7.0] - 2026-06-09
 
 Brand cutover: the fork is renamed **Postiz → Postmill**. This release rebrands every
