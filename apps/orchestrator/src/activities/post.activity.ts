@@ -197,6 +197,11 @@ export class PostActivity {
       posts
     );
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      integration.providerIdentifier,
+      integration.organizationId
+    ).catch(() => undefined);
+
     return getIntegration.comment(
       integration.internalId,
       postId,
@@ -221,7 +226,8 @@ export class PostActivity {
           ),
         }))
       ),
-      integration
+      integration,
+      clientInformation
     );
   }
 
@@ -234,6 +240,11 @@ export class PostActivity {
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier
     );
+
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      integration.providerIdentifier,
+      integration.organizationId
+    ).catch(() => undefined);
 
     return getIntegration.comment(
       integration.internalId,
@@ -255,7 +266,8 @@ export class PostActivity {
           media: [],
         },
       ],
-      integration
+      integration,
+      clientInformation
     );
   }
 
@@ -280,6 +292,11 @@ export class PostActivity {
       posts
     );
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      integration.providerIdentifier,
+      integration.organizationId
+    ).catch(() => undefined);
+
     const postNow = await getIntegration.post(
       integration.internalId,
       integration.token,
@@ -302,7 +319,8 @@ export class PostActivity {
           ),
         }))
       ),
-      integration
+      integration,
+      clientInformation
     );
 
     await this._temporalService.client

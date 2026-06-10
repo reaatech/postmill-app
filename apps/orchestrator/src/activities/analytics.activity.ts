@@ -103,10 +103,16 @@ export class AnalyticsActivity {
       }
 
       try {
+        const clientInformation = await this._integrationManager.requireClientInformation(
+          integration.providerIdentifier,
+          integration.organizationId
+        ).catch(() => undefined);
+
         const data = await provider.analytics(
           integration.internalId,
           token,
-          daysBack
+          daysBack,
+          clientInformation
         );
 
         for (const entry of data) {
@@ -193,11 +199,17 @@ export class AnalyticsActivity {
           }
         }
 
+        const clientInformation = await this._integrationManager.requireClientInformation(
+          post.integration.providerIdentifier,
+          post.integration.organizationId
+        ).catch(() => undefined);
+
         const data = await provider.postAnalytics(
           post.integration.internalId,
           token,
           post.releaseId,
-          2
+          2,
+          clientInformation
         );
 
         for (const entry of data) {
@@ -413,7 +425,12 @@ export class AnalyticsActivity {
     }
 
     try {
-      const data = await provider.analytics(integration.internalId, token, 90);
+      const clientInformation = await this._integrationManager.requireClientInformation(
+        integration.providerIdentifier,
+        integration.organizationId
+      ).catch(() => undefined);
+
+      const data = await provider.analytics(integration.internalId, token, 90, clientInformation);
 
       for (const entry of data) {
         const canonical = normalizeMetric(

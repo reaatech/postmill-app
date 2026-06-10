@@ -266,8 +266,13 @@ export class PublicIntegrationsController {
     }
 
     try {
+      const clientInformation = await this._integrationManager.requireClientInformation(
+        integration,
+        org.id
+      );
+
       const { codeVerifier, state, url } =
-        await integrationProvider.generateAuthUrl();
+        await integrationProvider.generateAuthUrl(clientInformation);
 
       if (refresh) {
         await ioRedis.set(`refresh:${state}`, refresh, 'EX', 3600);

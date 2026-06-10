@@ -169,10 +169,16 @@ export class IntegrationService {
     return this._integrationRepository.getIntegrationById(org, id);
   }
 
-  async refreshToken(provider: SocialProvider, refresh: string) {
+  async refreshToken(provider: SocialProvider, refresh: string, orgId?: string) {
     try {
+      const clientInformation = orgId
+        ? await this._integrationManager.requireClientInformation(
+            provider.identifier,
+            orgId
+          ).catch(() => undefined)
+        : undefined;
       const { refreshToken, accessToken, expiresIn } =
-        await provider.refreshToken(refresh);
+        await provider.refreshToken(refresh, clientInformation);
 
       if (!refreshToken || !accessToken || !expiresIn) {
         return false;
@@ -225,7 +231,7 @@ export class IntegrationService {
         continue;
       }
 
-      const data = await this.refreshToken(provider, integration.refreshToken!);
+      const data = await this.refreshToken(provider, integration.refreshToken!, integration.organizationId);
 
       if (!data) {
         await this.informAboutRefreshError(
@@ -391,10 +397,16 @@ export class IntegrationService {
 
     if (integrationProvider.analytics) {
       try {
+        const clientInformation = await this._integrationManager.requireClientInformation(
+          integration,
+          getIntegration.organizationId
+        ).catch(() => undefined);
+
         const loadAnalytics = await integrationProvider.analytics(
           getIntegration.internalId,
           getIntegration.token,
-          +date
+          +date,
+          clientInformation
         );
         await ioRedis.set(
           `integration:${org.id}:${integration}:${date}`,
@@ -472,6 +484,14 @@ export class IntegrationService {
         getIntegration.providerIdentifier
       );
 
+    // Warm the org credential cache before invoking the internal plug — see processPlugs.
+    // Internal plug methods (e.g. X repostPostUsers) sign with app credentials read via
+    // getOrgCredential, which is empty until the org's cache is populated (v3.7.1: no env fallback).
+    await this._integrationManager.getClientInformation(
+      getIntegration.providerIdentifier,
+      data.orgId
+    );
+
     // @ts-ignore
     await getSocialIntegration?.[getAllInternalPlugs.methodName]?.(
       getIntegration,
@@ -497,6 +517,16 @@ export class IntegrationService {
 
     const integration = await this._integrationManager.getSocialIntegration(
       getPlugById.integration.providerIdentifier
+    );
+
+    // Warm the org credential cache before invoking the plug. Plug methods that sign with the
+    // provider's app credentials (e.g. X OAuth1 auto-repost/auto-plug) read them via
+    // getOrgCredential, which resolves from the lazily-populated per-org cache. Plugs run in
+    // worker processes that may not have touched this org yet, and as of v3.7.1 there is no
+    // process.env fallback — without this warm the credentials resolve empty.
+    await this._integrationManager.getClientInformation(
+      getPlugById.integration.providerIdentifier,
+      getPlugById.integration.organizationId
     );
 
     // @ts-ignore

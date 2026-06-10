@@ -99,6 +99,11 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`onboarding:${body.state}`);
     }
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      integration,
+      org.id
+    ).catch(() => undefined);
+
     const {
       error,
       accessToken,
@@ -118,7 +123,7 @@ export class NoAuthIntegrationsController {
             codeVerifier: getCodeVerifier,
             refresh: body.refresh,
           },
-          details ? JSON.parse(details) : undefined
+          clientInformation
         );
 
         if (typeof auth === 'string') {
@@ -372,10 +377,15 @@ export class NoAuthIntegrationsController {
       throw new HttpException('Not a Chrome extension integration', 400);
     }
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      provider,
+      integration.organizationId
+    ).catch(() => undefined);
+
     const authResult = await integrationProvider.authenticate({
       code: body.cookies,
       codeVerifier: '',
-    });
+    }, clientInformation);
 
     if (typeof authResult === 'string') {
       throw new HttpException(authResult, 400);

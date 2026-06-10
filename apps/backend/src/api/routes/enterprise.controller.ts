@@ -79,8 +79,13 @@ export class EnterpriseController {
         load.provider
       );
 
+      const clientInformation = await this._integrationManager.requireClientInformation(
+        load.provider,
+        org.id
+      );
+
       const { codeVerifier, state, url } =
-        await integrationProvider.generateAuthUrl();
+        await integrationProvider.generateAuthUrl(clientInformation);
 
       if (load.refreshId) {
         await ioRedis.set(`refresh:${state}`, load.refreshId, 'EX', 3600);

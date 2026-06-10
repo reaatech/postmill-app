@@ -227,11 +227,17 @@ export class PostsService {
     }
 
     try {
+      const clientInformation = await this._integrationManager.requireClientInformation(
+        getIntegration.providerIdentifier,
+        getIntegration.organizationId
+      ).catch(() => undefined);
+
       const loadAnalytics = await integrationProvider.postAnalytics(
         getIntegration.internalId,
         getIntegration.token,
         post.releaseId,
-        date
+        date,
+        clientInformation
       );
       await ioRedis.set(
         `integration:${orgId}:${post.id}:${date}`,

@@ -85,8 +85,13 @@ export class RefreshIntegrationService {
     socialProvider: SocialProvider,
     cause = ''
   ): Promise<AuthTokenDetails | false> {
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      integration.providerIdentifier,
+      integration.organizationId
+    ).catch(() => undefined);
+
     const refresh: false | AuthTokenDetails = await socialProvider
-      .refreshToken(integration.refreshToken)
+      .refreshToken(integration.refreshToken, clientInformation)
       .catch((err) => false);
 
     if (!refresh || !refresh.accessToken) {
