@@ -117,7 +117,7 @@ jobs:
 
       - name: Boot backend and assert it answers (not a 502/crash-loop)
         run: |
-          node apps/backend/dist/main.js > backend-boot.log 2>&1 &
+          node apps/backend/dist/apps/backend/src/main.js > backend-boot.log 2>&1 &
           BACKEND_PID=$!
 
           # Poll up to ~60s for the backend to bind and answer. A booting Nest app
