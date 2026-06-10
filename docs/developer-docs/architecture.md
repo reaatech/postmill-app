@@ -1,0 +1,133 @@
+# Architecture
+
+This document describes the architecture of the Postmill platform for developers
+contributing to the codebase.
+
+## Monorepo layout
+
+Postmill is a PNPM monorepo with a single root `package.json` for dependencies.
+Workspaces are driven by `pnpm --filter`.
+
+```
+postmill-app/
+├── apps/
+│   ├── backend/        # NestJS REST API
+│   ├── orchestrator/   # NestJS + Temporal workflows
+│   ├── frontend/       # Next.js App Router (port 4200)
+│   ├── extension/      # Browser extension
+│   ├── commands/       # CLI commands
+│   └── sdk/            # Published Node.js SDK
+├── libraries/
+│   ├── nestjs-libraries/  # Prisma, repositories, business logic
+│   ├── helpers/           # Shared utilities, useFetch hook
+│   └── react-shared-libraries/ # Shared React components
+└── docs/
+```
+
+### Apps
+
+| App | Stack | Purpose |
+|-----|-------|---------|
+| `backend` | NestJS REST API | Thin controllers + module wiring. Real logic in `nestjs-libraries`. |
+| `orchestrator` | NestJS + Temporal | Background jobs: workflows and activities. |
+| `frontend` | Next.js App Router, React 19, Tailwind 3 | User-facing web app on port 4200. |
+| `extension` | Browser extension | Chrome extension for cross-platform posting. |
+| `commands` | CLI | Command-line operations. |
+| `sdk` | Node.js (published) | `@reaatech/postmill-sdk` for third-party integrations. |
+
+### Libraries
+
+| Library | Purpose |
+|---------|---------|
+| `nestjs-libraries` | Prisma schema, repositories, services, integrations, AI layer, analytics, encryption, upload adapters. |
+| `helpers` | Shared utilities including `useFetch` (SWR wrapper), auth helpers, decorators (`@Plug`, `@PostPlug`). |
+| `react-shared-libraries` | Shared React components used across frontend surfaces. |
+
+## Backend layering
+
+The backend enforces strict layering. **No shortcuts.** Only repositories touch
+Prisma.
+
+```
+Controller → Service → Repository
+Controller → Manager → Service → Repository  (when a manager is involved)
+```
+
+- **Controllers** (`apps/backend/src/api/routes/`) handle HTTP, auth guards,
+  validation, and delegate to services. Controllers are **thin** — no business
+  logic.
+- **Services** (`libraries/nestjs-libraries/src/database/prisma/<domain>/`)
+  contain business logic. A service must go through another domain's **service**,
+  not its repository.
+- **Repositories** are the only layer that calls Prisma directly.
+- **Managers** (`libraries/nestjs-libraries/src/integrations/`,
+  `libraries/nestjs-libraries/src/ai/`) coordinate cross-cutting concerns.
+
+Public API (v1) routes live in `apps/backend/src/public-api/routes/v1/` and are
+API-key authenticated.
+
+## Frontend conventions
+
+- **Next.js App Router**: Pages in `apps/frontend/src/app/(app)/(site)/`.
+- **Data fetching**: Every API call uses **SWR** through the `useFetch` hook
+  from `libraries/helpers/src/utils/custom.fetch.tsx`. Each SWR call must be
+  its **own hook** per `react-hooks/rules-of-hooks`.
+- **Styling**: Tailwind 3 with CSS variables defined in
+  `apps/frontend/src/app/colors.scss`. All `--color-custom*` variables are
+  deprecated. Always check existing components before building new ones.
+- **Components**: UI primitives in `apps/frontend/src/components/ui/`; feature
+  components in `apps/frontend/src/components/`. Never install third-party UI
+  component libraries — write them natively.
+- **New channel providers** require a composer component in
+  `apps/frontend/src/components/new-launch/`.
+
+## How a post gets published
+
+1. User creates a post in the composer. A **preflight** validation
+   (`/posts/preflight`) checks content, media, and provider capabilities.
+2. Post is saved to the database with a scheduled date.
+3. At the scheduled time, a **Temporal workflow** picks up the post:
+   - `post.workflow.v1.0.5.ts` — base publish workflow.
+   - `post.workflow.v1.0.6.ts` — adds optional **first comment** support.
+4. The workflow calls `PostActivity` which resolves the provider through
+   `IntegrationManager` and calls `provider.post()`.
+5. After successful publish:
+   - **Internal plugs** (`@PostPlug`) execute (one-shot post-publish actions,
+     e.g. "have another account repost this").
+   - If `settings.firstComment` is set and the provider supports it (gated via
+     `providerCapabilities.firstComment`), the workflow posts a first comment.
+     This is **idempotent** — it records `firstCommentPostedAt` so retries
+     cannot double-post. Failure is **non-fatal** (the post stays published).
+6. Webhooks fire for `post.published` events.
+
+## How analytics works
+
+1. A Temporal **`analyticsCollectionWorkflow`** runs one sweep per org, then
+   `continueAsNew`s every 24h. Requires `RUN_CRON=true`.
+2. Each sweep calls `AnalyticsActivity` which queries channel analytics (7-day
+   lookback for channel metrics, 30-day lookback for per-post metrics).
+3. Results are saved as daily **`AnalyticsSnapshot`** and
+   **`PostAnalyticsSnapshot`** rows.
+4. After ~18 months, `pruneAndRollupSnapshots()` rolls daily rows into weekly:
+   flow metrics summed, stock metrics keep the week's latest value.
+5. Per-post snapshots are pruned after 90 days. Both windows are configurable
+   via `ANALYTICS_DAILY_RETENTION_DAYS` and `ANALYTICS_POST_RETENTION_DAYS`.
+6. The `/analytics/v2` endpoints serve persisted data. Legacy
+   `/public/v1/analytics/*` and `/analytics/*` routes are kept for backward
+   compatibility (n8n/Zapier/Make integrations) — never change their response
+   shape.
+
+## Cross-cutting concerns
+
+| Concern | Implementation |
+|---------|---------------|
+| **SSRF protection** | All outbound HTTP on user-influenced URLs goes through `safeFetch` (validates HTTPS, validates redirects per-hop) in `libraries/nestjs-libraries/src/dtos/webhooks/safe.fetch.ts`. |
+| **At-rest encryption** | `EncryptionService` (AES-256-GCM, `v2:` prefix) encrypts OAuth tokens, API keys, and Nostr keys. Falls back to deriving key from `JWT_SECRET` if `ENCRYPTION_KEY` is unset. |
+| **CSRF** | CSRF middleware on cookie-authenticated mutating routes. Bypassed under `NOT_SECURED` (dev). Header/API-key clients are unaffected. |
+| **Helmet** | HSTS (1yr, includeSubDomains, preload), `noSniff`, `referrerPolicy`, `frameguard: deny`, conservative CSP. Gated by `NOT_SECURED`. |
+| **Throttling** | `ThrottlerBehindProxyGuard` applies default per-route limits. Global default: `API_LIMIT` env var (600/hour). |
+| **Sentry** | `beforeSend`/`beforeBreadcrumb` scrubs auth headers, tokens, PII. OpenAI capture disabled (`recordInputs: false`). |
+| **JWT** | Algorithm pinned to `HS256`. New tokens carry `exp` with sliding renewal. Legacy exp-less tokens still verify. |
+| **Validation** | Global `ValidationPipe` rejects unknown fields (`whitelist` + `forbidNonWhitelisted`). |
+
+> Verified against v3.7.0

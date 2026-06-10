@@ -1,0 +1,340 @@
+# Changes From Upstream
+
+Postmill is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) that has
+diverged substantially across seven major releases. The upstream documentation at `docs.postiz.com`
+no longer describes this fork's behavior. This page is the canonical summary of every change,
+organized by release. The [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md)
+has the full per-commit detail.
+
+---
+
+## At a glance
+
+| Area | Upstream | This fork |
+|------|----------|-----------|
+| AI | Single hardcoded OpenAI integration | Governed multi-provider system (**25 providers** — 13 direct + 12 multi-model hubs/gateways, BYO keys) with admin config, guardrails, RAG, and per-org spend caps |
+| Channel credentials | Environment variables only | Per-tenant OAuth credentials in **Settings → Channels** (no env fallback) |
+| Storage | Single cloud storage via env vars | Per-tenant storage adapters (S3/R2/B2/IDrive/local) in **Settings → Storage** |
+| AI provider config | Single `OPENAI_API_KEY` | Per-tenant providers in **Settings → AI** (no env fallback) |
+| Admin UI | Separate `/admin/*` routes | Admin functionality moved to per-tenant settings tabs |
+| Media library | Basic upload/list | Media manager with folders, tags, bulk actions, search |
+| Channel count | Upstream set | **36** providers (adds Tumblr, Pixelfed, PeerTube) |
+| Analytics | Single-channel, live fetch on demand | Persisted multi-channel dashboard from daily snapshots (`/analytics/v2`) |
+| Calendar | Card click opens edit modal | Card body opens a **Post Detail** modal; a settings icon opens edit |
+| Comments | — | Synced social comments foundation with per-user read state |
+| MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
+| Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postmill-app` |
+| Product name | Postiz | **Postmill** (rebranded in v3.7.0; env vars `POSTMILL_*`, SDK `@reaatech/postmill-sdk`) |
+
+---
+
+## v3.7.1 — Env var removal for channel & AI credentials
+
+Removes the last `process.env` credential reads from social providers, deletes the env-migration
+helpers, and prunes the configuration surface. The env var fallback for channel and AI credentials
+is now **gone** — every provider reads from the database, encrypted at rest.
+
+- **YouTube, GMB, Telegram providers** — removed remaining `process.env` fallbacks for
+  `YOUTUBE_CLIENT_ID/SECRET`, `GOOGLE_GMB_CLIENT_ID/SECRET`, and `TELEGRAM_TOKEN`.
+- **`ChannelEnvMigrationService`** and **`AiEnvMigrationService`** deleted — these `OnModuleInit`
+  services that seeded DB configs from env vars are no longer needed.
+- **`getEnvOr()` function** deleted from `credentials.ts` — all credential reads must use
+  `getOrgCredential(orgId, identifier, key)` or `clientInformation`.
+- **`.env.example`** and **`docker-compose.yaml`** pruned of all per-tenant channel/AI env vars
+  (~30+ vars removed from each). Channel/AI config is now exclusively in-app.
+- **Docs** updated across all relevant pages (configuration, env-vars, channels, AGENTS.md).
+- **CI guard** added to `security-audit.yml` — greps for `getEnvOr(` and `process.env.<VAR>` in
+  social provider files, failing the workflow if any are found.
+
+---
+
+## v3.7.0 — Brand cutover (Postiz → Postmill)
+
+The fork is renamed **Postiz → Postmill**. No application schema changes. The rename rebrands every
+user-facing surface and most internal identifiers, and carries several **breaking** infrastructure
+renames for self-hosters.
+
+- **Branding** — product name `Postiz` → `Postmill` across UI copy, page titles, emails, OpenAPI,
+  and all translation locales; primary brand color `#612bd3` → `#2b5cd3`; logos and the browser
+  extension rebranded. The `isGeneralServerSide()`/`isGeneral` "Postiz vs Gitroom" display toggles
+  collapse to always render Postmill.
+- **Packages & SDK** — workspace names `postiz-*` → `postmill-*` (internal; scripts target by path).
+  The Node SDK is republished as **`@reaatech/postmill-sdk`** (was `@postiz/node`).
+- **Env vars (BREAKING)** — all `POSTIZ_*` variables hard-renamed to `POSTMILL_*`
+  (`POSTMILL_GENERIC_OAUTH`, `POSTMILL_OAUTH_*`, `POSTMILL_API_KEY`, `POSTMILL_CONTAINER`,
+  `NEXT_PUBLIC_POSTMILL_OAUTH_*`). The old names are no longer read.
+- **Docker / self-hosting (BREAKING)** — image is now `ghcr.io/reaatech/postmill-app`; compose
+  services/network/volumes and the Postgres role/db renamed `postiz-*` → `postmill-*`. The Postgres
+  **data** volume (`postgres-volume`) is unchanged, so data persists. See the upgrading guide in the
+  self-hosting documentation.
+- **Internal identifiers** — the Mastra chat agent id (`postiz` → `postmill`) and memory store
+  (`postiz-store` → `postmill-store`) were renamed, which **orphans persisted chat memory** (one-time
+  reset). MCP server name + setup snippets, OpenTelemetry tracer (`postmill-ai`), and the C2PA media
+  claim generator were rebranded too.
+- **Legal/governance** — product name rebranded in LICENSE/CONTRIBUTING/CCLA/ICLA/SECURITY (original
+  copyright + AGPL preserved); `SECURITY.md` scope/reporting retargeted to `reaatech/postmill-app`.
+
+**Intentionally not changed:** website/domain URLs (`*.postiz.com`, pending the new site), the
+`npm install -g postiz` CLI snippets (pending CLI publish under the new name), internal translation
+keys, and the `@gitroom/*` TypeScript path aliases.
+
+---
+
+## v3.6.0 — User profile, per-tenant storage/OAuth/AI, media manager, datatable rebuilds
+
+The settings surface is fundamentally reorganized: admin-only pages are gone, and every org manages
+its own storage, channel OAuth credentials, and AI provider configuration from the settings sidebar.
+
+### User-facing features
+- **User profile page** (`/settings/profile`) with Profile (avatar/name/bio), Security (password change),
+  and Notifications (email prefs) tabs.
+- **Settings re-tabbed** — Settings, Profile, Teams, Channels, AI, Brand, Media, Storage, Webhooks,
+  Auto Post, Sets, Signatures, Developers, Approved Apps. Admin routes are removed.
+- **Teams datatable** — search, sort, paginate, invite, and create users inline.
+- **Webhooks datatable** — educational header, test ping, event selection, HMAC signing.
+- **Auto Post / Sets / Signatures datatables** — educational empty states and proper CRUD.
+- **Media manager** — folder tree, file details panel, bulk actions, search/sort/pagination, tags,
+  descriptions, **trash & restore** (soft-delete + recovery).
+- **Campaigns page** — educational header + aggregate stats row.
+
+### Per-tenant infrastructure
+- **Storage adapter system** — each org mounts S3/R2/B2/IDrive e2/local disk via `StorageProviderConfig`.
+  5 GB default quota per org (`localStorageQuotaBytes`). Four-panel Storage settings tab:
+  - **Providers** — cards showing type, mount status, usage
+  - **Quota Status** — usage meter with 80%+ warning banner
+  - **Usage Breakdown** — pie charts / tables by folder and provider
+  - **Audit Log** — all storage operations (mount, unmount, test, migrate, set-default-folder) with pagination
+- **Storage health tracking** — last-checked timestamp and error messages on each provider card
+  (`lastHealthCheck`, `lastHealthError` columns in `StorageProviderConfig`).
+- **Folder-level provider routing** — assign a storage provider to a folder; uploads to that folder
+  automatically use the assigned provider. Configured via `POST /settings/storage/:id/set-default-folder`,
+  stored in `StorageProviderConfig.defaultFolderId`.
+- **Per-tenant channel OAuth** — orgs provide their own OAuth app credentials in the Channels tab.
+  All per-provider env vars (`LINKEDIN_CLIENT_ID`, `FACEBOOK_APP_ID`, etc.) deprecated (kept as
+  fallback at the time; fully removed in v3.7.1).
+- **Per-tenant AI provider config** — orgs configure providers/models/keys in the AI tab.
+  `OPENAI_API_KEY` deprecated for model resolution (no longer read by `AIModelProvider`; removed
+  in v3.6.3).
+- **Brand voice + RAG knowledge base** (Brand tab) — brand voice profiles and content-index UI.
+- **Media provider settings** (Media tab) — per-tenant media pipeline config.
+
+> **Note:** In v3.6.0, `getEnvOr()`, `ChannelEnvMigrationService`, and `AiEnvMigrationService`
+> still existed but were deprecated — they were fully deleted in v3.7.1. This provided a migration
+> path for deployments that had not yet moved credentials into the database.
+
+### Bugfixes
+- Comments inbox: proper error/permission states + `RUN_CRON` banner.
+- Analytics v2: dark mode charts (CSS vars) + skeleton loader performance.
+- Calendar: card stats and comment badge fixes.
+
+### Schema (additive)
+- **New:** `MediaFolder`, `StorageProviderConfig`, `OrgProviderConfiguration`, `AuditLog`.
+- **Added columns:** `Media.folderId` (nullable), `Media.tags` (JSON), `Media.description` (text),
+  `Media.deletedAt` (soft-delete for trash); `Organization.localStorageQuotaBytes` (default 5 GB);
+  `StorageProviderConfig.lastHealthCheck`, `lastHealthError`, `defaultFolderId`;
+  `AIOrgProviderConfig.isActive`.
+- **Deprecated** but kept: `ProviderConfiguration`, `AIProviderConfig`, `AISystemSettings`.
+
+### Deprecated env vars (kept as fallback; deprecation warning on boot — removed in v3.7.1)
+`STORAGE_PROVIDER`, all `CLOUDFLARE_*` vars, all per-provider OAuth env vars, `OPENAI_API_KEY`.
+
+---
+
+## v3.5.10 — Stabilization release
+
+Gets v3.5.9 **actually booting** (it shipped with six chained boot blockers that returned 502 on
+every `/api/*`) and closes a batch of UI/API bugs found by a comprehensive end-to-end Playwright
+audit of the real interface. No schema changes.
+
+### Boot & deploy reliability
+- Lockfile regenerated so `node-telegram-bot-api` resolves to the CommonJS `0.66.x` the code targets
+  (the drifted lockfile had pinned an ESM-only `1.0.0-rc.0` that crash-looped the backend).
+- Five further runtime boot crashes fixed (DI on `ProviderHealthService` / `IdempotencyFactory`,
+  path-to-regexp v8 wildcard routes, the orchestrator's `AiModule`/`RagService` wiring, and a
+  `crypto` import banned in the Temporal workflow sandbox).
+- New CI **boot guard** rejects lockfile drift and boots the backend against ephemeral Postgres+Redis
+  — the check that would have stopped v3.5.9 from shipping un-booted.
+
+### UI/API fixes
+- Composer can save/schedule/publish again (lenient validate DTO on `/posts/valid` + `/preflight`).
+- CopilotKit stops 403-ing on every page (forwards the CSRF token to its runtime).
+- `/analytics/v2` no longer crashes — the line chart was missing its Chart.js `type`, so it threw and
+  tripped the page's error boundary ("Something went wrong").
+- Billing no longer **logs you out of the whole app**: on instances without Stripe, the pricing-tiers
+  call hit Stripe with a placeholder key and got `401 "Invalid API Key"`; the frontend force-logs-out
+  on any `401`, so opening Billing silently logged you out — making every admin page and Settings
+  render as login. `getPackages()` now returns empty tiers (never a 401) when Stripe is unconfigured.
+- `agent-media-sso` degrades gracefully when unconfigured.
+
+### Completeness & accessibility
+- **Team management**: change a member's role and view a member's profile (was list + remove only).
+- **Admin errors**: Retry a failed post (re-queues it) and Resolve/dismiss an error from `/admin/errors`.
+- Settings tabs and the admin channel-config row are now keyboard-focusable semantic buttons.
+- Global API throttle default raised `90 → 600`/hour (`API_LIMIT`) so normal interactive use no longer
+  trips it and renders pages blank on 429.
+
+---
+
+## v3.5.9 — Bugfix & UI-completeness release
+
+A comprehensive bugfix and UI-wiring release following a 56-item codebase audit. Focuses on closing
+cross-org security gaps, fixing runtime bugs, re-wiring disconnected UI surfaces, and hardening
+validation and type safety.
+
+### Security & org isolation
+- All campaign update/delete operations now require `organizationId` in the WHERE clause.
+- Watchlist account mutations (update, soft-delete, error management) now scoped to org.
+- Bulk comment mark-read (`POST /posts/inbox/bulk-read`) requires org ownership.
+- Comment assignment verifies post belongs to requesting user's org before reassigning.
+- All five campaign endpoints (`GET/POST/PUT/DELETE`) now carry `@CheckPolicies` and org scoping.
+- Sensitive post reads (`getPost`, `getPostById`, `getPostsByGroup`) now require mandatory `orgId`.
+- `POST /posts/bulk` now gated by `@CheckPolicies([..., Sections.POSTS_PER_MONTH])`.
+
+### Runtime fixes
+- `GET /posts/inbox` now resolves correctly (controller registration order fixed).
+- Calendar stats footer renders for all published posts.
+- `metric.component.tsx` no longer crashes on missing `timezones-list` package.
+- Calendar grid uses timezone-aware `newDayjs` for correct date display.
+- 4 event listener memory leaks fixed (icons, html, support, new-modal components).
+- Helmet middleware condition corrected (`||` → `&&`).
+- CopilotKit budget check logic clarified.
+
+### Data & performance
+- `disableIntegrations()` replaced per-row `update()` loop with single `updateMany()`.
+- `getComments()` now filters soft-deleted rows (`deletedAt: null`).
+- `getBestTimePosts()` pagination now has deterministic id tiebreaker.
+- `useCredit()` wrapped in `$transaction()` to prevent race conditions.
+- Comment sync loop guarded against null `result.comments`.
+
+### Validation hardening
+- 10 new validations: cursor date parsing, array size limits, enum status values,
+  campaign date ordering, watchlist handle format, query parameter whitelists,
+  and null guards on comment status.
+- 11 AI user endpoints now throttled at 30 req/min.
+
+### Feature / contract fixes
+- `campaignId` added to `CreatePostDto` and threaded through `createPost`/`bulkCreate`.
+- Image moderation de-scoped to text-only (image params removed from endpoint).
+- `CommentStatus` const enum introduced; hardcoded string arrays replaced.
+- `any` types in social comments service replaced with proper `Integration` type.
+- TTS generation error handling added (BudgetExceeded/GuardrailViolation patterns).
+
+### UI wiring
+- Sidebar now includes "Administration" section for super-admins.
+- User profile form (name, bio, picture) wired into settings.
+- User avatar dropdown menu added to top navigation bar.
+- `SetTimezone` component uncommented in app layout.
+- Billing address element, notification component, and FAQ heading uncommented.
+- Dead TikTok validity reference removed.
+- Admin dashboard page created at `/admin/dashboard`.
+- Read-only "Media Providers" panel added to Brand & AI settings (`GET /ai/media-providers`).
+- "Summarize comments" button added to comment composer.
+
+---
+
+## v3.5.0 — Security hardening + feature expansion
+
+A codebase-hardening and feature-expansion release. Every change is additive or a refactor under
+existing contracts — no breaking changes, no schema renames.
+
+### Security & infrastructure hardening
+- **SSRF-safe outbound dispatch** — a single `safeFetch` helper (validate + manual redirect
+  re-validation via `ssrfSafeDispatcher`) now fronts all webhook dispatch and user-influenced
+  provider fetches, closing blind-SSRF / DNS-rebinding / redirect-to-metadata holes.
+- **Encryption at rest** — versioned AES-GCM `EncryptionService` (`v2:` prefix); `Integration.token`
+  / `refreshToken` are now encrypted, with transparent legacy-plaintext read fallback. Optional
+  dedicated `ENCRYPTION_KEY`, falling back to `JWT_SECRET`.
+- **Response headers & PII scrubbing** — helmet (HSTS, CSP, noSniff, frameguard) plus a Sentry
+  `beforeSend`/`beforeBreadcrumb` scrubber that strips auth headers, cookies, tokens, and PII. CSRF
+  middleware on cookie-authenticated mutating routes. All bypass under `NOT_SECURED` (dev-only).
+- **Throttle guard fix** — the throttler now applies its default limit to all routes (most routes
+  previously bypassed it), so per-route `@Throttle` caps actually take effect.
+- **OAuth 2.0 / PKCE hardening**, JWT algorithm pinning + expiry/renewal, CSPRNG IDs, open-redirect
+  allowlisting (`INTEGRATION_RETURN_URL_ALLOWLIST`), bounded analytics query validation, and a
+  multipart-upload ownership ledger.
+- **CI** — a `pnpm audit --audit-level=high` workflow on PRs and weekly.
+
+### New feature surfaces
+- **Analytics** — best-time-to-post heatmap (`/analytics/v2/best-time`), recommendations action tab
+  (`/analytics/v2/recommendations`), competitor watchlist CRUD (`/analytics/v2/watchlist`), and a 60s
+  Redis cache on the overview endpoint.
+- **AI utilities** — hashtag generator, content-compliance checker, comment sentiment/summary modes,
+  and brand-memory (RAG) index/search — all rate-limited.
+- **Composer** — content-QA preflight (`/posts/preflight`) and bulk/CSV scheduling (`/posts/bulk`).
+- **Social** — cross-channel comment inbox (`/posts/inbox`), first-comment and poll support gated on
+  a new provider **capability matrix** (`/provider-capabilities`).
+- **Campaigns** — campaign folders (`/campaigns`) grouping posts/assets/analytics/comments.
+- **Webhooks** — new event types: `comment.new`, `comment.reply`, `analytics.snapshot_complete`.
+
+---
+
+## v3.4.0 — Pluggable AI provider system
+
+The AI layer is now an admin-configurable, governed, multi-provider system that replaces the single
+hardcoded OpenAI integration.
+
+- **25 providers** — 13 direct model providers (OpenAI, Anthropic, Google Gemini, xAI Grok, Meta
+  Llama, Mistral, DeepSeek, Cohere, Perplexity, Groq, Qwen, MiniMax, Azure OpenAI) plus 12
+  multi-model hubs & gateways (Amazon Bedrock, Google Vertex AI, OpenRouter, Vercel AI Gateway,
+  Together AI, Fireworks AI, DeepInfra, SiliconFlow, Lightning AI, GMI Cloud, Bitdeer, Vultr).
+- **Admin AI Settings** at `/admin/ai` — pick provider/model, store encrypted credentials, test the
+  connection, set the active provider, and configure governance.
+- **Governance** — input/output guardrails (prompt-injection, PII, brand safety, NSFW), per-scope
+  budgets with threshold alerts, OpenTelemetry GenAI telemetry, and provider-health tracking.
+- **No-provider behavior** — with no active AI provider configured for an org, AI is **off** for
+  that org across all four surfaces (`resolveConfigForScope` returns null; surfaces report "AI not
+  configured"). The frontend does not mount CopilotKit when AI is off and routes the user to
+  Settings → AI. No env-`OPENAI_API_KEY` fallback (since v3.6.3).
+
+---
+
+## v3.3.0 — Calendar, post detail & social comments
+
+- Clicking a calendar card **body** opens a new **Post Detail** modal (KPI header + post thread);
+  the edit modal now opens from a settings icon on the card's hover strip.
+- A scheduled/published pill and a card stats footer (views/likes/comments) are sourced from
+  persisted post snapshots.
+- Foundation for **social comments** — synced platform comments, per-user read state, and a
+  Temporal sync workflow (gated by `RUN_CRON`).
+
+---
+
+## v3.2.0 — Three extra providers (36 channels)
+
+Adds **Tumblr** (OAuth2, NPF posts), **Pixelfed** (instance URL + access token, Mastodon-compatible),
+and **PeerTube** (instance URL + login, single-video uploads). No database migration required.
+
+---
+
+## v3.1.0 — Persisted analytics dashboard
+
+Replaces single-channel live-fetch analytics with a persisted multi-channel dashboard. Daily metric
+snapshots are collected by a Temporal workflow (requires `RUN_CRON=true` on one orchestrator
+instance) and served through `/analytics/v2` with real period-over-period comparisons, charts, and
+CSV/JSON export. Daily snapshots roll up to weekly after ~18 months; per-post snapshots prune after
+90 days (both windows env-configurable).
+
+---
+
+## v3.0.0 — Database-backed provider configuration
+
+Channel OAuth/API credentials are managed through an admin UI at `/admin/channels` instead of
+environment variables, and are encrypted at rest. Environment variables were kept as a fallback: with no
+DB configs present, providers fall back to `process.env`. A one-time migration script imports
+existing env credentials into the database.
+
+> **Note:** The env var fallback and migration helpers described in v3.0.0 were fully removed in
+> v3.7.1. All credentials now come exclusively from the database.
+
+---
+
+## Backward compatibility commitments
+
+This fork is run in production. Two invariants are deliberately preserved:
+
+1. **Legacy public analytics route** — the original public API analytics route keeps its response
+   shape for n8n/Zapier/Make compatibility; a parallel v2 route was added rather than changing it.
+2. **Schema changes are additive** — new tables, nullable-or-defaulted columns. The `db push` model
+   never drops or renames columns without a manual backfill plan.
+
+> Verified against v3.7.0

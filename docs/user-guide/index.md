@@ -1,0 +1,37 @@
+# User Guide
+
+Postmill is a social media and chat post scheduling platform. Schedule posts to 36 channels,
+view your content on a calendar, track performance with persisted analytics, manage your team,
+organise media assets, and use AI to generate and optimise your content.
+
+## Supported channels
+
+X (Twitter), LinkedIn (2 channels: profile and page), Reddit, Instagram (2 channels: Business and Standalone), Facebook,
+Threads, YouTube, Google My Business, TikTok, Pinterest, Dribbble, Discord, Slack, Kick, Twitch,
+Mastodon, Bluesky, Lemmy, Farcaster, Telegram, Nostr, VK, Medium, Dev.to, Hashnode, WordPress,
+ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
+
+## How it works
+
+1. You schedule posts in the composer and place them on the calendar.
+2. Temporal workflows pick up posts at their scheduled time and publish to each channel.
+3. Daily analytics snapshots collect engagement data and populate the dashboard.
+
+## Guide pages
+
+| Page | Description |
+|------|-------------|
+| [Getting Started](./getting-started.md) | Set up your account, connect your first channel, and publish your first post. |
+| [Calendar](./calendar.md) | Manage scheduled posts in a monthly/weekly calendar. Open post detail modals, view KPIs, and drag to reschedule. |
+| [Composer](./composer.md) | Create posts with per-channel content, media, polls, first comments, and preflight validation. |
+| [Bulk Import](./bulk-import.md) | Upload a CSV to schedule hundreds of posts at once with per-row validation. |
+| [Analytics](./analytics.md) | Dashboard with multi-channel metrics, post performance, best-time insights, and recommendations. |
+| [Watchlist](./watchlist.md) | Track competitor accounts and external profiles with public metric probes. |
+| [Social Comments](./social-comments.md) | Unified comment inbox with sentiment scoring, priority badges, and quick replies. |
+| [Campaigns](./campaigns.md) | Group posts into campaigns for unified analytics, media organisation, and comment tracking. |
+| [Media Library](./media-library.md) | Folder tree, drag/drop uploads, file metadata, bulk actions, trash with restore, and storage provider routing. |
+| [AI Tools](./ai-tools.md) | Text generation, hashtags, comment replies, content compliance, brand voice, RAG search, image/video/TTS/STT, and spending dashboard. |
+| [Settings](./settings.md) | Profile, teams, channels, AI configuration, brand voice, media providers, storage, webhooks, auto posting, sets, signatures, developers, and approved apps. |
+| [Billing](./billing.md) | Subscription plans, payment methods, invoice history, and lifetime deal (when Stripe is configured). |
+
+> Verified against v3.7.0

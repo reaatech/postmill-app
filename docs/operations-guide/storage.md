@@ -1,0 +1,194 @@
+# Storage Setup
+
+Postmill supports multiple storage backends for uploaded media: local disk, Cloudflare R2, AWS S3,
+Backblaze B2, and IDrive e2. Each organization can mount its own storage provider independently,
+configured from the in-app Settings -> Storage page.
+
+## Storage model
+
+### `StorageProviderConfig`
+
+Each storage provider mount is a row in the `StorageProviderConfig` table:
+
+| Field | Description |
+|-------|-------------|
+| `type` | One of `LOCAL`, `S3`, `CLOUDFLARE_R2`, `BACKBLAZE_B2`, `IDRIVE_E2` |
+| `name` | User-facing label |
+| `mounted` | Whether this provider is actively serving files |
+| `credentials` | Encrypted JSON: `accessKeyId`, `secretAccessKey`, `endpoint`, `region` |
+| `bucket` | Bucket name (for S3-family providers) |
+| `publicUrl` | Public base URL for file access |
+| `quotaBytes` | Per-provider byte limit (null = use org quota) |
+| `lastHealthCheck` | Timestamp of last connection test |
+| `lastHealthError` | Error message from last failed connection test |
+| `defaultFolderId` | Folder-level routing: uploads to this folder use this provider |
+
+### Per-org quota
+
+Each organization starts with a 5 GB quota (`localStorageQuotaBytes`). At 80% usage, a warning
+banner appears in the storage settings. At 100%, new uploads are blocked until space is freed or
+quota is raised.
+
+## Storage backends
+
+### Local storage
+
+Default. Files are written to `UPLOAD_DIRECTORY` (e.g. `/uploads/`) on the container's filesystem.
+Simple but not redundant — a single container's disk, not shared across replicas.
+
+```yaml
+STORAGE_PROVIDER: 'local'
+UPLOAD_DIRECTORY: '/uploads'
+```
+
+### Cloudflare R2
+
+S3-compatible object storage with no egress fees. Recommended for production.
+
+```yaml
+STORAGE_PROVIDER: 'cloudflare'
+CLOUDFLARE_ACCOUNT_ID: 'your-account-id'
+CLOUDFLARE_ACCESS_KEY: 'your-access-key'
+CLOUDFLARE_SECRET_ACCESS_KEY: 'your-secret-key'
+CLOUDFLARE_BUCKETNAME: 'postmill-media'
+CLOUDFLARE_BUCKET_URL: 'https://your-bucket.r2.cloudflarestorage.com'
+CLOUDFLARE_REGION: 'auto'
+```
+
+### AWS S3
+
+Native S3 API. Configure per-org in Settings -> Storage using access key + secret.
+
+**Required IAM permissions:**
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::your-bucket-name",
+        "arn:aws:s3:::your-bucket-name/*"
+      ]
+    }
+  ]
+}
+```
+
+**Bucket setup:**
+1. Create an S3 bucket in your preferred region.
+2. Optionally enable versioning and server-side encryption (Postmill encrypts at the application
+   layer and does not require SSE — but enabling it adds an extra layer of protection).
+3. Disable "Block all public access" if you intend to serve files publicly (Postmill can serve
+   through presigned URLs instead).
+4. Create an IAM user with programmatic access and attach the policy above.
+
+**Credential format:**
+- Access key ID: `AKIA...`
+- Secret access key: the 40-character key paired with the access key ID
+
+### Backblaze B2
+
+S3-compatible API. Configure per-org with your B2 application key ID and key, plus the endpoint
+for your bucket.
+
+**Required permissions:** Create an application key (not a master key) scoped to a single bucket
+with `readFiles`, `writeFiles`, `deleteFiles`, and `listFiles` capabilities.
+
+**Bucket setup:**
+1. Create a bucket in the B2 web console (or via CLI).
+2. Go to App Keys → Add a New Application Key.
+3. Give it a name (e.g. "Postmill"), select your bucket, and enable the four capabilities above.
+4. Copy the `keyID` and `applicationKey` — the key is shown only once.
+
+**Credential format:**
+- Access key: `keyID` from the application key (e.g. `005...`)
+- Secret key: `applicationKey` from the application key
+- Endpoint: `https://s3.us-west-004.backblazeb2.com` (adjust region based on your bucket)
+
+### IDrive e2
+
+S3-compatible API. Configure per-org with your e2 access key and secret.
+
+**Required permissions:** Create access keys from the e2 web console under "Create Access Keys."
+The generated key pair has full access to your e2 account — IDrive does not currently offer
+scoped/bucket-level keys.
+
+**Bucket setup:**
+1. Create a bucket in the IDrive e2 web console.
+2. Go to Access Keys → Create Access Key.
+3. Copy the `Access Key ID` and `Secret Access Key` — the secret is shown only once.
+
+**Credential format:**
+- Access key: the `Access Key ID` shown after creation
+- Secret key: the `Secret Access Key` shown after creation
+- Endpoint: `https://[region].idrivee2.com` (region is shown in the bucket details, e.g.
+  `https://ewr1.idrivee2.com` for us-east-1)
+
+## Per-org storage management
+
+Operators do not need to manage storage for individual orgs — org admins self-serve via Settings
+-> Storage. The four-panel interface provides:
+
+1. **Providers** — Cards showing type, mount status, last health check, usage percentage. Mount
+   and unmount buttons.
+2. **Quota Status** — Usage meter with 80%+ amber warning and 100%+ red block.
+3. **Usage Breakdown** — Bytes used by folder and by provider (pie charts/tables).
+4. **Audit Log** — Paginated log of all storage operations: create, update, delete, mount,
+   unmount, health-check, migrate, set-default-folder.
+
+## File migration between providers
+
+From the Storage tab, an org admin can migrate files between providers:
+
+1. Both source and destination providers must be mounted and healthy.
+2. The migration reads file bytes through the source adapter and writes through the destination
+   adapter.
+3. After a successful migration, files at the old location can be deleted.
+
+Migrations are recorded in the audit log.
+
+## Health tracking
+
+Each storage provider is periodically health-checked:
+
+- `lastHealthCheck` timestamp is updated on each test
+- `lastHealthError` captures the error message if connection fails
+- The UI shows a green/amber/red badge with "Last checked: `<time>`"
+
+Health checks verify the provider is reachable and the credentials are valid.
+
+## Folder-level provider routing
+
+In Settings -> Storage, an org admin can assign a storage provider to a specific folder
+(`defaultFolderId`). All uploads targeting that folder will automatically use that provider. If
+a folder has no assigned provider, the system picks any mounted provider.
+
+## Multipart upload ownership ledger
+
+Large files are uploaded via multipart presigned URLs. Postmill maintains an ownership ledger
+that tracks each upload's `uploadId` and `parts` against the org that initiated it. This prevents
+cross-org upload hijacking — a client cannot complete or list a multipart upload by supplying a
+different org's `uploadId`.
+
+## Legacy storage env vars
+
+The legacy `STORAGE_PROVIDER` and `CLOUDFLARE_*` environment variables still work as global
+fallbacks. However, per-org `StorageProviderConfig` mounts take precedence. The
+`UploadFactory.createStorage()` helper that reads these env vars is deprecated and logs a
+deprecation warning at boot. For new deployments, configure storage exclusively through the
+Settings UI.
+
+## Related
+
+- [Configuration](./configuration.md) — all storage env vars
+- [Requirements](./requirements.md) — object storage options
+
+> Verified against v3.7.0
