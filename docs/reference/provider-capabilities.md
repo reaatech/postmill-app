@@ -84,8 +84,43 @@ The canonical source is `PROVIDER_CAPABILITIES` in
 
 **refreshToken** — 16 providers support OAuth refresh token rotation.
 
+## Short-link providers
+
+Postmill also includes a separate capability system for short-link providers. Each short-link
+provider declares support for custom domains and click analytics. The canonical source is
+the adapter classes in `libraries/nestjs-libraries/src/short-linking/adapters/`.
+
+| Provider | Custom Domain | Click Analytics | Notes |
+|---|---|---|---|
+| Bitly | ✓ | ✓ | Branded domains via `group_guid` |
+| TinyURL | ✓ | — | Custom alias support |
+| T.LY | ✓ | ✓ | Referral tracking |
+| Short.io | ✓ | ✓ | iOS/Android deep links |
+| Rebrandly | ✓ | ✓ | Workspaces, tags |
+| Dub.co | ✓ | ✓ | Link-level tags |
+| Cutt.ly | — | ✓ | |
+| Tiny.cc | — | ✓ | |
+| is.gd | — | — | |
+| v.gd | — | — | |
+| BL.INK | ✓ | ✓ | Enterprise analytics |
+| T2M | ✓ | ✓ | Geo-targeting |
+| Linkly | ✓ | ✓ | Retargeting pixels |
+| Replug | ✓ | — | Retargeting pixels |
+| Switchy | ✓ | — | QR codes |
+| PixelMe | ✓ | — | Conversion pixels |
+| Sniply | ✓ | — | CTA overlays |
+| Ow.ly | — | — | Ow.ly requires a Hootsuite token and is not create/stats-capable in this release. |
+| CleanURI | — | — | Link monitoring |
+
+**customDomain** — 13 of 19 providers support branded/custom short domains.
+
+**clickAnalytics** — 10 of 19 providers expose click-count retrieval for the analytics dashboard: Bitly, BL.INK, Cutt.ly, Dub.co, Linkly, Rebrandly, Short.io, T2M, Tiny.cc, T.LY.
+
+---
+
 ## See Also
 
 - [Adding a Provider](../developer-docs/adding-a-provider.md) — How to register capability flags when adding a new channel provider.
+- [Short-link Providers](#short-link-providers) — Short-link provider capability matrix (above).
 
-> Verified against v3.7.0
+> Verified against v3.8.4

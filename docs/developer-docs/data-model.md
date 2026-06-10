@@ -29,7 +29,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `Media` | Uploaded media files (image/video), with path, type, thumbnail, tags | FK → `Organization`, `MediaFolder` |
 | `MediaFolder` | Folder tree for organizing media, supports cloud-store mounting | FK → `Organization`, parent `MediaFolder`, `StorageProviderConfig` |
-| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL) | FK → `Organization`; has many `MediaFolder` |
+| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL). `isDefault` column removed in v3.8.3, `POST /settings/storage/:id/set-default` route removed — LOCAL is always-on base; other providers mount onto it. | FK → `Organization`; has many `MediaFolder` |
 | `MultipartUpload` | Tracks ownership and state of multipart S3 uploads | FK → `Organization` |
 
 ---
@@ -102,6 +102,16 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 ---
 
+## Short-links (3)
+
+| Model | Purpose | Key Relationships |
+|---|---|---|
+| `OrgShortLinkConfig` | Per-org short-link provider config — provider type, API credentials (encrypted), custom domain, active flag | FK → `Organization` |
+| `ShortLink` | Ledger of generated short links — original URL, short URL, provider, post reference | FK → `Organization`, `Post` (nullable) |
+| `ShortLinkSnapshot` | Daily click-count snapshot per short link, collected by the Temporal analytics sweep | FK → `ShortLink` |
+
+---
+
 ## Campaigns (1)
 
 | Model | Purpose | Key Relationships |
@@ -167,6 +177,7 @@ through Prisma repositories — Mastra manages its own tables.
 | `PopularPosts` | Curated popular post templates (category + topic + content + hook) | Standalone |
 | `Mentions` | Cross-platform mention tracking | Standalone |
 | `AuditLog` | DB-backed audit log for credential and storage mutations | FK → `Organization` |
+| `EmailLog` | Email send-log metadata (no body). Lifecycle: queued → sent → delivered/bounced/complained/opened/clicked | Indexed on `(provider, providerMessageId)`, `sentAt`, `status` |
 
 ---
 
@@ -185,4 +196,4 @@ through Prisma repositories — Mastra manages its own tables.
 | `StorageProviderType` | `LOCAL`, `S3`, `CLOUDFLARE_R2`, `BACKBLAZE_B2`, `IDRIVE_E2` |
 | `From` | `BUYER`, `SELLER` |
 
-> Verified against v3.7.0
+> Verified against v3.8.3

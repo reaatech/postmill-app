@@ -1,25 +1,17 @@
 # Settings
 
 The Settings page at `/settings` is the control centre for your organisation and personal
-account. Each tab manages a distinct aspect of your Postmill instance.
+account. Each tab manages a distinct aspect of your Postmill instance. Tabs are sorted
+alphabetically with **General** (or **Settings** on some layouts) pinned first.
 
 ## Settings tab
 
 Global account preferences:
 
-- **Shortlink preference** — toggle shortlink generation for posts. When enabled, posted links
-  are automatically shortened.
-
-## Profile tab
-
-Links to `/settings/profile` for your personal account details:
-
-- **Avatar** — upload or change your profile picture from the media library.
-- **Full name** — your display name across the platform.
-- **Bio** — a short description shown on your profile.
-- **Email notifications** — toggle preferences for calendar reminders, publish confirmations,
-  comment notifications, and team invitations.
-- **Password change** — update your account password.
+> **Profile is now accessed from the user avatar menu** in the top navigation bar — not from a
+> settings tab. Click your avatar to find the Profile link alongside Settings and Logout. The
+> settings gear icon was removed from the header; all settings pages are reached through the
+> avatar menu.
 
 ## Teams tab
 
@@ -79,6 +71,63 @@ A reference matrix below the connection status shows what each provider supports
 include: analytics, comments, first comment, polls, video, carousel, alt text, max media count,
 link preview, and refresh token support. Use this to understand feature availability per channel
 before composing posts.
+
+## Shortlinks tab
+
+Configure and manage short-link providers per organisation. Short links are used to shorten URLs
+in published posts.
+
+- **Provider selection** — choose from 19 supported providers via a searchable dropdown: Bitly,
+  TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly,
+  Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
+- **One active at a time** — only one short-link provider can be active per organisation. Switching
+  providers automatically deactivates the previous one.
+- **Custom domains** — if your selected provider supports custom (branded) domains, enter the domain
+  in the configuration panel.
+- **Credentials** — API keys or tokens are stored encrypted at rest in `OrgShortLinkConfig`.
+- **Test connection** — validate that the configured credentials and domain are working before
+  publishing.
+- **Shortlink preference** — choose **ASK** (prompt before shortening), **YES** (always shorten), or
+  **NO** (never shorten). This is the same preference previously managed in the Settings tab; it has
+  moved to the Shortlinks tab alongside the provider configuration. The `ShortLinkPreferenceComponent`
+  is shared between the composer and settings.
+- **Link ledger** — every generated short link is recorded in the `ShortLink` table for analytics
+  tracking and deduplication.
+- **Known limitation (v3.8.4):** Short links are tracked per-org, not per-post.
+
+### Per-provider credential fields
+
+| Provider | Auth Type | Credential Fields | Where to get them |
+|----------|-----------|-------------------|-------------------|
+| Bitly | OAuth2 / API Key | Access Token (paste) — or Client ID + Client Secret (OAuth flow) | [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps) — register an OAuth app, or generate a Generic Access Token from your Bitly settings |
+| TinyURL | API Key | API Token | [tinyurl.com/app/settings/api](https://tinyurl.com/app/settings/api) |
+| T.LY | API Key | API Token | [t.ly/settings/api](https://t.ly/settings/api) |
+| Short.io | API Key | Secret Key, Short Domain | [short.io/settings/api](https://short.io/settings/api) |
+| Rebrandly | API Key | API Key, Workspace ID (optional) | [rebrandly.com/settings/api](https://rebrandly.com/settings/api) |
+| Dub.co | API Key | API Token (`dub_...`), API Endpoint (optional) | [dub.co/settings/tokens](https://dub.co/settings/tokens) |
+| Cutt.ly | API Key | API Key | [cutt.ly/api](https://cutt.ly/api) |
+| Tiny.cc | API Key | Login / Username, API Key | [tiny.cc/api](https://tiny.cc/api) |
+| is.gd | None | — | No credentials required |
+| v.gd | None | — | No credentials required |
+| BL.INK | API Key | API Key | [bl.ink/settings/api](https://bl.ink/settings/api) |
+| T2M | API Key | API Token | [t2m.io/settings/api](https://t2m.io/settings/api) |
+| Linkly | API Key | API Key, Workspace ID | [linklyhq.com/settings/api](https://linklyhq.com/settings/api) |
+| Replug | API Key | API Key | [replug.link/settings/api](https://replug.link/settings/api) |
+| Switchy | API Key | API Key | [switchy.io/settings/api](https://switchy.io/settings/api) |
+| PixelMe | API Key | API Key | [pixelme.me/settings/api](https://pixelme.me/settings/api) |
+| Sniply | API Key | API Token | [snip.ly/settings/api](https://snip.ly/settings/api) |
+| Ow.ly | API Key | Hootsuite Token | Create/stats not supported via public API — requires Hootsuite dashboard |
+| CleanURI | None | — | No credentials required |
+
+**Bitly OAuth setup (alternative to pasting an access token):**
+1. Register a new OAuth app at [bitly.com/a/oauth_apps](https://bitly.com/a/oauth_apps).
+2. Enter the redirect URI as `<FRONTEND_URL>/settings?tab=shortlinks` (this must also be on the
+   `INTEGRATION_RETURN_URL_ALLOWLIST` env var — see [Configuration](../operations-guide/configuration.md#security)).
+3. Copy the generated Client ID and Client Secret into the Bitly provider panel.
+4. Postmill handles the authorization redirect and token exchange via the built-in OAuth flow.
+
+See [Short-link Providers](../reference/provider-capabilities.md#short-link-providers) for the
+full capability matrix including click analytics and custom domain support.
 
 ## AI tab
 
@@ -186,11 +235,14 @@ for the operations perspective.
   Actions per card:
   - **Mount/Unmount** — make the provider available or unavailable as a root folder in the media
     library.
-  - **Set as default** — new uploads route to this provider.
   - **Edit** — update credentials, bucket, region, endpoint.
   - **Test** — verify connectivity and permissions.
   - **Delete** — remove the provider configuration.
   - **Migrate** — move files from this provider to another.
+- **LOCAL is the always-on base storage** — it cannot be deleted or unmounted. All app-internal
+  writes (avatars, AI-generated media, uploads) go to LOCAL. Additional providers (S3, R2, B2,
+  iDrive e2) mount onto LOCAL and appear as root folders in the media library; there is no "default"
+  provider concept.
 
 ### Quota sub-tab
 
@@ -288,4 +340,4 @@ Lists all OAuth applications that you have granted access to your account:
 
 Endpoints: `GET /user/approved-apps` lists apps; `DELETE /user/approved-apps/:id` revokes access.
 
-> Verified against v3.7.0
+> Verified against v3.8.4

@@ -43,8 +43,8 @@ restarts mid-workflow, execution resumes from the last persisted step — no los
 A scheduled content item. Has content (text, media, poll settings), a target set of channels, a
 scheduled date/time, and optional campaign, first-comment, and signature settings.
 
-**Launch / Calendar**
-The scheduling interface at `/launches`. A calendar grid view where users create, schedule, and
+**Schedule** (previously Launches/Calendar)
+The scheduling interface at `/schedule`. A grid view where users create, schedule, and
 manage posts.
 
 **Workflow**

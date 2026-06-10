@@ -22,7 +22,7 @@ ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
 | Page | Description |
 |------|-------------|
 | [Getting Started](./getting-started.md) | Set up your account, connect your first channel, and publish your first post. |
-| [Calendar](./calendar.md) | Manage scheduled posts in a monthly/weekly calendar. Open post detail modals, view KPIs, and drag to reschedule. |
+| [Schedule](./calendar.md) | Manage scheduled posts in a monthly/weekly schedule. Open post detail modals, view KPIs, and drag to reschedule. |
 | [Composer](./composer.md) | Create posts with per-channel content, media, polls, first comments, and preflight validation. |
 | [Bulk Import](./bulk-import.md) | Upload a CSV to schedule hundreds of posts at once with per-row validation. |
 | [Analytics](./analytics.md) | Dashboard with multi-channel metrics, post performance, best-time insights, and recommendations. |
@@ -34,4 +34,4 @@ ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
 | [Settings](./settings.md) | Profile, teams, channels, AI configuration, brand voice, media providers, storage, webhooks, auto posting, sets, signatures, developers, and approved apps. |
 | [Billing](./billing.md) | Subscription plans, payment methods, invoice history, and lifetime deal (when Stripe is configured). |
 
-> Verified against v3.7.0
+> Verified against v3.8.3

@@ -4,6 +4,11 @@ Postmill supports multiple storage backends for uploaded media: local disk, Clou
 Backblaze B2, and IDrive e2. Each organization can mount its own storage provider independently,
 configured from the in-app Settings -> Storage page.
 
+**v3.8.3:** **LOCAL** is the always-on base storage that every org has. Other providers
+(S3/R2/B2/IDriveE2) mount onto this base — there is no default provider. New uploads always land
+on LOCAL first. Cloud providers are configured per-organization in-app; the old global-env
+`STORAGE_PROVIDER`/`CLOUDFLARE_*` path has been removed.
+
 ## Storage model
 
 ### `StorageProviderConfig`
@@ -23,6 +28,9 @@ Each storage provider mount is a row in the `StorageProviderConfig` table:
 | `lastHealthError` | Error message from last failed connection test |
 | `defaultFolderId` | Folder-level routing: uploads to this folder use this provider |
 
+> **v3.8.3:** `StorageProviderConfig.isDefault` was removed. The `set-default` API route is gone.
+> There is no default provider — LOCAL is the always-on base that every org has.
+
 ### Per-org quota
 
 Each organization starts with a 5 GB quota (`localStorageQuotaBytes`). At 80% usage, a warning
@@ -31,33 +39,25 @@ quota is raised.
 
 ## Storage backends
 
-### Local storage
+### Local storage (always-on base)
 
-Default. Files are written to `UPLOAD_DIRECTORY` (e.g. `/uploads/`) on the container's filesystem.
-Simple but not redundant — a single container's disk, not shared across replicas.
+Files are written to `UPLOAD_DIRECTORY` (e.g. `/uploads/`) on the container's filesystem, served
+at `/uploads`. Simple but not redundant — a single container's disk, not shared across replicas.
+
+Avatars and all app-internal image writes always target LOCAL storage.
 
 ```yaml
-STORAGE_PROVIDER: 'local'
 UPLOAD_DIRECTORY: '/uploads'
+MEDIA_UPLOAD_MAX_BYTES: '1073741824'
 ```
 
-### Cloudflare R2
+### Cloudflare R2 (per-tenant)
 
-S3-compatible object storage with no egress fees. Recommended for production.
+S3-compatible object storage with no egress fees. Configure per-org in Settings → Storage.
 
-```yaml
-STORAGE_PROVIDER: 'cloudflare'
-CLOUDFLARE_ACCOUNT_ID: 'your-account-id'
-CLOUDFLARE_ACCESS_KEY: 'your-access-key'
-CLOUDFLARE_SECRET_ACCESS_KEY: 'your-secret-key'
-CLOUDFLARE_BUCKETNAME: 'postmill-media'
-CLOUDFLARE_BUCKET_URL: 'https://your-bucket.r2.cloudflarestorage.com'
-CLOUDFLARE_REGION: 'auto'
-```
+### AWS S3 (per-tenant)
 
-### AWS S3
-
-Native S3 API. Configure per-org in Settings -> Storage using access key + secret.
+Native S3 API. Configure per-org in Settings → Storage using access key + secret.
 
 **Required IAM permissions:**
 
@@ -94,7 +94,7 @@ Native S3 API. Configure per-org in Settings -> Storage using access key + secre
 - Access key ID: `AKIA...`
 - Secret access key: the 40-character key paired with the access key ID
 
-### Backblaze B2
+### Backblaze B2 (per-tenant)
 
 S3-compatible API. Configure per-org with your B2 application key ID and key, plus the endpoint
 for your bucket.
@@ -113,7 +113,7 @@ with `readFiles`, `writeFiles`, `deleteFiles`, and `listFiles` capabilities.
 - Secret key: `applicationKey` from the application key
 - Endpoint: `https://s3.us-west-004.backblazeb2.com` (adjust region based on your bucket)
 
-### IDrive e2
+### IDrive e2 (per-tenant)
 
 S3-compatible API. Configure per-org with your e2 access key and secret.
 
@@ -171,24 +171,16 @@ In Settings -> Storage, an org admin can assign a storage provider to a specific
 (`defaultFolderId`). All uploads targeting that folder will automatically use that provider. If
 a folder has no assigned provider, the system picks any mounted provider.
 
-## Multipart upload ownership ledger
+## Large file uploads
 
-Large files are uploaded via multipart presigned URLs. Postmill maintains an ownership ledger
-that tracks each upload's `uploadId` and `parts` against the org that initiated it. This prevents
-cross-org upload hijacking — a client cannot complete or list a multipart upload by supplying a
-different org's `uploadId`.
-
-## Legacy storage env vars
-
-The legacy `STORAGE_PROVIDER` and `CLOUDFLARE_*` environment variables still work as global
-fallbacks. However, per-org `StorageProviderConfig` mounts take precedence. The
-`UploadFactory.createStorage()` helper that reads these env vars is deprecated and logs a
-deprecation warning at boot. For new deployments, configure storage exclusively through the
-Settings UI.
+Large media files (up to `MEDIA_UPLOAD_MAX_BYTES`, default 1 GB) are uploaded through
+`/media/upload-server` using XHRUpload (streamed to disk). The pre-v3.8.2 presigned multipart
+Cloudflare R2 path has been removed. If an S3/R2 provider is configured for media-library
+uploads, large files go through the backend as well.
 
 ## Related
 
 - [Configuration](./configuration.md) — all storage env vars
 - [Requirements](./requirements.md) — object storage options
 
-> Verified against v3.7.0
+> Verified against v3.8.3

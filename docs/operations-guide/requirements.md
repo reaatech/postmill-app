@@ -39,19 +39,21 @@ The heavy pieces:
 | Redis                 | 7.2         | Session cache, throttle store, analytics cache |
 | Temporal              | 1.28.1      | Workflow engine |
 | Elasticsearch         | 7.17.27     | Temporal visibility store |
-| Resend (optional)     | —           | Transactional email; account if using email features |
+| Email provider (optional) | —           | 6-provider adapter system (Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP). Configure with `EMAIL_PROVIDER` + standardized env vars. See [Configuration](./configuration.md#email-v381). |
 
-### Object storage (optional)
+### Object storage
 
-For production use with large media, choose one:
+All media is stored locally by default (`UPLOAD_DIRECTORY`). Cloud providers (S3, R2, B2, IDrive e2)
+are configured per-organization via Settings → Storage. Avatars and app-internal writes always use
+local storage.
 
 | Provider            | Notes |
 |---------------------|-------|
 | Local disk          | Default; 5 GB quota per org. Simple but not redundant. |
-| Cloudflare R2       | S3-compatible, no egress fees |
-| AWS S3              | S3-native API |
-| Backblaze B2        | S3-compatible, low storage cost |
-| IDrive e2           | S3-compatible |
+| Cloudflare R2       | S3-compatible, no egress fees (per-tenant, Settings → Storage) |
+| AWS S3              | S3-native API (per-tenant, Settings → Storage) |
+| Backblaze B2        | S3-compatible, low storage cost (per-tenant, Settings → Storage) |
+| IDrive e2           | S3-compatible (per-tenant, Settings → Storage) |
 
 Storage providers are configured **per-organization** via the Settings UI, not environment
 variables. See [Storage Setup](./storage.md) and [Configuration](./configuration.md).
@@ -89,4 +91,4 @@ npx nestjs-command run:agent
 
 Run these inside the application container or with the same environment variables as the backend.
 
-> Verified against v3.7.0
+> Verified against v3.8.2

@@ -73,7 +73,7 @@ Update the status of a comment as you triage it:
 
 ## Per-Post Comments in Post Detail
 
-When viewing a post detail modal (from the calendar), the comments section is **capability-aware**:
+When viewing a post detail modal (from the schedule), the comments section is **capability-aware**:
 
 - **Reply and Like actions** are only shown for providers that support them (`comments: true`).
 - **Unread comments** are highlighted.
@@ -111,12 +111,12 @@ context. You can review and edit the suggestion before posting.
 
 For AI setup and configuration, see [AI Tools](./ai-tools.md).
 
-## Calendar Integration
+## Schedule Integration
 
-The calendar post cards display an unread comment badge (red circle, top-right corner) when a post
+Schedule post cards display an unread comment badge (red circle, top-right corner) when a post
 has comments you haven't read. The badge shows the count up to "99+." Clicking the card body opens
 the post detail modal with the comments section.
 
-See [Calendar](./calendar.md) for details on post cards and the post detail modal.
+See [Schedule](./calendar.md) for details on post cards and the post detail modal.
 
-> Verified against v3.7.0
+> Verified against v3.8.3

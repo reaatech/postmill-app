@@ -1,11 +1,11 @@
-# Calendar
+# Schedule
 
-The Calendar (`/launches`) is your primary workspace for viewing, managing, and scheduling social
+The Schedule (`/schedule`) is your primary workspace for viewing, managing, and scheduling social
 media posts. It provides a visual timeline of all your content across channels.
 
 ## Views
 
-The calendar supports three view modes, toggled from the view selector in the toolbar:
+The schedule supports three view modes, toggled from the view selector in the toolbar:
 
 ### Month View
 
@@ -25,17 +25,17 @@ A single-day detailed view showing all posts scheduled for that day. Posts are l
 chronological order with full content previews. The day view is ideal for reviewing the day's
 publishing plan at a glance.
 
-## Calendar Navigation
+## Navigation
 
 - **Date picker** in the toolbar jumps to any past or future date.
 - **Today button** returns to the current date.
 - **Arrow buttons** move forward/backward by one unit (month, week, or day depending on active
   view).
-- **Channel filter** narrows the calendar to show posts for specific channels.
+- **Channel filter** narrows the schedule to show posts for specific channels.
 
 ## Card Anatomy
 
-Each post card on the calendar provides at-a-glance information:
+Each post card on the schedule provides at-a-glance information:
 
 ### Status Pill
 
@@ -61,15 +61,19 @@ platform provider icon overlay, so you can identify the target platform at a gla
 
 ### Stats Footer
 
-Published posts display a footer row with performance metrics sourced from
-`PostAnalyticsSnapshot`:
+Published posts display a footer row with performance metrics:
 
 - **Views** (eye icon)
 - **Likes** (heart icon)
 - **Comments** (speech bubble icon)
 
-Numbers are formatted compactly (e.g., 1.2K, 3.4M). If no analytics snapshot is available yet, the
-stats footer is hidden.
+Numbers are formatted compactly (e.g., 1.2K, 3.4M). Metrics are sourced from
+`PostAnalyticsSnapshot` when available; if no snapshot exists yet (e.g., a just-published post), a
+live-fallback enrich provides the latest data from the platform.
+
+Card stats (views/likes/comments) populate from collected analytics snapshots; for very recent posts
+or instances without scheduled analytics collection (`RUN_CRON`), stats are fetched live on a
+best-effort basis and may lag.
 
 ### Post Time
 
@@ -85,7 +89,7 @@ Hovering over the card's top strip reveals action icons:
 - **Duplicate**: Creates a copy of the post
 - **Preview**: Opens a live preview of how the post renders
 - **Statistics**: Links to the published post on the platform
-- **Delete**: Removes the post from the calendar
+- **Delete**: Removes the post from the schedule
 
 ## Post Detail Modal
 
@@ -116,12 +120,12 @@ details on the unified comments inbox.
 
 ## Timezone Handling
 
-All dates and times in the calendar respect the timezone configured in your **Settings →
+All dates and times in the schedule respect the timezone configured in your **Settings →
 Profile**. The `timezones-list` library provides the list of available timezones, and the Day.js
 timezone plugin handles all conversions. When you schedule a post for "9:00 AM," it means 9:00 AM
 in your configured timezone.
 
-When viewing the calendar, the grid displays dates in your local timezone. The current time
+When viewing the schedule, the grid displays dates in your local timezone. The current time
 indicator (a red line in week/day views) also follows your timezone.
 
-> Verified against v3.7.0
+> Verified against v3.8.4

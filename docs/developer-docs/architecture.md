@@ -130,4 +130,27 @@ API-key authenticated.
 | **JWT** | Algorithm pinned to `HS256`. New tokens carry `exp` with sliding renewal. Legacy exp-less tokens still verify. |
 | **Validation** | Global `ValidationPipe` rejects unknown fields (`whitelist` + `forbidNonWhitelisted`). |
 
-> Verified against v3.7.0
+> Verified against v3.8.1
+
+## Email adapter system (v3.8.1)
+
+The email layer was refactored from a hardcoded 2-provider path (Resend / nodemailer reading
+`process.env` at module load) to a pluggable 6-provider adapter system:
+
+- **6 adapters**: Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP (nodemailer). Each
+  implements `EmailAdapter` with `send()`, `isConfigured()`, and optional `verifyWebhook()` /
+  `parseWebhook()`.
+- **Global env selection**: `EMAIL_PROVIDER` picks the adapter. Unset/unknown → `EmptyAdapter` and
+  `hasProvider() === false` (activation auto-on, same as before).
+- **Lazy construction**: SDK clients are built inside methods, not at module load — unit-testable
+  with per-test env and no boot-time crashes when unconfigured.
+- **`EmailAdapterRegistry`**: `@Injectable` registry keyed by adapter name; `getActiveAdapter()`
+  resolves the active adapter per-call.
+- **Delivery-lifecycle log**: `EmailLog` Prisma model (metadata only — no HTML body). Each send
+  writes a `queued` row; successful sends advance to `sent` with `providerMessageId`; webhook
+  events advance through `delivered`/`bounced`/`complained`/`opened`/`clicked`. Status never
+  downgrades; terminal negatives (`bounced`/`complained`) cannot be overwritten.
+- **Webhook ingestion**: `POST /webhooks/email` — signature-verified, CSRF-exempt (same pattern as
+  Stripe). SES also handles SNS `SubscriptionConfirmation` via `safeFetch`.
+- **Retention**: `pruneEmailLogs()` in the analytics sweep deletes rows older than
+  `EMAIL_LOG_RETENTION_DAYS` (default 90). Best-effort; never fails the sweep.
