@@ -4,6 +4,7 @@ export interface ClientInformation {
   client_id: string;
   client_secret: string;
   instanceUrl: string;
+  token?: string;
 }
 export interface IAuthenticator {
   authenticate(
@@ -14,7 +15,7 @@ export interface IAuthenticator {
     },
     clientInformation?: ClientInformation
   ): Promise<AuthTokenDetails | string>;
-  refreshToken(refreshToken: string): Promise<AuthTokenDetails>;
+  refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails>;
   reConnect?(
     id: string,
     requiredId: string,
@@ -26,13 +27,15 @@ export interface IAuthenticator {
   analytics?(
     id: string,
     accessToken: string,
-    date: number
+    date: number,
+    clientInformation?: ClientInformation
   ): Promise<AnalyticsData[]>;
   postAnalytics?(
     integrationId: string,
     accessToken: string,
     postId: string,
     fromDate: number,
+    clientInformation?: ClientInformation
   ): Promise<AnalyticsData[]>;
   changeNickname?(
     id: string,
@@ -86,7 +89,8 @@ export interface ISocialMediaIntegration {
     id: string,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]>; // Schedules a new post
 
   comment?(
@@ -95,7 +99,8 @@ export interface ISocialMediaIntegration {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]>; // Schedules a new post
 }
 
@@ -160,7 +165,8 @@ export interface ISocialMediaComments {
     accessToken: string,
     postId: string,
     cursor: string | undefined,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }>;
 
   replyToComment?(
@@ -169,7 +175,8 @@ export interface ISocialMediaComments {
     postId: string,
     parentCommentId: string,
     message: string,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<SocialCommentDTO>;
 
   likeComment?(
@@ -178,7 +185,8 @@ export interface ISocialMediaComments {
     postId: string,
     commentId: string,
     like: boolean,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<{ liked: boolean; likeCount?: number }>;
 }
 

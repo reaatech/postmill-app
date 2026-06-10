@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -19,7 +20,6 @@ import dayjs from 'dayjs';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 @Rules(
   'Pinterest requires at least one media, if posting a video, you must have two attachment, one for video, one for the cover picture, When posting a video, there can be only one, if posting images, there can be maximum 5'
@@ -127,14 +127,14 @@ export class PinterestProvider
     return undefined;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const { access_token, expires_in } = await (
       await fetch('https://api.pinterest.com/v5/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${getEnvOr('PINTEREST_CLIENT_ID', 'pinterest', 'clientId')}:${getEnvOr('PINTEREST_CLIENT_SECRET', 'pinterest', 'clientSecret')}`
+            `${clientInformation?.client_id || ''}:${clientInformation?.client_secret || ''}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({
@@ -166,11 +166,11 @@ export class PinterestProvider
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     return {
       url: `https://www.pinterest.com/oauth/?client_id=${
-        getEnvOr('PINTEREST_CLIENT_ID', 'pinterest', 'clientId')
+        clientInformation?.client_id || ''
       }&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/pinterest`
       )}&response_type=code&scope=${encodeURIComponent(
@@ -181,18 +181,21 @@ export class PinterestProvider
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const { access_token, refresh_token, expires_in, scope } = await (
       await fetch('https://api.pinterest.com/v5/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${getEnvOr('PINTEREST_CLIENT_ID', 'pinterest', 'clientId')}:${getEnvOr('PINTEREST_CLIENT_SECRET', 'pinterest', 'clientSecret')}`
+            `${clientInformation?.client_id || ''}:${clientInformation?.client_secret || ''}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({

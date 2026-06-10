@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import {
   AuthTokenDetails,
+  ClientInformation,
   MediaContent,
   PostDetails,
   PostResponse,
@@ -12,7 +13,6 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { WhopDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/whop.dto';
 import { Integration } from '@prisma/client';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class WhopProvider extends SocialAbstract implements SocialProvider {
@@ -70,7 +70,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     return undefined;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const response = await (
       await fetch('https://api.whop.com/oauth/token', {
         method: 'POST',
@@ -78,7 +78,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
         body: JSON.stringify({
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
-          client_id: getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId'),
+          client_id: clientInformation?.client_id || '',
         }),
       })
     ).json();
@@ -100,7 +100,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     const codeVerifier = randomBytes(32).toString('base64url');
     const codeChallenge = this.generateCodeChallenge(codeVerifier);
@@ -110,7 +110,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
       url:
         'https://api.whop.com/oauth/authorize' +
         `?response_type=code` +
-        `&client_id=${getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId')}` +
+        `&client_id=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/whop`
         )}` +
@@ -124,11 +124,14 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const redirectUri = `${process.env.FRONTEND_URL}/integrations/social/whop${
       params.refresh ? `?refresh=${params.refresh}` : ''
     }`;
@@ -141,7 +144,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
           grant_type: 'authorization_code',
           code: params.code,
           redirect_uri: redirectUri,
-          client_id: getEnvOr('WHOP_CLIENT_ID', 'whop', 'clientId'),
+          client_id: clientInformation?.client_id || '',
           code_verifier: params.codeVerifier,
         }),
       })

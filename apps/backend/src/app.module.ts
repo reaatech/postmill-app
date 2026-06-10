@@ -11,6 +11,7 @@ import { ThirdPartyModule } from '@gitroom/nestjs-libraries/3rdparties/thirdpart
 import { VideoModule } from '@gitroom/nestjs-libraries/videos/video.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { FILTER } from '@gitroom/nestjs-libraries/sentry/sentry.exception';
+import { PROVIDER_NOT_CONFIGURED_FILTER } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.filter';
 import { ChatModule } from '@gitroom/nestjs-libraries/chat/chat.module';
 import { getTemporalModule } from '@gitroom/nestjs-libraries/temporal/temporal.module';
 import { TemporalRegisterMissingSearchAttributesModule } from '@gitroom/nestjs-libraries/temporal/temporal.register';
@@ -18,8 +19,6 @@ import { InfiniteWorkflowRegisterModule } from '@gitroom/nestjs-libraries/tempor
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
-import { AiEnvMigrationService } from '@gitroom/nestjs-libraries/ai/env-migration.service';
-import { ChannelEnvMigrationService } from '@gitroom/nestjs-libraries/integrations/env-migration.service';
 
 @Global()
 @Module({
@@ -55,8 +54,7 @@ import { ChannelEnvMigrationService } from '@gitroom/nestjs-libraries/integratio
   controllers: [],
   providers: [
     FILTER,
-    AiEnvMigrationService,
-    ChannelEnvMigrationService,
+    PROVIDER_NOT_CONFIGURED_FILTER,
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,

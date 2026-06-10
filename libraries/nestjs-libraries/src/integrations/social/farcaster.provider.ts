@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -10,7 +11,6 @@ import {
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 import { Integration } from '@prisma/client';
 import { FarcasterDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/farcaster.dto';
@@ -32,14 +32,10 @@ export class FarcasterProvider
   override maxConcurrentJob = 3; // Farcaster has moderate limits
   editor = 'normal' as const;
 
-  private _client: NeynarAPIClient | null = null;
-  private get client(): NeynarAPIClient {
-    if (!this._client) {
-      this._client = new NeynarAPIClient({
-        apiKey: getEnvOr('NEYNAR_SECRET_KEY', 'wrapcast', 'clientSecret') || '00000000-000-0000-000-000000000000',
-      });
-    }
-    return this._client;
+  private getClient(apiKey: string): NeynarAPIClient {
+    return new NeynarAPIClient({
+      apiKey: apiKey || '00000000-000-0000-000-000000000000',
+    });
   }
   maxLength() {
     return 800;
@@ -71,10 +67,10 @@ export class FarcasterProvider
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(17);
     return {
-      url: `${getEnvOr('NEYNAR_CLIENT_ID', 'wrapcast', 'clientId')}||${state}`,
+      url: `${clientInformation?.client_id || ''}||${state}`,
       codeVerifier: makeId(10),
       state,
     };
@@ -100,7 +96,9 @@ export class FarcasterProvider
   async post(
     id: string,
     accessToken: string,
-    postDetails: PostDetails<FarcasterDto>[]
+    postDetails: PostDetails<FarcasterDto>[],
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
     const ids: { releaseURL: string; postId: string }[] = [];
@@ -112,7 +110,7 @@ export class FarcasterProvider
         : firstPost?.settings?.subreddit;
 
     for (const channel of channels) {
-      const data = await this.client.publishCast({
+      const data = await this.getClient(clientInformation?.client_secret || '').publishCast({
         embeds: (firstPost?.media?.map((media) => ({
           url: media.path,
         })) || []) as any,
@@ -144,7 +142,8 @@ export class FarcasterProvider
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails<FarcasterDto>[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [commentPost] = postDetails;
     const ids: { releaseURL: string; postId: string }[] = [];
@@ -153,7 +152,7 @@ export class FarcasterProvider
     const parentIds = (lastCommentId || postId).split(',');
 
     for (const parentHash of parentIds) {
-      const data = await this.client.publishCast({
+      const data = await this.getClient(clientInformation?.client_secret || '').publishCast({
         embeds: (commentPost?.media?.map((media) => ({
           url: media.path,
         })) || []) as any,
@@ -189,7 +188,7 @@ export class FarcasterProvider
     id: string,
     integration: Integration
   ) {
-    const search = await this.client.searchChannels({
+    const search = await this.getClient(integration.organizationId).searchChannels({
       q: data.word,
       limit: 10,
     });

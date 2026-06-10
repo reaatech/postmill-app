@@ -141,17 +141,33 @@ export class ProviderConfigManager implements OnModuleInit {
     client_id: string;
     client_secret: string;
     instanceUrl: string;
+    token?: string;
   } | undefined> {
     await this.ensureFresh();
     const config = this.cache.get(identifier);
-    if (!config?.enabled || !config?.clientId || !config?.clientSecret) {
+    if (!config?.enabled) {
+      return undefined;
+    }
+    let token: string | undefined;
+    if (config.additionalConfig) {
+      try {
+        const parsed = JSON.parse(config.additionalConfig);
+        if (parsed?.botToken) {
+          token = AuthService.fixedDecryption(parsed.botToken);
+        }
+      } catch {}
+    }
+    if (!config.clientId && !config.clientSecret) {
+      if (!token) return undefined;
+    } else if (!config.clientId || !config.clientSecret) {
       return undefined;
     }
     return {
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
+      client_id: config.clientId || '',
+      client_secret: config.clientSecret || '',
       // redirectUri doubles as instanceUrl for self-hosted providers (Mastodon, etc.)
       instanceUrl: config.redirectUri || '',
+      ...(token ? { token } : {}),
     };
   }
 }

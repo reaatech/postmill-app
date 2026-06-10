@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -18,7 +19,6 @@ import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { Logger } from '@nestjs/common';
 
 @Rules(
@@ -234,12 +234,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     return {
       url:
         'https://www.facebook.com/v20.0/dialog/oauth' +
-        `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
+        `?client_id=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/facebook`
         )}` +
@@ -268,21 +268,24 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const getAccessToken = await (
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
-          `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
+          `?client_id=${clientInformation?.client_id || ''}` +
           `&redirect_uri=${encodeURIComponent(
             `${process.env.FRONTEND_URL}/integrations/social/facebook${
               params.refresh ? `?refresh=${params.refresh}` : ''
             }`
           )}` +
-          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'facebook', 'clientSecret')}` +
+          `&client_secret=${clientInformation?.client_secret || ''}` +
           `&code=${params.code}`
       )
     ).json();
@@ -291,8 +294,8 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
-          `&client_id=${getEnvOr('FACEBOOK_APP_ID', 'facebook', 'clientId')}` +
-          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'facebook', 'clientSecret')}` +
+          `&client_id=${clientInformation?.client_id || ''}` +
+          `&client_secret=${clientInformation?.client_secret || ''}` +
           `&fb_exchange_token=${getAccessToken.access_token}&fields=access_token,expires_in`
       )
     ).json();

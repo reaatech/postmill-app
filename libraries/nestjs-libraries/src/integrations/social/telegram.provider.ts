@@ -13,7 +13,8 @@ import mime from 'mime';
 import TelegramBot from 'node-telegram-bot-api';
 import { Integration } from '@prisma/client';
 import striptags from 'striptags';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { getOrgCredential } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { ClientInformation } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 
 export class TelegramProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Telegram has moderate bot API limits
@@ -24,12 +25,8 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   scopes = [] as string[];
   editor = 'html' as const;
 
-  private _bot: TelegramBot | null = null;
-  private get bot(): TelegramBot {
-    if (!this._bot) {
-      this._bot = new TelegramBot(getEnvOr('TELEGRAM_TOKEN', 'telegram', 'token'));
-    }
-    return this._bot;
+  private createBot(token: string): TelegramBot {
+    return new TelegramBot(token);
   }
   maxLength() {
     return 4096;
@@ -56,12 +53,16 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
-    const chat = await this.bot.getChat(params.code);
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
+    const bot = this.createBot(clientInformation?.client_id || '');
+    const chat = await bot.getChat(params.code);
 
     console.log(JSON.stringify(chat));
     if (!chat?.id) {
@@ -70,7 +71,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
     const photo = !chat?.photo?.big_file_id
       ? ''
-      : await this.bot.getFileLink(chat.photo.big_file_id);
+      : await bot.getFileLink(chat.photo.big_file_id);
 
     // Modified id to work with chat.username (public groups/channels) or chat.id (private groups/channels) when chat.username is not available
     return {
@@ -84,9 +85,13 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async getBotId(query: { id?: number; word: string }) {
+  async getBotId(query: { id?: number; word: string }, integration?: Integration) {
+    const orgId = integration?.organizationId || '';
+    const bot = this.createBot(
+      (orgId ? (getOrgCredential(orgId, this.identifier, 'clientId') || '') : '')
+    );
     // Added allowed_updates Ensure only necessary updates are fetched
-    const res = await this.bot.getUpdates({
+    const res = await bot.getUpdates({
       ...(query.id ? { offset: query.id } : {}),
       allowed_updates: ['message', 'channel_post'],
     });
@@ -104,30 +109,30 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     // prevents the code from running while chatId is still undefined to avoid the error 'ETELEGRAM: 400 Bad Request: chat_id is empty'. the code would still work eventually but console spam is not pretty
     if (chatId) {
       //get the numberic ID of the bot
-      const botId = (await this.bot.getMe()).id;
+      const botId = (await bot.getMe()).id;
       // check if the bot is an admin in the chat
-      const isAdmin = await this.botIsAdmin(chatId, botId);
+      const isAdmin = await this.botIsAdmin(chatId, botId, orgId);
       // get the messageId of the message that triggered the connection
       const connectMessageId =
         match?.message?.message_id || match?.channel_post?.message_id;
 
       if (!isAdmin) {
         // alternatively you can replace this with a console.log if you do not want to inform the user of the bot's admin status
-        this.bot.sendMessage(
+        bot.sendMessage(
           chatId,
           "Connection Successful. I don't have admin privileges to delete these messages, please go ahead and remove them yourself."
         );
       } else {
         // Delete the message that triggered the connection
-        await this.bot.deleteMessage(chatId, connectMessageId);
+        await bot.deleteMessage(chatId, connectMessageId);
         // Send success message to the chat
-        const successMessage = await this.bot.sendMessage(
+        const successMessage = await bot.sendMessage(
           chatId,
           'Connection Successful. Message will be deleted in 10 seconds.'
         );
         // Delete the success message after 10 seconds
         setTimeout(async () => {
-          await this.bot.deleteMessage(chatId, successMessage.message_id);
+          await bot.deleteMessage(chatId, successMessage.message_id);
           console.log('Success message deleted.');
         }, 10000);
       }
@@ -176,8 +181,10 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   private async sendMessage(
     accessToken: string,
     message: PostDetails,
-    replyToMessageId?: number
+    replyToMessageId?: number,
+    botToken?: string
   ): Promise<number | null> {
+    const bot = this.createBot(botToken || '');
     let messageId: number | null = null;
     const mediaFiles = message.media || [];
     const text = striptags(message.message || '', ['u', 'strong', 'p'])
@@ -190,7 +197,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
 
     // if there's no media, bot sends a text message only
     if (processedMedia.length === 0) {
-      const response = await this.bot.sendMessage(accessToken, text, {
+      const response = await bot.sendMessage(accessToken, text, {
         parse_mode: 'HTML',
         ...(replyToMessageId ? { reply_to_message_id: replyToMessageId } : {}),
       });
@@ -206,20 +213,20 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
       };
       const response =
         media.type === 'video'
-          ? await this.bot.sendVideo(
+          ? await bot.sendVideo(
               accessToken,
               media.media,
               options,
               media.fileOptions
             )
           : media.type === 'photo'
-          ? await this.bot.sendPhoto(
+          ? await bot.sendPhoto(
               accessToken,
               media.media,
               options,
               media.fileOptions
             )
-          : await this.bot.sendDocument(
+          : await bot.sendDocument(
               accessToken,
               media.media,
               options,
@@ -238,7 +245,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
           parse_mode: 'HTML',
         }));
 
-        const response = await this.bot.sendMediaGroup(
+        const response = await bot.sendMediaGroup(
           accessToken,
           mediaGroup as any[],
           {
@@ -259,11 +266,13 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   async post(
     id: string,
     accessToken: string,
-    postDetails: PostDetails[]
+    postDetails: PostDetails[],
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
 
-    const messageId = await this.sendMessage(accessToken, firstPost);
+    const messageId = await this.sendMessage(accessToken, firstPost, undefined, clientInformation?.client_id || '');
 
     // for private groups/channels message.id is undefined so the link generated by Postmill will be unusable "https://t.me/c/undefined/16"
     // to avoid that, we use accessToken instead of message.id and we generate the link manually removing the -100 from the start.
@@ -289,12 +298,13 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [commentPost] = postDetails;
     const replyToId = Number(lastCommentId || postId);
 
-    const messageId = await this.sendMessage(accessToken, commentPost, replyToId);
+    const messageId = await this.sendMessage(accessToken, commentPost, replyToId, clientInformation?.client_id || '');
 
     if (messageId) {
       return [
@@ -329,12 +339,14 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postId: string,
     cursor: string | undefined,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
+    const bot = this.createBot(clientInformation?.client_id || '');
     try {
       const chatId = accessToken;
       const offset = cursor ? parseInt(cursor, 10) : undefined;
-      const updates = await this.bot.getUpdates({
+      const updates = await bot.getUpdates({
         offset,
         allowed_updates: ['message'],
         limit: 100,
@@ -377,11 +389,13 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     parentCommentId: string,
     message: string,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<SocialCommentDTO> {
+    const bot = this.createBot(clientInformation?.client_id || '');
     try {
       const chatId = accessToken;
-      const response = await this.bot.sendMessage(chatId, message, {
+      const response = await bot.sendMessage(chatId, message, {
         reply_to_message_id: parseInt(parentCommentId, 10),
         parse_mode: 'HTML',
       });
@@ -424,9 +438,12 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
     return { liked: like };
   }
 
-  async botIsAdmin(chatId: number, botId: number): Promise<boolean> {
+  async botIsAdmin(chatId: number, botId: number, orgId?: string): Promise<boolean> {
+    const bot = this.createBot(
+      (orgId ? (getOrgCredential(orgId, this.identifier, 'clientId') || '') : '')
+    );
     try {
-      const chatMember = await this.bot.getChatMember(chatId, botId);
+      const chatMember = await bot.getChatMember(chatId, botId);
 
       if (
         chatMember.status === 'administrator' ||

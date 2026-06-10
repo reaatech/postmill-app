@@ -119,16 +119,32 @@ export class OrgProviderConfigManager {
     client_id: string;
     client_secret: string;
     instanceUrl: string;
+    token?: string;
   } | undefined> {
     await this.ensureFresh(orgId);
     const config = this.orgCaches.get(orgId)?.configs.get(identifier);
-    if (!config?.enabled || !config?.clientId || !config?.clientSecret) {
+    if (!config?.enabled) {
+      return undefined;
+    }
+    let token: string | undefined;
+    if (config.additionalConfig) {
+      try {
+        const parsed = JSON.parse(config.additionalConfig);
+        if (parsed?.botToken) {
+          token = parsed.botToken;
+        }
+      } catch {}
+    }
+    if (!config.clientId && !config.clientSecret) {
+      if (!token) return undefined;
+    } else if (!config.clientId || !config.clientSecret) {
       return undefined;
     }
     return {
-      client_id: config.clientId,
-      client_secret: config.clientSecret,
+      client_id: config.clientId || '',
+      client_secret: config.clientSecret || '',
       instanceUrl: config.redirectUri || '',
+      ...(token ? { token } : {}),
     };
   }
 }

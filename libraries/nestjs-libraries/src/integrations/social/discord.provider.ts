@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -10,7 +11,7 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { Integration } from '@prisma/client';
 import { DiscordDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/discord.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { getOrgCredential } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
@@ -25,7 +26,9 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
   }
   dto = DiscordDto;
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
     const { access_token, expires_in, refresh_token } = await (
       await this.fetch('https://discord.com/api/oauth2/token', {
         method: 'POST',
@@ -36,9 +39,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId') +
-              ':' +
-              getEnvOr('DISCORD_CLIENT_SECRET', 'discord', 'clientSecret')
+            clientId + ':' + clientSecret
           ).toString('base64')}`,
         },
       })
@@ -62,11 +63,11 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       username: '',
     };
   }
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     return {
       url: `https://discord.com/oauth2/authorize?client_id=${
-        getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId')
+        clientInformation?.client_id || ''
       }&permissions=377957124096&response_type=code&redirect_uri=${encodeURIComponent(
         `${process.env.FRONTEND_URL}/integrations/social/discord`
       )}&integration_type=0&scope=bot+identify+guilds&state=${state}`,
@@ -79,7 +80,9 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
     const { access_token, expires_in, refresh_token, scope, guild } = await (
       await this.fetch('https://discord.com/api/oauth2/token', {
         method: 'POST',
@@ -91,9 +94,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            getEnvOr('DISCORD_CLIENT_ID', 'discord', 'clientId') +
-              ':' +
-              getEnvOr('DISCORD_CLIENT_SECRET', 'discord', 'clientSecret')
+            clientId + ':' + clientSecret
           ).toString('base64')}`,
         },
       })
@@ -121,11 +122,14 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
   }
 
   @Tool({ description: 'Channels', dataSchema: [] })
-  async channels(accessToken: string, params: any, id: string) {
+  async channels(accessToken: string, params: any, id: string, integration?: Integration) {
+    const botToken = integration
+      ? getOrgCredential(integration.organizationId, 'discord', 'token') || ''
+      : '';
     const list = await (
       await this.fetch(`https://discord.com/api/guilds/${id}/channels`, {
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
         },
       })
     ).json();
@@ -141,10 +145,13 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
   async post(
     id: string,
     accessToken: string,
-    postDetails: PostDetails[]
+    postDetails: PostDetails[],
+    integration?: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
     const channel = firstPost.settings.channel;
+    const botToken = clientInformation?.token || '';
 
     const form = new FormData();
     form.append(
@@ -177,7 +184,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       await this.fetch(`https://discord.com/api/channels/${channel}/messages`, {
         method: 'POST',
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
         },
         body: form,
       })
@@ -199,10 +206,12 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
-    const [commentPost] = postDetails;
-    const channel = commentPost.settings.channel;
+    const [firstPost] = postDetails;
+    const channel = firstPost.settings.channel;
+    const botToken = clientInformation?.token || '';
 
     // For Discord, we create a thread from the original message for comments
     // If we don't have a thread yet, create one
@@ -216,7 +225,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
           {
             method: 'POST',
             headers: {
-              Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+              Authorization: `Bot ${botToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
@@ -233,10 +242,10 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     form.append(
       'payload_json',
       JSON.stringify({
-        content: commentPost.message.replace(/\[\[\[(@.*?)]]]/g, (match, p1) => {
+        content: firstPost.message.replace(/\[\[\[(@.*?)]]]/g, (match, p1) => {
             return `<${p1}>`;
         }),
-        attachments: commentPost.media?.map((p, index) => ({
+        attachments: firstPost.media?.map((p, index) => ({
           id: index,
           description: `Picture ${index}`,
           filename: p.path.split('/').pop(),
@@ -245,7 +254,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     );
 
     let index = 0;
-    for (const media of commentPost.media || []) {
+    for (const media of firstPost.media || []) {
       const loadMedia = await safeFetch(media.path);
 
       form.append(
@@ -262,7 +271,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         {
           method: 'POST',
           headers: {
-            Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+            Authorization: `Bot ${botToken}`,
           },
           body: form,
         }
@@ -271,7 +280,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
     return [
       {
-        id: commentPost.id,
+        id: firstPost.id,
         releaseURL: `https://discord.com/channels/${id}/${threadChannel}/${data.id}`,
         postId: data.id,
         status: 'success',
@@ -279,12 +288,15 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     ];
   }
 
-  async changeNickname(id: string, accessToken: string, name: string) {
+  async changeNickname(id: string, accessToken: string, name: string, integration?: Integration) {
+    const botToken = integration
+      ? getOrgCredential(integration.organizationId, 'discord', 'token') || ''
+      : '';
     await (
       await this.fetch(`https://discord.com/api/guilds/${id}/members/@me`, {
         method: 'PATCH',
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -304,10 +316,11 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     id: string,
     integration: Integration
   ) {
+    const botToken = getOrgCredential(integration.organizationId, 'discord', 'token') || '';
     const allRoles = await (
       await this.fetch(`https://discord.com/api/guilds/${id}/roles`, {
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
           'Content-Type': 'application/json',
         },
       })
@@ -324,7 +337,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
         `https://discord.com/api/guilds/${id}/members/search?query=${data.query}`,
         {
           headers: {
-            Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+            Authorization: `Bot ${botToken}`,
             'Content-Type': 'application/json',
           },
         }
@@ -378,9 +391,11 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postId: string,
     cursor: string | undefined,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
+      const botToken = clientInformation?.token || '';
       let url = `https://discord.com/api/channels/${id}/messages?limit=100`;
       if (cursor) {
         url += `&before=${cursor}`;
@@ -388,7 +403,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
       const response = await this.fetch(url, {
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
         },
       });
       const messages = await response.json() as any[];
@@ -422,15 +437,17 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     postId: string,
     parentCommentId: string,
     message: string,
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<SocialCommentDTO> {
+    const botToken = clientInformation?.token || '';
     const channel = id;
     const response = await this.fetch(
       `https://discord.com/api/channels/${channel}/messages`,
       {
         method: 'POST',
         headers: {
-          Authorization: `Bot ${getEnvOr('DISCORD_BOT_TOKEN_ID', 'discord', 'token')}`,
+          Authorization: `Bot ${botToken}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({

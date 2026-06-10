@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -10,7 +11,6 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { KickDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/kick.dto';
 import { createHash, randomBytes } from 'crypto';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class KickProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3;
@@ -38,7 +38,7 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
     return { codeVerifier, codeChallenge: challenge };
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const response = await this.fetch('https://id.kick.com/oauth/token', {
       method: 'POST',
       headers: {
@@ -46,8 +46,8 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId'),
-        client_secret: getEnvOr('KICK_SECRET', 'kick', 'clientSecret'),
+        client_id: clientInformation?.client_id || '',
+        client_secret: clientInformation?.client_secret || '',
         refresh_token: refreshToken,
       }),
     });
@@ -68,7 +68,7 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(32);
     const { codeVerifier, codeChallenge } = this.generatePKCE();
 
@@ -77,7 +77,7 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
     const url =
       `https://id.kick.com/oauth/authorize` +
       `?response_type=code` +
-      `&client_id=${getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId')}` +
+      `&client_id=${clientInformation?.client_id || ''}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&scope=${encodeURIComponent(this.scopes.join(' '))}` +
       `&state=${state}` +
@@ -91,11 +91,14 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const redirectUri = `${process.env.FRONTEND_URL}/integrations/social/kick${
       params.refresh ? `?refresh=${params.refresh}` : ''
     }`;
@@ -107,8 +110,8 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: getEnvOr('KICK_CLIENT_ID', 'kick', 'clientId'),
-        client_secret: getEnvOr('KICK_SECRET', 'kick', 'clientSecret'),
+        client_id: clientInformation?.client_id || '',
+        client_secret: clientInformation?.client_secret || '',
         redirect_uri: redirectUri,
         code: params.code,
         code_verifier: params.codeVerifier,

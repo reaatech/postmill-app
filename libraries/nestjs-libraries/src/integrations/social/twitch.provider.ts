@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -9,7 +10,6 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import { Integration } from '@prisma/client';
 import { TwitchDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/twitch.dto';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class TwitchProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 1;
@@ -24,7 +24,9 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     return 500; // Twitch chat message max length
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
     const response = await this.fetch('https://id.twitch.tv/oauth2/token', {
       method: 'POST',
       headers: {
@@ -32,8 +34,8 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'refresh_token',
-        client_id: getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
-        client_secret: getEnvOr('TWITCH_CLIENT_SECRET', 'twitch', 'clientSecret'),
+        client_id: clientId,
+        client_secret: clientSecret,
         refresh_token: refreshToken,
       }),
     });
@@ -41,7 +43,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     const { access_token, refresh_token, expires_in } = await response.json();
 
     // Get user info
-    const userInfo = await this.getUserInfo(access_token);
+    const userInfo = await this.getUserInfo(access_token, clientId);
 
     return {
       refreshToken: refresh_token,
@@ -54,7 +56,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(32);
 
     const redirectUri = `${process.env.FRONTEND_URL}/integrations/social/twitch`;
@@ -62,7 +64,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     const url =
       `https://id.twitch.tv/oauth2/authorize` +
       `?response_type=code` +
-      `&client_id=${getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId')}` +
+      `&client_id=${clientInformation?.client_id || ''}` +
       `&redirect_uri=${encodeURIComponent(redirectUri)}` +
       `&scope=${encodeURIComponent(this.scopes.join(' '))}` +
       `&state=${state}`;
@@ -78,7 +80,9 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
     const redirectUri = `${process.env.FRONTEND_URL}/integrations/social/twitch${
       params.refresh ? `?refresh=${params.refresh}` : ''
     }`;
@@ -90,8 +94,8 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       },
       body: new URLSearchParams({
         grant_type: 'authorization_code',
-        client_id: getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
-        client_secret: getEnvOr('TWITCH_CLIENT_SECRET', 'twitch', 'clientSecret'),
+        client_id: clientId,
+        client_secret: clientSecret,
         redirect_uri: redirectUri,
         code: params.code,
       }),
@@ -103,7 +107,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     this.checkScopes(this.scopes, (scope || '').split(' '));
 
     // Get user info
-    const userInfo = await this.getUserInfo(access_token);
+    const userInfo = await this.getUserInfo(access_token, clientId);
 
     return {
       id: userInfo.id,
@@ -117,13 +121,14 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
   }
 
   private async getUserInfo(
-    accessToken: string
+    accessToken: string,
+    clientId?: string
   ): Promise<{ id: string; name: string; username: string; picture?: string }> {
     const userResponse = await fetch('https://api.twitch.tv/helix/users', {
       method: 'GET',
       headers: {
         Authorization: `Bearer ${accessToken}`,
-        'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
+        'Client-Id': clientId || '',
       },
     });
 
@@ -142,6 +147,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     broadcasterId: string,
     accessToken: string,
     message: string,
+    clientId: string,
     color: string = 'primary'
   ): Promise<{ success: boolean }> {
     await fetch(
@@ -150,7 +156,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
+          'Client-Id': clientId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -168,6 +174,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     broadcasterId: string,
     accessToken: string,
     message: string,
+    clientId: string,
     replyToMessageId?: string
   ): Promise<{ messageId: string; isSent: boolean }> {
     const body: Record<string, string> = {
@@ -186,7 +193,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
-          'Client-Id': getEnvOr('TWITCH_CLIENT_ID', 'twitch', 'clientId'),
+          'Client-Id': clientId,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(body),
@@ -205,18 +212,21 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     id: string,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     await timer(2000);
     const [firstPost] = postDetails;
     const messageType = firstPost.settings?.messageType || 'message';
     const announcementColor = firstPost.settings?.announcementColor || 'primary';
+    const clientId = clientInformation?.client_id || '';
 
     if (messageType === 'announcement') {
       const result = await this.sendAnnouncement(
         id,
         accessToken,
         firstPost.message,
+        clientId,
         announcementColor
       );
 
@@ -231,7 +241,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     }
 
     // Regular chat message
-    const result = await this.sendChatMessage(id, accessToken, firstPost.message);
+    const result = await this.sendChatMessage(id, accessToken, firstPost.message, clientId);
 
     return [
       {
@@ -249,18 +259,21 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     await timer(2000);
     const [commentPost] = postDetails;
     const messageType = commentPost.settings?.messageType || 'message';
     const announcementColor = commentPost.settings?.announcementColor || 'primary';
+    const clientId = clientInformation?.client_id || '';
 
     if (messageType === 'announcement') {
       const result = await this.sendAnnouncement(
         id,
         accessToken,
         commentPost.message,
+        clientId,
         announcementColor
       );
 
@@ -279,6 +292,7 @@ export class TwitchProvider extends SocialAbstract implements SocialProvider {
       id,
       accessToken,
       commentPost.message,
+      clientId,
       lastCommentId || postId
     );
 

@@ -1,9 +1,8 @@
 import {
-  AuthTokenDetails, PostDetails, PostResponse, SocialProvider,
+  AuthTokenDetails, ClientInformation, PostDetails, PostResponse, SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class TumblrProvider extends SocialAbstract implements SocialProvider {
@@ -25,9 +24,9 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
     return `${process.env.FRONTEND_URL}/integrations/social/tumblr`;
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
-    const clientId = getEnvOr('TUMBLR_CLIENT_ID', 'tumblr', 'clientId');
+    const clientId = clientInformation?.client_id || '';
     const url =
       `https://www.tumblr.com/oauth2/authorize?client_id=${clientId}` +
       `&response_type=code` +
@@ -37,9 +36,9 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
     return { url, codeVerifier: makeId(10), state };
   }
 
-  async authenticate(params: { code: string; codeVerifier: string; refresh?: string }) {
-    const clientId = getEnvOr('TUMBLR_CLIENT_ID', 'tumblr', 'clientId');
-    const clientSecret = getEnvOr('TUMBLR_CLIENT_SECRET', 'tumblr', 'clientSecret');
+  async authenticate(params: { code: string; codeVerifier: string; refresh?: string }, clientInformation?: ClientInformation) {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
 
     const token = await (
       await this.fetch('https://api.tumblr.com/v2/oauth2/token', {
@@ -76,9 +75,9 @@ export class TumblrProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
-    const clientId = getEnvOr('TUMBLR_CLIENT_ID', 'tumblr', 'clientId');
-    const clientSecret = getEnvOr('TUMBLR_CLIENT_SECRET', 'tumblr', 'clientSecret');
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
+    const clientId = clientInformation?.client_id || '';
+    const clientSecret = clientInformation?.client_secret || '';
     const token = await (
       await this.fetch('https://api.tumblr.com/v2/oauth2/token', {
         method: 'POST',

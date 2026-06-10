@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -18,7 +19,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+
 
 @Rules(
   'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment'
@@ -263,10 +264,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     return undefined;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const value = {
-      client_key: getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId'),
-      client_secret: getEnvOr('TIKTOK_CLIENT_SECRET', 'tiktok', 'clientSecret'),
+      client_key: clientInformation?.client_id || '',
+      client_secret: clientInformation?.client_secret || '',
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
     };
@@ -308,13 +309,13 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = randomUUID();
 
     return {
       url:
         'https://www.tiktok.com/v2/auth/authorize/' +
-        `?client_key=${getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId')}` +
+        `?client_key=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
           `${
             process?.env?.FRONTEND_URL?.indexOf('https') === -1
@@ -334,10 +335,10 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
     const value = {
-      client_key: getEnvOr('TIKTOK_CLIENT_ID', 'tiktok', 'clientId'),
-      client_secret: getEnvOr('TIKTOK_CLIENT_SECRET', 'tiktok', 'clientSecret'),
+      client_key: clientInformation?.client_id || '',
+      client_secret: clientInformation?.client_secret || '',
       code: params.code,
       grant_type: 'authorization_code',
       code_verifier: params.codeVerifier,
