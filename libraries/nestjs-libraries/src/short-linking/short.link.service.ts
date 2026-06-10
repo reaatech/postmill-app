@@ -1,60 +1,58 @@
-import { Dub } from '@gitroom/nestjs-libraries/short-linking/providers/dub';
-import { Empty } from '@gitroom/nestjs-libraries/short-linking/providers/empty';
-import { ShortLinking } from '@gitroom/nestjs-libraries/short-linking/short-linking.interface';
-import { Injectable } from '@nestjs/common';
-import { ShortIo } from './providers/short.io';
-import { Kutt } from './providers/kutt';
-import { LinkDrip } from './providers/linkdrip';
+import { Injectable, Logger } from '@nestjs/common';
+import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
+import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
+import { type ShortLinkContext } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
 import { uniq } from 'lodash';
 import striptags from 'striptags';
 
-const getProvider = (): ShortLinking => {
-  if (process.env.DUB_TOKEN) {
-    return new Dub();
-  }
-
-  if (process.env.SHORT_IO_SECRET_KEY) {
-    return new ShortIo();
-  }
-
-  if (process.env.KUTT_API_KEY) {
-    return new Kutt();
-  }
-
-  if (process.env.LINK_DRIP_API_KEY) {
-    return new LinkDrip();
-  }
-
-  return new Empty();
-};
-
 @Injectable()
 export class ShortLinkService {
-  static provider = getProvider();
+  private readonly _logger = new Logger(ShortLinkService.name);
 
-  askShortLinkedin(messages: string[]): boolean {
-    if (ShortLinkService.provider.shortLinkDomain === 'empty') {
-      return false;
-    }
+  constructor(
+    private _registry: ShortLinkRegistry,
+    private _settingsService: OrgShortLinkSettingsService,
+    private _repository: OrgShortLinkSettingsRepository,
+  ) {}
 
-    const mergeMessages = messages.join(' ');
-    const urlRegex =
-      /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
-    const urls = mergeMessages.match(urlRegex);
-    if (!urls) {
-      // No URLs found, return the original text
-      return false;
-    }
+  private async _resolve(orgId: string): Promise<{ adapter: any; ctx: ShortLinkContext } | null> {
+    const active = await this._settingsService.getActiveProvider(orgId);
+    if (!active) return null;
 
-    return urls.some(
-      (url) => url.indexOf(ShortLinkService.provider.shortLinkDomain) === -1
-    );
+    const adapter = this._registry.getAdapter(active.identifier);
+    if (!adapter) return null;
+
+    return {
+      adapter,
+      ctx: {
+        orgId,
+        credentials: active.credentials || {},
+        customDomain: active.customDomain || undefined,
+      },
+    };
   }
 
-  async convertTextToShortLinks(id: string, messagesList: string[]) {
-    if (ShortLinkService.provider.shortLinkDomain === 'empty') {
-      return messagesList;
-    }
+  async askShortLinkedin(orgId: string, messages: string[]): Promise<boolean> {
+    const resolved = await this._resolve(orgId);
+    if (!resolved) return false;
+
+    const domain = resolved.adapter.resolveDomain(resolved.ctx);
+    if (!domain || domain === 'empty') return false;
+
+    const mergeMessages = messages.join(' ');
+    const urlRegex = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
+    const urls = mergeMessages.match(urlRegex);
+    if (!urls) return false;
+
+    return urls.some((url) => url.indexOf(domain) === -1);
+  }
+
+  async convertTextToShortLinks(orgId: string, messagesList: string[]) {
+    const resolved = await this._resolve(orgId);
+    if (!resolved) return messagesList;
+    const { adapter, ctx } = resolved;
+    const domain = adapter.resolveDomain(ctx);
 
     const messages = messagesList.map((text) => {
       return text
@@ -63,97 +61,121 @@ export class ShortLinkService {
         .replace(/&num;/g, '#');
     });
 
-    const urlRegex =
-      /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
+    const urlRegex = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
     return Promise.all(
       messages.map(async (text) => {
         const urls = uniq(text.match(urlRegex));
-        if (!urls) {
-          // No URLs found, return the original text
-          return text;
-        }
+        if (!urls) return text;
 
         const replacementMap: Record<string, string> = {};
-
-        // Process each URL asynchronously
         await Promise.all(
           urls.map(async (url) => {
-            if (url.indexOf(ShortLinkService.provider.shortLinkDomain) === -1) {
-              replacementMap[url] =
-                await ShortLinkService.provider.convertLinkToShortLink(id, url);
+            if (url.indexOf(domain) === -1) {
+              try {
+                const result = await adapter.createShortLink(ctx, url);
+                replacementMap[url] = result.shortUrl;
+                await this._repository.recordLink({
+                  organizationId: orgId,
+                  provider: adapter.identifier,
+                  shortUrl: result.shortUrl,
+                  originalUrl: url,
+                  providerLinkId: result.providerLinkId,
+                  postId: undefined,
+                }).catch((err) => {
+                  this._logger.warn(`Failed to record short link in ledger: ${(err as Error).message}`);
+                });
+              } catch (err) {
+                this._logger.warn(`Failed to shorten URL ${url}: ${(err as Error).message}`);
+                replacementMap[url] = url;
+              }
             } else {
-              replacementMap[url] = url; // Keep the original URL if it matches the prefix
+              replacementMap[url] = url;
             }
           })
         );
 
-        // Replace the URLs in the text with their replacements
-        return text.replace(urlRegex, (url) => replacementMap[url]);
+        return text.replace(urlRegex, (url) => replacementMap[url] ?? url);
       })
     );
   }
 
-  async convertShortLinksToLinks(messages: string[]) {
-    if (ShortLinkService.provider.shortLinkDomain === 'empty') {
-      return messages;
-    }
+  async convertShortLinksToLinks(orgId: string, messages: string[]) {
+    const resolved = await this._resolve(orgId);
+    if (!resolved) return messages;
+    const { adapter, ctx } = resolved;
+    const domain = adapter.resolveDomain(ctx);
+
+    if (!adapter.expandShortLink) return messages;
 
     const urlRegex = /https?:\/\/[^\s/$.?#].[^\s]*/g;
     return Promise.all(
       messages.map(async (text) => {
         const urls = text.match(urlRegex);
-        if (!urls) {
-          // No URLs found, return the original text
-          return text;
-        }
+        if (!urls) return text;
 
         const replacementMap: Record<string, string> = {};
-
-        // Process each URL asynchronously
         await Promise.all(
           urls.map(async (url) => {
-            if (url.indexOf(ShortLinkService.provider.shortLinkDomain) > -1) {
-              replacementMap[url] =
-                await ShortLinkService.provider.convertShortLinkToLink(url);
+            if (url.indexOf(domain) > -1) {
+              try {
+                replacementMap[url] = await adapter.expandShortLink!(ctx, url);
+              } catch {
+                replacementMap[url] = url;
+              }
             } else {
-              replacementMap[url] = url; // Keep the original URL if it matches the prefix
+              replacementMap[url] = url;
             }
           })
         );
 
-        // Replace the URLs in the text with their replacements
-        return text.replace(urlRegex, (url) => replacementMap[url]);
+        return text.replace(urlRegex, (url) => replacementMap[url] ?? url);
       })
     );
   }
 
-  async getStatistics(messages: string[]) {
-    if (ShortLinkService.provider.shortLinkDomain === 'empty') {
-      return [];
-    }
+  async getStatistics(orgId: string, messages: string[]) {
+    const resolved = await this._resolve(orgId);
+    if (!resolved) return [];
+    const { adapter, ctx } = resolved;
+    const domain = adapter.resolveDomain(ctx);
+
+    if (!adapter.linkStatistics) return [];
 
     const mergeMessages = messages.join(' ');
-    const regex = new RegExp(
-      `https?://${ShortLinkService.provider.shortLinkDomain.replace(
-        '.',
-        '\\.'
-      )}/[^\\s]*`,
-      'g'
-    );
+    const regex = new RegExp(`https?://${domain.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}/[^\\s]*`, 'g');
     const urls = striptags(mergeMessages).match(regex);
-    if (!urls) {
-      // No URLs found, return the original text
+    if (!urls) return [];
+
+    try {
+      return await adapter.linkStatistics(ctx, urls);
+    } catch (err) {
+      this._logger.warn(`Failed to get link statistics: ${(err as Error).message}`);
       return [];
     }
-
-    return ShortLinkService.provider.linksStatistics(urls);
   }
 
-  async getAllLinks(id: string) {
-    if (ShortLinkService.provider.shortLinkDomain === 'empty') {
+  async getAllLinks(orgId: string) {
+    const resolved = await this._resolve(orgId);
+    if (!resolved) return [];
+    const { adapter, ctx } = resolved;
+
+    if (!adapter.listLinks) return [];
+
+    try {
+      const allLinks: any[] = [];
+      let page = 1;
+      const maxPages = 10;
+      while (page <= maxPages) {
+        const pageResults = await adapter.listLinks(ctx, page);
+        if (!pageResults.length) break;
+        allLinks.push(...pageResults);
+        if (pageResults.length < 50) break;
+        page++;
+      }
+      return allLinks;
+    } catch (err) {
+      this._logger.warn(`Failed to list links: ${(err as Error).message}`);
       return [];
     }
-
-    return ShortLinkService.provider.getAllLinksStatistics(id, 1);
   }
 }
