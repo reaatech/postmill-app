@@ -28,17 +28,8 @@ services:
       DISABLE_REGISTRATION: 'false'
 
       # === Storage Settings
-      STORAGE_PROVIDER: 'local'
       UPLOAD_DIRECTORY: '/uploads'
-
-      # === Cloudflare (R2) Settings
-      # STORAGE_PROVIDER: 'cloudflare'
-      # CLOUDFLARE_ACCOUNT_ID: 'your-account-id'
-      # CLOUDFLARE_ACCESS_KEY: 'your-access-key'
-      # CLOUDFLARE_SECRET_ACCESS_KEY: 'your-secret-access-key'
-      # CLOUDFLARE_BUCKETNAME: 'your-bucket-name'
-      # CLOUDFLARE_BUCKET_URL: 'https://your-bucket-url.r2.cloudflarestorage.com/'
-      # CLOUDFLARE_REGION: 'auto'
+      MEDIA_UPLOAD_MAX_BYTES: '1073741824'
 
       # === Login / SSO providers (used for user authentication, not channel posting)
       # GITHUB_CLIENT_ID: ''
@@ -72,17 +63,22 @@ services:
       STRIPE_SECRET_KEY: ''
       STRIPE_SIGNING_KEY: ''
 
-      # === Short Link Service Settings (Optional - leave blank if unused)
-      # DUB_TOKEN: ""
-      # DUB_API_ENDPOINT: "https://api.dub.co"
-      # DUB_SHORT_LINK_DOMAIN: "dub.sh"
-      # SHORT_IO_SECRET_KEY: ""
-      # KUTT_API_KEY: ""
-      # KUTT_API_ENDPOINT: "https://kutt.it/api/v2"
-      # KUTT_SHORT_LINK_DOMAIN: "kutt.it"
-      # LINK_DRIP_API_KEY: ""
-      # LINK_DRIP_API_ENDPOINT: "https://api.linkdrip.com/v1/"
-      # LINK_DRIP_SHORT_LINK_DOMAIN: "dripl.ink"
+      # === Email Settings (v3.8.1+)
+      # EMAIL_PROVIDER: ""
+      # EMAIL_API_KEY: ""
+      # EMAIL_FROM_ADDRESS: ""
+      # EMAIL_FROM_NAME: ""
+      # EMAIL_WEBHOOK_SECRET: ""
+      # EMAIL_MAILGUN_DOMAIN: ""
+      # EMAIL_REGION: "us"
+      # EMAIL_SES_ACCESS_KEY_ID: ""
+      # EMAIL_SES_SECRET_ACCESS_KEY: ""
+      # EMAIL_SMTP_HOST: ""
+      # EMAIL_SMTP_PORT: "587"
+      # EMAIL_SMTP_SECURE: "false"
+      # EMAIL_SMTP_USER: ""
+      # EMAIL_SMTP_PASS: ""
+      # EMAIL_LOG_RETENTION_DAYS: "90"
 
     volumes:
       - postmill-config:/config/

@@ -44,3 +44,43 @@ jobs:
               exit 1
             fi
           done
+
+      - name: Check for env var reads in short-linking adapters
+        run: |
+          if grep -rn 'process\.env' libraries/nestjs-libraries/src/short-linking/adapters/ 2>/dev/null; then
+            echo "ERROR: Short-link adapters must not read process.env for credentials"
+            exit 1
+          fi
+          echo "OK: No process.env reads in adapters"
+
+      - name: Check for bare fetch() in short-linking adapters
+        run: |
+          if grep -rn '[^a-zA-Z]fetch(' libraries/nestjs-libraries/src/short-linking/adapters/ 2>/dev/null | grep -v 'safeFetch' | grep -v 'node_modules'; then
+            echo "ERROR: Short-link adapters must use safeFetch, not bare fetch()"
+            exit 1
+          fi
+          echo "OK: No bare fetch() in adapters"
+
+      - name: Check for removed legacy email env vars
+        run: |
+          for VAR in RESEND_API_KEY EMAIL_HOST EMAIL_PORT EMAIL_SECURE EMAIL_USER EMAIL_PASS; do
+            if grep -rn "$VAR" --include='*.ts' --include='*.js' --include='*.yaml' --include='*.yml' --include='.env*' libraries/ apps/ 2>/dev/null | grep -v 'node_modules' | grep -v '\.spec\.' | grep -v 'security-audit\.yml' | grep -v 'CHANGELOG\.md' | grep -v 'changes-from-upstream'; then
+              echo "ERROR: Legacy env var $VAR must not be used. Use the standardized EMAIL_* scheme instead."
+              exit 1
+            fi
+          done
+          echo "OK: No legacy email env vars found"
+
+      - name: Check for removed legacy storage env vars
+        run: |
+          for VAR in CLOUDFLARE_ACCOUNT_ID CLOUDFLARE_ACCESS_KEY CLOUDFLARE_SECRET_ACCESS_KEY CLOUDFLARE_BUCKETNAME CLOUDFLARE_BUCKET_URL CLOUDFLARE_REGION STORAGE_PROVIDER; do
+            if grep -rn "process\.env\.$VAR" --include='*.ts' --include='*.js' libraries/ apps/ 2>/dev/null | grep -v 'node_modules' | grep -v '\.spec\.' | grep -v 'security-audit\.yml' | grep -v 'configuration\.checker\.ts' | grep -v 'CHANGELOG\.md' | grep -v 'changes-from-upstream'; then
+              echo "ERROR: Removed legacy storage env var $VAR must not be read. Use per-tenant StorageService instead."
+              exit 1
+            fi
+          done
+          if grep -rn "from.*upload\.factory\|from.*r2\.uploader\|from.*cloudflare\.storage" --include='*.ts' libraries/ apps/ 2>/dev/null | grep -v 'node_modules' | grep -v '\.spec\.' | grep -v 'security-audit\.yml'; then
+            echo "ERROR: Deleted module (upload.factory / r2.uploader / cloudflare.storage) must not be imported."
+            exit 1
+          fi
+          echo "OK: No legacy storage env vars or imports found"

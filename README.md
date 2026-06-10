@@ -23,6 +23,16 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.8.4]** — SES webhook remediation release. No schema changes. Docs: backfilled upgrade notes, per-provider short-link credential reference, and email provider setup guides.
+
+**[v3.8.3]** — Schedule rename, calendar stats, sorted settings, streamlined header nav, storage LOCAL-as-base refactor
+
+**[v3.8.2]** — Local-first avatar & media storage; remove the global-env Cloudflare path. Avatars and app-internal writes always use the org's LOCAL storage. Large uploads stream through the backend (up to 1 GB). Cloud providers are per-tenant in Settings → Storage only.
+
+**[v3.8.1]** — Pluggable email — 6 providers (Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP), standardized config, delivery tracking with a 90-day send log.
+
+**[v3.8.0]** — Bring your own link shortener — 19 providers, branded domains, click analytics. Per-tenant configuration in Settings → Shortlinks. No more env-var lock-in.
+
 **[v3.7.0]**
 - **Postiz is now Postmill** — the fork has a new name, logo, and brand color. It's the same app and your data is untouched; only the branding changed across the UI, page titles, emails, and every language.
 - **A renamed Node SDK** — the SDK is now published as [`@reaatech/postmill-sdk`](https://www.npmjs.com/package/@reaatech/postmill-sdk) (was `@postiz/node`). Update your `npm install` and import if you use it.

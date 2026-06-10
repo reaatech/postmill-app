@@ -86,7 +86,6 @@ jobs:
       MAIN_URL: http://localhost:4200
       NEXT_PUBLIC_BACKEND_URL: http://localhost:3000
       BACKEND_INTERNAL_URL: http://localhost:3000
-      STORAGE_PROVIDER: local
       # Dev toggle: skip helmet/HSTS/CSRF so a plain-HTTP curl reaches the API.
       NOT_SECURED: 'true'
       PORT: '3000'

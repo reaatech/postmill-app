@@ -73,3 +73,4 @@ apps/frontend/public/*.zip
 
 dev
 coolify-compose.yml
+.env.coolify

@@ -61,6 +61,41 @@ an env-key fallback.**
 `AIBrandProfile`, `AIPromptTemplate`, `AISettingsAudit`, `AIMediaJob`, `AIPromptLibraryItem`,
 `AIContentIndex`.
 
+## Short-link providers (v3.8.0)
+
+The short-link system is a pluggable, per-org configurable multi-provider system replacing the old
+env-based approach.
+
+### Architecture
+- **`ShortLinkAdapter` interface** in `libraries/nestjs-libraries/src/short-linking/` — all 19
+  providers implement `createShortLink`, `validateCredentials`, and `resolveDomain`.
+- **19 adapters**: Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd,
+  v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
+- **`OrgShortLinkSettingsService`** — resolves the active provider config per-org per-call on every
+  short-link operation. No cached/stale provider.
+- **`ShortLinkService`** — `@Injectable()` with constructor DI, orchestrates resolution → delegation
+  → ledger recording. Returns the original URL (passthrough) when no provider is active (non-fatal
+  — never fails a publish because of missing short-link config).
+- **All adapter HTTP goes through `safeFetch`** — no bare `fetch()`.
+- **Credentials are encrypted at rest** in `OrgShortLinkConfig` via `EncryptionService` (AES-GCM).
+  Never read `process.env` for short-link credentials. Credentials never sent to the client — API
+  keys stay server-side.
+
+### Data model
+3 Prisma models: `OrgShortLinkConfig` (per-org provider config with encrypted credentials and custom
+domain), `ShortLink` (generated short link ledger — original URL, short URL, provider, optional post
+reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the Temporal analytics sweep).
+
+### No-provider behaviour
+No active short-link provider for an org = the `ShortLinkService` returns the original URL
+unmodified (passthrough). Publishes never fail due to missing short-link config. The composer's
+short-link toggle is hidden when no provider is configured, and the Settings → Shortlinks tab shows
+an empty state guiding the admin to configure one.
+
+### Analytics
+Daily click-count snapshots collected in the Temporal analytics sweep (`ShortLinkSnapshot`, best-effort,
+never throws). Dashboard includes a **Links** tab for click-count views.
+
 ## Feature surfaces (v3.5.0)
 
 New analytics/AI/social surfaces, all additive on existing infrastructure.
@@ -143,3 +178,69 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 - `ENCRYPTION_KEY` — optional at-rest secret encryption key (3U); falls back to `JWT_SECRET`.
 - `INTEGRATION_RETURN_URL_ALLOWLIST` — comma-separated allowed partner origins for return URLs (3AB).
 - `SSRF_ALLOWED_PRIVATE_CIDRS` — opt-in private-CIDR allowlist for self-hosted provider instances (1H).
+
+# Amendments
+
+Behavioral guidelines to reduce common LLM coding mistakes. Merge with project-specific instructions as needed.
+
+**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+
+## 1. Think Before Coding
+
+**Don't assume. Don't hide confusion. Surface tradeoffs.**
+
+Before implementing:
+- State your assumptions explicitly. If uncertain, ask.
+- If multiple interpretations exist, present them - don't pick silently.
+- If a simpler approach exists, say so. Push back when warranted.
+- If something is unclear, stop. Name what's confusing. Ask.
+
+## 2. Simplicity First
+
+**Minimum code that solves the problem. Nothing speculative.**
+
+- No features beyond what was asked.
+- No abstractions for single-use code.
+- No "flexibility" or "configurability" that wasn't requested.
+- No error handling for impossible scenarios.
+- If you write 200 lines and it could be 50, rewrite it.
+
+Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+## 3. Surgical Changes
+
+**Touch only what you must. Clean up only your own mess.**
+
+When editing existing code:
+- Don't "improve" adjacent code, comments, or formatting.
+- Don't refactor things that aren't broken.
+- Match existing style, even if you'd do it differently.
+- If you notice unrelated dead code, mention it - don't delete it.
+
+When your changes create orphans:
+- Remove imports/variables/functions that YOUR changes made unused.
+- Don't remove pre-existing dead code unless asked.
+
+The test: Every changed line should trace directly to the user's request.
+
+## 4. Goal-Driven Execution
+
+**Define success criteria. Loop until verified.**
+
+Transform tasks into verifiable goals:
+- "Add validation" → "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" → "Write a test that reproduces it, then make it pass"
+- "Refactor X" → "Ensure tests pass before and after"
+
+For multi-step tasks, state a brief plan:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+3. [Step] → verify: [check]
+```
+
+Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+
+---
+
+**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
