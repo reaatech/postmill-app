@@ -1,10 +1,10 @@
 # Configuration
 
-Postiz is configured through environment variables. The authoritative template is
-[`.env.example`](../../.env.example) at the repo root — copy it to `.env` and edit. This page
+Postmill is configured through environment variables. The authoritative template is
+[`.env.example`](https://github.com/reaatech/postmill-app/blob/main/.env.example) at the repo root — copy it to `.env` and edit. This page
 explains the important groups and the fork-specific behaviour.
 
-> **Verified against v3.6.0.** When a variable's exact default matters, check `.env.example` and
+> When a variable's exact default matters, check `.env.example` and
 > `docker-compose.yaml` directly; this page documents intent and fork behaviour rather than
 > duplicating every line.
 
@@ -17,7 +17,7 @@ explains the important groups and the fork-specific behaviour.
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `REDIS_URL` | Redis connection string (cache, queues, rate limiting/idempotency). |
 | `JWT_SECRET` | Signs JWTs **and is the encryption key** for stored channel/AI credentials. Make it long and stable — changing it invalidates encrypted DB credentials and sessions. |
-| `FRONTEND_URL` | The exact URL you access Postiz on. |
+| `FRONTEND_URL` | The exact URL you access Postmill on. |
 | `NEXT_PUBLIC_BACKEND_URL` | Public URL the browser uses to reach the backend API. |
 | `BACKEND_INTERNAL_URL` | Internal URL the frontend server uses to reach the backend. |
 
@@ -86,7 +86,7 @@ See [Temporal & background jobs](./temporal-and-cron.md) for how these workflows
 
 ## Generic OAuth / SSO (optional)
 
-`POSTIZ_GENERIC_OAUTH` plus `POSTIZ_OAUTH_*` and `NEXT_PUBLIC_POSTIZ_OAUTH_*` enable a generic OIDC
+`POSTMILL_GENERIC_OAUTH` plus `POSTMILL_OAUTH_*` and `NEXT_PUBLIC_POSTMILL_OAUTH_*` enable a generic OIDC
 login provider (e.g. Authentik). `IS_GENERAL="true"` is required for now.
 
 ## Short-link services (optional)

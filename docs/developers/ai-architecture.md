@@ -4,7 +4,7 @@ The AI layer is a pluggable, admin-configurable, governed multi-provider system 
 old single hardcoded OpenAI integration. This page is the developer view; for admin configuration
 see [AI settings admin](../admin/ai-settings.md).
 
-> **Verified against v3.6.0.** Code under `libraries/nestjs-libraries/src/ai`.
+> Code under `libraries/nestjs-libraries/src/ai`.
 
 ---
 

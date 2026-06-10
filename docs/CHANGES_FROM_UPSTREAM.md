@@ -1,11 +1,9 @@
 # What's Different From Upstream
 
-This fork (**Postiz REAA Flavor**) has diverged substantially from
+This fork (**Postmill**) has diverged substantially from
 [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app). The upstream documentation at
 `docs.postiz.com` no longer describes how this fork behaves. This page is the canonical summary of
-the differences; the [CHANGELOG](../CHANGELOG.md) has the full detail per release.
-
-> **Verified against v3.6.0.**
+the differences; the [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md) has the full detail per release.
 
 ---
 
@@ -41,9 +39,40 @@ Everything below builds around that foundation.
 | Calendar | Card click opens edit modal | Card body opens a **Post Detail** modal; a settings icon opens edit |
 | Comments | — | Synced social comments foundation with per-user read state |
 | MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
-| Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postiz-app` |
+| Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postmill-app` |
+| Product name | Postiz | **Postmill** (rebranded in v3.7.0; env vars `POSTMILL_*`, SDK `@reaatech/postmill-sdk`) |
 
 ---
+
+## v3.7.0 — Brand cutover (Postiz → Postmill)
+
+The fork is renamed **Postiz → Postmill**. No application schema changes. The rename rebrands every
+user-facing surface and most internal identifiers, and carries several **breaking** infrastructure
+renames for self-hosters.
+
+- **Branding** — product name `Postiz` → `Postmill` across UI copy, page titles, emails, OpenAPI,
+  and all translation locales; primary brand color `#612bd3` → `#2b5cd3`; logos and the browser
+  extension rebranded. The `isGeneralServerSide()`/`isGeneral` "Postiz vs Gitroom" display toggles
+  collapse to always render Postmill.
+- **Packages & SDK** — workspace names `postiz-*` → `postmill-*` (internal; scripts target by path).
+  The Node SDK is republished as **`@reaatech/postmill-sdk`** (was `@postiz/node`).
+- **Env vars (BREAKING)** — all `POSTIZ_*` variables hard-renamed to `POSTMILL_*`
+  (`POSTMILL_GENERIC_OAUTH`, `POSTMILL_OAUTH_*`, `POSTMILL_API_KEY`, `POSTMILL_CONTAINER`,
+  `NEXT_PUBLIC_POSTMILL_OAUTH_*`). The old names are no longer read.
+- **Docker / self-hosting (BREAKING)** — image is now `ghcr.io/reaatech/postmill-app`; compose
+  services/network/volumes and the Postgres role/db renamed `postiz-*` → `postmill-*`. The Postgres
+  **data** volume (`postgres-volume`) is unchanged, so data persists. See *"Migrating from a
+  Postiz-branded deployment"* in [Upgrading](./self-hosting/upgrading.md).
+- **Internal identifiers** — the Mastra chat agent id (`postiz` → `postmill`) and memory store
+  (`postiz-store` → `postmill-store`) were renamed, which **orphans persisted chat memory** (one-time
+  reset). MCP server name + setup snippets, OpenTelemetry tracer (`postmill-ai`), and the C2PA media
+  claim generator were rebranded too.
+- **Legal/governance** — product name rebranded in LICENSE/CONTRIBUTING/CCLA/ICLA/SECURITY (original
+  copyright + AGPL preserved); `SECURITY.md` scope/reporting retargeted to `reaatech/postmill-app`.
+
+**Intentionally not changed:** website/domain URLs (`*.postiz.com`, pending the new site), the
+`npm install -g postiz` CLI snippets (pending CLI publish under the new name), internal translation
+keys, and the `@gitroom/*` TypeScript path aliases.
 
 ## v3.6.0 — User profile, per-tenant storage/OAuth/AI, media manager, datatable rebuilds
 

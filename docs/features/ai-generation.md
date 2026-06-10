@@ -3,7 +3,7 @@
 This page covers AI content generation — text and media — and is explicit about what works today
 versus what is stubbed for a later phase.
 
-> **Verified against v3.6.0.** Generation resolves its model through the AI facade configured per-org
+> Generation resolves its model through the AI facade configured per-org
 > in **Settings → AI**. No env fallback. See [AI settings admin](../admin/ai-settings.md).
 
 ---

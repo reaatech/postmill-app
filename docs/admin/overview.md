@@ -3,7 +3,7 @@
 Super-admins get an extra set of controls surfaced from the impersonation/admin bar. This page maps
 that surface; each item links to its own page where there's more to say.
 
-> **Verified against v3.6.0.** v3.6.0 removes the admin-only routes and pages — all settings are now
+> v3.6.0 removes the admin-only routes and pages — all settings are now
 > tenant-scoped from the settings sidebar. The admin bar (impersonation) remains, but the admin
 > Channels, AI, Dashboard, and Errors pages are deleted. Their functionality moved to per-tenant
 > settings tabs (Settings → Channels, Settings → AI, etc.).

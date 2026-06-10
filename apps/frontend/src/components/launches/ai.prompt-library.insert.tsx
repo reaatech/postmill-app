@@ -132,7 +132,7 @@ const PromptLibraryDropdown: FC<{
         </div>
         <button
           onClick={() => setShowAddForm(!showAddForm)}
-          className="text-[11px] text-[#612BD3] hover:underline"
+          className="text-[11px] text-[#2B5CD3] hover:underline"
         >
           {showAddForm ? t('cancel', 'Cancel') : t('add_new', 'Add New')}
         </button>
@@ -155,7 +155,7 @@ const PromptLibraryDropdown: FC<{
           <button
             onClick={savePrompt}
             disabled={saving}
-            className="cursor-pointer text-white disabled:opacity-50 h-[28px] text-[11px] items-center justify-center bg-[#612BD3] flex rounded-[4px]"
+            className="cursor-pointer text-white disabled:opacity-50 h-[28px] text-[11px] items-center justify-center bg-[#2B5CD3] flex rounded-[4px]"
           >
             {saving ? (
               <Loading height={12} width={12} type="spin" color="#fff" />
@@ -169,7 +169,7 @@ const PromptLibraryDropdown: FC<{
       <div className="max-h-[300px] overflow-y-auto">
         {isLoading && (
           <div className="flex justify-center py-[20px]">
-            <Loading height={20} width={20} type="spin" color="#612bd3" />
+            <Loading height={20} width={20} type="spin" color="#2b5cd3" />
           </div>
         )}
 

@@ -3,7 +3,7 @@
 A single Prisma schema is the source of truth, applied with **`prisma db push`**. There are **no SQL
 migration files**.
 
-> **Verified against v3.5.9.** Prisma 6.5.0. Schema:
+> Prisma 6.5.0. Schema:
 > `libraries/nestjs-libraries/src/database/prisma/schema.prisma`.
 
 ---

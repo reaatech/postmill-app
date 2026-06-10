@@ -55,7 +55,7 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
           <button
             onClick={loadBestTime}
             disabled={loading}
-            className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed w-full h-[42px] px-[20px] items-center justify-center bg-[#612BD3] flex rounded-[6px]"
+            className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed w-full h-[42px] px-[20px] items-center justify-center bg-[#2B5CD3] flex rounded-[6px]"
           >
             {loading ? (
               <Loading height={16} width={16} type="spin" color="#fff" />

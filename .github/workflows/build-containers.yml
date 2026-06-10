@@ -40,8 +40,8 @@ jobs:
         run: |
           docker buildx build --platform linux/amd64 \
             -f Dockerfile.dev \
-            -t ghcr.io/reaatech/postiz-app:${CONTAINERVER} \
-            -t ghcr.io/reaatech/postiz-app:latest \
+            -t ghcr.io/reaatech/postmill-app:${CONTAINERVER} \
+            -t ghcr.io/reaatech/postmill-app:latest \
             --build-arg NEXT_PUBLIC_VERSION=${NEXT_PUBLIC_VERSION} \
             --pull \
             --no-cache \
@@ -50,4 +50,4 @@ jobs:
 
       - name: Verify pushed image
         run: |
-          docker buildx imagetools inspect ghcr.io/reaatech/postiz-app:${{ github.ref_name }}
+          docker buildx imagetools inspect ghcr.io/reaatech/postmill-app:${{ github.ref_name }}

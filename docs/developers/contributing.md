@@ -1,7 +1,5 @@
 # Contributing
 
-> **Verified against v3.6.0.**
-
 ---
 
 ## Before you start
@@ -30,12 +28,12 @@
 
 ## Process & legal
 
-- Repo-level guidelines: [`CONTRIBUTING.md`](../../CONTRIBUTING.md) and
-  [`CODE_OF_CONDUCT.md`](../../CODE_OF_CONDUCT.md).
-- Security policy: [`SECURITY.md`](../../SECURITY.md).
-- Contributor License Agreements: [`ICLA.md`](../../ICLA.md) (individual) /
-  [`CCLA.md`](../../CCLA.md) (entity).
-- License: [AGPL-3.0](../../LICENSE).
+- Repo-level guidelines: [`CONTRIBUTING.md`](https://github.com/reaatech/postmill-app/blob/main/CONTRIBUTING.md) and
+  [`CODE_OF_CONDUCT.md`](https://github.com/reaatech/postmill-app/blob/main/CODE_OF_CONDUCT.md).
+- Security policy: [`SECURITY.md`](https://github.com/reaatech/postmill-app/blob/main/SECURITY.md).
+- Contributor License Agreements: [`ICLA.md`](https://github.com/reaatech/postmill-app/blob/main/ICLA.md) (individual) /
+  [`CCLA.md`](https://github.com/reaatech/postmill-app/blob/main/CCLA.md) (entity).
+- License: [AGPL-3.0](https://github.com/reaatech/postmill-app/blob/main/LICENSE).
 
 ## Submitting
 

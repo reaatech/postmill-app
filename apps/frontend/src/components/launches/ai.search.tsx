@@ -67,7 +67,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
 
       {isLoading && (
         <div className="flex justify-center py-[32px]">
-          <Loading height={24} width={24} type="spin" color="#612bd3" />
+          <Loading height={24} width={24} type="spin" color="#2b5cd3" />
         </div>
       )}
 

@@ -3,8 +3,6 @@
 Bulk scheduling lets you create many scheduled posts at once — upload a CSV or paste rows — instead
 of composing them one by one.
 
-> **Verified against v3.5.9.** Introduced in v3.5.0. v3.5.9 adds @CheckPolicies to the bulk endpoint, campaignId support in bulk import rows, and quota enforcement.
-
 ---
 
 ## What it does

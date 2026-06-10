@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Guidance for AI coding agents working in this repository. Postiz is a tool to schedule social
+Guidance for AI coding agents working in this repository. Postmill is a tool to schedule social
 media and chat posts to 28+ channels — schedule posts, calendar view, analytics, team management,
 and a media library. Posts added to the calendar enter a workflow and are published at the right
 time.

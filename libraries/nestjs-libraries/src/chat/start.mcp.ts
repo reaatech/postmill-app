@@ -227,14 +227,14 @@ export const startMcp = async (app: INestApplication) => {
 
   // ── Boot-time tool snapshot (hot provider/model changes are OK; tool-set changes need restart) ──
   const mastra = await mastraService.mastra();
-  const agent = mastra.getAgent('postiz');
+  const agent = mastra.getAgent('postmill');
   const tools = await agent.listTools();
 
   const serverConfig = {
-    name: 'Postiz MCP',
+    name: 'Postmill MCP',
     version: '1.0.0',
     tools,
-    agents: { postiz: agent },
+    agents: { postmill: agent },
   };
 
   const server = new MCPServer(serverConfig);
@@ -834,11 +834,11 @@ export const startMcp = async (app: INestApplication) => {
     const a2aBridge = await import('@reaatech/a2a-reference-mcp-bridge' as any).catch(() => null as any);
     if (a2aBridge?.A2aAsMcpServer && a2aBridge?.McpToolAdapter) {
       const { A2aAsMcpServer, McpToolAdapter } = a2aBridge;
-      const toolAdapter = new McpToolAdapter(agent, { serverName: 'postiz', auth: resolveAuth });
+      const toolAdapter = new McpToolAdapter(agent, { serverName: 'postmill', auth: resolveAuth });
       const a2aServer = new A2aAsMcpServer({
         tools: toolAdapter,
         auth: resolveAuth,
-        serverInfo: { name: 'Postiz A2A', version: '1.0.0' },
+        serverInfo: { name: 'Postmill A2A', version: '1.0.0' },
       });
 
       app.use('/a2a', async (req: Request, res: Response) => {

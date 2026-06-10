@@ -2,7 +2,7 @@
 
 Tests run on **Vitest**, per package. A blocking CI workflow runs the full suite.
 
-> **Verified against v3.5.9.** The root `jest.config.ts` is vestigial — do not add jest-style
+> The root `jest.config.ts` is vestigial — do not add jest-style
 > config.
 
 ---

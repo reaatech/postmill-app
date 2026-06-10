@@ -1,7 +1,5 @@
 # Storage Provider Setup
 
-> **Verified against v3.6.0**
-
 Each organization can mount its own storage provider for media uploads. Supported providers: **S3**,
 **Cloudflare R2**, **Backblaze B2**, **IDrive e2**, and **Local** (default, filesystem-based).
 
@@ -12,9 +10,9 @@ are encrypted at rest using the `EncryptionService`.
 
 ## Default Setup (Local Storage)
 
-Out of the box, Postiz uses **Local Storage** — files are written to the directory specified by the
-`UPLOAD_DIRECTORY` environment variable (default: `/tmp/postiz-uploads` inside the container, or
-`/var/lib/postiz/uploads` in self-hosted setups).
+Out of the box, Postmill uses **Local Storage** — files are written to the directory specified by the
+`UPLOAD_DIRECTORY` environment variable (default: `/tmp/postmill-uploads` inside the container, or
+`/var/lib/postmill/uploads` in self-hosted setups).
 
 Each organization has a **5 GB quota by default** (`Organization.localStorageQuotaBytes`). To change
 the per-org quota, update the `localStorageQuotaBytes` value in the database:
@@ -217,7 +215,7 @@ CLOUDFLARE_REGION
 STORAGE_PROVIDER
 ```
 
-If these are set and no `StorageProviderConfig` is configured in the database, Postiz creates a
+If these are set and no `StorageProviderConfig` is configured in the database, Postmill creates a
 fallback local or Cloudflare R2 provider on startup. **A deprecation warning is logged at boot.**
 
 **Migrate to database configuration** by:

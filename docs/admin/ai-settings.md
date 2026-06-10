@@ -3,7 +3,6 @@
 The AI layer is a governed, multi-provider system configured per-tenant in **Settings → AI**, with
 provider keys encrypted at rest. This replaces the single hardcoded OpenAI integration from upstream.
 
-> **Verified against v3.6.0.** Introduced in v3.4.0; converted to per-tenant config in v3.6.0.
 > UI route: `/settings/ai` · API route: `/settings/ai` (org-scoped).
 
 ---

@@ -34,7 +34,7 @@ const PROVIDER_MAPPINGS: ProviderMapping[] = [
   { identifier: 'vk', name: 'VK', clientIdEnv: 'VK_ID' },
   { identifier: 'whop', name: 'Whop', clientIdEnv: 'WHOP_CLIENT_ID' },
   { identifier: 'telegram', name: 'Telegram', clientIdEnv: 'TELEGRAM_TOKEN', isTokenOnly: true },
-  { identifier: 'oauth_custom', name: 'Custom OAuth', clientIdEnv: 'POSTIZ_OAUTH_CLIENT_ID', clientSecretEnv: 'POSTIZ_OAUTH_CLIENT_SECRET' },
+  { identifier: 'oauth_custom', name: 'Custom OAuth', clientIdEnv: 'POSTMILL_OAUTH_CLIENT_ID', clientSecretEnv: 'POSTMILL_OAUTH_CLIENT_SECRET' },
 ];
 
 @Injectable()

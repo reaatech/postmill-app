@@ -3,8 +3,6 @@
 The fastest path to a running instance. For a production-style single-container deployment, use
 [Docker](../self-hosting/docker.md) instead.
 
-> **Verified against v3.6.0.**
-
 ---
 
 ## Option A — Docker Compose (recommended to try it)
@@ -19,7 +17,7 @@ Then open **http://localhost:4007** and register the first account.
 
 The bundled `docker-compose.yaml` is self-contained — Postgres, Redis, Temporal (with
 Elasticsearch), and the app. For what each service does and how to point it at the fork image
-(`ghcr.io/reaatech/postiz-app`) and external storage, see [Docker](../self-hosting/docker.md).
+(`ghcr.io/reaatech/postmill-app`) and external storage, see [Docker](../self-hosting/docker.md).
 
 ---
 

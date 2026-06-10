@@ -64,7 +64,7 @@ export const BulkToolbar: FC<{
   if (selectedFiles.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-[8px] px-[12px] py-[8px] mb-[10px] bg-[#612BD3]/10 rounded-[8px] border border-[#612BD3]/20">
+    <div className="flex items-center gap-[8px] px-[12px] py-[8px] mb-[10px] bg-[#2B5CD3]/10 rounded-[8px] border border-[#2B5CD3]/20">
       <div className="text-[13px] text-textColor font-[500]">
         {selectedFiles.length} selected
       </div>
@@ -97,7 +97,7 @@ export const BulkToolbar: FC<{
                 onClick={() => setTargetFolderId(null)}
                 className={clsx(
                   'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                  targetFolderId === null ? 'bg-[#612BD3]/20 text-white' : 'text-textColor hover:bg-forth'
+                  targetFolderId === null ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-forth'
                 )}
               >
                 Root (no folder)
@@ -108,7 +108,7 @@ export const BulkToolbar: FC<{
                   onClick={() => setTargetFolderId(f.id)}
                   className={clsx(
                     'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                    targetFolderId === f.id ? 'bg-[#612BD3]/20 text-white' : 'text-textColor hover:bg-forth'
+                    targetFolderId === f.id ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-forth'
                   )}
                   style={{ paddingLeft: `${10 + f.depth * 16}px` }}
                 >
@@ -125,7 +125,7 @@ export const BulkToolbar: FC<{
               </button>
               <button
                 onClick={handleBulkMove}
-                className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-white bg-[#612BD3] hover:bg-[#612BD3]/80 transition-all"
+                className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-white bg-[#2B5CD3] hover:bg-[#2B5CD3]/80 transition-all"
               >
                 Move
               </button>

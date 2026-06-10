@@ -4,8 +4,6 @@ A central **provider capability matrix** declares what each channel can do. It i
 of truth that the composer and admin UI read to hide or disable controls a provider can't support,
 and that capability-gated features (first comment, polls, comments, watchlist) check against.
 
-> **Verified against v3.5.9.** Introduced in v3.5.0.
-
 ---
 
 ## The capabilities

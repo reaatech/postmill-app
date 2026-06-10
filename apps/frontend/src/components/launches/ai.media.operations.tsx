@@ -209,7 +209,7 @@ const AiMediaOperationsModal: FC<{ close: () => void }> = (props) => {
               className={clsx(
                 'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                 activeOperation === op.key
-                  ? 'bg-[#612BD3] border-[#612BD3] text-white'
+                  ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                   : 'bg-newColColor border-newBgLineColor'
               )}
             >
@@ -297,7 +297,7 @@ const AiMediaOperationsModal: FC<{ close: () => void }> = (props) => {
             href={result.url}
             target="_blank"
             rel="noreferrer"
-            className="text-[12px] text-[#612BD3] break-all"
+            className="text-[12px] text-[#2B5CD3] break-all"
           >
             {result.url}
           </a>

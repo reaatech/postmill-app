@@ -1,7 +1,14 @@
+# ⚠️  UPGRADING FROM A POSTIZ-BRANDED COMPOSE?
+# This file renames Docker volumes (postiz-* -> postmill-*) and the Postgres
+# role/database (postiz-user/postiz-db-local -> postmill-user/postmill-db-local).
+# A fresh install needs no action. An EXISTING install must migrate its data, or
+# it will come up empty (old volumes are not mounted, and the renamed Postgres
+# role/db won't exist on the already-initialized volume). See the migration
+# steps in docs/self-hosting/upgrading.md before running `docker compose up`.
 services:
-  postiz:
-    image: ghcr.io/gitroomhq/postiz-app:latest
-    container_name: postiz
+  postmill:
+    image: ghcr.io/reaatech/postmill-app:latest
+    container_name: postmill
     restart: always
     environment:
       # === Required Settings
@@ -9,8 +16,8 @@ services:
       FRONTEND_URL: 'http://localhost:4007'
       NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4007/api'
       JWT_SECRET: 'random string that is unique to every install - just type random characters here!'
-      DATABASE_URL: 'postgresql://postiz-user:postiz-password@postiz-postgres:5432/postiz-db-local'
-      REDIS_URL: 'redis://postiz-redis:6379'
+      DATABASE_URL: 'postgresql://postmill-user:postmill-password@postmill-postgres:5432/postmill-db-local'
+      REDIS_URL: 'redis://postmill-redis:6379'
       BACKEND_INTERNAL_URL: 'http://localhost:3000'
       TEMPORAL_ADDRESS: "temporal:7233"
       IS_GENERAL: 'true'
@@ -65,16 +72,16 @@ services:
       MASTODON_CLIENT_SECRET: ''
 
       # === OAuth & Authentik Settings
-      # NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME: 'Authentik'
-      # NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL: 'https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png'
-      # POSTIZ_GENERIC_OAUTH: 'false'
-      # POSTIZ_OAUTH_URL: 'https://auth.example.com'
-      # POSTIZ_OAUTH_AUTH_URL: 'https://auth.example.com/application/o/authorize'
-      # POSTIZ_OAUTH_TOKEN_URL: 'https://auth.example.com/application/o/token'
-      # POSTIZ_OAUTH_USERINFO_URL: 'https://authentik.example.com/application/o/userinfo'
-      # POSTIZ_OAUTH_CLIENT_ID: ''
-      # POSTIZ_OAUTH_CLIENT_SECRET: ''
-      # POSTIZ_OAUTH_SCOPE: "openid profile email"  # Optional: uncomment to override default scope
+      # NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME: 'Authentik'
+      # NEXT_PUBLIC_POSTMILL_OAUTH_LOGO_URL: 'https://raw.githubusercontent.com/walkxcode/dashboard-icons/master/png/authentik.png'
+      # POSTMILL_GENERIC_OAUTH: 'false'
+      # POSTMILL_OAUTH_URL: 'https://auth.example.com'
+      # POSTMILL_OAUTH_AUTH_URL: 'https://auth.example.com/application/o/authorize'
+      # POSTMILL_OAUTH_TOKEN_URL: 'https://auth.example.com/application/o/token'
+      # POSTMILL_OAUTH_USERINFO_URL: 'https://authentik.example.com/application/o/userinfo'
+      # POSTMILL_OAUTH_CLIENT_ID: ''
+      # POSTMILL_OAUTH_CLIENT_SECRET: ''
+      # POSTMILL_OAUTH_SCOPE: "openid profile email"  # Optional: uncomment to override default scope
 
       # === Sentry
 
@@ -110,39 +117,39 @@ services:
       # LINK_DRIP_SHORT_LINK_DOMAIN: "dripl.ink"
 
     volumes:
-      - postiz-config:/config/
-      - postiz-uploads:/uploads/
+      - postmill-config:/config/
+      - postmill-uploads:/uploads/
     ports:
       - "4007:5000"
     networks:
-      - postiz-network
+      - postmill-network
       - temporal-network
     depends_on:
-      postiz-postgres:
+      postmill-postgres:
         condition: service_healthy
-      postiz-redis:
+      postmill-redis:
         condition: service_healthy
 
-  postiz-postgres:
+  postmill-postgres:
     image: postgres:17-alpine
-    container_name: postiz-postgres
+    container_name: postmill-postgres
     restart: always
     environment:
-      POSTGRES_PASSWORD: postiz-password
-      POSTGRES_USER: postiz-user
-      POSTGRES_DB: postiz-db-local
+      POSTGRES_PASSWORD: postmill-password
+      POSTGRES_USER: postmill-user
+      POSTGRES_DB: postmill-db-local
     volumes:
       - postgres-volume:/var/lib/postgresql/data
     networks:
-      - postiz-network
+      - postmill-network
     healthcheck:
-      test: pg_isready -U postiz-user -d postiz-db-local
+      test: pg_isready -U postmill-user -d postmill-db-local
       interval: 10s
       timeout: 3s
       retries: 3
-  postiz-redis:
+  postmill-redis:
     image: redis:7.2
-    container_name: postiz-redis
+    container_name: postmill-redis
     restart: always
     healthcheck:
       test: redis-cli ping
@@ -150,9 +157,9 @@ services:
       timeout: 3s
       retries: 3
     volumes:
-      - postiz-redis-data:/data
+      - postmill-redis-data:/data
     networks:
-      - postiz-network
+      - postmill-network
 
   # For Application Monitoring / Debugging
   spotlight:
@@ -162,7 +169,7 @@ services:
       - 8969:8969/tcp
     image: ghcr.io/getsentry/spotlight:latest
     networks:
-      - postiz-network
+      - postmill-network
 
   # -----------------------
   # Temporal Stack
@@ -252,17 +259,17 @@ volumes:
   postgres-volume:
     external: false
 
-  postiz-redis-data:
+  postmill-redis-data:
     external: false
 
-  postiz-config:
+  postmill-config:
     external: false
 
-  postiz-uploads:
+  postmill-uploads:
     external: false
 
 networks:
-  postiz-network:
+  postmill-network:
     external: false
   temporal-network:
     driver: bridge

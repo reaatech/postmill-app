@@ -1,7 +1,5 @@
 # Glossary
 
-> **Verified against v3.5.9.**
-
 ---
 
 **Activity** — A unit of work invoked by a Temporal workflow (e.g. analytics collection). Lives in

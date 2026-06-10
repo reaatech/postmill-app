@@ -75,7 +75,7 @@ describe('TelemetryService', () => {
   describe('constructor', () => {
     it('creates a default tracer from the API', () => {
       freshService();
-      expect(mockGetTracer).toHaveBeenCalledWith('postiz-ai');
+      expect(mockGetTracer).toHaveBeenCalledWith('postmill-ai');
     });
 
     it('is not configured by default', () => {
@@ -94,7 +94,7 @@ describe('TelemetryService', () => {
     it('creates a tracer from provider when endpoint is provided', () => {
       const service = freshService();
       service.configure({ endpoint: 'https://otel.example.com/v1/traces' });
-      expect(mockProviderGetTracer).toHaveBeenCalledWith('postiz-ai');
+      expect(mockProviderGetTracer).toHaveBeenCalledWith('postmill-ai');
     });
 
     it('is a no-op when observability is null', () => {

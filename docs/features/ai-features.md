@@ -5,7 +5,7 @@ provider/model the org has configured in **Settings → AI** and are subject to 
 governance the admin has set. For generation specifically, see
 [AI generation](./ai-generation.md); for admin setup, see [AI settings admin](../admin/ai-settings.md).
 
-> **Verified against v3.6.0.** Introduced in v3.4.0. User endpoints live under `/ai`. The AI moderation endpoint (`POST /ai/moderate`) is now text-only — image moderation removed pending a configured vision provider. All 11 AI user endpoints now throttled at 30 req/min. A read-only `GET /ai/media-providers` endpoint surfaces configured media providers (credential-free) for the Brand & AI settings panel.
+> User endpoints live under `/ai`. The AI moderation endpoint (`POST /ai/moderate`) is now text-only — image moderation removed pending a configured vision provider. All 11 AI user endpoints now throttled at 30 req/min. A read-only `GET /ai/media-providers` endpoint surfaces configured media providers (credential-free) for the Brand & AI settings panel.
 > v3.5.0 tools (hashtags, comment sentiment/summary, compliance, brand memory) route through the
 > same `AIModelProvider` facade and each carries an explicit `@Throttle` rate limit.
 

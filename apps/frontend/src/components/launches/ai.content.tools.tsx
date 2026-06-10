@@ -166,7 +166,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             className={clsx(
               'cursor-pointer rounded-[6px] px-[12px] h-[32px] flex items-center text-[12px] font-[500] transition-all',
               activeTab === tab
-                ? 'bg-[#612BD3] text-white'
+                ? 'bg-[#2B5CD3] text-white'
                 : 'text-newTextColor/60 hover:text-newTextColor'
             )}
           >
@@ -199,7 +199,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                 className={clsx(
                   'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                   selectedPlatforms.includes(p)
-                    ? 'bg-[#612BD3] border-[#612BD3] text-white'
+                    ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
@@ -221,7 +221,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                 className={clsx(
                   'cursor-pointer rounded-[4px] px-[10px] h-[30px] flex items-center text-[12px] border',
                   selectedLocales.includes(l.key)
-                    ? 'bg-[#612BD3] border-[#612BD3] text-white'
+                    ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
@@ -245,7 +245,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                 className={clsx(
                   'cursor-pointer rounded-[4px] w-[36px] h-[30px] flex items-center justify-center text-[12px] border',
                   variantCount === n
-                    ? 'bg-[#612BD3] border-[#612BD3] text-white'
+                    ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
                     : 'bg-newColColor border-newBgLineColor'
                 )}
               >
@@ -298,7 +298,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(p.content)}
-                    className="text-[11px] text-[#612BD3] hover:underline"
+                    className="text-[11px] text-[#2B5CD3] hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>
@@ -327,7 +327,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(tr.text)}
-                    className="text-[11px] text-[#612BD3] hover:underline"
+                    className="text-[11px] text-[#2B5CD3] hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>
@@ -351,7 +351,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
                   </div>
                   <button
                     onClick={() => copyToClipboard(v.content)}
-                    className="text-[11px] text-[#612BD3] hover:underline"
+                    className="text-[11px] text-[#2B5CD3] hover:underline"
                   >
                     {t('copy', 'Copy')}
                   </button>

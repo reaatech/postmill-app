@@ -1,11 +1,11 @@
 # Environment Variable Reference
 
 Curated reference of the environment variables. The authoritative template is
-[`.env.example`](../../.env.example); `docker-compose.yaml` shows them set inline for the container
+[`.env.example`](https://github.com/reaatech/postmill-app/blob/main/.env.example); `docker-compose.yaml` shows them set inline for the container
 deployment. This page groups them by purpose — see [Configuration](../self-hosting/configuration.md)
 for the narrative version.
 
-> **Verified against v3.6.0.** When an exact default matters, check `.env.example` directly.
+> When an exact default matters, check `.env.example` directly.
 
 ---
 
@@ -16,7 +16,7 @@ for the narrative version.
 | `DATABASE_URL` | PostgreSQL connection string. |
 | `REDIS_URL` | Redis connection string. |
 | `JWT_SECRET` | Signs JWTs **and encrypts stored channel/AI credentials**. Keep long & stable. |
-| `FRONTEND_URL` | Exact URL Postiz is accessed on. |
+| `FRONTEND_URL` | Exact URL Postmill is accessed on. |
 | `NEXT_PUBLIC_BACKEND_URL` | Public backend URL the browser uses. |
 | `BACKEND_INTERNAL_URL` | Internal backend URL the frontend server uses. |
 
@@ -70,10 +70,10 @@ for the narrative version.
 
 ## Generic OAuth / SSO (optional)
 
-`IS_GENERAL`, `POSTIZ_GENERIC_OAUTH`, `POSTIZ_OAUTH_URL`, `POSTIZ_OAUTH_AUTH_URL`,
-`POSTIZ_OAUTH_TOKEN_URL`, `POSTIZ_OAUTH_USERINFO_URL`, `POSTIZ_OAUTH_CLIENT_ID`,
-`POSTIZ_OAUTH_CLIENT_SECRET`, `POSTIZ_OAUTH_SCOPE`, `NEXT_PUBLIC_POSTIZ_OAUTH_DISPLAY_NAME`,
-`NEXT_PUBLIC_POSTIZ_OAUTH_LOGO_URL`.
+`IS_GENERAL`, `POSTMILL_GENERIC_OAUTH`, `POSTMILL_OAUTH_URL`, `POSTMILL_OAUTH_AUTH_URL`,
+`POSTMILL_OAUTH_TOKEN_URL`, `POSTMILL_OAUTH_USERINFO_URL`, `POSTMILL_OAUTH_CLIENT_ID`,
+`POSTMILL_OAUTH_CLIENT_SECRET`, `POSTMILL_OAUTH_SCOPE`, `NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME`,
+`NEXT_PUBLIC_POSTMILL_OAUTH_LOGO_URL`.
 
 ## Short links (optional)
 

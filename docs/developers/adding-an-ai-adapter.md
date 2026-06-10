@@ -3,7 +3,7 @@
 How to add a new AI provider to the pluggable AI layer. For the architecture see
 [AI architecture](./ai-architecture.md).
 
-> **Verified against v3.5.9.** Adapters live in `libraries/nestjs-libraries/src/ai/adapters/`.
+> Adapters live in `libraries/nestjs-libraries/src/ai/adapters/`.
 
 ---
 

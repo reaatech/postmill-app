@@ -2,29 +2,29 @@
 
 ## Introduction
 
-The Postiz app is committed to ensuring the security and integrity of our users' data. This security policy outlines our procedures for handling security vulnerabilities and our disclosure policy.
+The Postmill app is committed to ensuring the security and integrity of our users' data. This security policy outlines our procedures for handling security vulnerabilities and our disclosure policy.
 
 ## Scope
 
-We, at Postiz (gitroomhq), cover the following scopes for vulnerability disclosures:
+We, at Postmill (reaatech), cover the following scopes for vulnerability disclosures:
 
-- The core repository for `postiz-app` (github.com/gitroomhq/postiz-app)
-- All `gitroomhq` repositories that are official components, tooling, or integrations of Postiz
-- Official Postiz container images published under `gitroomhq` on GHCR
-- Official Postiz CLI tools and NPM packages (NPM org: @postiz)
-- Postiz-Cloud related infrastructure & services. (API, Frontend, Configurations etc.)
-- Plugins for Postiz maintained within the `gitroomhq` organization
+- The core repository for `postmill-app` (github.com/reaatech/postmill-app)
+- All `reaatech` repositories that are official components, tooling, or integrations of Postmill
+- Official Postmill container images published under `reaatech` on GHCR
+- Official Postmill CLI tools and NPM packages (NPM org: @reaatech)
+- Postmill-Cloud related infrastructure & services. (API, Frontend, Configurations etc.)
+- Plugins for Postmill maintained within the `reaatech` organization
 
 Vulnerabilities in third-party dependencies or user-hosted infrastructure are outside of this scope.
 
 ## Supported Versions
 
-This project currently only supports the latest release. We recommend that users always use the latest version of the Postiz app to ensure they have the latest security patches.
+This project currently only supports the latest release. We recommend that users always use the latest version of the Postmill app to ensure they have the latest security patches.
 *CVE IDs will only be assigned to vulnerabilities affecting currently supported versions.*
 
 ## Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in the Postiz app, please report it through the [GitHub Security Advisory system](https://github.com/gitroomhq/postiz-app/security/advisories/new).
+If you discover a security vulnerability in the Postmill app, please report it through the [GitHub Security Advisory system](https://github.com/reaatech/postmill-app/security/advisories/new).
 
 When reporting a security vulnerability, please provide as much detail as possible, including:
 

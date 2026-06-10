@@ -4,7 +4,7 @@ How to create the developer app / credentials for each channel and what to enter
 [Channels admin](../admin/channels.md). Scopes, identifiers, and credential keys below are taken
 from the provider implementations.
 
-> **Verified against v3.6.0.** 36 providers. Configure per-tenant credentials via
+> 36 providers. Configure per-tenant credentials via
 > **Settings → Channels** (encrypted at rest). The global env var fallback is removed in v3.6.0 —
 > all credentials are managed in-app.
 
@@ -20,7 +20,7 @@ from the provider implementations.
 ## How channel auth works here
 
 Most providers use an **OAuth redirect**: you register an app on the platform, give it a redirect
-(callback) URL pointing back at your Postiz instance, and enter the app's client ID/secret in
+(callback) URL pointing back at your Postmill instance, and enter the app's client ID/secret in
 [Channels admin](../admin/channels.md). Users then click "Add channel" and authorize.
 
 A few providers don't use a global app — instead the **user** supplies an instance URL plus a token
@@ -28,7 +28,7 @@ or login (Mastodon-compatible servers, PeerTube, etc.), or you provide a single 
 
 ### The redirect / callback URL
 
-For OAuth providers, the callback URL Postiz expects is:
+For OAuth providers, the callback URL Postmill expects is:
 
 ```
 <FRONTEND_URL>/integrations/social/<identifier>

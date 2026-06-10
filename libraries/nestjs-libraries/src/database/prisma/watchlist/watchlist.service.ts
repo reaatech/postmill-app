@@ -71,7 +71,7 @@ export class WatchlistService {
     const url = this.publicProfileUrl(provider, handle);
     const response = await safeFetch(url, {
       headers: {
-        'User-Agent': 'Postiz watchlist probe',
+        'User-Agent': 'Postmill watchlist probe',
         Accept: 'text/html,application/xhtml+xml',
       },
     });

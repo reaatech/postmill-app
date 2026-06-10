@@ -11,7 +11,7 @@ interface KPICardProps {
   onClick?: () => void;
 }
 
-export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #612bd3)', onClick }) => {
+export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3)', onClick }) => {
   const animatedTotal = useCountUp(kpi.total, 800, true);
   const isPositive = kpi.percentageChange >= 0;
 

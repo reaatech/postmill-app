@@ -40,7 +40,7 @@ interface LineChartProps {
 export const LineChart: FC<LineChartProps> = ({
   series,
   comparisonSeries,
-  color = 'var(--chart-1, #612bd3)',
+  color = 'var(--chart-1, #2b5cd3)',
   comparisonColor = 'var(--chart-muted, #71767b)',
   height = 300,
   format = 'number',
@@ -48,7 +48,7 @@ export const LineChart: FC<LineChartProps> = ({
 }) => {
   const ref = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<DrawChart | null>(null);
-  const resolvedColor = useCSSToken(color, '#612bd3');
+  const resolvedColor = useCSSToken(color, '#2b5cd3');
   const resolvedComparisonColor = useCSSToken(comparisonColor, '#71767b');
   const bgColor = useCSSToken('var(--new-bgColorInner)', '#1a1919');
   const textColor = useCSSToken('var(--new-btn-text)', '#ffffff');

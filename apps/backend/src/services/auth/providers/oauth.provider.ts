@@ -7,12 +7,12 @@ import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 @AuthProvider({ provider: 'GENERIC' })
 export class OauthProvider extends AuthProviderAbstract {
   private getConfig() {
-    const clientId = getEnvOr('POSTIZ_OAUTH_CLIENT_ID', 'oauth_custom', 'clientId');
-    const clientSecret = getEnvOr('POSTIZ_OAUTH_CLIENT_SECRET', 'oauth_custom', 'clientSecret');
+    const clientId = getEnvOr('POSTMILL_OAUTH_CLIENT_ID', 'oauth_custom', 'clientId');
+    const clientSecret = getEnvOr('POSTMILL_OAUTH_CLIENT_SECRET', 'oauth_custom', 'clientSecret');
     const {
-      POSTIZ_OAUTH_AUTH_URL: authUrl,
-      POSTIZ_OAUTH_TOKEN_URL: tokenUrl,
-      POSTIZ_OAUTH_USERINFO_URL: userInfoUrl,
+      POSTMILL_OAUTH_AUTH_URL: authUrl,
+      POSTMILL_OAUTH_TOKEN_URL: tokenUrl,
+      POSTMILL_OAUTH_USERINFO_URL: userInfoUrl,
       FRONTEND_URL: frontendUrl,
     } = process.env;
 
@@ -24,7 +24,7 @@ export class OauthProvider extends AuthProviderAbstract {
       !authUrl ||
       !frontendUrl
     ) {
-      throw new Error('POSTIZ_OAUTH environment variables are not set');
+      throw new Error('POSTMILL_OAUTH environment variables are not set');
     }
 
     return {

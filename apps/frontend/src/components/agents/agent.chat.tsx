@@ -46,7 +46,7 @@ export const AgentChat: FC = () => {
   const aiActive = useAiActive();
 
   // No AI provider configured → CopilotKit's /copilot/agent handshake would
-  // 403 and the "postiz" agent wouldn't resolve. Send the user to set one up.
+  // 403 and the "postmill" agent wouldn't resolve. Send the user to set one up.
   if (aiActive === false) {
     return (
       <div className="bg-newBgColorInner flex flex-1 flex-col items-center justify-center gap-[16px] text-center p-[40px]">
@@ -81,7 +81,7 @@ export const AgentChat: FC = () => {
       runtimeUrl={backendUrl + '/copilot/agent'}
       headers={csrfHeader()}
       showDevConsole={false}
-      agent="postiz"
+      agent="postmill"
       properties={{
         integrations: properties,
       }}
@@ -102,7 +102,7 @@ export const AgentChat: FC = () => {
             className="w-full h-full"
             labels={{
               title: t('your_assistant', 'Your Assistant'),
-              initial: t('agent_welcome_message', `Hello, I am your Postiz agent 🙌🏻.
+              initial: t('agent_welcome_message', `Hello, I am your Postmill agent 🙌🏻.
               
 I can schedule a post or multiple posts to multiple channels and generate pictures and videos.
 

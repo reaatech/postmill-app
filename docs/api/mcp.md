@@ -1,9 +1,7 @@
 # MCP
 
-The MCP (Model Context Protocol) surface lets AI agents/tools interact with Postiz. In this fork all
+The MCP (Model Context Protocol) surface lets AI agents/tools interact with Postmill. In this fork all
 entrypoints are hardened with scope enforcement, rate limiting, and idempotency.
-
-> **Verified against v3.5.9.** Hardening introduced in v3.4.0 using `@reaatech` auth packages.
 
 ---
 

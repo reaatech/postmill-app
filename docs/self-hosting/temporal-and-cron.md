@@ -4,8 +4,6 @@ Background work runs on **Temporal** in the `orchestrator` app. This includes sc
 token refresh, email/digests, analytics collection, and comment sync. This page covers what runs,
 and the one setting that trips people up: `RUN_CRON`.
 
-> **Verified against v3.5.9.**
-
 ---
 
 ## What runs in the orchestrator
@@ -63,6 +61,6 @@ It is gated by the same `RUN_CRON=true` requirement.
 ## Operating Temporal
 
 - The orchestrator connects to Temporal at `TEMPORAL_ADDRESS` (e.g. `temporal:7233`).
-- The bundled [`docker-compose.yaml`](../../docker-compose.yaml) includes a complete Temporal stack
+- The bundled [`docker-compose.yaml`](https://github.com/reaatech/postmill-app/blob/main/docker-compose.yaml) includes a complete Temporal stack
   (server, its Postgres, Elasticsearch, and a UI on `:8080`). See [Docker](./docker.md).
 - Use the Temporal UI to inspect running/failed workflows.

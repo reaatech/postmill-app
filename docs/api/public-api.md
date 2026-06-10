@@ -2,7 +2,7 @@
 
 The stable, API-key-authenticated surface for automation. Base path: **`/public/v1`**.
 
-> **Verified against v3.5.10.** Endpoints below are taken from the v1 public integrations controller.
+> Endpoints below are taken from the v1 public integrations controller.
 
 ---
 
@@ -80,7 +80,7 @@ n8n, Make, and the Node SDK call this surface. See [Automation](./automation.md)
 
 The following endpoints live on the **internal app API** (session/JWT, base path `/`), not on
 `/public/v1`. They back the frontend and are documented here for completeness; they are not a stable
-public contract (see [Overview](./overview.md)). The full set is in [`openapi.yml`](../../openapi.yml).
+public contract (see [Overview](./overview.md)). The full set is in [`openapi.yml`](https://github.com/reaatech/postmill-app/blob/main/openapi.yml).
 
 ### AI utilities (`AiUserController`)
 

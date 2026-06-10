@@ -1,8 +1,6 @@
 # Requirements
 
-What you need to build and run Postiz REAA Flavor.
-
-> **Verified against v3.6.0.**
+What you need to build and run Postmill.
 
 ---
 
@@ -41,7 +39,7 @@ Only needed if you build from source rather than running the prebuilt image.
 
 ## Network / URLs
 
-Set these to the URL users actually reach Postiz on (behind your reverse proxy/TLS):
+Set these to the URL users actually reach Postmill on (behind your reverse proxy/TLS):
 
 - `FRONTEND_URL`, `NEXT_PUBLIC_BACKEND_URL`, `BACKEND_INTERNAL_URL`.
 
@@ -50,5 +48,5 @@ OAuth redirect URLs for channels are derived from `FRONTEND_URL` — see
 
 ## Container images
 
-The fork publishes to `ghcr.io/reaatech/postiz-app`. The bundled compose file references the
+The fork publishes to `ghcr.io/reaatech/postmill-app`. The bundled compose file references the
 upstream image by default — repoint it to the fork image. See [Docker](./docker.md).

@@ -141,7 +141,7 @@ export const FolderTree: FC<{
     const isSelected = selectedFolderId === folder.id;
     const isDragOver = dragOverFolderId === folder.id;
     const hasChildren = folder.children && folder.children.length > 0;
-    const folderColor = folder.color || '#612BD3';
+    const folderColor = folder.color || '#2B5CD3';
 
     return (
       <div key={folder.id}>
@@ -149,9 +149,9 @@ export const FolderTree: FC<{
           className={clsx(
             'flex items-center gap-[6px] px-[8px] py-[6px] rounded-[6px] cursor-pointer group transition-all text-[13px]',
             isSelected
-              ? 'bg-[#612BD3]/20 text-white'
+              ? 'bg-[#2B5CD3]/20 text-white'
               : isDragOver
-                ? 'bg-[#612BD3]/30 text-white'
+                ? 'bg-[#2B5CD3]/30 text-white'
                 : 'text-textColor hover:bg-newColColor/50'
           )}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
@@ -183,7 +183,7 @@ export const FolderTree: FC<{
               onChange={(e) => setRenamingName(e.target.value)}
               onBlur={() => handleRename(folder.id)}
               onKeyDown={(e) => { if (e.key === 'Enter') handleRename(folder.id); if (e.key === 'Escape') setRenamingId(null); }}
-              className="flex-1 bg-transparent border-b border-[#612BD3] text-textColor text-[13px] outline-none"
+              className="flex-1 bg-transparent border-b border-[#2B5CD3] text-textColor text-[13px] outline-none"
               onClick={(e) => e.stopPropagation()}
             />
           ) : (
@@ -224,9 +224,9 @@ export const FolderTree: FC<{
           className={clsx(
             'flex items-center gap-[8px] px-[12px] py-[8px] cursor-pointer text-[13px] transition-all',
             selectedFolderId === null
-              ? 'bg-[#612BD3]/20 text-white'
+              ? 'bg-[#2B5CD3]/20 text-white'
               : dragOverFolderId === null
-                ? 'bg-[#612BD3]/30 text-white'
+                ? 'bg-[#2B5CD3]/30 text-white'
                 : 'text-textColor hover:bg-newColColor/50'
           )}
         >
@@ -251,7 +251,7 @@ export const FolderTree: FC<{
                 if (e.key === 'Escape') { setNewFolderParent(null); setNewFolderName(''); }
               }}
               placeholder="Folder name..."
-              className="flex-1 bg-transparent border-b border-[#612BD3] text-textColor text-[13px] outline-none placeholder:text-textColor/30"
+              className="flex-1 bg-transparent border-b border-[#2B5CD3] text-textColor text-[13px] outline-none placeholder:text-textColor/30"
             />
           </div>
         )}
