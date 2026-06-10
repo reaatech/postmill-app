@@ -129,6 +129,7 @@ describe('AnalyticsActivity', () => {
 
     integrationManager = {
       getSocialIntegrationUnchecked: vi.fn(),
+      requireClientInformation: vi.fn().mockResolvedValue({ client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' }),
     } as any;
 
     providerConfigManager = {
@@ -288,7 +289,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'access-token-1', 7);
+      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'access-token-1', 7, expect.anything());
     });
 
     it('uses custom daysBack argument', async () => {
@@ -300,7 +301,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, 30);
 
-      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'access-token-1', 30);
+      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'access-token-1', 30, expect.anything());
     });
 
     it('refreshes token when tokenExpiration is in the past', async () => {
@@ -319,7 +320,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(refreshIntegrationService.refresh).toHaveBeenCalledWith(integrations[0]);
-      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'refreshed-token', 7);
+      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'refreshed-token', 7, expect.anything());
     });
 
     it('does not refresh token when tokenExpiration is null', async () => {
@@ -755,7 +756,8 @@ describe('AnalyticsActivity', () => {
         expect.any(String),
         expect.any(String),
         'valid-release',
-        2
+        2,
+        expect.anything()
       );
     });
 
@@ -849,7 +851,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(provider.postAnalytics).toHaveBeenCalledWith('ig-1', 'ig-token', 'release-1', 2);
+      expect(provider.postAnalytics).toHaveBeenCalledWith('ig-1', 'ig-token', 'release-1', 2, expect.anything());
     });
 
     it('refreshes expired token and uses new token', async () => {
@@ -880,7 +882,7 @@ describe('AnalyticsActivity', () => {
       expect(refreshIntegrationService.refresh).toHaveBeenCalledWith(
         posts[0].integration
       );
-      expect(provider.postAnalytics).toHaveBeenCalledWith('ig-1', 'fresh-token', 'release-1', 2);
+      expect(provider.postAnalytics).toHaveBeenCalledWith('ig-1', 'fresh-token', 'release-1', 2, expect.anything());
     });
 
     it('skips post when token refresh fails', async () => {
@@ -1166,7 +1168,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.backfillIntegration(integrationId);
 
-      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'fb-token', 90);
+      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'fb-token', 90, expect.anything());
     });
 
     it('refreshes expired token before calling analytics', async () => {
@@ -1184,7 +1186,7 @@ describe('AnalyticsActivity', () => {
       await activity.backfillIntegration(integrationId);
 
       expect(refreshIntegrationService.refresh).toHaveBeenCalledWith(integration);
-      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'refreshed-backfill', 90);
+      expect(provider.analytics).toHaveBeenCalledWith('fb-page-1', 'refreshed-backfill', 90, expect.anything());
     });
 
     it('returns early when token refresh fails', async () => {

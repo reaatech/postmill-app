@@ -97,6 +97,11 @@ export class SocialCommentsService {
 
     const { token } = await this.refreshTokenIfExpired(post.integration, provider);
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      post.integration.providerIdentifier,
+      post.integration.organizationId
+    ).catch(() => undefined);
+
     try {
       const result = await provider.replyToComment(
         post.integration.internalId,
@@ -105,6 +110,7 @@ export class SocialCommentsService {
         comment.platformCommentId,
         message,
         post.integration,
+        clientInformation,
       );
 
       // Providers swallow API errors and return a fabricated DTO with an empty
@@ -162,6 +168,11 @@ export class SocialCommentsService {
 
     const { token } = await this.refreshTokenIfExpired(post.integration, provider);
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      post.integration.providerIdentifier,
+      post.integration.organizationId
+    ).catch(() => undefined);
+
     try {
       const result = await provider.likeComment(
         post.integration.internalId,
@@ -170,6 +181,7 @@ export class SocialCommentsService {
         comment.platformCommentId,
         like,
         post.integration,
+        clientInformation,
       );
 
       await this._socialCommentsRepository.upsertComment({
@@ -303,6 +315,11 @@ export class SocialCommentsService {
     // errored sweep leaves syncedIds partial and must NOT drive deletions.
     let fullySynced = true;
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      post.integration.providerIdentifier,
+      post.integration.organizationId
+    ).catch(() => undefined);
+
     while (hasMore && attempts < MAX_PAGES) {
       attempts++;
       try {
@@ -312,6 +329,7 @@ export class SocialCommentsService {
           post.releaseId,
           cursor,
           post.integration,
+          clientInformation,
         );
 
         const comments = result.comments ?? [];
@@ -410,6 +428,11 @@ export class SocialCommentsService {
 
     const { token } = await this.refreshTokenIfExpired(post.integration, provider);
 
+    const clientInformation = await this._integrationManager.requireClientInformation(
+      post.integration.providerIdentifier,
+      post.integration.organizationId
+    ).catch(() => undefined);
+
     try {
       const result = await provider.replyToComment(
         post.integration.internalId,
@@ -418,6 +441,7 @@ export class SocialCommentsService {
         post.releaseId,
         message,
         post.integration,
+        clientInformation,
       );
 
       // See replyToComment: a fabricated empty-id DTO means the provider call

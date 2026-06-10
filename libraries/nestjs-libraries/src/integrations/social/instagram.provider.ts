@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -17,7 +18,6 @@ import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-set
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { Logger } from '@nestjs/common';
 
 @Rules(
@@ -404,12 +404,12 @@ export class InstagramProvider
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     return {
       url:
         'https://www.facebook.com/v20.0/dialog/oauth' +
-        `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
+        `?client_id=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/instagram`
         )}` +
@@ -420,21 +420,24 @@ export class InstagramProvider
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const getAccessToken = await (
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
-          `?client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
+          `?client_id=${clientInformation?.client_id || ''}` +
           `&redirect_uri=${encodeURIComponent(
             `${process.env.FRONTEND_URL}/integrations/social/instagram${
               params.refresh ? `?refresh=${params.refresh}` : ''
             }`
           )}` +
-          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'instagram', 'clientSecret')}` +
+          `&client_secret=${clientInformation?.client_secret || ''}` +
           `&code=${params.code}`
       )
     ).json();
@@ -443,8 +446,8 @@ export class InstagramProvider
       await fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
-          `&client_id=${getEnvOr('FACEBOOK_APP_ID', 'instagram', 'clientId')}` +
-          `&client_secret=${getEnvOr('FACEBOOK_APP_SECRET', 'instagram', 'clientSecret')}` +
+          `&client_id=${clientInformation?.client_id || ''}` +
+          `&client_secret=${clientInformation?.client_secret || ''}` +
           `&fb_exchange_token=${getAccessToken.access_token}`
       )
     ).json();
@@ -592,6 +595,7 @@ export class InstagramProvider
     token: string,
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration,
+    clientInformation?: ClientInformation,
     type = 'graph.facebook.com'
   ): Promise<PostResponse[]> {
     const [accessToken, userToken] = token.split('___');
@@ -794,6 +798,7 @@ export class InstagramProvider
     token: string,
     postDetails: PostDetails<InstagramDto>[],
     integration: Integration,
+    clientInformation?: ClientInformation,
     type = 'graph.facebook.com'
   ): Promise<PostResponse[]> {
     const [accessToken, userToken] = token.split('___');
@@ -875,21 +880,22 @@ export class InstagramProvider
     id: string,
     token: string,
     date: number,
-    type = 'graph.facebook.com'
+    clientInformation?: ClientInformation
   ): Promise<AnalyticsData[]> {
+    const graphHost = clientInformation?.instanceUrl || 'graph.facebook.com';
     const [accessToken, userToken] = token.split('___');
     const until = dayjs().startOf('day').unix();
     const since = dayjs().subtract(date, 'day').unix();
 
     const { data, ...all } = await (
       await fetch(
-        `https://${type}/v21.0/${id}/insights?metric=follower_count,reach&access_token=${accessToken}&period=day&since=${since}&until=${until}`
+        `https://${graphHost}/v21.0/${id}/insights?metric=follower_count,reach&access_token=${accessToken}&period=day&since=${since}&until=${until}`
       )
     ).json();
 
     const { data: data2, ...all2 } = await (
       await fetch(
-        `https://${type}/v21.0/${id}/insights?metric_type=total_value&metric=likes,views,comments,shares,saves,replies&access_token=${accessToken}&period=day&since=${since}&until=${until}`
+        `https://${graphHost}/v21.0/${id}/insights?metric_type=total_value&metric=likes,views,comments,shares,saves,replies&access_token=${accessToken}&period=day&since=${since}&until=${until}`
       )
     ).json();
     const analytics = [];
@@ -932,8 +938,9 @@ export class InstagramProvider
     token: string,
     postId: string,
     date: number,
-    type = 'graph.facebook.com'
+    clientInformation?: ClientInformation
   ): Promise<AnalyticsData[]> {
+    const graphHost = clientInformation?.instanceUrl || 'graph.facebook.com';
     const [accessToken, userToken] = token.split('___');
     const today = dayjs().format('YYYY-MM-DD');
 
@@ -941,7 +948,7 @@ export class InstagramProvider
       // Fetch media insights from Instagram Graph API
       const { data } = await (
         await this.fetch(
-          `https://${type}/v21.0/${postId}/insights?metric=views,reach,saved,likes,comments,shares&access_token=${accessToken}`
+          `https://${graphHost}/v21.0/${postId}/insights?metric=views,reach,saved,likes,comments,shares&access_token=${accessToken}`
         )
       ).json();
 

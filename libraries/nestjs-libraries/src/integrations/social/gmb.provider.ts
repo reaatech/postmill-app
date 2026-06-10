@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -12,7 +13,6 @@ import {
   SocialAbstract,
   ValidityMedia,
 } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import dayjs from 'dayjs';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
 import { GmbSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/gmb.settings.dto';
@@ -22,13 +22,15 @@ let _clientAndGmb: {
   oauth2: (newClient: OAuth2Client) => ReturnType<typeof google.oauth2>;
 } | undefined;
 
-const clientAndGmb = () => {
-  if (_clientAndGmb) return _clientAndGmb;
+const clientAndGmb = (clientId?: string, clientSecret?: string) => {
+  const useClientId = clientId || '';
+  const useClientSecret = clientSecret || '';
+
+  if (!clientId && !clientSecret && _clientAndGmb) return _clientAndGmb;
 
   const client = new google.auth.OAuth2({
-    clientId: getEnvOr('GOOGLE_GMB_CLIENT_ID', 'gmb', 'clientId') || getEnvOr('YOUTUBE_CLIENT_ID', 'youtube', 'clientId'),
-    clientSecret:
-      getEnvOr('GOOGLE_GMB_CLIENT_SECRET', 'gmb', 'clientSecret') || getEnvOr('YOUTUBE_CLIENT_SECRET', 'youtube', 'clientSecret'),
+    clientId: useClientId,
+    clientSecret: useClientSecret,
     redirectUri: `${process.env.FRONTEND_URL}/integrations/social/gmb`,
   });
 
@@ -38,8 +40,11 @@ const clientAndGmb = () => {
       auth: newClient,
     });
 
-  _clientAndGmb = { client, oauth2 };
-  return _clientAndGmb;
+  if (!clientId && !clientSecret) {
+    _clientAndGmb = { client, oauth2 };
+  }
+
+  return { client, oauth2 };
 };
 
 @Rules(
@@ -140,8 +145,11 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     return undefined;
   }
 
-  async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
-    const { client, oauth2 } = clientAndGmb();
+  async refreshToken(refresh_token: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
+    const { client, oauth2 } = clientAndGmb(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     client.setCredentials({ refresh_token });
     const { credentials } = await client.refreshAccessToken();
     if (!credentials.access_token) {
@@ -169,9 +177,12 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(7);
-    const { client } = clientAndGmb();
+    const { client } = clientAndGmb(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     return {
       url: client.generateAuthUrl({
         access_type: 'offline',
@@ -185,12 +196,18 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
-    const { client, oauth2 } = clientAndGmb();
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
+    const { client, oauth2 } = clientAndGmb(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     const { tokens } = await client.getToken(params.code);
     if (!tokens.access_token) {
       throw new Error('Failed to get Google My Business access token');

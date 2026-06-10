@@ -6,7 +6,6 @@ import {
 import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { Integration } from '@prisma/client';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class MastodonCustomProvider extends MastodonProvider {
@@ -74,12 +73,14 @@ export class MastodonCustomProvider extends MastodonProvider {
   override async post(
     id: string,
     accessToken: string,
-    postDetails: PostDetails[]
+    postDetails: PostDetails[],
+    integration?: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     return this.dynamicPost(
       id,
       accessToken,
-      (getEnvOr('MASTODON_URL', 'mastodon-custom', 'redirectUri') || 'https://mastodon.social'),
+      clientInformation?.instanceUrl || 'https://mastodon.social',
       postDetails
     );
   }
@@ -90,14 +91,15 @@ export class MastodonCustomProvider extends MastodonProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     return this.dynamicComment(
       id,
       postId,
       lastCommentId,
       accessToken,
-      (getEnvOr('MASTODON_URL', 'mastodon-custom', 'redirectUri') || 'https://mastodon.social'),
+      clientInformation?.instanceUrl || 'https://mastodon.social',
       postDetails
     );
   }

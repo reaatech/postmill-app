@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -22,7 +23,7 @@ import { Logger } from '@nestjs/common';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+
 
 // @ts-ignore
 if (!global.WebSocket) global.WebSocket = WebSocket;
@@ -64,14 +65,14 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     return true;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthTokenDetails> {
+  async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const { access_token: accessToken, expires_in: expiresIn } = await (
       await this.fetch('https://www.reddit.com/api/v1/access_token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')}:${getEnvOr('REDDIT_CLIENT_SECRET', 'reddit', 'clientSecret')}`
+            `${clientInformation?.client_id || ''}:${clientInformation?.client_secret || ''}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({
@@ -100,11 +101,11 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     const codeVerifier = makeId(30);
     const url = `https://www.reddit.com/api/v1/authorize?client_id=${
-      getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')
+      clientInformation?.client_id || ''
     }&response_type=code&state=${state}&redirect_uri=${encodeURIComponent(
       `${process.env.FRONTEND_URL}/integrations/social/reddit`
     )}&duration=permanent&scope=${encodeURIComponent(this.scopes.join(' '))}`;
@@ -115,7 +116,10 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: { code: string; codeVerifier: string }) {
+  async authenticate(
+    params: { code: string; codeVerifier: string },
+    clientInformation?: ClientInformation
+  ) {
     const {
       access_token: accessToken,
       refresh_token: refreshToken,
@@ -127,7 +131,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Authorization: `Basic ${Buffer.from(
-            `${getEnvOr('REDDIT_CLIENT_ID', 'reddit', 'clientId')}:${getEnvOr('REDDIT_CLIENT_SECRET', 'reddit', 'clientSecret')}`
+            `${clientInformation?.client_id || ''}:${clientInformation?.client_secret || ''}`
           ).toString('base64')}`,
         },
         body: new URLSearchParams({

@@ -118,6 +118,7 @@ describe('SocialCommentsService', () => {
 
     integrationManager = {
       getSocialIntegrationUnchecked: vi.fn(),
+      requireClientInformation: vi.fn().mockResolvedValue({ client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' }),
     };
 
     refreshIntegrationService = {
@@ -228,6 +229,7 @@ describe('SocialCommentsService', () => {
         basePost.releaseId,
         message,
         basePost.integration,
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -314,6 +316,7 @@ describe('SocialCommentsService', () => {
         expect.anything(),
         message,
         expect.anything(),
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
     });
 
@@ -431,6 +434,7 @@ describe('SocialCommentsService', () => {
         baseComment.platformCommentId,
         message,
         basePost.integration,
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -509,6 +513,7 @@ describe('SocialCommentsService', () => {
         baseComment.platformCommentId,
         true,
         basePost.integration,
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -784,6 +789,7 @@ describe('SocialCommentsService', () => {
         post.releaseId,
         undefined,
         post.integration,
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledTimes(1);
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledWith(
@@ -825,9 +831,11 @@ describe('SocialCommentsService', () => {
       expect(mockProvider.fetchComments).toHaveBeenCalledTimes(2);
       expect(mockProvider.fetchComments).toHaveBeenNthCalledWith(
         1, expect.anything(), expect.anything(), expect.anything(), undefined, expect.anything(),
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(mockProvider.fetchComments).toHaveBeenNthCalledWith(
         2, expect.anything(), expect.anything(), expect.anything(), 'cursor-1', expect.anything(),
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.upsertComment).toHaveBeenCalledTimes(2);
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(post.id);
@@ -894,6 +902,7 @@ describe('SocialCommentsService', () => {
         expiredPost.releaseId,
         undefined,
         expiredPost.integration,
+        { client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' },
       );
       expect(socialCommentsRepo.countComments).toHaveBeenCalledWith(expiredPost.id);
       expect(postsRepo.updateCommentCount).toHaveBeenCalledWith(expiredPost.id, 0);

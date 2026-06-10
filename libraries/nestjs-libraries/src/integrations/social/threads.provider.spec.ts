@@ -18,7 +18,7 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
   PrismaService: class {},
 }));
 vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
-  getEnvOr: () => 'mock-value',
+  getOrgCredential: () => 'mock-value',
   setCredentials: vi.fn(),
   getCredential: vi.fn(function() { return undefined; }),
   clearCredentials: vi.fn(),

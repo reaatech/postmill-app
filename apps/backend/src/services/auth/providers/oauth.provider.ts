@@ -2,13 +2,13 @@ import {
   AuthProvider,
   AuthProviderAbstract,
 } from '@gitroom/backend/services/auth/providers.interface';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { getLoginEnv } from './get-login-env';
 
 @AuthProvider({ provider: 'GENERIC' })
 export class OauthProvider extends AuthProviderAbstract {
   private getConfig() {
-    const clientId = getEnvOr('POSTMILL_OAUTH_CLIENT_ID', 'oauth_custom', 'clientId');
-    const clientSecret = getEnvOr('POSTMILL_OAUTH_CLIENT_SECRET', 'oauth_custom', 'clientSecret');
+    const clientId = getLoginEnv('POSTMILL_OAUTH_CLIENT_ID');
+    const clientSecret = getLoginEnv('POSTMILL_OAUTH_CLIENT_SECRET');
     const {
       POSTMILL_OAUTH_AUTH_URL: authUrl,
       POSTMILL_OAUTH_TOKEN_URL: tokenUrl,

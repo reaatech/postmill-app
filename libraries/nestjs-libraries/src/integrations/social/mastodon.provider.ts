@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -10,7 +11,6 @@ import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.ab
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { number, string } from 'yup';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { htmlToText } from '@gitroom/helpers/utils/html.to.text';
 import { Logger } from '@nestjs/common';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
@@ -69,12 +69,14 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     )}&scope=${this.scopes.join('+')}&state=${state}`;
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
+    const clientId = clientInformation?.client_id || '';
     const url = this.generateUrlDynamic(
-      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
+      instanceUrl,
       state,
-      getEnvOr('MASTODON_CLIENT_ID', 'mastodon', 'clientId'),
+      clientId,
       process.env.FRONTEND_URL || 'http://localhost:5000'
     );
     return {
@@ -131,11 +133,11 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
     return this.dynamicAuthenticate(
-      getEnvOr('MASTODON_CLIENT_ID', 'mastodon', 'clientId'),
-      getEnvOr('MASTODON_CLIENT_SECRET', 'mastodon', 'clientSecret'),
-      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
+      clientInformation?.client_id || '',
+      clientInformation?.client_secret || '',
+      clientInformation?.instanceUrl || 'https://mastodon.social',
       params.code
     );
   }
@@ -256,12 +258,15 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
   async post(
     id: string,
     accessToken: string,
-    postDetails: PostDetails[]
+    postDetails: PostDetails[],
+    integration?: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
     return this.dynamicPost(
       id,
       accessToken,
-      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
+      instanceUrl,
       postDetails
     );
   }
@@ -272,14 +277,16 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
     return this.dynamicComment(
       id,
       postId,
       lastCommentId,
       accessToken,
-      (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social'),
+      instanceUrl,
       postDetails
     );
   }
@@ -289,10 +296,11 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     accessToken: string,
     postId: string,
     _cursor: string | undefined,
-    _integration: Integration
+    _integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<{ comments: SocialCommentDTO[]; nextCursor?: string }> {
     try {
-      const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+      const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
 
       const context = await (
         await this.fetch(`${instanceUrl}/api/v1/statuses/${postId}/context`, {
@@ -331,10 +339,11 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     _postId: string,
     parentCommentId: string,
     message: string,
-    _integration: Integration
+    _integration: Integration,
+    clientInformation?: ClientInformation
   ) {
     try {
-      const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+      const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
 
       const form = new FormData();
       form.append('status', message);
@@ -383,9 +392,10 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
     _postId: string,
     commentId: string,
     like: boolean,
-    _integration: Integration
+    _integration: Integration,
+    clientInformation?: ClientInformation
   ) {
-    const instanceUrl = (getEnvOr('MASTODON_URL', 'mastodon', 'redirectUri') || 'https://mastodon.social');
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mastodon.social';
     const endpoint = like ? 'favourite' : 'unfavourite';
 
     try {

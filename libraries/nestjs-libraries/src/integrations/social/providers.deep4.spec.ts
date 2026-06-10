@@ -32,9 +32,9 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/prisma.service', () => ({
   PrismaService: class {},
 }));
 vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
-  getEnvOr: (key: string, integration: string, field: string) => {
-    if (key === 'TUMBLR_CLIENT_ID') return 'mock-client-id';
-    if (key === 'TUMBLR_CLIENT_SECRET') return 'mock-client-secret';
+  getOrgCredential: (orgId: string, integration: string, key: string) => {
+    if (key === 'clientId') return 'mock-client-id';
+    if (key === 'clientSecret') return 'mock-client-secret';
     return 'mock-value';
   },
   setCredentials: vi.fn(),

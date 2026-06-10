@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -11,7 +12,6 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { SlackDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/slack.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class SlackProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Slack has moderate API limits
@@ -44,12 +44,12 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
       username: '',
     };
   }
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
 
     return {
       url: `https://slack.com/oauth/v2/authorize?client_id=${
-        getEnvOr('SLACK_ID', 'slack', 'clientId')
+        clientInformation?.client_id || ''
       }&redirect_uri=${encodeURIComponent(
         `${
           process?.env?.FRONTEND_URL?.indexOf('https') === -1
@@ -62,11 +62,14 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const { access_token, team, bot_user_id, scope } = await (
       await this.fetch(`https://slack.com/api/oauth.v2.access`, {
         method: 'POST',
@@ -74,8 +77,8 @@ export class SlackProvider extends SocialAbstract implements SocialProvider {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
-          client_id: getEnvOr('SLACK_ID', 'slack', 'clientId'),
-          client_secret: getEnvOr('SLACK_SECRET', 'slack', 'clientSecret'),
+          client_id: clientInformation?.client_id || '',
+          client_secret: clientInformation?.client_secret || '',
           code: params.code,
           redirect_uri: `${
             process?.env?.FRONTEND_URL?.indexOf('https') === -1

@@ -72,3 +72,4 @@ apps/frontend/public/*.psd
 apps/frontend/public/*.zip
 
 dev
+coolify-compose.yml

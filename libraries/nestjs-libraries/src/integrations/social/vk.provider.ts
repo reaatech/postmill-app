@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -13,7 +14,6 @@ import FormDataNew from 'form-data';
 import mime from 'mime-types';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 export class VkProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 2; // VK has moderate API limits
@@ -35,12 +35,13 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     return 2048;
   }
 
-  async refreshToken(refresh: string): Promise<AuthTokenDetails> {
+  async refreshToken(refresh: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const [oldRefreshToken, device_id] = refresh.split('&&&&');
+    const clientId = clientInformation?.client_id || '';
     const formData = new FormData();
     formData.append('grant_type', 'refresh_token');
     formData.append('refresh_token', oldRefreshToken);
-    formData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
+    formData.append('client_id', clientId);
     formData.append('device_id', device_id);
     formData.append('state', makeId(32));
     formData.append('scope', this.scopes.join(' '));
@@ -53,7 +54,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const newFormData = new FormData();
-    newFormData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
+    newFormData.append('client_id', clientId);
     newFormData.append('access_token', access_token);
 
     const {
@@ -76,7 +77,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(32);
     const codeVerifier = randomBytes(64).toString('base64url');
     const challenge = Buffer.from(
@@ -91,7 +92,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
       url:
         'https://id.vk.com/authorize' +
         `?response_type=code` +
-        `&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}` +
+        `&client_id=${clientInformation?.client_id || ''}` +
         `&code_challenge_method=S256` +
         `&code_challenge=${challenge}` +
         `&redirect_uri=${encodeURIComponent(
@@ -112,11 +113,12 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
     const [code, device_id] = params.code.split('&&&&');
+    const clientId = clientInformation?.client_id || '';
 
     const formData = new FormData();
-    formData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
+    formData.append('client_id', clientId);
     formData.append('grant_type', 'authorization_code');
     formData.append('code_verifier', params.codeVerifier);
     formData.append('device_id', device_id);
@@ -138,7 +140,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const newFormData = new FormData();
-    newFormData.append('client_id', getEnvOr('VK_ID', 'vk', 'clientId'));
+    newFormData.append('client_id', clientId);
     newFormData.append('access_token', access_token);
 
     const {
@@ -230,9 +232,12 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
   async post(
     userId: string,
     accessToken: string,
-    postDetails: PostDetails[]
+    postDetails: PostDetails[],
+    integration?: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
+    const clientId = clientInformation?.client_id || '';
 
     // Upload media for the first post
     const mediaList = await this.uploadMedia(userId, accessToken, firstPost);
@@ -249,7 +254,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
 
     const { response } = await (
       await this.fetch(
-        `https://api.vk.com/method/wall.post?v=5.251&access_token=${accessToken}&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}`,
+        `https://api.vk.com/method/wall.post?v=5.251&access_token=${accessToken}&client_id=${clientId}`,
         {
           method: 'POST',
           body,
@@ -273,9 +278,11 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [commentPost] = postDetails;
+    const clientId = clientInformation?.client_id || '';
 
     // Upload media for the comment
     const mediaList = await this.uploadMedia(userId, accessToken, commentPost);
@@ -293,7 +300,7 @@ export class VkProvider extends SocialAbstract implements SocialProvider {
 
     const { response } = await (
       await this.fetch(
-        `https://api.vk.com/method/wall.createComment?v=5.251&access_token=${accessToken}&client_id=${getEnvOr('VK_ID', 'vk', 'clientId')}`,
+        `https://api.vk.com/method/wall.createComment?v=5.251&access_token=${accessToken}&client_id=${clientId}`,
         {
           method: 'POST',
           body,

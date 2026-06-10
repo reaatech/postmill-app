@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialProvider,
@@ -11,7 +12,7 @@ import { Integration } from '@prisma/client';
 import { MeweDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/mewe.dto';
 import { Tool } from '@gitroom/nestjs-libraries/integrations/tool.decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { getOrgCredential } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { Logger } from '@nestjs/common';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
@@ -24,14 +25,14 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
   editor = 'normal' as const;
   dto = MeweDto;
 
-  private get meweHost() {
-    return (getEnvOr('MEWE_HOST', 'mewe', 'redirectUri') || 'https://mewe.com');
+  private getMeweHost(instanceUrl?: string) {
+    return instanceUrl || 'https://mewe.com';
   }
 
-  private authHeaders(apiToken: string) {
+  private authHeaders(apiToken: string, appId: string, apiKey: string) {
     return {
-      'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
-      'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
+      'X-App-Id': appId,
+      'X-Api-Key': apiKey,
       Authorization: `Bearer ${apiToken}`,
       'Content-Type': 'application/json',
     };
@@ -82,12 +83,13 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
     return {
       url:
-        `${this.meweHost}/login` +
-        `?client_id=${getEnvOr('MEWE_APP_ID', 'mewe', 'clientId')}` +
+        `${instanceUrl}/login` +
+        `?client_id=${clientInformation?.client_id || ''}` +
         `&redirect_uri=${encodeURIComponent(
           `${process.env.FRONTEND_URL}/integrations/social/mewe`
         )}` +
@@ -101,8 +103,11 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     code: string;
     codeVerifier: string;
     refresh?: string;
-  }) {
+  }, clientInformation?: ClientInformation) {
     const loginRequestToken = params.code;
+    const appId = clientInformation?.client_id || '';
+    const apiKey = clientInformation?.client_secret || '';
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
 
     if (!loginRequestToken) {
       return 'No login request token received. Please try again.';
@@ -111,12 +116,12 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     try {
       // Exchange loginRequestToken for apiToken
       const tokenResponse = await fetch(
-        `${this.meweHost}/api/dev/token?loginRequestToken=${loginRequestToken}`,
+        `${instanceUrl}/api/dev/token?loginRequestToken=${loginRequestToken}`,
         {
           method: 'GET',
           headers: {
-            'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
-            'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
+            'X-App-Id': appId,
+            'X-Api-Key': apiKey,
           },
         }
       );
@@ -139,9 +144,9 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
       const expiresAt = tokenData.expiresAt;
 
       // Fetch user profile
-      const profileResponse = await fetch(`${this.meweHost}/api/dev/me`, {
+      const profileResponse = await fetch(`${instanceUrl}/api/dev/me`, {
         method: 'GET',
-        headers: this.authHeaders(apiToken),
+        headers: this.authHeaders(apiToken, appId, apiKey),
       });
 
       if (!profileResponse.ok) {
@@ -179,20 +184,23 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     integration: Integration
   ) {
     try {
+      const appId = getOrgCredential(integration.organizationId, 'mewe', 'clientId') || '';
+      const apiKey = getOrgCredential(integration.organizationId, 'mewe', 'clientSecret') || '';
+      const instanceUrl = getOrgCredential(integration.organizationId, 'mewe', 'redirectUri') || 'https://mewe.com';
       const allGroups: any[] = [];
-      let nextUrl: string | null = `${this.meweHost}/api/dev/groups`;
+      let nextUrl: string | null = `${instanceUrl}/api/dev/groups`;
 
       while (nextUrl) {
         const response = await fetch(nextUrl, {
           method: 'GET',
-          headers: this.authHeaders(accessToken),
+          headers: this.authHeaders(accessToken, appId, apiKey),
         });
 
         if (!response.ok) break;
 
         const data = await response.json();
         allGroups.push(...(data.groups || []));
-        nextUrl = data.nextPage ? `${this.meweHost}${data.nextPage}` : null;
+        nextUrl = data.nextPage ? `${instanceUrl}${data.nextPage}` : null;
       }
 
       return allGroups.map((group: any) => ({
@@ -206,7 +214,10 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
   private async uploadPhoto(
     accessToken: string,
-    mediaPath: string
+    mediaPath: string,
+    appId: string,
+    apiKey: string,
+    instanceUrl: string
   ): Promise<string> {
     const mediaResponse = await safeFetch(mediaPath);
     const blob = await mediaResponse.blob();
@@ -216,12 +227,12 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     form.append('file', blob, fileName);
 
     const uploadResponse = await fetch(
-      `${this.meweHost}/api/dev/photo/upload`,
+      `${instanceUrl}/api/dev/photo/upload`,
       {
         method: 'POST',
         headers: {
-          'X-App-Id': getEnvOr('MEWE_APP_ID', 'mewe', 'clientId'),
-          'X-Api-Key': getEnvOr('MEWE_API_KEY', 'mewe', 'clientSecret'),
+          'X-App-Id': appId,
+          'X-Api-Key': apiKey,
           Authorization: `Bearer ${accessToken}`,
         },
         body: form,
@@ -241,11 +252,15 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     id: string,
     accessToken: string,
     postDetails: PostDetails<MeweDto>[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     const [firstPost] = postDetails;
     const postType = firstPost.settings.postType || 'group';
     const groupId = firstPost.settings.group;
+    const appId = clientInformation?.client_id || '';
+    const apiKey = clientInformation?.client_secret || '';
+    const instanceUrl = clientInformation?.instanceUrl || 'https://mewe.com';
 
     // Upload photos if present (exclude videos)
     const imageMedia =
@@ -254,7 +269,7 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
     const uploadedPhotoIds: string[] = [];
     for (const media of imageMedia) {
-      const photoId = await this.uploadPhoto(accessToken, media.path);
+      const photoId = await this.uploadPhoto(accessToken, media.path, appId, apiKey, instanceUrl);
       uploadedPhotoIds.push(photoId);
     }
 
@@ -265,13 +280,13 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
 
     const postUrl =
       postType === 'timeline'
-        ? `${this.meweHost}/api/dev/me/post`
-        : `${this.meweHost}/api/dev/group/${groupId}/post`;
+        ? `${instanceUrl}/api/dev/me/post`
+        : `${instanceUrl}/api/dev/group/${groupId}/post`;
 
     // MeWe post endpoint may return 204 (no content), so use raw fetch
     const postResponse = await fetch(postUrl, {
       method: 'POST',
-      headers: this.authHeaders(accessToken),
+      headers: this.authHeaders(accessToken, appId, apiKey),
       body: JSON.stringify(postBody),
     });
 

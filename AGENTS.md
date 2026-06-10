@@ -29,11 +29,12 @@ Libraries (`libraries/`):
 - `react-shared-libraries` — shared React components.
 
 Docs & plans:
-- `docs/` — the maintained documentation site (features, channels, api, reference, developers,
-  self-hosting, admin). **Keep it in sync with code: any new feature, endpoint, env var, schema
-  model, or security invariant must be reflected here in the same release**, and bump the relevant
-  page's "Verified against vX.Y.Z" note. The release-level summary also lives in `CHANGELOG.md`,
-  `README.md` (fork-notice block), and `docs/CHANGES_FROM_UPSTREAM.md`.
+- `docs/` — the maintained VitePress documentation site, structured as three audience-specific
+  guides (`user-guide/`, `developer-docs/`, `operations-guide/`) plus a cross-cutting `reference/`
+  section. **Keep it in sync with code: any new feature, endpoint, env var, schema model, or
+  security invariant must be reflected here in the same release**, and bump the relevant page's
+  "Verified against vX.Y.Z" note. The release-level summary also lives in `CHANGELOG.md`,
+  `README.md` (fork-notice block), and `docs/reference/changes-from-upstream.md`.
 - `dev/` — release/implementation plans (e.g. `dev/RELEASE_v3.5.0.md`). Plans here drive a release;
   reconcile code against the plan, not the other way around.
 
@@ -126,6 +127,19 @@ source of truth. Because pushes can force destructive diffs against the live pro
 - Add columns as **nullable or defaulted**; a new required column without a default breaks the push.
 - Renames/drops are destructive under `db push` — provide a manual backfill / expand-contract plan.
 - Run `pnpm run prisma-generate` after schema edits to keep the client in sync.
+
+---
+
+## Channel credentials
+
+All channel provider credentials live exclusively in the database via `OrgProviderConfiguration`,
+encrypted at rest through `EncryptionService` (AES-GCM). There is **no env var fallback** — the
+`getEnvOr()` function and `ChannelEnvMigrationService` were removed in v3.7.1. Each provider
+receives credentials through `clientInformation` (passed from `OrgProviderConfiguration`) or via
+`getOrgCredential(orgId, identifier, key)`. Never read `process.env` for channel credentials.
+
+AI provider credentials follow the same pattern: stored in `AIOrgProviderConfig`, encrypted at rest,
+with no `OPENAI_API_KEY` or other env var fallback.
 
 ---
 

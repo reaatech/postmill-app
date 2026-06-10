@@ -41,6 +41,7 @@ import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
+import { ProviderNotConfiguredError } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.error';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new XProvider(),
@@ -251,6 +252,14 @@ export class IntegrationManager {
       return this._orgProviderConfigManager.getClientInfo(orgId, integration);
     }
     return this._providerConfigManager.getClientInfo(integration);
+  }
+
+  async requireClientInformation(integration: string, orgId?: string) {
+    const info = await this.getClientInformation(integration, orgId);
+    if (!info?.client_id && !info?.token) {
+      throw new ProviderNotConfiguredError(integration, orgId);
+    }
+    return info;
   }
 
   async isProviderEnabled(integration: string, orgId?: string) {

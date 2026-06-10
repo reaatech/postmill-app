@@ -1,5 +1,6 @@
 import {
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -15,7 +16,6 @@ import { InstagramDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-set
 import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.provider';
 import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { Logger } from '@nestjs/common';
 
 @Rules(
@@ -114,12 +114,12 @@ export class InstagramStandaloneProvider
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(6);
     return {
       url:
         `https://www.instagram.com/oauth/authorize?enable_fb_login=0&client_id=${
-          getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId')
+          clientInformation?.client_id || ''
         }&redirect_uri=${encodeURIComponent(
           `${
             process?.env.FRONTEND_URL?.indexOf('https') == -1
@@ -134,14 +134,17 @@ export class InstagramStandaloneProvider
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh: string;
-  }) {
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
     const formData = new FormData();
-    formData.append('client_id', getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId'));
-    formData.append('client_secret', getEnvOr('INSTAGRAM_APP_SECRET', 'instagram-standalone', 'clientSecret'));
+    formData.append('client_id', clientInformation?.client_id || '');
+    formData.append('client_secret', clientInformation?.client_secret || '');
     formData.append('grant_type', 'authorization_code');
     formData.append(
       'redirect_uri',
@@ -164,8 +167,8 @@ export class InstagramStandaloneProvider
       await fetch(
         'https://graph.instagram.com/access_token' +
           '?grant_type=ig_exchange_token' +
-          `&client_id=${getEnvOr('INSTAGRAM_APP_ID', 'instagram-standalone', 'clientId')}` +
-          `&client_secret=${getEnvOr('INSTAGRAM_APP_SECRET', 'instagram-standalone', 'clientSecret')}` +
+          `&client_id=${clientInformation?.client_id || ''}` +
+          `&client_secret=${clientInformation?.client_secret || ''}` +
           `&access_token=${getAccessToken.access_token}`
       )
     ).json();
@@ -193,13 +196,15 @@ export class InstagramStandaloneProvider
     id: string,
     accessToken: string,
     postDetails: PostDetails<InstagramDto>[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     return this.instagramProvider.post(
       id,
       accessToken,
       postDetails,
       integration,
+      clientInformation,
       'graph.instagram.com'
     );
   }
@@ -210,7 +215,8 @@ export class InstagramStandaloneProvider
     lastCommentId: string | undefined,
     accessToken: string,
     postDetails: PostDetails<InstagramDto>[],
-    integration: Integration
+    integration: Integration,
+    clientInformation?: ClientInformation
   ): Promise<PostResponse[]> {
     return this.instagramProvider.comment(
       id,
@@ -219,16 +225,17 @@ export class InstagramStandaloneProvider
       accessToken,
       postDetails,
       integration,
+      clientInformation,
       'graph.instagram.com'
     );
   }
 
-  async analytics(id: string, accessToken: string, date: number) {
+  async analytics(id: string, accessToken: string, date: number, clientInformation?: ClientInformation) {
     return this.instagramProvider.analytics(
       id,
       accessToken,
       date,
-      'graph.instagram.com'
+      { ...clientInformation, instanceUrl: 'graph.instagram.com' }
     );
   }
 
@@ -236,14 +243,15 @@ export class InstagramStandaloneProvider
     integrationId: string,
     accessToken: string,
     postId: string,
-    date: number
+    date: number,
+    clientInformation?: ClientInformation
   ) {
     return this.instagramProvider.postAnalytics(
       integrationId,
       accessToken,
       postId,
       date,
-      'graph.instagram.com'
+      { ...clientInformation, instanceUrl: 'graph.instagram.com' }
     );
   }
 

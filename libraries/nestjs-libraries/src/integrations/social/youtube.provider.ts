@@ -1,6 +1,7 @@
 import {
   AnalyticsData,
   AuthTokenDetails,
+  ClientInformation,
   PostDetails,
   PostResponse,
   SocialCommentDTO,
@@ -21,7 +22,6 @@ import dayjs from 'dayjs';
 import { GaxiosResponse } from 'gaxios/build/src/common';
 import Schema$Video = youtube_v3.Schema$Video;
 import { Rules } from '@gitroom/nestjs-libraries/chat/rules.description.decorator';
-import { getEnvOr } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { Integration } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 
@@ -32,12 +32,15 @@ let _clientAndYoutube: {
   youtubeAnalytics: (newClient: OAuth2Client) => ReturnType<typeof google.youtubeAnalytics>;
 } | undefined;
 
-const clientAndYoutube = () => {
-  if (_clientAndYoutube) return _clientAndYoutube;
+const clientAndYoutube = (clientId?: string, clientSecret?: string) => {
+  const useClientId = clientId || '';
+  const useClientSecret = clientSecret || '';
+
+  if (!clientId && !clientSecret && _clientAndYoutube) return _clientAndYoutube;
 
   const client = new google.auth.OAuth2({
-    clientId: getEnvOr('YOUTUBE_CLIENT_ID', 'youtube', 'clientId'),
-    clientSecret: getEnvOr('YOUTUBE_CLIENT_SECRET', 'youtube', 'clientSecret'),
+    clientId: useClientId,
+    clientSecret: useClientSecret,
     redirectUri: `${process.env.FRONTEND_URL}/integrations/social/youtube`,
   });
 
@@ -59,8 +62,11 @@ const clientAndYoutube = () => {
       auth: newClient,
     });
 
-  _clientAndYoutube = { client, youtube, oauth2, youtubeAnalytics };
-  return _clientAndYoutube;
+  if (!clientId && !clientSecret) {
+    _clientAndYoutube = { client, youtube, oauth2, youtubeAnalytics };
+  }
+
+  return { client, youtube, oauth2, youtubeAnalytics };
 };
 
 @Rules('YouTube must have on video attachment, it cannot be empty')
@@ -272,8 +278,11 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     return undefined;
   }
 
-  async refreshToken(refresh_token: string): Promise<AuthTokenDetails> {
-    const { client, oauth2 } = clientAndYoutube();
+  async refreshToken(refresh_token: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
+    const { client, oauth2 } = clientAndYoutube(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     client.setCredentials({ refresh_token });
     const { credentials } = await client.refreshAccessToken();
     if (!credentials.access_token) {
@@ -301,9 +310,12 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async generateAuthUrl() {
+  async generateAuthUrl(clientInformation?: ClientInformation) {
     const state = makeId(7);
-    const { client } = clientAndYoutube();
+    const { client } = clientAndYoutube(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     return {
       url: client.generateAuthUrl({
         access_type: 'offline',
@@ -317,12 +329,18 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
-  async authenticate(params: {
-    code: string;
-    codeVerifier: string;
-    refresh?: string;
-  }) {
-    const { client, oauth2 } = clientAndYoutube();
+  async authenticate(
+    params: {
+      code: string;
+      codeVerifier: string;
+      refresh?: string;
+    },
+    clientInformation?: ClientInformation
+  ) {
+    const { client, oauth2 } = clientAndYoutube(
+      clientInformation?.client_id,
+      clientInformation?.client_secret
+    );
     const { tokens } = await client.getToken(params.code);
     if (!tokens.access_token) {
       throw new Error('Failed to get YouTube access token');
