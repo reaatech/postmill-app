@@ -1,6 +1,11 @@
-import { IsBoolean, IsIn, IsOptional, Matches } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, Matches, Allow } from 'class-validator';
 
 export class XDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsOptional()
   @Matches(/^(https:\/\/x\.com\/i\/communities\/\d+)?$/, {
     message:

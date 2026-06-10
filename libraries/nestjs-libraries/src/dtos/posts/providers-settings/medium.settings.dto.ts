@@ -7,8 +7,7 @@ import {
   Matches,
   MinLength,
   ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+  ValidateNested, Allow } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class MediumTagsSettings {
@@ -20,6 +19,11 @@ export class MediumTagsSettings {
 }
 
 export class MediumSettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsString()
   @MinLength(2)
   @IsDefined()

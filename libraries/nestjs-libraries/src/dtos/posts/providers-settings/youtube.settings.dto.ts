@@ -11,8 +11,7 @@ import {
   ValidationArguments,
   ValidationOptions,
   ValidatorConstraint,
-  ValidatorConstraintInterface,
-} from 'class-validator';
+  ValidatorConstraintInterface, Allow } from 'class-validator';
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
 
@@ -64,6 +63,11 @@ export class YoutubeTagsSettings {
 }
 
 export class YoutubeSettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsString()
   @MinLength(2)
   @MaxLength(100)

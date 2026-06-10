@@ -1,9 +1,13 @@
 import {
-  IsDefined, IsOptional, IsString, IsUrl, MaxLength, MinLength, ValidateIf
-} from 'class-validator';
+  IsDefined, IsOptional, IsString, IsUrl, MaxLength, MinLength, ValidateIf, Allow } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
 
 export class PinterestSettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsString()
   @ValidateIf((o) => !!o.title)
   @MaxLength(100)

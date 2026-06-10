@@ -6,8 +6,7 @@ import {
   IsUrl,
   MinLength,
   ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+  ValidateNested, Allow } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class LemmySettingsDtoInner {
@@ -39,6 +38,11 @@ export class LemmySettingsValueDto {
 }
 
 export class LemmySettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @Type(() => LemmySettingsValueDto)
   @ValidateNested({ each: true })
   @ArrayMinSize(1)

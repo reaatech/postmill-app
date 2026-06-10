@@ -7,13 +7,17 @@ import {
   Matches,
   MinLength,
   ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+  ValidateNested, Allow } from 'class-validator';
 import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import { Type } from 'class-transformer';
 import { DevToTagsSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/dev.to.tags.settings.dto';
 
 export class DevToSettingsDto {
+  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
+  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
+  @Allow()
+  __type?: string;
+
   @IsString()
   @MinLength(2)
   @IsDefined()
