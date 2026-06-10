@@ -1,9 +1,8 @@
-// @ts-check
 import { withSentryConfig } from '@sentry/nextjs';
+import type { NextConfig } from 'next';
 import { redirects } from './src/redirects.config';
 
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+const nextConfig: NextConfig = {
   experimental: {
     proxyTimeout: 90_000,
   },
