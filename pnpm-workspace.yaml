@@ -21,6 +21,10 @@ overrides:
   # form-data ~2.3.2). request has no non-`request` successor, so bump the vulnerable 2.3.x
   # to patched 2.5.x (same major, API-compatible) only where <2.5.4 is requested.
   'form-data@<2.5.4': '>=2.5.4 <3'
+  # fast-xml-parser <4.5.4: critical entity-encoding bypass + high DoS (GHSA-m7jm-9gc2-mpf2),
+  # pulled by @aws-sdk/client-sesv2@3.800.0 -> @aws-sdk/core@3.799.0 (pins 4.4.1). Bump the
+  # vulnerable 4.x to patched 4.5.x (same major, API-compatible); newer aws-sdk paths use 5.x.
+  'fast-xml-parser@<4.5.4': '>=4.5.4 <5'
 
 onlyBuiltDependencies:
   - bcrypt

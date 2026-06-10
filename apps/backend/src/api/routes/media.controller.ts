@@ -20,16 +20,13 @@ import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/me
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ApiTags } from '@nestjs/swagger';
-import handleR2Upload from '@gitroom/nestjs-libraries/upload/r2.uploader';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
-import { MultipartUploadService } from '@gitroom/nestjs-libraries/database/prisma/media/multipart-upload.service';
 import { CreateFolderDto } from '@gitroom/nestjs-libraries/dtos/media/create.folder.dto';
 import { UpdateFolderDto } from '@gitroom/nestjs-libraries/dtos/media/update.folder.dto';
 import { MoveMediaDto } from '@gitroom/nestjs-libraries/dtos/media/move.media.dto';
@@ -38,15 +35,21 @@ import { UpdateMediaTagsDto } from '@gitroom/nestjs-libraries/dtos/media/update.
 import { UpdateMediaDescriptionDto } from '@gitroom/nestjs-libraries/dtos/media/update.media.description.dto';
 import { BulkDeleteMediaDto } from '@gitroom/nestjs-libraries/dtos/media/bulk.delete.media.dto';
 import { BulkMoveMediaDto } from '@gitroom/nestjs-libraries/dtos/media/bulk.move.media.dto';
+import { diskStorage } from 'multer';
+import { tmpdir } from 'os';
+import { mkdirSync } from 'fs';
+import fs from 'fs';
+import * as path from 'path';
+
+const TMP_UPLOAD_DIR = path.join(tmpdir(), 'postmill-uploads');
+try { mkdirSync(TMP_UPLOAD_DIR, { recursive: true }); } catch {}
 
 @ApiTags('Media')
 @Controller('/media')
 export class MediaController {
-  private storage = UploadFactory.createStorage();
   constructor(
     private _mediaService: MediaService,
     private _subscriptionService: SubscriptionService,
-    private _multipartUploadService: MultipartUploadService,
     private _storageService: StorageService
   ) {}
 
@@ -97,30 +100,41 @@ export class MediaController {
       return false;
     }
 
-    const file = await this.storage.uploadSimple(image.output);
+    const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+    const file = await adapter.uploadSimple(image.output);
 
     return this._mediaService.saveFile(org.id, file.split('/').pop(), file);
   }
 
   @Post('/upload-server')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', {
+      storage: diskStorage({
+          destination: TMP_UPLOAD_DIR,
+      }),
+      limits: { fileSize: parseInt(process.env.MEDIA_UPLOAD_MAX_BYTES || String(1024 * 1024 * 1024), 10) }
+  }))
   @UsePipes(new CustomFileValidationPipe())
   async uploadServer(
     @GetOrgFromRequest() org: Organization,
     @UploadedFile() file: Express.Multer.File,
     @Body('folderId') folderId?: string
   ) {
-    await this._storageService.assertWithinQuota(org.id, file?.size || 0);
-    const originalName = file?.originalname || '';
-    const uploadedFile = await this.storage.uploadFile(file);
-    return this._mediaService.saveFile(
-      org.id,
-      uploadedFile.originalname,
-      uploadedFile.path,
-      originalName,
-      folderId
-    );
+    try {
+      await this._storageService.assertWithinQuota(org.id, file?.size || 0);
+      const originalName = file?.originalname || '';
+      const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+      const uploadedFile = await adapter.uploadFile(file);
+      return this._mediaService.saveFile(
+        org.id,
+        uploadedFile.originalname,
+        uploadedFile.path,
+        originalName,
+        folderId
+      );
+    } finally {
+      if (file?.path) { try { await fs.promises.unlink(file.path); } catch { /* best-effort */ } }
+    }
   }
 
   @Post('/save-media')
@@ -129,6 +143,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Req() req: Request,
     @Body('name') name: string,
+    @Body('path') path: string,
     @Body('originalName') originalName: string,
     @Body('folderId') folderId?: string
   ) {
@@ -138,7 +153,7 @@ export class MediaController {
     return this._mediaService.saveFile(
       org.id,
       name,
-      process.env.CLOUDFLARE_BUCKET_URL + '/' + name,
+      path,
       originalName || undefined,
       folderId
     );
@@ -165,7 +180,8 @@ export class MediaController {
   ) {
     await this._storageService.assertWithinQuota(org.id, file?.size || 0);
     const originalName = file.originalname;
-    const getFile = await this.storage.uploadFile(file);
+    const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+    const getFile = await adapter.uploadFile(file);
 
     if (preventSave === 'true') {
       const { path } = getFile;
@@ -385,34 +401,4 @@ export class MediaController {
     return trashed;
   }
 
-  // Catch-all multipart-upload endpoint. MUST stay declared after every
-  // static single-segment POST route (e.g. /folders) — otherwise this
-  // parameterized route shadows them (NestJS matches top-to-bottom).
-  @Post('/:endpoint')
-  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
-  async uploadFile(
-    @GetOrgFromRequest() org: Organization,
-    @Req() req: Request,
-    @Res() res: Response,
-    @Param('endpoint') endpoint: string
-  ) {
-    const upload = await handleR2Upload(endpoint, req, res, org.id, this._multipartUploadService);
-    if (endpoint !== 'complete-multipart-upload') {
-      return upload;
-    }
-
-    // @ts-ignore
-    const name = upload.Location.split('/').pop();
-    const originalName = req.body?.file?.name;
-
-    const saveFile = await this._mediaService.saveFile(
-      org.id,
-      name,
-      // @ts-ignore
-      upload.Location,
-      originalName || undefined
-    );
-
-    res.status(200).json({ ...upload, saved: saveFile });
-  }
 }

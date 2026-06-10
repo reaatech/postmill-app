@@ -220,6 +220,32 @@ describe('CalendarItem', () => {
       expect(screen.queryByText('42')).toBeNull();
     });
 
+    it('each stat span has accessible title and aria-label (U10)', () => {
+      const post = basePost({ lastViews: 100, lastLikes: 20, lastComments: 5 });
+      const { container } = render(<CalendarItem {...baseProps()} post={post} />);
+
+      const viewSpan = container.querySelector('span[title="Views"]');
+      expect(viewSpan).toBeDefined();
+      expect(viewSpan?.getAttribute('aria-label')).toBe('Views');
+
+      const likesSpan = container.querySelector('span[title="Likes"]');
+      expect(likesSpan).toBeDefined();
+      expect(likesSpan?.getAttribute('aria-label')).toBe('Likes');
+
+      const commentsSpan = container.querySelector('span[title="Comments"]');
+      expect(commentsSpan).toBeDefined();
+      expect(commentsSpan?.getAttribute('aria-label')).toBe('Comments');
+    });
+
+    it('commentCount stat span also has accessible label', () => {
+      const post = basePost({ lastViews: null, lastLikes: null, lastComments: null, commentCount: 8 });
+      const { container } = render(<CalendarItem {...baseProps()} post={post} />);
+
+      const commentsSpan = container.querySelector('span[title="Comments"]');
+      expect(commentsSpan).toBeDefined();
+      expect(commentsSpan?.getAttribute('aria-label')).toBe('Comments');
+    });
+
     it('is hidden when all stats are undefined', () => {
       const post = basePost({
         lastViews: undefined,

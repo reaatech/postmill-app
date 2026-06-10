@@ -8,6 +8,112 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.8.4] - 2026-06-10
+
+### Fixed
+- Amazon SES email webhook: SNS subscription confirmation handling corrected; bounce, complaint, and
+  delivery event processing no longer silently drops events
+- Email webhook signature verification for SendGrid, Mailgun, Postmark, and Resend aligned with
+  provider specifications
+- Documentation: backfill v3.8.0→v3.8.1 upgrade notes, restructure upgrading guide, add short-link
+  provider credential reference, document email provider setup per-provider
+
+## [3.8.3] - 2026-06-10
+
+### Added
+- Calendar stats: live-fallback enrich shows views/likes/comments on post cards without requiring a cron sweep
+- User avatar menu now includes Profile link
+
+### Changed
+- Calendar → **Schedule**; route `/launches` → `/schedule` (with permanent redirect)
+- Settings tabs now sorted alphabetically (General/Settings pinned first)
+- Storage: LOCAL is always-on base storage; other providers mount onto it; no default provider concept
+- Header top-bar icons aligned to consistent 36×36 sizing
+
+### Removed
+- Profile tab from settings panel (moved to user avatar menu)
+- Settings gear icon from top header bar (accessible via avatar menu)
+- `StorageProviderConfig.isDefault` column and all related backend/frontend code
+- `POST /settings/storage/:id/set-default` API route
+
+### Fixed
+- Storage UI bugs (diagnosed and fixed in provider-form.modal, provider-card, and storage.tab)
+
+## [3.8.2] - 2026-06-10
+
+### Added
+- `StorageService.getLocalAdapterForOrg(orgId)` — always returns the org's LOCAL adapter
+- Large-file streaming upload — `/media/upload-server` limit configurable via `MEDIA_UPLOAD_MAX_BYTES` (default 1 GB)
+- CI guard for removed legacy storage env vars (`CLOUDFLARE_*`, `STORAGE_PROVIDER`) and deleted module imports
+
+### Changed
+- **Avatars (C1, C2)** — `IntegrationRepository.updateIntegration` and `IntegrationService.createOrUpdateIntegration` now upload avatars through `StorageService.getLocalAdapterForOrg(orgId)` (LOCAL storage). The `CLOUDFLARE_BUCKET_URL` dedup guard and `imagedelivery.net` passthrough are removed.
+- **Media writes (C3, C4, C10)** — `MediaService.generateVideo`, `PostsService.updateMedia`, and `MediaController` endpoints (`/upload-server`, `/upload-simple`, `/generate-image-with-prompt`, `/save-media`) use `StorageService.getLocalAdapterForOrg(orgId)`.
+- **AI/agent writes (C5, C6, C7, C8)** — `AgentGraphService.uploadPictures`, `ImagesSlides.process`, `UploadFromUrlTool`, and `GenerateImageTool` use `StorageService.getLocalAdapterForOrg(orgId)`.
+- **Public API uploads (C9)** — `PublicIntegrationsController` upload endpoints use `StorageService.getLocalAdapterForOrg(orgId)`.
+- **Third-party controller** — uploads use `StorageService.getLocalAdapterForOrg(orgId)`.
+- `VideoAbstract.process()` now accepts an optional `orgId` parameter; `Veo3` and `ImagesSlides` updated.
+- `updateMedia(id, imagesList, convertToJPEG, orgId?)` now accepts an optional `orgId` — threaded from all 4 callers (2 in `posts.service.ts`, 2 in orchestrator `post.activity.ts`).
+- Frontend: `/uploads` redirect/rewrite in `next.config.js` is unconditional (no longer gated on `STORAGE_PROVIDER === 'local'`). The media uploader always uses the XHR (local) plugin.
+- Frontend layouts: all three layouts hard-pin `storageProvider` to `'local'` and drop `cloudflareUrl`.
+
+### Removed
+- `UploadFactory`, `cloudflare.storage.ts`, `r2.uploader.ts` — deleted
+- `UploadModule` — `UploadFactory` removed from providers/exports
+- `MediaController`: multipart-upload catch-all `@Post('/:endpoint')` and `handleR2Upload` import deleted; `MultipartUploadService` DI removed
+- `uppy.upload.ts`: `'cloudflare'` case deleted (always uses `XHRUpload`)
+- Env vars: `STORAGE_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKETNAME`, `CLOUDFLARE_BUCKET_URL`, `CLOUDFLARE_REGION` — removed from `.env.example`, `.env.coolify`, and `docker-compose.yaml`
+- Frontend: `cloudflareUrl` removed from `VariableContextInterface`; `storageProvider` hard-pinned to `'local'`
+- All `UploadFactory.createStorage()` field initializers across 9 consumer files replaced with DI of `StorageService`
+- Config `StorageService` is the only write path for avatars and app-internal images; cloud providers (S3/R2/B2/iDriveE2) remain configurable per-tenant in Settings → Storage
+- No backwards compatibility for old env vars — fresh deployers need only `UPLOAD_DIRECTORY` + `FRONTEND_URL`
+
+## [3.8.1] - 2026-06-10
+
+### Added
+- Pluggable email provider system — 6 adapters (Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP) selected globally by `EMAIL_PROVIDER`
+- Standardized env scheme: `EMAIL_API_KEY` + provider-specific vars (`EMAIL_SMTP_*`, `EMAIL_MAILGUN_DOMAIN`, `EMAIL_SES_*`) — all documented in `.env.example`
+- Delivery-lifecycle email log (`EmailLog` Prisma model) — metadata only, no HTML body. Status advances through `queued` → `sent` → `delivered`/`bounced`/`complained`/`opened`/`clicked` via webhooks
+- `POST /webhooks/email` endpoint — signature-verified, CSRF-exempt. SES handles SNS `SubscriptionConfirmation`
+- Best-effort email log retention prune in the daily analytics sweep (`EMAIL_LOG_RETENTION_DAYS`, default 90)
+- CI guard (security-audit.yml) — fails if removed legacy vars (`RESEND_API_KEY`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`) are reintroduced
+
+### Changed
+- `EmailService` rewritten to use `EmailAdapterRegistry` + `EmailLogService` — same public API, no consumer signature changes
+- Adapters construct SDK clients lazily inside methods (not at module load) — unit-testable, no boot crashes when unconfigured
+- `EmailAdapterRegistry` + `EmailLogRepository`/`EmailLogService` wired into `DatabaseModule`
+- `.env.example` and `docker-compose.yaml` updated with the new standardized email env scheme
+- Docs updated: configuration, architecture, data-model, temporal-and-cron, changes-from-upstream
+
+### Removed
+- Old env vars: `RESEND_API_KEY`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`, `EMAIL_USER`, `EMAIL_PASS`
+- Old provider classes: `email.interface.ts`, `resend.provider.ts`, `node.mailer.provider.ts`, `empty.provider.ts`
+
+## [3.8.0] - 2026-06-10
+
+### Added
+- Tenant-configurable short-link provider system — 19 providers (Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI)
+- Per-org short-link provider configuration in Settings → Shortlinks with searchable dropdown, credential management, and test connection
+- `OrgShortLinkConfig`, `ShortLink`, `ShortLinkSnapshot` Prisma models for provider config, link ledger, and daily click snapshots
+- Daily short-link click analytics collection via Temporal sweep (best-effort, never crashes)
+- Analytics v2 endpoints: `GET /analytics/v2/shortlinks` and `GET /analytics/v2/shortlinks/timeseries`
+- New analytics dashboard **Links** tab showing top links and click timeseries
+- `ShortLinkService` rewrite: per-call per-org provider resolution, ledger recording, non-fatal Empty behavior when no provider is active
+- `safeFetch` used for all short-link provider HTTP calls (SSRF safety)
+- Credentials encrypted at rest via `EncryptionService` (AES-GCM)
+
+### Changed
+- Short-link provider config moved from env vars (`DUB_TOKEN`, `SHORT_IO_SECRET_KEY`, `KUTT_API_KEY`, `LINK_DRIP_API_KEY`) to per-org DB-backed, admin-configured settings
+- `ShortLinkService` is now a proper `@Injectable` with constructor DI — no static module-level provider
+- `orgId` threaded through all `ShortLinkService` methods; `getStatistics` and `askShortLinkedin` signatures updated
+- `/should-shortlink` endpoint now resolves org server-side (frontend unchanged)
+
+### Removed
+- Old env-based short-link providers: Dub, Short.io, Kutt, LinkDrip, Empty (all `short-linking/providers/*.ts`)
+- Legacy `short-linking.interface.ts` replaced by `short-link.interface.ts`
+- All 10 short-link env vars removed (no env fallback — consistent with v3.6.3/v3.7.1 AI provider pattern)
+- Static `getProvider()` env-precedence function
+
 ## [3.7.1] - 2026-06-09
 
 Removes the last remaining `process.env` credential reads from social providers, deletes the

@@ -19,6 +19,10 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { log } from '@temporalio/activity';
 import { decryptIntegrationTokens, decryptPostIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
+import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
+import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
+import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 
 dayjs.extend(isoWeek);
 
@@ -59,6 +63,10 @@ export class AnalyticsActivity {
     private readonly _refreshIntegrationService: RefreshIntegrationService,
     private readonly _webhooksService: WebhooksService,
     private readonly _watchlistService: WatchlistService,
+    private readonly _shortLinkSettingsService: OrgShortLinkSettingsService,
+    private readonly _shortLinkSettingsRepository: OrgShortLinkSettingsRepository,
+    private readonly _shortLinkRegistry: ShortLinkRegistry,
+    private readonly _emailLogService: EmailLogService,
   ) {}
 
   @ActivityMethod()
@@ -248,7 +256,7 @@ export class AnalyticsActivity {
 
         // Update denormalized counters on the Post record
         const latestSnapshots = await this._prisma.postAnalyticsSnapshot.findMany({
-          where: { postId: post.id, metric: { in: ['views', 'likes', 'comments'] } },
+          where: { postId: post.id, metric: { in: ['views', 'likes', 'comments', 'impressions', 'reactions', 'replies'] } },
           orderBy: { date: 'desc' },
           select: { metric: true, value: true },
         });
@@ -261,9 +269,12 @@ export class AnalyticsActivity {
         }
 
         const updateData: Record<string, number> = {};
-        if ('views' in latestByMetric) updateData.lastViews = latestByMetric.views;
-        if ('likes' in latestByMetric) updateData.lastLikes = latestByMetric.likes;
-        if ('comments' in latestByMetric) updateData.lastComments = latestByMetric.comments;
+        const views = latestByMetric['views'] || latestByMetric['impressions'];
+        const likes = latestByMetric['likes'] || latestByMetric['reactions'];
+        const comments = latestByMetric['comments'] || latestByMetric['replies'];
+        if (views !== undefined) updateData.lastViews = views;
+        if (likes !== undefined) updateData.lastLikes = likes;
+        if (comments !== undefined) updateData.lastComments = comments;
 
         if (Object.keys(updateData).length > 0) {
           await this._prisma.post.update({
@@ -516,5 +527,94 @@ export class AnalyticsActivity {
         { error: err?.message }
       );
     }
+  }
+
+  @ActivityMethod()
+  async collectShortLinkSnapshots(orgId: string): Promise<void> {
+    const active = await this._shortLinkSettingsService.getActiveProvider(orgId);
+    if (!active) return;
+
+    const adapter = this._shortLinkRegistry.getAdapter(active.identifier);
+    if (!adapter) return;
+    if (!adapter.capabilities.statistics) return;
+    if (!adapter.linkStatistics) return;
+
+    const links = await this._shortLinkSettingsRepository.getLinksForOrg(orgId);
+    if (links.length === 0) return;
+
+    const batchSize = 20;
+    const today = dayjs().startOf('day').toDate();
+
+    try {
+      for (let i = 0; i < links.length; i += batchSize) {
+        const batch = links.slice(i, i + batchSize);
+        const shortUrls = batch.map((l) => l.shortUrl);
+
+        try {
+          const stats = await adapter.linkStatistics(
+            {
+              orgId,
+              credentials: active.credentials || {},
+              customDomain: active.customDomain || undefined,
+            },
+            shortUrls,
+          );
+
+          const rows: {
+            shortLinkId: string;
+            organizationId: string;
+            date: Date;
+            clicks: number;
+          }[] = [];
+          for (const stat of stats) {
+            const link = batch.find((l) => l.shortUrl === stat.short);
+            if (!link) continue;
+            rows.push({
+              shortLinkId: link.id,
+              organizationId: orgId,
+              date: today,
+              clicks: parseInt(stat.clicks, 10) || 0,
+            });
+          }
+
+          // N6: one transaction per batch instead of one upsert per link.
+          await this._shortLinkSettingsRepository.upsertSnapshotsBatch(rows);
+        } catch (err) {
+          log.warn(
+            `AnalyticsActivity: short-link snapshot batch failed for org ${orgId}, provider ${active.identifier}: ${(err as Error).message}`,
+          );
+        }
+      }
+    } catch (err) {
+      log.warn(
+        `AnalyticsActivity: short-link snapshot collection failed for org ${orgId}: ${(err as Error).message}`,
+      );
+    }
+  }
+
+  @ActivityMethod()
+  async pruneShortLinkSnapshots(orgId: string): Promise<void> {
+    const retentionDays = (() => {
+      const raw = process.env.ANALYTICS_POST_RETENTION_DAYS;
+      if (raw === undefined || raw === '') return 90;
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed <= 0) return 90;
+      return Math.floor(parsed);
+    })();
+
+    const before = dayjs().subtract(retentionDays, 'day').startOf('day').toDate();
+    await this._shortLinkSettingsRepository.pruneSnapshots(orgId, before);
+  }
+
+  @ActivityMethod()
+  async pruneEmailLogs(): Promise<void> {
+    const days = (() => {
+      const raw = process.env.EMAIL_LOG_RETENTION_DAYS;
+      if (raw === undefined || raw === '') return 90;
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed <= 0) return 90;
+      return Math.floor(parsed);
+    })();
+    await this._emailLogService.prune(days);
   }
 }

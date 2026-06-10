@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { StorageProviderType } from '@prisma/client';
 import { IStorageAdapter, StorageFileEntry } from '../upload.interface';
 import {
@@ -7,11 +8,12 @@ import {
   readdirSync,
   statSync,
   readFileSync,
+  copyFileSync,
 } from 'fs';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-import { fromBuffer } from 'file-type';
+import { fromBuffer, fromFile } from 'file-type';
 import path from 'path';
 
 const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
@@ -31,6 +33,7 @@ const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
 
 export class LocalAdapter implements IStorageAdapter {
   readonly type = StorageProviderType.LOCAL;
+  private readonly _logger = new Logger(LocalAdapter.name);
 
   constructor(private uploadDirectory: string) {}
 
@@ -172,7 +175,18 @@ export class LocalAdapter implements IStorageAdapter {
 
   async uploadFile(file: Express.Multer.File): Promise<any> {
     try {
-      const detected = await fromBuffer(file.buffer);
+      let detected: { ext: string; mime: string } | undefined;
+      let isBufferPath = true;
+
+      if (file.buffer && Buffer.isBuffer(file.buffer)) {
+        detected = await fromBuffer(file.buffer);
+      } else if (file.path) {
+        detected = (await fromFile(file.path)) as any;
+        isBufferPath = false;
+      } else {
+        throw new Error('Invalid file upload.');
+      }
+
       if (!detected || !LOCAL_STORAGE_ALLOWED_MIME.has(detected.mime)) {
         throw new Error('Unsupported file type.');
       }
@@ -193,7 +207,11 @@ export class LocalAdapter implements IStorageAdapter {
       const filePath = `${dir}/${randomName}${safeExt}`;
       const publicPath = `${innerPath}/${randomName}${safeExt}`;
 
-      writeFileSync(filePath, file.buffer);
+      if (isBufferPath) {
+        writeFileSync(filePath, file.buffer);
+      } else {
+        copyFileSync(file.path!, filePath);
+      }
 
       return {
         filename: `${randomName}${safeExt}`,
@@ -202,7 +220,7 @@ export class LocalAdapter implements IStorageAdapter {
         originalname: `${randomName}${safeExt}`,
       };
     } catch (err) {
-      console.error('Error uploading file to Local Storage:', err);
+      this._logger.warn(`Local storage upload failed: ${(err as Error).message}`);
       throw err;
     }
   }

@@ -48,7 +48,7 @@ export const AuditTab: React.FC = () => {
       'storage.delete': 'Deleted',
       'storage.mount': 'Mounted',
       'storage.unmount': 'Unmounted',
-      'storage.set-default': 'Set as Default',
+      'storage.set-default-folder': 'Set as Default',
       'storage.migrate': 'Migrated',
     };
     return map[action] || action;

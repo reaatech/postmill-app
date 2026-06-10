@@ -12,7 +12,7 @@ import dayjs from 'dayjs';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { z } from 'zod';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
@@ -97,11 +97,11 @@ const contentZod = (
 @Injectable()
 export class AgentGraphService {
   private readonly _logger = new Logger(AgentGraphService.name);
-  private storage = UploadFactory.createStorage();
   constructor(
     private _postsService: PostsService,
     private _mediaService: MediaService,
     private _aiModelProvider: AIModelProvider,
+    private _storageService: StorageService,
   ) {}
   static state = () =>
     new StateGraph<WorkflowChannelsState>({
@@ -285,7 +285,8 @@ export class AgentGraphService {
       (state.content || []).map(async (p) => {
         if (p.image) {
           try {
-            const upload = await this.storage.uploadSimple(p.image);
+            const adapter = await this._storageService.getLocalAdapterForOrg(state.orgId);
+            const upload = await adapter.uploadSimple(p.image);
             const name = upload.split('/').pop()!;
             const uploadWithId = await this._mediaService.saveFile(
               state.orgId,

@@ -9,16 +9,26 @@ export default defineConfig({
       '@gitroom/helpers': path.resolve(__dirname, '../../libraries/helpers/src'),
       '@gitroom/react': path.resolve(__dirname, '../../libraries/react-shared-libraries/src'),
       '@gitroom/frontend': path.resolve(__dirname, 'src'),
+      '@gitroom/nestjs-libraries': path.resolve(__dirname, '../../libraries/nestjs-libraries/src'),
     },
   },
   test: {
     globals: true,
     environment: 'jsdom',
+    server: {
+      deps: {
+        fallbackCJS: true,
+      },
+    },
     include: [
       'src/components/analytics-v2/**/*.spec.{ts,tsx}',
       'src/components/launches/post-detail/*.spec.{ts,tsx}',
       'src/components/launches/calendar.spec.{ts,tsx}',
       'src/components/ai/**/*.spec.{ts,tsx}',
+      'src/components/settings/shortlinks/**/*.spec.{ts,tsx}',
+      'src/components/layout/settings.component.spec.{ts,tsx}',
+      'src/components/new-layout/layout.component.spec.{ts,tsx}',
+      'src/redirects.config.spec.ts',
     ],
     coverage: {
       provider: 'v8',

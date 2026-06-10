@@ -3,7 +3,9 @@ import {
   Injectable,
   PipeTransform,
 } from '@nestjs/common';
-import { fromBuffer } from 'file-type';
+import { fromBuffer, fromFile } from 'file-type';
+import { statSync } from 'fs';
+import { promises as fs } from 'fs';
 
 const ALLOWED_MIME_TYPES = new Set<string>([
   'image/jpeg',
@@ -19,39 +21,52 @@ const ALLOWED_MIME_TYPES = new Set<string>([
 @Injectable()
 export class CustomFileValidationPipe implements PipeTransform {
   async transform(value: any) {
-    if (!value || typeof value !== 'object') {
+    try {
+      if (!value || typeof value !== 'object') {
+        return value;
+      }
+
+      // Skip non-file parameters (org, body, query, etc.)
+      if (!('buffer' in value) && !('mimetype' in value) && !('fieldname' in value)) {
+        return value;
+      }
+
+      const detected = value.buffer && Buffer.isBuffer(value.buffer)
+        ? await fromBuffer(value.buffer)
+        : value.path
+          ? await fromFile(value.path)
+          : null;
+
+      if (!detected) {
+        throw new BadRequestException('Invalid file upload.');
+      }
+      if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
+        throw new BadRequestException('Unsupported file type.');
+      }
+
+      if (!value.size && value.path) {
+        try { value.size = statSync(value.path).size; } catch {}
+      }
+
+      const maxSize = this.getMaxSize(detected.mime);
+      if (value.size > maxSize) {
+        throw new BadRequestException(
+          `File size exceeds the maximum allowed size of ${maxSize} bytes.`
+        );
+      }
+
+      value.mimetype = detected.mime;
+      const safeBase = (value.originalname || 'upload')
+        .replace(/\.[^./\\]*$/, '')
+        .replace(/[\\/]/g, '_')
+        .slice(0, 100) || 'upload';
+      value.originalname = `${safeBase}.${detected.ext}`;
+
       return value;
+    } catch (e) {
+      if (value?.path) { try { await fs.unlink(value.path); } catch {} }
+      throw e;
     }
-
-    // Skip non-file parameters (org, body, query, etc.)
-    if (!('buffer' in value) && !('mimetype' in value) && !('fieldname' in value)) {
-      return value;
-    }
-
-    if (!value.buffer || !Buffer.isBuffer(value.buffer)) {
-      throw new BadRequestException('Invalid file upload.');
-    }
-
-    const detected = await fromBuffer(value.buffer);
-    if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
-      throw new BadRequestException('Unsupported file type.');
-    }
-
-    const maxSize = this.getMaxSize(detected.mime);
-    if (value.size > maxSize) {
-      throw new BadRequestException(
-        `File size exceeds the maximum allowed size of ${maxSize} bytes.`
-      );
-    }
-
-    value.mimetype = detected.mime;
-    const safeBase = (value.originalname || 'upload')
-      .replace(/\.[^./\\]*$/, '')
-      .replace(/[\\/]/g, '_')
-      .slice(0, 100) || 'upload';
-    value.originalname = `${safeBase}.${detected.ext}`;
-
-    return value;
   }
 
   private getMaxSize(mimeType: string): number {

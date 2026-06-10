@@ -29,6 +29,17 @@ These three workflows start at boot time and run forever (`continueAsNew` to res
 
 Daily sweep of every organization:
 
+Operations performed per-org (in a loop):
+- Channel analytics snapshots (7-day lookback)
+- Post analytics snapshots (30-day lookback)
+- Snapshot pruning + weekly rollup
+- Watched account probes
+- Short-link click snapshots + prune
+
+Operations performed once per sweep (global, after the org loop):
+- **Email log prune** — deletes metadata rows older than `EMAIL_LOG_RETENTION_DAYS` (default 90).
+  Best-effort; never fails the sweep.
+
 1. **Collect channel snapshots** — 7-day lookback per integration, pulling follower counts,
    engagement metrics, and reach data for each connected channel.
 2. **Collect post snapshots** — 30-day lookback per published post, pulling views, likes,
@@ -128,6 +139,7 @@ Rollup behaviour:
 |---------------|---------|--------|
 | `POST_DAYS_BACK` | 30 days | Comments fetched for posts published within this window |
 | `SOCIAL_COMMENT_RETENTION_DAYS` | 90 days | Comments soft-deleted after this age |
+| `EMAIL_LOG_RETENTION_DAYS` | 90 days | Email log metadata pruned after this age (see [Configuration](./configuration.md#email-v381)) |
 | `COMMENTS_SWEEP_INTERVAL_MINUTES` | 30 minutes | Interval between comment collection sweeps |
 
 ## Verifying workflows
@@ -151,4 +163,4 @@ on only **one** of them. Temporal itself handles workflow uniqueness, but duplic
 would start duplicate perpetual workflow instances, doubling analytics and comment collection
 work.
 
-> Verified against v3.7.0
+> Verified against v3.8.1

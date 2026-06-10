@@ -23,6 +23,28 @@ import { AgenciesService } from '@gitroom/nestjs-libraries/database/prisma/agenc
 import { AgenciesRepository } from '@gitroom/nestjs-libraries/database/prisma/agencies/agencies.repository';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
+import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
+import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
+import { BitlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/bitly.adapter';
+import { BlinkAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/blink.adapter';
+import { CuttlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/cuttly.adapter';
+import { DubAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/dub.adapter';
+import { IsgdAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/isgd.adapter';
+import { RebrandlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/rebrandly.adapter';
+import { ShortioAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/shortio.adapter';
+import { TinyccAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tinycc.adapter';
+import { TinyurlAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tinyurl.adapter';
+import { TlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tly.adapter';
+import { VgdAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/vgd.adapter';
+import { CleanuriAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/cleanuri.adapter';
+import { LinklyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/linkly.adapter';
+import { OwlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/owly.adapter';
+import { PixelmeAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/pixelme.adapter';
+import { ReplugAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/replug.adapter';
+import { SniplyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/sniply.adapter';
+import { SwitchyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/switchy.adapter';
+import { T2mAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/t2m.adapter';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { SignatureRepository } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.repository';
@@ -65,6 +87,16 @@ import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watc
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { EmailLogRepository } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.repository';
+import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
+import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
+import { EmptyAdapter } from '@gitroom/nestjs-libraries/emails/adapters/empty.adapter';
+import { ResendAdapter } from '@gitroom/nestjs-libraries/emails/adapters/resend.adapter';
+import { SendGridAdapter } from '@gitroom/nestjs-libraries/emails/adapters/sendgrid.adapter';
+import { MailgunAdapter } from '@gitroom/nestjs-libraries/emails/adapters/mailgun.adapter';
+import { PostmarkAdapter } from '@gitroom/nestjs-libraries/emails/adapters/postmark.adapter';
+import { SesAdapter } from '@gitroom/nestjs-libraries/emails/adapters/ses.adapter';
+import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adapter';
 
 @Global()
 @Module({
@@ -139,6 +171,136 @@ import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit
     OrgProviderConfigRepository,
     OrgProviderConfigManager,
     AuditRepository,
+    EmailLogRepository,
+    EmailLogService,
+    EmailAdapterRegistry,
+    EmptyAdapter,
+    ResendAdapter,
+    SendGridAdapter,
+    MailgunAdapter,
+    PostmarkAdapter,
+    SesAdapter,
+    SmtpAdapter,
+    ShortLinkRegistry,
+    OrgShortLinkSettingsService,
+    OrgShortLinkSettingsRepository,
+    BitlyAdapter,
+    BlinkAdapter,
+    CuttlyAdapter,
+    DubAdapter,
+    IsgdAdapter,
+    RebrandlyAdapter,
+    ShortioAdapter,
+    TinyccAdapter,
+    TinyurlAdapter,
+    TlyAdapter,
+    VgdAdapter,
+    CleanuriAdapter,
+    LinklyAdapter,
+    OwlyAdapter,
+    PixelmeAdapter,
+    ReplugAdapter,
+    SniplyAdapter,
+    SwitchyAdapter,
+    T2mAdapter,
+    {
+      provide: 'SHORT_LINK_ADAPTER_REGISTRATION',
+      useFactory: (
+        registry: ShortLinkRegistry,
+        bitly: BitlyAdapter,
+        blink: BlinkAdapter,
+        cuttly: CuttlyAdapter,
+        dub: DubAdapter,
+        isgd: IsgdAdapter,
+        rebrandly: RebrandlyAdapter,
+        shortio: ShortioAdapter,
+        tinycc: TinyccAdapter,
+        tinyurl: TinyurlAdapter,
+        tly: TlyAdapter,
+        vgd: VgdAdapter,
+        cleanuri: CleanuriAdapter,
+        linkly: LinklyAdapter,
+        owly: OwlyAdapter,
+        pixelme: PixelmeAdapter,
+        replug: ReplugAdapter,
+        sniply: SniplyAdapter,
+        switchy: SwitchyAdapter,
+        t2m: T2mAdapter,
+      ) => {
+        registry.register(bitly);
+        registry.register(blink);
+        registry.register(cuttly);
+        registry.register(dub);
+        registry.register(isgd);
+        registry.register(rebrandly);
+        registry.register(shortio);
+        registry.register(tinycc);
+        registry.register(tinyurl);
+        registry.register(tly);
+        registry.register(vgd);
+        registry.register(cleanuri);
+        registry.register(linkly);
+        registry.register(owly);
+        registry.register(pixelme);
+        registry.register(replug);
+        registry.register(sniply);
+        registry.register(switchy);
+        registry.register(t2m);
+      },
+      inject: [
+        ShortLinkRegistry,
+        BitlyAdapter,
+        BlinkAdapter,
+        CuttlyAdapter,
+        DubAdapter,
+        IsgdAdapter,
+        RebrandlyAdapter,
+        ShortioAdapter,
+        TinyccAdapter,
+        TinyurlAdapter,
+        TlyAdapter,
+        VgdAdapter,
+        CleanuriAdapter,
+        LinklyAdapter,
+        OwlyAdapter,
+        PixelmeAdapter,
+        ReplugAdapter,
+        SniplyAdapter,
+        SwitchyAdapter,
+        T2mAdapter,
+      ],
+    },
+    {
+      provide: 'EMAIL_ADAPTER_REGISTRATION',
+      useFactory: (
+        registry: EmailAdapterRegistry,
+        empty: EmptyAdapter,
+        resend: ResendAdapter,
+        sendgrid: SendGridAdapter,
+        mailgun: MailgunAdapter,
+        postmark: PostmarkAdapter,
+        ses: SesAdapter,
+        smtp: SmtpAdapter,
+      ) => {
+        registry.register(empty);
+        registry.register(resend);
+        registry.register(sendgrid);
+        registry.register(mailgun);
+        registry.register(postmark);
+        registry.register(ses);
+        registry.register(smtp);
+      },
+      inject: [
+        EmailAdapterRegistry,
+        EmptyAdapter,
+        ResendAdapter,
+        SendGridAdapter,
+        MailgunAdapter,
+        PostmarkAdapter,
+        SesAdapter,
+        SmtpAdapter,
+      ],
+    },
   ],
   get exports() {
     return this.providers;

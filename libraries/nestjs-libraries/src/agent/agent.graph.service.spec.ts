@@ -40,15 +40,15 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/media/media.service', () => (
   },
 }));
 
-const { mockUploadStorage } = vi.hoisted(() => ({
-  mockUploadStorage: {
+const { mockUploadAdapter } = vi.hoisted(() => ({
+  mockUploadAdapter: {
     uploadSimple: vi.fn().mockResolvedValue('https://storage.example.com/uploaded.png'),
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/upload/upload.factory', () => ({
-  UploadFactory: {
-    createStorage: vi.fn().mockReturnValue(mockUploadStorage),
+vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
+  StorageService: class {
+    getLocalAdapterForOrg = vi.fn().mockResolvedValue(mockUploadAdapter);
   },
 }));
 
@@ -127,6 +127,7 @@ vi.mock('dayjs', () => {
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AgentGraphService } from './agent.graph.service';
 
 describe('AgentGraphService', () => {
@@ -134,13 +135,15 @@ describe('AgentGraphService', () => {
   let aiModelProvider: AIModelProvider;
   let postsService: PostsService;
   let mediaService: MediaService;
+  let storageService: StorageService;
 
   beforeEach(() => {
     vi.clearAllMocks();
     postsService = new (PostsService as any)();
     mediaService = new (MediaService as any)();
     aiModelProvider = new (AIModelProvider as any)();
-    service = new AgentGraphService(postsService, mediaService, aiModelProvider);
+    storageService = new (StorageService as any)();
+    service = new AgentGraphService(postsService, mediaService, aiModelProvider, storageService);
   });
 
   describe('constructor', () => {
@@ -150,8 +153,8 @@ describe('AgentGraphService', () => {
       expect((service as any)._mediaService).toBe(mediaService);
     });
 
-    it('initializes UploadFactory storage', () => {
-      expect((service as any).storage).toBe(mockUploadStorage);
+    it('injects StorageService', () => {
+      expect((service as any)._storageService).toBe(storageService);
     });
   });
 
@@ -282,7 +285,7 @@ describe('AgentGraphService', () => {
 
       const result = await service.uploadPictures(state);
 
-      expect(mockUploadStorage.uploadSimple).toHaveBeenCalledWith('https://cdn.example.com/img.png');
+      expect(mockUploadAdapter.uploadSimple).toHaveBeenCalledWith('https://cdn.example.com/img.png');
       expect(mediaService.saveFile).toHaveBeenCalledWith(
         'org-1',
         'uploaded.png',
@@ -299,12 +302,12 @@ describe('AgentGraphService', () => {
 
       const result = await service.uploadPictures(state);
 
-      expect(mockUploadStorage.uploadSimple).not.toHaveBeenCalled();
+      expect(mockUploadAdapter.uploadSimple).not.toHaveBeenCalled();
       expect(result.content[0].image).toBeUndefined();
     });
 
     it('handles upload errors gracefully', async () => {
-      mockUploadStorage.uploadSimple.mockRejectedValueOnce(new Error('Upload failed'));
+      mockUploadAdapter.uploadSimple.mockRejectedValueOnce(new Error('Upload failed'));
 
       const state = {
         orgId: 'org-3',

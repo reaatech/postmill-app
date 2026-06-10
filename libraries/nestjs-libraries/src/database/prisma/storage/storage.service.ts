@@ -17,7 +17,6 @@ type StorageConfigRow = {
   endpoint: string | null;
   publicUrl: string | null;
   mounted: boolean;
-  isDefault: boolean;
   quotaBytes: bigint | null;
   createdAt: Date;
   updatedAt: Date;
@@ -178,17 +177,9 @@ export class StorageService {
     if (config.mounted) {
       throw new Error('Cannot delete a mounted storage provider. Unmount first.');
     }
-    await this._storageRepository.clearDefaultIfMatches(orgId, id);
     const deleted = await this._storageRepository.delete(id);
     this.#audit('delete', orgId, config, userId);
     return deleted;
-  }
-
-  async setDefault(id: string, orgId: string, userId?: string) {
-    await this.#getOrgScopedConfig(id, orgId);
-    const updated = await this._storageRepository.setDefault(orgId, id);
-    this.#audit('set-default', orgId, updated, userId);
-    return this.#sanitize(updated);
   }
 
   async testConnection(
@@ -207,13 +198,21 @@ export class StorageService {
     return this.#buildAdapter(config);
   }
 
-  // Deterministic upload routing (#56): default provider → oldest mounted → local/first.
+  // Force the org's LOCAL adapter — used for avatars and app-internal writes (v3.8.2).
+  async getLocalAdapterForOrg(orgId: string): Promise<IStorageAdapter> {
+    await this.ensureLocalProvider(orgId);
+    const configs = await this._storageRepository.findByOrg(orgId);
+    const local = configs.find(
+      (c) => c.type === StorageProviderType.LOCAL
+    ) as StorageConfigRow;
+    return this.#buildAdapter(local);
+  }
+
+  // Upload routing (#56): oldest mounted → local/first.
   async getAdapterForOrg(orgId: string): Promise<IStorageAdapter | null> {
-    const preferred =
-      (await this._storageRepository.findDefault(orgId)) ||
-      (await this._storageRepository.findMountedByOrg(orgId))[0];
-    if (preferred) {
-      return this.#buildAdapter(preferred as StorageConfigRow);
+    const mounted = (await this._storageRepository.findMountedByOrg(orgId))[0];
+    if (mounted) {
+      return this.#buildAdapter(mounted as StorageConfigRow);
     }
 
     const configs = await this._storageRepository.findByOrg(orgId);
@@ -360,16 +359,22 @@ export class StorageService {
       await this._storageRepository.createMountFolder(orgId, id, folderName);
     }
 
-    return this.#sanitize(await this.#getOrgScopedConfig(id, orgId));
+    const updated = await this.#getOrgScopedConfig(id, orgId);
+    this.#audit('mount', orgId, updated);
+    return this.#sanitize(updated);
   }
 
   async unmount(id: string, orgId: string) {
-    await this.#getOrgScopedConfig(id, orgId);
+    const config = await this.#getOrgScopedConfig(id, orgId);
+    if (config.type === StorageProviderType.LOCAL) {
+      throw new Error('Cannot unmount the local storage provider.');
+    }
 
     // Delete the auto-created root folder when empty, else detach it (#55).
     await this._storageRepository.removeOrDetachMountFolders(id);
 
     const updated = await this._storageRepository.update(id, { mounted: false });
+    this.#audit('unmount', orgId, updated);
     return this.#sanitize(updated);
   }
 

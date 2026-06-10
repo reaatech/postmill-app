@@ -24,13 +24,13 @@ swatch, and post count.
   and does not delete the associated posts. Posts with a deleted campaign revert to having no
   campaign assignment (`campaignId = null`).
 
-## Color Tinting on Calendar
+## Color Tinting on Schedule
 
-When a post is assigned to a campaign, the post card on the calendar is visually distinguished
+When a post is assigned to a campaign, the post card on the schedule is visually distinguished
 with the campaign's color on the left border or as a tint overlay. This makes it easy to scan the
-calendar and identify which posts belong to which campaign.
+schedule and identify which posts belong to which campaign.
 
-In the calendar, you can filter by campaign to show only posts belonging to a specific campaign.
+On the schedule, you can filter by campaign to show only posts belonging to a specific campaign.
 
 ## Composer Integration
 
@@ -74,4 +74,4 @@ posts.
 These campaign-aware filters help you manage all content, media, and engagement for a campaign in
 one place.
 
-> Verified against v3.7.0
+> Verified against v3.8.3

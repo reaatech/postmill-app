@@ -39,7 +39,8 @@ export class Veo3 extends VideoAbstract<Veo3Params> {
   override dto = Veo3Params;
   async process(
     output: 'vertical' | 'horizontal',
-    customParams: Veo3Params
+    customParams: Veo3Params,
+    orgId?: string
   ): Promise<URL> {
     const value = await (
       await fetch('https://api.kie.ai/api/v1/veo/generate', {

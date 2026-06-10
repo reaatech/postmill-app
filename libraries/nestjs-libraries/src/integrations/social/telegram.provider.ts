@@ -151,7 +151,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   private processMedia(mediaFiles: PostDetails['media']) {
     return (mediaFiles || []).map((media) => {
       let mediaUrl = media.path;
-      if ((process.env.STORAGE_PROVIDER || 'local') === 'local' && mediaUrl.startsWith(process.env.FRONTEND_URL || 'http://localhost:5000')) {
+      if (mediaUrl.startsWith(process.env.FRONTEND_URL || 'http://localhost:5000')) {
         mediaUrl = mediaUrl.replace(process.env.FRONTEND_URL || 'http://localhost:5000', '');
       }
       //get mime type to pass contentType to telegram api.

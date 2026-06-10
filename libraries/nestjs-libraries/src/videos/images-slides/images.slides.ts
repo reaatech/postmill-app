@@ -7,7 +7,7 @@ import {
 } from '@gitroom/nestjs-libraries/videos/video.interface';
 import { chunk } from 'lodash';
 import Transloadit from 'transloadit';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { Readable } from 'stream';
 import { stringifySync } from 'subtitle';
 
@@ -58,17 +58,18 @@ class ImagesSlidesParams {
 })
 export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
   override dto = ImagesSlidesParams;
-  private storage = UploadFactory.createStorage();
   constructor(
     private _openaiService: OpenaiService,
-    private _falService: FalService
+    private _falService: FalService,
+    private _storageService: StorageService
   ) {
     super();
   }
 
   async process(
     output: 'vertical' | 'horizontal',
-    customParams: ImagesSlidesParams
+    customParams: ImagesSlidesParams,
+    orgId?: string
   ): Promise<URL> {
     const list = await this._openaiService.generateSlidesFromText(
       customParams.prompt
@@ -112,18 +113,21 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
               ).arrayBuffer()
             );
 
-            const { path } = await this.storage.uploadFile({
-              buffer,
-              mimetype: 'audio/mp3',
-              size: buffer.length,
-              path: '',
-              fieldname: '',
-              destination: '',
-              stream: new Readable(),
-              filename: '',
-              originalname: '',
-              encoding: '',
-            });
+            const adapter = orgId ? await this._storageService.getLocalAdapterForOrg(orgId) : null;
+            const { path } = adapter
+              ? await adapter.uploadFile({
+                  buffer,
+                  mimetype: 'audio/mp3',
+                  size: buffer.length,
+                  path: '',
+                  fieldname: '',
+                  destination: '',
+                  stream: new Readable(),
+                  filename: '',
+                  originalname: '',
+                  encoding: '',
+                })
+              : { path: '' };
 
             res({
               len: await getAudioDuration(buffer),

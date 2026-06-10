@@ -141,6 +141,9 @@ receives credentials through `clientInformation` (passed from `OrgProviderConfig
 AI provider credentials follow the same pattern: stored in `AIOrgProviderConfig`, encrypted at rest,
 with no `OPENAI_API_KEY` or other env var fallback.
 
+Short-link provider credentials follow the same pattern: stored in `OrgShortLinkConfig`, encrypted
+at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
+
 ---
 
 # Architecture notes
@@ -241,6 +244,38 @@ Settings → AI (`/settings?tab=ai`). **Preserve this — do not reintroduce an 
 10 Prisma models in `schema.prisma`: `AIProviderConfig`, `AISystemSettings`, `AISpendLog`,
 `AIOrgProviderConfig`, `AIBrandProfile`, `AIPromptTemplate`, `AISettingsAudit`, `AIMediaJob`,
 `AIPromptLibraryItem`, `AIContentIndex`.
+
+## Short-link providers (v3.8.0)
+
+The short-link system is a pluggable, per-org configurable multi-provider system replacing the old
+env-based approach (Dub, Short.io, Kutt, LinkDrip).
+
+### Architecture
+- **`ShortLinkAdapter` interface** in `libraries/nestjs-libraries/src/short-linking/` — all 19
+  providers implement `createShortLink`, `getClickCount`, and `healthCheck`.
+- **19 adapters**: Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd,
+  v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
+- **`OrgShortLinkSettingsService`** — resolves the active provider config per-org per-call on every
+  short-link operation. No cached/stale provider.
+- **`ShortLinkService`** — `@Injectable()` with constructor DI, orchestrates resolution → delegation
+  → ledger recording. Returns the original URL (passthrough) when no provider is active (non-fatal
+  Empty behaviour — never fails a publish because of missing short-link config).
+- **All adapter HTTP goes through `safeFetch`** — no bare `fetch()`. See security invariants.
+- **Credentials are encrypted at rest** in `OrgShortLinkConfig` via `EncryptionService` (AES-GCM).
+  Never read `process.env` for short-link credentials.
+- **Credentials never sent to the client** — the provider selection UI only displays names and
+  status (configured / active / inactive); API keys stay server-side.
+
+### Data model
+3 Prisma models: `OrgShortLinkConfig` (per-org provider config with encrypted credentials and custom
+domain), `ShortLink` (generated short link ledger — original URL, short URL, provider, optional post
+reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the Temporal analytics sweep).
+
+### No-provider behaviour
+No active short-link provider for an org = the `ShortLinkService` returns the original URL
+unmodified (passthrough). Publishes never fail due to missing short-link config. The composer's
+short-link toggle is hidden when no provider is configured, and the Settings → Shortlinks tab shows
+an empty state guiding the admin to configure one.
 
 ## Feature surfaces (v3.5.0)
 

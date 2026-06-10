@@ -49,6 +49,13 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => (
   },
 }));
 
+vi.mock('@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service', () => ({
+  OrgShortLinkSettingsService: class MockOrgShortLinkSettingsService {
+    getLinksForOrg = vi.fn();
+    getAggregatedClicks = vi.fn();
+  },
+}));
+
 // Mock ioRedis to prevent cache cross-contamination between tests
 vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
   ioRedis: {
@@ -69,6 +76,7 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 
 // Helper: create local-midnight dates to avoid timezone offset in dayjs formatting
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
@@ -78,6 +86,7 @@ describe('AnalyticsService', () => {
   let analyticsRepository: AnalyticsRepository;
   let integrationService: IntegrationService;
   let postsService: PostsService;
+  let shortLinkSettingsService: OrgShortLinkSettingsService;
 
   const mockOrg = { id: 'org1', name: 'Test Org' } as any;
 
@@ -101,8 +110,9 @@ describe('AnalyticsService', () => {
     const manager = {} as any;
     integrationService = new IntegrationService();
     postsService = new PostsService();
+    shortLinkSettingsService = new OrgShortLinkSettingsService();
     const mockRedisService = { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue('OK'), del: vi.fn().mockResolvedValue(1), exists: vi.fn().mockResolvedValue(0), client: {} };
-    service = new AnalyticsService(analyticsRepository, manager, integrationService, postsService, mockRedisService as any);
+    service = new AnalyticsService(analyticsRepository, manager, integrationService, postsService, mockRedisService as any, shortLinkSettingsService);
   });
 
   // ============ EXISTING TESTS (kept exactly) ============
@@ -1184,6 +1194,30 @@ describe('AnalyticsService', () => {
       ]);
       const r = await service.exportData(mockOrg as any, '2024-01-01', '2024-01-01', ['i1'], 'csv');
       expect(r.data).toContain(',,');
+    });
+  });
+
+  // ── L5: Short-link pass-through methods ──
+
+  describe('getLinksForOrg', () => {
+    it('delegates to OrgShortLinkSettingsService.getLinksForOrg', async () => {
+      const mockLinks = [{ id: 'l1', shortUrl: 'https://sh.rt/a' }];
+      (shortLinkSettingsService.getLinksForOrg as any).mockResolvedValue(mockLinks);
+      const result = await service.getLinksForOrg('org1');
+      expect(shortLinkSettingsService.getLinksForOrg).toHaveBeenCalledWith('org1');
+      expect(result).toEqual(mockLinks);
+    });
+  });
+
+  describe('getAggregatedClicks', () => {
+    it('delegates to OrgShortLinkSettingsService.getAggregatedClicks', async () => {
+      const from = new Date('2024-01-01');
+      const to = new Date('2024-01-07');
+      const mockClicks = [{ shortLinkId: 'l1', clicks: 42 }];
+      (shortLinkSettingsService.getAggregatedClicks as any).mockResolvedValue(mockClicks);
+      const result = await service.getAggregatedClicks('org1', from, to);
+      expect(shortLinkSettingsService.getAggregatedClicks).toHaveBeenCalledWith('org1', from, to);
+      expect(result).toEqual(mockClicks);
     });
   });
 });

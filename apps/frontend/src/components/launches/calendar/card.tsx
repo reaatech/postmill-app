@@ -260,21 +260,21 @@ export const CalendarItem: FC<{
           post.commentCount ? (
             <div className="flex items-center gap-3 mt-2 text-[12px] text-textColor">
               {post.lastViews !== undefined && post.lastViews !== null && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={t('views', 'Views')} aria-label={t('views', 'Views')}>
                   <ViewsIcon /> {formatCompactNumber(post.lastViews)}
                 </span>
               )}
               {post.lastLikes !== undefined && post.lastLikes !== null && (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={t('likes', 'Likes')} aria-label={t('likes', 'Likes')}>
                   <LikesIcon /> {formatCompactNumber(post.lastLikes)}
                 </span>
               )}
               {post.lastComments !== undefined && post.lastComments !== null ? (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={t('comments', 'Comments')} aria-label={t('comments', 'Comments')}>
                   <CommentsIcon /> {formatCompactNumber(post.lastComments)}
                 </span>
               ) : post.commentCount ? (
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1" title={t('comments', 'Comments')} aria-label={t('comments', 'Comments')}>
                   <CommentsIcon /> {formatCompactNumber(post.commentCount)}
                 </span>
               ) : null}

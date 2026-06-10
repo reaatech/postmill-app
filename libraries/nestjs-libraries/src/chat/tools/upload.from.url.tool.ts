@@ -3,7 +3,7 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { Readable } from 'stream';
@@ -23,9 +23,10 @@ const ALLOWED_MIME = new Set<string>([
 
 @Injectable()
 export class UploadFromUrlTool implements AgentToolInterface {
-  private storage = UploadFactory.createStorage();
-
-  constructor(private _mediaService: MediaService) {}
+  constructor(
+    private _mediaService: MediaService,
+    private _storageService: StorageService,
+  ) {}
   name = 'uploadFromUrlTool';
 
   run() {
@@ -74,7 +75,8 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
           throw new Error('Unsupported file type.');
         }
 
-        const getFile = await this.storage.uploadFile({
+        const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+        const getFile = await adapter.uploadFile({
           buffer,
           mimetype: detected.mime,
           size: buffer.length,

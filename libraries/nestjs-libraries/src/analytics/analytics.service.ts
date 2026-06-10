@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import { createHash } from 'crypto';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 
 dayjs.extend(utc);
 
@@ -80,7 +81,8 @@ export class AnalyticsService {
     private integrationManager: IntegrationManager,
     private integrationService: IntegrationService,
     private postsService: PostsService,
-    private _redisService: RedisService
+    private _redisService: RedisService,
+    private _orgShortLinkSettingsService: OrgShortLinkSettingsService,
   ) {}
 
   private getMetricDef(metric: string) {
@@ -1366,7 +1368,7 @@ export class AnalyticsService {
         title: `Best time to post: ${dayNames[slot.day]} at ${slot.hour}:00`,
         description: `Your content gets the highest engagement when posted at this time. Try scheduling more posts here.`,
         action: 'Schedule a post',
-        link: `/launches`,
+        link: `/schedule`,
         priority: 2,
       });
     }
@@ -1467,6 +1469,13 @@ export class AnalyticsService {
       .map(({ day, hour, avgEngagement }) => ({ day, hour, avgEngagement }));
 
     return { heatmap, bestSlots };
+  }
+  async getLinksForOrg(orgId: string) {
+    return this._orgShortLinkSettingsService.getLinksForOrg(orgId);
+  }
+
+  async getAggregatedClicks(orgId: string, from: Date, to: Date) {
+    return this._orgShortLinkSettingsService.getAggregatedClicks(orgId, from, to);
   }
 }
 

@@ -70,45 +70,6 @@ describe('StorageRepository', () => {
     });
   });
 
-  describe('findDefault', () => {
-    it('returns the default provider for an org', async () => {
-      mockModel.storageProviderConfig.findFirst.mockResolvedValue({
-        id: 'default-1',
-        isDefault: true,
-      });
-      const repo = makeRepo();
-
-      const result = await repo.findDefault('org-1');
-
-      expect(result).toEqual({ id: 'default-1', isDefault: true });
-      expect(mockModel.storageProviderConfig.findFirst).toHaveBeenCalledWith({
-        where: { organizationId: 'org-1', isDefault: true },
-      });
-    });
-  });
-
-  describe('setDefault', () => {
-    it('clears the old default and sets a new one', async () => {
-      mockModel.storageProviderConfig.updateMany.mockResolvedValue({ count: 1 });
-      mockModel.storageProviderConfig.update.mockResolvedValue({
-        id: 'new-default',
-        isDefault: true,
-      });
-      const repo = makeRepo();
-
-      const result = await repo.setDefault('org-1', 'new-default');
-
-      expect(mockModel.storageProviderConfig.updateMany).toHaveBeenCalledWith({
-        where: { organizationId: 'org-1', isDefault: true },
-        data: { isDefault: false },
-      });
-      expect(mockModel.storageProviderConfig.update).toHaveBeenCalledWith({
-        where: { id: 'new-default' },
-        data: { isDefault: true },
-      });
-    });
-  });
-
   describe('countSourceMedia', () => {
     it('counts LOCAL unfoldered media and sums their size', async () => {
       mockModel.media.count.mockResolvedValue(5);

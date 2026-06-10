@@ -18,6 +18,7 @@ import { ExportButton } from './export.button';
 import { BestTimeTab } from './views/best-time.tab';
 import { RecommendationsTab } from './views/recommendations.tab';
 import { WatchlistTab } from './views/watchlist.tab';
+import { ShortlinksTab } from './views/shortlinks.tab';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 
@@ -237,6 +238,7 @@ export const AnalyticsDashboard: FC = () => {
     'best-time': t('analytics_tab_best_time', 'Best time'),
     recommendations: t('analytics_tab_recommendations', 'Recommendations'),
     watchlist: t('analytics_tab_watchlist', 'Watchlist'),
+    shortlinks: t('analytics_tab_shortlinks', 'Links'),
   };
 
   return (
@@ -275,7 +277,7 @@ export const AnalyticsDashboard: FC = () => {
           />
 
           <div className="flex gap-[8px] mb-[16px]">
-            {(['overview', 'channels', 'posts', 'best-time', 'recommendations', 'watchlist'] as const).map((tabName) => (
+            {(['overview', 'channels', 'posts', 'best-time', 'recommendations', 'watchlist', 'shortlinks'] as const).map((tabName) => (
               <button
                 key={tabName}
                 onClick={() => handleTabChange(tabName)}
@@ -345,6 +347,9 @@ export const AnalyticsDashboard: FC = () => {
           )}
           {tab === 'watchlist' && (
             <WatchlistTab />
+          )}
+          {tab === 'shortlinks' && (
+            <ShortlinksTab from={from} to={to} />
           )}
           {tab === 'posts' && (
             <PostsTab

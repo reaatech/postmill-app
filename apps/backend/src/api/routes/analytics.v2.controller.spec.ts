@@ -11,6 +11,8 @@ vi.mock('@gitroom/nestjs-libraries/analytics/analytics.service', () => ({
     getDayDetail = vi.fn();
     getChannelMetric = vi.fn();
     exportData = vi.fn();
+    getLinksForOrg = vi.fn();
+    getAggregatedClicks = vi.fn();
   },
 }));
 
@@ -283,6 +285,65 @@ describe('AnalyticsV2Controller', () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
     await controller.getPosts(mockOrg, dq({ limit: 999 }));
     expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 100);
+  });
+
+  describe('getShortLinks', () => {
+    it('returns enriched links with click counts (routed through analytics service)', async () => {
+      (service.getLinksForOrg as any).mockResolvedValue([
+        { id: 'l1', shortUrl: 'https://sh.rt/a', originalUrl: 'https://example.com/a', provider: 'bitly', createdAt: new Date('2024-01-01') },
+        { id: 'l2', shortUrl: 'https://sh.rt/b', originalUrl: 'https://example.com/b', provider: 'bitly', createdAt: new Date('2024-01-02') },
+      ]);
+      (service.getAggregatedClicks as any).mockResolvedValue([
+        { shortLinkId: 'l1', clicks: 42, date: new Date('2024-01-03T12:00:00.000Z'), shortLink: { id: 'l1' } },
+        { shortLinkId: 'l1', clicks: 8, date: new Date('2024-01-04T12:00:00.000Z'), shortLink: { id: 'l1' } },
+        { shortLinkId: 'l2', clicks: 7, date: new Date('2024-01-05T12:00:00.000Z'), shortLink: { id: 'l2' } },
+      ]);
+
+      const result = await controller.getShortLinks(mockOrg, '2024-01-01', '2024-01-07');
+
+      expect(service.getLinksForOrg).toHaveBeenCalledWith('test-org-id');
+      expect(service.getAggregatedClicks).toHaveBeenCalledWith('test-org-id', expect.any(Date), expect.any(Date));
+      expect(result).toHaveLength(2);
+      expect(result[0].clicks).toBe(50);
+      expect(result[1].clicks).toBe(7);
+    });
+
+    it('returns zero clicks for links with no snapshots', async () => {
+      (service.getLinksForOrg as any).mockResolvedValue([
+        { id: 'l1', shortUrl: 'https://sh.rt/a', originalUrl: 'https://example.com/a', provider: 'bitly', createdAt: new Date() },
+      ]);
+      (service.getAggregatedClicks as any).mockResolvedValue([]);
+
+      const result = await controller.getShortLinks(mockOrg);
+
+      expect(result[0].clicks).toBe(0);
+    });
+  });
+
+  describe('getShortLinkTimeseries', () => {
+    it('returns daily click timeseries (routed through analytics service)', async () => {
+      (service.getAggregatedClicks as any).mockResolvedValue([
+        { date: new Date('2024-01-01T12:00:00.000Z'), clicks: 10, shortLink: { id: 'l1' } },
+        { date: new Date('2024-01-01T12:00:00.000Z'), clicks: 5, shortLink: { id: 'l2' } },
+        { date: new Date('2024-01-02T12:00:00.000Z'), clicks: 15, shortLink: { id: 'l1' } },
+      ]);
+
+      const result = await controller.getShortLinkTimeseries(mockOrg, '2024-01-01', '2024-01-07');
+
+      expect(service.getAggregatedClicks).toHaveBeenCalledWith('test-org-id', expect.any(Date), expect.any(Date));
+      expect(result).toEqual([
+        { date: '2024-01-01', clicks: 15 },
+        { date: '2024-01-02', clicks: 15 },
+      ]);
+    });
+
+    it('returns empty array when no snapshots exist', async () => {
+      (service.getAggregatedClicks as any).mockResolvedValue([]);
+
+      const result = await controller.getShortLinkTimeseries(mockOrg);
+
+      expect(result).toEqual([]);
+    });
   });
 });
 

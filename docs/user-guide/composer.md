@@ -6,7 +6,7 @@ validation panel.
 
 ## Opening the Composer
 
-From the **Launches** calendar page (`/launches`), click the **New Post** button in the top-right
+From the **Schedule** page (`/schedule`), click the **New Post** button in the top-right
 corner. The composer opens as a full-screen modal with all options visible.
 
 ## Channel Multi-Select
@@ -164,4 +164,4 @@ You can import multiple posts at once via CSV. The bulk import flow uses the sam
 validation as the composer — each row is validated individually, and per-row successes, warnings,
 and errors are reported. Failed rows do not block successful rows. See [Bulk Import](./bulk-import.md) for details.
 
-> Verified against v3.7.0
+> Verified against v3.8.3

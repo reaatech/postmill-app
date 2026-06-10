@@ -10,7 +10,6 @@ const serviceMock = {
   mount: vi.fn(),
   unmount: vi.fn(),
   getUsage: vi.fn(),
-  setDefault: vi.fn(),
   getMigrationPreview: vi.fn(),
   migrate: vi.fn(),
 };
@@ -25,7 +24,6 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () 
     mount = serviceMock.mount;
     unmount = serviceMock.unmount;
     getUsage = serviceMock.getUsage;
-    setDefault = serviceMock.setDefault;
     getMigrationPreview = serviceMock.getMigrationPreview;
     migrate = serviceMock.migrate;
   },
@@ -136,21 +134,6 @@ describe('StorageController', () => {
 
       expect(result).toEqual({ success: true });
       expect(serviceMock.deleteConfig).toHaveBeenCalledWith('s3-1', 'org-1', 'user-1');
-    });
-  });
-
-  describe('setDefaultProvider', () => {
-    it('sets a provider as the default for the org', async () => {
-      serviceMock.setDefault.mockResolvedValue({
-        id: 's3-1',
-        isDefault: true,
-      });
-      const controller = makeController();
-
-      const result = await controller.setDefaultProvider(org, user, 's3-1');
-
-      expect(result.isDefault).toBe(true);
-      expect(serviceMock.setDefault).toHaveBeenCalledWith('s3-1', 'org-1', 'user-1');
     });
   });
 
@@ -288,6 +271,20 @@ describe('StorageController', () => {
       const result = await controller.getUsage(org);
 
       expect(result.providers[0].usageBytes).toBeNull();
+    });
+  });
+
+  describe('no setDefault route', () => {
+    it('does not expose a setDefaultProvider handler', () => {
+      const controller = makeController();
+
+      expect(
+        Object.getOwnPropertyNames(Object.getPrototypeOf(controller))
+      ).not.toContain('setDefaultProvider');
+    });
+
+    it('does not expose a setDefault method on the service', () => {
+      expect(serviceMock).not.toHaveProperty('setDefault');
     });
   });
 });

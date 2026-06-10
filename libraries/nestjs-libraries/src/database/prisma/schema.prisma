@@ -59,6 +59,9 @@ model Organization {
   storageProviders    StorageProviderConfig[]
   orgProviderConfigs  OrgProviderConfiguration[]
   auditLogs           AuditLog[]
+  orgShortLinkConfigs  OrgShortLinkConfig[]
+  shortLinks           ShortLink[]
+  shortLinkSnapshots   ShortLinkSnapshot[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -874,7 +877,6 @@ model StorageProviderConfig {
   endpoint         String?             // custom endpoint (R2, B2, IDrive)
   publicUrl        String?             // base CDN/public URL
   mounted          Boolean             @default(false)
-  isDefault        Boolean             @default(false) // receives new uploads when multiple providers exist
   quotaBytes       BigInt?             // null = org default
   lastHealthCheck  DateTime?           // last successful testConnection
   lastHealthError  String?             // error message from last failed testConnection
@@ -1221,6 +1223,55 @@ model AIOrgProviderConfig {
   @@index([organizationId, isActive])
 }
 
+model OrgShortLinkConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  identifier     String
+  enabled        Boolean  @default(false)
+  isActive       Boolean  @default(false)
+  credentials    String?
+  customDomain   String?
+  extraConfig    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+}
+
+model ShortLink {
+  id             String   @id @default(cuid())
+  organizationId String
+  provider       String
+  shortUrl       String
+  originalUrl    String
+  providerLinkId String?
+  postId         String?
+  createdAt      DateTime @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  snapshots      ShortLinkSnapshot[]
+
+  @@unique([organizationId, shortUrl])
+  @@index([organizationId, provider])
+  @@index([organizationId, createdAt])
+}
+
+model ShortLinkSnapshot {
+  id             String       @id @default(cuid())
+  organizationId String
+  shortLinkId    String
+  clicks         Float
+  date           DateTime     @db.Date
+  createdAt      DateTime     @default(now())
+  shortLink      ShortLink    @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([shortLinkId, date])
+  @@index([organizationId, date])
+}
+
 // Per-org brand voice / custom instructions + localization
 model AIBrandProfile {
   id                String       @id @default(cuid())
@@ -1482,4 +1533,24 @@ model Campaign {
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+model EmailLog {
+  id                String    @id @default(cuid())
+  provider          String
+  toAddress         String
+  fromAddress       String
+  subject           String
+  replyTo           String?
+  providerMessageId String?
+  status            String    @default("queued")
+  error             String?
+  organizationId    String?
+  sentAt            DateTime  @default(now())
+  deliveredAt       DateTime?
+  updatedAt         DateTime  @updatedAt
+
+  @@index([provider, providerMessageId])
+  @@index([sentAt])
+  @@index([status])
 }

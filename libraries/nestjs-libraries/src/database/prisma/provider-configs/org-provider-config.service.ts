@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OrgProviderConfigRepository } from './org-provider-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { randomBytes } from 'crypto';
 
 @Injectable()
 export class OrgProviderConfigService {
@@ -92,7 +93,7 @@ export class OrgProviderConfigService {
       return { success: false, error: 'Client ID not configured' };
     }
 
-    const state = Math.random().toString(36).substring(2, 8);
+    const state = randomBytes(32).toString('base64url');
     const redirectUri = config.redirectUri || `${process.env.FRONTEND_URL}/integrations/social/${identifier}`;
     const scopes = config.scopes || '';
 

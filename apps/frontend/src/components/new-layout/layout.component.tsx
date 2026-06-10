@@ -18,6 +18,7 @@ import { useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ShowMediaBoxModal } from '@gitroom/frontend/components/media/media.component';
 import { ShowLinkedinCompany } from '@gitroom/frontend/components/launches/helpers/linkedin.component';
 import { MediaSettingsLayout } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
@@ -41,7 +42,6 @@ import { OrganizationSelector } from '@gitroom/frontend/components/layout/organi
 import { StreakComponent } from '@gitroom/frontend/components/layout/streak.component';
 import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-condition.component';
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
-import { SettingsComponent } from '@gitroom/frontend/components/layout/settings.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { OnboardingChecklist } from '@gitroom/frontend/components/onboarding/onboarding.checklist';
@@ -121,21 +121,32 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         <div className="text-[24px] font-[600] flex flex-1">
                           <Title />
                         </div>
-                        <div className="flex gap-[20px] text-textItemBlur">
-                          <StreakComponent />
+                        <div className="flex gap-[20px] text-textItemBlur items-center">
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <StreakComponent />
+                          </div>
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
                           <OrganizationSelector />
-                          <div className="hover:text-newTextColor">
+                          <div className="hover:text-newTextColor flex items-center justify-center w-[36px] h-[36px]">
                             <ModeComponent />
                           </div>
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <LanguageComponent />
-                          <ChromeExtensionComponent />
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <LanguageComponent />
+                          </div>
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <ChromeExtensionComponent />
+                          </div>
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <AttachToFeedbackIcon />
-                          <SettingsComponent />
-                          <NotificationComponent />
-                          <UserAvatarMenu />
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <AttachToFeedbackIcon />
+                          </div>
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <NotificationComponent />
+                          </div>
+                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                            <UserAvatarMenu />
+                          </div>
                         </div>
                       </div>
                       <div className="flex flex-1 gap-[1px]">{children}</div>
@@ -153,6 +164,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
 const UserAvatarMenu = () => {
   const user = useUser();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -168,6 +180,16 @@ const UserAvatarMenu = () => {
     }
   }, [open]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [open]);
+
   if (!user) return null;
 
   return (
@@ -175,6 +197,8 @@ const UserAvatarMenu = () => {
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup={true}
         className="flex items-center gap-[8px] hover:text-newTextColor"
       >
         {(user as any).picture ? (
@@ -190,7 +214,7 @@ const UserAvatarMenu = () => {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-[36px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]">
+        <div className="absolute right-0 top-[36px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]" role="menu">
           <div className="px-[14px] py-[8px] border-b border-newTableBorder">
             <div className="text-[13px] font-[600] text-textColor truncate">
               {user.name || user.email}
@@ -202,16 +226,25 @@ const UserAvatarMenu = () => {
             )}
           </div>
           <a
-            href="/settings"
+            href="/settings/profile"
+            role="menuitem"
             className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
           >
-            Settings
+            {t('profile', 'Profile')}
+          </a>
+          <a
+            href="/settings"
+            role="menuitem"
+            className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
+          >
+            {t('settings', 'Settings')}
           </a>
           <a
             href="/logout"
+            role="menuitem"
             className="block px-[14px] py-[8px] text-[13px] text-red-500 hover:bg-boxHover"
           >
-            Logout
+            {t('logout', 'Logout')}
           </a>
         </div>
       )}

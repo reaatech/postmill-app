@@ -23,29 +23,64 @@ Every environment variable Postmill recognises, sourced from `.env.example` and
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `UPLOAD_DIRECTORY` | — | Local path for file uploads when using local storage (e.g. `/uploads`) |
+| `UPLOAD_DIRECTORY` | — | Local path for file uploads (e.g. `/uploads`). Avatars and app-internal images always use LOCAL. |
 | `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | — | Public URL path serving uploads (e.g. `/uploads`) |
-| `STORAGE_PROVIDER` | `local` | Default storage backend (`local` or `cloudflare`). Per-org overrides in Settings -> Storage take precedence. |
+| `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/media/upload-server` (default 1 GB) |
 
-### Cloudflare R2
+## Email (v3.8.1+)
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `CLOUDFLARE_ACCOUNT_ID` | — | Cloudflare account ID |
-| `CLOUDFLARE_ACCESS_KEY` | — | R2 access key ID |
-| `CLOUDFLARE_SECRET_ACCESS_KEY` | — | R2 secret access key |
-| `CLOUDFLARE_BUCKETNAME` | — | R2 bucket name |
-| `CLOUDFLARE_BUCKET_URL` | — | Public URL of the R2 bucket |
-| `CLOUDFLARE_REGION` | `auto` | R2 region |
+Pluggable provider system with 6 adapters: Resend, SendGrid, Mailgun, Postmark, Amazon SES, and
+SMTP (nodemailer). The active provider is selected globally via `EMAIL_PROVIDER`; unset/unknown →
+email is off (users activate automatically — same as the old `RESEND_API_KEY` absence).
 
-## Email
+All metadata (to, from, subject, status) is logged in the `EmailLog` table with 90-day retention,
+pruned by the daily analytics sweep (`RUN_CRON=true`). Webhook-capable providers (all except SMTP)
+advance log rows through `delivered`/`bounced`/`complained`/`opened`/`clicked`.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `RESEND_API_KEY` | — | Resend API key for transactional email. If absent, user activation is automatic. |
+| `EMAIL_PROVIDER` | — | `resend`, `sendgrid`, `mailgun`, `postmark`, `ses`, or `smtp` |
+| `EMAIL_API_KEY` | — | API key for Resend, SendGrid, Mailgun, or Postmark |
 | `EMAIL_FROM_ADDRESS` | — | Sender email address |
 | `EMAIL_FROM_NAME` | — | Sender display name |
+| `EMAIL_WEBHOOK_SECRET` | — | Signing secret / verification key for the active provider's webhook |
+| `EMAIL_MAILGUN_DOMAIN` | — | Mailgun sending domain (required for `mailgun`) |
+| `EMAIL_REGION` | `us` | API region for Mailgun (`us`/`eu`) and SES region |
+| `EMAIL_SES_ACCESS_KEY_ID` | — | SES IAM access key (optional; falls back to `AWS_*` env) |
+| `EMAIL_SES_SECRET_ACCESS_KEY` | — | SES IAM secret key (optional; falls back to `AWS_*` env) |
+| `EMAIL_SMTP_HOST` | — | SMTP server hostname (required for `smtp`) |
+| `EMAIL_SMTP_PORT` | `587` | SMTP server port |
+| `EMAIL_SMTP_SECURE` | `false` | Use TLS for SMTP |
+| `EMAIL_SMTP_USER` | — | SMTP authentication username (optional for open relays) |
+| `EMAIL_SMTP_PASS` | — | SMTP authentication password |
+| `EMAIL_LOG_RETENTION_DAYS` | `90` | Days to keep email log metadata before pruning |
 | `DISABLE_REGISTRATION` | `false` | Set to `true` to disable self-registration |
+
+The webhook endpoint is at `POST /webhooks/email`, signature-verified, and registered outside CSRF
+(same as Stripe). SES uses SNS topic verification; the `EMAIL_WEBHOOK_SECRET` can optionally hold
+the expected SNS TopicArn to restrict incoming notifications.
+
+**Removed vars (v3.8.1):** `RESEND_API_KEY`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`,
+`EMAIL_USER`, `EMAIL_PASS` — use the standardized scheme above.
+
+### Provider credential setup
+
+| Provider | API Key source | Webhook signing secret |
+|----------|---------------|----------------------|
+| **Resend** | [resend.com/api-keys](https://resend.com/api-keys) — create an API key. Set `EMAIL_API_KEY`. | Webhook signing secret is in the webhook settings on the Resend dashboard (Settings → Webhooks). Set `EMAIL_WEBHOOK_SECRET`. |
+| **SendGrid** | [sendgrid.com/settings/api_keys](https://sendgrid.com/settings/api_keys) — create a "Full Access" API key. Set `EMAIL_API_KEY`. | Verification key from [sendgrid.com/settings/webhooks](https://sendgrid.com/settings/webhooks) — enable "Event Webhook" and copy the Verification Key. Set `EMAIL_WEBHOOK_SECRET`. |
+| **Mailgun** | [mailgun.com/sessions](https://mailgun.com/sessions) — use your SMTP credentials or create a Mailgun API key. Set `EMAIL_API_KEY`. | Mailgun sends webhook signing secrets via its API; see the Mailgun webhook setup page. Set `EMAIL_WEBHOOK_SECRET`. Also set `EMAIL_MAILGUN_DOMAIN` and optionally `EMAIL_REGION` (`us`/`eu`). |
+| **Postmark** | [postmarkapp.com/account/api-tokens](https://postmarkapp.com/account/api-tokens) — create a server API token. Set `EMAIL_API_KEY`. | Webhook signing secret is generated when you create a webhook in the Postmark dashboard (Servers → Your Server → Webhooks). Set `EMAIL_WEBHOOK_SECRET`. |
+| **Amazon SES** | IAM credentials (`EMAIL_SES_ACCESS_KEY_ID` + `EMAIL_SES_SECRET_ACCESS_KEY`) — falls back to `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN` if those are set in the environment. Set `EMAIL_REGION` to the SES region (e.g. `us-east-1`). | SES uses SNS. Subscribe your webhook endpoint to the SNS topic. `EMAIL_WEBHOOK_SECRET` can optionally hold the expected SNS TopicArn to restrict incoming notifications. The adapter handles `SubscriptionConfirmation` automatically. |
+| **SMTP** | No API key — set `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_SECURE`, `EMAIL_SMTP_USER`, and `EMAIL_SMTP_PASS`. | Webhooks are not supported for SMTP (no delivery tracking). |
+
+### Webhook endpoint
+
+All webhook-capable providers (Resend, SendGrid, Mailgun, Postmark, SES) must have their dashboard
+webhook configured to point at `POST /webhooks/email` on your backend (e.g.
+`https://postmill.example.com/webhooks/email`). This endpoint is signature-verified and registered
+outside CSRF (same as Stripe). SES handles SNS topic verification; the `EMAIL_WEBHOOK_SECRET` can
+optionally hold the expected SNS TopicArn to restrict incoming notifications.
 
 ## Analytics & background jobs
 
@@ -117,23 +152,6 @@ See [OAuth / SSO](./oauth-sso.md) for a complete setup walkthrough.
 |----------|---------|---------|
 | `EXTENSION_ID` | — | Chrome extension ID for cookie-based platform integrations (Skool) |
 
-## Short link services
-
-All optional. Leave blank if unused.
-
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `DUB_TOKEN` | — | Dub.co API token |
-| `DUB_API_ENDPOINT` | `https://api.dub.co` | Dub API endpoint |
-| `DUB_SHORT_LINK_DOMAIN` | `dub.sh` | Dub short link domain |
-| `SHORT_IO_SECRET_KEY` | — | Short.io API secret key |
-| `KUTT_API_KEY` | — | Kutt.it API key |
-| `KUTT_API_ENDPOINT` | `https://kutt.it/api/v2` | Kutt API endpoint |
-| `KUTT_SHORT_LINK_DOMAIN` | `kutt.it` | Kutt short link domain |
-| `LINK_DRIP_API_KEY` | — | LinkDrip API key |
-| `LINK_DRIP_API_ENDPOINT` | `https://api.linkdrip.com/v1/` | LinkDrip API endpoint |
-| `LINK_DRIP_SHORT_LINK_DOMAIN` | `dripl.ink` | LinkDrip short link domain |
-
 ## Monitoring
 
 | Variable | Default | Purpose |
@@ -161,5 +179,7 @@ The following patterns are no longer supported as environment variables. Configu
 - `GOOGLE_GMB_CLIENT_ID` / `GOOGLE_GMB_CLIENT_SECRET`
 - `OPENAI_API_KEY` and any other AI provider key
 - `POSTIZ_*` prefixed variables (renamed to `POSTMILL_*` in v3.7.0)
+- **Short-link provider vars** (removed v3.8.0): `DUB_TOKEN`, `DUB_API_ENDPOINT`, `DUB_SHORT_LINK_DOMAIN`, `SHORT_IO_SECRET_KEY`, `KUTT_API_KEY`, `KUTT_API_ENDPOINT`, `KUTT_SHORT_LINK_DOMAIN`, `LINK_DRIP_API_KEY`, `LINK_DRIP_API_ENDPOINT`, `LINK_DRIP_SHORT_LINK_DOMAIN` — now configured per-org in Settings → Shortlinks
+- **Storage env vars** (removed v3.8.2): `STORAGE_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKETNAME`, `CLOUDFLARE_BUCKET_URL`, `CLOUDFLARE_REGION` — storage is now per-tenant via Settings → Storage. The built-in default is LOCAL.
 
-> Verified against v3.7.0
+> Verified against v3.8.4

@@ -15,7 +15,7 @@ export const Onboarding: FC = () => {
 
   const handleClose = useCallback(() => {
     modal.closeAll();
-    router.push('/launches');
+    router.push('/schedule');
   }, [modal, router]);
 
   useEffect(() => {

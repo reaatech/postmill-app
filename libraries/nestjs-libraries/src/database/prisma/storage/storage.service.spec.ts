@@ -18,6 +18,7 @@ vi.mock(
   })
 );
 
+import { StorageAdapterFactory } from '@gitroom/nestjs-libraries/upload/adapters/adapter.factory';
 import { StorageService } from './storage.service';
 
 const encryption = {
@@ -33,9 +34,7 @@ function makeRepo(overrides: Record<string, any> = {}) {
     update: vi.fn(),
     delete: vi.fn(),
     findMountedByOrg: vi.fn().mockResolvedValue([]),
-    findDefault: vi.fn().mockResolvedValue(null),
-    setDefault: vi.fn(),
-    clearDefaultIfMatches: vi.fn(),
+
     getOrgQuota: vi.fn(),
     countSourceMedia: vi.fn(),
     findSourceMediaPage: vi.fn(),
@@ -292,5 +291,85 @@ describe('StorageService — health tracking (#62)', () => {
 
     expect(result.ok).toBe(false);
     expect(repo.updateHealthCheck).toHaveBeenCalledWith('p1', false, 'Access Denied');
+  });
+});
+
+describe('StorageService — getLocalAdapterForOrg', () => {
+  it('creates the LOCAL row when none exists and returns a LocalAdapter', async () => {
+    const repo = makeRepo({
+      findByOrg: vi
+        .fn()
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([localConfig]),
+      create: vi.fn().mockResolvedValue(localConfig),
+    });
+    const auditRepo = { create: vi.fn() } as any;
+    const service = new StorageService(repo, auditRepo, encryption);
+
+    const result = await service.getLocalAdapterForOrg('org-1');
+
+    expect(repo.create).toHaveBeenCalledWith({
+      organizationId: 'org-1',
+      type: StorageProviderType.LOCAL,
+      name: 'Local Storage',
+    });
+    expect(result).toBe(adapterMock);
+  });
+
+  it('returns a LocalAdapter even when a cloud provider is present', async () => {
+    const s3Config = {
+      id: 's3-1',
+      organizationId: 'org-1',
+      type: StorageProviderType.S3,
+      name: 'S3',
+      credentials: 'enc:{}',
+    };
+    const repo = makeRepo({
+      findByOrg: vi.fn().mockResolvedValue([localConfig, s3Config]),
+    });
+    const auditRepo = { create: vi.fn() } as any;
+    const service = new StorageService(repo, auditRepo, encryption);
+
+    const result = await service.getLocalAdapterForOrg('org-1');
+
+    expect(result).toBe(adapterMock);
+    expect(StorageAdapterFactory.createFromConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'local-1', type: StorageProviderType.LOCAL })
+    );
+    expect(StorageAdapterFactory.createFromConfig).not.toHaveBeenCalledWith(
+      expect.objectContaining({ id: 's3-1' })
+    );
+  });
+
+  it('org isolation — only returns LOCAL for the requested org', async () => {
+    const repo = makeRepo({
+      findByOrg: vi.fn().mockResolvedValue([localConfig]),
+    });
+    const auditRepo = { create: vi.fn() } as any;
+    const service = new StorageService(repo, auditRepo, encryption);
+
+    await service.getLocalAdapterForOrg('org-1');
+
+    expect(repo.findByOrg).toHaveBeenCalledWith('org-1');
+    expect(repo.findByOrg).not.toHaveBeenCalledWith('org-2');
+  });
+
+  it('builds adapter from the found LOCAL config row', async () => {
+    const repo = makeRepo({
+      findByOrg: vi.fn().mockResolvedValue([localConfig]),
+    });
+    const auditRepo = { create: vi.fn() } as any;
+    const service = new StorageService(repo, auditRepo, encryption);
+
+    const result = await service.getLocalAdapterForOrg('org-1');
+
+    expect(result).toBe(adapterMock);
+    expect(StorageAdapterFactory.createFromConfig).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'local-1',
+        type: StorageProviderType.LOCAL,
+        credentials: '{}',
+      })
+    );
   });
 });

@@ -1,7 +1,7 @@
 # Changes From Upstream
 
 Postmill is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) that has
-diverged substantially across seven major releases. The upstream documentation at `docs.postiz.com`
+diverged substantially across eight major releases. The upstream documentation at `docs.postiz.com`
 no longer describes this fork's behavior. This page is the canonical summary of every change,
 organized by release. The [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md)
 has the full per-commit detail.
@@ -25,6 +25,117 @@ has the full per-commit detail.
 | MCP | — | 5 entrypoints hardened with scope enforcement, rate limiting, idempotency |
 | Container image | `ghcr.io/gitroomhq/postiz-app` | `ghcr.io/reaatech/postmill-app` |
 | Product name | Postiz | **Postmill** (rebranded in v3.7.0; env vars `POSTMILL_*`, SDK `@reaatech/postmill-sdk`) |
+
+---
+
+## v3.8.4 — SES webhook remediation release
+
+v3.8.4 is a remediation release addressing bugs introduced in v3.8.3. No schema changes.
+
+- **Amazon SES webhook handling fixed** — SNS subscription confirmation, bounce, complaint, and
+  delivery event processing corrected. SES users should re-test webhook delivery after upgrading.
+- **Email webhook signature verification** for SendGrid, Mailgun, Postmark, and Resend aligned with
+  provider specifications.
+- Documentation backfilled with v3.8.0→v3.8.1 upgrade notes, per-provider short-link credential
+  reference, and per-provider email setup guides.
+
+---
+
+## v3.8.2 — Local-first avatar & media storage; remove the global-env Cloudflare path
+
+Removes the deprecated global-env `STORAGE_PROVIDER`/`CLOUDFLARE_*` path and routes all app-internal
+writes through the per-org LOCAL storage adapter.
+
+- **All avatars and app-internal writes now use LOCAL storage** — `IntegrationRepository`,
+  `IntegrationService`, `MediaService`, `PostsService`, `AgentGraphService`, `ImagesSlides`,
+  `UploadFromUrlTool`, `GenerateImageTool`, `PublicIntegrationsController`, `MediaController`,
+  and `ThirdPartyController` all call `StorageService.getLocalAdapterForOrg(orgId)` instead of
+  `UploadFactory.createStorage()`.
+- **`UploadFactory`, `cloudflare.storage.ts`, and `r2.uploader.ts` deleted** — these files read
+  `STORAGE_PROVIDER`/`CLOUDFLARE_*` env vars at module-load time and are no longer used.
+- **Multipart catch-all removed** — `POST /media/:endpoint` (presigned multipart for Cloudflare R2)
+  is gone. Large files upload through `/media/upload-server` with a raised configurable limit
+  (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB).
+- **Frontend de-cloudflared** — `uppy.upload.ts` has no `cloudflare` case; layouts hard-pin
+  `storageProvider` to `'local'`; `cloudflareUrl` removed from context; `/uploads` rewrites in
+  `next.config.js` are unconditional.
+- **Env vars removed** — `STORAGE_PROVIDER`, all 6 `CLOUDFLARE_*` vars deleted from `.env.example`,
+  `.env.coolify`, and `docker-compose.yaml`.
+- **CI guard added** — grep for `process.env.CLOUDFLARE_*`, `process.env.STORAGE_PROVIDER`, and
+  imports of deleted modules; fails if any are reintroduced.
+- **Per-tenant cloud providers preserved** — `CLOUDFLARE_R2` remains a valid `StorageProviderType`
+  selectable per-org in Settings → Storage, alongside S3/B2/IDriveE2. The operator-level env path
+  is gone; the per-tenant DB-encrypted provider path stays.
+
+## v3.8.3 — Schedule rename, calendar stats, sorted settings, streamlined nav, storage refactor
+
+Renames Calendar → Schedule, adds live-fallback enrich to post card stats, alphabetises settings
+tabs, moves Profile and Settings into the avatar menu, and refactors storage to a
+base-plus-mounted model with no default provider.
+
+- **Calendar renamed to Schedule** — the route changes from `/launches` to `/schedule` (with a
+  permanent redirect). All user-facing copy updated: the sidebar, page titles, and documentation
+  now use "Schedule."
+- **Calendar stats live-fallback** — post cards now show views/likes/comments even when no
+  `PostAnalyticsSnapshot` exists yet (fallback to live platform data). Previously the stats footer
+  was hidden until the next cron sweep.
+- **Settings tabs sorted alphabetically** — the General/Settings tab is pinned first, followed by
+  the remaining tabs in alphabetical order.
+- **Profile moved to avatar menu** — the Profile tab has been removed from Settings. Profile,
+  Settings, and Logout are now accessed from the user avatar menu in the top navigation bar. The
+  settings gear icon was removed from the header.
+- **Storage: LOCAL as always-on base** — `StorageProviderConfig.isDefault` column removed. LOCAL
+  is the implicit base storage every org has; other providers (S3/R2/B2/IDriveE2) mount onto it
+  for media-library use. The `POST /settings/storage/:id/set-default` API route was deleted.
+- **Storage UI fixes** — bugs in `provider-form.modal`, `provider-card`, and `storage.tab` resolved.
+
+---
+
+## v3.8.1 — Pluggable email provider system
+
+Replaces the hardcoded 2-provider email path (Resend / nodemailer) with a 6-provider adapter
+system selected globally by one env var, with a standardized env scheme, a delivery-lifecycle
+email log (metadata only, 90-day retention), and inbound webhook ingestion.
+
+- **6 provider adapters** — Resend, SendGrid, Mailgun, Postmark, Amazon SES, SMTP (nodemailer).
+  Each implements `EmailAdapter` with `send()`, `isConfigured()`, and optional `verifyWebhook()` /
+  `parseWebhook()`.
+- **Standardized env scheme** — one shared `EMAIL_API_KEY` + provider-specific vars (`EMAIL_SMTP_*`,
+  `EMAIL_MAILGUN_DOMAIN`, `EMAIL_SES_*`). `EMAIL_WEBHOOK_SECRET` for all webhook-capable providers.
+- **`EmailLog` Prisma model** — delivery-lifecycle metadata row per send. Webhook events advance
+  status through `delivered`/`bounced`/`complained`/`opened`/`clicked` (never downgrade; terminal
+  negatives win).
+- **Webhook ingestion** — `POST /webhooks/email`, signature-verified, CSRF-exempt. SES handles SNS
+  `SubscriptionConfirmation` via `safeFetch`.
+- **Retention** — `pruneEmailLogs()` in the daily analytics sweep (best-effort, configured via
+  `EMAIL_LOG_RETENTION_DAYS`, default 90).
+- **Lazy adapter construction** — SDK clients built inside methods, not at module load (testable,
+  no boot crashes).
+- **Old env vars removed** — `RESEND_API_KEY`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_SECURE`,
+  `EMAIL_USER`, `EMAIL_PASS`.
+- **Old provider classes deleted** — `email.interface.ts`, `resend.provider.ts`,
+  `node.mailer.provider.ts`, `empty.provider.ts`.
+
+---
+
+## v3.8.0 — Short-link provider system
+
+Replaces the old env-based short-link providers (Dub, Short.io, Kutt, LinkDrip) with a 19-provider
+adapter system configured per-org in-app.
+
+- **19 provider adapters** — Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc,
+  is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI. Each adapter
+  implements a consistent `ShortLinkAdapter` interface with `createShortLink`, `getClickCount`, and
+  `healthCheck`.
+- **Per-org configuration** — provider choice, credentials, and custom domain stored in
+  `OrgShortLinkConfig` (encrypted at rest), managed in Settings → Shortlinks. No env var fallback.
+- **Ledger & analytics** — every shortened link recorded in `ShortLink`; daily click snapshots in
+  `ShortLinkSnapshot` collected by a Temporal sweep (best-effort, non-fatal).
+- **SSRF-safe** — all adapter HTTP calls go through `safeFetch`.
+- **Kutt and LinkDrip removed** — these two providers are no longer available in the 19-provider set.
+- **Old env vars removed** — `DUB_TOKEN`, `DUB_API_ENDPOINT`, `DUB_SHORT_LINK_DOMAIN`,
+  `SHORT_IO_SECRET_KEY`, `KUTT_API_KEY`, `KUTT_API_ENDPOINT`, `KUTT_SHORT_LINK_DOMAIN`,
+  `LINK_DRIP_API_KEY`, `LINK_DRIP_API_ENDPOINT`, `LINK_DRIP_SHORT_LINK_DOMAIN`.
 
 ---
 
@@ -337,4 +448,4 @@ This fork is run in production. Two invariants are deliberately preserved:
 2. **Schema changes are additive** — new tables, nullable-or-defaulted columns. The `db push` model
    never drops or renames columns without a manual backfill plan.
 
-> Verified against v3.7.0
+> Verified against v3.8.4

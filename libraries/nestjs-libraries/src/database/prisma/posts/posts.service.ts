@@ -13,6 +13,7 @@ import { ValidatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/validate.
 import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
+import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -37,7 +38,7 @@ import {
   minifyPosts,
 } from '@gitroom/helpers/utils/posts.list.minify';
 import sharp from 'sharp';
-import { UploadFactory } from '@gitroom/nestjs-libraries/upload/upload.factory';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { Readable } from 'stream';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 dayjs.extend(utc);
@@ -50,6 +51,7 @@ import {
   postId as postIdSearchParam,
 } from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
 import { AnalyticsData } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
+import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -69,9 +71,9 @@ type PostWithConditionals = Post & {
 
 @Injectable()
 export class PostsService {
-  private storage = UploadFactory.createStorage();
   constructor(
     private _postRepository: PostsRepository,
+    private _analyticsRepository: AnalyticsRepository,
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _mediaService: MediaService,
@@ -80,6 +82,7 @@ export class PostsService {
     private _temporalService: TemporalService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _ragService: RagService,
+    private _storageService: StorageService,
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -258,10 +261,107 @@ export class PostsService {
     return [];
   }
 
+  async enrichPostsWithLatestStats(orgId: string, posts: any[]) {
+    const disableX = !!process.env.DISABLE_X_ANALYTICS;
+
+    const qualifyingPosts = posts.filter((p) => {
+      if (p.lastViews !== null && p.lastViews !== undefined) return false;
+      if (p.lastLikes !== null && p.lastLikes !== undefined) return false;
+      if (p.lastComments !== null && p.lastComments !== undefined) return false;
+      if (p.state !== 'PUBLISHED') return false;
+      if (!p.releaseId || p.releaseId === 'missing') return false;
+      if (disableX && p.integration?.providerIdentifier === 'x') return false;
+      return true;
+    });
+
+    if (!qualifyingPosts.length) return;
+
+    const postIds = qualifyingPosts.map((p) => p.id);
+    if (!postIds.length) return;
+
+    const latestByPost: Record<string, Record<string, number>> = {};
+
+    try {
+      const snapshots = await this._analyticsRepository.getLatestPostSnapshotsByPostIds(orgId, postIds);
+
+      for (const snap of snapshots) {
+        if (!latestByPost[snap.postId]) {
+          latestByPost[snap.postId] = {};
+        }
+        if (!(snap.metric in latestByPost[snap.postId])) {
+          latestByPost[snap.postId][snap.metric] = snap.value;
+        }
+      }
+
+      for (const post of qualifyingPosts) {
+        const metrics = latestByPost[post.id];
+        if (!metrics) continue;
+        if ('views' in metrics) post.lastViews = metrics.views;
+        if ('likes' in metrics) post.lastLikes = metrics.likes;
+        if ('comments' in metrics) post.lastComments = metrics.comments;
+      }
+    } catch (e) {
+      Logger.warn(`enrichPostsWithLatestStats error: ${(e as Error)?.message}`);
+    }
+
+    // Second tier: live fallback for posts still missing metrics after the snapshot pass
+    const residualPosts = qualifyingPosts.filter((p) => {
+      const metrics = latestByPost[p.id];
+      if (!metrics) return true;
+      return !('views' in metrics) && !('likes' in metrics) && !('comments' in metrics);
+    });
+
+    if (residualPosts.length > 0) {
+      const cap = 10;
+      const batch = residualPosts.slice(0, cap);
+      await Promise.allSettled(
+        batch.map(async (post) => {
+          try {
+            const result = await this.checkPostAnalytics(orgId, post.id, Date.now());
+            if (!Array.isArray(result)) return;
+
+            // Mirror the snapshot pipeline (analytics.activity): normalize each
+            // provider label to a canonical metric, then take the latest data point.
+            const latestByMetric: Record<string, number> = {};
+            for (const entry of result) {
+              const canonical = normalizeMetric(
+                post.integration?.providerIdentifier,
+                entry.label
+              );
+              if (!canonical || canonical in latestByMetric) continue;
+
+              let latest: { total: string; date: string } | undefined;
+              for (const point of entry.data ?? []) {
+                if (!latest || dayjs(point.date).isAfter(dayjs(latest.date))) {
+                  latest = point;
+                }
+              }
+              if (!latest) continue;
+
+              const val = parseFloat(String(latest.total));
+              if (isNaN(val)) continue;
+              latestByMetric[canonical] = val;
+            }
+
+            const views = latestByMetric['views'] ?? latestByMetric['impressions'];
+            const likes = latestByMetric['likes'] ?? latestByMetric['reactions'];
+            const comments = latestByMetric['comments'] ?? latestByMetric['replies'];
+            if (views !== undefined) post.lastViews = views;
+            if (likes !== undefined) post.lastLikes = likes;
+            if (comments !== undefined) post.lastComments = comments;
+          } catch {
+            // Best-effort — individual failures don't reject the batch
+          }
+        })
+      );
+    }
+  }
+
   async getStatistics(orgId: string, id: string) {
     const getPost = await this.getPostsRecursively(id, true, orgId, true);
     const content = getPost.map((p) => p.content);
     const shortLinksTracking = await this._shortLinkService.getStatistics(
+      orgId,
       content
     );
 
@@ -356,9 +456,11 @@ export class PostsService {
   }
 
   async getPostsMinified(orgId: string, query: GetPostsDto, userId?: string) {
-    return minifyPosts({
-      posts: await this._postRepository.getPosts(orgId, query, userId),
-    });
+    const posts = await this._postRepository.getPosts(orgId, query, userId);
+    if (posts?.length) {
+      await this.enrichPostsWithLatestStats(orgId, posts);
+    }
+    return minifyPosts({ posts });
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {
@@ -367,7 +469,7 @@ export class PostsService {
     );
   }
 
-  async updateMedia(id: string, imagesList: any[], convertToJPEG = false) {
+  async updateMedia(id: string, imagesList: any[], convertToJPEG = false, orgId: string) {
     try {
       let imageUpdateNeeded = false;
       const getImageList = await Promise.all(
@@ -414,18 +516,21 @@ export class PostsService {
                 .jpeg({ quality: 100 })
                 .toBuffer();
 
-              const { path, originalname } = await this.storage.uploadFile({
-                buffer,
-                mimetype: 'image/jpeg',
-                size: buffer.length,
-                path: '',
-                fieldname: '',
-                destination: '',
-                stream: new Readable(),
-                filename: '',
-                originalname: '',
-                encoding: '',
-              });
+              const adapter = await this._storageService.getLocalAdapterForOrg(orgId);
+              const { path, originalname } = adapter
+                ? await adapter.uploadFile({
+                    buffer,
+                    mimetype: 'image/jpeg',
+                    size: buffer.length,
+                    path: '',
+                    fieldname: '',
+                    destination: '',
+                    stream: new Readable(),
+                    filename: '',
+                    originalname: '',
+                    encoding: '',
+                  })
+                : { path: '', originalname: '' };
 
               return {
                 ...m,
@@ -522,7 +627,8 @@ export class PostsService {
           image: await this.updateMedia(
             post.id,
             JSON.parse(post.image || '[]'),
-            convertToJPEG
+            convertToJPEG,
+            orgId
           ),
         }))
       ),
@@ -560,7 +666,8 @@ export class PostsService {
           image: await this.updateMedia(
             post.id,
             JSON.parse(post.image || '[]'),
-            convertToJPEG
+            convertToJPEG,
+            orgId
           ),
         }))
       ),

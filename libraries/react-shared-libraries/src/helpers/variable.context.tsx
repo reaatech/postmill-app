@@ -9,11 +9,10 @@ interface VariableContextInterface {
   oauthLogoUrl: string;
   oauthDisplayName: string;
   mcpUrl?: string;
-  cloudflareUrl: string;
   mainUrl: string;
   frontEndUrl: string;
   plontoKey: string;
-  storageProvider: 'local' | 'cloudflare';
+  storageProvider: 'local';
   backendUrl: string;
   environment: string;
   discordUrl: string;
@@ -43,10 +42,9 @@ const VariableContext = createContext({
   googleAdsTrialTracking: '',
   oauthDisplayName: '',
   mcpUrl: '',
-  cloudflareUrl: '',
   mainUrl: '',
   frontEndUrl: '',
-  storageProvider: 'local',
+  storageProvider: 'local' as const,
   plontoKey: '',
   backendUrl: '',
   discordUrl: '',

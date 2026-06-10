@@ -11,7 +11,7 @@ Source: `apps/frontend/src/app/`
 
 | Route group | Path | Purpose |
 |---|---|---|
-| `(app)/(site)/` | `/launches`, `/agents`, `/comments`, `/analytics`, `/media`, `/plugs`, `/campaigns`, `/billing`, `/settings`, `/third-party` | Main application pages |
+| `(app)/(site)/` | `/schedule`, `/agents`, `/comments`, `/analytics`, `/media`, `/plugs`, `/campaigns`, `/billing`, `/settings`, `/third-party` | Main application pages |
 | `(app)/(site)/analytics/v2/` | `/analytics/v2` | Multi-channel analytics dashboard |
 | `(app)/(site)/agents/[id]/` | `/agents/[id]` | Individual agent detail |
 | `(app)/auth/` | `/auth/login`, `/auth/forgot`, `/auth/activate` | Authentication flows |
@@ -169,7 +169,7 @@ matrix is also exposed via `GET /provider-capabilities` API endpoint for the fro
 `apps/frontend/src/components/layout/top.menu.tsx` defines two menu groups:
 
 **Group 1 — Core features:**
-Calendar (Launches), Agent, Comments, Analytics, Media, Plugs, Campaigns, Integrations (Third Party)
+Schedule (previously Launches/Calendar), Agent, Comments, Analytics, Media, Plugs, Campaigns, Integrations (Third Party)
 
 **Group 2 — Account:**
 UGC (AgentMedia), Affiliate, Billing, Profile, Settings

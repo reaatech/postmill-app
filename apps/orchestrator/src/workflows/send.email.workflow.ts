@@ -48,8 +48,8 @@ export async function sendEmailWorkflow({
       }
       await sendEmail(email.to, email.subject, email.html, email.replyTo);
       processedThisRun++;
-    } catch (err) {
-      console.log(err);
+    } catch (err: any) {
+      console.log('Email send failed:', err?.message);
     }
 
     await sleep(RATE_LIMIT_MS);

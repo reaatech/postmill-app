@@ -46,8 +46,8 @@ BACKEND_INTERNAL_URL: 'http://localhost:3000'
 TEMPORAL_ADDRESS: 'temporal:7233'
 IS_GENERAL: 'true'
 DISABLE_REGISTRATION: 'false'
-STORAGE_PROVIDER: 'local'
 UPLOAD_DIRECTORY: '/uploads'
+MEDIA_UPLOAD_MAX_BYTES: '1073741824'
 API_LIMIT: 600
 ```
 
@@ -75,7 +75,7 @@ API_LIMIT: 600
 | `postgres-volume`    | `/var/lib/postgresql/data` | Application Postgres data |
 | `postmill-redis-data`| `/data`                 | Redis AOF/RDB persistence |
 | `postmill-config`    | `/config/`              | Application runtime config |
-| `postmill-uploads`   | `/uploads/`             | Uploaded media (when `STORAGE_PROVIDER=local`) |
+| `postmill-uploads`   | `/uploads/`             | Uploaded media (always local) |
 | ephemeral (ES)       | `/var/lib/elasticsearch/data` | Temporal ES indices |
 | ephemeral (Temporal PG) | `/var/lib/postgresql/data` | Temporal Postgres data |
 
@@ -176,4 +176,4 @@ your data persists. However:
 
 See [Upgrading](./upgrading.md) for the full migration procedure.
 
-> Verified against v3.7.0
+> Verified against v3.8.2

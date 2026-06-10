@@ -10,7 +10,7 @@ import { useCopilotAction, useCopilotReadable } from '@copilotkit/react-core';
  * `<CopilotKit>` provider — but the provider is only mounted when the org has
  * an active AI provider (see use-ai-active.ts + layout.component.tsx). Calling
  * those hooks unconditionally would throw "wrap your app in <CopilotKit>" on
- * every /launches render when AI is off.
+ * every /schedule render when AI is off.
  *
  * So the hook usage lives here, in components the parent renders ONLY when AI
  * is active (`{aiActive && <...Bridge />}`). When AI is off, these never
