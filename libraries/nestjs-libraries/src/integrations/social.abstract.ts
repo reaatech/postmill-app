@@ -4,6 +4,10 @@ import { ApplicationFailure } from '@temporalio/activity';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import sharp from 'sharp';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+// undici's own fetch — the global fetch is Node's built-in undici (v6) and throws
+// `invalid onRequestStart method` when handed an Agent from npm undici (v8), breaking
+// every outbound provider call (publish/refresh/analytics). Same version = dispatcher works.
+import { fetch as undiciFetch } from 'undici';
 
 export type ValidityMedia = {
   path: string;
@@ -161,11 +165,11 @@ export abstract class SocialAbstract {
     // hosts. The heavier `safeFetch` (HTTPS + isSafePublicHttpsUrl pre-check +
     // per-hop re-validation) is reserved for the dedicated user-URL paths
     // (mastodon `uploadFile`, bluesky `downloadVideo`, provider connect flows).
-    const request = await fetch(url, {
-      ...options,
+    const request = (await undiciFetch(url, {
+      ...(options as any),
       // dispatcher is an undici-only RequestInit option, absorbed by the cast below
       dispatcher: (options as any).dispatcher ?? ssrfSafeDispatcher,
-    } as RequestInit);
+    } as any)) as unknown as Response;
 
     if (request.status === 200 || request.status === 201) {
       return request;
