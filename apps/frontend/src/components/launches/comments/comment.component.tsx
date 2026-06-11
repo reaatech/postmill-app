@@ -266,7 +266,7 @@ export const CommentComponent: FC<{
     );
   }, []);
   return (
-    <div className="relative flex gap-[20px] flex-col flex-1 rounded-[4px] border border-customColor6 bg-sixth p-[16px] pt-0">
+    <div className="relative flex gap-[20px] flex-col flex-1 rounded-[4px] border border-newTableBorder bg-newBgColorInner p-[16px] pt-0">
       <TopTitle title={`Comments for ${date.format('DD/MM/YYYY HH:mm')}`} />
       <button
         onClick={closeAll}
@@ -301,11 +301,11 @@ export const CommentComponent: FC<{
               <div className="flex gap-[8px]">
                 <div className="w-[40px] flex flex-col items-center">
                   <div
-                    className={`rounded-full relative z-[2] text-blue-500 font-bold flex justify-center items-center w-[40px] h-[40px] bg-white border-tableBorder border`}
+                    className={`rounded-full relative z-[2] text-blue-500 font-bold flex justify-center items-center w-[40px] h-[40px] bg-white border-newTableBorder border`}
                   >
                     {comment.user.email[0].toUpperCase()}
                   </div>
-                  <div className="flex-1 w-[2px] h-[calc(100%-10px)] bg-customColor25 absolute top-[10px] z-[1]" />
+                  <div className="flex-1 w-[2px] h-[calc(100%-10px)] bg-newTableBorder absolute top-[10px] z-[1]" />
                 </div>
                 <div className="flex-1 flex flex-col gap-[4px]">
                   <div className="flex">
@@ -329,7 +329,7 @@ export const CommentComponent: FC<{
                   >
                     <div className="w-[40px] flex flex-col items-center">
                       <div
-                        className={`rounded-full relative z-[2] text-blue-500 font-bold flex justify-center items-center w-[40px] h-[40px] bg-white border-tableBorder border`}
+className={`rounded-full relative z-[2] text-blue-500 font-bold flex justify-center items-center w-[40px] h-[40px] bg-white border-newTableBorder border`}
                       >
                         {childComment.user.email[0].toUpperCase()}
                       </div>
@@ -354,8 +354,8 @@ export const CommentComponent: FC<{
             </div>
             <div className="flex">
               <div className="relative w-[40px] flex flex-col items-center">
-                <div className="h-[30px] w-[2px] bg-customColor25 absolute top-0 z-[1]" />
-                <div className="h-[2px] w-[21px] bg-customColor25 absolute top-[30px] end-0 z-[1]" />
+                <div className="h-[30px] w-[2px] bg-newTableBorder absolute top-0 z-[1]" />
+                <div className="h-[2px] w-[21px] bg-newTableBorder absolute top-[30px] end-0 z-[1]" />
               </div>
               <div className="flex-1">
                 <CommentBox

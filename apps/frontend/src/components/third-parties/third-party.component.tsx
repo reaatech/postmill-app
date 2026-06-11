@@ -11,6 +11,10 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import useCookie from 'react-use-cookie';
 import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
+import { EmptyState } from '@gitroom/frontend/components/ui/empty-state';
+import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
+import { Button } from '@gitroom/react/form/button';
+import Link from 'next/link';
 
 export const ThirdPartyMenuComponent: FC<{
   reload: () => void;
@@ -64,7 +68,7 @@ export const ThirdPartyMenuComponent: FC<{
       {show && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute top-[100%] start-0 p-[8px] px-[20px] bg-fifth flex flex-col gap-[16px] z-[100] rounded-[8px] border border-tableBorder text-nowrap`}
+          className={`absolute top-[100%] start-0 p-[8px] px-[20px] bg-newBgColorInner flex flex-col gap-[16px] z-[100] rounded-[8px] border border-newTableBorder text-nowrap`}
         >
           <div
             className="flex gap-[12px] items-center"
@@ -154,7 +158,23 @@ export const ThirdPartyComponent = () => {
                 )}
               >
                 {!isLoading && !data?.length ? (
-                  <div>No Integrations Yet</div>
+                  <EmptyState
+                    icon={
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 22v-5" />
+                        <path d="M9 8V2" />
+                        <path d="M15 8V2" />
+                        <path d="M18 8v5a6 6 0 0 1-12 0V8Z" />
+                      </svg>
+                    }
+                    title="No integrations yet"
+                    description="Connect your social channels to post content, track analytics, and manage your publishing workflow."
+                    action={
+                      <Link href="/settings?tab=integrations">
+                        <Button>Connect a channel</Button>
+                      </Link>
+                    }
+                  />
                 ) : (
                   data?.map((p: any) => (
                     <div
@@ -180,10 +200,7 @@ export const ThirdPartyComponent = () => {
                           height={32}
                         />
                       </div>
-                      <div
-                        // @ts-ignore
-                        role="Handle"
-                        className={clsx(
+                      <div className={clsx(
                           'flex-1 whitespace-nowrap text-ellipsis overflow-hidden group-[.sidebar]:hidden'
                         )}
                         data-tooltip-id="tooltip"
@@ -201,6 +218,7 @@ export const ThirdPartyComponent = () => {
         </div>
       </div>
       <div className="bg-newBgColorInner flex-1 flex-col flex p-[20px] gap-[12px]">
+        <PageHeader title="Integrations" description="Connect your social media and chat channels" />
         <ThirdPartyListComponent reload={mutate} />
       </div>
     </>

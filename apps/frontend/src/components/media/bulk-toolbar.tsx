@@ -71,13 +71,13 @@ export const BulkToolbar: FC<{
       <div className="flex-1" />
       <button
         onClick={() => setShowMoveDialog(true)}
-        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-textColor border border-newColColor hover:bg-forth transition-all"
+        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-textColor border border-newColColor hover:bg-boxHover transition-all"
       >
         Move to Folder
       </button>
       <button
         onClick={handleBulkDelete}
-        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-red-400 border border-newColColor hover:bg-forth transition-all"
+        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-red-400 border border-newColColor hover:bg-boxHover transition-all"
       >
         Delete
       </button>
@@ -97,7 +97,7 @@ export const BulkToolbar: FC<{
                 onClick={() => setTargetFolderId(null)}
                 className={clsx(
                   'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                  targetFolderId === null ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-forth'
+                  targetFolderId === null ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-boxHover'
                 )}
               >
                 Root (no folder)
@@ -108,7 +108,7 @@ export const BulkToolbar: FC<{
                   onClick={() => setTargetFolderId(f.id)}
                   className={clsx(
                     'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                    targetFolderId === f.id ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-forth'
+                    targetFolderId === f.id ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-boxHover'
                   )}
                   style={{ paddingLeft: `${10 + f.depth * 16}px` }}
                 >
@@ -119,7 +119,7 @@ export const BulkToolbar: FC<{
             <div className="flex justify-end gap-[8px] mt-[16px]">
               <button
                 onClick={() => setShowMoveDialog(false)}
-                className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-textColor border border-newColColor hover:bg-forth transition-all"
+                className="px-[14px] py-[8px] rounded-[8px] text-[13px] text-textColor border border-newColColor hover:bg-boxHover transition-all"
               >
                 Cancel
               </button>

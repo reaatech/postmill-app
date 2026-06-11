@@ -11,6 +11,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
+import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
 const PAGE_SIZE = 25;
 
@@ -107,7 +108,7 @@ const CreateEditCampaignModal: FC<{
           <div className="flex gap-[8px] items-center">
             <input
               type="color"
-              value={color || '#6366f1'}
+              value={color || '#2b5cd3'}
               onChange={(e) => setColor(e.target.value)}
               className="w-[36px] h-[36px] rounded-[4px] cursor-pointer bg-transparent border-0"
             />
@@ -116,7 +117,7 @@ const CreateEditCampaignModal: FC<{
               value={color}
               onChange={(e) => setColor(e.target.value)}
               className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none w-[100px]"
-              placeholder="#6366f1"
+              placeholder="#2b5cd3"
             />
           </div>
         </div>
@@ -178,7 +179,7 @@ const CampaignCard: FC<{ campaign: Campaign }> = ({ campaign }) => {
         <div className="flex items-center gap-[8px]">
           <span className="text-[15px] font-medium">{campaign.name}</span>
           {campaign.archived && (
-            <span className="text-[11px] bg-customColor18/20 text-customColor18 px-[6px] py-[1px] rounded-full">
+            <span className="text-[11px] bg-newTableText/20 text-newTableText px-[6px] py-[1px] rounded-full">
               {t('archived', 'Archived')}
             </span>
           )}
@@ -195,24 +196,24 @@ const CampaignCard: FC<{ campaign: Campaign }> = ({ campaign }) => {
         {engagement && (
           <div className="flex gap-[16px] text-[12px] flex-wrap">
             {engagement.totalViews > 0 && (
-              <span className="text-customColor18">
+              <span className="text-newTableText">
                 {t('views', 'Views')}: {Math.round(engagement.totalViews).toLocaleString()}
               </span>
             )}
             {engagement.totalLikes > 0 && (
-              <span className="text-customColor18">
+              <span className="text-newTableText">
                 {t('likes', 'Likes')}: {Math.round(engagement.totalLikes).toLocaleString()}
               </span>
             )}
             {engagement.totalComments > 0 && (
-              <span className="text-customColor18">
+              <span className="text-newTableText">
                 {t('comments', 'Comments')}: {Math.round(engagement.totalComments).toLocaleString()}
               </span>
             )}
           </div>
         )}
         {engagement?.topPost && (
-          <div className="text-[11px] text-customColor18/70">
+          <div className="text-[11px] text-newTableText/70">
             {t('top_post', 'Top Post')}: {engagement.topPost.title} ({engagement.topPost.integration})
             {engagement.topPost.lastLikes ? ` — ${Math.round(engagement.topPost.lastLikes)} likes` : ''}
           </div>
@@ -292,12 +293,7 @@ export const CampaignsPage: FC = () => {
 
   return (
     <div className="flex-1 flex flex-col p-[24px] gap-[24px]">
-      <div className="mb-[8px]">
-        <h1 className="text-[24px] font-semibold">{t('campaigns_title', 'Campaigns')}</h1>
-        <p className="text-[13px] text-customColor18 mt-[4px] leading-relaxed">
-          {t('campaigns_description', 'Campaigns help you organize related posts together. Track performance across a group of posts, monitor engagement, and measure the impact of your marketing initiatives.')}
-        </p>
-      </div>
+      <PageHeader title="Campaigns" description="Organize posts into campaign folders" />
 
       <div className="flex items-center gap-[12px]">
         <div className="flex-1">
@@ -328,15 +324,15 @@ export const CampaignsPage: FC = () => {
       )}
 
       {isLoading && (
-        <div className="flex items-center justify-center py-[60px] text-customColor18">
+        <div className="flex items-center justify-center py-[60px] text-newTableText">
           {t('loading', 'Loading...')}
         </div>
       )}
 
       {!isLoading && campaigns && campaigns.length === 0 && (
         <div className="flex flex-col items-center justify-center py-[60px] gap-[16px]">
-          <div className="text-[16px] text-customColor18">{t('campaigns_empty', 'No campaigns yet')}</div>
-          <p className="text-[13px] text-customColor18/70 max-w-[400px] text-center">
+          <div className="text-[16px] text-newTableText">{t('campaigns_empty', 'No campaigns yet')}</div>
+          <p className="text-[13px] text-newTableText/70 max-w-[400px] text-center">
             {t('campaigns_empty_hint', 'Campaigns let you group related posts together to track their collective performance and measure the impact of your marketing initiatives.')}
           </p>
           <Button onClick={() => openCreateModal()}>{t('create_first_campaign', 'Create your first campaign')}</Button>
@@ -355,14 +351,14 @@ export const CampaignsPage: FC = () => {
               <div className="flex items-center gap-[8px] justify-end px-[16px] pb-[12px]">
                 <button
                   onClick={() => openCreateModal(campaign)}
-                  className="px-[8px] py-[4px] text-[12px] bg-forth text-white rounded-[4px]"
+                  className="px-[8px] py-[4px] text-[12px] bg-btnPrimary text-white rounded-[8px]"
                 >
                   {t('edit', 'Edit')}
                 </button>
                 {campaign.archived ? (
                   <button
                     onClick={() => archiveCampaign(campaign)}
-                    className="px-[8px] py-[4px] text-[12px] border border-newTableBorder text-customColor18 rounded-[4px]"
+                    className="px-[8px] py-[4px] text-[12px] border border-newTableBorder text-newTableText rounded-[4px]"
                   >
                     {t('unarchive', 'Unarchive')}
                   </button>
@@ -388,21 +384,21 @@ export const CampaignsPage: FC = () => {
 
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-[16px]">
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}
           </div>
           <div className="flex gap-[8px]">
             <button
               onClick={() => setPage(p => Math.max(0, p - 1))}
               disabled={page === 0}
-              className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40"
+              className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40"
             >
               {t('previous', 'Previous')}
             </button>
             <button
               onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
               disabled={page >= totalPages - 1}
-              className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40"
+              className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40"
             >
               {t('next', 'Next')}
             </button>

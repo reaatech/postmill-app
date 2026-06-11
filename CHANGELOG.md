@@ -8,6 +8,45 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.8.8] - 2026-06-10
+
+### Added
+- **Dashboard:** New `/dashboard` landing page with KPIs, charts, upcoming posts, and recommendations
+- **Dashboard setup:** In-page onboarding checklist replacing the old modal overlay
+- **Per-user API keys:** Hashed, show-once API keys with create/rotate/revoke (pm_live_... format)
+- **API key management UI:** Full key lifecycle management in Settings → Developers
+- **Settings reorganization:** Removed redundant "Settings" tab; moved shortlink preference into Shortlinks tab
+- **DataTable component:** Reusable typed DataTable with sorting, pagination, selection, status pills, loading/empty/error states
+- **EmptyState component:** Standardized empty state with icon, title, description, and optional action
+- **PageHeader component:** Consistent page header with title, description, and action slot
+- **Comments inbox sync:** On-demand sync via "Sync now" button + `POST /posts/inbox/sync` endpoint
+
+### Changed
+- **Branding:** Logo wordmark updated to "Postmill"; DataFast analytics domain updated to postmill.com
+- **Theme de-purpled:** All purple, violet, indigo, magenta, and pink colors remapped to primary blue (#2b5cd3) family
+- **Calendar cards:** Increased min-height for better content + stats fit; no more overlap
+- **Button primitive:** Upgraded to canonical rounded-[8px] with hover/focus/active states and danger variant
+- **Input/select primitives:** Focus rings, error-state borders, consistent disabled styling
+- **Shortlinks tab:** Provider icons with brand-color fallbacks for all 19 providers
+- **Login page:** Replaced inherited Postiz testimonials with product highlights panel
+- **Error page:** Fully rebuilt with proper layout, logo, and actions
+- **Integrations page:** Empty state now uses standard EmptyState component
+- **Settings sidebar:** Section grouping with icons (Workspace, Providers, Automation, Developer)
+- **Charts restyled:** Gradient fills, rounded bars, dotted gridlines, themed tooltips
+- **Navigation:** Active item styling with accent bar; consistent icon sizing; comment badges as btnPrimary pills
+- **Scrollbars + selection:** Custom styled for polished feel
+- **Legacy token migration:** 100+ component files migrated from deprecated customColor/bg-sixth/border-fifth/bg-forth tokens to canonical design tokens
+
+### Fixed
+- Comments inbox showing empty despite real comments: added on-demand sync + clarified RUN_CRON requirement
+- Onboarding overlay leaking onto analytics page: removed global overlay; replaced with in-page dashboard section
+- Analytics empty state masked by onboarding overlay: added proper empty state with cron guidance
+- Media settings tab "Failed to load" error: endpoints already corrected to user-scoped /ai/media-providers
+- Plaintext org API key exposed in /user/self response: replaced with per-user hashed key system
+- Calendar card content overlapping stats: increased min-height and removed hard caps
+- Onboarding checklist "first post" step permanently incomplete: rewired to real post count
+- Broken var(--purple-light) CSS reference: repointed to var(--new-boxFocused)
+
 ## [3.8.4] - 2026-06-10
 
 ### Fixed

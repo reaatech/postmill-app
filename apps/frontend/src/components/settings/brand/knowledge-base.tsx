@@ -6,6 +6,7 @@ import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Slider } from '@gitroom/react/form/slider';
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
 interface RagStatus {
   enabled: boolean;
@@ -89,7 +90,7 @@ export const KnowledgeBase = () => {
   const [vectorStore, setVectorStore] = useState('pgvector');
   const [qdrantUrl, setQdrantUrl] = useState('');
   const [qdrantApiKey, setQdrantApiKey] = useState('');
-  const [qdrantCollection, setQdrantCollection] = useState('postiz_rag');
+  const [qdrantCollection, setQdrantCollection] = useState('postmill_rag');
   const [distance, setDistance] = useState('Cosine');
   const [embeddingDimension, setEmbeddingDimension] = useState(1536);
   const [chunkStrategy, setChunkStrategy] = useState('fixed-size');
@@ -114,7 +115,7 @@ export const KnowledgeBase = () => {
     const data = await res.json();
     setVectorStore(data.vectorStore || 'pgvector');
     setQdrantUrl(data.qdrantUrl || '');
-    setQdrantCollection(data.qdrantCollection || 'postiz_rag');
+    setQdrantCollection(data.qdrantCollection || 'postmill_rag');
     setDistance(data.distance || 'Cosine');
     setEmbeddingDimension(data.embeddingDimension || 1536);
     setChunkStrategy(data.chunkStrategy || 'fixed-size');
@@ -283,7 +284,7 @@ export const KnowledgeBase = () => {
 
   if (statusLoading) {
     return (
-      <div className="my-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
@@ -300,16 +301,16 @@ export const KnowledgeBase = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
             <div className="text-[14px]">{t('knowledge_base', 'Knowledge Base')}</div>
-            <div className="text-[12px] text-customColor18">
+            <div className="text-[12px] text-newTableText">
               {t('knowledge_base_description', 'Manage your RAG knowledge base for AI-powered content generation')}
             </div>
           </div>
           <button
-            className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
             onClick={handleBackfill}
             disabled={backfilling}
           >
@@ -318,26 +319,26 @@ export const KnowledgeBase = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px]">
-          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
-            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-newTableText uppercase tracking-wider">
               {t('status', 'Status')}
             </span>
             <span className="text-[14px] font-semibold">
               {status?.enabled ? (
                 <span className="text-green-500">{t('enabled', 'Enabled')}</span>
               ) : (
-                <span className="text-customColor18">{t('disabled', 'Disabled')}</span>
+                <span className="text-newTableText">{t('disabled', 'Disabled')}</span>
               )}
             </span>
           </div>
-          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
-            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-newTableText uppercase tracking-wider">
               {t('indexed_items', 'Indexed Items')}
             </span>
             <span className="text-[14px] font-semibold">{status?.indexedItems || 0}</span>
           </div>
-          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
-            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-newTableText uppercase tracking-wider">
               {t('last_indexed', 'Last Indexed')}
             </span>
             <span className="text-[14px] font-semibold">
@@ -346,8 +347,8 @@ export const KnowledgeBase = () => {
                 : t('never', 'Never')}
             </span>
           </div>
-          <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[4px]">
-            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[4px]">
+            <span className="text-[11px] text-newTableText uppercase tracking-wider">
               {t('embedding_model', 'Embedding Model')}
             </span>
             <span className="text-[14px] font-semibold break-all">
@@ -357,9 +358,9 @@ export const KnowledgeBase = () => {
         </div>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="text-[14px]">{t('vector_store', 'Vector Database')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t('vector_store_description', 'Configure the hybrid-RAG vector store adapter.')}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
@@ -368,7 +369,7 @@ export const KnowledgeBase = () => {
             <select
               value={vectorStore}
               onChange={(e) => setVectorStore(e.target.value)}
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             >
               <option value="pgvector">pgvector (built-in PostgreSQL)</option>
               <option value="qdrant">Qdrant (external)</option>
@@ -379,7 +380,7 @@ export const KnowledgeBase = () => {
               <div className="flex flex-col gap-[4px]">
                 <label className="text-[12px] text-newTableText">{t('qdrant_url', 'URL')}</label>
                 <input
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantUrl}
                   onChange={(e) => setQdrantUrl(e.target.value)}
                   placeholder="http://qdrant:6333"
@@ -389,7 +390,7 @@ export const KnowledgeBase = () => {
                 <label className="text-[12px] text-newTableText">{t('qdrant_api_key', 'API Key')}</label>
                 <input
                   type="password"
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantApiKey}
                   onChange={(e) => setQdrantApiKey(e.target.value)}
                   placeholder={t('optional', '(optional)')}
@@ -398,10 +399,10 @@ export const KnowledgeBase = () => {
               <div className="flex flex-col gap-[4px]">
                 <label className="text-[12px] text-newTableText">{t('qdrant_collection', 'Collection')}</label>
                 <input
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantCollection}
                   onChange={(e) => setQdrantCollection(e.target.value)}
-                  placeholder="postiz_rag"
+                  placeholder="postmill_rag"
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -409,7 +410,7 @@ export const KnowledgeBase = () => {
                 <select
                   value={distance}
                   onChange={(e) => setDistance(e.target.value)}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
                   <option value="Cosine">Cosine</option>
                   <option value="Euclid">Euclidean</option>
@@ -424,7 +425,7 @@ export const KnowledgeBase = () => {
               type="number"
               min={128}
               max={4096}
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
               value={embeddingDimension}
               onChange={(e) => setEmbeddingDimension(parseInt(e.target.value, 10) || 1536)}
             />
@@ -432,7 +433,7 @@ export const KnowledgeBase = () => {
         </div>
 
         <button
-          className="text-[12px] text-customColor4 hover:underline self-start"
+          className="text-[12px] text-textColor hover:underline self-start"
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
@@ -447,7 +448,7 @@ export const KnowledgeBase = () => {
                 <select
                   value={chunkStrategy}
                   onChange={(e) => setChunkStrategy(e.target.value)}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
                   <option value="fixed-size">Fixed Size</option>
                   <option value="semantic">Semantic</option>
@@ -461,7 +462,7 @@ export const KnowledgeBase = () => {
                   type="number"
                   min={100}
                   max={2000}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={chunkSize}
                   onChange={(e) => setChunkSize(parseInt(e.target.value, 10) || 500)}
                 />
@@ -472,7 +473,7 @@ export const KnowledgeBase = () => {
                   type="number"
                   min={0}
                   max={500}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={chunkOverlap}
                   onChange={(e) => setChunkOverlap(parseInt(e.target.value, 10) || 100)}
                 />
@@ -486,7 +487,7 @@ export const KnowledgeBase = () => {
                 <select
                   value={fusionStrategy}
                   onChange={(e) => setFusionStrategy(e.target.value)}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 >
                   <option value="rrf">Reciprocal Rank Fusion (RRF)</option>
                   <option value="weighted-sum">Weighted Sum</option>
@@ -500,7 +501,7 @@ export const KnowledgeBase = () => {
                     type="number"
                     min={1}
                     max={200}
-                    className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                    className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                     value={rrfK}
                     onChange={(e) => setRrfK(parseInt(e.target.value, 10) || 60)}
                   />
@@ -515,7 +516,7 @@ export const KnowledgeBase = () => {
                       min={0}
                       max={1}
                       step={0.05}
-                      className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                      className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                       value={vectorWeight}
                       onChange={(e) => setVectorWeight(parseFloat(e.target.value) || 0.5)}
                     />
@@ -527,7 +528,7 @@ export const KnowledgeBase = () => {
                       min={0}
                       max={1}
                       step={0.05}
-                      className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                      className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                       value={bm25Weight}
                       onChange={(e) => setBm25Weight(parseFloat(e.target.value) || 0.5)}
                     />
@@ -545,7 +546,7 @@ export const KnowledgeBase = () => {
                   min={0}
                   max={5}
                   step={0.05}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={bm25K1}
                   onChange={(e) => setBm25K1(parseFloat(e.target.value) || 1.2)}
                 />
@@ -557,7 +558,7 @@ export const KnowledgeBase = () => {
                   min={0}
                   max={1}
                   step={0.05}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={bm25B}
                   onChange={(e) => setBm25B(parseFloat(e.target.value) || 0.75)}
                 />
@@ -573,14 +574,14 @@ export const KnowledgeBase = () => {
         )}
         <div className="flex gap-[8px]">
           <button
-            className="bg-forth border border-tableBorder text-textColor rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-newBgColorInner border border-newTableBorder text-textColor rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
             onClick={handleTestConnection}
             disabled={vecTesting}
           >
             {vecTesting ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
           </button>
           <button
-            className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
             onClick={handleSaveVecSettings}
             disabled={vecSaving}
           >
@@ -589,7 +590,7 @@ export const KnowledgeBase = () => {
         </div>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="text-[14px] font-medium">{t('auto_index', 'Auto-Index')}</div>
         <p className="text-[12px] text-newTableText">
           {t('auto_index_description', 'Enable automatic indexing of content from specified URL patterns during crawl/sync operations.')}
@@ -606,7 +607,7 @@ export const KnowledgeBase = () => {
             <div className="flex gap-[8px]">
               <input
                 type="text"
-                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] flex-1"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] flex-1"
                 placeholder={t('auto_index_source_placeholder', 'e.g. https://example.com/blog/*')}
                 value={newAutoIndexSource}
                 onChange={(e) => setNewAutoIndexSource(e.target.value)}
@@ -618,7 +619,7 @@ export const KnowledgeBase = () => {
                 }}
               />
               <button
-                className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[8px] text-[13px] hover:opacity-90"
+                className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[8px] text-[13px] hover:opacity-90"
                 onClick={() => {
                   if (newAutoIndexSource.trim()) {
                     setAutoIndexSources([...autoIndexSources, newAutoIndexSource.trim()]);
@@ -632,8 +633,8 @@ export const KnowledgeBase = () => {
             {autoIndexSources.length > 0 && (
               <div className="flex flex-col gap-[4px]">
                 {autoIndexSources.map((src, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-forth rounded-[4px] px-[12px] py-[6px] text-[13px]">
-                    <code className="text-customColor4">{src}</code>
+                  <div key={idx} className="flex items-center justify-between bg-newBgColorInner rounded-[8px] px-[12px] py-[6px] text-[13px]">
+                    <code className="text-textColor">{src}</code>
                     <button
                       className="text-red-500 hover:underline ml-[8px] text-[12px]"
                       onClick={() => setAutoIndexSources(autoIndexSources.filter((_, i) => i !== idx))}
@@ -648,11 +649,11 @@ export const KnowledgeBase = () => {
         )}
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="flex items-center justify-between">
           <div className="text-[14px]">{t('add_content', 'Add Content')}</div>
           <button
-            className="text-[13px] text-customColor4 hover:underline"
+            className="text-[13px] text-textColor hover:underline"
             onClick={() => setShowAddContent(!showAddContent)}
           >
             {showAddContent ? t('cancel', 'Cancel') : t('add_content_button', '+ Add Content')}
@@ -660,33 +661,33 @@ export const KnowledgeBase = () => {
         </div>
 
         {showAddContent && (
-          <div className="flex flex-col gap-[12px] bg-forth border border-tableBorder rounded-[4px] p-[16px]">
+          <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
             <div className="flex gap-[8px]">
               <button
-                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                className={`px-[12px] py-[6px] text-[13px] rounded-[8px] border ${
                   addSourceType === 'text'
-                    ? 'bg-customColor4 text-white border-customColor4'
-                    : 'border-tableBorder hover:bg-boxHover'
+                    ? 'bg-btnPrimary text-white border-btnPrimary'
+                    : 'border-newTableBorder hover:bg-boxHover'
                 }`}
                 onClick={() => setAddSourceType('text')}
               >
                 {t('text', 'Text')}
               </button>
               <button
-                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                className={`px-[12px] py-[6px] text-[13px] rounded-[8px] border ${
                   addSourceType === 'url'
-                    ? 'bg-customColor4 text-white border-customColor4'
-                    : 'border-tableBorder hover:bg-boxHover'
+                    ? 'bg-btnPrimary text-white border-btnPrimary'
+                    : 'border-newTableBorder hover:bg-boxHover'
                 }`}
                 onClick={() => setAddSourceType('url')}
               >
                 {t('url', 'URL')}
               </button>
               <button
-                className={`px-[12px] py-[6px] text-[13px] rounded-[4px] border ${
+                className={`px-[12px] py-[6px] text-[13px] rounded-[8px] border ${
                   addSourceType === 'file'
-                    ? 'bg-customColor4 text-white border-customColor4'
-                    : 'border-tableBorder hover:bg-boxHover'
+                    ? 'bg-btnPrimary text-white border-btnPrimary'
+                    : 'border-newTableBorder hover:bg-boxHover'
                 }`}
                 onClick={() => setAddSourceType('file')}
               >
@@ -696,7 +697,7 @@ export const KnowledgeBase = () => {
 
             {addSourceType === 'url' && (
               <input
-                className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                className="bg-newBgColor border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                 placeholder={t('url_placeholder', 'Enter URL to index...')}
                 value={addContent}
                 onChange={(e) => setAddContent(e.target.value)}
@@ -705,7 +706,7 @@ export const KnowledgeBase = () => {
 
             {addSourceType === 'text' && (
               <textarea
-                className="bg-newBgColor border border-tableBorder rounded-[4px] min-h-[100px] p-[8px] text-textColor text-[13px] resize-y"
+                className="bg-newBgColor border border-newTableBorder rounded-[8px] min-h-[100px] p-[8px] text-textColor text-[13px] resize-y"
                 placeholder={t('text_placeholder', 'Paste or type content to index...')}
                 value={addContent}
                 onChange={(e) => setAddContent(e.target.value)}
@@ -717,7 +718,7 @@ export const KnowledgeBase = () => {
                 <input
                   type="file"
                   accept=".txt,.pdf,.md,.csv"
-                  className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] file:mr-[12px] file:bg-customColor4 file:text-white file:border-0 file:rounded-[4px] file:px-[12px] file:py-[6px] file:text-[13px] file:cursor-pointer cursor-pointer"
+                  className="bg-newBgColor border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] file:mr-[12px] file:bg-btnPrimary file:text-white file:border-0 file:rounded-[4px] file:px-[12px] file:py-[6px] file:text-[13px] file:cursor-pointer cursor-pointer"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
@@ -729,7 +730,7 @@ export const KnowledgeBase = () => {
                   }}
                 />
                 {addContent && (
-                  <div className="text-[12px] text-customColor18">
+                  <div className="text-[12px] text-newTableText">
                     {t('file_loaded', 'File loaded:')} {addContent.length} {t('chars', 'chars')}
                   </div>
                 )}
@@ -738,7 +739,7 @@ export const KnowledgeBase = () => {
 
             <div className="flex justify-end">
               <button
-                className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+                className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
                 onClick={handleAddContent}
                 disabled={adding || !addContent.trim()}
               >
@@ -749,104 +750,53 @@ export const KnowledgeBase = () => {
         )}
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+      <div className="flex flex-col gap-[16px]">
         <div className="text-[14px]">{t('indexed_content', 'Indexed Content')}</div>
 
-        {itemsLoading ? (
-          <div className="animate-pulse text-[13px] text-customColor18">{t('loading', 'Loading...')}</div>
-        ) : itemsData?.items.length === 0 ? (
-          <div className="text-[13px] text-customColor18">{t('no_indexed_content', 'No indexed content yet')}</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b border-tableBorder">
-                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('source', 'Source')}
-                  </th>
-                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('type', 'Type')}
-                  </th>
-                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('chunks', 'Chunks')}
-                  </th>
-                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('chars', 'Chars')}
-                  </th>
-                  <th className="text-left py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('indexed_date', 'Indexed Date')}
-                  </th>
-                  <th className="text-right py-[8px] px-[8px] text-customColor18 font-medium">
-                    {t('actions', 'Actions')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {itemsData?.items.map((item) => (
-                  <tr key={`${item.sourceType}:${item.sourceId}`} className="border-b border-tableBorder hover:bg-boxHover">
-                    <td className="py-[8px] px-[8px] max-w-[200px] truncate">
-                      {item.sourceId}
-                    </td>
-                    <td className="py-[8px] px-[8px]">
-                      <span className="bg-fifth rounded-[4px] px-[6px] py-[2px] text-[11px]">
-                        {sourceTypeLabels[item.sourceType] || item.sourceType}
-                      </span>
-                    </td>
-                    <td className="py-[8px] px-[8px]">{item.chunkCount}</td>
-                    <td className="py-[8px] px-[8px]">{item.charCount.toLocaleString()}</td>
-                    <td className="py-[8px] px-[8px] text-customColor18">
-                      {new Date(item.indexedDate).toLocaleDateString()}
-                    </td>
-                    <td className="py-[8px] px-[8px] text-right">
-                      <button
-                        className="text-[12px] text-red-500 hover:underline"
-                        onClick={() => handleDelete(item.sourceType, item.sourceId)}
-                      >
-                        {t('delete', 'Delete')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {itemsData && itemsData.total > 20 && (
-          <div className="flex items-center justify-center gap-[8px]">
-            <button
-              className="text-[13px] text-customColor4 hover:underline disabled:opacity-50"
-              disabled={itemsPage === 0}
-              onClick={() => setItemsPage((p) => Math.max(0, p - 1))}
-            >
-              {t('previous', 'Previous')}
-            </button>
-            <span className="text-[13px] text-customColor18">
-              {itemsPage + 1} / {Math.ceil(itemsData.total / 20)}
-            </span>
-            <button
-              className="text-[13px] text-customColor4 hover:underline disabled:opacity-50"
-              disabled={(itemsPage + 1) * 20 >= itemsData.total}
-              onClick={() => setItemsPage((p) => p + 1)}
-            >
-              {t('next', 'Next')}
-            </button>
-          </div>
-        )}
+        <DataTable
+          columns={[
+            { key: 'source', header: t('source', 'Source'), render: (item: RagItem) => (
+              <span className="max-w-[200px] truncate block">{item.sourceId}</span>
+            )},
+            { key: 'type', header: t('type', 'Type'), render: (item: RagItem) => (
+              <span className="bg-newTableHeader rounded-[4px] px-[6px] py-[2px] text-[11px]">
+                {sourceTypeLabels[item.sourceType] || item.sourceType}
+              </span>
+            )},
+            { key: 'chunks', header: t('chunks', 'Chunks'), render: (item: RagItem) => item.chunkCount },
+            { key: 'chars', header: t('chars', 'Chars'), render: (item: RagItem) => item.charCount.toLocaleString() },
+            { key: 'indexedDate', header: t('indexed_date', 'Indexed Date'), render: (item: RagItem) => (
+              <span className="text-newTableText">{new Date(item.indexedDate).toLocaleDateString()}</span>
+            )},
+            { key: 'actions', header: t('actions', 'Actions'), align: 'right', render: (item: RagItem) => (
+              <button className="text-[12px] text-red-500 hover:underline" onClick={() => handleDelete(item.sourceType, item.sourceId)}>
+                {t('delete', 'Delete')}
+              </button>
+            )},
+          ]}
+          data={itemsData?.items || []}
+          keyExtractor={(item: RagItem) => `${item.sourceType}:${item.sourceId}`}
+          loading={itemsLoading}
+          page={itemsPage + 1}
+          total={itemsData?.total || 0}
+          limit={20}
+          onPageChange={(p) => setItemsPage(p - 1)}
+          emptyState={{ title: t('no_indexed_content', 'No indexed content yet') }}
+        />
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[16px]">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="text-[14px]">{t('search_knowledge_base', 'Search Knowledge Base')}</div>
         <div className="flex gap-[8px]">
           <input
-            className="flex-1 bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             placeholder={t('search_placeholder', 'Search your knowledge base...')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
           />
           <button
-            className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
             onClick={handleSearch}
             disabled={searching || !searchQuery.trim()}
           >
@@ -857,20 +807,20 @@ export const KnowledgeBase = () => {
         {searchResults !== null && (
           <div className="flex flex-col gap-[8px]">
             {searchResults.length === 0 ? (
-              <div className="text-[13px] text-customColor18">
+              <div className="text-[13px] text-newTableText">
                 {t('no_results', 'No results found')}
               </div>
             ) : (
               searchResults.map((hit, i) => (
                 <div
                   key={i}
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[12px] flex flex-col gap-[4px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[4px]"
                 >
                   <div className="flex items-center gap-[8px]">
-                    <span className="bg-fifth rounded-[4px] px-[6px] py-[2px] text-[11px]">
+                    <span className="bg-newTableHeader rounded-[4px] px-[6px] py-[2px] text-[11px]">
                       {sourceTypeLabels[hit.sourceType] || hit.sourceType}
                     </span>
-                    <span className="text-[11px] text-customColor18">
+                    <span className="text-[11px] text-newTableText">
                       {t('relevance', 'Relevance')}: {(hit.score * 100).toFixed(0)}%
                     </span>
                   </div>

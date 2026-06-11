@@ -6,7 +6,7 @@ alphabetically with **General** (or **Settings** on some layouts) pinned first.
 
 ## Settings tab
 
-Global account preferences:
+The standalone Settings tab was removed in v3.8.8. The auto-shortlink preference (ASK / YES / NO) has moved to the Shortlinks tab.
 
 > **Profile is now accessed from the user avatar menu** in the top navigation bar — not from a
 > settings tab. Click your avatar to find the Profile link alongside Settings and Logout. The

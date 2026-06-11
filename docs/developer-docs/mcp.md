@@ -34,7 +34,7 @@ Token resolution uses a two-layer strategy:
 
 1. **Token type detection**: Tokens starting with `pos_` resolve via OAuth
    service (`oauthService.getOrgByOAuthToken`). All other tokens resolve as
-   API keys (`organizationService.getOrgByApiKey`).
+   per-user API keys (`apiKeysService.findActiveByHash`).
 2. **Scope enforcement**: Via `@reaatech/a2a-reference-auth` `AuthStrategy`.
    The resolved identity is checked against required scopes.
 

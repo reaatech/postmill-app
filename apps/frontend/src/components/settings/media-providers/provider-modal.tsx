@@ -105,7 +105,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[500]">
-        <div className="bg-sixth border border-fifth rounded-[8px] p-[24px] w-[480px] max-w-[90vw]">
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[24px] w-[480px] max-w-[90vw]">
           <div className="animate-pulse">{t('loading', 'Loading...')}</div>
         </div>
       </div>
@@ -115,10 +115,10 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
   if (!provider) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[500]">
-        <div className="bg-sixth border border-fifth rounded-[8px] p-[24px] w-[480px] max-w-[90vw]">
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[24px] w-[480px] max-w-[90vw]">
           <div className="text-[14px]">{t('provider_not_found', 'Provider not found')}</div>
           <button
-            className="mt-[16px] text-[13px] text-customColor4 hover:underline"
+            className="mt-[16px] text-[13px] text-textColor hover:underline"
             onClick={onClose}
           >
             {t('close', 'Close')}
@@ -130,11 +130,11 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[500]">
-      <div className="bg-sixth border border-fifth rounded-[8px] p-[24px] w-[480px] max-w-[90vw] flex flex-col gap-[20px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[24px] w-[480px] max-w-[90vw] flex flex-col gap-[20px]">
         <div className="flex items-center justify-between">
           <div className="text-[16px] font-semibold">{provider.name}</div>
           <button
-            className="text-customColor18 hover:text-textColor text-[20px] leading-none"
+            className="text-newTableText hover:text-textColor text-[20px] leading-none"
             onClick={onClose}
           >
             ×
@@ -144,13 +144,13 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
         <div className="flex flex-col gap-[16px]">
           {provider.credentialFields.map((field) => (
             <div key={field.key} className="flex flex-col gap-[4px]">
-              <label className="text-[13px] text-customColor18">
+              <label className="text-[13px] text-newTableText">
                 {field.label}
                 {field.required && <span className="text-red-500 ml-[2px]">*</span>}
               </label>
               {field.type === 'textarea' ? (
                 <textarea
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] resize-y min-h-[60px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] resize-y min-h-[60px]"
                   placeholder={field.placeholder || field.label}
                   value={credentials[field.key] || ''}
                   onChange={(e) =>
@@ -159,7 +159,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
                 />
               ) : (
                 <input
-                  className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   type={field.type === 'password' ? 'password' : 'text'}
                   placeholder={field.placeholder || field.label}
                   value={credentials[field.key] || ''}
@@ -176,7 +176,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
           <label className="flex items-center gap-[6px] cursor-pointer">
             <input
               type="checkbox"
-              className="accent-customColor4"
+              className="accent-btnPrimary"
               checked={enabled}
               onChange={(e) => setEnabled(e.target.checked)}
             />
@@ -198,7 +198,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
 
         <div className="flex items-center justify-between gap-[12px]">
           <button
-            className="text-[13px] px-[12px] py-[6px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+            className="text-[13px] px-[12px] py-[6px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
             onClick={handleTest}
             disabled={testing}
           >
@@ -206,13 +206,13 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
           </button>
           <div className="flex gap-[8px]">
             <button
-              className="text-[13px] px-[12px] py-[6px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+              className="text-[13px] px-[12px] py-[6px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
               onClick={onClose}
             >
               {t('cancel', 'Cancel')}
             </button>
             <button
-              className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
+              className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
               onClick={handleSave}
               disabled={saving}
             >

@@ -14,7 +14,7 @@ export const ProfileComponent: FC<{
   if (!form) return null;
 
   return (
-    <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] mt-[16px] mb-[16px] flex flex-col gap-[24px]">
+    <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] mt-[16px] mb-[16px] flex flex-col gap-[24px]">
       <h4 className="text-[16px] font-[600]">{t('profile', 'Profile')}</h4>
       <Input
         label={t('full_name', 'Full Name')}

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 
-let mockSearchParams = 'tab=settings';
+let mockSearchParams = 'tab=channels';
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(mockSearchParams),
@@ -80,32 +80,28 @@ vi.mock('@gitroom/frontend/components/media/media.component', () => ({
   showMediaBox: vi.fn(),
 }));
 
-vi.mock('@gitroom/frontend/components/settings/global.settings', () => ({
-  GlobalSettings: () => <div>Global Settings</div>,
-}));
-
 vi.mock('@gitroom/frontend/components/launches/launches.component', () => ({
   SVGLine: () => null,
+}));
+
+vi.mock('@gitroom/frontend/components/settings/channels/channels.tab', () => ({
+  ChannelsTab: () => null,
 }));
 
 import { SettingsPopup } from './settings.component';
 
 describe('SettingsPopup', () => {
   beforeEach(() => {
-    mockSearchParams = 'tab=settings';
+    mockSearchParams = 'tab=channels';
   });
 
-  it('renders tabs sorted alphabetically with Settings first', () => {
+  it('groups tabs into sections', () => {
     render(<SettingsPopup />);
 
-    const buttons = screen.getAllByRole('button');
-    const labels = buttons.map((b) => b.textContent!.trim());
-
-    expect(labels[0]).toBe('Settings');
-
-    const rest = labels.slice(1);
-    const sortedRest = [...rest].sort((a, b) => a.localeCompare(b));
-    expect(rest).toEqual(sortedRest);
+    expect(screen.getByText('Workspace')).toBeDefined();
+    expect(screen.getByText('Providers')).toBeDefined();
+    expect(screen.getByText('Automation')).toBeDefined();
+    expect(screen.getByText('Developer')).toBeDefined();
   });
 
   it('does not have a Profile tab', () => {
@@ -114,11 +110,12 @@ describe('SettingsPopup', () => {
     expect(screen.queryByText('Profile')).toBeNull();
   });
 
-  it('defaults to settings tab when no tab param is given', () => {
+  it('defaults to channels tab when no tab param is given', () => {
     mockSearchParams = '';
 
     render(<SettingsPopup />);
 
-    expect(screen.getByText('Global Settings')).toBeDefined();
+    const channelsButtons = screen.getAllByText('Channels');
+    expect(channelsButtons.length).toBeGreaterThan(0);
   });
 });

@@ -224,7 +224,7 @@ export const PickPlatforms: FC<{
                       <div
                         onClick={addPlatform(integration)}
                         className={clsx(
-                          'cursor-pointer relative w-[34px] h-[34px] rounded-full flex justify-center items-center bg-fifth filter transition-all duration-500',
+                          'cursor-pointer relative w-[34px] h-[34px] rounded-full flex justify-center items-center bg-newTableHeader filter transition-all duration-500',
                           selectedAccounts.findIndex(
                             (p) => p.id === integration.id
                           ) === -1
@@ -248,7 +248,7 @@ export const PickPlatforms: FC<{
                         ) : (
                           <SafeImage
                             src={`/icons/platforms/${integration.identifier}.png`}
-                            className="rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
+                            className="rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-newTableBorder"
                             alt={integration.identifier}
                             width={20}
                             height={20}
@@ -261,12 +261,12 @@ export const PickPlatforms: FC<{
                       <div
                         onClick={addPlatform(integration)}
                         className={clsx(
-                          'cursor-pointer rounded-[50px] w-[200px] relative h-[40px] flex justify-center items-center bg-fifth filter transition-all duration-500',
+                          'cursor-pointer rounded-[50px] w-[200px] relative h-[40px] flex justify-center items-center bg-newTableHeader filter transition-all duration-500',
                           selectedAccounts.findIndex(
                             (p) => p.id === integration.id
                           ) === -1
                             ? 'bg-third border border-third'
-                            : 'bg-customColor29 border border-customColor30'
+                            : 'bg-boxHover border border-newTableBorder'
                         )}
                       >
                         <div className="flex items-center justify-center gap-[10px]">
@@ -280,7 +280,7 @@ export const PickPlatforms: FC<{
                             />
                             <SafeImage
                               src={`/icons/platforms/${integration.identifier}.png`}
-                              className="rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
+                              className="rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-newTableBorder"
                               alt={integration.identifier}
                               width={15}
                               height={15}

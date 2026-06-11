@@ -13,6 +13,16 @@ retry.
 
 The orchestrator connects to Temporal at `TEMPORAL_ADDRESS` (default `localhost:7233`).
 
+## Required environment variables
+
+### `RUN_CRON=true`
+Required for:
+- Analytics snapshot collection (Temporal `analyticsCollectionWorkflow`)
+- Comment sync (Temporal `commentsCollectionWorkflow`)
+- Watchlist account probes
+
+Without this, the analytics dashboard, comment inbox, and watchlist data will remain empty.
+
 ## Prerequisites
 
 - **Temporal server** running (included in `docker-compose.yaml`)

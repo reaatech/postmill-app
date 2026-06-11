@@ -83,13 +83,13 @@ export const PollBuilder: FC<PollBuilderProps> = ({
   ].filter((d) => d.value <= maxDuration);
 
   return (
-    <div className="mt-[12px] border border-tableBorder rounded-[8px] p-[12px] bg-sixth">
+    <div className="mt-[12px] border border-newTableBorder rounded-[8px] p-[12px] bg-newBgColorInner">
       <label className="flex items-center gap-[8px] cursor-pointer">
         <input
           type="checkbox"
           checked={isActive}
           onChange={handleToggle}
-          className="accent-forth"
+          className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
         />
         <span className="text-[13px] font-medium">
           {t('add_poll', 'Add Poll')}
@@ -101,7 +101,7 @@ export const PollBuilder: FC<PollBuilderProps> = ({
           {options.map((option, i) => (
             <div key={i} className="flex items-center gap-[6px]">
               <input
-                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-[13px] text-textColor flex-1"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-[13px] text-textColor flex-1"
                 value={option}
                 onChange={(e) => handleOptionChange(i, e.target.value)}
                 placeholder={t('poll_option_placeholder', `Option ${i + 1}...`)}
@@ -123,7 +123,7 @@ export const PollBuilder: FC<PollBuilderProps> = ({
           {options.length < maxOptions && (
             <button
               onClick={addOption}
-              className="text-forth text-[13px] self-start hover:opacity-80"
+              className="text-textColor text-[13px] self-start hover:opacity-80"
             >
               {t('add_option', '+ Add Option')}
             </button>
@@ -136,7 +136,7 @@ export const PollBuilder: FC<PollBuilderProps> = ({
             <select
               value={duration}
               onChange={(e) => setDuration(Number(e.target.value))}
-              className="bg-forth border border-tableBorder rounded-[4px] p-[6px] text-[13px] text-textColor"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[6px] text-[13px] text-textColor"
               aria-label={t('poll_duration', 'Duration:')}
             >
               {durationOptions.map((opt) => (

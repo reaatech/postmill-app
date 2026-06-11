@@ -114,10 +114,10 @@ export const AreaChart: FC<AreaChartProps> = ({
             bodyColor: tableText,
             borderColor,
             borderWidth: 1,
-            padding: 8,
-            cornerRadius: 6,
+            padding: 12,
+            cornerRadius: 8,
             displayColors: false,
-            titleFont: { size: 11, weight: 'normal' },
+            titleFont: { size: 12, weight: 'normal' },
             bodyFont: { size: 12, weight: 'bold' },
             callbacks: {
               label(context) {

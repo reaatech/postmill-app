@@ -13,6 +13,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import { ImportDebugPostModal } from '@gitroom/frontend/components/launches/import-debug-post.modal';
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
 interface Charge {
   id: string;
@@ -46,18 +47,6 @@ const ChargesModal: FC<{ close: () => void }> = ({ close }) => {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [refunding, setRefunding] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-
-  const toggleCharge = useCallback((chargeId: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(chargeId)) {
-        next.delete(chargeId);
-      } else {
-        next.add(chargeId);
-      }
-      return next;
-    });
-  }, []);
 
   const handleRefund = useCallback(async () => {
     if (!selected.size) return;
@@ -126,100 +115,37 @@ const ChargesModal: FC<{ close: () => void }> = ({ close }) => {
             {t('no_charges', 'No charges found')}
           </div>
         ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="text-left border-b border-newTableBorder">
-                <th className="p-[8px] w-[40px]" />
-                <th className="p-[8px]">{t('date', 'Date')}</th>
-                <th className="p-[8px]">{t('amount', 'Amount')}</th>
-                <th className="p-[8px]">{t('status', 'Status')}</th>
-                <th className="p-[8px] w-[50px]" />
-              </tr>
-            </thead>
-            <tbody>
-              {charges.map((charge) => (
-                <tr
-                  key={charge.id}
-                  className="border-b border-newTableBorder hover:bg-tableBorder cursor-pointer"
-                  onClick={() => !charge.refunded && toggleCharge(charge.id)}
-                >
-                  <td className="p-[8px]">
-                    <div
-                      className={`w-[20px] h-[20px] rounded-[4px] border-2 flex items-center justify-center ${
-                        charge.refunded
-                          ? 'border-newTextColor/20 opacity-40'
-                          : selected.has(charge.id)
-                          ? 'bg-forth border-forth'
-                          : 'border-newTextColor/40'
-                      }`}
-                    >
-                      {(selected.has(charge.id) || charge.refunded) && (
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          width="14"
-                          height="14"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-[8px]">
-                    {new Date(charge.created * 1000).toLocaleDateString()}
-                  </td>
-                  <td className="p-[8px]">
-                    ${(charge.amount / 100).toFixed(2)}{' '}
-                    {charge.currency.toUpperCase()}
-                  </td>
-                  <td className="p-[8px]">
-                    {charge.refunded ? (
-                      <span className="text-red-400">
-                        {t('refunded', 'Refunded')}
-                      </span>
-                    ) : (
-                      <span className="text-green-400">
-                        {t('paid', 'Paid')}
-                      </span>
-                    )}
-                  </td>
-                  <td className="p-[8px]">
-                    {(charge.invoice_pdf || charge.receipt_url) && (
-                      <a
-                        href={charge.invoice_pdf || charge.receipt_url!}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-[4px] hover:bg-tableBorder transition-colors"
-                        title={charge.invoice_pdf ? t('download_invoice', 'Download Invoice') : t('view_receipt', 'View Receipt')}
-                      >
-                        <svg
-                          xmlns="http://www.w3.org/2000/svg"
-                          viewBox="0 0 24 24"
-                          width="16"
-                          height="16"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        >
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="7 10 12 15 17 10" />
-                          <line x1="12" y1="15" x2="12" y2="3" />
-                        </svg>
-                      </a>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <DataTable
+            columns={[
+              { key: 'date', header: t('date', 'Date'), render: (charge: Charge) => new Date(charge.created * 1000).toLocaleDateString() },
+              { key: 'amount', header: t('amount', 'Amount'), render: (charge: Charge) => `$${(charge.amount / 100).toFixed(2)} ${charge.currency.toUpperCase()}` },
+              { key: 'status', header: t('status', 'Status'), render: (charge: Charge) => (
+                charge.refunded ? <span className="text-red-400">{t('refunded', 'Refunded')}</span> : <span className="text-green-400">{t('paid', 'Paid')}</span>
+              )},
+              { key: 'actions', header: '', align: 'right', render: (charge: Charge) => (
+                (charge.invoice_pdf || charge.receipt_url) ? (
+                  <a
+                    href={charge.invoice_pdf || charge.receipt_url!}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center w-[28px] h-[28px] rounded-[4px] hover:bg-tableBorder transition-colors"
+                    title={charge.invoice_pdf ? t('download_invoice', 'Download Invoice') : t('view_receipt', 'View Receipt')}
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  </a>
+                ) : null
+              )},
+            ]}
+            data={charges}
+            keyExtractor={(charge: Charge) => charge.id}
+            selectedIds={Array.from(selected)}
+            onSelectionChange={(ids) => setSelected(new Set(ids.filter((id) => !charges?.find((c) => c.id === id)?.refunded)))}
+            emptyState={{ title: t('no_charges', 'No charges found') }}
+          />
         )}
       </div>
       <div className="flex gap-[12px] justify-end">
@@ -361,7 +287,7 @@ const AddAnnouncementModal: FC<{ close: () => void }> = ({ close }) => {
           {t('announcement_description', 'Description')}
         </label>
         <textarea
-          className="bg-input border border-tableBorder rounded-[8px] p-[10px] text-newTextColor min-h-[120px] outline-none resize-y"
+          className="bg-input border border-newTableBorder rounded-[8px] p-[10px] text-newTextColor min-h-[120px] outline-none resize-y"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           placeholder={t(
@@ -504,7 +430,7 @@ export const Impersonate = () => {
   }, [data]);
   return (
     <div>
-      <div className="bg-forth h-[52px] flex justify-center items-center border-input border rounded-[8px] text-white">
+      <div className="bg-btnPrimary h-[52px] flex justify-center items-center border-input border rounded-[8px] text-white">
         <div className="relative flex flex-col w-[600px]">
           <div className="relative z-[1]">
             {user?.impersonate ? (
@@ -548,12 +474,12 @@ export const Impersonate = () => {
                 className="bg-primary/80 fixed start-0 top-0 w-full h-full z-[998]"
                 onClick={() => setName('')}
               />
-              <div className="absolute top-[100%] w-full start-0 bg-sixth border border-customColor6 text-textColor z-[999]">
+              <div className="absolute top-[100%] w-full start-0 bg-newBgColorInner border border-newTableBorder text-textColor z-[999]">
                 {mapData?.map((user: any) => (
                   <div
                     onClick={setUser(user.id)}
                     key={user.id}
-                    className="p-[10px] border-b border-customColor6 hover:bg-tableBorder cursor-pointer"
+                    className="p-[10px] border-b border-newTableBorder hover:bg-boxHover cursor-pointer"
                   >
                     {t('user_1', 'user:')}
                     {user.id.split('-').at(-1)} - {user.name} - {user.email}

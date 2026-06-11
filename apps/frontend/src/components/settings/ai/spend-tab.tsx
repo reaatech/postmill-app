@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
 interface SpendEntry {
   id: string;
@@ -96,12 +97,12 @@ export const SpendTab = () => {
 
   return (
     <div className="flex flex-col gap-[24px]">
-      <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
         <div className="mt-[4px]">{t('spend_log', 'Spend Log')}</div>
 
         <div className="flex items-center gap-[12px]">
           <select
-            className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-[200px]"
+            className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-[200px]"
             value={scope}
             onChange={(e) => {
               setScope(e.target.value);
@@ -116,7 +117,7 @@ export const SpendTab = () => {
           </select>
           {scope && (
             <button
-              className="text-[12px] text-customColor4 hover:underline"
+              className="text-[12px] text-textColor hover:underline"
               onClick={handleClearFilters}
             >
               {t('clear', 'Clear')}
@@ -124,70 +125,34 @@ export const SpendTab = () => {
           )}
         </div>
 
-        {isLoading ? (
-          <div className="animate-pulse">{t('loading', 'Loading...')}</div>
-        ) : spend && spend.length > 0 ? (
-          <div className="flex flex-col gap-[8px]">
-            <div className="grid grid-cols-6 gap-[8px] text-[12px] text-customColor18 font-semibold px-[12px]">
-              <div>{t('provider', 'Provider')}</div>
-              <div>{t('model', 'Model')}</div>
-              <div>{t('scope', 'Scope')}</div>
-              <div>{t('tokens', 'Tokens')}</div>
-              <div>{t('cost', 'Cost')}</div>
-              <div>{t('date', 'Date')}</div>
-            </div>
-            {spend.map((entry) => (
-              <div
-                key={entry.id}
-                className="grid grid-cols-6 gap-[8px] text-[13px] bg-forth border border-tableBorder rounded-[4px] px-[12px] py-[8px]"
-              >
-                <div>{entry.provider}</div>
-                <div className="truncate">{entry.model}</div>
-                <div>{entry.scope}</div>
-                <div>
-                  {entry.inputTokens + entry.outputTokens}
-                </div>
-                <div>${entry.costUsd.toFixed(6)}</div>
-                <div className="text-[12px] text-customColor18">
-                  {new Date(entry.createdAt).toLocaleDateString()}
-                </div>
-              </div>
-            ))}
-            <div className="flex items-center justify-between mt-[8px]">
-              <button
-                className="text-[12px] text-customColor4 hover:underline disabled:opacity-50"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                {t('previous', 'Previous')}
-              </button>
-              <span className="text-[12px] text-customColor18">
-                {t('page', 'Page')} {page + 1}
-              </span>
-              <button
-                className="text-[12px] text-customColor4 hover:underline disabled:opacity-50"
-                disabled={!spend || spend.length < 50}
-                onClick={() => setPage((p) => p + 1)}
-              >
-                {t('next', 'Next')}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <div className="text-[12px] text-customColor18">
-            {t('no_spend_data', 'No spend data yet')}
-          </div>
-        )}
+        <DataTable
+          columns={[
+            { key: 'provider', header: t('provider', 'Provider') },
+            { key: 'model', header: t('model', 'Model'), render: (entry: SpendEntry) => <span className="truncate block max-w-[200px]">{entry.model}</span> },
+            { key: 'scope', header: t('scope', 'Scope') },
+            { key: 'tokens', header: t('tokens', 'Tokens'), align: 'right', render: (entry: SpendEntry) => entry.inputTokens + entry.outputTokens },
+            { key: 'cost', header: t('cost', 'Cost'), align: 'right', render: (entry: SpendEntry) => `$${entry.costUsd.toFixed(6)}` },
+            { key: 'date', header: t('date', 'Date'), render: (entry: SpendEntry) => new Date(entry.createdAt).toLocaleDateString() },
+          ]}
+          data={spend || []}
+          keyExtractor={(entry: SpendEntry) => entry.id}
+          loading={isLoading}
+          page={page + 1}
+          total={spend ? (spend.length < 50 ? page * 50 + spend.length : (page + 1) * 50 + 1) : 0}
+          limit={50}
+          onPageChange={(p) => setPage(p - 1)}
+          emptyState={{ title: t('no_spend_data', 'No spend data yet') }}
+        />
       </div>
 
-      <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
         <div className="mt-[4px]">{t('budget_caps', 'Budget Caps')}</div>
 
         <div className="flex flex-col gap-[16px]">
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <div className="text-[14px]">{t('enable_budget', 'Enable Budget')}</div>
-              <div className="text-[12px] text-customColor18">
+              <div className="text-[12px] text-newTableText">
                 {t('enable_budget_description', 'Set caps on AI spend for this organization')}
               </div>
             </div>
@@ -200,7 +165,7 @@ export const SpendTab = () => {
                   setBudgetForm((prev) => ({ ...prev, enabled: e.target.checked }))
                 }
               />
-              <div className="w-[36px] h-[20px] bg-forth rounded-full peer peer-checked:bg-customColor4 peer-checked:after:translate-x-[16px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-[16px] after:w-[16px] after:transition-all" />
+              <div className="w-[36px] h-[20px] bg-newTableHeader rounded-full peer peer-checked:bg-btnPrimary peer-checked:after:translate-x-[16px] after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-[16px] after:w-[16px] after:transition-all" />
             </label>
           </div>
 
@@ -210,7 +175,7 @@ export const SpendTab = () => {
             </label>
             <input
               type="number"
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-[250px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-[250px]"
               value={budgetForm?.monthlyCap ?? ''}
               onChange={(e) =>
                 setBudgetForm((prev) => ({
@@ -230,7 +195,7 @@ export const SpendTab = () => {
             </label>
             <input
               type="number"
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-[250px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-[250px]"
               value={budgetForm?.dailyCap ?? ''}
               onChange={(e) =>
                 setBudgetForm((prev) => ({
@@ -246,7 +211,7 @@ export const SpendTab = () => {
 
           <div className="flex justify-end">
             <button
-              className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
+              className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
               onClick={handleSaveBudget}
             >
               {t('save_budget', 'Save Budget')}

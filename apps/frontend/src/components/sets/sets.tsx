@@ -162,7 +162,7 @@ export const Sets: FC = () => {
     <div className="flex flex-col">
       <div className="mb-[16px]">
         <h3 className="text-[20px]">{t('sets', 'Sets')}</h3>
-        <div className="text-customColor18 mt-[4px] text-[13px] leading-relaxed">
+        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
           {t('sets_description', 'A Set is a saved group of social accounts and post content that you can reuse across multiple posts. Create sets for recurring campaigns, weekly digests, or common post configurations.')}
         </div>
       </div>
@@ -180,15 +180,15 @@ export const Sets: FC = () => {
         <Button onClick={addSet()}>{t('add_set', 'Add Set')}</Button>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] overflow-x-auto">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
         {isLoading && (
           <div className="flex flex-col gap-[8px] py-[16px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
               </div>
             ))}
           </div>
@@ -197,14 +197,14 @@ export const Sets: FC = () => {
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
             <div className="text-red-400 text-[14px]">{t('failed_loading_sets', 'Failed to load sets')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-forth hover:underline">{t('try_again', 'Try again')}</button>
+            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
 
         {!isLoading && !error && (!data || data.length === 0) && (
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_sets', 'No sets created yet')}</div>
-            <p className="text-[12px] text-customColor18 max-w-[400px] text-center">
+            <p className="text-[12px] text-newTableText max-w-[400px] text-center">
               {t('sets_empty_hint', 'Sets let you save groups of social accounts and content together so you can quickly reuse them when creating new posts.')}
             </p>
             <Button onClick={addSet()}>{t('create_first_set', 'Create your first set')}</Button>
@@ -214,7 +214,7 @@ export const Sets: FC = () => {
         {!isLoading && data && data.length > 0 && (
           <>
             <div className="min-w-[700px]">
-            <div className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-customColor18 uppercase font-medium pb-[12px] border-b border-fifth items-center">
+            <div className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
               <div>{t('name', 'Name')}</div>
               <div>{t('channels', 'Channels')}</div>
               <div>{t('post_count', 'Posts')}</div>
@@ -224,7 +224,7 @@ export const Sets: FC = () => {
 
             <div className="flex flex-col">
               {filtered.map((s: any) => (
-                <div key={s.id} className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-fifth/50 items-center text-[14px]">
+                <div key={s.id} className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-newTableBorder/50 items-center text-[14px]">
                   <div className="truncate">{s.name}</div>
                   <div>
                     {(() => {
@@ -239,20 +239,20 @@ export const Sets: FC = () => {
                                   key={i}
                                   src={c.integration.picture}
                                   alt=""
-                                  className="w-[20px] h-[20px] rounded-full border border-fifth"
+                                  className="w-[20px] h-[20px] rounded-full border border-newTableBorder"
                                 />
                               ))}
                               {channels.length > 5 && (
-                                <span className="text-[11px] text-customColor18">+{channels.length - 5}</span>
+                                <span className="text-[11px] text-newTableText">+{channels.length - 5}</span>
                               )}
                             </div>
                           );
                         }
                       } catch {}
-                      return <span className="text-[12px] text-customColor18">—</span>;
+                      return <span className="text-[12px] text-newTableText">—</span>;
                     })()}
                   </div>
-                  <div className="text-customColor18 text-[12px]">
+                  <div className="text-newTableText text-[12px]">
                     {(() => {
                       try {
                         const content = JSON.parse(s.content || '[]');
@@ -260,9 +260,9 @@ export const Sets: FC = () => {
                       } catch { return 0; }
                     })()}
                   </div>
-                  <div className="text-customColor18 text-[12px]">{dayjs(s.createdAt).format('MMM D, YYYY')}</div>
+                  <div className="text-newTableText text-[12px]">{dayjs(s.createdAt).format('MMM D, YYYY')}</div>
                   <div className="flex justify-end gap-[8px]">
-                    <button onClick={addSet(s)} className="text-[12px] text-forth hover:underline">{t('edit', 'Edit')}</button>
+                    <button onClick={addSet(s)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
                     <button onClick={deleteSet(s)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
@@ -272,11 +272,11 @@ export const Sets: FC = () => {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-fifth">
-                <div className="text-[12px] text-customColor18">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
+              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-newTableBorder">
+                <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
                 <div className="flex gap-[8px]">
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
+                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
+                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
                 </div>
               </div>
             )}

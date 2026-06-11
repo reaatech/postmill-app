@@ -4,7 +4,7 @@ import { capitalize } from 'lodash';
 
 const SENSITIVE_FIELDS = new Set([
   'Authorization', 'auth', 'cookie', 'showorg', 'impersonate',
-  'apiKey', 'api_key', 'pos_', 'pca_', 'pcs_',
+  'apiKey', 'api_key', 'pos_', 'pca_', 'pcs_', 'pm_',
   'password', 'secret', 'accessToken', 'access_token',
   'refreshToken', 'refresh_token', 'token',
 ]);

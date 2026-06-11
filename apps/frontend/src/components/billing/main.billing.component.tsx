@@ -28,6 +28,7 @@ import { FinishTrial } from '@gitroom/frontend/components/billing/finish.trial';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useDubClickId } from '@gitroom/frontend/components/layout/dubAnalytics';
 import { LogoutComponent } from '@gitroom/frontend/components/layout/logout.component';
+import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
 export const Prorate: FC<{
   period: 'MONTHLY' | 'YEARLY';
@@ -111,7 +112,7 @@ export const Features: FC<{
     return list;
   }, [pack]);
   return (
-    <div className="flex flex-col gap-[10px] justify-center text-[16px] text-customColor18">
+    <div className="flex flex-col gap-[10px] justify-center text-[16px] text-newTableText">
       {features.map((feature) => (
         <div key={feature} className="flex gap-[20px]">
           <div>
@@ -439,16 +440,19 @@ export const MainBillingComponent: FC<{
   }
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex flex-row">
-        <div className="flex-1 text-[20px]">{t('plans', 'Plans')}</div>
-        <div className="flex items-center gap-[16px]">
-          <div>{t('monthly', 'MONTHLY')}</div>
-          <div>
-            <Slider value={monthlyOrYearly} onChange={setMonthlyOrYearly} />
+      <PageHeader
+        title="Billing"
+        description="Manage your subscription and plan"
+        action={
+          <div className="flex items-center gap-[16px]">
+            <div>{t('monthly', 'MONTHLY')}</div>
+            <div>
+              <Slider value={monthlyOrYearly} onChange={setMonthlyOrYearly} />
+            </div>
+            <div>{t('yearly', 'YEARLY')}</div>
           </div>
-          <div>{t('yearly', 'YEARLY')}</div>
-        </div>
-      </div>
+        }
+      />
 
       {finishTrial && <FinishTrial close={() => setFinishTrial(false)} />}
       <div className="flex gap-[16px] [@media(max-width:1024px)]:flex-col [@media(max-width:1024px)]:text-center">
@@ -457,7 +461,7 @@ export const MainBillingComponent: FC<{
           .map(([name, values]) => (
             <div
               key={name}
-              className="flex-1 bg-sixth border border-customColor6 rounded-[4px] p-[24px] gap-[16px] flex flex-col [@media(max-width:1024px)]:items-center"
+              className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[4px] p-[24px] gap-[16px] flex flex-col [@media(max-width:1024px)]:items-center"
             >
               <div className="text-[18px]">{name}</div>
               <div className="text-[38px] flex gap-[2px] items-center">
@@ -467,7 +471,7 @@ export const MainBillingComponent: FC<{
                     ? values.year_price
                     : values.month_price}
                 </div>
-                <div className={`text-[14px] text-customColor18`}>
+                <div className={`text-[14px] text-newTableText`}>
                   {monthlyOrYearly === 'on' ? '/year' : '/month'}
                 </div>
               </div>

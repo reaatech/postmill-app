@@ -6,6 +6,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ShortlinkProviderForm } from '@gitroom/frontend/components/settings/shortlinks/shortlink-provider-form';
 import { useShortlinksConfig } from '@gitroom/frontend/components/settings/shortlinks/hooks/useShortlinksConfig';
+import ShortlinkPreferenceComponent from '@gitroom/frontend/components/settings/shortlink-preference.component';
 
 export const ShortlinksTab = () => {
   const t = useT();
@@ -92,6 +93,59 @@ export const ShortlinksTab = () => {
     mutate();
   }, [fetch, mutate, toaster, t]);
 
+  const PROVIDER_BRANDS: Record<string, { color: string; shortName: string }> = {
+    bitly: { color: '#EE6123', shortName: 'Bi' },
+    blink: { color: '#1B73E8', shortName: 'BL' },
+    tly: { color: '#4361EE', shortName: 'TL' },
+    replug: { color: '#4361EE', shortName: 'Re' },
+    owly: { color: '#00A86B', shortName: 'Ow' },
+    dub: { color: '#18181B', shortName: 'Du' },
+    shortio: { color: '#F97316', shortName: 'Sh' },
+    linkly: { color: '#2563EB', shortName: 'Li' },
+    isgd: { color: '#059669', shortName: 'is' },
+    tinycc: { color: '#DC2626', shortName: 'TC' },
+    sniply: { color: '#4361EE', shortName: 'Sn' },
+    cleanuri: { color: '#0891B2', shortName: 'Cl' },
+    rebrandly: { color: '#2563EB', shortName: 'Rb' },
+    tinyurl: { color: '#0284C7', shortName: 'TU' },
+    pixelme: { color: '#2563EB', shortName: 'Px' },
+    t2m: { color: '#475569', shortName: 'T2' },
+    vgd: { color: '#15803D', shortName: 'vg' },
+    cuttly: { color: '#B45309', shortName: 'Cu' },
+    switchy: { color: '#4361EE', shortName: 'Sw' },
+  };
+
+  const ProviderIcon = ({ identifier, name }: { identifier: string; name: string }) => {
+    const [imgError, setImgError] = useState(false);
+    const brand = PROVIDER_BRANDS[identifier];
+    const src = `/icons/shortlinks/${identifier}.png`;
+    if (!imgError) {
+      return (
+        <img
+          className="w-[48px] h-[48px] rounded-[8px] object-contain"
+          src={src}
+          alt={name}
+          onError={() => setImgError(true)}
+        />
+      );
+    }
+    if (brand) {
+      return (
+        <div
+          className="w-[48px] h-[48px] rounded-[8px] flex items-center justify-center text-white text-[16px] font-semibold shrink-0"
+          style={{ backgroundColor: brand.color }}
+        >
+          {brand.shortName}
+        </div>
+      );
+    }
+    return (
+      <div className="w-[48px] h-[48px] rounded-[8px] bg-blue-500 flex items-center justify-center text-white text-[20px] font-semibold shrink-0">
+        {name.charAt(0).toUpperCase()}
+      </div>
+    );
+  };
+
   const capabilityChips = (provider: any) => {
     const chips = [];
     if (provider.capabilities.statistics) chips.push(t('stats', 'Stats'));
@@ -105,11 +159,13 @@ export const ShortlinksTab = () => {
     <div className="flex flex-col gap-[16px]">
       <h3 className="text-[20px]">{t('shortlinks', 'Shortlinks')}</h3>
 
+      <ShortlinkPreferenceComponent />
+
       {error && (
-        <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col items-center gap-[12px]">
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">{t('failed_to_load', 'Failed to load shortlink settings')}</span>
           <button
-            className="text-[13px] bg-forth border border-tableBorder rounded-[4px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
+            className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
             onClick={() => window.location.reload()}
           >
             {t('try_again', 'Try again')}
@@ -129,13 +185,14 @@ export const ShortlinksTab = () => {
       ) : (
         <>
           {/* Active Provider Card */}
-          <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
             <div className="mt-[4px]">{t('active_provider', 'Active Provider')}</div>
             {isLoading ? (
               <div className="animate-pulse">{t('loading', 'Loading...')}</div>
             ) : config?.active ? (
-              <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex items-center justify-between">
-                <div className="flex flex-col gap-[4px]">
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex items-center gap-[12px]">
+                <ProviderIcon identifier={config.active.identifier} name={config.active.name} />
+                <div className="flex flex-col gap-[4px] flex-1">
                   <span className="text-[14px] font-semibold">{config.active.name}</span>
                     {config.active.customDomain && (
                     <span className="text-[12px] text-newTableText">
@@ -148,7 +205,7 @@ export const ShortlinksTab = () => {
                 </span>
               </div>
             ) : (
-              <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px]">
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px]">
                 <span className="text-[13px] text-newTableText">
                   {t('no_active_provider', 'No provider configured. Search and configure a provider below.')}
                 </span>
@@ -157,14 +214,14 @@ export const ShortlinksTab = () => {
           </div>
 
           {/* Searchable Provider Dropdown */}
-          <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
             <div className="mt-[4px]">{t('all_providers', 'All Providers')}</div>
 
             {/* Search input - native combobox */}
             <div className="relative">
               <input
                 type="text"
-                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-full"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-full"
                 placeholder={t('search_providers', 'Search providers...')}
                 value={searchQuery}
                 onChange={(e) => {
@@ -175,19 +232,20 @@ export const ShortlinksTab = () => {
                 onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               />
               {showDropdown && filteredProviders.length > 0 && (
-                <div className="absolute z-50 top-full left-0 right-0 mt-[4px] bg-forth border border-tableBorder rounded-[4px] max-h-[300px] overflow-y-auto shadow-lg">
+                <div className="absolute z-50 top-full left-0 right-0 mt-[4px] bg-newBgColorInner border border-newTableBorder rounded-[8px] max-h-[300px] overflow-y-auto shadow-lg">
                   {filteredProviders.map((provider: any) => (
                     <button
                       key={provider.identifier}
-                      className="w-full text-left px-[12px] py-[10px] hover:bg-boxHover flex items-center justify-between gap-[8px] border-b border-tableBorder last:border-b-0"
+                      className="w-full text-left px-[12px] py-[10px] hover:bg-boxHover flex items-center gap-[8px] border-b border-newTableBorder last:border-b-0"
                       onMouseDown={() => {
                         setConfiguringProvider(provider.identifier);
                         setShowDropdown(false);
                         setSearchQuery('');
                       }}
                     >
-                      <span className="text-[13px] font-medium">{provider.name}</span>
-                      <div className="flex gap-[4px]">
+                      <ProviderIcon identifier={provider.identifier} name={provider.name} />
+                      <span className="text-[13px] font-medium flex-1">{provider.name}</span>
+                      <div className="flex gap-[4px] shrink-0">
                         {capabilityChips(provider).map((chip: string) => (
                           <span
                             key={chip}
@@ -211,23 +269,24 @@ export const ShortlinksTab = () => {
                 {filteredProviders.map((provider: any) => (
                   <div
                     key={provider.identifier}
-                    className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex items-center justify-between"
+                    className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex items-center gap-[12px]"
                   >
-                    <div className="flex flex-col gap-[4px] flex-1">
+                    <ProviderIcon identifier={provider.identifier} name={provider.name} />
+                    <div className="flex flex-col gap-[4px] flex-1 min-w-0">
                       <div className="flex items-center gap-[8px]">
-                        <span className="text-[14px] font-semibold">{provider.name}</span>
+                        <span className="text-[14px] font-semibold truncate">{provider.name}</span>
                         {provider.isActive && (
-                          <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px]">
+                          <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px] shrink-0">
                             {t('active', 'Active')}
                           </span>
                         )}
                         {provider.isConfigured && !provider.isActive && (
-                          <span className="text-[11px] bg-blue-900/20 text-blue-400 rounded-[4px] px-[8px] py-[2px]">
+                          <span className="text-[11px] bg-blue-900/20 text-blue-400 rounded-[4px] px-[8px] py-[2px] shrink-0">
                             {t('configured', 'Configured')}
                           </span>
                         )}
                       </div>
-                      <div className="flex gap-[4px] mt-[4px]">
+                      <div className="flex gap-[4px] mt-[4px] flex-wrap">
                         {capabilityChips(provider).map((chip: string) => (
                           <span
                             key={chip}
@@ -238,7 +297,7 @@ export const ShortlinksTab = () => {
                         ))}
                       </div>
                     </div>
-                    <div className="flex items-center gap-[8px]">
+                    <div className="flex items-center gap-[8px] shrink-0">
                       <button
                         className="text-[12px] text-btnPrimary hover:underline"
                         onClick={() => setConfiguringProvider(provider.identifier)}

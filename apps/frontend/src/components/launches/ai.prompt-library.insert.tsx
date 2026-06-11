@@ -124,9 +124,9 @@ const PromptLibraryDropdown: FC<{
   return (
     <div
       ref={ref}
-      className="absolute z-[200] top-full mt-[4px] w-[280px] bg-fifth border border-tableBorder rounded-[8px] shadow-lg overflow-hidden"
+      className="absolute z-[200] top-full mt-[4px] w-[280px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg overflow-hidden"
     >
-      <div className="p-[8px] border-b border-tableBorder flex justify-between items-center">
+      <div className="p-[8px] border-b border-newTableBorder flex justify-between items-center">
         <div className="text-[12px] font-[600]">
           {t('saved_prompts', 'Saved Prompts')}
         </div>
@@ -139,23 +139,23 @@ const PromptLibraryDropdown: FC<{
       </div>
 
       {showAddForm && (
-        <div className="p-[8px] border-b border-tableBorder flex flex-col gap-[6px]">
+        <div className="p-[8px] border-b border-newTableBorder flex flex-col gap-[6px]">
           <input
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             placeholder={t('prompt_title', 'Prompt title...')}
-            className="bg-input px-[10px] h-[32px] outline-none border-fifth border rounded-[4px] text-inputText placeholder-inputText text-[12px]"
+            className="bg-newBgColorInner px-[10px] h-[32px] outline-none border-newTableBorder border rounded-[8px] text-textColor placeholder-inputText text-[12px]"
           />
           <textarea
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
             placeholder={t('prompt_content', 'Prompt content...')}
-            className="bg-input min-h-[60px] p-[10px] outline-none border-fifth border rounded-[4px] text-inputText placeholder-inputText text-[12px]"
+            className="bg-newBgColorInner min-h-[60px] p-[10px] outline-none border-newTableBorder border rounded-[8px] text-textColor placeholder-inputText text-[12px]"
           />
           <button
             onClick={savePrompt}
             disabled={saving}
-            className="cursor-pointer text-white disabled:opacity-50 h-[28px] text-[11px] items-center justify-center bg-[#2B5CD3] flex rounded-[4px]"
+            className="cursor-pointer text-white disabled:opacity-50 h-[28px] text-[11px] items-center justify-center bg-btnPrimary flex rounded-[8px]"
           >
             {saving ? (
               <Loading height={12} width={12} type="spin" color="#fff" />
@@ -187,7 +187,7 @@ const PromptLibraryDropdown: FC<{
           data.map((item: PromptLibraryItem) => (
             <div
               key={item.id}
-              className="group px-[10px] py-[8px] hover:bg-forth cursor-pointer border-b border-tableBorder/50 last:border-b-0 flex justify-between items-center"
+              className="group px-[10px] py-[8px] hover:bg-boxHover cursor-pointer border-b border-newTableBorder/50 last:border-b-0 flex justify-between items-center"
             >
               <div
                 className="flex-1 min-w-0"

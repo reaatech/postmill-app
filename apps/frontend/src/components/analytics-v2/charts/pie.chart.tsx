@@ -34,7 +34,7 @@ function resolveChartColors(): string[] {
     resolveCSSVar('var(--chart-4, #f97066)'),
     resolveCSSVar('var(--chart-5, #ffac30)'),
     resolveCSSVar('var(--chart-6, #8b90ff)'),
-    resolveCSSVar('var(--chart-7, #b69dec)'),
+    resolveCSSVar('var(--chart-7, #8b90ff)'),
     resolveCSSVar('var(--chart-8, #e4b895)'),
   ];
 }
@@ -131,8 +131,9 @@ export const PieChart: FC<PieChartProps> = ({
             bodyColor: tableText,
             borderColor,
             borderWidth: 1,
-            padding: 8,
-            cornerRadius: 6,
+            padding: 12,
+            cornerRadius: 8,
+            titleFont: { size: 12, weight: 'normal' },
             bodyFont: { size: 12, weight: 'bold' },
             callbacks: {
               label(context) {

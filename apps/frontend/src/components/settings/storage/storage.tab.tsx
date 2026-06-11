@@ -190,15 +190,15 @@ export const StorageTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-[20px]">
       {/* Tab Navigation */}
-      <div className="flex gap-[16px] border-b border-customColor20">
+      <div className="flex gap-[16px] border-b border-newTableBorder">
         {['providers', 'quota', 'breakdown', 'audit'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab as typeof activeTab)}
             className={`px-[16px] py-[12px] text-[14px] font-medium transition-colors ${
               activeTab === tab
-                ? 'text-customColor13 border-b-2 border-customColor13'
-                : 'text-customColor18 hover:text-textColor'
+                ? 'text-textColor border-b-2 border-btnPrimary'
+                : 'text-newTableText hover:text-textColor'
             }`}
           >
             {tab === 'providers' && 'Providers'}
@@ -226,14 +226,14 @@ export const StorageTab: React.FC = () => {
                 setEditProvider(null);
                 setShowModal(true);
               }}
-              className="px-[16px] py-[8px] rounded-[8px] bg-customColor4 text-textColor text-[13px] font-medium hover:bg-customColor4/80 transition-colors"
+              className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors"
             >
               Add Provider
             </button>
           </div>
 
           {loading ? (
-            <div className="text-[14px] text-customColor18">Loading...</div>
+            <div className="text-[14px] text-newTableText">Loading...</div>
           ) : (
             <>
               <div className="flex flex-col gap-[12px]">
@@ -283,7 +283,7 @@ export const StorageTab: React.FC = () => {
                   </div>
                 </div>
               ) : (
-                <div className="text-[14px] text-customColor18 text-center py-[40px]">
+                <div className="text-[14px] text-newTableText text-center py-[40px]">
                   No additional storage providers configured yet.
                 </div>
               )}
@@ -297,24 +297,24 @@ export const StorageTab: React.FC = () => {
           <h3 className="text-[20px] text-textColor">Quota Status</h3>
           {quotaStatus ? (
             <div className="flex flex-col gap-[16px]">
-              <div className="p-[16px] rounded-[8px] bg-customColor8">
-                <div className="text-[13px] text-customColor18 mb-[8px]">Used / Quota</div>
+              <div className="p-[16px] rounded-[8px] bg-btnSimple">
+                <div className="text-[13px] text-newTableText mb-[8px]">Used / Quota</div>
                 <div className="text-[24px] text-textColor font-semibold mb-[12px]">
                   {formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)}
                 </div>
-                <div className="w-full bg-customColor20 rounded-[4px] h-[8px] overflow-hidden">
+                <div className="w-full bg-newTableHeader rounded-[4px] h-[8px] overflow-hidden">
                   <div
                     className={`h-full ${quotaStatus.percentUsed >= 90 ? 'bg-[#ef4444]' : quotaStatus.percentUsed >= 80 ? 'bg-[#f59e0b]' : 'bg-[#10b981]'}`}
                     style={{ width: `${Math.min(quotaStatus.percentUsed, 100)}%` }}
                   />
                 </div>
-                <div className="text-[13px] text-customColor18 mt-[8px]">
+                <div className="text-[13px] text-newTableText mt-[8px]">
                   {quotaStatus.percentUsed.toFixed(1)}% Used
                 </div>
               </div>
             </div>
           ) : (
-            <div className="text-[14px] text-customColor18">Loading quota status...</div>
+            <div className="text-[14px] text-newTableText">Loading quota status...</div>
           )}
         </div>
       )}
@@ -329,14 +329,14 @@ export const StorageTab: React.FC = () => {
                 {usageBreakdown.byFolder?.length > 0 ? (
                   <div className="space-y-[8px]">
                     {usageBreakdown.byFolder.map((folder: any) => (
-                      <div key={folder.folderId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-customColor8 text-[13px]">
+                      <div key={folder.folderId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-btnSimple text-[13px]">
                         <span className="text-textColor">{folder.folderName}</span>
-                        <span className="text-customColor18">{formatBytes(folder.totalBytes)}</span>
+                        <span className="text-newTableText">{formatBytes(folder.totalBytes)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-[13px] text-customColor18">No usage data</div>
+                  <div className="text-[13px] text-newTableText">No usage data</div>
                 )}
               </div>
               <div className="flex flex-col gap-[12px]">
@@ -344,19 +344,19 @@ export const StorageTab: React.FC = () => {
                 {usageBreakdown.byProvider?.length > 0 ? (
                   <div className="space-y-[8px]">
                     {usageBreakdown.byProvider.map((provider: any) => (
-                      <div key={provider.providerId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-customColor8 text-[13px]">
+                      <div key={provider.providerId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-btnSimple text-[13px]">
                         <span className="text-textColor">{provider.providerName}</span>
-                        <span className="text-customColor18">{formatBytes(provider.totalBytes)}</span>
+                        <span className="text-newTableText">{formatBytes(provider.totalBytes)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-[13px] text-customColor18">No usage data</div>
+                  <div className="text-[13px] text-newTableText">No usage data</div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="text-[14px] text-customColor18">Loading usage breakdown...</div>
+            <div className="text-[14px] text-newTableText">Loading usage breakdown...</div>
           )}
         </div>
       )}

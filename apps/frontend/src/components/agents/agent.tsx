@@ -174,7 +174,7 @@ export const AgentList: FC<{ onChange: (arr: any[]) => void }> = ({
                 />
                 <SafeImage
                   src={`/icons/platforms/${integration.identifier}.png`}
-                  className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
+                  className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-newTableBorder"
                   alt={integration.identifier}
                   width={18.41}
                   height={18.41}

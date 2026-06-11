@@ -71,7 +71,8 @@ describe('PostsTab', () => {
     render(
       <PostsTab {...baseProps} loading={false} error={new Error('fail')} />
     );
-    expect(screen.getByText('Failed to load posts')).toBeTruthy();
+    expect(screen.getByText('Failed to load data')).toBeTruthy();
+    expect(screen.getByText('fail')).toBeTruthy();
   });
 
   it('renders empty state', () => {

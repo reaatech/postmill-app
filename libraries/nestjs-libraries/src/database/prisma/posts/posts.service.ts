@@ -1560,4 +1560,24 @@ export class PostsService {
 
     return { rows: results };
   }
+
+  getTotalCount(orgId: string) {
+    return this._postRepository.getTotalPostCount(orgId);
+  }
+
+  getScheduledCount(orgId: string) {
+    return this._postRepository.getScheduledPostCount(orgId);
+  }
+
+  getPublishedCountSince(orgId: string, since: Date) {
+    return this._postRepository.getPublishedPostCountSince(orgId, since);
+  }
+
+  getDraftCount(orgId: string) {
+    return this._postRepository.getDraftPostCount(orgId);
+  }
+
+  getUpcomingPosts(orgId: string, limit: number) {
+    return this._postRepository.getUpcomingPosts(orgId, limit);
+  }
 }

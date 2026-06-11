@@ -220,11 +220,11 @@ export const CalendarItem: FC<{
             src={post.integration.picture! || '/no-picture.jpg'}
           />
           <img
-            className="w-[12px] h-[12px] rounded-[8px] absolute z-10 top-[10px] end-0 border border-fifth"
+            className="w-[12px] h-[12px] rounded-[8px] absolute z-10 top-[10px] end-0 border border-newTableBorder"
             src={`/icons/platforms/${post.integration?.providerIdentifier}.png`}
           />
         </div>
-        <div className="w-full flex-1 flex flex-col min-h-[40px]">
+        <div className="w-full flex-1 flex flex-col min-h-[90px] gap-[2px]">
           <div className="flex items-center gap-[6px] flex-wrap">
             <div className="text-start text-[12px]">
               {state === 'DRAFT' ? t('draft', 'Draft') + ': ' : ''}
@@ -248,11 +248,9 @@ export const CalendarItem: FC<{
               </div>
             )}
           </div>
-            <div className="w-full relative">
-              <div className="absolute top-0 start-0 w-full text-ellipsis break-words line-clamp-1 text-start">
-                {stripHtmlValidation('none', post.content, false, true, false) ||
-                  t('no_content', 'no content')}
-              </div>
+            <div className="w-full text-ellipsis break-words line-clamp-1 text-start min-h-[18px]">
+              {stripHtmlValidation('none', post.content, false, true, false) ||
+                t('no_content', 'no content')}
             </div>
           {(post.lastViews !== undefined && post.lastViews !== null) ||
           (post.lastLikes !== undefined && post.lastLikes !== null) ||

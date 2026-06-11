@@ -130,29 +130,29 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-sixth border border-fifth rounded-[16px] p-[24px] w-full max-w-[500px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[16px] p-[24px] w-full max-w-[500px]">
         <h3 className="text-[18px] font-medium text-textColor mb-[20px]">
           Migrate Files
         </h3>
 
         {!result ? (
           <>
-            <p className="text-[14px] text-customColor18 mb-[20px]">
+            <p className="text-[14px] text-newTableText mb-[20px]">
               Migrate all files from{' '}
               <span className="text-textColor font-medium">{source.name}</span> to
               another storage provider. Files will be copied, verified, and then
               removed from the source.
             </p>
 
-            <div className="mb-[16px] p-[12px] rounded-[8px] bg-fifth">
+            <div className="mb-[16px] p-[12px] rounded-[8px] bg-btnSimple">
               <div className="flex justify-between text-[13px]">
-                <span className="text-customColor18">Files to migrate</span>
+                <span className="text-newTableText">Files to migrate</span>
                 <span className="text-textColor font-medium">
                   {preview ? preview.count : '…'}
                 </span>
               </div>
               <div className="flex justify-between text-[13px] mt-[4px]">
-                <span className="text-customColor18">Total size</span>
+                <span className="text-newTableText">Total size</span>
                 <span className="text-textColor font-medium">
                   {preview ? formatBytes(preview.totalBytes) : '…'}
                 </span>
@@ -160,14 +160,14 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
             </div>
 
             <div className="mb-[20px]">
-              <label className="text-[12px] text-customColor18 mb-[6px] block">
+              <label className="text-[12px] text-newTableText mb-[6px] block">
                 Target Provider
               </label>
               <select
                 value={targetId}
                 onChange={(e) => setTargetId(e.target.value)}
                 disabled={running}
-                className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4 disabled:opacity-50"
+                className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary disabled:opacity-50"
               >
                 {targets.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -185,7 +185,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
 
             {running && (
               <div className="mb-[16px]">
-                <div className="flex justify-between text-[12px] text-customColor18 mb-[4px]">
+                <div className="flex justify-between text-[12px] text-newTableText mb-[4px]">
                   <span>
                     {progress && progress.total > 0
                       ? `Migrating\u2026 ${processed} / ${progress.total}`
@@ -193,9 +193,9 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                   </span>
                   <span>{percent}%</span>
                 </div>
-                <div className="h-[6px] bg-fifth rounded-full overflow-hidden">
+                <div className="h-[6px] bg-newTableHeader rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-customColor4 rounded-full transition-all"
+                    className="h-full bg-btnPrimary rounded-full transition-all"
                     style={{ width: `${percent}%` }}
                   />
                 </div>
@@ -208,7 +208,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                   abortRef.current = true;
                   onClose();
                 }}
-                className="px-[16px] py-[8px] rounded-[8px] bg-fifth text-customColor18 text-[13px] hover:bg-[#3A3A3A] transition-colors"
+                className="px-[16px] py-[8px] rounded-[8px] bg-btnSimple text-newTableText text-[13px] hover:bg-boxHover transition-colors"
               >
                 Cancel
               </button>
@@ -224,18 +224,18 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
         ) : (
           <>
             <div className="flex flex-col gap-[12px] mb-[20px]">
-              <div className="flex items-center gap-[12px] p-[16px] rounded-[12px] bg-fifth">
+              <div className="flex items-center gap-[12px] p-[16px] rounded-[12px] bg-btnSimple">
                 <div className="flex-1">
                   <p className="text-[14px] text-textColor font-medium">Migration Complete</p>
                   <div className="flex gap-[16px] mt-[8px]">
                     <div>
-                      <span className="text-[11px] text-customColor18">Migrated</span>
-                      <p className="text-[16px] text-customColor4 font-medium">
+                      <span className="text-[11px] text-newTableText">Migrated</span>
+                      <p className="text-[16px] text-textColor font-medium">
                         {result.migrated}
                       </p>
                     </div>
                     <div>
-                      <span className="text-[11px] text-customColor18">Failed</span>
+                      <span className="text-[11px] text-newTableText">Failed</span>
                       <p className="text-[16px] text-[#f87171] font-medium">
                         {result.failed}
                       </p>
@@ -264,7 +264,7 @@ export const MigrationModal: React.FC<MigrationModalProps> = ({
                   onComplete();
                   onClose();
                 }}
-                className="px-[16px] py-[8px] rounded-[8px] bg-customColor4 text-textColor text-[13px] font-medium hover:bg-customColor4/80 transition-colors"
+                className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors"
               >
                 Done
               </button>

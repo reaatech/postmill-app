@@ -16,4 +16,6 @@ Quick links to cross-cutting reference documentation for the Postmill platform.
 - **Developers**: See the [Developer Docs](../developer-docs/) for API references, architecture, and integration guides.
 - **Operators**: See the [Operations Guide](../operations-guide/) for deployment, configuration, and maintenance.
 
-> Verified against v3.7.0
+- **API Keys** — Per-user API key management (`ApiKey` model). See [Developer Docs: API Keys](../developer-docs/api-keys.md).
+
+> Verified against v3.8.8

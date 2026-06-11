@@ -41,7 +41,7 @@ export const CommentInboxFilters: FC<CommentInboxFiltersProps> = ({ filters, onC
             onClick={() => setStatus(opt.value)}
             className={`px-[12px] py-[4px] text-[13px] font-medium rounded-[6px] transition-colors ${
               filters.status === opt.value
-                ? 'bg-forth text-white'
+                ? 'bg-btnPrimary text-white'
                 : 'bg-newBgColorInner text-newTableText hover:text-btnText border border-newTableBorder'
             }`}
           >
@@ -54,7 +54,7 @@ export const CommentInboxFilters: FC<CommentInboxFiltersProps> = ({ filters, onC
           type="checkbox"
           checked={filters.unreadOnly}
           onChange={toggleUnreadOnly}
-          className="accent-forth"
+          className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
         />
         {t('comment_inbox.filter_unread_only', 'Unread only')}
       </label>

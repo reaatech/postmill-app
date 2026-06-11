@@ -40,7 +40,7 @@ export const MediaUploader: FC<{
         <button
           disabled={loading}
           onClick={() => uploaderRef.current?.click()}
-          className="relative cursor-pointer bg-btnSimple flex gap-[8px] h-[36px] px-[14px] justify-center items-center rounded-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+          className="relative cursor-pointer bg-btnSimple flex gap-[8px] h-[36px] px-[14px] justify-center items-center rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
         >
           {loading ? (
             <div className="w-[14px] h-[14px] border-2 border-white border-t-transparent rounded-full animate-spin" />

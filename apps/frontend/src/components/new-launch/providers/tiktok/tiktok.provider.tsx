@@ -173,7 +173,7 @@ const TikTokSettings: FC<{
           'This feature available only for photos, it will add a default music that\n        you can change later.'
         )}
       </div>
-      <hr className="mb-[15px] border-tableBorder" />
+      <hr className="mb-[15px] border-newTableBorder" />
       <div className="text-[14px] mb-[10px]">
         {t('allow_user_to', 'Allow User To:')}
       </div>
@@ -203,7 +203,7 @@ const TikTokSettings: FC<{
           })}
         />
       </div>
-      <hr className="my-[15px] mb-[25px] border-tableBorder" />
+      <hr className="my-[15px] mb-[25px] border-newTableBorder" />
       <div className="flex flex-col gap-[20px]">
         <Checkbox
           label={t('video_made_with_ai', 'Video made with AI')}
@@ -305,7 +305,7 @@ const TikTokSettings: FC<{
               brand_organic_toggle || brand_content_toggle ? (
                 <a
                   target="_blank"
-                  className="text-[#B69DEC] hover:underline"
+                  className="text-[#2b5cd3] hover:underline"
                   href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en"
                 >
                   {t('music_usage_confirmation', 'Music Usage Confirmation')}
@@ -315,7 +315,7 @@ const TikTokSettings: FC<{
               brand_content_toggle ? (
                 <a
                   target="_blank"
-                  className="text-[#B69DEC] hover:underline"
+                  className="text-[#2b5cd3] hover:underline"
                   href="https://www.tiktok.com/legal/page/global/bc-policy/en"
                 >
                   {t('branded_content_policy', 'Branded Content Policy')}

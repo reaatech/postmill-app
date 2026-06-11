@@ -4,6 +4,20 @@ import { FC, useEffect, useRef, useState } from 'react';
 import DrawChart from 'chart.js/auto';
 import { SeriesPoint } from '../utils';
 
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function resolveCSSVar(value: string): string {
   if (typeof document === 'undefined') return value;
   const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
@@ -53,8 +67,12 @@ export const LineChart: FC<LineChartProps> = ({
   const bgColor = useCSSToken('var(--new-bgColorInner)', '#1a1919');
   const textColor = useCSSToken('var(--new-btn-text)', '#ffffff');
   const tableText = useCSSToken('var(--new-table-text)', '#9c9c9c');
-  const gridColor = useCSSToken('var(--new-bgLineColor)', '#212121');
   const borderColor = useCSSToken('var(--new-table-border)', '#2b2b2b');
+  const gridColor = useCSSToken('var(--new-bgLineColor)', '#212121');
+  const gridDottedColor = (() => {
+    const c = resolveCSSVar('var(--new-table-border)') || '#2b2b2b';
+    return hexToRgba(c, 0.4);
+  })();
 
   useEffect(() => {
     if (!ref.current) return;
@@ -86,16 +104,22 @@ export const LineChart: FC<LineChartProps> = ({
       datasets.push({
         label: 'Current period',
         data: series.map(p => p.value),
-        borderColor: resolvedColor,
-        backgroundColor: 'transparent',
-        borderWidth: 2.5,
-        pointRadius: 0,
-        pointHoverRadius: 5,
-        pointHoverBackgroundColor: resolvedColor,
-        pointHoverBorderColor: bgColor,
-        pointHoverBorderWidth: 2,
-        tension: 0.3,
-        fill: false,
+          borderColor: resolvedColor,
+          backgroundColor: (() => {
+            if (!ctx) return 'transparent';
+            const g = ctx.createLinearGradient(0, 0, 0, height);
+            g.addColorStop(0, hexToRgba(resolvedColor, 0.15));
+            g.addColorStop(1, hexToRgba(resolvedColor, 0.01));
+            return g;
+          })(),
+          borderWidth: 2.5,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          pointHoverBackgroundColor: resolvedColor,
+          pointHoverBorderColor: bgColor,
+          pointHoverBorderWidth: 2,
+          tension: 0.3,
+          fill: true,
       });
 
       chartRef.current = new DrawChart(ref.current, {
@@ -125,12 +149,12 @@ export const LineChart: FC<LineChartProps> = ({
           y: {
             beginAtZero: true,
             grid: {
-              color: gridColor,
+              color: gridDottedColor,
             },
             border: { display: false },
             ticks: {
               color: tableText,
-              font: { size: 11 },
+              font: { size: 12 },
               maxTicksLimit: 6,
               callback(value) {
                 const v = Number(value);
@@ -145,7 +169,7 @@ export const LineChart: FC<LineChartProps> = ({
             border: { display: false },
             ticks: {
               color: tableText,
-              font: { size: 10 },
+              font: { size: 12 },
               maxTicksLimit: labels.length > 120 ? 12 : 8,
               maxRotation: 0,
             },
@@ -160,12 +184,12 @@ export const LineChart: FC<LineChartProps> = ({
             bodyColor: tableText,
             borderColor,
             borderWidth: 1,
-            padding: 10,
+            padding: 12,
             cornerRadius: 8,
             displayColors: true,
             boxPadding: 4,
             titleFont: { size: 12, weight: 'normal' },
-            bodyFont: { size: 13, weight: 'bold' },
+            bodyFont: { size: 12, weight: 'bold' },
             callbacks: {
               label(context) {
                 const label = context.dataset.label || '';
@@ -189,7 +213,7 @@ export const LineChart: FC<LineChartProps> = ({
     return () => {
       chartRef.current?.destroy();
     };
-  }, [series, comparisonSeries, color, comparisonColor, height, format, onPointClick, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor]);
+  }, [series, comparisonSeries, color, comparisonColor, height, format, onPointClick, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor, gridDottedColor]);
 
   return <canvas ref={ref} style={{ width: '100%', height }} />;
 };

@@ -120,7 +120,7 @@ export const WatchlistTab: FC = () => {
         <button
           onClick={addAccount}
           disabled={!handle.trim()}
-          className="px-[16px] py-[8px] bg-forth text-white rounded-[8px] text-[14px] font-medium disabled:opacity-50"
+          className="px-[16px] py-[8px] bg-btnPrimary text-white rounded-[8px] text-[14px] font-medium disabled:opacity-50"
         >
           {t('add', 'Add')}
         </button>

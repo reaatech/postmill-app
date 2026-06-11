@@ -1,9 +1,11 @@
 'use client';
 
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 import { useTranslation } from 'react-i18next';
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
+import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
 interface ProviderCapability {
   analytics: boolean;
@@ -45,6 +47,25 @@ export const ProviderCapabilityMatrix = () => {
 
   const { data, error } = useSWR('/admin/provider-capabilities', load);
 
+  const columns: Column<[string, ProviderCapability]>[] = useMemo(() => {
+    const capabilities = Object.keys(CAPABILITY_LABELS) as (keyof ProviderCapability)[];
+    const cols: Column<[string, ProviderCapability]>[] = [
+      { key: 'provider', header: t('provider', 'Provider'), render: ([name]: [string, ProviderCapability]) => name },
+    ];
+    capabilities.forEach((cap) => {
+      cols.push({
+        key: cap,
+        header: t(`capability_${cap}`, CAPABILITY_LABELS[cap]),
+        align: 'center',
+        render: ([_name, caps]: [string, ProviderCapability]) => {
+          if (cap === 'maxMedia') return String(caps[cap]);
+          return caps[cap] ? <span className="text-green-500">✓</span> : <span className="text-red-500">✗</span>;
+        },
+      });
+    });
+    return cols;
+  }, [t]);
+
   if (error) {
     return (
       <div className="text-red-500 p-[16px]">
@@ -62,53 +83,18 @@ export const ProviderCapabilityMatrix = () => {
   }
 
   const providers = Object.entries(data);
-  const capabilities = Object.keys(CAPABILITY_LABELS) as (keyof ProviderCapability)[];
 
   return (
     <div className="overflow-auto p-[16px]">
       <h2 className="text-[20px] font-bold mb-[16px] text-textColor">
         {t('provider_capability_matrix', 'Provider Capability Matrix')}
       </h2>
-      <table className="w-full border-collapse border border-tableBorder text-[13px]">
-        <thead>
-          <tr className="bg-forth">
-            <th className="border border-tableBorder p-[8px] text-left text-textColor sticky left-0 bg-forth z-10">
-              {t('provider', 'Provider')}
-            </th>
-            {capabilities.map((cap) => (
-              <th
-                key={cap}
-                className="border border-tableBorder p-[8px] text-center text-textColor min-w-[100px]"
-              >
-                {t(`capability_${cap}`, CAPABILITY_LABELS[cap])}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {providers.map(([name, caps]) => (
-            <tr key={name} className="hover:bg-fifth/30">
-              <td className="border border-tableBorder p-[8px] font-medium text-textColor sticky left-0 bg-primary z-10">
-                {name}
-              </td>
-              {capabilities.map((cap) => (
-                <td
-                  key={cap}
-                  className={`border border-tableBorder p-[8px] text-center ${
-                    cap === 'maxMedia'
-                      ? 'text-textColor'
-                      : caps[cap]
-                        ? 'text-green-500'
-                        : 'text-red-500'
-                  }`}
-                >
-                  {cap === 'maxMedia' ? caps[cap] : caps[cap] ? '✓' : '✗'}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <DataTable
+        columns={columns}
+        data={providers}
+        keyExtractor={([name]: [string, ProviderCapability]) => name}
+        className="!rounded-none"
+      />
     </div>
   );
 };

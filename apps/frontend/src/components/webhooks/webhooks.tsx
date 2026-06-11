@@ -137,7 +137,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
                     type="checkbox"
                     checked={(events || []).includes(opt.value)}
                     onChange={() => toggleEvent(opt.value)}
-                    className="accent-forth"
+                    className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
                   />
                   {opt.label}
                 </label>
@@ -246,7 +246,7 @@ export const Webhooks: FC = () => {
     <div className="flex flex-col">
       <div className="mb-[16px]">
         <h3 className="text-[20px]">{t('webhooks', 'Webhooks')}</h3>
-        <div className="text-customColor18 mt-[4px] text-[13px] leading-relaxed">
+        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
           {t('webhooks_description', 'Webhooks are HTTP callbacks that notify your application when events happen in Postmill. When a triggered event occurs, we send an HTTP POST request to the URLs you configure.')}
         </div>
       </div>
@@ -264,15 +264,15 @@ export const Webhooks: FC = () => {
         <Button onClick={addWebhook()}>{t('add_webhook', 'Add Webhook')}</Button>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] overflow-x-auto">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
         {isLoading && (
           <div className="flex flex-col gap-[8px] py-[16px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
               </div>
             ))}
           </div>
@@ -281,14 +281,14 @@ export const Webhooks: FC = () => {
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
             <div className="text-red-400 text-[14px]">{t('failed_loading_webhooks', 'Failed to load webhooks')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-forth hover:underline">{t('try_again', 'Try again')}</button>
+            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
 
         {!isLoading && !error && (!data || data.length === 0) && (
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_webhooks', 'No webhooks configured yet')}</div>
-            <p className="text-[12px] text-customColor18 max-w-[400px] text-center">
+            <p className="text-[12px] text-newTableText max-w-[400px] text-center">
               {t('webhooks_empty_hint', 'Webhooks let you receive real-time notifications when posts are published, comments are received, or other events occur.')}
             </p>
             <Button onClick={addWebhook()}>{t('create_first_webhook', 'Create your first webhook')}</Button>
@@ -298,7 +298,7 @@ export const Webhooks: FC = () => {
         {!isLoading && data && data.length > 0 && (
           <>
             <div className="min-w-[700px]">
-            <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-customColor18 uppercase font-medium pb-[12px] border-b border-fifth items-center">
+            <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
               <div>{t('url', 'URL')}</div>
               <div>{t('events', 'Events')}</div>
               <div>{t('status', 'Status')}</div>
@@ -308,27 +308,27 @@ export const Webhooks: FC = () => {
 
             <div className="flex flex-col">
               {filtered.map((w: any) => (
-                <div key={w.id} className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-fifth/50 items-center text-[14px]">
-                  <div className="truncate text-customColor18" title={w.url}>{w.url}</div>
+                <div key={w.id} className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-newTableBorder/50 items-center text-[14px]">
+                  <div className="truncate text-newTableText" title={w.url}>{w.url}</div>
                   <div className="flex flex-wrap gap-[4px]">
                     {(w.events || ['post.published']).slice(0, 3).map((ev: string) => (
-                      <span key={ev} className="text-[11px] bg-forth/20 text-forth px-[6px] py-[2px] rounded-full">
+                      <span key={ev} className="text-[11px] bg-btnPrimary/20 text-btnPrimary px-[6px] py-[2px] rounded-full">
                         {ev.replace('.', ' ')}
                       </span>
                     ))}
                     {(w.events || []).length > 3 && (
-                      <span className="text-[11px] text-customColor18">+{w.events.length - 3}</span>
+                      <span className="text-[11px] text-newTableText">+{w.events.length - 3}</span>
                     )}
                   </div>
                   <div>
-                    <span className={clsx('text-[12px]', w.active !== false ? 'text-green-500' : 'text-customColor18')}>
+                    <span className={clsx('text-[12px]', w.active !== false ? 'text-green-500' : 'text-newTableText')}>
                       {w.active !== false ? t('active', 'Active') : t('disabled', 'Disabled')}
                     </span>
                   </div>
-                  <div className="text-customColor18 text-[12px]">{dayjs(w.createdAt).format('MMM D, YYYY')}</div>
+                  <div className="text-newTableText text-[12px]">{dayjs(w.createdAt).format('MMM D, YYYY')}</div>
                   <div className="flex justify-end gap-[8px]">
-                    <button onClick={() => testPing(w)} className="text-[12px] text-forth hover:underline">{t('test', 'Test')}</button>
-                    <button onClick={addWebhook(w)} className="text-[12px] text-forth hover:underline">{t('edit', 'Edit')}</button>
+                    <button onClick={() => testPing(w)} className="text-[12px] text-textColor hover:underline">{t('test', 'Test')}</button>
+                    <button onClick={addWebhook(w)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
                     <button onClick={deleteHook(w)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
@@ -338,11 +338,11 @@ export const Webhooks: FC = () => {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-fifth">
-                <div className="text-[12px] text-customColor18">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
+              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-newTableBorder">
+                <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
                 <div className="flex gap-[8px]">
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
+                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('previous', 'Previous')}</button>
+                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('next', 'Next')}</button>
                 </div>
               </div>
             )}

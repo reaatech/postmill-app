@@ -128,7 +128,7 @@ export const ImportDebugPostModal: FC<{ close: () => void }> = ({ close }) => {
   return (
     <div className="flex flex-col gap-[16px] min-w-[500px]">
       <textarea
-        className="w-full h-[200px] p-[12px] rounded-[8px] bg-input border border-tableBorder text-textColor font-mono text-[13px] resize-y"
+        className="w-full h-[200px] p-[12px] rounded-[8px] bg-newBgColorInner border border-newTableBorder text-textColor font-mono text-[13px] resize-y"
         placeholder={t(
           'paste_debug_json',
           'Paste the debug JSON copied from a failed post...'
@@ -143,7 +143,7 @@ export const ImportDebugPostModal: FC<{ close: () => void }> = ({ close }) => {
 
       {parsed && (
         <div className="flex flex-col gap-[12px]">
-          <div className="flex flex-col gap-[8px] p-[12px] rounded-[8px] bg-input border border-tableBorder">
+          <div className="flex flex-col gap-[8px] p-[12px] rounded-[8px] bg-newBgColorInner border border-newTableBorder">
             <div className="text-[13px] font-[600] text-textColor">
               {t('debug_info', 'Debug Info')}
             </div>
@@ -216,8 +216,8 @@ export const ImportDebugPostModal: FC<{ close: () => void }> = ({ close }) => {
                     className={clsx(
                       'flex items-center gap-[10px] p-[10px] rounded-[8px] border cursor-pointer transition-all',
                       selectedIntegrationId === integration.id
-                        ? 'border-forth bg-forth/10'
-                        : 'border-tableBorder hover:border-textColor/30'
+                        ? 'border-btnPrimary bg-btnPrimary/10'
+                        : 'border-newTableBorder hover:border-textColor/30'
                     )}
                     onClick={() => setSelectedIntegrationId(integration.id)}
                   >
@@ -244,7 +244,7 @@ export const ImportDebugPostModal: FC<{ close: () => void }> = ({ close }) => {
             onClick={handleImport}
             loading={importing}
             disabled={!selectedIntegrationId}
-            className="rounded-[4px]"
+            className="rounded-[8px]"
           >
             {t('import_as_draft', 'Import as Draft')}
           </Button>

@@ -8,6 +8,20 @@ has the full per-commit detail.
 
 ---
 
+### v3.8.8 (June 2026)
+- Per-user API keys with hashed storage, role inheritance, and show-once plaintext
+- New dashboard landing page replacing the old calendar-first flow
+- Complete theme de-purpling (purple/magenta → blue)
+- Major UI consistency pass: DataTable, EmptyState, form primitives polish, settings IA
+- Comment inbox on-demand sync
+
+**Breaking changes:**
+- `Organization.apiKey` retired — old org-level API keys no longer authenticate. Regenerate keys from the per-user API Keys UI (Settings → Developers).
+- `publicApi` field removed from `GET /user/self` response — the old org key is no longer returned to the browser.
+- MCP credentials must use new `pm_live_*` per-user keys — old org keys will not work with MCP entrypoints.
+
+---
+
 ## At a glance
 
 | Area | Upstream | This fork |
@@ -448,4 +462,4 @@ This fork is run in production. Two invariants are deliberately preserved:
 2. **Schema changes are additive** — new tables, nullable-or-defaulted columns. The `db push` model
    never drops or renames columns without a manual backfill plan.
 
-> Verified against v3.8.4
+> Verified against v3.8.8

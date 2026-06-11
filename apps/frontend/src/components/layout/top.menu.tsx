@@ -34,12 +34,22 @@ export const useMenuItem = () => {
 
   const firstMenu = [
     {
+      name: 'Dashboard',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      ),
+      path: '/dashboard',
+    },
+    {
       name: isGeneral ? t('schedule', 'Schedule') : t('launches', 'Launches'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="21"
-          height="23"
+          width="20"
+          height="20"
           viewBox="0 0 21 23"
           fill="none"
         >
@@ -59,8 +69,8 @@ export const useMenuItem = () => {
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="23"
-          height="23"
+          width="20"
+          height="20"
           viewBox="0 0 32 32"
           fill="none"
         >
@@ -78,7 +88,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -97,7 +107,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="19"
+          height="20"
           viewBox="0 0 20 19"
           fill="none"
         >
@@ -118,7 +128,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 20 21"
           fill="none"
         >
@@ -138,8 +148,8 @@ export const useMenuItem = () => {
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="18"
-          height="19"
+          width="20"
+          height="20"
           viewBox="0 0 18 19"
           fill="none"
         >
@@ -160,7 +170,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -179,7 +189,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="19"
+          height="20"
           viewBox="0 0 20 19"
           fill="none"
         >
@@ -202,7 +212,7 @@ export const useMenuItem = () => {
       icon: (
         <svg
           fill="#c52e2e"
-          height="30"
+          height="20"
           width="20"
           version="1.1"
           id="Layer_1"
@@ -236,7 +246,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 20 21"
           fill="none"
         >
@@ -284,7 +294,7 @@ export const useMenuItem = () => {
           />
         </svg>
       ),
-      path: 'https://affiliate.postiz.com',
+      path: 'https://affiliate.postmill.com',
       role: ['ADMIN', 'SUPERADMIN', 'USER'],
       requireBilling: true,
     },
@@ -294,7 +304,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 20 21"
           fill="none"
         >
@@ -317,7 +327,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -338,7 +348,7 @@ export const useMenuItem = () => {
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
-          height="21"
+          height="20"
           viewBox="0 0 20 21"
           fill="none"
         >

@@ -53,20 +53,12 @@ export class OrganizationService {
     return this._organizationRepository.getOrgById(id);
   }
 
-  getOrgByApiKey(api: string) {
-    return this._organizationRepository.getOrgByApiKey(api);
-  }
-
   getUserOrg(id: string) {
     return this._organizationRepository.getUserOrg(id);
   }
 
   getOrgsByUserId(userId: string) {
     return this._organizationRepository.getOrgsByUserId(userId);
-  }
-
-  updateApiKey(orgId: string) {
-    return this._organizationRepository.updateApiKey(orgId);
   }
 
   getTeam(orgId: string) {

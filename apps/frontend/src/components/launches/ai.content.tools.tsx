@@ -184,7 +184,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             'enter_your_post_content',
             'Enter your post content...'
           )}
-          className="bg-input min-h-[120px] p-[16px] outline-none border-fifth border rounded-[4px] text-inputText placeholder-inputText"
+          className="bg-input min-h-[120px] p-[16px] outline-none border-newTableBorder border rounded-[4px] text-inputText placeholder-inputText"
         />
       </div>
 
@@ -290,7 +290,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             results.platforms.map((p: any, idx: number) => (
               <div
                 key={idx}
-                className="bg-fifth p-[12px] rounded-[8px] border border-tableBorder"
+                className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
                   <div className="text-[12px] font-[600] capitalize">
@@ -319,7 +319,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             results.translations.map((tr: any, idx: number) => (
               <div
                 key={idx}
-                className="bg-fifth p-[12px] rounded-[8px] border border-tableBorder"
+                className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
                   <div className="text-[12px] font-[600] uppercase">
@@ -343,7 +343,7 @@ const ContentToolsModal: FC<{ close: () => void }> = (props) => {
             results.variants.map((v: any, idx: number) => (
               <div
                 key={idx}
-                className="bg-fifth p-[12px] rounded-[8px] border border-tableBorder"
+                className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
               >
                 <div className="flex justify-between items-center mb-[6px]">
                   <div className="text-[12px] font-[600] capitalize">

@@ -25,7 +25,6 @@ import { NewPost } from '@gitroom/frontend/components/launches/new.post';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import useCookie from 'react-use-cookie';
-import { Onboarding } from '@gitroom/frontend/components/onboarding/onboarding';
 
 export const SVGLine = () => {
   return (
@@ -305,7 +304,7 @@ export const MenuComponent: FC<
         ) : (
           <SafeImage
             src={`/icons/platforms/${integration.identifier}.png`}
-            className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-fifth"
+            className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-newTableBorder"
             alt={integration.identifier}
             width={18.41}
             height={18.41}
@@ -325,7 +324,7 @@ export const MenuComponent: FC<
               ),
             }
           : {})}
-        role="Handle"
+        role="button"
         className={clsx(
           'group-[.sidebar]:hidden flex-1 whitespace-nowrap text-ellipsis overflow-hidden cursor-move',
           integration.disabled && 'opacity-50'
@@ -361,7 +360,7 @@ export const LaunchesComponent = () => {
   const [reload, setReload] = useState(false);
   const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
   const [mode] = useCookie('mode', 'dark');
-  const { isLoading, data: integrationsRaw, mutate } = useIntegrationList();
+  const { isLoading, data: integrationsRaw, mutate, error } = useIntegrationList();
   // Guard at the consumer: `integrations` is iterated in render `useMemo`s
   // (`?.filter`, `orderBy`, `.map`), so a non-array value (error/edge response)
   // throws during render and white-screens the page. Coerce to an array here so
@@ -509,7 +508,6 @@ export const LaunchesComponent = () => {
   // @ts-ignore
   return (
     <DNDProvider>
-      <Onboarding />
       <CalendarWeekProvider integrations={sortedIntegrations}>
         <div
           className={clsx(
@@ -559,7 +557,26 @@ export const LaunchesComponent = () => {
               </div>
             </div>
             <div className="gap-[32px] flex flex-col select-none flex-1">
-              {sortedIntegrations.length === 0 && collapseMenu === '0' && (
+              {error && collapseMenu === '0' ? (
+                <div className="flex-1 max-h-[500px] justify-center items-center flex">
+                  <div className="flex flex-col gap-[12px] text-center p-[16px]">
+                    <div className="text-red-500 text-[14px] font-[500]">
+                      {t('could_not_load_channels', "Couldn't load channels")}
+                    </div>
+                    <div className="text-[12px] text-textColor">
+                      {t('retry_or_check_connection', 'Check your connection and retry')}
+                    </div>
+                    <div>
+                      <button
+                        onClick={() => mutate()}
+                        className="bg-btnPrimary text-white px-[24px] py-[8px] rounded-[8px] text-[12px] cursor-pointer"
+                      >
+                        {t('retry', 'Retry')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : sortedIntegrations.length === 0 && collapseMenu === '0' ? (
                 <div className="flex-1 max-h-[500px] justify-center items-center flex">
                   <div className="flex flex-col gap-[12px] text-center">
                     <img
@@ -579,7 +596,7 @@ export const LaunchesComponent = () => {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
               {menuIntegrations.map((menu) => (
                 <MenuGroupComponent
                   collapsed={collapseMenu === '1'}

@@ -6,7 +6,7 @@ import { ProviderCapabilityMatrix } from '@gitroom/frontend/components/admin/pro
 export const ProviderCapabilitiesPanel: FC = () => {
   return (
     <div className="flex flex-col gap-[12px] mt-[8px]">
-      <div className="border-t border-tableBorder pt-[16px]">
+      <div className="border-t border-newTableBorder pt-[16px]">
         <h3 className="text-[15px] font-[600] text-textColor mb-[8px]">
           Provider Capability Reference
         </h3>

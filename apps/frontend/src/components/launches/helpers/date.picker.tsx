@@ -48,14 +48,14 @@ export const DatePicker: FC<{
       {open && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="animate-fadeIn absolute bottom-[100%] mb-[16px] start-[50%] -translate-x-[50%] bg-sixth border border-tableBorder text-textColor rounded-[16px] z-[300] p-[16px] flex flex-col"
+          className="animate-fadeIn absolute bottom-[100%] mb-[16px] start-[50%] -translate-x-[50%] bg-newBgColorInner border border-newTableBorder text-textColor rounded-[16px] z-[300] p-[16px] flex flex-col"
         >
           <Calendar
             onChange={changeDate('date')}
             value={date.toDate()}
             dayClassName={(date, modifiers) => {
               if (modifiers.weekend) {
-                return '!text-customColor28';
+                return '!text-textColor';
               }
               if (modifiers.outside) {
                 return '!text-gray';
@@ -77,7 +77,7 @@ export const DatePicker: FC<{
             classNames={{
               label: 'text-textColor py-[12px]',
               input:
-                'bg-sixth h-[40px] border border-tableBorder text-textColor rounded-[4px] outline-none',
+                'bg-newBgColorInner h-[40px] border border-newTableBorder text-textColor rounded-[4px] outline-none',
             }}
             defaultValue={date.toDate()}
           />

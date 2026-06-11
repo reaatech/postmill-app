@@ -69,7 +69,7 @@ export const BrandMemoryPanel: FC = () => {
         <button
           onClick={handleIndex}
           disabled={indexing}
-          className="px-[12px] py-[6px] bg-forth text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
+          className="px-[12px] py-[6px] bg-btnPrimary text-white rounded-[8px] text-[13px] font-medium disabled:opacity-50"
         >
           {indexing
             ? t('indexing', 'Indexing...')
@@ -97,7 +97,7 @@ export const BrandMemoryPanel: FC = () => {
         <button
           onClick={handleSearch}
           disabled={loading || !prompt.trim()}
-          className="px-[16px] py-[8px] bg-forth text-white rounded-[8px] text-[14px] font-medium disabled:opacity-50"
+          className="px-[16px] py-[8px] bg-btnPrimary text-white rounded-[8px] text-[14px] font-medium disabled:opacity-50"
         >
           {loading
             ? t('searching', 'Searching...')

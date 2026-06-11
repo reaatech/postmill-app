@@ -107,11 +107,11 @@ export const MissingReleaseModal: FC<{
           </div>
         ))}
       </div>
-      <div className="flex justify-end gap-[10px] pt-[8px] border-t border-tableBorder">
+      <div className="flex justify-end gap-[10px] pt-[8px] border-t border-newTableBorder">
         <Button
           type="button"
           onClick={() => modal.closeAll()}
-          className="bg-transparent border border-tableBorder text-textColor"
+          className="bg-transparent border border-newTableBorder text-textColor"
         >
           {t('cancel', 'Cancel')}
         </Button>
