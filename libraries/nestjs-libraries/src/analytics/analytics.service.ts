@@ -478,17 +478,19 @@ export class AnalyticsService {
     const fromDate = dayjs(from).startOf('day').toDate();
     const toDate = dayjs(to).endOf('day').toDate();
 
-    // 60s Redis cache (skip when endDate is today — data may still arrive)
-    const endDateIsToday = dayjs(to).isSame(dayjs(), 'day');
-    if (!endDateIsToday) {
-      const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
-      try {
-        const cached = await this._redisService.get(cacheKey);
-        if (cached) {
-          return JSON.parse(cached) as AnalyticsOverviewResponse;
-        }
-      } catch { /* cache miss — continue */ }
-    }
+    // 60s Redis cache. Today-ending windows (the dashboard default) are cached
+    // too: snapshots only change via the daily sweep, and recomputing the
+    // overview — including its potential live provider fan-out — on every view
+    // is the dashboard's dominant CPU/memory cost. getChannel/getPosts/
+    // recommendations all funnel through here, so one uncached view recomputed
+    // everything several times over.
+    const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
+    try {
+      const cached = await this._redisService.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached) as AnalyticsOverviewResponse;
+      }
+    } catch { /* cache miss — continue */ }
 
     const dbIntegrations = await this.getIntegrations(org.id, integrations);
 
@@ -659,11 +661,7 @@ export class AnalyticsService {
       },
     };
 
-    // Cache for 60s (skip when endDate is today)
-    if (!endDateIsToday) {
-      const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
-      this._redisService.set(cacheKey, JSON.stringify(result), 60).catch(() => {});
-    }
+    this._redisService.set(cacheKey, JSON.stringify(result), 60).catch(() => {});
 
     return result;
   }
