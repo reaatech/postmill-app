@@ -3,9 +3,17 @@ import { getT } from '@gitroom/react/translation/get.translation.service.backend
 export const dynamic = 'force-dynamic';
 import { ReactNode } from 'react';
 import loadDynamic from 'next/dynamic';
-import { TestimonialComponent } from '@gitroom/frontend/components/auth/testimonial.component';
+import Image from 'next/image';
 import { LogoTextComponent } from '@gitroom/frontend/components/ui/logo-text.component';
 const ReturnUrlComponent = loadDynamic(() => import('./return.url.component'));
+
+const features = [
+  '28+ social & chat channels',
+  'AI-powered content creation',
+  'Team collaboration & approval workflows',
+  'Analytics & best-time scheduling',
+];
+
 export default async function AuthLayout({
   children,
 }: {
@@ -15,7 +23,6 @@ export default async function AuthLayout({
 
   return (
     <div className="bg-[#0E0E0E] flex flex-1 p-[12px] gap-[12px] min-h-screen w-screen text-white">
-      {/*<style>{`html, body {overflow-x: hidden;}`}</style>*/}
       <ReturnUrlComponent />
       <div className="flex flex-col py-[40px] px-[20px] flex-1 lg:w-[600px] lg:flex-none rounded-[12px] text-white p-[12px] bg-[#1A1919]">
         <div className="w-full max-w-[440px] mx-auto justify-center gap-[20px] h-full flex flex-col text-white">
@@ -23,14 +30,49 @@ export default async function AuthLayout({
           <div className="flex">{children}</div>
         </div>
       </div>
-      <div className="text-[36px] flex-1 pt-[88px] hidden lg:flex flex-col items-center">
-        <div className="text-center">
-          Over <span className="text-[42px] text-[#FC69FF]">20,000+</span>{' '}
-          Entrepreneurs use
-          <br />
-          Postmill To Grow Their Social Presence
+      <div className="flex-1 hidden lg:flex flex-col items-center justify-center bg-newBgColorInner">
+        <div className="flex flex-col items-center gap-[32px] max-w-[440px] px-[40px]">
+          <div className="flex flex-col items-center gap-[16px]">
+            <Image
+              src="/postmill-logo.png"
+              alt="Postmill"
+              width={48}
+              height={48}
+              className="h-[48px] w-auto"
+            />
+            <h1 className="text-[28px] font-[700] text-textColor text-center leading-tight">
+              Schedule smarter.
+              <br />
+              <span className="text-[#1d9bf0]">Grow faster.</span>
+            </h1>
+          </div>
+          <div className="flex flex-col gap-[14px] w-full">
+            {features.map((feature) => (
+              <div
+                key={feature}
+                className="flex items-center gap-[12px] text-[15px] text-textColor"
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="shrink-0"
+                >
+                  <circle cx="12" cy="12" r="10" fill="#2b5cd3" />
+                  <path
+                    d="M8 12l3 3 5-5"
+                    stroke="#fff"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <span>{feature}</span>
+              </div>
+            ))}
+          </div>
         </div>
-        <TestimonialComponent />
       </div>
     </div>
   );
