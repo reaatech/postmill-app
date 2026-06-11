@@ -18,9 +18,9 @@ function mergeDataPoints(data: TotalList[], numPoints: number): TotalList[] {
 
 export const ChartSocial: FC<{
   data: TotalList[];
-  color?: 'purple' | 'green' | 'blue';
+  color?: 'blue' | 'green' | 'sky';
 }> = (props) => {
-  const { data, color = 'purple' } = props;
+  const { data, color = 'blue' } = props;
   const [mode] = useCookie('mode', 'dark');
 
   const list = useMemo(() => {
@@ -39,17 +39,17 @@ export const ChartSocial: FC<{
   const chart = useRef<null | DrawChart>(null);
 
   const colorSchemes = {
-    purple: {
-      start: 'rgba(97, 43, 211, 0.8)',
-      end: 'rgba(97, 43, 211, 0.1)',
-      border: 'rgb(97, 43, 211)',
+    blue: {
+      start: 'rgba(43, 92, 211, 0.8)',
+      end: 'rgba(43, 92, 211, 0.1)',
+      border: 'rgb(43, 92, 211)',
     },
     green: {
       start: 'rgba(50, 213, 131, 0.8)',
       end: 'rgba(50, 213, 131, 0.1)',
       border: 'rgb(50, 213, 131)',
     },
-    blue: {
+    sky: {
       start: 'rgba(29, 155, 240, 0.8)',
       end: 'rgba(29, 155, 240, 0.1)',
       border: 'rgb(29, 155, 240)',

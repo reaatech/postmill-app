@@ -66,10 +66,10 @@ const AddOrEditSignature: FC<{
             <textarea
               value={text}
               onChange={(e) => form.setValue('content', e.target.value)}
-              className="min-h-[120px] max-h-[240px] w-full p-[12px] bg-newBgColor border border-fifth rounded-[4px] text-[14px] outline-none resize-y scrollbar scrollbar-thumb-tableBorder"
+              className="min-h-[120px] max-h-[240px] w-full p-[12px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none resize-y scrollbar scrollbar-thumb-tableBorder"
               placeholder={t('write_signature', 'Write your signature...')}
             />
-            <div className="text-[11px] text-customColor18 text-end mt-[4px]">
+            <div className="text-[11px] text-newTableText text-end mt-[4px]">
               {text.length} {t('characters', 'characters')}
             </div>
           </div>
@@ -152,7 +152,7 @@ export const SignaturesComponent: FC<{
     <div className="flex flex-col">
       <div className="mb-[16px]">
         <h3 className="text-[20px]">{t('signatures', 'Signatures')}</h3>
-        <div className="text-customColor18 mt-[4px] text-[13px] leading-relaxed">
+        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
           {t('signatures_description', 'Signatures are reusable text blocks that you can append to your social media posts. Create signatures for branding, disclaimers, or call-to-action messages.')}
         </div>
       </div>
@@ -170,15 +170,15 @@ export const SignaturesComponent: FC<{
         <Button onClick={addSignature()}>{t('add_signature', 'Add Signature')}</Button>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] overflow-x-auto">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
         {isLoading && (
           <div className="flex flex-col gap-[8px] py-[16px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
               </div>
             ))}
           </div>
@@ -187,14 +187,14 @@ export const SignaturesComponent: FC<{
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
             <div className="text-red-400 text-[14px]">{t('failed_loading_signatures', 'Failed to load signatures')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-forth hover:underline">{t('try_again', 'Try again')}</button>
+            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
 
         {!isLoading && !error && (!data || data.length === 0) && (
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_signatures', 'No signatures created yet')}</div>
-            <p className="text-[12px] text-customColor18 max-w-[400px] text-center">
+            <p className="text-[12px] text-newTableText max-w-[400px] text-center">
               {t('signatures_empty_hint', 'Signatures let you add consistent branding, disclaimers, or calls-to-action to the end of your social media posts.')}
             </p>
             <Button onClick={addSignature()}>{t('create_first_signature', 'Create your first signature')}</Button>
@@ -205,7 +205,7 @@ export const SignaturesComponent: FC<{
           <>
             <div className="min-w-[700px]">
             <div className={clsx(
-              'grid gap-[12px] text-[12px] text-customColor18 uppercase font-medium pb-[12px] border-b border-fifth items-center',
+              'grid gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center',
               appendSignature ? 'grid-cols-[2fr,1.5fr,1fr,1fr,1fr]' : 'grid-cols-[2fr,1.5fr,1fr,1fr]'
             )}>
               <div>{t('name_preview', 'Preview')}</div>
@@ -218,30 +218,30 @@ export const SignaturesComponent: FC<{
             <div className="flex flex-col">
               {filtered.map((sig: any) => (
                 <div key={sig.id} className={clsx(
-                  'grid gap-[12px] py-[12px] border-b border-fifth/50 items-center text-[14px]',
+                  'grid gap-[12px] py-[12px] border-b border-newTableBorder/50 items-center text-[14px]',
                   appendSignature ? 'grid-cols-[2fr,1.5fr,1fr,1fr,1fr]' : 'grid-cols-[2fr,1.5fr,1fr,1fr]'
                 )}>
-                  <div className="truncate text-customColor18" title={sig.content}>
+                  <div className="truncate text-newTableText" title={sig.content}>
                     {sig.content.slice(0, 80)}{sig.content.length > 80 ? '...' : ''}
                   </div>
                   <div className="text-[12px]">
                     <span className={clsx(
                       'px-[6px] py-[2px] rounded-full text-[11px]',
-                      (!sig.channelScope || sig.channelScope === 'all') ? 'bg-forth/20 text-forth' : 'bg-amber-500/20 text-amber-500'
+                      (!sig.channelScope || sig.channelScope === 'all') ? 'bg-btnSecondary/20 text-btnPrimary' : 'bg-amber-500/20 text-amber-500'
                     )}>
                       {(!sig.channelScope || sig.channelScope === 'all') ? t('all_channels', 'All') : t('social_only', 'Social')}
                     </span>
                   </div>
-                  <div className="text-[12px] text-customColor18">{usageCount(sig)}</div>
+                  <div className="text-[12px] text-newTableText">{usageCount(sig)}</div>
                   {!!appendSignature && (
                     <div className="text-center">
-                      <button onClick={() => appendSignature(sig.content)} className="text-[12px] text-forth hover:underline">
+                      <button onClick={() => appendSignature(sig.content)} className="text-[12px] text-textColor hover:underline">
                         {t('use', 'Use')}
                       </button>
                     </div>
                   )}
                   <div className="flex justify-end gap-[8px]">
-                    <button onClick={addSignature(sig)} className="text-[12px] text-forth hover:underline">{t('edit', 'Edit')}</button>
+                    <button onClick={addSignature(sig)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
                     <button onClick={deleteSignature(sig)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
@@ -251,11 +251,11 @@ export const SignaturesComponent: FC<{
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-fifth">
-                <div className="text-[12px] text-customColor18">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
+              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-newTableBorder">
+                <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
                 <div className="flex gap-[8px]">
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
+                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('previous', 'Previous')}</button>
+                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('next', 'Next')}</button>
                 </div>
               </div>
             )}

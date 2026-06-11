@@ -58,7 +58,7 @@ const ChangePasswordComponent: FC = () => {
   }, [currentPassword, newPassword, confirmPassword, fetch, toaster, t]);
 
   return (
-    <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] mt-[16px] flex flex-col gap-[24px]">
+    <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] mt-[16px] flex flex-col gap-[24px]">
       <h4 className="text-[16px] font-[600]">{t('change_password', 'Change Password')}</h4>
       <div className="flex flex-col gap-[8px]">
         <label className="text-[14px] font-[500]">{t('current_password', 'Current Password')}</label>

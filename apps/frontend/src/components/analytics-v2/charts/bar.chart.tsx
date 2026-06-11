@@ -3,6 +3,20 @@
 import { FC, useEffect, useRef, useState } from 'react';
 import DrawChart from 'chart.js/auto';
 
+function hexToRgba(hex: string, alpha: number): string {
+  const clean = hex.replace('#', '');
+  if (clean.length === 3) {
+    const r = parseInt(clean[0] + clean[0], 16);
+    const g = parseInt(clean[1] + clean[1], 16);
+    const b = parseInt(clean[2] + clean[2], 16);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
 function resolveCSSVar(value: string): string {
   if (typeof document === 'undefined') return value;
   const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
@@ -51,8 +65,12 @@ export const BarChart: FC<BarChartProps> = ({
   const bgColor = useCSSToken('var(--new-bgColorInner)', '#1a1919');
   const textColor = useCSSToken('var(--new-btn-text)', '#ffffff');
   const tableText = useCSSToken('var(--new-table-text)', '#9c9c9c');
-  const gridColor = useCSSToken('var(--new-bgLineColor)', '#212121');
   const borderColor = useCSSToken('var(--new-table-border)', '#2b2b2b');
+  const gridColor = useCSSToken('var(--new-bgLineColor)', '#212121');
+  const gridDottedColor = (() => {
+    const c = resolveCSSVar('var(--new-table-border)') || '#2b2b2b';
+    return hexToRgba(c, 0.4);
+  })();
 
   useEffect(() => {
     if (!ref.current) return;
@@ -82,12 +100,12 @@ export const BarChart: FC<BarChartProps> = ({
           y: {
             beginAtZero: true,
             grid: {
-              color: gridColor,
+              color: gridDottedColor,
             },
             border: { display: false },
             ticks: {
               color: tableText,
-              font: { size: 11 },
+              font: { size: 12 },
               maxTicksLimit: 6,
               callback(value) {
                 const v = Number(value);
@@ -102,7 +120,7 @@ export const BarChart: FC<BarChartProps> = ({
             border: { display: false },
             ticks: {
               color: tableText,
-              font: { size: 10 },
+              font: { size: 12 },
               maxRotation: 0,
             },
           },
@@ -121,9 +139,10 @@ export const BarChart: FC<BarChartProps> = ({
             bodyColor: tableText,
             borderColor,
             borderWidth: 1,
-            padding: 8,
-            cornerRadius: 6,
+            padding: 12,
+            cornerRadius: 8,
             displayColors: false,
+            titleFont: { size: 12, weight: 'normal' },
             bodyFont: { size: 12, weight: 'bold' },
             callbacks: {
               label(context) {
@@ -140,7 +159,7 @@ export const BarChart: FC<BarChartProps> = ({
     return () => {
       chartRef.current?.destroy();
     };
-  }, [labels, values, color, height, format, horizontal, bgColor, textColor, tableText, gridColor, borderColor, resolvedColor]);
+  }, [labels, values, color, height, format, horizontal, bgColor, textColor, tableText, gridColor, borderColor, resolvedColor, gridDottedColor]);
 
   return <canvas ref={ref} style={{ width: '100%', height }} />;
 };

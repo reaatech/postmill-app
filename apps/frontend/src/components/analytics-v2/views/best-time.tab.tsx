@@ -9,7 +9,7 @@ interface BestTimeTabProps {
 }
 
 function getColorClass(avgEngagement: number, maxAvg: number): string {
-  if (maxAvg === 0) return 'bg-fifth opacity-20';
+  if (maxAvg === 0) return 'bg-newTableHeader opacity-20';
   const ratio = avgEngagement / maxAvg;
   if (ratio < 0.1) return 'bg-green-900/30';
   if (ratio < 0.25) return 'bg-green-700/40';
@@ -90,7 +90,7 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
             {data.bestSlots.map((slot, i) => (
               <div
                 key={i}
-                className="bg-fifth border border-tableBorder rounded-[8px] px-[12px] py-[8px] text-[13px]"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[13px]"
               >
                 <span className="font-medium">{DAY_LABELS[slot.day]}</span>{' '}
                 <span>{HOUR_LABELS[slot.hour]}</span>

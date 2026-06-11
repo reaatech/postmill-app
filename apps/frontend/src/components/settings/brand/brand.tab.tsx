@@ -13,13 +13,13 @@ export const BrandTab = () => {
   return (
     <div className="flex flex-col">
       <h3 className="text-[20px] mb-[8px]">{t('brand', 'Brand')}</h3>
-      <div className="flex gap-[16px] border-b border-tableBorder mb-[8px]">
+      <div className="flex gap-[16px] border-b border-newTableBorder mb-[8px]">
         <button
           className={clsx(
             'pb-[8px] text-[14px] border-b-2 transition-colors',
             subtab === 'voice'
-              ? 'border-customColor4 text-textColor'
-              : 'border-transparent text-customColor18 hover:text-textColor',
+              ? 'border-btnPrimary text-textColor'
+              : 'border-transparent text-newTableText hover:text-textColor',
           )}
           onClick={() => setSubtab('voice')}
         >
@@ -28,9 +28,9 @@ export const BrandTab = () => {
         <button
           className={clsx(
             'pb-[8px] text-[14px] border-b-2 transition-colors',
-            subtab === 'knowledge'
-              ? 'border-customColor4 text-textColor'
-              : 'border-transparent text-customColor18 hover:text-textColor',
+subtab === 'knowledge'
+                ? 'border-btnPrimary text-textColor'
+              : 'border-transparent text-newTableText hover:text-textColor',
           )}
           onClick={() => setSubtab('knowledge')}
         >

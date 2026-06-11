@@ -69,7 +69,7 @@ export const RecommendationsTab: FC = () => {
           <p className="text-[13px] text-newTableText leading-relaxed">{item.description}</p>
           <button
             onClick={() => router.push(item.link)}
-            className="self-start mt-auto px-[14px] py-[6px] bg-forth text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
+            className="self-start mt-auto px-[14px] py-[6px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
           >
             {item.action}
           </button>

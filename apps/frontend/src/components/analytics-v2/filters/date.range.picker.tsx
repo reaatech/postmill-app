@@ -95,7 +95,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
           onClick={() => handlePreset(p)}
           className={`px-[10px] py-[5px] text-[12px] font-medium rounded-[6px] transition-colors ${
             activePreset === p.label
-              ? 'bg-forth text-white'
+              ? 'bg-btnPrimary text-white'
               : 'bg-newTableHeader text-newTableText hover:text-btnText border border-newTableBorder'
           }`}
         >
@@ -106,7 +106,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
         onClick={() => setCustom(!custom)}
         className={`px-[10px] py-[5px] text-[12px] font-medium rounded-[6px] transition-colors ${
           activePreset === 'Custom'
-            ? 'bg-forth text-white'
+            ? 'bg-btnPrimary text-white'
             : 'bg-newTableHeader text-newTableText hover:text-btnText border border-newTableBorder'
         }`}
       >
@@ -135,7 +135,7 @@ export const DateRangePicker: FC<DateRangePickerProps> = ({
           type="checkbox"
           checked={compare}
           onChange={toggleCompare}
-          className="accent-forth w-[14px] h-[14px]"
+          className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
         />
         Compare
       </label>

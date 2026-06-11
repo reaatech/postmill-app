@@ -107,7 +107,7 @@ export const PreflightPanel: FC<PreflightPanelProps> = ({
           {!hasBlocks && (
             <button
               onClick={onProceed}
-              className="px-[20px] py-[8px] bg-forth text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
+              className="px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
             >
               {t('proceed', 'Proceed')}
             </button>

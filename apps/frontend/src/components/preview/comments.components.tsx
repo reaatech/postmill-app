@@ -54,7 +54,7 @@ export const RenderComponents: FC<{
             {...register('comment', {
               required: true,
             })}
-            className="flex w-full px-3 py-2 h-[98px] text-sm ring-offset-background placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none text-white bg-third border border-tableBorder placeholder-gray-500 focus:ring-0"
+            className="flex w-full px-3 py-2 h-[98px] text-sm ring-offset-background placeholder:text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 min-h-[80px] resize-none text-white bg-third border border-newTableBorder placeholder-gray-500 focus:ring-0"
             placeholder="Add a comment..."
             defaultValue={''}
           />
@@ -87,7 +87,7 @@ export const RenderComponents: FC<{
         {data.comments.map((comment: any) => (
           <div
             key={comment.id}
-            className="flex space-x-3 border-t border-tableBorder py-3"
+            className="flex space-x-3 border-t border-newTableBorder py-3"
           >
             <div className="flex-1 space-y-1">
               <div className="flex items-center space-x-2">

@@ -158,7 +158,7 @@ export const ChannelEditModal: FC<ChannelEditModalProps> = ({
   const appLink = PROVIDER_APP_LINKS[identifier];
 
   return (
-    <div className="flex flex-col gap-[12px] p-[16px] rounded-[8px] bg-sixth border border-customColor6">
+    <div className="flex flex-col gap-[12px] p-[16px] rounded-[8px] bg-newBgColorInner border border-newTableBorder">
       <div className="flex items-center justify-between">
         <h3 className="text-[15px] font-[600]">{name}</h3>
         {appLink?.url && (
@@ -166,7 +166,7 @@ export const ChannelEditModal: FC<ChannelEditModalProps> = ({
             href={appLink.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-[12px] text-customColor4 underline hover:opacity-80"
+            className="text-[12px] text-textColor underline hover:opacity-80"
           >
             {appLink.label}
           </a>
@@ -241,7 +241,7 @@ export const ChannelEditModal: FC<ChannelEditModalProps> = ({
           <textarea
             value={editSetupNotes}
             onChange={(e) => setEditSetupNotes(e.target.value)}
-            className="p-[8px] rounded-[4px] border border-tableBorder bg-bgInput text-textColor min-h-[80px] text-[14px]"
+            className="p-[8px] rounded-[8px] border border-newTableBorder bg-bgInput text-textColor min-h-[80px] text-[14px]"
             rows={3}
             placeholder="Setup instructions for this provider"
           />
@@ -252,7 +252,7 @@ export const ChannelEditModal: FC<ChannelEditModalProps> = ({
         <div className="flex gap-[8px]">
           <Button
             type="button"
-            className="!bg-transparent border border-tableBorder text-textColor"
+            className="!bg-transparent border border-newTableBorder text-textColor"
             onClick={onClose}
           >
             Cancel
@@ -270,7 +270,7 @@ export const ChannelEditModal: FC<ChannelEditModalProps> = ({
               </Button>
               <Button
                 type="button"
-                className="!bg-transparent border border-tableBorder text-textColor text-[12px]"
+                className="!bg-transparent border border-newTableBorder text-textColor text-[12px]"
                 onClick={() => onTest(identifier)}
               >
                 Test

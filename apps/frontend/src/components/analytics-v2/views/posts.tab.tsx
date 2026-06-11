@@ -1,33 +1,11 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useMemo, useState } from 'react';
 import { Post, CANONICAL_METRICS } from '../utils';
 import { usePostDetail } from '../hooks/usePostDetail';
 import { PostDetailChart } from '../post.detail.chart';
-
-const SortIcon: FC<{ active: boolean; direction: 'asc' | 'desc' }> = ({
-  active,
-  direction,
-}) => (
-  <svg
-    width="10"
-    height="12"
-    viewBox="0 0 10 12"
-    fill="none"
-    className={`ml-[4px] ${active ? 'text-btnText' : 'text-newTableText/40'}`}
-  >
-    <path
-      d="M5 1L9 5H1L5 1Z"
-      fill="currentColor"
-      opacity={!active || direction === 'asc' ? 1 : 0.3}
-    />
-    <path
-      d="M5 11L1 7H9L5 11Z"
-      fill="currentColor"
-      opacity={!active || direction === 'desc' ? 1 : 0.3}
-    />
-  </svg>
-);
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
+import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
 interface PostsTabProps {
   posts?: Post[];
@@ -89,34 +67,50 @@ export const PostsTab: FC<PostsTabProps> = ({
 
   const METRICS_LIST = CANONICAL_METRICS;
 
-  if (loading) {
-    return (
-      <div className="animate-pulse space-y-[8px]">
-        <div className="h-[44px] bg-newTableHeader rounded-[8px]" />
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-[56px] bg-newTableHeader rounded-[8px]" />
-        ))}
-      </div>
-    );
-  }
+  const columns: Column<Post>[] = useMemo(() => {
+    const base: Column<Post>[] = [
+      {
+        key: 'content',
+        header: 'Content',
+        render: (post: Post) => (
+          <span className="max-w-[240px] truncate block">{post.content}</span>
+        ),
+      },
+      {
+        key: 'channel',
+        header: 'Channel',
+        render: (post: Post) => (
+          <div className="flex items-center gap-[6px]">
+            <img src={post.integration.picture} alt="" className="w-[16px] h-[16px] rounded-[4px]" />
+            <span className="text-[12px]">{post.integration.name}</span>
+          </div>
+        ),
+      },
+      {
+        key: 'publishedAt',
+        header: 'Date',
+        sortable: true,
+        render: (post: Post) => (
+          <span className="text-[12px] text-newTableText tabular-nums whitespace-nowrap">
+            {new Date(post.publishedAt).toLocaleDateString()}
+          </span>
+        ),
+      },
+    ];
 
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center py-[48px] text-center">
-        <p className="text-newTableText text-[14px]">Failed to load posts</p>
-      </div>
-    );
-  }
+    selectedColumns.forEach((key) => {
+      base.push({
+        key,
+        header: CANONICAL_METRICS.find((m) => m.key === key)?.label || key,
+        align: 'right',
+        sortable: true,
+        render: (post: Post) =>
+          new Intl.NumberFormat().format(Math.round(post.metrics[key] || 0)),
+      });
+    });
 
-  if (!posts?.length) {
-    return (
-      <div className="flex flex-col items-center justify-center py-[48px] text-center">
-        <p className="text-newTableText text-[14px]">
-          No posts found in this period
-        </p>
-      </div>
-    );
-  }
+    return base;
+  }, [selectedColumns]);
 
   return (
     <div>
@@ -155,7 +149,7 @@ export const PostsTab: FC<PostsTabProps> = ({
                               : [...prev, m.key]
                           );
                         }}
-                        className="accent-forth"
+                        className="accent-btnPrimary"
                       />
                       {m.label}
                     </label>
@@ -166,103 +160,23 @@ export const PostsTab: FC<PostsTabProps> = ({
           )}
         </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-newTableBorder">
-              <th className="text-left text-[12px] font-medium text-newTableText py-[10px] px-[12px]">
-                Content
-              </th>
-              <th className="text-left text-[12px] font-medium text-newTableText py-[10px] px-[12px]">
-                Channel
-              </th>
-              <th className="text-left text-[12px] font-medium text-newTableText py-[10px] px-[12px]">
-                <button
-                  onClick={() => handleSort('publishedAt')}
-                  className="flex items-center"
-                >
-                  Date{' '}
-                  <SortIcon active={sort === 'publishedAt'} direction={dir} />
-                </button>
-              </th>
-              {metricHeaders.map((h) => (
-                <th
-                  key={h.key}
-                  className="text-right text-[12px] font-medium text-newTableText py-[10px] px-[12px]"
-                >
-                  <button
-                    onClick={() => handleSort(h.key)}
-                    className="flex items-center justify-end ml-auto"
-                  >
-                    {h.label}{' '}
-                    <SortIcon active={sort === h.key} direction={dir} />
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {posts.map((post) => (
-              <tr
-                key={post.postId}
-                onClick={() => setSelectedPostId(post.postId)}
-                className="border-b border-newTableBorder hover:bg-boxHover transition-colors cursor-pointer"
-              >
-                <td className="py-[10px] px-[12px] text-[13px] max-w-[240px] truncate">
-                  {post.content}
-                </td>
-                <td className="py-[10px] px-[12px]">
-                  <div className="flex items-center gap-[6px]">
-                    <img
-                      src={post.integration.picture}
-                      alt=""
-                      className="w-[16px] h-[16px] rounded-[4px]"
-                    />
-                    <span className="text-[12px]">{post.integration.name}</span>
-                  </div>
-                </td>
-                <td className="py-[10px] px-[12px] text-[12px] text-newTableText tabular-nums whitespace-nowrap">
-                  {new Date(post.publishedAt).toLocaleDateString()}
-                </td>
-                {metricHeaders.map((h) => (
-                  <td
-                    key={h.key}
-                    className="py-[10px] px-[12px] text-[13px] font-medium tabular-nums text-right"
-                  >
-                    {new Intl.NumberFormat().format(
-                      Math.round(post.metrics[h.key] || 0)
-                    )}
-                  </td>
-                ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
 
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-[16px] px-[12px]">
-          <div className="text-[12px] text-newTableText">
-            {(page - 1) * limit + 1}–{Math.min(page * limit, total)} of {total}
-          </div>
-          <div className="flex items-center gap-[4px]">
-            <button
-              disabled={page <= 1}
-              onClick={() => onPageChange(page - 1)}
-              className="px-[8px] py-[4px] text-[12px] rounded-[6px] bg-newTableHeader border border-newTableBorder disabled:opacity-30 hover:border-newTableText/30 transition-colors"
-            >
-              Previous
-            </button>
-            <button
-              disabled={page >= totalPages}
-              onClick={() => onPageChange(page + 1)}
-              className="px-[8px] py-[4px] text-[12px] rounded-[6px] bg-newTableHeader border border-newTableBorder disabled:opacity-30 hover:border-newTableText/30 transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={posts || []}
+        keyExtractor={(post: Post) => post.postId}
+        loading={loading}
+        error={error || undefined}
+        sortKey={sort}
+        sortDir={dir}
+        onSort={handleSort}
+        page={page}
+        total={total}
+        limit={limit}
+        onPageChange={onPageChange}
+        onRowClick={(post: Post) => setSelectedPostId(post.postId)}
+        emptyState={{ title: 'No posts found in this period' }}
+      />
 
       {selectedPostId && (
         <div

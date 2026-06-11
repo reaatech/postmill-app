@@ -208,7 +208,7 @@ export const FolderTree: FC<{
         <div className="text-[13px] font-[600] text-textColor">Folders</div>
         <button
           onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
-          className="p-[4px] rounded-[4px] text-textColor/60 hover:text-textColor hover:bg-forth transition-all"
+          className="p-[4px] rounded-[4px] text-textColor/60 hover:text-textColor hover:bg-boxHover transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
         </button>
@@ -269,7 +269,7 @@ export const FolderTree: FC<{
               setRenamingName(f?.name || '');
               setContextMenu(null);
             }}
-            className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+            className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
           >
             Rename
           </button>
@@ -279,14 +279,14 @@ export const FolderTree: FC<{
               setNewFolderName('');
               setContextMenu(null);
             }}
-            className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+            className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
           >
             New Subfolder
           </button>
           <div className="border-t border-newBorder my-[4px]" />
           <button
             onClick={() => handleDelete(contextMenu.folderId)}
-            className="w-full text-left px-[12px] py-[8px] text-[13px] text-red-400 hover:bg-forth transition-all"
+            className="w-full text-left px-[12px] py-[8px] text-[13px] text-red-400 hover:bg-boxHover transition-all"
           >
             Delete
           </button>

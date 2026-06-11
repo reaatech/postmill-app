@@ -82,7 +82,7 @@ export function Activate() {
         )}
       </div>
 
-      <div className="mt-8 border-t border-fifth pt-6">
+      <div className="mt-8 border-t border-newTableBorder pt-6">
         <h2 className="text-lg font-semibold mb-4">
           {t('didnt_receive_email', "Didn't receive the email?")}
         </h2>

@@ -241,20 +241,20 @@ export const BrandVoiceSection = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="mt-[4px]">{t('brand_voice', 'Brand Voice')}</div>
 
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <div className="text-[14px]">{t('enable_brand_profile', 'Enable Brand Profile')}</div>
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('enable_brand_profile_description', 'Apply brand instructions to AI-generated content')}
           </div>
         </div>
@@ -267,11 +267,11 @@ export const BrandVoiceSection = () => {
 
       <div className="flex flex-col gap-[8px]">
         <div className="text-[14px]">{t('brand_instructions', 'Brand Instructions')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t('brand_instructions_description', 'Define tone, banned words, emoji policy, CTA style, and other brand guidelines for AI-generated content')}
         </div>
         <textarea
-          className="bg-forth border border-tableBorder rounded-[4px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
+          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           placeholder={t('brand_instructions_placeholder', 'e.g. Keep a friendly and professional tone. Never use emojis. Always include a call-to-action at the end.')}
@@ -280,7 +280,7 @@ export const BrandVoiceSection = () => {
 
       <div className="flex flex-col gap-[12px]">
         <div className="text-[14px]">{t('platform_overrides', 'Per-Platform Overrides')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t('platform_overrides_description', 'Override brand instructions for specific platforms. Falls back to global instructions when not set.')}
         </div>
 
@@ -308,7 +308,7 @@ export const BrandVoiceSection = () => {
               {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
             </div>
             <textarea
-              className="bg-forth border border-tableBorder rounded-[4px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
               value={platformInstructions[selectedPlatform] || ''}
               onChange={(e) => handlePlatformInstructionChange(selectedPlatform, e.target.value)}
               placeholder={t('platform_instructions_placeholder', 'e.g. Be more casual on this platform')}
@@ -322,7 +322,7 @@ export const BrandVoiceSection = () => {
               instr ? (
                 <div
                   key={platform}
-                  className="bg-fifth border border-tableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
+                  className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
                 >
                   <span className="font-medium">{PLATFORM_OPTIONS.find((p) => p.value === platform)?.label || platform}</span>
                   <button
@@ -348,7 +348,7 @@ export const BrandVoiceSection = () => {
       <div className="flex items-center justify-between gap-[24px]">
         <div className="flex flex-col flex-1">
           <div className="text-[14px]">{t('brand_language', 'Language')}</div>
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('brand_language_description', 'Default language for AI-generated content')}
           </div>
         </div>
@@ -372,7 +372,7 @@ export const BrandVoiceSection = () => {
 
       <div className="flex justify-end">
         <button
-          className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[14px] hover:opacity-90"
+          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[14px] hover:opacity-90"
           onClick={handleSave}
         >
           {t('save', 'Save')}
@@ -388,7 +388,7 @@ export const UsageSection = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
@@ -405,7 +405,7 @@ export const UsageSection = () => {
     data?.byScope?.reduce((max, s) => Math.max(max, s._sum?.costUsd || 0), 0) || 1;
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="mt-[4px]">{t('usage_and_spend', 'Usage & Spend')}</div>
 
       <div className="flex flex-col gap-[8px]">
@@ -417,7 +417,7 @@ export const UsageSection = () => {
         </div>
 
         {data?.budget && (
-          <div className="flex flex-col gap-[4px] text-[12px] text-customColor18">
+          <div className="flex flex-col gap-[4px] text-[12px] text-newTableText">
             {data.budget.monthlyCap != null && (
               <div>
                 {t('monthly_cap', 'Monthly cap')}: ${data.budget.monthlyCap.toFixed(2)}
@@ -446,9 +446,9 @@ export const UsageSection = () => {
               <div className="w-[80px] text-[13px]">
                 {scopeLabels[scope.scope] || scope.scope}
               </div>
-              <div className="flex-1 h-[20px] bg-forth border border-tableBorder rounded-[4px] overflow-hidden">
+              <div className="flex-1 h-[20px] bg-newTableHeader rounded-[4px] overflow-hidden">
                 <div
-                  className="h-full bg-customColor4 rounded-[4px] transition-all"
+                  className="h-full bg-btnPrimary rounded-[4px] transition-all"
                   style={{ width: `${barWidth}%` }}
                 />
               </div>
@@ -459,7 +459,7 @@ export const UsageSection = () => {
           );
         })}
         {(!data?.byScope || data.byScope.length === 0) && (
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('no_spend_data', 'No spend data yet')}
           </div>
         )}
@@ -542,18 +542,18 @@ export const PromptTemplatesSection = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="mt-[4px]">{t('prompt_templates', 'Prompt Templates')}</div>
         <button
-          className="text-[13px] text-customColor4 hover:underline"
+          className="text-[13px] text-textColor hover:underline"
           onClick={() => setShowNew(!showNew)}
         >
           {showNew ? t('cancel', 'Cancel') : t('add_template', '+ Add Template')}
@@ -561,22 +561,22 @@ export const PromptTemplatesSection = () => {
       </div>
 
       {showNew && (
-        <div className="flex flex-col gap-[12px] bg-forth border border-tableBorder rounded-[4px] p-[16px]">
+        <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
           <input
-            className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            className="bg-newBgColor border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             placeholder={t('template_key_placeholder', 'Template key (e.g. social_twitter)')}
             value={newKey}
             onChange={(e) => setNewKey(e.target.value)}
           />
           <textarea
-            className="bg-newBgColor border border-tableBorder rounded-[4px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
+            className="bg-newBgColor border border-newTableBorder rounded-[8px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
             placeholder={t('template_content_placeholder', 'Template content with {{variable}} placeholders')}
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
           />
           <div className="flex justify-end gap-[8px]">
             <button
-              className="text-[13px] px-[12px] py-[6px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+              className="text-[13px] px-[12px] py-[6px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
               onClick={() => {
                 setShowNew(false);
                 setNewKey('');
@@ -586,7 +586,7 @@ export const PromptTemplatesSection = () => {
               {t('cancel', 'Cancel')}
             </button>
             <button
-              className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
+              className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
               onClick={handleCreate}
             >
               {t('create', 'Create')}
@@ -599,12 +599,12 @@ export const PromptTemplatesSection = () => {
         {data?.map((template) => (
           <div
             key={template.id}
-            className="flex flex-col gap-[8px] bg-forth border border-tableBorder rounded-[4px] p-[16px]"
+            className="flex flex-col gap-[8px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]"
           >
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-semibold">{template.key}</span>
               {!template.organizationId && (
-                <span className="text-[11px] text-customColor18 bg-fifth rounded-[4px] px-[8px] py-[2px]">
+                <span className="text-[11px] text-newTableText bg-newTableHeader rounded-[4px] px-[8px] py-[2px]">
                   {t('global', 'Global')}
                 </span>
               )}
@@ -613,19 +613,19 @@ export const PromptTemplatesSection = () => {
             {editingKey === template.key ? (
               <div className="flex flex-col gap-[8px]">
                 <textarea
-                  className="bg-newBgColor border border-tableBorder rounded-[4px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
+                  className="bg-newBgColor border border-newTableBorder rounded-[8px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
                   value={editingContent}
                   onChange={(e) => setEditingContent(e.target.value)}
                 />
                 <div className="flex justify-end gap-[8px]">
                   <button
-                    className="text-[13px] px-[12px] py-[6px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+                    className="text-[13px] px-[12px] py-[6px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
                     onClick={cancelEdit}
                   >
                     {t('cancel', 'Cancel')}
                   </button>
                   <button
-                    className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
+className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
                     onClick={() => handleSave(template.key)}
                   >
                     {t('save', 'Save')}
@@ -639,7 +639,7 @@ export const PromptTemplatesSection = () => {
                 </div>
                 <div className="flex justify-end gap-[8px]">
                   <button
-                    className="text-[12px] text-customColor4 hover:underline"
+                    className="text-[12px] text-textColor hover:underline"
                     onClick={() => startEdit(template)}
                   >
                     {t('edit', 'Edit')}
@@ -656,7 +656,7 @@ export const PromptTemplatesSection = () => {
           </div>
         ))}
         {(!data || data.length === 0) && (
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('no_templates', 'No templates yet')}
           </div>
         )}
@@ -709,18 +709,18 @@ export const PromptLibrarySection = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="mt-[4px]">{t('prompt_library', 'Prompt Library')}</div>
         <button
-          className="text-[13px] text-customColor4 hover:underline"
+          className="text-[13px] text-textColor hover:underline"
           onClick={() => setShowNew(!showNew)}
         >
           {showNew ? t('cancel', 'Cancel') : t('add_prompt', '+ Add Prompt')}
@@ -728,22 +728,22 @@ export const PromptLibrarySection = () => {
       </div>
 
       {showNew && (
-        <div className="flex flex-col gap-[12px] bg-forth border border-tableBorder rounded-[4px] p-[16px]">
+        <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
           <input
-            className="bg-newBgColor border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            className="bg-newBgColor border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             placeholder={t('prompt_title_placeholder', 'Prompt title')}
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
           />
           <textarea
-            className="bg-newBgColor border border-tableBorder rounded-[4px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
+            className="bg-newBgColor border border-newTableBorder rounded-[8px] min-h-[80px] p-[8px] text-textColor text-[13px] resize-y"
             placeholder={t('prompt_content_placeholder', 'Prompt content')}
             value={newContent}
             onChange={(e) => setNewContent(e.target.value)}
           />
           <div className="flex justify-end gap-[8px]">
             <button
-              className="text-[13px] px-[12px] py-[6px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+              className="text-[13px] px-[12px] py-[6px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
               onClick={() => {
                 setShowNew(false);
                 setNewTitle('');
@@ -753,7 +753,7 @@ export const PromptLibrarySection = () => {
               {t('cancel', 'Cancel')}
             </button>
             <button
-              className="bg-customColor4 text-white rounded-[4px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
+              className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90"
               onClick={handleCreate}
             >
               {t('save', 'Save')}
@@ -766,7 +766,7 @@ export const PromptLibrarySection = () => {
         {data?.map((item) => (
           <div
             key={item.id}
-            className="flex items-start justify-between bg-forth border border-tableBorder rounded-[4px] p-[16px]"
+            className="flex items-start justify-between bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]"
           >
             <div className="flex flex-col gap-[4px] flex-1">
               <span className="text-[13px] font-semibold">{item.title}</span>
@@ -783,7 +783,7 @@ export const PromptLibrarySection = () => {
           </div>
         ))}
         {(!data || data.length === 0) && (
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('no_prompts', 'No saved prompts yet')}
           </div>
         )}
@@ -798,17 +798,17 @@ export const MediaProvidersSection = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex flex-col gap-[4px]">
         <div className="mt-[4px]">{t('media_providers', 'Media Providers')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t(
             'media_providers_description',
             'Read-only view of the media generation providers configured for this workspace. Managed by an administrator in Admin → AI Settings.',
@@ -820,14 +820,14 @@ export const MediaProvidersSection = () => {
         {data?.map((entry) => (
           <div
             key={entry.operation}
-            className="flex items-center justify-between bg-forth border border-tableBorder rounded-[4px] px-[16px] py-[12px]"
+            className="flex items-center justify-between bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[12px]"
           >
             <div className="flex flex-col">
               <span className="text-[13px] font-semibold">
                 {MEDIA_OPERATION_LABELS[entry.operation] || entry.operation}
               </span>
               {entry.available ? (
-                <span className="text-[12px] text-customColor18">
+                <span className="text-[12px] text-newTableText">
                   {entry.providers
                     .map(
                       (p) => `${p.id}${p.c2paAvailable ? ' (C2PA)' : ''}`,
@@ -835,7 +835,7 @@ export const MediaProvidersSection = () => {
                     .join(', ')}
                 </span>
               ) : (
-                <span className="text-[12px] text-customColor18">
+                <span className="text-[12px] text-newTableText">
                   {t('media_provider_not_configured', 'Not configured')}
                 </span>
               )}
@@ -843,8 +843,8 @@ export const MediaProvidersSection = () => {
             <span
               className={`text-[11px] rounded-[4px] px-[8px] py-[2px] ${
                 entry.available
-                  ? 'bg-fifth text-newTableText'
-                  : 'bg-forth text-customColor18'
+                  ? 'bg-newTableHeader text-newTableText'
+                  : 'bg-newTableHeader text-newTableText'
               }`}
             >
               {entry.available
@@ -854,7 +854,7 @@ export const MediaProvidersSection = () => {
           </div>
         ))}
         {(!data || data.length === 0) && (
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('no_media_providers', 'No media providers configured')}
           </div>
         )}

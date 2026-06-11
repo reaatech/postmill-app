@@ -116,7 +116,7 @@ export const FileDetailsPanel: FC<{
         <div className="text-[14px] font-[600] text-textColor">Details</div>
         <button
           onClick={onClose}
-          className="p-[4px] rounded-[4px] text-textColor/60 hover:text-textColor hover:bg-forth transition-all"
+          className="p-[4px] rounded-[4px] text-textColor/60 hover:text-textColor hover:bg-boxHover transition-all"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -217,7 +217,7 @@ export const FileDetailsPanel: FC<{
           <div className="border-t border-newBorder pt-[14px] space-y-[8px]">
             <button
               onClick={handleCopyUrl}
-              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <rect x="2" y="4" width="8" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
@@ -227,7 +227,7 @@ export const FileDetailsPanel: FC<{
             </button>
             <button
               onClick={handleDownload}
-              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M7 1V9M7 9L3.5 5.5M7 9L10.5 5.5M2 11V12C2 12.5523 2.44772 13 3 13H11C11.5523 13 12 12.5523 12 12V11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
@@ -241,7 +241,7 @@ export const FileDetailsPanel: FC<{
                 a.download = file.name;
                 a.click();
               }}
-              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-forth transition-all"
+              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M2 2H12M2 7H12M2 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
@@ -250,7 +250,7 @@ export const FileDetailsPanel: FC<{
             </button>
             <button
               onClick={handleDelete}
-              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-red-400 hover:bg-forth transition-all"
+              className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-red-400 hover:bg-boxHover transition-all"
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                 <path d="M2 3.5H12M4.5 3.5V2.5C4.5 2.22386 4.72386 2 5 2H9C9.27614 2 9.5 2.22386 9.5 2.5V3.5M5.5 6.5V10.5M8.5 6.5V10.5M3.16667 3.5L3.83333 11.6667C3.87363 12.1289 4.26222 12.5 4.72727 12.5H9.27273C9.73778 12.5 10.1264 12.1289 10.1667 11.6667L10.8333 3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />

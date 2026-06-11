@@ -117,14 +117,14 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
-      <div className="bg-sixth border border-fifth rounded-[16px] p-[24px] w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[16px] p-[24px] w-full max-w-[500px] max-h-[90vh] overflow-y-auto">
         <h3 className="text-[18px] font-medium text-textColor mb-[20px]">
           {editProvider ? 'Edit Provider' : 'Add Storage Provider'}
         </h3>
 
         <div className="flex flex-col gap-[16px]">
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Provider Type
             </label>
             <div className="grid grid-cols-3 gap-[8px]">
@@ -143,12 +143,12 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                   disabled={!!editProvider}
                   className={`flex flex-col items-center gap-[4px] p-[8px] rounded-[8px] border transition-colors ${
                     type === value
-                      ? 'border-customColor4 bg-[#1a3a1a]'
-                      : 'border-fifth bg-transparent hover:bg-fifth'
+                      ? 'border-btnPrimary bg-[#1a3a1a]'
+                      : 'border-newTableBorder bg-transparent hover:bg-boxHover'
                   }`}
                 >
                   <Icon />
-                  <span className="text-[10px] text-customColor18 text-center">
+                  <span className="text-[10px] text-newTableText text-center">
                     {label}
                   </span>
                 </button>
@@ -157,7 +157,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
           </div>
 
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Name
             </label>
             <input
@@ -165,14 +165,14 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="My Storage"
-              className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
             />
           </div>
 
           {showCredentials && (
             <>
               <div>
-                <label className="text-[12px] text-customColor18 mb-[6px] block">
+                <label className="text-[12px] text-newTableText mb-[6px] block">
                   Access Key ID
                 </label>
                 <input
@@ -180,11 +180,11 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                   value={accessKeyId}
                   onChange={(e) => setAccessKeyId(e.target.value)}
                   placeholder="AKIA..."
-                  className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+                  className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
                 />
               </div>
               <div>
-                <label className="text-[12px] text-customColor18 mb-[6px] block">
+                <label className="text-[12px] text-newTableText mb-[6px] block">
                   Secret Access Key
                 </label>
                 <input
@@ -192,14 +192,14 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                   value={secretAccessKey}
                   onChange={(e) => setSecretAccessKey(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+                  className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Region
             </label>
             <input
@@ -207,12 +207,12 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               value={region}
               onChange={(e) => setRegion(e.target.value)}
               placeholder="us-east-1"
-              className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
             />
           </div>
 
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Bucket
             </label>
             <input
@@ -220,12 +220,12 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               value={bucket}
               onChange={(e) => setBucket(e.target.value)}
               placeholder="my-bucket"
-              className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
             />
           </div>
 
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Custom Endpoint <span className="text-[10px]">(optional)</span>
             </label>
             <input
@@ -233,12 +233,12 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               value={endpoint}
               onChange={(e) => setEndpoint(e.target.value)}
               placeholder="https://..."
-              className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
             />
           </div>
 
           <div>
-            <label className="text-[12px] text-customColor18 mb-[6px] block">
+            <label className="text-[12px] text-newTableText mb-[6px] block">
               Public URL <span className="text-[10px]">(optional)</span>
             </label>
             <input
@@ -246,7 +246,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
               value={publicUrl}
               onChange={(e) => setPublicUrl(e.target.value)}
               placeholder="https://cdn.example.com"
-              className="w-full bg-fifth border border-[#3A3A3A] rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-customColor4"
+              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
             />
           </div>
 
@@ -254,7 +254,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
             <div
               className={`p-[12px] rounded-[8px] text-[13px] ${
                 testResult.ok
-                  ? 'bg-[#1a3a1a] text-customColor4'
+                  ? 'bg-[#1a3a1a] text-textColor'
                   : 'bg-[#3a1a1a] text-[#f87171]'
               }`}
             >
@@ -267,7 +267,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
           <div className="flex gap-[12px] justify-end mt-[8px]">
             <button
               onClick={onClose}
-              className="px-[16px] py-[8px] rounded-[8px] bg-fifth text-customColor18 text-[13px] hover:bg-[#3A3A3A] transition-colors"
+              className="px-[16px] py-[8px] rounded-[8px] bg-btnSimple text-newTableText text-[13px] hover:bg-boxHover transition-colors"
             >
               Cancel
             </button>
@@ -283,7 +283,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
             <button
               onClick={handleSave}
               disabled={saving || !name.trim()}
-              className="px-[16px] py-[8px] rounded-[8px] bg-customColor4 text-textColor text-[13px] font-medium hover:bg-customColor4/80 transition-colors disabled:opacity-50"
+              className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors disabled:opacity-50"
             >
               {saving
                 ? 'Saving...'

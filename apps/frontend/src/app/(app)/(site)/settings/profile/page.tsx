@@ -60,7 +60,7 @@ export default function ProfilePage() {
             className={clsx(
               'pb-[12px] px-[4px] text-[14px] font-[500] border-b-2 transition-colors',
               tab === key
-                ? 'border-customColor4 text-textColor'
+                ? 'border-btnPrimary text-textColor'
                 : 'border-transparent text-textColor/50 hover:text-textColor/80'
             )}
           >
@@ -81,7 +81,7 @@ export default function ProfilePage() {
       {tab === 'security' && (
         <>
           <ChangePasswordComponent />
-          <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] mt-[16px] flex flex-col gap-[24px]">
+          <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] mt-[16px] flex flex-col gap-[24px]">
             <h4 className="text-[16px] font-[600]">{t('active_sessions', 'Active Sessions')}</h4>
             <SessionCard />
             <button
@@ -156,7 +156,7 @@ const SessionCard: FC = () => {
   return (
     <div className="flex flex-col gap-[12px]">
       <div className="flex items-center gap-[12px] bg-newBgColor border border-newTableBorder rounded-[6px] px-[16px] py-[12px]">
-        <div className="w-[32px] h-[32px] rounded-full bg-customColor4/20 flex items-center justify-center text-[14px]">
+        <div className="w-[32px] h-[32px] rounded-full bg-btnPrimary/20 flex items-center justify-center text-[14px]">
           {info?.isMobile ? '📱' : '💻'}
         </div>
         <div className="flex-1">

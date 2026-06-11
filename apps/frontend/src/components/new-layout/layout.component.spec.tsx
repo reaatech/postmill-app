@@ -162,10 +162,6 @@ vi.mock('../layout/gtm.component', () => ({
   TrialTracker: () => null,
 }));
 
-vi.mock('../onboarding/onboarding.checklist', () => ({
-  OnboardingChecklist: () => null,
-}));
-
 vi.mock('../layout/pre-condition.component', () => ({
   PreConditionComponent: () => null,
 }));

@@ -254,7 +254,7 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
           {mainPost?.integration?.providerIdentifier && (
             <SafeImage
               src={`/icons/platforms/${mainPost.integration.providerIdentifier}.png`}
-              className="w-[14px] h-[14px] rounded-[4px] absolute -bottom-[4px] -end-[4px] border border-fifth"
+              className="w-[14px] h-[14px] rounded-[4px] absolute -bottom-[4px] -end-[4px] border border-newTableBorder"
               alt={mainPost.integration.providerIdentifier}
               width={14}
               height={14}

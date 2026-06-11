@@ -109,14 +109,14 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
 
   if (!provider) {
     return (
-      <div className="bg-sixth border border-fifth rounded-[4px] p-[24px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="text-[16px] font-semibold">{provider.name}</div>
         <button
@@ -135,7 +135,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
           </label>
           {field.type === 'select' && field.options ? (
             <select
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
               value={creds[field.key] || ''}
               onChange={(e) => setCreds((prev) => ({ ...prev, [field.key]: e.target.value }))}
             >
@@ -149,7 +149,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
           ) : (
             <div className="relative">
               <input
-                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-full"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-full"
                 type={field.type === 'password' && !visibleFields[field.key] ? 'password' : 'text'}
                 placeholder={field.placeholder || ''}
                 value={creds[field.key] || ''}
@@ -177,7 +177,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
               <span className="text-red-500 ml-[2px]">*</span>
             </label>
             <input
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
               type="text"
               placeholder={t('client_id_placeholder', 'Bitly OAuth Client ID')}
               value={clientId}
@@ -191,7 +191,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
             </label>
             <div className="relative">
               <input
-                className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px] w-full"
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-full"
                 type={showClientSecret ? 'text' : 'password'}
                 placeholder={provider.isConfigured ? t('secret_saved', '••••• saved — leave blank to keep') : ''}
                 value={clientSecret}
@@ -215,7 +215,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
             {t('custom_domain', 'Custom Domain')}
           </label>
           <input
-            className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             type="text"
             placeholder={provider.defaultDomain || 'custom.domain.com'}
             value={customDomain}
@@ -225,7 +225,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
       )}
 
       {provider.setupNotes && (
-        <div className="text-[12px] text-newTableText bg-forth border border-tableBorder rounded-[4px] p-[12px]">
+        <div className="text-[12px] text-newTableText bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px]">
           {provider.setupNotes}
         </div>
       )}
@@ -238,7 +238,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
               : t('oauth_save_first', 'Save Client ID and Client Secret above first, then connect.')}
           </div>
           <button
-            className="bg-btnPrimary text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 whitespace-nowrap"
+            className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 whitespace-nowrap"
             onClick={handleOAuthConnect}
             disabled={connecting || !provider.isConfigured && !clientId && !clientSecret}
           >
@@ -263,14 +263,14 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
 
       <div className="flex items-center justify-end gap-[12px]">
         <button
-          className="text-[13px] px-[16px] py-[8px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+          className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
           onClick={handleTest}
           disabled={testing}
         >
           {testing ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
         </button>
         <button
-          className="bg-btnPrimary text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
+          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
           onClick={handleSave}
           disabled={saving}
         >

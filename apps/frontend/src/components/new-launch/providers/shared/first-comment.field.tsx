@@ -10,7 +10,7 @@ export const FirstCommentField = () => {
   return (
     <div className="mt-[12px]">
       <textarea
-        className="bg-forth border border-tableBorder rounded-[4px] min-h-[60px] p-[8px] text-textColor resize-y bg-newBgColor w-full text-[13px]"
+        className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[60px] p-[8px] text-textColor resize-y bg-newBgColor w-full text-[13px]"
         {...register('firstComment')}
         placeholder={t('first_comment_placeholder', 'First comment (auto-posted after publish)...')}
       />

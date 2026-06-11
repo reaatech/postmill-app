@@ -13,6 +13,7 @@ import { MediaUploader } from '@gitroom/frontend/components/media/media-uploader
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { TrashComponent } from '@gitroom/frontend/components/media/trash.component';
 import clsx from 'clsx';
+import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
 type ViewMode = 'grid' | 'list';
 
@@ -125,6 +126,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
       />
 
       <div className="flex-1 flex flex-col min-w-0">
+        <PageHeader title="Media Library" description="Manage your images, videos, and files" />
         <div className="flex items-center gap-[12px] mb-[15px]">
           <div className="flex-1 relative">
             <input
@@ -160,7 +162,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
               onClick={() => setViewMode('grid')}
               className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
                 ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
-                : 'border-newColColor text-textColor hover:bg-forth')}
+                : 'border-newColColor text-textColor hover:bg-boxHover')}
             >
               <GridIcon />
             </button>
@@ -168,14 +170,14 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
               onClick={() => setViewMode('list')}
               className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
                 ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
-                : 'border-newColColor text-textColor hover:bg-forth')}
+                : 'border-newColColor text-textColor hover:bg-boxHover')}
             >
               <ListViewIcon />
             </button>
 
             <button
               onClick={() => setShowTrash(!showTrash)}
-              className="px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-forth transition-colors"
+              className="px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-boxHover transition-colors"
             >
               🗑️ Trash
             </button>
@@ -243,7 +245,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
               disabled={page === 0}
               onClick={() => setPage(p => Math.max(0, p - 1))}
               className={clsx('p-[8px] rounded-[6px] border border-newColColor transition-all',
-                page === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-forth text-textColor')}
+                page === 0 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-boxHover text-textColor')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>
@@ -265,7 +267,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
                   className={clsx('w-[36px] h-[36px] rounded-[6px] text-[13px] font-medium transition-all',
                     page === pageNum
                       ? 'bg-[#2B5CD3] text-white'
-                      : 'text-textColor hover:bg-forth border border-newColColor')}
+                      : 'text-textColor hover:bg-boxHover border border-newColColor')}
                 >
                   {pageNum + 1}
                 </button>
@@ -275,7 +277,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
               disabled={page >= pages - 1}
               onClick={() => setPage(p => Math.min(pages - 1, p + 1))}
               className={clsx('p-[8px] rounded-[6px] border border-newColColor transition-all',
-                page >= pages - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-forth text-textColor')}
+                page >= pages - 1 ? 'opacity-30 cursor-not-allowed' : 'hover:bg-boxHover text-textColor')}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             </button>

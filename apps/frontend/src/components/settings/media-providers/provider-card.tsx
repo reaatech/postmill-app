@@ -44,12 +44,12 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
   const t = useT();
 
   return (
-    <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex flex-col gap-[12px]">
+    <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[12px]">
       <div className="flex items-start justify-between">
         <div className="flex flex-col gap-[4px]">
           <span className="text-[15px] font-semibold">{provider.name}</span>
           {provider.type && (
-            <span className="text-[11px] text-customColor18 uppercase tracking-wider">
+            <span className="text-[11px] text-newTableText uppercase tracking-wider">
               {provider.type}
             </span>
           )}
@@ -60,7 +60,7 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
               ? 'bg-green-500/20 text-green-400'
               : provider.isConfigured
                 ? 'bg-yellow-500/20 text-yellow-400'
-                : 'bg-fifth text-customColor18'
+                : 'bg-newTableHeader text-newTableText'
           }`}
         >
           {provider.enabled && provider.isConfigured
@@ -76,7 +76,7 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
           <span
             key={op}
             className={`text-[11px] rounded-[4px] px-[6px] py-[2px] ${
-              OPERATION_COLORS[op] || 'bg-fifth text-customColor18'
+              OPERATION_COLORS[op] || 'bg-newTableHeader text-newTableText'
             }`}
           >
             {OPERATION_LABELS[op] || op}
@@ -84,9 +84,9 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
         ))}
       </div>
 
-      <div className="flex items-center justify-between pt-[8px] border-t border-tableBorder">
+      <div className="flex items-center justify-between pt-[8px] border-t border-newTableBorder">
         <button
-          className="text-[13px] text-customColor4 hover:underline"
+          className="text-[13px] text-textColor hover:underline"
           onClick={() => onConfigure(provider.identifier)}
         >
           {provider.isConfigured ? t('edit_config', 'Edit Config') : t('configure', 'Configure')}
@@ -94,12 +94,12 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
 
         {provider.isConfigured && (
           <label className="flex items-center gap-[6px] cursor-pointer">
-            <span className="text-[12px] text-customColor18">
+            <span className="text-[12px] text-newTableText">
               {t('enabled', 'Enabled')}
             </span>
             <input
               type="checkbox"
-              className="accent-customColor4"
+              className="accent-btnPrimary"
               checked={provider.enabled}
               onChange={(e) => onToggle(provider.identifier, e.target.checked)}
             />

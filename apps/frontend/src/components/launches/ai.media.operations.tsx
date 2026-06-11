@@ -234,7 +234,7 @@ const AiMediaOperationsModal: FC<{ close: () => void }> = (props) => {
                     'describe_what_you_want',
                     'Describe what you want...'
                   )}
-                  className="bg-input min-h-[100px] p-[16px] outline-none border-fifth border rounded-[4px] text-inputText placeholder-inputText"
+                  className="bg-input min-h-[100px] p-[16px] outline-none border-newTableBorder border rounded-[4px] text-inputText placeholder-inputText"
                 />
               </div>
             ) : (
@@ -246,7 +246,7 @@ const AiMediaOperationsModal: FC<{ close: () => void }> = (props) => {
                   type="text"
                   value={values[field] || ''}
                   onChange={(e) => setField(field, e.target.value)}
-                  className="bg-input h-[44px] px-[16px] outline-none border-fifth border rounded-[4px] text-inputText placeholder-inputText"
+                  className="bg-input h-[44px] px-[16px] outline-none border-newTableBorder border rounded-[4px] text-inputText placeholder-inputText"
                 />
               </div>
             )

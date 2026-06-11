@@ -111,11 +111,11 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
   }, []);
 
   return (
-    <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <div className="text-[14px]">{t('brand_voice', 'Brand Voice')}</div>
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('brand_voice_description', 'Define your brand voice and tone for AI-generated content')}
           </div>
         </div>
@@ -124,7 +124,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
           <div className="text-[14px]">{t('enable_brand_profile', 'Enable Brand Profile')}</div>
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('enable_brand_profile_description', 'Apply brand instructions to AI-generated content')}
           </div>
         </div>
@@ -137,11 +137,11 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
 
       <div className="flex flex-col gap-[8px]">
         <div className="text-[14px]">{t('brand_instructions', 'Brand Instructions')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t('brand_instructions_description', 'Define tone, banned words, emoji policy, CTA style, and other brand guidelines for AI-generated content')}
         </div>
         <textarea
-          className="bg-forth border border-tableBorder rounded-[4px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
+          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           placeholder={t('brand_instructions_placeholder', 'e.g. Keep a friendly and professional tone. Never use emojis. Always include a call-to-action at the end.')}
@@ -150,7 +150,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
 
       <div className="flex flex-col gap-[12px]">
         <div className="text-[14px]">{t('platform_overrides', 'Per-Platform Overrides')}</div>
-        <div className="text-[12px] text-customColor18">
+        <div className="text-[12px] text-newTableText">
           {t('platform_overrides_description', 'Override brand instructions for specific platforms. Falls back to global instructions when not set.')}
         </div>
 
@@ -178,7 +178,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
               {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
             </div>
             <textarea
-              className="bg-forth border border-tableBorder rounded-[4px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
               value={platformInstructions[selectedPlatform] || ''}
               onChange={(e) => handlePlatformInstructionChange(selectedPlatform, e.target.value)}
               placeholder={t('platform_instructions_placeholder', 'e.g. Be more casual on this platform')}
@@ -192,7 +192,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
               instr ? (
                 <div
                   key={platform}
-                  className="bg-fifth border border-tableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
+                  className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
                 >
                   <span className="font-medium">{PLATFORM_OPTIONS.find((p) => p.value === platform)?.label || platform}</span>
                   <button
@@ -218,7 +218,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
       <div className="flex items-center justify-between gap-[24px]">
         <div className="flex flex-col flex-1">
           <div className="text-[14px]">{t('brand_language', 'Language')}</div>
-          <div className="text-[12px] text-customColor18">
+          <div className="text-[12px] text-newTableText">
             {t('brand_language_description', 'Default language for AI-generated content')}
           </div>
         </div>
@@ -242,7 +242,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
 
       <div className="flex justify-end">
         <button
-          className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[14px] hover:opacity-90"
+          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[14px] hover:opacity-90"
           onClick={handleSave}
         >
           {t('save', 'Save')}
@@ -258,7 +258,7 @@ export const BrandVoice = () => {
 
   if (isLoading) {
     return (
-      <div className="my-[16px] mt-[16px] bg-sixth border-fifth border rounded-[4px] p-[24px]">
+      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{translate('loading', 'Loading...')}</div>
       </div>
     );

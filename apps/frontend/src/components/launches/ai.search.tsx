@@ -61,7 +61,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
             'search_past_content',
             'Search past content semantically...'
           )}
-          className="bg-input w-full pl-[36px] pr-[12px] h-[42px] outline-none border-fifth border rounded-[6px] text-inputText placeholder-inputText text-[14px]"
+          className="bg-input w-full pl-[36px] pr-[12px] h-[42px] outline-none border-newTableBorder border rounded-[6px] text-inputText placeholder-inputText text-[14px]"
         />
       </div>
 
@@ -91,7 +91,7 @@ const AiSearchModal: FC<{ close: () => void }> = (props) => {
           {data.map((item: any, idx: number) => (
             <div
               key={idx}
-              className="bg-fifth p-[12px] rounded-[8px] border border-tableBorder"
+              className="bg-newBgColorInner p-[12px] rounded-[8px] border border-newTableBorder"
             >
               <div className="text-[13px] leading-[20px] whitespace-pre-wrap mb-[8px]">
                 {item.content || item.text || item.snippet || JSON.stringify(item)}

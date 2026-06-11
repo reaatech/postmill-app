@@ -94,7 +94,7 @@ const RedditPreview: FC = (props) => {
           <div
             key={index}
             className={clsx(
-              `bg-customColor37 w-full p-[10px] flex flex-col border-tableBorder border`
+              `bg-newBgColorInner w-full p-[10px] flex flex-col border-newTableBorder border`
             )}
           >
             <div className="flex flex-col">

@@ -78,7 +78,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
         {onClose && (
           <button
             onClick={onClose}
-            className="text-customColor18 hover:text-textColor transition-colors"
+            className="text-newTableText hover:text-textColor transition-colors"
           >
             ✕
           </button>
@@ -86,9 +86,9 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
       </div>
 
       {loading ? (
-        <div className="text-[14px] text-customColor18">Loading trash...</div>
+        <div className="text-[14px] text-newTableText">Loading trash...</div>
       ) : trashedMedia.length === 0 ? (
-        <div className="text-[14px] text-customColor18 text-center py-[40px]">
+        <div className="text-[14px] text-newTableText text-center py-[40px]">
           Your trash is empty.
         </div>
       ) : (
@@ -96,10 +96,10 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
           {trashedMedia.map((media) => (
             <div
               key={media.id}
-              className="rounded-[8px] bg-customColor8 overflow-hidden border border-customColor20"
+              className="rounded-[8px] bg-btnSimple overflow-hidden border border-newTableBorder"
             >
               {media.path && (
-                <div className="aspect-square bg-customColor20 flex items-center justify-center">
+                <div className="aspect-square bg-newTableHeader flex items-center justify-center">
                   <img
                     src={media.path}
                     alt={media.name}
@@ -114,19 +114,19 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
                 <div className="text-[13px] text-textColor font-medium truncate mb-[4px]">
                   {media.name}
                 </div>
-                <div className="text-[11px] text-customColor18 mb-[8px]">
+                <div className="text-[11px] text-newTableText mb-[8px]">
                   Deleted: {formatDate(media.deletedAt)}
                 </div>
                 <div className="flex gap-[8px]">
                   <button
                     onClick={() => handleRestore(media.id)}
-                    className="flex-1 px-[8px] py-[6px] rounded-[4px] bg-customColor4 text-textColor text-[12px] font-medium hover:bg-customColor4/80 transition-colors"
+                    className="flex-1 px-[8px] py-[6px] rounded-[8px] bg-btnPrimary text-white text-[12px] font-medium hover:bg-btnPrimary/80 transition-colors"
                   >
                     Restore
                   </button>
                   <button
                     onClick={() => handlePermanentDelete(media.id)}
-                    className="flex-1 px-[8px] py-[6px] rounded-[4px] bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors"
+                    className="flex-1 px-[8px] py-[6px] rounded-[8px] bg-red-600 text-white text-[12px] font-medium hover:bg-red-700 transition-colors"
                   >
                     Delete
                   </button>

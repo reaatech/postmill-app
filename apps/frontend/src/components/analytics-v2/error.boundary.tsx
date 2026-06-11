@@ -30,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
           <p className="text-[12px] text-newTableText/60 mt-[8px]">{this.state.error?.message}</p>
           <button
             onClick={() => this.setState({ hasError: false, error: undefined })}
-            className="mt-[16px] px-[12px] py-[6px] text-[12px] bg-forth text-white rounded-[6px]"
+            className="mt-[16px] px-[12px] py-[6px] text-[12px] bg-btnPrimary text-white rounded-[6px]"
           >
             Try again
           </button>

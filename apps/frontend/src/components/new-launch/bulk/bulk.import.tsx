@@ -1,9 +1,10 @@
 'use client';
 
-import { FC, useCallback, useRef, useState } from 'react';
+import { FC, useCallback, useMemo, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useBulkImport, BulkRow } from './useBulkImport';
+import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
 export const BulkImport: FC = () => {
   const t = useT();
@@ -76,7 +77,7 @@ export const BulkImport: FC = () => {
       />
       <button
         onClick={() => fileInputRef.current?.click()}
-        className="px-[16px] py-[8px] bg-forth text-white rounded-[8px] text-[14px] font-medium self-start"
+        className="px-[16px] py-[8px] bg-btnPrimary text-white rounded-[8px] text-[14px] font-medium self-start"
       >
         {t('upload_csv', 'Upload CSV')}
       </button>
@@ -87,36 +88,16 @@ export const BulkImport: FC = () => {
             {t('preview', 'Preview')} ({rows.length} {t('rows', 'rows')})
           </h3>
           <div className="max-h-[300px] overflow-y-auto border border-newTableBorder rounded-[8px]">
-            <table className="w-full text-[13px]">
-              <thead className="bg-newBgColor sticky top-0">
-                <tr>
-                  <th className="px-[8px] py-[4px] text-left">#</th>
-                  <th className="px-[8px] py-[4px] text-left">
-                    {t('content', 'Content')}
-                  </th>
-                  <th className="px-[8px] py-[4px] text-left">
-                    {t('channels', 'Channels')}
-                  </th>
-                  <th className="px-[8px] py-[4px] text-left">
-                    {t('schedule', 'Schedule')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.slice(0, 50).map((row, i) => (
-                  <tr key={i} className="border-t border-newTableBorder">
-                    <td className="px-[8px] py-[4px]">{i + 1}</td>
-                    <td className="px-[8px] py-[4px] max-w-[200px] truncate">
-                      {row.content}
-                    </td>
-                    <td className="px-[8px] py-[4px]">
-                      {row.channels.join(', ')}
-                    </td>
-                    <td className="px-[8px] py-[4px]">{row.scheduleAt}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={[
+                { key: 'idx', header: '#', width: '40px', render: (row: any) => row._idx + 1 },
+                { key: 'content', header: t('content', 'Content'), render: (row: BulkRow) => <span className="max-w-[200px] truncate block">{row.content}</span> },
+                { key: 'channels', header: t('channels', 'Channels'), render: (row: BulkRow) => row.channels.join(', ') },
+                { key: 'schedule', header: t('schedule', 'Schedule'), render: (row: BulkRow) => row.scheduleAt },
+              ]}
+              data={rows.slice(0, 50).map((row, i) => ({ ...row, _idx: i }))}
+              keyExtractor={(row: any) => `preview-${row._idx}`}
+            />
           </div>
           {rows.length > 50 && (
             <p className="text-[12px] text-newTableText">
@@ -131,7 +112,7 @@ export const BulkImport: FC = () => {
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-[16px] py-[8px] bg-forth text-white rounded-[8px] text-[14px] font-medium self-start disabled:opacity-50"
+            className="px-[16px] py-[8px] bg-btnPrimary text-white rounded-[8px] text-[14px] font-medium self-start disabled:opacity-50"
           >
             {loading
               ? t('importing', 'Importing...')
@@ -148,51 +129,21 @@ export const BulkImport: FC = () => {
             {t('results', 'Results')}
           </h3>
           <div className="max-h-[300px] overflow-y-auto border border-newTableBorder rounded-[8px]">
-            <table className="w-full text-[13px]">
-              <thead className="bg-newBgColor sticky top-0">
-                <tr>
-                  <th className="px-[8px] py-[4px] text-left">#</th>
-                  <th className="px-[8px] py-[4px] text-left">
-                    {t('status', 'Status')}
-                  </th>
-                  <th className="px-[8px] py-[4px] text-left">
-                    {t('details', 'Details')}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {results.map((r) => (
-                  <tr
-                    key={r.index}
-                    className={`border-t border-newTableBorder ${
-                      r.success ? '' : 'bg-red-500/10'
-                    }`}
-                  >
-                    <td className="px-[8px] py-[4px]">{r.index + 1}</td>
-                    <td className="px-[8px] py-[4px]">
-                      {r.success
-                        ? t('success', 'Success')
-                        : t('failed', 'Failed')}
-                    </td>
-                    <td className="px-[8px] py-[4px]">
-                      {r.error && (
-                        <span className="text-red-500">{r.error}</span>
-                      )}
-                      {r.warnings && r.warnings.length > 0 && (
-                        <span className="text-yellow-500">
-                          {r.warnings.join('; ')}
-                        </span>
-                      )}
-                      {r.success && !r.warnings?.length && (
-                        <span className="text-green-500">
-                          {t('created', 'Created')}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <DataTable
+              columns={[
+                { key: 'idx', header: '#', width: '40px', render: (r: any) => r._idx + 1 },
+                { key: 'status', header: t('status', 'Status'), render: (r: any) => r.success ? t('success', 'Success') : t('failed', 'Failed') },
+                { key: 'details', header: t('details', 'Details'), render: (r: any) => (
+                  <>
+                    {r.error && <span className="text-red-500">{r.error}</span>}
+                    {r.warnings && r.warnings.length > 0 && <span className="text-yellow-500">{r.warnings.join('; ')}</span>}
+                    {r.success && !r.warnings?.length && <span className="text-green-500">{t('created', 'Created')}</span>}
+                  </>
+                )},
+              ]}
+              data={results.map((r) => ({ ...r, _idx: r.index }))}
+              keyExtractor={(r: any) => `result-${r.index}`}
+            />
           </div>
         </div>
       )}

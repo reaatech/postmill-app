@@ -157,7 +157,7 @@ const AddOrEditAutopost: FC<{ data?: any; reload: () => void }> = ({ data, reloa
                 <textarea
                   value={content}
                   onChange={(e) => form.setValue('content', e.target.value)}
-                  className="min-h-[120px] p-[12px] bg-newBgColor border border-fifth rounded-[4px] text-[14px] outline-none resize-y"
+                  className="min-h-[120px] p-[12px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none resize-y"
                   placeholder={t('write_your_post_placeholder', 'Write your post...')}
                 />
               </div>
@@ -248,7 +248,7 @@ export const Autopost: FC = () => {
     <div className="flex flex-col">
       <div className="mb-[16px]">
         <h3 className="text-[20px]">{t('autopost', 'Auto Post')}</h3>
-        <div className="text-customColor18 mt-[4px] text-[13px] leading-relaxed">
+        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
           {t('autopost_description', 'Auto Post automatically publishes drafts or queued posts on a schedule. Connect an RSS feed and we\'ll fetch new content and publish it to your social channels automatically.')}
         </div>
       </div>
@@ -266,15 +266,15 @@ export const Autopost: FC = () => {
         <Button onClick={addEdit()}>{t('add_autopost', 'Add Auto Post Rule')}</Button>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] overflow-x-auto">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
         {isLoading && (
           <div className="flex flex-col gap-[8px] py-[16px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
               </div>
             ))}
           </div>
@@ -283,14 +283,14 @@ export const Autopost: FC = () => {
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
             <div className="text-red-400 text-[14px]">{t('failed_loading_autopost', 'Failed to load auto post rules')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-forth hover:underline">{t('try_again', 'Try again')}</button>
+            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
 
         {!isLoading && !error && (!data || data.length === 0) && (
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_autopost_rules', 'No auto post rules yet')}</div>
-            <p className="text-[12px] text-customColor18 max-w-[400px] text-center">
+            <p className="text-[12px] text-newTableText max-w-[400px] text-center">
               {t('autopost_empty_hint', 'Auto Post lets you automatically fetch content from an RSS feed and publish it to your social channels on a schedule.')}
             </p>
             <Button onClick={addEdit()}>{t('create_first_autopost', 'Create your first auto post rule')}</Button>
@@ -300,7 +300,7 @@ export const Autopost: FC = () => {
         {!isLoading && data && data.length > 0 && (
           <>
             <div className="min-w-[700px]">
-            <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-customColor18 uppercase font-medium pb-[12px] border-b border-fifth items-center">
+            <div className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
               <div>{t('name', 'Name')}</div>
               <div>{t('channels', 'Channels')}</div>
               <div>{t('status', 'Status')}</div>
@@ -310,7 +310,7 @@ export const Autopost: FC = () => {
 
             <div className="flex flex-col">
               {filtered.map((r: any) => (
-                <div key={r.id} className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-fifth/50 items-center text-[14px]">
+                <div key={r.id} className="grid grid-cols-[2fr,1.5fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-newTableBorder/50 items-center text-[14px]">
                   <div className="truncate">{r.title}</div>
                   <div className="flex gap-[4px]">
                     {r.integrations ? (
@@ -320,18 +320,18 @@ export const Autopost: FC = () => {
                         return ints.length > 0 ? (
                           <>
                             {ints.slice(0, 3).map((i: any) => (
-                              <span key={i.id} className="text-[11px] bg-forth/20 text-forth px-[6px] py-[2px] rounded-full">
+                              <span key={i.id} className="text-[11px] bg-btnPrimary/20 text-btnPrimary px-[6px] py-[2px] rounded-full">
                                 {i.name || i.id?.slice(0, 8)}
                               </span>
                             ))}
-                            {ints.length > 3 && <span className="text-[11px] text-customColor18">+{ints.length - 3}</span>}
+                            {ints.length > 3 && <span className="text-[11px] text-newTableText">+{ints.length - 3}</span>}
                           </>
                         ) : (
-                          <span className="text-[12px] text-customColor18">{t('all_channels', 'All channels')}</span>
+                          <span className="text-[12px] text-newTableText">{t('all_channels', 'All channels')}</span>
                         );
                       })()
                     ) : (
-                      <span className="text-[12px] text-customColor18">{t('all_channels', 'All channels')}</span>
+                      <span className="text-[12px] text-newTableText">{t('all_channels', 'All channels')}</span>
                     )}
                   </div>
                   <div>
@@ -341,11 +341,11 @@ export const Autopost: FC = () => {
                       fill
                     />
                   </div>
-                  <div className="text-[12px] text-customColor18">
+                  <div className="text-[12px] text-newTableText">
                     {r.lastUrl ? t('pending', 'Pending') : t('not_run_yet', 'Not run yet')}
                   </div>
                   <div className="flex justify-end gap-[8px]">
-                    <button onClick={addEdit(r)} className="text-[12px] text-forth hover:underline">{t('edit', 'Edit')}</button>
+                    <button onClick={addEdit(r)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
                     <button onClick={deleteRule(r)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
                   </div>
                 </div>
@@ -355,11 +355,11 @@ export const Autopost: FC = () => {
             </div>
 
             {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-fifth">
-                <div className="text-[12px] text-customColor18">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
+              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-newTableBorder">
+                <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
                 <div className="flex gap-[8px]">
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
+                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('previous', 'Previous')}</button>
+                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('next', 'Next')}</button>
                 </div>
               </div>
             )}

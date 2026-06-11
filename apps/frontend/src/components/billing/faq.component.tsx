@@ -62,7 +62,7 @@ export const FAQSection: FC<{
   }, [show]);
   return (
     <div
-      className="bg-sixth p-[24px] border border-tableBorder rounded-[8px] flex flex-col"
+      className="bg-newBgColorInner p-[24px] border border-newTableBorder rounded-[8px] flex flex-col"
       onClick={changeShow}
     >
       <div className={`text-[20px] cursor-pointer flex justify-center`}>
@@ -111,7 +111,7 @@ export const FAQSection: FC<{
           onClick={(e: React.MouseEvent) => {
             e.stopPropagation();
           }}
-          className="mt-[16px] w-full text-wrap font-[400] text-[16px] text-customColor17 select-text max-w-[450px]"
+          className="mt-[16px] w-full text-wrap font-[400] text-[16px] text-newTableText select-text max-w-[450px]"
           content={description}
         />
       </div>

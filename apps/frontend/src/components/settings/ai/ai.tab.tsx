@@ -93,14 +93,14 @@ export const AITab = () => {
     <div className="flex flex-col gap-[16px]">
       <h3 className="text-[20px]">{t('ai_settings', 'AI Settings')}</h3>
 
-      <div className="flex gap-[8px] border-b border-fifth pb-[8px]">
+      <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
         {subTabs.map((tab) => (
           <button
             key={tab.key}
             className={`text-[13px] px-[16px] py-[8px] rounded-t-[4px] transition-colors ${
               subTab === tab.key
-                ? 'bg-sixth border border-fifth border-b-transparent text-textColor'
-                : 'text-customColor18 hover:text-textColor'
+                ? 'bg-newBgColorInner border border-newTableBorder border-b-transparent text-textColor'
+                : 'text-newTableText hover:text-textColor'
             }`}
             onClick={() => {
               setSubTab(tab.key);
@@ -113,10 +113,10 @@ export const AITab = () => {
       </div>
 
       {error && (
-        <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col items-center gap-[12px]">
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">{t('failed_to_load_ai_settings', 'Failed to load AI settings')}</span>
           <button
-            className="text-[13px] bg-forth border border-tableBorder rounded-[4px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
+            className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
             onClick={() => window.location.reload()}
           >
             {t('try_again', 'Try again')}
@@ -137,15 +137,15 @@ export const AITab = () => {
             />
           ) : (
             <>
-              <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
                 <div className="mt-[4px]">{t('active_provider', 'Active Provider')}</div>
                 {isLoading ? (
                   <div className="animate-pulse">{t('loading', 'Loading...')}</div>
                 ) : config?.active ? (
-                  <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex items-center justify-between">
+                  <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center justify-between">
                     <div className="flex flex-col gap-[4px]">
                       <span className="text-[14px] font-semibold">{config.active.name}</span>
-                      <span className="text-[12px] text-customColor18">
+                      <span className="text-[12px] text-newTableText">
                         {config.active.defaultModel || t('no_model_selected', 'No model selected')}
                       </span>
                     </div>
@@ -154,15 +154,15 @@ export const AITab = () => {
                     </span>
                   </div>
                 ) : (
-                  <div className="bg-forth border border-tableBorder rounded-[4px] p-[16px]">
-                    <span className="text-[13px] text-customColor18">
+                  <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
+                    <span className="text-[13px] text-newTableText">
                       {t('no_active_provider', 'No provider configured. Select and configure a provider below.')}
                     </span>
                   </div>
                 )}
               </div>
 
-              <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
                 <div className="flex items-center justify-between">
                   <div className="mt-[4px]">{t('all_providers', 'All Providers')}</div>
                 </div>
@@ -178,14 +178,14 @@ export const AITab = () => {
                       if (groupProviders.length === 0) return null;
                       return (
                         <div key={group.type}>
-                          <div className="text-[11px] uppercase text-customColor18 mb-[6px] tracking-wide">
+                          <div className="text-[11px] uppercase text-newTableText mb-[6px] tracking-wide">
                             {group.label}
                           </div>
                           <div className="flex flex-col gap-[8px]">
                             {groupProviders.map((provider) => (
                               <div
                                 key={provider.identifier}
-                                className="bg-forth border border-tableBorder rounded-[4px] p-[16px] flex items-center justify-between"
+                                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center justify-between"
                               >
                                 <div className="flex flex-col gap-[4px] flex-1">
                                   <div className="flex items-center gap-[8px]">
@@ -202,21 +202,21 @@ export const AITab = () => {
                                     )}
                                   </div>
                                   {provider.defaultModel && (
-                                    <span className="text-[12px] text-customColor18">
+                                    <span className="text-[12px] text-newTableText">
                                       {provider.defaultModel}
                                     </span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-[8px]">
                                   <button
-                                    className="text-[12px] text-customColor4 hover:underline"
+                                    className="text-[12px] text-textColor hover:underline"
                                     onClick={() => setConfiguringProvider(provider.identifier)}
                                   >
                                     {provider.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
                                   </button>
                                   {!provider.isActive && provider.isConfigured && (
                                     <button
-                                      className="text-[12px] text-customColor4 hover:underline"
+                                      className="text-[12px] text-textColor hover:underline"
                                       onClick={() => handleSetActive(provider.identifier)}
                                     >
                                       {t('set_active', 'Set Active')}
@@ -238,7 +238,7 @@ export const AITab = () => {
                       );
                     })}
                     {(!config?.providers || config.providers.length === 0) && (
-                      <div className="text-[12px] text-customColor18">
+                      <div className="text-[12px] text-newTableText">
                         {t('no_providers', 'No providers available')}
                       </div>
                     )}

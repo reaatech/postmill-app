@@ -16,7 +16,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import clsx from 'clsx';
+import { DataTable, StatusPill, AvatarCell } from '@gitroom/frontend/components/ui/data-table';
 
 const PAGE_SIZE = 25;
 
@@ -85,7 +85,7 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
           {roles.map((r) => <option key={r.value} value={r.value}>{r.name}</option>)}
         </Select>
         <div className="flex gap-[5px] items-center">
-          <input type="checkbox" {...form.register('sendEmail')} className="accent-forth" />
+          <input type="checkbox" {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
           <span className="text-[13px]">{t('send_invitation_via_email', 'Send invitation via email?')}</span>
         </div>
         <Button type="submit" className="mt-[18px]">{t('send_invitation_link', 'Send Invitation')}</Button>
@@ -176,22 +176,6 @@ export const TeamsComponent = () => {
     await mutate();
   }, [fetch, mutate]);
 
-  const toggleSelect = useCallback((id: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleAll = useCallback(() => {
-    if (selected.size === members.length) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(members.map((m: any) => m.user.id)));
-    }
-  }, [selected, members]);
-
   const bulkRemove = useCallback(async () => {
     if (!(await deleteDialog(t('remove_selected_confirm', 'Are you sure you want to remove the selected members?')))) return;
     for (const id of selected) {
@@ -221,7 +205,7 @@ export const TeamsComponent = () => {
       <div className="flex items-center justify-between mb-[16px]">
         <div>
           <h3 className="text-[20px]">{t('team_members', 'Team Members')}</h3>
-          <div className="text-customColor18 mt-[4px]">
+          <div className="text-newTableText mt-[4px]">
             {t('invite_your_assistant_or_team_member_to_manage_your_account', 'Invite your assistant or team member to manage your account')}
           </div>
         </div>
@@ -260,16 +244,16 @@ export const TeamsComponent = () => {
         </select>
       </div>
 
-      <div className="bg-sixth border-fifth border rounded-[4px] p-[24px] overflow-x-auto">
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
         {isLoading && (
           <div className="flex flex-col gap-[8px] py-[16px]">
             {Array.from({ length: 5 }).map((_, i) => (
               <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-fifth rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
+                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
               </div>
             ))}
           </div>
@@ -278,7 +262,7 @@ export const TeamsComponent = () => {
         {!isLoading && error && !data && (
           <div className="flex flex-col items-center py-[40px] gap-[8px]">
             <div className="text-red-400 text-[14px]">{t('failed_loading_team', 'Failed to load team')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-forth hover:underline">{t('try_again', 'Try again')}</button>
+            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
           </div>
         )}
 
@@ -291,96 +275,75 @@ export const TeamsComponent = () => {
 
         {!isLoading && data && data.length > 0 && (
           <>
-            <div className="min-w-[800px]">
-            <div className="grid grid-cols-[40px,1fr,1fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-customColor18 uppercase font-medium pb-[12px] border-b border-fifth items-center">
-              <div>
-                <input type="checkbox" checked={selected.size === members.length && members.length > 0} onChange={toggleAll} className="accent-forth" />
-              </div>
-              <div>{t('name', 'Name')}</div>
-              <div>{t('email', 'Email')}</div>
-              <div>{t('role', 'Role')}</div>
-              <div>{t('status', 'Status')}</div>
-              <div className="text-end">{t('actions', 'Actions')}</div>
-            </div>
-
-            <div className="flex flex-col">
-              {members.map((m: any) => (
-                <div key={m.user.id} className={clsx('grid grid-cols-[40px,1fr,1fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-fifth/50 items-center text-[14px]', selected.has(m.user.id) && 'bg-forth/10')}>
-                  <div>
-                    <input type="checkbox" checked={selected.has(m.user.id)} onChange={() => toggleSelect(m.user.id)} className="accent-forth" />
-                  </div>
-                  <div className="flex items-center gap-[8px]">
-                    <img src={getAvatarUrl(m.user.email, m.user.name)} alt="" className="w-[28px] h-[28px] rounded-full" />
-                    <span>{capitalize(m.user.name || m.user.email.split('@')[0]).split('.')[0]}</span>
-                  </div>
-                  <div className="text-customColor18">{m.user.email}</div>
-                  <div>
-                    {myLevel > getLevel(m.role) && m.role !== 'SUPERADMIN' ? (
+            <DataTable
+              columns={[
+                {
+                  key: 'name',
+                  header: t('name', 'Name'),
+                  render: (m: any) => (
+                    <AvatarCell
+                      src={getAvatarUrl(m.user.email, m.user.name)}
+                      name={capitalize(m.user.name || m.user.email.split('@')[0]).split('.')[0]}
+                      subtitle={m.user.email}
+                    />
+                  ),
+                },
+                {
+                  key: 'role',
+                  header: t('role', 'Role'),
+                  render: (m: any) =>
+                    myLevel > getLevel(m.role) && m.role !== 'SUPERADMIN' ? (
                       <select
                         value={m.role}
                         onChange={changeRole(m)}
-                        className="bg-newBgColor border border-fifth rounded-[4px] px-[8px] py-[4px] text-[13px] outline-none"
+                        className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"
                       >
                         {roles.map((r) => <option key={r.value} value={r.value}>{r.name}</option>)}
                       </select>
                     ) : (
-                      <span className="text-customColor18">{memberRoleDisplay(m.role)}</span>
-                    )}
-                  </div>
-                  <div>
-                    <span className={clsx('inline-flex items-center gap-[4px] text-[12px]', getStatus(m) === 'active' ? 'text-green-500' : 'text-amber-500')}>
-                      <span className={clsx('w-[6px] h-[6px] rounded-full', getStatus(m) === 'active' ? 'bg-green-500' : 'bg-amber-500')} />
-                      {getStatus(m) === 'active' ? t('active', 'Active') : t('pending', 'Pending')}
-                    </span>
-                  </div>
-                  <div className="flex justify-end gap-[8px]">
-                    {myLevel > getLevel(m.role) ? (
-                      <button
-                        onClick={remove(m)}
-                        className="text-[12px] text-red-400 hover:text-red-300 transition-colors"
-                      >
+                      <span className="text-newTableText">{memberRoleDisplay(m.role)}</span>
+                    ),
+                },
+                {
+                  key: 'status',
+                  header: t('status', 'Status'),
+                  render: (m: any) => (
+                    <StatusPill
+                      status={getStatus(m) === 'active' ? 'green' : 'amber'}
+                      label={getStatus(m) === 'active' ? t('active', 'Active') : t('pending', 'Pending')}
+                    />
+                  ),
+                },
+                {
+                  key: 'actions',
+                  header: t('actions', 'Actions'),
+                  align: 'right',
+                  render: (m: any) =>
+                    myLevel > getLevel(m.role) ? (
+                      <button onClick={remove(m)} className="text-[12px] text-red-400 hover:text-red-300 transition-colors">
                         {t('remove', 'Remove')}
                       </button>
                     ) : (
-                      <span className="text-[12px] text-customColor18">—</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            </div>
+                      <span className="text-[12px] text-newTableText">—</span>
+                    ),
+                },
+              ]}
+              data={members}
+              keyExtractor={(m: any) => m.user.id}
+              selectedIds={Array.from(selected)}
+              onSelectionChange={(ids) => setSelected(new Set(ids))}
+              page={page + 1}
+              total={data.length}
+              limit={PAGE_SIZE}
+              onPageChange={(p) => setPage(p - 1)}
+            />
 
             {selected.size > 0 && (
-              <div className="flex items-center gap-[8px] mt-[12px] pt-[12px] border-t border-fifth">
-                <span className="text-[13px] text-customColor18">{selected.size} selected</span>
+              <div className="flex items-center gap-[8px] mt-[12px] pt-[12px] border-t border-newTableBorder">
+                <span className="text-[13px] text-newTableText">{selected.size} selected</span>
                 <Button secondary className="!h-[32px] !text-[12px]" onClick={bulkRemove}>
                   {t('remove_selected', 'Remove Selected')}
                 </Button>
-              </div>
-            )}
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-fifth">
-                <div className="text-[12px] text-customColor18">
-                  {t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}
-                </div>
-                <div className="flex gap-[8px]">
-                  <button
-                    onClick={() => setPage(p => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                    className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40"
-                  >
-                    {t('previous', 'Previous')}
-                  </button>
-                  <button
-                    onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                    disabled={page >= totalPages - 1}
-                    className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-fifth rounded-[4px] disabled:opacity-40"
-                  >
-                    {t('next', 'Next')}
-                  </button>
-                </div>
               </div>
             )}
           </>

@@ -135,6 +135,6 @@ describe('DateRangePicker', () => {
       <DateRangePicker from={from30} to={to} compare={true} onChange={onChange} />
     );
     const btn = screen.getByText('30 days');
-    expect(btn.className).toContain('bg-forth');
+    expect(btn.className).toContain('bg-btnPrimary');
   });
 });

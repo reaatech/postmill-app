@@ -270,7 +270,7 @@ export const ContinueIntegration: FC<{
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#FC69FF] rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
         </div>
 
         <div className="relative z-10 text-center">
@@ -309,7 +309,7 @@ export const ContinueIntegration: FC<{
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#FC69FF] rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
         </div>
 
         {/* Content */}
@@ -367,7 +367,7 @@ export const ContinueIntegration: FC<{
         {/* Background gradient decoration */}
         <div className="absolute inset-0 opacity-30">
           <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#FC69FF] rounded-full blur-[120px]" />
+          <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
         </div>
 
         <div className="relative z-10 text-center">
@@ -406,7 +406,7 @@ export const ContinueIntegration: FC<{
       {/* Background gradient decoration */}
       <div className="absolute inset-0 opacity-30">
         <div className="absolute top-[20%] left-[10%] w-[300px] h-[300px] bg-[#2B5CD3] rounded-full blur-[120px]" />
-        <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#FC69FF] rounded-full blur-[120px]" />
+        <div className="absolute bottom-[20%] right-[10%] w-[250px] h-[250px] bg-[#1d9bf0] rounded-full blur-[120px]" />
       </div>
 
       <div className="relative z-10 text-center">

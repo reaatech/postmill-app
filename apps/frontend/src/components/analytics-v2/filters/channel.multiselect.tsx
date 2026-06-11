@@ -88,7 +88,7 @@ export const ChannelMultiSelect: FC<ChannelMultiSelectProps> = ({
           >
             <div
               className={`w-[16px] h-[16px] rounded-[4px] border flex items-center justify-center ${
-                allSelected ? 'bg-forth border-forth' : 'border-newTableBorder'
+                allSelected ? 'bg-btnPrimary border-btnPrimary' : 'border-newTableBorder'
               }`}
             >
               {allSelected && (
@@ -115,7 +115,7 @@ export const ChannelMultiSelect: FC<ChannelMultiSelectProps> = ({
               <div
                 className={`w-[16px] h-[16px] rounded-[4px] border flex items-center justify-center ${
                   selected.includes(ch.integrationId)
-                    ? 'bg-forth border-forth'
+                    ? 'bg-btnPrimary border-btnPrimary'
                     : 'border-newTableBorder'
                 }`}
               >

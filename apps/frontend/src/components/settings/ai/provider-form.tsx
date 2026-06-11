@@ -133,18 +133,18 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
 
   if (!provider) {
     return (
-      <div className="bg-sixth border border-fifth rounded-[4px] p-[24px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
       </div>
     );
   }
 
   return (
-    <div className="bg-sixth border border-fifth rounded-[4px] p-[24px] flex flex-col gap-[24px]">
+    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="text-[16px] font-semibold">{provider.name}</div>
         <button
-          className="text-[12px] text-customColor18 hover:text-textColor"
+          className="text-[12px] text-newTableText hover:text-textColor"
           onClick={onClose}
         >
           {t('close', 'Close')}
@@ -159,7 +159,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
           </label>
           {field.type === 'select' && field.options ? (
             <select
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
               value={creds[field.key] || ''}
               onChange={(e) => setCreds((prev) => ({ ...prev, [field.key]: e.target.value }))}
             >
@@ -172,7 +172,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
             </select>
           ) : (
             <input
-              className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
               type={field.type === 'password' ? 'password' : 'text'}
               placeholder={field.placeholder || ''}
               value={creds[field.key] || ''}
@@ -188,7 +188,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
             {t('default_model', 'Default Model')}
           </label>
           <select
-            className="bg-forth border border-tableBorder rounded-[4px] p-[8px] text-textColor text-[13px]"
+            className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             value={defaultModel}
             onChange={(e) => setDefaultModel(e.target.value)}
           >
@@ -220,14 +220,14 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
 
       <div className="flex items-center justify-end gap-[12px]">
         <button
-          className="text-[13px] px-[16px] py-[8px] rounded-[4px] border border-tableBorder hover:bg-boxHover"
+          className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
           onClick={handleTest}
           disabled={testing}
         >
           {testing ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
         </button>
         <button
-          className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
+          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
           onClick={handleSave}
           disabled={saving}
         >

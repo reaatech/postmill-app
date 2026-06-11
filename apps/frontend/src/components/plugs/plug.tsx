@@ -47,7 +47,7 @@ export const TextArea: FC<{
         placeholder={props.placeHolder}
         value={value}
         className={clsx(
-          '!min-h-40 !max-h-80 p-[24px] overflow-hidden bg-customColor2 outline-none rounded-[4px] border-fifth border'
+          '!min-h-40 !max-h-80 p-[24px] overflow-hidden bg-newBgColorInner outline-none rounded-[4px] border-newTableBorder border'
         )}
         onChange={(e) => {
           onChange({
@@ -145,7 +145,7 @@ export const PlugPop: FC<{
                   <Input
                     name={field.name}
                     label={field.description}
-                    className="w-full mt-[8px] p-[8px] border border-tableBorder rounded-md text-black"
+                    className="w-full mt-[8px] p-[8px] border border-newTableBorder rounded-md text-black"
                     placeholder={field.placeholder}
                     type={field.type}
                   />

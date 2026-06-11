@@ -84,7 +84,7 @@ const AiBestTimeModal: FC<{ close: () => void }> = (props) => {
               ? t('based_on_analytics', 'Based on your analytics data')
               : t('general_best_practices', 'Based on general best practices')}
           </div>
-          <div className="text-[14px] leading-[22px] whitespace-pre-wrap bg-fifth p-[16px] rounded-[8px] border border-tableBorder max-h-[500px] overflow-y-auto">
+          <div className="text-[14px] leading-[22px] whitespace-pre-wrap bg-newBgColorInner p-[16px] rounded-[8px] border border-newTableBorder max-h-[500px] overflow-y-auto">
             {result.suggestion}
           </div>
           <div className="flex">

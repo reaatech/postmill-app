@@ -60,13 +60,13 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
       <div className="text-[14px] font-medium">
         {t('content_compliance', 'Content Compliance Checker')}
       </div>
-      <div className="text-[12px] text-customColor18">
+      <div className="text-[12px] text-newTableText">
         {t('content_compliance_description', 'Check your post content for platform ToS violations, brand safety concerns, and regulatory issues.')}
       </div>
 
       {!externalContent && (
         <textarea
-          className="bg-forth border border-tableBorder rounded-[4px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
+          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y text-[13px]"
           value={content}
           onChange={(e) => setContent(e.target.value)}
           placeholder={t('compliance_placeholder', 'Paste your post content here...')}
@@ -76,7 +76,7 @@ export const AICompliance: FC<{ content?: string; platform?: string }> = ({
       <button
         onClick={handleCheck}
         disabled={loading || !content.trim()}
-        className="bg-customColor4 text-white rounded-[4px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50 self-start"
+        className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50 self-start"
       >
         {loading
           ? t('checking', 'Checking...')

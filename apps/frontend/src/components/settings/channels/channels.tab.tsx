@@ -1,12 +1,14 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useMemo, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ChannelEditModal } from './channel-edit.modal';
 import { ProviderCapabilitiesPanel } from './provider-capabilities.panel';
+import { DataTable, StatusPill } from '@gitroom/frontend/components/ui/data-table';
+import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
 interface ChannelHealthItem {
   id: string;
@@ -192,7 +194,7 @@ export const ChannelsTab: FC = () => {
                 </div>
                 <div className="flex items-center gap-[8px] shrink-0">
                   <StatusBadge enabled={config.enabled} isConfigured={config.isConfigured} />
-                  <span className="text-[12px] text-forth font-[500]">
+                  <span className="text-[12px] text-textColor font-[500]">
                     {editingIdentifier === config.identifier ? 'Close' : 'Edit'}
                   </span>
                 </div>
@@ -224,83 +226,63 @@ export const ChannelsTab: FC = () => {
 
       {health && health.length > 0 && (
         <div className="flex flex-col gap-[12px] mt-[8px]">
-          <div className="border-t border-tableBorder pt-[16px]">
+          <div className="border-t border-newTableBorder pt-[16px]">
             <h3 className="text-[15px] font-[600] text-textColor mb-[4px]">
               Connection Status
             </h3>
             <p className="text-[13px] text-textColor/60 mb-[12px]">
               Overview of your connected channels and their authentication status.
             </p>
-            <div className="bg-newTableHeader rounded-[8px] overflow-hidden">
-              <table className="w-full text-left text-[13px]">
-                <thead>
-                  <tr className="border-b border-tableBorder text-textColor/60 text-[12px]">
-                    <th className="p-[10px] font-[500]">Channel</th>
-                    <th className="p-[10px] font-[500]">Status</th>
-                    <th className="p-[10px] font-[500]">Details</th>
-                    <th className="p-[10px] font-[500]">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {health.map((item) => {
-                    const statusColor = item.disabled
-                      ? 'bg-red-500/10 text-red-500'
-                      : item.tokenExpired
-                      ? 'bg-red-500/10 text-red-500'
-                      : item.refreshNeeded
-                      ? 'bg-yellow-500/10 text-yellow-500'
-                      : 'bg-green-500/10 text-green-500';
-
-                    const statusLabel = item.disabled
-                      ? 'Disabled'
-                      : item.tokenExpired
-                      ? 'Token Expired'
-                      : item.refreshNeeded
-                      ? 'Refresh Needed'
-                      : 'Connected';
-
-                    return (
-                      <tr key={item.id} className="border-b border-tableBorder last:border-b-0">
-                        <td className="p-[10px]">
-                          <div className="flex items-center gap-[8px]">
-                            {item.picture && (
-                              <img
-                                className="w-[22px] h-[22px] rounded-full"
-                                src={item.picture}
-                                alt={item.name}
-                              />
-                            )}
-                            <span className="font-[500] text-textColor">{item.name}</span>
-                          </div>
-                        </td>
-                        <td className="p-[10px]">
-                          <span className={`text-[12px] px-[8px] py-[2px] rounded-full ${statusColor}`}>
-                            {statusLabel}
-                          </span>
-                        </td>
-                        <td className="p-[10px] text-textColor/60 text-[12px]">
-                          {!item.configured && 'Provider not configured'}
-                          {item.configured && !item.providerEnabled && 'Provider disabled in settings'}
-                          {item.configured && item.providerEnabled && item.tokenExpired && 'Token expired, reconnect needed'}
-                          {item.configured && item.providerEnabled && !item.tokenExpired && item.refreshNeeded && 'Token refresh required'}
-                          {item.configured && item.providerEnabled && !item.tokenExpired && !item.refreshNeeded && 'Healthy'}
-                        </td>
-                        <td className="p-[10px]">
-                          {(item.tokenExpired || item.refreshNeeded) && (
-                            <a
-                              href={`/integrations/social/${item.provider}?refresh=${item.id}`}
-                              className="text-[12px] text-forth font-[500] hover:underline"
-                            >
-                              Reconnect
-                            </a>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+            <DataTable
+              columns={[
+                {
+                  key: 'channel',
+                  header: 'Channel',
+                  render: (item: ChannelHealthItem) => (
+                    <div className="flex items-center gap-[8px]">
+                      {item.picture && (
+                        <img className="w-[22px] h-[22px] rounded-full" src={item.picture} alt={item.name} />
+                      )}
+                      <span className="font-[500] text-textColor">{item.name}</span>
+                    </div>
+                  ),
+                },
+                {
+                  key: 'status',
+                  header: 'Status',
+                  render: (item: ChannelHealthItem) => {
+                    const map = item.disabled ? 'red' : item.tokenExpired ? 'red' : item.refreshNeeded ? 'amber' : 'green' as const;
+                    const label = item.disabled ? 'Disabled' : item.tokenExpired ? 'Token Expired' : item.refreshNeeded ? 'Refresh Needed' : 'Connected';
+                    return <StatusPill status={map} label={label} />;
+                  },
+                },
+                {
+                  key: 'details',
+                  header: 'Details',
+                  render: (item: ChannelHealthItem) => {
+                    let text = '';
+                    if (!item.configured) text = 'Provider not configured';
+                    else if (!item.providerEnabled) text = 'Provider disabled in settings';
+                    else if (item.tokenExpired) text = 'Token expired, reconnect needed';
+                    else if (item.refreshNeeded) text = 'Token refresh required';
+                    else text = 'Healthy';
+                    return <span className="text-textColor/60 text-[12px]">{text}</span>;
+                  },
+                },
+                {
+                  key: 'action',
+                  header: 'Action',
+                  render: (item: ChannelHealthItem) =>
+                    (item.tokenExpired || item.refreshNeeded) ? (
+                      <a href={`/integrations/social/${item.provider}?refresh=${item.id}`} className="text-[12px] text-textColor font-[500] hover:underline">
+                        Reconnect
+                      </a>
+                    ) : null,
+                },
+              ]}
+              data={health}
+              keyExtractor={(item: ChannelHealthItem) => item.id}
+            />
           </div>
         </div>
       )}
