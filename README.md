@@ -23,6 +23,8 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v3.8.8]** — Dashboard landing page, per-user API keys, theme de-purpling, and major UI consistency pass. New dashboard at `/dashboard` (post-login redirect), per-user `pm_live_*` API keys with SHA256-hashed storage, on-demand comment sync, shared DataTable/EmptyState/LoadingRows components, settings IA overhaul with grouped tabs and inline SVG icons, polished form primitives (blue primary, rounded), and full theme de-purpling (purple/magenta → blue). DataFast analytics domain corrected, onboarding bugs fixed, and legacy `customColor*` tokens removed from 195+ files.
+
 **[v3.8.4]** — SES webhook remediation release. No schema changes. Docs: backfilled upgrade notes, per-provider short-link credential reference, and email provider setup guides.
 
 **[v3.8.3]** — Schedule rename, calendar stats, sorted settings, streamlined header nav, storage LOCAL-as-base refactor
