@@ -31,7 +31,7 @@ info:
     > global route prefix — controller paths are mounted at the root.
 
     ## Rate limiting
-    A global throttler allows `API_LIMIT` (default **90**) requests/hour per client (Redis-backed,
+    A global throttler allows `API_LIMIT` (default **600**) requests/hour per client (Redis-backed,
     proxy-aware). Some routes apply tighter per-route throttles (e.g. AI provider connection tests).
 
   contact:

@@ -56,7 +56,8 @@ services:
       # === Misc Settings
       NEXT_PUBLIC_DISCORD_SUPPORT: ''
       NEXT_PUBLIC_POLOTNO: ''
-      API_LIMIT: 30
+      # API_LIMIT: unset = 600 req/hr global throttle. Do NOT set it to 30: the
+      # SPA fires 15-30 API calls per page navigation, so 30/hr 429s normal use.
 
       # === Payment / Stripe Settings
       STRIPE_PUBLISHABLE_KEY: ''

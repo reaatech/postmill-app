@@ -2,9 +2,28 @@ import { withSentryConfig } from '@sentry/nextjs';
 import type { NextConfig } from 'next';
 import { redirects } from './src/redirects.config';
 
+// The browser fetches the backend directly (NEXT_PUBLIC_BACKEND_URL). When the
+// frontend and backend are served from different origins (e.g. the cross-origin
+// dev split :4200 → :3000), that origin must be in connect-src or the browser
+// blocks the request with "Failed to fetch" before it leaves the page. Same-origin
+// deployments already covered by 'self'; adding it explicitly is harmless.
+const backendOrigin = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_BACKEND_URL!).origin;
+  } catch {
+    return '';
+  }
+})();
+
 const nextConfig: NextConfig = {
   experimental: {
     proxyTimeout: 90_000,
+    // Turbopack's dev cache is native (Rust) memory, unbounded by default and
+    // outside --max-old-space-size; without a target it grows past 5 GB on this
+    // app. This sets a GC target (bytes) so dev fits in a memory-limited VM.
+    ...(process.env.NODE_ENV === 'development'
+      ? { turbopackMemoryLimit: 3 * 1024 * 1024 * 1024 }
+      : {}),
   },
   // Document-Policy header for browser profiling
   async headers() {
@@ -24,7 +43,7 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://js.stripe.com",
               "img-src 'self' data: blob: https:",
               "font-src 'self' data: https://fonts.gstatic.com",
-              "connect-src 'self' https://plausible.io https://api.stripe.com https://m.stripe.network https://www.googletagmanager.com ws://localhost:* wss://*",
+              `connect-src 'self' ${backendOrigin} https://plausible.io https://api.stripe.com https://m.stripe.network https://www.googletagmanager.com ws://localhost:* wss://*`,
               "frame-src 'self' https://js.stripe.com https://hooks.stripe.com",
               "frame-ancestors 'none'",
               "media-src 'self' data: blob: https:",

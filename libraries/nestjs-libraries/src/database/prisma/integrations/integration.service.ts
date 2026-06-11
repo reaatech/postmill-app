@@ -390,6 +390,16 @@ export class IntegrationService {
         }
       } else {
         await this.disconnectChannel(org.id, getIntegration);
+        // Negative cache: without it, every analytics view re-attempts the
+        // live token refresh (and re-disconnects) for this integration.
+        await ioRedis.set(
+          `integration:${org.id}:${integration}:${date}`,
+          JSON.stringify([]),
+          'EX',
+          !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+            ? 60
+            : 600
+        );
         return [];
       }
     }
@@ -430,6 +440,17 @@ export class IntegrationService {
         console.warn(
           `checkAnalytics failed for integration ${integration}:`,
           (e as any)?.message
+        );
+        // Negative cache: the analytics live fallback calls this per dashboard
+        // view, so without it a persistently failing integration re-fires the
+        // full provider fan-out (incl. token refresh) on every view.
+        await ioRedis.set(
+          `integration:${org.id}:${integration}:${date}`,
+          JSON.stringify([]),
+          'EX',
+          !process.env.NODE_ENV || process.env.NODE_ENV === 'development'
+            ? 60
+            : 600
         );
       }
     }
