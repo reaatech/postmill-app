@@ -74,3 +74,5 @@ apps/frontend/public/*.zip
 dev
 coolify-compose.yml
 .env.coolify
+/.pnpm-store/
+/node-compile-cache/

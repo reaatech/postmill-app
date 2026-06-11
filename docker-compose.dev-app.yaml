@@ -1,0 +1,68 @@
+# Live-reload app container. Use TOGETHER with docker-compose.dev.yaml (which provides
+# postgres, redis, temporal, etc.):
+#
+#   docker compose -f docker-compose.dev.yaml -f docker-compose.dev-app.yaml up
+#
+# The whole repo is bind-mounted into the container and the backend/frontend/orchestrator
+# run in watch mode, so host edits hot-reload. node_modules are kept in named volumes so the
+# host's macOS-arm64 modules never shadow the Linux ones built inside the container.
+services:
+  postmill-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev-live
+    container_name: postmill-app
+    # The entrypoint exits if any watcher dies (e.g. OOM during a heavy route
+    # compile) — auto-restart instead of leaving the stack dead.
+    restart: unless-stopped
+    working_dir: /app
+    command: ["bash", "/app/var/docker/dev-entrypoint.sh"]
+    environment:
+      # The Temporal orchestrator is opt-in — three resident Node watchers don't fit a
+      # ~7.7 GB Docker VM. Set to "true" (and give Docker ~11 GB) to also run it.
+      START_ORCHESTRATOR: "false"
+      # The frontend runs on the HOST (pnpm run dev:frontend) — Turbopack's 5-6.5 GB
+      # native cache doesn't fit the VM next to the backend watcher. Set to "true"
+      # (and re-add the 4200 port mapping) to run it in the container again.
+      START_FRONTEND: "false"
+    ports:
+      # 4200 is NOT mapped — the host frontend binds it directly.
+      - "3000:3000"   # backend (NestJS REST API)
+      - "3002:3002"   # orchestrator (Temporal worker http)
+    volumes:
+      - .:/app
+      # Mask every workspace node_modules with a named volume (Linux-built, never the host's).
+      - app-node-modules-root:/app/node_modules
+      - app-node-modules-backend:/app/apps/backend/node_modules
+      - app-node-modules-commands:/app/apps/commands/node_modules
+      - app-node-modules-extension:/app/apps/extension/node_modules
+      - app-node-modules-frontend:/app/apps/frontend/node_modules
+      - app-node-modules-orchestrator:/app/apps/orchestrator/node_modules
+      - app-node-modules-sdk:/app/apps/sdk/node_modules
+      - app-node-modules-helpers:/app/libraries/helpers/node_modules
+      - app-node-modules-nestjs:/app/libraries/nestjs-libraries/node_modules
+      - app-node-modules-react-shared:/app/libraries/react-shared-libraries/node_modules
+      # Keep Next.js build cache off the bind mount for speed.
+      - app-frontend-next:/app/apps/frontend/.next
+      - postmill-uploads:/uploads
+    networks:
+      - postmill-network
+      - temporal-network
+    depends_on:
+      - postmill-postgres
+      - postmill-redis
+      - temporal
+
+volumes:
+  app-node-modules-root:
+  app-node-modules-backend:
+  app-node-modules-commands:
+  app-node-modules-extension:
+  app-node-modules-frontend:
+  app-node-modules-orchestrator:
+  app-node-modules-sdk:
+  app-node-modules-helpers:
+  app-node-modules-nestjs:
+  app-node-modules-react-shared:
+  app-frontend-next:
+  postmill-uploads:
