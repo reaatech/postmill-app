@@ -21,6 +21,11 @@ vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
   useT: () => mockT,
 }));
 
+vi.mock('@gitroom/frontend/components/settings/shortlink-preference.component', () => ({
+  default: () => null,
+  useShortlinkPreference: () => ({ data: undefined, isLoading: false, mutate: vi.fn() }),
+}));
+
 const mockMutate = vi.fn();
 let mockLocationSearch = '';
 
@@ -123,7 +128,7 @@ describe('ShortlinksTab', () => {
       const activeBadges = screen.getAllByText('Active');
       expect(activeBadges.length).toBeGreaterThan(0);
 
-      const activeCard = screen.getByText('Active Provider').closest('.bg-sixth')!;
+      const activeCard = screen.getByText('Active Provider').closest('.bg-newBgColorInner')!;
       expect(within(activeCard).getByText('Rebrandly')).toBeDefined();
     });
 
@@ -228,7 +233,7 @@ describe('ShortlinksTab', () => {
         expect(bitlyEntries.length).toBeGreaterThanOrEqual(1);
       });
 
-      const providerList = screen.getByText('All Providers').closest('.bg-sixth')!;
+      const providerList = screen.getByText('All Providers').closest('.bg-newBgColorInner')!;
       expect(within(providerList).queryByText('TinyURL')).toBeFalsy();
       expect(within(providerList).queryByText('Rebrandly')).toBeFalsy();
     });
