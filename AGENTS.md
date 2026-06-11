@@ -355,8 +355,11 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 
 ### Analytics Redis cache (3J)
 - `getOverview()` results cached in Redis for 60s with key `analytics:overview:{orgId}:{sha256(JSON params)}`.
-- Cache skipped when `endDate` is today (data may still arrive via Temporal workflow).
-- Uses `ioRedis` from `redis.service.ts`.
+- Cached for today-ending ranges too (v3.8.9) — the dashboard default never cached before, so every
+  view recomputed the overview (and its potential live provider fan-out) several times per render.
+- Uses `ioRedis` from `redis.service.ts`. **Never run blocking Redis commands
+  (BRPOP/BLPOP/BRPOPLPUSH) on the shared `ioRedis` client** — they stall every pipelined command,
+  including the per-request throttler check; use `ioRedis.duplicate()` (see `rag.service.ts` worker).
 
 ### CI vulnerability scanning (3AQ)
 - `.github/workflows/security-audit.yml` runs `pnpm audit --audit-level=high` on PRs and weekly (Sunday midnight).

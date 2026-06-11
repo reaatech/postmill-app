@@ -8,6 +8,43 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.8.9] - 2026-06-11
+
+### Fixed
+- **Per-request ~2s stall on every authenticated API call (dev AND prod):** the RAG index queue
+  worker ran a blocking `BRPOPLPUSH` (2s timeout, tight loop) on the shared `ioRedis` connection.
+  ioredis pipelines all commands on one connection, so the global throttler check — which runs on
+  every authenticated request — queued behind the block. Blocking pops now run on a dedicated
+  duplicated connection. Measured: `/user/self` 2.0s → 6ms, analytics overview (repeat) 4.0s → 8ms.
+- **Analytics overview recomputed on every view:** the 60s Redis cache was skipped whenever the
+  range ends today — the dashboard default — so the default view never cached, and
+  channel/posts/recommendations (which all funnel through `getOverview`) recomputed everything
+  several times per render. The overview is now always cached for 60s.
+- **Live-fallback hot loop:** failing integrations were never negative-cached, so the per-view
+  live provider fan-out (token refresh, external API calls, `refreshWait` sleeps) re-fired on
+  every analytics view. Failures (including token-refresh failures) now negative-cache for
+  60s (dev) / 10min (prod).
+- **LinkedIn Page analytics crash:** `analytics()` destructured `elements` from three LinkedIn
+  responses unguarded — any error body threw `elements2 is not iterable`, which also broke the
+  nightly snapshot sweep for the channel, keeping coverage low and the live fallback permanently
+  engaged. Defaults added (matches the Facebook provider's defensive pattern).
+- **Dev watch-restart orphans:** `nest start --watch` kills only the wrapper shell on recompile;
+  the old backend stayed alive (~700 MB each), held port 3000, and served stale code while the
+  new instance died with `EADDRINUSE`. A dev-only parent-death watchdog in backend + orchestrator
+  `main.ts` now exits orphaned instances.
+- **Frontend CSP `connect-src`:** the backend origin (from `NEXT_PUBLIC_BACKEND_URL`) is now
+  included, fixing "Failed to fetch" on login in cross-origin dev splits; harmless in same-origin
+  deployments.
+
+### Added
+- **Docker live-dev environment:** `Dockerfile.dev-live` + `docker-compose.dev-app.yaml` +
+  `var/docker/dev-entrypoint.sh` — repo bind-mounted with watchers in the container
+  (`START_FRONTEND`/`START_ORCHESTRATOR` opt-outs, `restart: unless-stopped`, polling tsc watcher
+  for reliable rebuilds across the bind mount), and `scripts/seed-test-data.js` for UI-testing data.
+- **Turbopack dev memory cap:** `experimental.turbopackMemoryLimit` (3 GB, dev only) in
+  `next.config.ts` — Turbopack's native cache is unbounded by default and not governed by
+  `--max-old-space-size`.
+
 ## [3.8.8] - 2026-06-10
 
 ### Added
