@@ -7,6 +7,7 @@ import dayjs from 'dayjs';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CommentInboxFilters, InboxFilters } from './comment.inbox.filters';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
+import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
 interface InboxComment {
   id: string;
@@ -39,6 +40,8 @@ export const CommentInbox: FC = () => {
   const [filters, setFilters] = useState<InboxFilters>({ unreadOnly: false });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [statusCode, setStatusCode] = useState<number | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
 
   const buildKey = useCallback(() => {
     const params = new URLSearchParams();
@@ -82,6 +85,41 @@ export const CommentInbox: FC = () => {
     setCursor(undefined);
   }, []);
 
+  const handleSyncNow = useCallback(async () => {
+    setSyncing(true);
+    try {
+      const res = await fetch('/posts/inbox/sync', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        setLastSynced(data.timestamp);
+        mutate();
+      }
+    } catch {
+      // sync failure is non-fatal
+    } finally {
+      setSyncing(false);
+    }
+  }, [fetch, mutate]);
+
+  const syncAction = (
+    <div className="flex items-center gap-[8px] shrink-0">
+      {lastSynced && (
+        <span className="text-[11px] text-newTableText">
+          {t('comment_inbox.last_synced', 'Last synced')}: {dayjs(lastSynced).format('HH:mm')}
+        </span>
+      )}
+      <button
+        onClick={handleSyncNow}
+        disabled={syncing}
+        className="px-[12px] py-[6px] bg-btnPrimary text-white text-[12px] font-medium rounded-[6px] transition-colors hover:bg-btnPrimary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {syncing
+          ? t('comment_inbox.syncing', 'Syncing...')
+          : t('comment_inbox.sync_now', 'Sync now')}
+      </button>
+    </div>
+  );
+
   if (error && statusCode === 402) {
     return (
       <div className="flex flex-col items-center justify-center py-[48px] text-center">
@@ -99,7 +137,7 @@ export const CommentInbox: FC = () => {
         </p>
         <a
           href="/billing"
-          className="px-[20px] py-[8px] bg-forth text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
+          className="px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
         >
           {t('comment_inbox.upgrade_cta', 'Upgrade Plan')}
         </a>
@@ -127,7 +165,9 @@ export const CommentInbox: FC = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-[16px]">
+      <div className="flex items-center justify-between gap-[12px]">
         <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
+      </div>
         <div className="space-y-[8px] animate-pulse">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]">
@@ -148,6 +188,8 @@ export const CommentInbox: FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
+      <PageHeader title="Inbox" description="Manage and respond to comments across channels" action={syncAction} />
+
       {!runCron && (
         <div className="flex items-center gap-[8px] px-[16px] py-[10px] bg-amber-500/10 border border-amber-500/30 rounded-[8px] text-[12px] text-amber-400">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
@@ -161,7 +203,9 @@ export const CommentInbox: FC = () => {
         </div>
       )}
 
-      <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
+      <div className="flex items-center justify-between gap-[12px]">
+        <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
+      </div>
 
       {!isLoading && comments.length === 0 && (
         <div className="flex items-center justify-center h-[200px] text-newTableText">
@@ -182,7 +226,7 @@ export const CommentInbox: FC = () => {
                 className="w-[36px] h-[36px] rounded-full object-cover flex-shrink-0"
               />
             ) : (
-              <div className="w-[36px] h-[36px] rounded-full bg-forth flex items-center justify-center text-white text-[14px] font-bold flex-shrink-0">
+              <div className="w-[36px] h-[36px] rounded-full bg-btnPrimary flex items-center justify-center text-white text-[14px] font-bold flex-shrink-0">
                 {comment.authorName?.[0]?.toUpperCase() || '?'}
               </div>
             )}
@@ -212,7 +256,7 @@ export const CommentInbox: FC = () => {
                 {comment.status !== 'handled' && (
                   <button
                     onClick={() => handleMarkRead(comment.id)}
-                    className="text-[12px] text-forth hover:underline"
+                    className="text-[12px] text-textColor hover:underline"
                   >
                     {t('comment_inbox.mark_handled', 'Mark handled')}
                   </button>
@@ -231,7 +275,7 @@ export const CommentInbox: FC = () => {
       {data?.nextCursor && (
         <button
           onClick={loadMore}
-          className="self-center px-[20px] py-[8px] bg-forth text-white text-[13px] font-medium rounded-[8px] transition-colors hover:opacity-80"
+          className="self-center px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:bg-btnPrimary/90"
         >
           {t('comment_inbox.load_more', 'Load more')}
         </button>

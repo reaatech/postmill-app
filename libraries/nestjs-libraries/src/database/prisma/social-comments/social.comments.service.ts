@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
@@ -38,6 +39,7 @@ export class SocialCommentsService {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _integrationService: IntegrationService,
     private _webhooksService: WebhooksService,
+    private _orgProviderConfigManager: OrgProviderConfigManager,
   ) {}
 
   private async refreshTokenIfExpired(
@@ -398,6 +400,37 @@ export class SocialCommentsService {
 
     const count = await this._socialCommentsRepository.countComments(post.id);
     await this._postsRepository.updateCommentCount(post.id, count);
+  }
+
+  async syncInbox(orgId: string): Promise<{ synced: boolean; timestamp: string }> {
+    await this._orgProviderConfigManager.ensureFresh(orgId);
+    const since = dayjs().subtract(30, 'day').startOf('day').toDate();
+
+    let cursor: string | undefined;
+    let hasMore = true;
+    while (hasMore) {
+      const posts = await this._socialCommentsRepository.getPublishedPostsForSync(
+        orgId,
+        since,
+        cursor,
+      );
+
+      for (const post of posts) {
+        if (!post.releaseId || post.releaseId === 'missing') continue;
+        try {
+          await this.syncComments(orgId, post);
+        } catch {
+          // individual post sync errors are non-fatal
+        }
+      }
+
+      hasMore = posts.length === 50;
+      if (hasMore) {
+        cursor = posts[posts.length - 1].id;
+      }
+    }
+
+    return { synced: true, timestamp: new Date().toISOString() };
   }
 
   async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {

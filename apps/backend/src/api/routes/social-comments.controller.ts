@@ -63,6 +63,15 @@ export class SocialCommentsController {
   ) {
     return this._socialCommentsService.getInboxUnreadCount(org.id, user.id);
   }
+
+  @Post('/inbox/sync')
+  @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
+  async syncInbox(
+    @GetOrgFromRequest() org: Organization,
+  ) {
+    return this._socialCommentsService.syncInbox(org.id);
+  }
+
   @Get('/:id/social-comments')
   @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
   async getComments(

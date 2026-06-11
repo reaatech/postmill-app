@@ -176,6 +176,20 @@ export class SocialCommentsRepository {
     });
   }
 
+  getPublishedPostsForSync(orgId: string, since: Date, cursor?: string) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        releaseId: { not: null },
+        publishDate: { gte: since },
+      },
+      include: { integration: true },
+      take: 50,
+      ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+      orderBy: { id: 'asc' },
+    });
+  }
+
   getReadState(userId: string, postId: string) {
     return this._postCommentRead.model.postCommentRead.findUnique({
       where: { userId_postId: { userId, postId } },
