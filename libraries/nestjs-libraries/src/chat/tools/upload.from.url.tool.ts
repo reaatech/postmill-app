@@ -6,6 +6,9 @@ import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/me
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+// undici's own fetch — global fetch (Node built-in undici v6) rejects the npm undici v8
+// Agent dispatcher with `invalid onRequestStart method`.
+import { fetch as undiciFetch } from 'undici';
 import { Readable } from 'stream';
 import { fromBuffer } from 'file-type';
 
@@ -60,10 +63,9 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
           (context?.requestContext as any)?.get('organization') as string
         );
 
-        const response = await fetch(inputData.url, {
-          // @ts-ignore — undici option, not in lib.dom fetch types
+        const response = (await undiciFetch(inputData.url, {
           dispatcher: ssrfSafeDispatcher,
-        });
+        })) as unknown as Response;
 
         if (!response.ok) {
           throw new Error('Failed to fetch URL');
