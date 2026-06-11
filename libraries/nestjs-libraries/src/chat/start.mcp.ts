@@ -2,9 +2,9 @@ import { INestApplication } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { MCPServer } from '@mastra/mcp';
-import { randomUUID } from 'crypto';
-import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { randomUUID, createHash } from 'crypto';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
+import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { IdempotencyFactory } from '@gitroom/nestjs-libraries/ai/governance/idempotency.factory';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
@@ -121,6 +121,8 @@ interface McpSettings {
 interface ResolvedMcpAuth {
   auth: any;
   scopes: string[];
+  userId?: string;
+  role?: string;
 }
 
 const DEFAULT_MCP_SCOPES = ['mcp:read'];
@@ -174,8 +176,8 @@ export function requireScopes(authResult: AuthResult, required: string[]): boole
 
 export const startMcp = async (app: INestApplication) => {
   const mastraService = app.get(MastraService, { strict: false });
-  const organizationService = app.get(OrganizationService, { strict: false });
   const oauthService = app.get(OAuthService, { strict: false });
+  const apiKeysService = app.get(ApiKeysService, { strict: false });
   const aiSettingsManager = app.get(AiSettingsManager, { strict: false });
 
   // IdempotencyFactory is not registered in every Nest context. app.get() throws
@@ -213,16 +215,31 @@ export const startMcp = async (app: INestApplication) => {
         scopes: DEFAULT_MCP_SCOPES,
       };
     }
-    const org = await organizationService.getOrgByApiKey(token);
-    if (!org) return null;
+    const hash = createHash('sha256').update(token).digest('hex');
+    const apiKey = await apiKeysService.findActiveByHash(hash);
+    if (!apiKey) return null;
+    const userOrg = apiKey.user.organizations?.find(
+      (o) => o.organizationId === apiKey.organizationId,
+    );
+    const role =
+      userOrg?.role ??
+      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+    const scopes =
+      role === 'SUPERADMIN' || role === 'ADMIN'
+        ? ORG_API_KEY_MCP_SCOPES
+        : DEFAULT_MCP_SCOPES;
     return {
-      auth: org,
-      scopes: ORG_API_KEY_MCP_SCOPES,
+      auth: apiKey.organization,
+      userId: apiKey.user.id,
+      role,
+      scopes,
     };
   };
 
   const resolveAuth = async (token: string) => {
-    return (await resolveAuthContext(token))?.auth ?? null;
+    const ctx = await resolveAuthContext(token);
+    if (!ctx) return null;
+    return { org: ctx.auth, userId: ctx.userId, role: ctx.role };
   };
 
   // ── Boot-time tool snapshot (hot provider/model changes are OK; tool-set changes need restart) ──
@@ -373,7 +390,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', auth.id);
+    const budgetResult = await budgetService.checkBudget('mcp', auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -384,7 +401,7 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token, auth }, async () => {
+    await runWithContext({ requestId: token, auth: auth.org }, async () => {
       await server.startHTTP({
         url: url,
         httpPath: url.pathname,
@@ -476,7 +493,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.id);
+    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -489,7 +506,7 @@ export const startMcp = async (app: INestApplication) => {
     const url = new URL('/mcp', process.env.NEXT_PUBLIC_BACKEND_URL);
 
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token, auth: req.auth }, async () => {
+    await runWithContext({ requestId: token, auth: req.auth.org }, async () => {
       await server.startHTTP({
         url,
         httpPath: url.pathname,
@@ -542,11 +559,19 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     const id = req.params.id as string;
-    req.auth = await organizationService.getOrgByApiKey(id);
-    if (!req.auth) {
+    const hash = createHash('sha256').update(id).digest('hex');
+    const apiKey = await apiKeysService.findActiveByHash(hash);
+    if (!apiKey) {
       res.status(401).json({ error: 'unauthorized', error_description: 'Invalid API Key' });
       return;
     }
+    const userOrg = apiKey.user.organizations?.find(
+      (o) => o.organizationId === apiKey.organizationId,
+    );
+    const role =
+      userOrg?.role ??
+      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+    req.auth = { org: apiKey.organization, userId: apiKey.user.id, role };
 
     // NOTE: The raw API key from the URL param is passed as `Bearer ${id}` to
     // scopeStrategy.authenticate(). This works correctly for long API keys, but
@@ -564,7 +589,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.id);
+    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -581,7 +606,7 @@ export const startMcp = async (app: INestApplication) => {
 
     fixAcceptHeader(req);
     await runWithContext(
-      { requestId: id, auth: req.auth },
+      { requestId: id, auth: req.auth.org },
       async () => {
         await server.startHTTP({
           url,
@@ -642,11 +667,19 @@ export const startMcp = async (app: INestApplication) => {
       }
     }
 
-    req.auth = await organizationService.getOrgByApiKey(id);
-    if (!req.auth) {
+    const hash = createHash('sha256').update(id).digest('hex');
+    const apiKey = await apiKeysService.findActiveByHash(hash);
+    if (!apiKey) {
       res.status(401).json({ error: 'unauthorized', error_description: 'Invalid API Key' });
       return;
     }
+    const sseUserOrg = apiKey.user.organizations?.find(
+      (o) => o.organizationId === apiKey.organizationId,
+    );
+    const sseRole =
+      sseUserOrg?.role ??
+      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+    req.auth = { org: apiKey.organization, userId: apiKey.user.id, role: sseRole };
 
     const authResult = await scopeStrategy.authenticate({
       headers: { authorization: `Bearer ${id}` },
@@ -660,7 +693,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.id);
+    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -673,7 +706,7 @@ export const startMcp = async (app: INestApplication) => {
     const url = new URL(req.originalUrl, process.env.NEXT_PUBLIC_BACKEND_URL);
 
     await runWithContext(
-      { requestId: id, auth: req.auth },
+      { requestId: id, auth: req.auth.org },
       async () => {
         await server.startSSE({
           url,
@@ -769,12 +802,12 @@ export const startMcp = async (app: INestApplication) => {
             const authHeader = req.headers.authorization;
             if (authHeader) {
               const token = authHeader.replace(/^Bearer\s+/i, '');
-              const org = await resolveAuth(token);
-              if (!org) {
+              const resolved = await resolveAuth(token);
+              if (!resolved) {
                 res.status(401).json({ error: 'unauthorized', error_description: 'Invalid token' });
                 return;
               }
-              (req as any).auth = org;
+              (req as any).auth = resolved;
 
               const authContext = await rbac.authenticate(req.headers);
               if (!authContext.authenticated) {
@@ -782,13 +815,13 @@ export const startMcp = async (app: INestApplication) => {
                 return;
               }
 
-              const rateResult = await rateLimiter.checkLimit(org.id, 'media-mcp');
+              const rateResult = await rateLimiter.checkLimit(resolved.org.id, 'media-mcp');
               if (!rateResult.allowed) {
                 res.status(429).json({ error: 'too_many_requests', error_description: 'Rate limit exceeded' });
                 return;
               }
 
-              const budgetResult = await budgetService.checkBudget('mcp', org.id);
+              const budgetResult = await budgetService.checkBudget('mcp', resolved.org.id);
               if (!budgetResult.allowed) {
                 res.status(429).json({
                   statusCode: 429,
@@ -834,10 +867,14 @@ export const startMcp = async (app: INestApplication) => {
     const a2aBridge = await import('@reaatech/a2a-reference-mcp-bridge' as any).catch(() => null as any);
     if (a2aBridge?.A2aAsMcpServer && a2aBridge?.McpToolAdapter) {
       const { A2aAsMcpServer, McpToolAdapter } = a2aBridge;
-      const toolAdapter = new McpToolAdapter(agent, { serverName: 'postmill', auth: resolveAuth });
+      const resolveOrgAuth = async (token: string) => {
+        const ctx = await resolveAuthContext(token);
+        return ctx?.auth ?? null;
+      };
+      const toolAdapter = new McpToolAdapter(agent, { serverName: 'postmill', auth: resolveOrgAuth });
       const a2aServer = new A2aAsMcpServer({
         tools: toolAdapter,
-        auth: resolveAuth,
+        auth: resolveOrgAuth,
         serverInfo: { name: 'Postmill A2A', version: '1.0.0' },
       });
 
@@ -874,13 +911,13 @@ export const startMcp = async (app: INestApplication) => {
           return;
         }
 
-        const org = await resolveAuth(token);
-        if (!org) {
+        const resolved = await resolveAuth(token);
+        if (!resolved) {
           res.status(401).json({ error: 'unauthorized', error_description: 'Invalid API Key or OAuth token' });
           return;
         }
 
-        const budgetResult = await budgetService.checkBudget('mcp', org.id);
+        const budgetResult = await budgetService.checkBudget('mcp', resolved.org.id);
         if (!budgetResult.allowed) {
           res.status(429).json({
             statusCode: 429,
@@ -889,7 +926,7 @@ export const startMcp = async (app: INestApplication) => {
           });
           return;
         }
-        (req as any).auth = org;
+        (req as any).auth = resolved;
 
         try {
           await a2aServer.handleRequest(req as any, res as any);

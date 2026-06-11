@@ -93,8 +93,6 @@ export class UsersController {
       isTrailing: !process.env.STRIPE_PUBLISHABLE_KEY ? false : organization?.isTrailing,
       allowTrial: organization?.allowTrial,
       streakSince: organization?.streakSince || null,
-      // @ts-ignore
-      publicApi: organization?.users[0]?.role === 'SUPERADMIN' || organization?.users[0]?.role === 'ADMIN' ? organization?.apiKey : '',
     };
   }
 
@@ -170,12 +168,6 @@ export class UsersController {
   ) {
     await this._userService.changePassword(user.id, body.currentPassword, body.newPassword);
     return { success: true };
-  }
-
-  @Post('/api-key/rotate')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  async rotateApiKey(@GetOrgFromRequest() organization: Organization) {
-    return this._orgService.updateApiKey(organization.id);
   }
 
   @Get('/subscription')

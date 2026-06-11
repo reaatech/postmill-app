@@ -285,7 +285,7 @@ export class NoAuthIntegrationsController {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             params: AuthService.signJWT({
-              apiKey: org.apiKey,
+              apiKey: org.id,
             }),
           }),
         });

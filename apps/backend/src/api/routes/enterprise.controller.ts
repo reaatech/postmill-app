@@ -3,9 +3,11 @@ import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import * as crypto from 'crypto';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 
@@ -15,6 +17,7 @@ export class EnterpriseController {
   constructor(
     private _integrationManager: IntegrationManager,
     private _organizationService: OrganizationService,
+    private _apiKeysService: ApiKeysService,
     private _integrationService: IntegrationService,
     private _postsService: PostsService
   ) {}
@@ -61,7 +64,9 @@ export class EnterpriseController {
         return;
       }
 
-      const org = await this._organizationService.getOrgByApiKey(load.apiKey);
+      const hash = crypto.createHash('sha256').update(load.apiKey).digest('hex');
+      const apiKey = await this._apiKeysService.findActiveByHash(hash);
+      const org = apiKey?.organization || null;
 
       if (!org) {
         throw new Error('Organization not found');
@@ -116,7 +121,9 @@ export class EnterpriseController {
         return { success: false };
       }
 
-      const org = await this._organizationService.getOrgByApiKey(load.apiKey);
+      const hash = crypto.createHash('sha256').update(load.apiKey).digest('hex');
+      const apiKey = await this._apiKeysService.findActiveByHash(hash);
+      const org = apiKey?.organization || null;
 
       if (!org) {
         return { success: false };

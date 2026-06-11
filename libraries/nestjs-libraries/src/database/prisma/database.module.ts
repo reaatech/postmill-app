@@ -87,6 +87,8 @@ import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watc
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { ApiKeysRepository } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.repository';
+import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
 import { EmailLogRepository } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.repository';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
@@ -171,6 +173,8 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
     OrgProviderConfigRepository,
     OrgProviderConfigManager,
     AuditRepository,
+    ApiKeysRepository,
+    ApiKeysService,
     EmailLogRepository,
     EmailLogService,
     EmailAdapterRegistry,

@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useSWRConfig } from 'swr';
 import { useUser } from '../layout/user.context';
 import copy from 'copy-to-clipboard';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import { DeveloperComponent } from '@gitroom/frontend/components/developer/developer.component';
+import { ApiKeysSection, CreatedKey } from '@gitroom/frontend/components/api-keys/api-keys.component';
 import clsx from 'clsx';
 
 const mcpClients = [
@@ -195,10 +193,10 @@ const CopyButton = ({
 };
 
 const McpSection = ({
-  user,
+  apiKey,
   mcpBase,
 }: {
-  user: { publicApi: string };
+  apiKey: string;
   mcpBase: string;
 }) => {
   const t = useT();
@@ -210,19 +208,36 @@ const McpSection = ({
     activeClient,
     method,
     mcpBase,
-    user.publicApi
+    apiKey
   );
 
-  const remoteUrl = `${mcpBase}/mcp/${user.publicApi}`;
+  const remoteUrl = `${mcpBase}/mcp/${apiKey}`;
   const cliUrl = `${mcpBase}/mcp`;
 
   const maskedConfig = revealed
     ? config
-    : config.replace(new RegExp(user.publicApi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '*'.repeat(user.publicApi.length));
+    : config.replace(new RegExp(apiKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), '*'.repeat(apiKey.length));
 
   const maskedRemoteUrl = revealed
     ? remoteUrl
-    : remoteUrl.replace(user.publicApi, '*'.repeat(user.publicApi.length));
+    : remoteUrl.replace(apiKey, '*'.repeat(apiKey.length));
+
+  if (!apiKey) {
+    return (
+      <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
+        <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
+          <div className="text-[15px] font-[600]">
+            {t('mcp_client_configuration', 'MCP Client Configuration')}
+          </div>
+        </div>
+        <div className="p-[20px]">
+          <div className="text-[13px] text-newTableText">
+            {t('mcp_no_key', 'Create an API key above to see MCP configuration.')}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
@@ -231,7 +246,7 @@ const McpSection = ({
           <div className="text-[15px] font-[600]">
             {t('mcp_client_configuration', 'MCP Client Configuration')}
           </div>
-          <div className="text-[13px] text-customColor18 mt-[2px]">
+          <div className="text-[13px] text-newTableText mt-[2px]">
             {t(
               'connect_your_mcp_client_to_postiz_to_schedule_your_posts_faster',
               'Connect Postmill MCP server to your client (Http streaming) to schedule your posts faster.'
@@ -241,7 +256,7 @@ const McpSection = ({
         <div className="flex gap-[6px] shrink-0 pt-[2px]">
           <a
             className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            href="https://docs.postiz.com/mcp/introduction"
+            href="https://docs.postmill.com/mcp/introduction"
             target="_blank"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -251,7 +266,7 @@ const McpSection = ({
       </div>
       <div className="p-[20px] flex flex-col gap-[16px]">
         <div className="flex flex-col gap-[6px]">
-          <div className="text-[13px] font-[600] text-customColor18">
+          <div className="text-[13px] font-[600] text-newTableText">
             {t('auth_method', 'Authentication')}
           </div>
           <div className="flex gap-[6px]">
@@ -263,7 +278,7 @@ const McpSection = ({
                   'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                   method === m
                     ? 'bg-[#2B5CD3] text-white'
-                    : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
+                    : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
                 )}
                 onClick={() => setMethod(m)}
               >
@@ -276,7 +291,7 @@ const McpSection = ({
         </div>
         {method === 'header' && (
           <div className="flex flex-col gap-[6px]">
-            <div className="text-[13px] font-[600] text-customColor18">
+            <div className="text-[13px] font-[600] text-newTableText">
               {t('mcp_client', 'Client')}
             </div>
             <div className="flex flex-wrap gap-[6px]">
@@ -288,7 +303,7 @@ const McpSection = ({
                     'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                     activeClient === client
                       ? 'bg-[#2B5CD3] text-white'
-                      : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
+                      : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
                   )}
                   onClick={() => setActiveClient(client)}
                 >
@@ -299,7 +314,7 @@ const McpSection = ({
           </div>
         )}
         <div className="flex flex-col gap-[8px]">
-          <div className="text-[12px] text-customColor18 font-[500]">
+          <div className="text-[12px] text-newTableText font-[500]">
             {method === 'header'
               ? hint
               : t(
@@ -361,22 +376,22 @@ const McpSection = ({
 const localCliSteps = [
   {
     label: 'Install the CLI',
-    code: 'npm install -g postiz',
+    code: 'npm install -g postmill',
   },
   {
-    label: 'Run: postiz auth:login',
-    code: 'postiz auth:login',
+    label: 'Run: postmill auth:login',
+    code: 'postmill auth:login',
   },
   {
     label: 'Install the Postmill skill for your AI agent',
-    code: 'npx skills add gitroomhq/postiz-agent',
+    code: 'npx skills add gitroomhq/postmill-agent',
   },
 ] as const;
 
 const ciCliSteps = [
   {
     label: 'Install the CLI',
-    code: 'npm install -g postiz',
+    code: 'npm install -g postmill',
   },
   {
     label: 'Set your API key as an environment variable',
@@ -384,7 +399,7 @@ const ciCliSteps = [
   },
   {
     label: 'Install the Postmill skill for your AI agent',
-    code: 'npx skills add gitroomhq/postiz-agent',
+    code: 'npx skills add gitroomhq/postmill-agent',
   },
 ] as const;
 
@@ -412,6 +427,23 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         }))
       : steps;
 
+  if (!apiKey) {
+    return (
+      <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
+        <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder">
+          <div className="text-[15px] font-[600]">
+            {t('cli_and_skills', 'CLI & AI Skills')}
+          </div>
+        </div>
+        <div className="p-[20px]">
+          <div className="text-[13px] text-newTableText">
+            {t('cli_no_key', 'Create an API key above to use the CLI.')}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
       <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder flex items-start justify-between gap-[12px]">
@@ -419,7 +451,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
           <div className="text-[15px] font-[600]">
             {t('cli_and_skills', 'CLI & AI Skills')}
           </div>
-          <div className="text-[13px] text-customColor18 mt-[2px]">
+          <div className="text-[13px] text-newTableText mt-[2px]">
             {t(
               'cli_description',
               'Use the Postmill CLI to automate posting from your terminal, or install the skill to let your AI agent schedule posts for you.'
@@ -429,7 +461,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         <div className="flex gap-[6px] shrink-0 pt-[2px]">
           <a
             className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            href="https://docs.postiz.com/cli/introduction"
+            href="https://docs.postmill.com/cli/introduction"
             target="_blank"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -447,7 +479,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
                 'cursor-pointer px-[14px] h-[36px] text-[13px] font-[500] rounded-[8px] transition-colors',
                 mode === m
                   ? 'bg-[#2B5CD3] text-white'
-                  : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
+                  : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
               )}
               onClick={() => setMode(m)}
             >
@@ -459,7 +491,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
         </div>
         {displaySteps.map((step, i) => (
           <div key={i} className="flex flex-col gap-[6px]">
-            <div className="text-[13px] font-[600] text-customColor18">
+            <div className="text-[13px] font-[600] text-newTableText">
               {i + 1}. {step.label}
             </div>
             <pre className="bg-newBgColorInner border border-newBorder rounded-[8px] p-[16px] text-[13px] whitespace-pre-wrap break-all overflow-x-auto leading-[1.6]">
@@ -512,37 +544,9 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
 
 const PublicApiContent = () => {
   const user = useUser();
-  const { backendUrl, frontEndUrl, mcpUrl } = useVariables();
-  const toaster = useToaster();
-  const fetch = useFetch();
-  const decision = useDecisionModal();
-  const { mutate } = useSWRConfig();
-  const [reveal, setReveal] = useState(false);
+  const { backendUrl, mcpUrl } = useVariables();
   const t = useT();
-
-  const rotateKey = useCallback(async () => {
-    const approved = await decision.open({
-      title: t('rotate_api_key', 'Rotate API Key?'),
-      description: t(
-        'rotate_api_key_description',
-        'This will generate a new API key and invalidate the current one. Any integrations using the old key will stop working.'
-      ),
-      approveLabel: t('rotate', 'Rotate'),
-      cancelLabel: t('cancel', 'Cancel'),
-    });
-    if (!approved) return;
-    await fetch('/user/api-key/rotate', { method: 'POST' });
-    await mutate('/user/self');
-    setReveal(false);
-    toaster.show(
-      t('api_key_rotated', 'API Key rotated successfully'),
-      'success'
-    );
-  }, [decision, fetch, mutate, toaster]);
-
-  if (!user || !user.publicApi) {
-    return null;
-  }
+  const [lastCreatedKey, setLastCreatedKey] = useState('');
 
   const mcpBase = mcpUrl || backendUrl;
 
@@ -569,140 +573,14 @@ const PublicApiContent = () => {
           'and you will receive a pos_ prefixed token that works with the API, MCP, and CLI — just like an API Key.'
         )}
       </div>
-      <div className="bg-newBgColorInnerInner rounded-[12px] border border-newBorder overflow-hidden">
-        <div className="bg-newBgColorInner px-[20px] py-[14px] border-b border-newBorder flex items-start justify-between gap-[12px]">
-          <div>
-            <div className="text-[15px] font-[600]">
-              {t('api_key', 'API Key')}
-            </div>
-            <div className="text-[13px] text-customColor18 mt-[2px]">
-              {t(
-                'use_postiz_api_to_integrate_with_your_tools',
-                'Use Postmill API to integrate with your tools.'
-              )}
-            </div>
-          </div>
-          <div className="flex gap-[6px] shrink-0 pt-[2px]">
-            <a
-              className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://docs.postiz.com/public-api"
-              target="_blank"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-            {t('read_the_docs', 'Docs')}
-            </a>
-            <a
-              className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://www.npmjs.com/package/n8n-nodes-postiz"
-              target="_blank"
-            >
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-              {t('n8n_node', 'N8N Node')}
-            </a>
-          </div>
-        </div>
-        <div className="p-[20px] flex flex-col gap-[16px]">
-          <div className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] flex items-center overflow-hidden">
-            <code className="text-[14px] flex-1 truncate">
-              {reveal ? (
-                user.publicApi
-              ) : (
-                <span className="flex items-center">
-                  <span className="blur-sm select-none">
-                    {user.publicApi.slice(0, -5)}
-                  </span>
-                  <span>{user.publicApi.slice(-5)}</span>
-                </span>
-              )}
-            </code>
-          </div>
-          <div className="flex gap-[8px]">
-            <button
-              type="button"
-              onClick={() => setReveal(!reveal)}
-              className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                {reveal ? (
-                  <>
-                    <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" />
-                    <path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19" />
-                    <line x1="1" y1="1" x2="23" y2="23" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                    <circle cx="12" cy="12" r="3" />
-                  </>
-                )}
-              </svg>
-              {reveal ? t('hide', 'Hide') : t('reveal', 'Reveal')}
-            </button>
-            <CopyButton text={user.publicApi} label={t('copy', 'Copy')} />
-            <button
-              type="button"
-              onClick={rotateKey}
-              className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M21.5 2v6h-6" />
-                <path d="M21.34 15.57a10 10 0 11-.57-8.38L21.5 8" />
-              </svg>
-              {t('rotate_key', 'Rotate Key')}
-            </button>
-            <button
-              type="button"
-              data-tooltip-id="tooltip"
-              data-tooltip-content={t(
-                'payload_wizard_description',
-                'Building a POST request to /posts can be complex. Use the wizard to schedule a post with the UI, then copy the generated payload.'
-              )}
-              onClick={() =>
-                window.open(`${frontEndUrl}/modal/dark/all`, '_blank')
-              }
-              className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-            >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              >
-                <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                <polyline points="15 3 21 3 21 9" />
-                <line x1="10" y1="14" x2="21" y2="3" />
-              </svg>
-              {t('open_wizard', 'Open Wizard')}
-            </button>
-          </div>
-        </div>
-      </div>
 
-      <CliSection apiKey={user.publicApi} />
+      <ApiKeysSection
+        onKeyCreated={(key: CreatedKey) => setLastCreatedKey(key.plaintext)}
+      />
 
-      <McpSection user={user} mcpBase={mcpBase} />
+      <McpSection apiKey={lastCreatedKey} mcpBase={mcpBase} />
+
+      <CliSection apiKey={lastCreatedKey} />
     </div>
   );
 };
@@ -722,7 +600,7 @@ export const PublicComponent = () => {
               'cursor-pointer px-[20px] h-[44px] text-[15px] font-[600] rounded-[8px] transition-colors',
               subTab === tab
                 ? 'bg-[#2B5CD3] text-white'
-                : 'bg-btnSimple text-customColor18 hover:bg-boxHover hover:text-textColor'
+                : 'bg-btnSimple text-newTableText hover:bg-boxHover hover:text-textColor'
             )}
             onClick={() => setSubTab(tab)}
           >

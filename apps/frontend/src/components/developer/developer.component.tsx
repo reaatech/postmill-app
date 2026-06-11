@@ -234,7 +234,7 @@ export const DeveloperComponent: FC = () => {
               <div className="text-[15px] font-[600]">
                 {t('oauth_application', 'OAuth Application')}
               </div>
-              <div className="text-[13px] text-customColor18 mt-[2px]">
+              <div className="text-[13px] text-newTableText mt-[2px]">
                 {t(
                   'create_an_oauth_application',
                   'Create an OAuth application to allow third-party integrations with Postmill on behalf of your users.'
@@ -244,7 +244,7 @@ export const DeveloperComponent: FC = () => {
             <div className="flex gap-[6px] shrink-0 pt-[2px]">
               <a
                 className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-                href="https://docs.postiz.com/public-api/oauth"
+                href="https://docs.postmill.com/public-api/oauth"
                 target="_blank"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -286,7 +286,7 @@ export const DeveloperComponent: FC = () => {
             <div className="text-[15px] font-[600]">
               {t('create_oauth_app', 'Create OAuth App')}
             </div>
-            <div className="text-[13px] text-customColor18 mt-[2px]">
+            <div className="text-[13px] text-newTableText mt-[2px]">
               {t(
                 'fill_in_the_details_for_your_oauth_application',
                 'Fill in the details for your OAuth application.'
@@ -295,7 +295,7 @@ export const DeveloperComponent: FC = () => {
           </div>
           <div className="p-[20px] flex flex-col gap-[16px]">
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('app_name', 'App Name')} *
               </label>
               <input
@@ -307,7 +307,7 @@ export const DeveloperComponent: FC = () => {
               />
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('description', 'Description')}
               </label>
               <textarea
@@ -319,7 +319,7 @@ export const DeveloperComponent: FC = () => {
               />
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('profile_picture', 'Profile Picture')}
               </label>
               <div className="flex items-center gap-[12px]">
@@ -330,7 +330,7 @@ export const DeveloperComponent: FC = () => {
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-customColor18">
+                  <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-newTableText">
                     ?
                   </div>
                 )}
@@ -344,7 +344,7 @@ export const DeveloperComponent: FC = () => {
               </div>
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('redirect_url', 'Redirect URL')} *
               </label>
               <input
@@ -397,7 +397,7 @@ export const DeveloperComponent: FC = () => {
             <div className="text-[15px] font-[600]">
               {t('oauth_application', 'OAuth Application')}
             </div>
-            <div className="text-[13px] text-customColor18 mt-[2px]">
+            <div className="text-[13px] text-newTableText mt-[2px]">
               {t(
                 'manage_your_oauth_application',
                 'Manage your OAuth application for third-party integrations.'
@@ -407,7 +407,7 @@ export const DeveloperComponent: FC = () => {
           <div className="flex gap-[6px] shrink-0 pt-[2px]">
             <a
               className="cursor-pointer px-[16px] h-[36px] bg-[#2B5CD3] hover:bg-[#5520CB] text-white transition-colors rounded-[8px] text-[13px] font-[600] flex items-center gap-[6px]"
-              href="https://docs.postiz.com/public-api/oauth"
+              href="https://docs.postmill.com/public-api/oauth"
               target="_blank"
             >
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
@@ -419,7 +419,7 @@ export const DeveloperComponent: FC = () => {
         {editing ? (
           <div className="p-[20px] flex flex-col gap-[16px]">
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('app_name', 'App Name')} *
               </label>
               <input
@@ -431,7 +431,7 @@ export const DeveloperComponent: FC = () => {
               />
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('description', 'Description')}
               </label>
               <textarea
@@ -443,7 +443,7 @@ export const DeveloperComponent: FC = () => {
               />
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('profile_picture', 'Profile Picture')}
               </label>
               <div className="flex items-center gap-[12px]">
@@ -454,7 +454,7 @@ export const DeveloperComponent: FC = () => {
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
-                  <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-customColor18">
+                  <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-newTableText">
                     ?
                   </div>
                 )}
@@ -468,7 +468,7 @@ export const DeveloperComponent: FC = () => {
               </div>
             </div>
             <div className="flex flex-col gap-[6px]">
-              <label className="text-[13px] font-[600] text-customColor18">
+              <label className="text-[13px] font-[600] text-newTableText">
                 {t('redirect_url', 'Redirect URL')} *
               </label>
               <input
@@ -505,21 +505,21 @@ export const DeveloperComponent: FC = () => {
                   className="w-[48px] h-[48px] rounded-full object-cover"
                 />
               ) : (
-                <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-customColor18 text-[18px] font-[600]">
+                <div className="w-[48px] h-[48px] rounded-full bg-btnSimple flex items-center justify-center text-newTableText text-[18px] font-[600]">
                   {app.name?.[0]?.toUpperCase() || '?'}
                 </div>
               )}
               <div>
                 <div className="text-[15px] font-[600]">{app.name}</div>
                 {app.description && (
-                  <div className="text-customColor18 text-[13px]">
+                  <div className="text-newTableText text-[13px]">
                     {app.description}
                   </div>
                 )}
               </div>
             </div>
             <div className="flex flex-col gap-[4px]">
-              <div className="text-[13px] font-[600] text-customColor18">
+              <div className="text-[13px] font-[600] text-newTableText">
                 {t('redirect_url', 'Redirect URL')}
               </div>
               <div className="text-[14px]">{app.redirectUrl}</div>
@@ -547,7 +547,7 @@ export const DeveloperComponent: FC = () => {
         </div>
         <div className="p-[20px] flex flex-col gap-[16px]">
           <div className="flex flex-col gap-[6px]">
-            <div className="text-[13px] font-[600] text-customColor18">
+            <div className="text-[13px] font-[600] text-newTableText">
               {t('client_id', 'Client ID')}
             </div>
             <div className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] flex items-center overflow-hidden">
@@ -555,7 +555,7 @@ export const DeveloperComponent: FC = () => {
             </div>
           </div>
           <div className="flex flex-col gap-[6px]">
-            <div className="text-[13px] font-[600] text-customColor18">
+            <div className="text-[13px] font-[600] text-newTableText">
               {t('client_secret', 'Client Secret')}
             </div>
             <div className="bg-newBgColorInner border border-newBorder rounded-[8px] px-[16px] h-[44px] flex items-center overflow-hidden">
@@ -564,7 +564,7 @@ export const DeveloperComponent: FC = () => {
                   {plaintextSecret}
                 </code>
               ) : (
-                <span className="text-customColor18 text-[13px]">
+                <span className="text-newTableText text-[13px]">
                   {t(
                     'secret_only_shown_on_creation',
                     'Secret is only shown on creation or rotation'

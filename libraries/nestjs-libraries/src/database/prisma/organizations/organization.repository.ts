@@ -17,11 +17,9 @@ export class OrganizationRepository {
     return this._organization.model.organization.create({
       select: {
         id: true,
-        apiKey: true,
       },
       data: {
         name: name ? `${name}###${id}` : `Unnamed User###${id}`,
-        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
         isTrailing: false,
         subscription: {
           create: {
@@ -46,23 +44,6 @@ export class OrganizationRepository {
                 timezone: 0,
               },
             },
-          },
-        },
-      },
-    });
-  }
-
-  getOrgByApiKey(api: string) {
-    return this._organization.model.organization.findFirst({
-      where: {
-        apiKey: AuthService.fixedEncryptionDeterministic(api),
-      },
-      include: {
-        subscription: {
-          select: {
-            subscriptionTier: true,
-            totalChannels: true,
-            isLifetime: true,
           },
         },
       },
@@ -155,17 +136,6 @@ export class OrganizationRepository {
             email: true,
           },
         },
-      },
-    });
-  }
-
-  updateApiKey(orgId: string) {
-    return this._organization.model.organization.update({
-      where: {
-        id: orgId,
-      },
-      data: {
-        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
       },
     });
   }
@@ -272,7 +242,6 @@ export class OrganizationRepository {
     return this._organization.model.organization.create({
       data: {
         name: body.company,
-        apiKey: AuthService.fixedEncryptionDeterministic(makeId(20)),
         allowTrial: true,
         isTrailing: true,
         users: {

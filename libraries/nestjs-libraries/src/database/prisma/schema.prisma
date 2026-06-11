@@ -62,6 +62,7 @@ model Organization {
   orgShortLinkConfigs  OrgShortLinkConfig[]
   shortLinks           ShortLink[]
   shortLinkSnapshots   ShortLinkSnapshot[]
+  apiKeys              ApiKey[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -137,6 +138,7 @@ model User {
   aiSettingsAudits      AISettingsAudit[]
   aiSpendLogs           AISpendLog[]
   aiMediaJobs           AIMediaJob[]
+  apiKeys               ApiKey[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1270,6 +1272,27 @@ model ShortLinkSnapshot {
 
   @@unique([shortLinkId, date])
   @@index([organizationId, date])
+}
+
+// ── v3.8.8: Per-user API keys ──
+model ApiKey {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String
+  name           String
+  hashedKey      String       @unique
+  prefix         String
+  lastUsedAt     DateTime?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  user           User         @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([hashedKey])
 }
 
 // Per-org brand voice / custom instructions + localization
