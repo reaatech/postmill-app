@@ -283,7 +283,7 @@ export const AnalyticsDashboard: FC = () => {
                 onClick={() => handleTabChange(tabName)}
                 className={`px-[14px] py-[6px] text-[13px] font-medium rounded-[8px] transition-colors capitalize ${
                   tab === tabName
-                    ? 'bg-forth text-white'
+                    ? 'bg-btnPrimary text-white'
                     : 'text-newTableText hover:text-btnText'
                 }`}
                 aria-pressed={tab === tabName}
@@ -294,17 +294,29 @@ export const AnalyticsDashboard: FC = () => {
           </div>
 
           {!overviewLoading && !overviewError && (tab === 'overview' || tab === 'channels') && isDataEmpty(overviewData) && (
-            <div className="flex items-center gap-[8px] mb-[16px] px-[16px] py-[10px] bg-amber-500/10 border border-amber-500/30 rounded-[8px] text-[12px] text-amber-400">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                <line x1="12" y1="9" x2="12" y2="13" />
-                <line x1="12" y1="17" x2="12.01" y2="17" />
+            <div className="flex flex-col items-center justify-center py-[48px] px-[24px] mb-[16px] bg-newBgColorInner border border-newTableBorder rounded-[12px]">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-newTableText mb-[16px]">
+                <path d="M18 20V10" />
+                <path d="M12 20V4" />
+                <path d="M6 20v-6" />
               </svg>
-              <span>
+              <div className="text-[16px] font-[600] text-textColor mb-[8px]">
+                {t('analytics_empty_title', 'No analytics data yet')}
+              </div>
+              <div className="text-[13px] text-newTableText text-center max-w-[420px] mb-[20px]">
                 {!runCron
                   ? t('analytics_no_cron', 'Analytics data requires the background cron worker. Set RUN_CRON=true to enable automatic snapshot collection.')
-                  : t('analytics_no_data', 'No analytics snapshots yet for the selected period. Data appears once the Temporal collection workflow runs.')}
-              </span>
+                  : t('analytics_empty_desc', 'Analytics appears after your first scheduled collection (requires connected channels and RUN_CRON=true).')}
+              </div>
+              <a
+                href="/third-party"
+                className="inline-flex items-center gap-[8px] px-[16px] py-[8px] bg-btnPrimary text-white text-[13px] font-[500] rounded-[8px] hover:opacity-90 transition-opacity"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
+                </svg>
+                {t('analytics_connect_channels', 'Connect channels')}
+              </a>
             </div>
           )}
 

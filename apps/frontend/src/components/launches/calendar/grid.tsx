@@ -38,7 +38,7 @@ export const SetSelectionModal: FC<{
           <div
             key={set.id}
             onClick={() => onSelect(set)}
-            className="p-3 border border-tableBorder rounded-lg cursor-pointer hover:transition-colors"
+            className="p-3 border border-newTableBorder rounded-lg cursor-pointer hover:transition-colors"
           >
             <div className="font-medium">{set.name}</div>
             {set.description && (
@@ -50,7 +50,7 @@ export const SetSelectionModal: FC<{
         ))}
       </div>
 
-      <div className="flex gap-2 pt-2 border-t border-tableBorder">
+      <div className="flex gap-2 pt-2 border-t border-newTableBorder">
         <button
           onClick={onContinueWithoutSet}
           className="flex-1 px-4 py-2 text-textColor rounded-lg hover:transition-colors"
@@ -315,7 +315,7 @@ export const CalendarColumn: FC<{
       )}
       <div
         className={clsx(
-          'relative flex flex-col flex-1 text-white rounded-[8px] min-h-[70px]',
+          'relative flex flex-col flex-1 text-white rounded-[8px] min-h-[90px]',
           canDrop && 'border border-[#2B5CD3]'
         )}
       >
@@ -432,7 +432,7 @@ export const CalendarColumn: FC<{
                         ) : (
                           <SafeImage
                             src={`/icons/platforms/${selectedIntegrations.identifier}.png`}
-                            className="rounded-[8px] absolute z-10 -bottom-[5px] -end-[5px] border border-fifth"
+                            className="rounded-[8px] absolute z-10 -bottom-[5px] -end-[5px] border border-newTableBorder"
                             alt={selectedIntegrations.identifier}
                             width={20}
                             height={20}
