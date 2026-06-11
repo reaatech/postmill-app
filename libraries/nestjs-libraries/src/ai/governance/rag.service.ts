@@ -579,15 +579,28 @@ export class RagService implements OnModuleInit {
   private _workerDelayMs = 2000;
   private readonly _QUEUE_KEY = 'rag:index:queue';
   private readonly _PROCESSING_KEY = 'rag:index:processing';
+  private _blockingRedis?: typeof ioRedis;
 
   private async _startWorker(): Promise<void> {
     if (this._workerRunning) return;
     this._workerRunning = true;
 
+    // BRPOPLPUSH blocks the connection it runs on. ioredis pipelines every
+    // command in the app onto the shared connection, so running it there
+    // stalls all other Redis ops — including the per-request throttler check —
+    // for up to the block timeout (~2s on EVERY request). Blocking commands
+    // must use their own dedicated connection.
+    if (!this._blockingRedis) {
+      this._blockingRedis = ioRedis.duplicate();
+      this._blockingRedis.on('error', () => {
+        /* reconnects are handled by ioredis; pollLoop backs off on throw */
+      });
+    }
+
     const pollLoop = async () => {
       while (this._workerRunning) {
         try {
-          const item = await ioRedis.brpoplpush(
+          const item = await this._blockingRedis!.brpoplpush(
             this._QUEUE_KEY,
             this._PROCESSING_KEY,
             this._workerDelayMs / 1000,

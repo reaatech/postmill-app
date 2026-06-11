@@ -5,8 +5,8 @@ import { EventEmitter } from 'events';
 const redisEmitter = new EventEmitter();
 let redisList: string[] = [];
 
-vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
-  ioRedis: {
+vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
+  const mock: any = {
     lpush: vi.fn(async (key: string, value: string) => {
       redisList.unshift(value);
       redisEmitter.emit('push');
@@ -25,8 +25,13 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
     lrem: vi.fn(async (_key: string, _count: number, _value: string) => {
       return 1;
     }),
-  },
-}));
+    on: vi.fn(),
+  };
+  // The worker runs blocking commands on a duplicated connection; share the
+  // same mocked fns so assertions on ioRedis.brpoplpush still observe them.
+  mock.duplicate = vi.fn(() => mock);
+  return { ioRedis: mock };
+});
 
 // The RAG data layer now lives behind AiRagRepository (Controller → Service →
 // Repository). The service holds no Prisma; we mock the repository's methods and
