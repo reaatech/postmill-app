@@ -50,6 +50,8 @@ import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
+import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
 import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
@@ -91,6 +93,8 @@ const authenticatedController = [
   OrgAiSettingsController,
   RagController,
   OrgShortLinkSettingsController,
+  ApiKeysController,
+  DashboardController,
 ];
 @Module({
   imports: [UploadModule],

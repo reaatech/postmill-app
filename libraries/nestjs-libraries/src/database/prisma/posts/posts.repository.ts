@@ -1010,4 +1010,81 @@ export class PostsRepository {
       },
     });
   }
+
+  getTotalPostCount(orgId: string) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getScheduledPostCount(orgId: string) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        state: State.QUEUE,
+        publishDate: { gte: dayjs.utc().toDate() },
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getPublishedPostCountSince(orgId: string, since: Date) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        state: State.PUBLISHED,
+        publishDate: { gte: since },
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getDraftPostCount(orgId: string) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        state: State.DRAFT,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getUpcomingPosts(orgId: string, limit: number) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        state: State.QUEUE,
+        publishDate: { gte: dayjs.utc().toDate() },
+        deletedAt: null,
+        parentPostId: null,
+        intervalInDays: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        content: true,
+        publishDate: true,
+        integration: {
+          select: {
+            name: true,
+            providerIdentifier: true,
+            picture: true,
+          },
+        },
+      },
+    });
+  }
 }
