@@ -32,6 +32,16 @@ import { isDev } from '@gitroom/helpers/utils/is.dev';
   return Number(this);
 };
 
+// `nest start --watch` spawns this process through a wrapper shell and on
+// recompile kills only that shell — the old server is orphaned (reparented to
+// init), keeps the port, and serves stale code while leaking ~700 MB per edit.
+// Exit when our parent dies so the freshly compiled instance can bind.
+if (isDev()) {
+  setInterval(() => {
+    if (process.ppid === 1) process.exit(0);
+  }, 2000).unref();
+}
+
 async function start() {
   const app = await NestFactory.create(AppModule, {
     rawBody: true,
