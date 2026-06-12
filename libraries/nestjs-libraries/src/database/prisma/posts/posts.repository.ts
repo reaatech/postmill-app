@@ -2,7 +2,6 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 import { Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import {
-  APPROVED_SUBMIT_FOR_ORDER,
   CreationMethod,
   Post,
   Prisma,
@@ -598,7 +597,8 @@ export class PostsRepository {
     tags: { value: string; label: string }[],
     creationMethod: CreationMethod,
     inter?: number,
-    campaignId?: string
+    campaignId?: string,
+    brandId?: string,
   ) {
     const posts: Post[] = [];
     const uuid = uuidv4();
@@ -631,7 +631,7 @@ export class PostsRepository {
         delay: value.delay || 0,
         group: uuid,
         intervalInDays: inter ? +inter : null,
-        approvedSubmitForOrder: APPROVED_SUBMIT_FOR_ORDER.NO,
+
         ...(type === 'create' ? { creationMethod } : {}),
         ...(state === 'update'
           ? {}
@@ -653,15 +653,10 @@ export class PostsRepository {
           where: {
             id: value.id || uuidv4(),
           },
-          create: { ...updateData('create'), ...(campaignId ? { campaign: { connect: { id: campaignId } } } : {}) },
+          create: { ...updateData('create'), ...(campaignId ? { campaign: { connect: { id: campaignId } } } : {}), ...(brandId ? { brand: { connect: { id: brandId } } } : {}) },
           update: {
             ...updateData('update'),
-            lastMessage: {
-              disconnect: true,
-            },
-            submittedForOrder: {
-              disconnect: true,
-            },
+
           },
         })
       );
@@ -736,39 +731,6 @@ export class PostsRepository {
     return { previousPost, posts };
   }
 
-  async submit(id: string, order: string, buyerOrganizationId: string) {
-    return this._post.model.post.update({
-      where: {
-        id,
-      },
-      data: {
-        submittedForOrderId: order,
-        approvedSubmitForOrder: 'WAITING_CONFIRMATION',
-        submittedForOrganizationId: buyerOrganizationId,
-      },
-      select: {
-        id: true,
-        description: true,
-        submittedForOrder: {
-          select: {
-            messageGroupId: true,
-          },
-        },
-      },
-    });
-  }
-
-  updateMessage(id: string, messageId: string) {
-    return this._post.model.post.update({
-      where: {
-        id,
-      },
-      data: {
-        lastMessageId: messageId,
-      },
-    });
-  }
-
   async getPostById(id: string, org: string) {
     const post = await this._post.model.post.findUnique({
       where: {
@@ -777,22 +739,6 @@ export class PostsRepository {
       },
       include: {
         integration: true,
-        submittedForOrder: {
-          include: {
-            posts: {
-              where: {
-                state: 'PUBLISHED',
-              },
-            },
-            ordersItems: true,
-            seller: {
-              select: {
-                id: true,
-                account: true,
-              },
-            },
-          },
-        },
       },
     });
     return decryptPostIntegrationTokens(post);

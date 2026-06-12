@@ -162,6 +162,56 @@ pnpm run build
 
 ## Per-release notes
 
+### v3.8.9 -> v3.8.10
+
+v3.8.10 restructures identity, roles, and the provider-surface settings, and — unusually for this
+fork — includes a **destructive schema push** that drops dead tables and migrated columns.
+
+**Take a database snapshot before pushing the schema.** This is not optional:
+
+```bash
+docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local > pre_3810_$(date +%Y%m%d).sql
+pnpm run prisma-db-push   # applies the schema, including the drops below
+```
+
+**Dropped tables** (dead Gitroom marketplace/GitHub-stars subsystems, no reachable entrypoints):
+`SocialMediaAgency`, `SocialMediaAgencyNiche`, `MessagesGroup`, `Messages`, `Orders`,
+`OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`.
+
+**Dropped columns/enums:**
+
+- `User` profile/notification columns (`name`, `lastName`, `bio`, `pictureId`, `timezone`,
+  `sendSuccessEmails`, `sendFailureEmails`, `sendStreakEmails`) — moved to the new `UserProfile`
+  table (1:1), backfilled automatically.
+- `User` marketplace columns (`audience`, `account`, `connectedAccount`) and `Post` marketplace
+  fields (`submittedForOrderId`, `submittedForOrganizationId`, `approvedSubmitForOrder`).
+- `UserOrganization.role` and the `Role` enum — replaced by `roleId` → `AppRole` (RBAC).
+- `AIOrgProviderConfig.imageModel` / `AIProviderConfig.imageModel` — image generation moved to
+  the Media provider system.
+- Enums `OrderStatus`, `From`.
+- The old `OrgShortLinkConfig` `@@unique([organizationId, identifier])` constraint (replaced by
+  the per-account unique, enabling multiple accounts per provider).
+
+**Automatic seed + backfill:** on first boot the backend idempotently seeds the RBAC catalog
+(5 system roles, 80 permissions) and backfills `UserProfile` rows, `UserOrganization.roleId`
+(legacy `SUPERADMIN → owner`, `ADMIN → admin`, `USER → member`), one default brand per org,
+storage/short-link account fingerprints, and media provider configs from the old
+`ragSettings.mediaProviders` blob. No manual data migration is required.
+
+**New env vars:**
+
+- `LOCAL_STORAGE_QUOTA_GB` (default `5`) — default soft quota for each org's local storage.
+
+**Behaviour changes to verify after upgrading:**
+
+- Login providers are now managed in `/admin` (super-admin) — env vars remain the bootstrap
+  fallback, so existing env-configured logins keep working.
+- Login now issues a refresh token backed by the `Session` table; users get a device list with
+  per-session revoke under Profile → Security. Existing JWTs keep verifying (no forced re-auth).
+- The post composer moved to `/schedule/post` and `/schedule/post/<id>` (was a modal).
+- Local uploads are partitioned per tenant under `<UPLOAD_DIRECTORY>/<tenantId>/`; existing files
+  remain readable at their recorded paths.
+
 ### v3.8.3 -> v3.8.4
 
 **No schema changes.** v3.8.4 is a remediation release addressing bugs introduced in v3.8.3.
@@ -298,4 +348,4 @@ If an upgrade causes issues:
 - [Backup & Retention](./backup-and-retention.md) — backup before upgrade
 - [Developer Docs: Database](../developer-docs/database.md) — schema management and safety
 
-> Verified against v3.8.4
+> Verified against v3.8.10

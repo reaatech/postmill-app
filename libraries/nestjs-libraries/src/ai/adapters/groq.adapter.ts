@@ -43,7 +43,8 @@ const GROQ_BASE_URL = 'https://api.groq.com/openai/v1';
 export class GroqAdapter implements AIProviderAdapter {
   readonly identifier = 'groq';
   readonly name = 'Groq';
-  readonly type = 'direct' as const;
+  // Hub: LPU inference host serving open-weight models (Llama/Mixtral/Gemma/etc.) — not a model maker.
+  readonly type = 'hub' as const;
   readonly credentialFields = GROQ_CREDENTIAL_FIELDS;
   readonly capabilities = GROQ_CAPABILITIES;
   readonly privacy = {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ForbiddenException, BadRequestException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 const mockAdapter = {
   identifier: 'openai',
@@ -82,6 +83,7 @@ import { ProviderHealthService } from '@gitroom/nestjs-libraries/ai/governance/p
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
+import type { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 
 const superAdmin = { id: 'admin-1', isSuperAdmin: true } as any;
 const regularUser = { id: 'user-1', isSuperAdmin: false } as any;
@@ -95,6 +97,7 @@ describe('AiSettingsController', () => {
   let guardrails: GuardrailService;
   let budget: BudgetService;
   let rag: RagService;
+  let orgMediaProviderSettings: { upsert: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,6 +108,9 @@ describe('AiSettingsController', () => {
     guardrails = new (GuardrailService as any)();
     budget = new (BudgetService as any)();
     rag = new (RagService as any)();
+    orgMediaProviderSettings = {
+      upsert: vi.fn().mockResolvedValue({}),
+    };
 
     controller = new AiSettingsController(
       aiSettings as any,
@@ -114,17 +120,8 @@ describe('AiSettingsController', () => {
       guardrails as any,
       budget as any,
       rag as any,
+      orgMediaProviderSettings as unknown as OrgMediaProviderSettingsService,
     );
-  });
-
-  describe('assertSuperAdmin', () => {
-    it('allows super-admin users', () => {
-      expect(() => (controller as any).assertSuperAdmin(superAdmin)).not.toThrow();
-    });
-
-    it('throws ForbiddenException for non-super-admin users', () => {
-      expect(() => (controller as any).assertSuperAdmin(regularUser)).toThrow(ForbiddenException);
-    });
   });
 
   describe('listProviders', () => {
@@ -139,8 +136,12 @@ describe('AiSettingsController', () => {
       }
     });
 
-    it('rejects non-admin users', async () => {
-      await expect(controller.listProviders(regularUser)).rejects.toThrow(ForbiddenException);
+    it('is gated with RequirePermission decorator', () => {
+      const metadata = Reflect.getMetadata(
+        REQUIRE_PERMISSION_KEY,
+        controller.listProviders,
+      );
+      expect(metadata).toEqual({ resource: 'ai-config', action: 'manage' });
     });
 
     it('marks providers configured when all required credential fields are present, not only apiKey', async () => {

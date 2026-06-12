@@ -123,11 +123,16 @@ best practices and indicates that no org-specific data was available via `hasAna
 
 ## Brand voice
 
-### Brand profile
+### Brands (v3.8.10: many per organisation)
 
-The `AIBrandProfile` model stores per-organisation writing instructions:
+The `AIBrandProfile` model stores brand writing instructions. Since v3.8.10 an organisation can
+have **multiple brands** with one default; manage them in Settings → Brands (`GET/POST /brands`,
+`PUT/DELETE /brands/:id`, `POST /brands/:id/default`) and pick a brand per post in the composer.
+AI generation uses the post's selected brand, falling back to the org's default brand.
 
-`PUT /ai/brand-profile` — upserts your brand profile:
+The legacy single-profile endpoints remain as an alias for the **default** brand:
+
+`PUT /ai/brand-profile` — upserts the default brand profile:
 
 ```json
 {
@@ -167,18 +172,21 @@ the RAG endpoints at `/rag`. See Settings → Brand → Knowledge Base for the i
 
 ## Image and media generation
 
-`POST /ai/media` supports 7 media operations, each routed through the configured AI media
-provider:
+`POST /ai/media` supports 7 media operations. Since v3.8.10 each operation routes through the
+per-organisation **media providers** configured in Settings → Media (fal.ai, OpenAI, ElevenLabs,
+HeyGen, Runway, Black Forest Labs, Vertex AI, Replicate, Stability AI, Tavus, D-ID, Hedra,
+MiniMax, Deepgram, Luma) — an operation is available when a configured, enabled provider supports
+that capability:
 
-| Operation | Description | Provider chain (first available wins) |
-|-----------|-------------|--------------------------------------|
-| `image` | AI image generation from a text prompt | Configured image provider |
-| `video` | Luma AI video generation from a text prompt | Configured video provider |
-| `tts` | Text-to-speech audio synthesis | ElevenLabs, falls back to OpenAI |
-| `stt` | Speech-to-text transcription (base64 audio) | Deepgram, falls back to OpenAI |
-| `upscale` | Image upscaling | Replicate, falls back to OpenAI |
-| `bg-remove` | Background removal from an image | Replicate |
-| `inpaint` | Image inpainting (fill masked region from prompt) | Replicate |
+| Operation | Description |
+|-----------|-------------|
+| `image` | AI image generation from a text prompt (synchronous) |
+| `video` | Video generation from a text prompt (asynchronous job) |
+| `tts` | Text-to-speech audio synthesis |
+| `stt` | Speech-to-text transcription (base64 audio) |
+| `upscale` | Image upscaling |
+| `bg-remove` | Background removal from an image |
+| `inpaint` | Image inpainting (fill masked region from prompt) |
 
 ```json
 // Example: generate an image
@@ -190,8 +198,10 @@ provider:
 ```
 
 All media operations are governed by the same budget, guardrails, and rate limits as text
-operations. Each media provider is configured independently in Settings → Media Providers,
-allowing you to mix providers (e.g. replicate for image tasks, ElevenLabs for TTS).
+operations. Each media provider is configured independently in **Settings → Media** (with a
+storage location for generated output — see [Settings](./settings.md#media-tab)), allowing you to
+mix providers (e.g. Replicate for image tasks, ElevenLabs for TTS). Async results (video, audio,
+avatar) are saved into your organisation's storage and appear in the Media library.
 
 ### C2PA provenance
 
@@ -241,4 +251,4 @@ All AI operations are subject to three governance layers:
 
 All AI operations log to the spend ledger (`AISpendLog`) for audit and cost tracking.
 
-> Verified against v3.7.0
+> Verified against v3.8.10

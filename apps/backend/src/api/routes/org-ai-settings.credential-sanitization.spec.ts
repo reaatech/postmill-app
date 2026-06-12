@@ -15,19 +15,20 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.s
 
 vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
   AIProviderRegistry: class {
-    list = () => [];
-    getAdapter = () => null;
+    list = (): unknown[] => [];
+    getAdapter = (): null => null;
   },
 }));
 
 import { OrgAiSettingsController } from './org-ai-settings.controller';
+import type { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
-    { list: () => [], getAdapter: () => null } as any
+    { list: (): unknown[] => [], getAdapter: (): null => null } as unknown as AIProviderRegistry
   ) as any;
 }
 
@@ -92,7 +93,11 @@ describe('OrgAiSettingsController — credential sanitization (#53)', () => {
 
       expect(result.providers).toHaveLength(2);
       expect(result.providers[0]).not.toHaveProperty('credentials');
-      expect(result.providers.every((p) => !('credentials' in p))).toBe(true);
+      expect(
+        result.providers.every(
+          (p: Record<string, unknown>) => !('credentials' in p)
+        )
+      ).toBe(true);
     });
 
     it('preserves other active provider properties', async () => {

@@ -1,10 +1,10 @@
 /**
  * Reads a deployment-level env var for application sign-in (SSO / login).
  *
- * These env vars are explicitly OUT of scope for the v3.7.1 per-tenant credential
- * migration — they configure app-level OAuth (GitHub/Google login, custom OAuth,
- * Farcaster) which has a bootstrap chicken-and-egg problem (must log in before any
- * in-app config exists).
+ * This is the BOOTSTRAP FALLBACK for when no AuthProviderConfig row exists in the DB.
+ * All OAuth providers (GitHub, Google, Farcaster, GENERIC/OIDC) resolve credentials
+ * from AuthProviderConfig first; env vars are only used when DB config is absent or
+ * disabled. LOCAL auth is always available regardless of DB config.
  *
  * Unlike the deleted getEnvOr (channel provider env path), this helper reads only
  * the explicitly-carved-out login env vars and must NEVER be used for channel or

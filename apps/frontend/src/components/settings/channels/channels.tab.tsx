@@ -9,6 +9,7 @@ import { ChannelEditModal } from './channel-edit.modal';
 import { ProviderCapabilitiesPanel } from './provider-capabilities.panel';
 import { DataTable, StatusPill } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
+import SafeImage from '@gitroom/react/helpers/safe.image';
 
 interface ChannelHealthItem {
   id: string;
@@ -58,7 +59,7 @@ const ProviderIcon: FC<{ identifier: string; name: string }> = ({ identifier, na
     : `/icons/platforms/${identifier}.png`;
 
   return (
-    <img
+    <SafeImage
       className="w-[28px] h-[28px] rounded-full"
       src={src}
       alt={name}
@@ -163,7 +164,7 @@ export const ChannelsTab: FC = () => {
   return (
     <div className="flex flex-col gap-[16px]">
       <div>
-        <h2 className="text-[18px] font-[600] text-textColor">Channel Credentials</h2>
+        <h2 className="text-[18px] font-[600]">Channel Credentials</h2>
         <p className="text-[13px] text-textColor/60 mt-[4px]">
           Configure your own OAuth app credentials for each social channel. These credentials are
           used when connecting channels to your organization.
@@ -241,7 +242,7 @@ export const ChannelsTab: FC = () => {
                   render: (item: ChannelHealthItem) => (
                     <div className="flex items-center gap-[8px]">
                       {item.picture && (
-                        <img className="w-[22px] h-[22px] rounded-full" src={item.picture} alt={item.name} />
+                        <SafeImage className="w-[22px] h-[22px] rounded-full" src={item.picture} alt={item.name} />
                       )}
                       <span className="font-[500] text-textColor">{item.name}</span>
                     </div>

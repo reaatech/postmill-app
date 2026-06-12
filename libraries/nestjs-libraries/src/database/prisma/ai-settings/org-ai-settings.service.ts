@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 
 @Injectable()
 export class OrgAiSettingsService {
@@ -11,6 +12,7 @@ export class OrgAiSettingsService {
     private _repository: OrgAiSettingsRepository,
     private _encryption: EncryptionService,
     private _registry: AIProviderRegistry,
+    @Optional() private _credentialLink?: ProviderCredentialLinkService,
   ) {}
 
   async getProviders(orgId: string) {
@@ -30,7 +32,7 @@ export class OrgAiSettingsService {
         isActive: dbConfig?.isActive || false,
         isConfigured,
         defaultModel: dbConfig?.defaultModel || '',
-        imageModel: dbConfig?.imageModel || '',
+        reasoningModel: dbConfig?.reasoningModel || '',
         createdAt: dbConfig?.createdAt || null,
         updatedAt: dbConfig?.updatedAt || null,
       };
@@ -51,7 +53,7 @@ export class OrgAiSettingsService {
       type: adapter.type,
       capabilities: adapter.capabilities,
       defaultModel: config.defaultModel,
-      imageModel: config.imageModel,
+      reasoningModel: config.reasoningModel,
       credentials: decrypted,
     };
   }
@@ -64,8 +66,8 @@ export class OrgAiSettingsService {
       isActive?: boolean;
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
-      extraConfig?: Record<string, any>;
+      reasoningModel?: string;
+      extraConfig?: Record<string, unknown> | string;
     },
   ) {
     const encryptedCredentials = data.credentials
@@ -76,11 +78,18 @@ export class OrgAiSettingsService {
       ? (typeof data.extraConfig === 'string' ? data.extraConfig : JSON.stringify(data.extraConfig))
       : undefined;
 
-    return this._repository.upsert(orgId, identifier, {
+    const result = await this._repository.upsert(orgId, identifier, {
       ...data,
       credentials: encryptedCredentials,
       extraConfig,
     });
+
+    // §11.4 auto-config: OpenAI/MiniMax AI credentials live-link to the media surface.
+    if (data.credentials && this._credentialLink) {
+      await this._credentialLink.syncFromAiProvider(orgId, identifier, data.credentials);
+    }
+
+    return result;
   }
 
   async setActive(orgId: string, identifier: string) {

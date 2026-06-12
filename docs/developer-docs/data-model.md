@@ -3,15 +3,33 @@
 71 Prisma models in a single schema at `libraries/nestjs-libraries/src/database/prisma/schema.prisma`.
 This page lists every model grouped by domain with a one-line purpose and key relationships.
 
+> **v3.8.10 restructure:** the `User` god-table was split (profile fields moved to `UserProfile`),
+> the flat `Role` enum was replaced by a full RBAC layer (`AppRole`/`Permission`/`AppRolePermission`),
+> and the dead Gitroom marketplace/GitHub-stars models were dropped. See
+> [Dropped in v3.8.10](#dropped-in-v3-8-10) below.
+
 ---
 
-## Core Identity (11)
+## Core Identity, RBAC & Sessions (9)
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
 | `Organization` | Tenant — every resource belongs to an org | FK to `Subscription`; has many `Integration`, `UserOrganization`, `Post`, `Campaign` |
-| `User` | Individual user account (email + provider login) | FK to `Media` (picture); has many `UserOrganization` |
-| `UserOrganization` | Many-to-many join between users and orgs, with role | FK → `Organization`, `User` |
+| `User` | Identity/auth only — email, password, `providerName`/`providerId`, `isSuperAdmin`, `activated`, last-online telemetry. Profile fields moved to `UserProfile` in v3.8.10. | Unique on `(email, providerName)`; has one `UserProfile`, many `Session`, `UserOrganization` |
+| `UserProfile` | 1:1 profile split off from `User` — name, lastName, bio, `avatarUrl` (provider/Gravatar), `pictureId` (uploaded), IANA `timezone`, notification prefs | FK → `User` (unique, cascade), `Media` (picture) |
+| `Session` | Login session backing refresh-token rotation — `tokenHash` (sha256 of the refresh token, rotated on every use), `previousTokenHash` (last rotated-out hash; reusing it revokes the session), userAgent/ip, `expiresAt`, `revokedAt` | FK → `User` (cascade) |
+| `UserOrganization` | Many-to-many join between users and orgs. The legacy `role` enum column was dropped in v3.8.10 — `roleId` → `AppRole` is the role pointer. | FK → `Organization`, `User`, `AppRole` (nullable `roleId`) |
+| `AppRole` | RBAC role. Org-scoped when `organizationId` is set; NULL org = seeded system role (`owner`/`admin`/`editor`/`member`/`viewer`, `isSystem: true`) | FK → `Organization` (nullable); has many `AppRolePermission`, `UserOrganization` |
+| `Permission` | Fine-grained `(resource, action)` capability — 16 resources × 5 actions seeded | Unique on `(resource, action)`; has many `AppRolePermission` |
+| `AppRolePermission` | Join table linking roles to permissions | Composite PK `(roleId, permissionId)`; cascade on both |
+| `AuthProviderConfig` | Platform-wide login provider config (super-admin managed in `/admin`) — client ID/secret encrypted, OIDC endpoints, enabled flag. Env vars remain the bootstrap fallback. | Unique on `provider` |
+
+---
+
+## Org Content Helpers (8)
+
+| Model | Purpose | Key Relationships |
+|---|---|---|
 | `Tags` | Per-org color-coded tags for posts | FK → `Organization`; has many `TagsPosts` |
 | `TagsPosts` | Many-to-many join between posts and tags | FK → `Post`, `Tags` |
 | `Sets` | Named content blocks (reusable text/JSON) | FK → `Organization` |
@@ -23,13 +41,14 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 ---
 
-## Media (4)
+## Media (5)
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Media` | Uploaded media files (image/video), with path, type, thumbnail, tags | FK → `Organization`, `MediaFolder` |
+| `Media` | Uploaded media files (image/video), with path, type, thumbnail, tags, and `metadata Json?` (dimensions, duration, model, provenance — populated on AI-generated ingest, v3.8.10) | FK → `Organization`, `MediaFolder` |
 | `MediaFolder` | Folder tree for organizing media, supports cloud-store mounting | FK → `Organization`, parent `MediaFolder`, `StorageProviderConfig` |
-| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL). `isDefault` column removed in v3.8.3, `POST /settings/storage/:id/set-default` route removed — LOCAL is always-on base; other providers mount onto it. | FK → `Organization`; has many `MediaFolder` |
+| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL). `accountFingerprint` (v3.8.10) enforces unique account per org via `@@unique([organizationId, accountFingerprint])`. | FK → `Organization`; has many `MediaFolder`, `MediaProviderConfig` |
+| `MediaProviderConfig` | Per-org AI media-generation provider config (v3.8.10) — encrypted credentials, storage binding (`storageProviderId`, null = LOCAL; `storageRootFolderId`) | FK → `Organization`, `StorageProviderConfig` (nullable); unique on `(organizationId, identifier)` |
 | `MultipartUpload` | Tracks ownership and state of multipart S3 uploads | FK → `Organization` |
 
 ---
@@ -60,12 +79,12 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Post` | Scheduled/social post — content, state (QUEUE/PUBLISHED/ERROR/DRAFT), publish date, media, settings, campaign | FK → `Organization`, `Integration`, `Campaign`; self-referential `parentPost` for threads |
+| `Post` | Scheduled/social post — content, state (QUEUE/PUBLISHED/ERROR/DRAFT), publish date, media, settings, campaign, optional `brandId` (per-post brand voice, v3.8.10) | FK → `Organization`, `Integration`, `Campaign`, `AIBrandProfile` (nullable `brandId`); self-referential `parentPost` for threads |
 | `Comments` | Internal team comments on posts | FK → `Organization`, `Post`, `User` |
 
 ---
 
-## Analytics (4)
+## Analytics (5)
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
@@ -73,6 +92,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 | `PostAnalyticsSnapshot` | Daily per-post metric snapshot | FK → `Post`, `Integration` |
 | `WatchedAccount` | Competitor/watchlist account being tracked | FK → `Organization`; has many `WatchedAccountMetric` |
 | `WatchedAccountMetric` | Individual metric reading for a watched account | FK → `WatchedAccount` |
+| `SubscriberCount` | Public subscriber/follower-count snapshots collected for watched accounts (v3.8.10) | Keyed by `accountId` |
 
 ---
 
@@ -89,15 +109,15 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `AIOrgProviderConfig` | Per-org active AI provider + encrypted credentials + model selection | FK → `Organization` |
+| `AIOrgProviderConfig` | Per-org AI provider + encrypted credentials + `defaultModel` (standard) and `reasoningModel` (v3.8.10). `imageModel` was dropped in v3.8.10 — image generation lives in the Media provider system. | FK → `Organization` |
 | `AISpendLog` | Cost ledger — input/output tokens, cost, provider, model, scope | FK → `Organization` (nullable), `User` (nullable) |
-| `AIBrandProfile` | Per-org brand voice instructions + language localization | FK → `Organization` (unique) |
+| `AIBrandProfile` | Brand voice instructions + language. **Many per org** since v3.8.10 (`name`, `isDefault`, `slug`); one default per org, selectable per-post via `Post.brandId`. | FK → `Organization`; has many `Post` |
 | `AIPromptTemplate` | Editable prompt templates (org-scoped or global, with key) | FK → `Organization` (nullable) |
 | `AISettingsAudit` | Append-only audit of AI-settings changes | FK → `User` (nullable) |
-| `AIMediaJob` | Media pipeline job — operation, status, artifact URL, provenance, cost | FK → `Organization`, `User` (nullable) |
+| `AIMediaJob` | Media pipeline job — operation, status, artifact URL, provenance, cost. Tracks async media generation (video/audio/avatar) in the v3.8.10 media-provider system. | FK → `Organization`, `User` (nullable) |
 | `AIPromptLibraryItem` | User-created reusable prompt library entries | FK → `Organization` |
 | `AIContentIndex` | RAG index — chunk metadata + BM25 text; embeddings in side table | FK → `Organization` |
-| `AIProviderConfig` | **DEPRECATED v3.6.0** — replaced by `AIOrgProviderConfig` | Standalone |
+| `AIProviderConfig` | **DEPRECATED v3.6.0** — replaced by `AIOrgProviderConfig`; carries `reasoningModel` for parity | Standalone |
 | `AISystemSettings` | **DEPRECATED v3.6.0** — active provider moved to per-tenant; kept for scope models and governance | Standalone |
 
 ---
@@ -106,7 +126,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `OrgShortLinkConfig` | Per-org short-link provider config — provider type, API credentials (encrypted), custom domain, active flag | FK → `Organization` |
+| `OrgShortLinkConfig` | Per-org short-link provider config — provider type, API credentials (encrypted), custom domain, active flag. Multi-account since v3.8.10: `name` + `accountFingerprint` with `@@unique([organizationId, identifier, accountFingerprint])` (the old one-config-per-provider unique was dropped). | FK → `Organization` |
 | `ShortLink` | Ledger of generated short links — original URL, short URL, provider, post reference | FK → `Organization`, `Post` (nullable) |
 | `ShortLinkSnapshot` | Daily click-count snapshot per short link, collected by the Temporal analytics sweep | FK → `ShortLink` |
 
@@ -129,19 +149,22 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 ---
 
-## Billing & Marketplace (9)
+## Billing (4)
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
 | `Subscription` | Billing subscription — tier, period, channel count, lifetime flag | FK → `Organization` (unique) |
-| `Customer` | Marketplace customer name per org | FK → `Organization` |
+| `Customer` | Billing customer name per org | FK → `Organization` |
 | `Credits` | AI credit balance per org (type: `ai_images`/`ai_videos`) | FK → `Organization` |
 | `UsedCodes` | Used promo/referral codes per org | FK → `Organization` |
-| `Orders` | Marketplace orders (buyer ↔ seller) | FK → `User` (buyer), `User` (seller), `MessagesGroup` |
-| `OrderItems` | Line items in an order (integration + quantity + price) | FK → `Orders`, `Integration` |
-| `MessagesGroup` | Chat thread between buyer and seller orgs | FK → `User` (buyer), `Organization` (buyer), `User` (seller) |
-| `Messages` | Individual messages in a chat thread | FK → `MessagesGroup` |
-| `PayoutProblems` | Payout dispute/problem records | FK → `Orders`, `User`, `Post` (nullable) |
+
+---
+
+## API Keys (1)
+
+| Model | Purpose | Key Relationships |
+|---|---|---|
+| `ApiKey` | Per-user hashed API keys (`pm_live_*`, sha256-stored, show-once) | FK → `User` |
 
 ---
 
@@ -163,17 +186,10 @@ through Prisma repositories — Mastra manages its own tables.
 
 ---
 
-## Miscellaneous (10)
+## Miscellaneous (4)
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `GitHub` | Per-org GitHub integration (token, login, job) | FK → `Organization` |
-| `Trending` | Trending topic snapshots per language | Standalone |
-| `TrendingLog` | Log of trending fetches | Standalone |
-| `ItemUser` | Key-value storage per user (feature flags, preferences) | FK → `User` |
-| `Star` | GitHub star/fork metrics over time | Standalone |
-| `SocialMediaAgency` | Agency profile listing in the marketplace | FK → `User`, `Media` (logo) |
-| `SocialMediaAgencyNiche` | Agency niche tags | FK → `SocialMediaAgency` |
 | `PopularPosts` | Curated popular post templates (category + topic + content + hook) | Standalone |
 | `Mentions` | Cross-platform mention tracking | Standalone |
 | `AuditLog` | DB-backed audit log for credential and storage mutations | FK → `Organization` |
@@ -186,14 +202,31 @@ through Prisma repositories — Mastra manages its own tables.
 | Enum | Values |
 |---|---|
 | `State` | `QUEUE`, `PUBLISHED`, `ERROR`, `DRAFT` |
-| `OrderStatus` | `PENDING`, `ACCEPTED`, `CANCELED`, `COMPLETED` |
 | `SubscriptionTier` | `STANDARD`, `PRO`, `TEAM`, `ULTIMATE` |
 | `Period` | `MONTHLY`, `YEARLY` |
 | `Provider` | `LOCAL`, `GITHUB`, `GOOGLE`, `FARCASTER`, `WALLET`, `GENERIC` |
-| `Role` | `SUPERADMIN`, `ADMIN`, `USER` |
 | `ShortLinkPreference` | `ASK`, `YES`, `NO` |
 | `CreationMethod` | `UNKNOWN`, `WEB`, `MCP`, `API`, `AUTOPOST`, `CLI` |
 | `StorageProviderType` | `LOCAL`, `S3`, `CLOUDFLARE_R2`, `BACKBLAZE_B2`, `IDRIVE_E2` |
-| `From` | `BUYER`, `SELLER` |
+| `AnnouncementColor` | `INFO`, `WARNING`, `ERROR` |
 
-> Verified against v3.8.3
+---
+
+## Dropped in v3.8.10
+
+The dead Gitroom creator-marketplace and GitHub-stars subsystems were removed in a single
+destructive push (preceded by a DB snapshot):
+
+- **Models:** `SocialMediaAgency`, `SocialMediaAgencyNiche`, `MessagesGroup`, `Messages`,
+  `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`
+- **Enums:** `Role` (`SUPERADMIN`/`ADMIN`/`USER` — superseded by `AppRole`-based RBAC),
+  `OrderStatus`, `From`
+- **Columns:** `User` profile/notification/marketplace columns (moved to `UserProfile` or dropped),
+  `UserOrganization.role`, `Post` marketplace fields (`submittedForOrderId`,
+  `submittedForOrganizationId`, `approvedSubmitForOrder`),
+  `AIOrgProviderConfig.imageModel` / `AIProviderConfig.imageModel`, and the old
+  `OrgShortLinkConfig` per-provider unique constraint
+
+See [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10) for the operational procedure.
+
+> Verified against v3.8.10

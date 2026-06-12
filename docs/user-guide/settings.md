@@ -6,12 +6,27 @@ alphabetically with **General** (or **Settings** on some layouts) pinned first.
 
 ## Settings tab
 
-The standalone Settings tab was removed in v3.8.8. The auto-shortlink preference (ASK / YES / NO) has moved to the Shortlinks tab.
+The standalone Settings tab was removed in v3.8.8. The auto-shortlink preference (ASK / YES / NO)
+is no longer shown in Settings at all since v3.8.10 — the shorten-links choice is applied in the
+composer flow.
 
 > **Profile is now accessed from the user avatar menu** in the top navigation bar — not from a
 > settings tab. Click your avatar to find the Profile link alongside Settings and Logout. The
 > settings gear icon was removed from the header; all settings pages are reached through the
 > avatar menu.
+
+## Your profile (`/user/me`)
+
+The profile page (avatar menu → Profile) has three tabs:
+
+- **Profile** — name, last name, bio, profile picture, and your **timezone** (IANA zone, used to
+  display schedule dates and the composer's time picker). Your avatar resolves in this order:
+  external avatar (your OAuth login provider's picture, or a **Gravatar** generated from your
+  email — refreshed on login) → uploaded profile picture → your initials.
+- **Security** — change your password, and an **Active Sessions** device list (browser, IP, last
+  used). Revoke any session individually, or log out all other sessions at once. Logging out
+  revokes all of your sessions.
+- **Notifications** — email notification preferences (success / failure / streak emails).
 
 ## Teams tab
 
@@ -19,16 +34,27 @@ Available when your subscription tier includes team members. Manage who has acce
 organisation:
 
 - **Invite members** — send email invitations. Invited users receive a registration link.
-- **Role assignment** — three roles are available:
+- **Roles (v3.8.10)** — membership is governed by a full role-based access control (RBAC) system.
+  Five system roles are seeded for every organisation:
 
-  | Role | Permissions |
-  |------|-------------|
-  | **SUPERADMIN** | Full access: manage all settings, billing, subscriptions, integrations, and all content. |
-  | **ADMIN** | Manage content, teams, channels, and settings. Cannot access billing or subscription. |
-  | **USER** | Create and manage own posts, view analytics and calendar. Cannot modify settings or invite users. |
+  | Role | What it can do |
+  |------|----------------|
+  | **Owner** | Everything in the org, including billing and member management. The user who created the org is the owner. |
+  | **Admin** | Everything except billing management and deleting the organisation. |
+  | **Editor** | Full control of posts, media, and comments; read access to channels, analytics, and brands. |
+  | **Member** | Create, read, and update posts; upload and view media; read analytics, comments, and brands. |
+  | **Viewer** | Read-only access to all resources. |
 
+  The team screen's role selector lists every role in the org — the five system roles plus any
+  custom roles. A member who lacks a permission receives **HTTP 403** on the gated action
+  (distinct from a 402, which means your plan doesn't include the feature).
+- **Custom roles** — the Workspace → **Roles** tab (visible to members with `members:manage` or
+  `settings:update`) lets an admin clone a system role, toggle individual permissions grouped by
+  resource, create/edit/delete custom roles (system roles can't be deleted), and assign a role to
+  a team member.
 - **Datatable** — the team list shows each member's name, email, role, and join date. Role
-  changes and member removal are available from the per-row controls.
+  changes and member removal are available from the per-row controls to members holding
+  `members:manage`; only the owner can change or remove another owner.
 
 ## Channels tab
 
@@ -77,23 +103,27 @@ before composing posts.
 Configure and manage short-link providers per organisation. Short links are used to shorten URLs
 in published posts.
 
-- **Provider selection** — choose from 19 supported providers via a searchable dropdown: Bitly,
-  TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly, Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly,
-  Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
-- **One active at a time** — only one short-link provider can be active per organisation. Switching
-  providers automatically deactivates the previous one.
+- **Provider list (v3.8.10 redesign)** — the tab mirrors the AI settings page: provider cards
+  with real brand icons, configured/active badges, and per-row **Configure / Set Active / Remove**
+  actions. 19 supported providers: Bitly, TinyURL, T.LY, Short.io, Rebrandly, Dub.co, Cutt.ly,
+  Tiny.cc, is.gd, v.gd, BL.INK, T2M, Linkly, Replug, Switchy, PixelMe, Sniply, Ow.ly, CleanURI.
+- **Multiple accounts per provider (v3.8.10)** — you can add several accounts of the same
+  provider (e.g. two Bitly accounts), each with its own display **name**. Adding the *same*
+  account twice is rejected (accounts are fingerprinted from their credentials).
+- **One active at a time** — only one short-link account can be active per organisation. Switching
+  automatically deactivates the previous one.
+- **Single-step configuration** — OAuth where the provider offers it (e.g. Bitly), otherwise API
+  keys. No second step.
 - **Custom domains** — if your selected provider supports custom (branded) domains, enter the domain
   in the configuration panel.
-- **Credentials** — API keys or tokens are stored encrypted at rest in `OrgShortLinkConfig`.
+- **Credentials** — API keys or tokens are stored encrypted at rest in `OrgShortLinkConfig` and
+  never sent to the browser.
 - **Test connection** — validate that the configured credentials and domain are working before
   publishing.
-- **Shortlink preference** — choose **ASK** (prompt before shortening), **YES** (always shorten), or
-  **NO** (never shorten). This is the same preference previously managed in the Settings tab; it has
-  moved to the Shortlinks tab alongside the provider configuration. The `ShortLinkPreferenceComponent`
-  is shared between the composer and settings.
+- **Shortlink preference** — the ASK / YES / NO preference card was removed from Settings in
+  v3.8.10; the shorten-links choice is applied in the composer flow when you post.
 - **Link ledger** — every generated short link is recorded in the `ShortLink` table for analytics
   tracking and deduplication.
-- **Known limitation (v3.8.4):** Short links are tracked per-org, not per-post.
 
 ### Per-provider credential fields
 
@@ -139,9 +169,15 @@ Configure AI providers, models, spending, and prompt management.
   is set, AI features are disabled across all surfaces.
 - **Provider list** — shows all available AI providers grouped by type: **Direct Providers**
   (native API integrations) and **Hub Providers** (OpenAI-compatible gateways). Each provider
-  card shows its name, default model, and status (Active / Configured / unconfigured).
-- **Configure** — enter API credentials (API key, base URL, organisation ID) for a provider.
-  Credentials are encrypted at rest.
+  card shows its brand icon, name, default model, and status (Active / Configured / unconfigured).
+  You can configure as many providers as you like; one is the active default.
+- **Configure (two steps, v3.8.10)** — first enter API credentials (API key, base URL,
+  organisation ID; encrypted at rest), then pick the provider's model defaults: a **standard
+  (default) model** and an optional **reasoning model**. The model picker splits the provider's
+  text models into *Standard* and *Reasoning* groups; AI features that request deep reasoning use
+  the reasoning model and fall back to the default model when none is set. Image models are no
+  longer part of AI provider configuration — image/video/audio generation is configured in the
+  [Media tab](#media-tab).
 - **Set Active** — activate a configured provider. All AI operations for your organisation will
   use this provider.
 - **Model selection** — choose models per scope:
@@ -178,12 +214,24 @@ Manage `AIPromptLibraryItem` records — user-created reusable prompts:
 - Browse, edit, and delete your library items.
 - Use library items as starting points when composing AI prompts in the text editor.
 
-## Brand tab
+## Brands tab
 
-### Brand Voice
+Since v3.8.10 an organisation can manage **multiple brands** instead of a single brand profile.
+The tab shows a brand list with create, edit, and delete, plus a **Default** badge:
 
-- **Instructions** — freeform text defining your brand's writing style, tone, and voice. This is
-  injected into all AI-generated content.
+- **Create / delete brands** — add as many brands as you need, each with a name. Deleting the
+  default brand reassigns the default to another brand.
+- **Default brand** — one brand is the default; it behaves exactly like the old single brand
+  profile (applied to all AI generations unless a post selects a different brand).
+- **Per-post brand selection** — the composer includes a brand picker; the selected brand's voice
+  is used when generating content for that post.
+- Brand management requires the `brands: manage` permission (owner/admin by default); all members
+  can read brands so the composer picker works.
+
+### Brand Voice (per brand)
+
+- **Instructions** — freeform text defining the brand's writing style, tone, and voice. This is
+  injected into AI-generated content.
 - **Language** — default language for AI content generation.
 - **Platform instructions** — per-platform overrides. For example, you might specify a different
   tone for LinkedIn (professional) versus X (witty).
@@ -202,20 +250,43 @@ Manage `AIPromptLibraryItem` records — user-created reusable prompts:
 
 ## Media tab
 
-Configure AI media providers for each media operation independently:
+Rebuilt in v3.8.10 as a pluggable per-organisation media-provider page that mirrors the AI tab:
+provider cards with brand icons, capability chips, configured/enabled badges, and per-row
+**Configure / Test / Remove** actions.
 
-| Operation | Purpose | Available providers |
-|-----------|---------|---------------------|
-| **Image** | AI image generation | Configured image provider |
-| **Video** | Luma AI video generation | Configured video provider |
-| **TTS** | Text-to-speech | ElevenLabs → OpenAI fallback |
-| **STT** | Speech-to-text | Deepgram → OpenAI fallback |
-| **Upscale** | Image upscaling | Replicate → OpenAI fallback |
-| **BG Remove** | Background removal | Replicate |
-| **Inpaint** | Image inpainting | Replicate |
+Available providers and their capabilities:
 
-Each operation can be enabled or disabled independently. Provider credentials entered here are
-encrypted at rest.
+| Provider | Image | Video | Audio | Avatar |
+|----------|:---:|:---:|:---:|:---:|
+| fal.ai | ✓ | ✓ | ✓ | |
+| OpenAI | ✓ | | ✓ | |
+| ElevenLabs | | | ✓ | |
+| HeyGen | | ✓ | | ✓ |
+| Runway | ✓ | ✓ | | |
+| Black Forest Labs | ✓ | | | |
+| Google Vertex AI | ✓ | ✓ | | |
+| Replicate | ✓ | ✓ | ✓ | ✓ |
+| Stability AI | ✓ | ✓ | ✓ | |
+| Tavus | | ✓ | | ✓ |
+| D-ID | | ✓ | | ✓ |
+| Hedra | | ✓ | | ✓ |
+| MiniMax | ✓ | ✓ | ✓ | |
+| Deepgram | | | ✓ (STT) | |
+| Luma | | ✓ | | |
+
+Configuration is **two steps**:
+
+1. **Auth** — API credentials (encrypted at rest).
+2. **Storage location** — where this provider's generated output lands: local storage or one of
+   your configured storage providers, under a provider folder with a typed sub-tree
+   (`documents/`, `audio/`, `images/`, `video/`, `other/`). Generated assets persist in your own
+   storage (and show in the Media library) until you delete them.
+
+Image generation returns immediately; video, audio, and avatar generation run as background jobs
+and the finished artifact is saved into your storage when the provider completes.
+
+**Auto-config:** entering OpenAI or MiniMax credentials in the AI tab also configures them as a
+media provider (and vice versa) — the key is shared, you don't re-enter it.
 
 ### C2PA provenance
 
@@ -229,20 +300,29 @@ for the operations perspective.
 
 ### Providers sub-tab
 
+Redesigned in v3.8.10 to mirror the AI tab: provider cards with real brand icons (AWS S3,
+Cloudflare R2, Backblaze B2, IDrive e2, Local), configured/mounted badges, and quota/usage chips.
+The tab now renders consistently on first load (a first-load render bug was fixed in v3.8.10).
+
 - **Add provider** — configure a new storage backend: Amazon S3, Cloudflare R2, Backblaze B2,
-  IDrive e2, or Local disk.
+  IDrive e2, or Local disk. You can add as many storages as you want per provider type, each with
+  its own name — but **each must be a unique account**: adding the same account twice is rejected
+  (accounts are fingerprinted from their credentials).
 - **Provider cards** — each configured provider shows its name, type, mount status, and usage.
   Actions per card:
   - **Mount/Unmount** — make the provider available or unavailable as a root folder in the media
-    library.
+    library. **Unmount disables, it does not delete** — the configuration and data references are
+    retained, and the provider can be re-mounted.
   - **Edit** — update credentials, bucket, region, endpoint.
   - **Test** — verify connectivity and permissions.
-  - **Delete** — remove the provider configuration.
+  - **Delete** — remove the provider configuration. Blocked while the provider is mounted
+    (unmount first); LOCAL can never be deleted.
   - **Migrate** — move files from this provider to another.
 - **LOCAL is the always-on base storage** — it cannot be deleted or unmounted. All app-internal
   writes (avatars, AI-generated media, uploads) go to LOCAL. Additional providers (S3, R2, B2,
   iDrive e2) mount onto LOCAL and appear as root folders in the media library; there is no "default"
-  provider concept.
+  provider concept. Local files are stored in a per-organisation partition with a soft quota
+  (5 GB by default; see [Storage Setup](../operations-guide/storage.md)).
 
 ### Quota sub-tab
 
@@ -340,4 +420,12 @@ Lists all OAuth applications that you have granted access to your account:
 
 Endpoints: `GET /user/approved-apps` lists apps; `DELETE /user/approved-apps/:id` revokes access.
 
-> Verified against v3.8.4
+## Who can see Settings
+
+Settings access is permission-gated (v3.8.10): reading and changing the org-level settings tabs
+requires the `settings` permission, which the seeded **Owner** and **Admin** roles carry. The
+four provider surfaces (AI, Media, Storage, Shortlinks) and brand management are likewise gated
+on their own permissions. A member whose role lacks the grant receives **HTTP 403**; an org can
+grant these permissions to a custom role.
+
+> Verified against v3.8.10

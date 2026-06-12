@@ -243,8 +243,8 @@ export class AiUserController {
   @Get('/media-providers')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
-  async getMediaProviders() {
-    return this._aiMediaService.getMediaProviderSummary();
+  async getMediaProviders(@GetOrgFromRequest() org: Organization) {
+    return this._aiMediaService.getMediaProviderSummary(org.id);
   }
 
   @Put('/brand-profile')
@@ -260,8 +260,8 @@ export class AiUserController {
   @Get('/brand-profile')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Read, Sections.AI])
-  async getBrandProfile(@GetOrgFromRequest() org: Organization) {
-    const profile = await this._aiSettingsService.getBrandProfile(org.id);
+  async getBrandProfile(@GetOrgFromRequest() org: Organization, @Query('brandId') brandId?: string) {
+    const profile = await this._aiSettingsService.getBrandProfile(org.id, brandId);
     return profile || {};
   }
 
@@ -356,6 +356,20 @@ export class AiUserController {
           );
           return { url };
         }
+        case 'audio': {
+          const jobId = await this._aiMediaService.generateAudio(
+            body.prompt || body.text || '',
+            { orgId, userId, voice: body.voice },
+          );
+          return { jobId };
+        }
+        case 'avatar': {
+          const jobId = await this._aiMediaService.generateAvatar(
+            body.prompt || '',
+            { orgId, userId, sourceUrl: body.imageUrl },
+          );
+          return { jobId };
+        }
         case 'upscale': {
           const url = await this._aiMediaService.upscaleImage(
             body.imageUrl || '',
@@ -389,7 +403,7 @@ export class AiUserController {
         case 'stt': {
           const text = await this._aiMediaService.speechToText(
             Buffer.from(body.audio || '', 'base64'),
-            { orgId },
+            { orgId, userId },
           );
           return { text };
         }

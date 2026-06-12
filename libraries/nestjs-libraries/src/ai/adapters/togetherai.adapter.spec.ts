@@ -31,8 +31,8 @@ describe('TogetherAIAdapter', () => {
       expect(adapter.name).toBe('Together AI');
     });
 
-    it('has type "direct"', () => {
-      expect(adapter.type).toBe('direct');
+    it('has type "hub"', () => {
+      expect(adapter.type).toBe('hub');
     });
 
     it('has credentialFields with apiKey', () => {

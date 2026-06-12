@@ -170,9 +170,37 @@ vi.mock('../billing/first.billing.component', () => ({
   FirstBillingComponent: () => null,
 }));
 
+let mockPermissions = {
+  isLoaded: true,
+  isResolved: true,
+  role: 'owner' as string | null,
+  isSuperAdmin: false,
+  isOwner: true,
+  isAdmin: true,
+  hasPermission: (_resource: string, _action: string) => true,
+  refresh: vi.fn(),
+};
+
+vi.mock('../layout/use-permissions', () => ({
+  usePermissions: () => mockPermissions,
+}));
+
 import { LayoutComponent } from './layout.component';
 
 describe('LayoutComponent header', () => {
+  beforeEach(() => {
+    mockPermissions = {
+      isLoaded: true,
+      isResolved: true,
+      role: 'owner',
+      isSuperAdmin: false,
+      isOwner: true,
+      isAdmin: true,
+      hasPermission: () => true,
+      refresh: vi.fn(),
+    };
+  });
+
   it('renders header icons without SettingsComponent gear', () => {
     const { container } = render(
       <LayoutComponent>
@@ -201,7 +229,7 @@ describe('LayoutComponent header', () => {
     fireEvent.click(avatarButton);
 
     const menuItems = screen.getAllByRole('menuitem');
-    const profileLink = menuItems.find((l) => l.getAttribute('href') === '/settings/profile');
+    const profileLink = menuItems.find((l) => l.getAttribute('href') === '/user/me');
     const settingsLink = menuItems.find((l) => l.getAttribute('href') === '/settings');
     const logoutLink = menuItems.find((l) => l.getAttribute('href') === '/logout');
 
@@ -260,6 +288,50 @@ describe('LayoutComponent header', () => {
 
     const menuItems = document.querySelectorAll('[role="menuitem"]');
     expect(menuItems.length).toBe(3);
+  });
+
+  it('R5: hides the Settings menu item for members lacking settings:read', () => {
+    mockPermissions.hasPermission = () => false;
+    mockPermissions.isOwner = false;
+    mockPermissions.isAdmin = false;
+    mockPermissions.role = 'viewer';
+
+    render(
+      <LayoutComponent>
+        <div>Child Content</div>
+      </LayoutComponent>
+    );
+
+    const avatarButton = document.querySelector('button')!;
+    fireEvent.click(avatarButton);
+
+    const menuItems = screen.getAllByRole('menuitem');
+    const settingsLink = menuItems.find(
+      (l) => l.getAttribute('href') === '/settings'
+    );
+    expect(settingsLink).toBeUndefined();
+    expect(menuItems.length).toBe(2);
+  });
+
+  it('R5: keeps Settings visible while permissions load (no flash)', () => {
+    mockPermissions.isResolved = false;
+    mockPermissions.isLoaded = false;
+    mockPermissions.hasPermission = () => false;
+
+    render(
+      <LayoutComponent>
+        <div>Child Content</div>
+      </LayoutComponent>
+    );
+
+    const avatarButton = document.querySelector('button')!;
+    fireEvent.click(avatarButton);
+
+    const menuItems = screen.getAllByRole('menuitem');
+    const settingsLink = menuItems.find(
+      (l) => l.getAttribute('href') === '/settings'
+    );
+    expect(settingsLink).toBeDefined();
   });
 
   it('pressing Escape closes the avatar menu (U9)', () => {

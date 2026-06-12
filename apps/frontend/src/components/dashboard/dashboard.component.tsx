@@ -12,11 +12,28 @@ import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { useOverview } from '@gitroom/frontend/components/analytics-v2/hooks/useOverview';
 import { useRecommendations, RecommendationItem } from '@gitroom/frontend/components/analytics-v2/hooks/useRecommendations';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
+
+export function greetingForUser(name: string, hour: number) {
+  if (hour < 5) return `Working late, ${name}?`;
+  if (hour < 12) return `Good morning, ${name}`;
+  if (hour < 17) return `Good afternoon, ${name}`;
+  if (hour < 22) return `Good evening, ${name}`;
+  return `Good night, ${name}`;
+}
 
 export const DashboardComponent = () => {
   const router = useRouter();
+  const user = useUser();
   const { data: summary, isLoading: summaryLoading } = useDashboardSummary();
   const { data: integrations } = useIntegrationList();
+
+  const greeting = useMemo(() => {
+    const firstName = user?.profile?.name?.trim().split(/\s+/)[0] || 'there';
+    const hour = dayjs().tz(getTimezone()).hour();
+    return greetingForUser(firstName, hour);
+  }, [user?.profile?.name]);
 
   const activeIntegrations = useMemo(() => {
     if (!integrations?.length) return [];
@@ -38,7 +55,9 @@ export const DashboardComponent = () => {
   const mainKPI = overviewData?.kpis?.[0];
   const series = useMemo(() => {
     if (!overviewData?.series || !mainKPI) return [];
-    return overviewData.series[mainKPI.metric] || [];
+    const points = overviewData.series[mainKPI.metric] || [];
+    // Reformat ISO ledger dates (2026-05-12) to a compact m/DD axis label.
+    return points.map((p) => ({ ...p, date: dayjs(p.date).format('M/DD') }));
   }, [overviewData, mainKPI]);
 
   const channelBarData = useMemo(() => {
@@ -54,15 +73,15 @@ export const DashboardComponent = () => {
 
   return (
     <div className="p-[24px]">
-      <PageHeader title="Dashboard" description="Overview of your social presence" />
+      <PageHeader title={greeting} description="Overview of your social presence" />
 
       <DashboardSetup />
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px] mb-[24px]">
-        <KpiCard label="Total Posts" value={summaryLoading ? '...' : String(summary?.totalPosts ?? 0)} />
-        <KpiCard label="Scheduled" value={summaryLoading ? '...' : String(summary?.scheduledPosts ?? 0)} />
-        <KpiCard label="Published (7d)" value={summaryLoading ? '...' : String(summary?.publishedNext7 ?? 0)} />
-        <KpiCard label="Channels" value={String(summary?.channelsConnected ?? integrations?.length ?? 0)} />
+        <KpiCard label="Total Posts" value={summaryLoading ? '...' : String(summary?.totalPosts ?? 0)} color="var(--chart-1, #2b5cd3)" />
+        <KpiCard label="Scheduled" value={summaryLoading ? '...' : String(summary?.scheduledPosts ?? 0)} color="var(--chart-5, #ffac30)" />
+        <KpiCard label="Published (7d)" value={summaryLoading ? '...' : String(summary?.publishedNext7 ?? 0)} color="var(--chart-2, #32d583)" />
+        <KpiCard label="Channels" value={String(summary?.channelsConnected ?? integrations?.length ?? 0)} color="var(--chart-3, #1d9bf0)" />
       </div>
 
       {overviewLoading ? (
@@ -109,11 +128,11 @@ export const DashboardComponent = () => {
       ) : null}
 
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] mb-[24px]">
-        <h2 className="text-[18px] font-[600] text-textColor mb-[12px]">Upcoming Posts</h2>
+        <h2 className="text-[18px] font-[600] mb-[12px]">Upcoming Posts</h2>
         {summary?.upcomingPosts?.length > 0 ? (
           <div className="flex flex-col gap-[8px]">
             {summary.upcomingPosts.map((post: any) => (
-              <div key={post.id} className="flex items-center gap-[12px] text-[13px] text-textColor py-[8px] border-b border-newTableBorder last:border-b-0">
+              <div key={post.id} className="font-playwrite flex items-center gap-[12px] text-[13px] text-newTableText py-[8px] border-b border-newTableBorder last:border-b-0">
                 <span className="flex-1 truncate">{post.content}</span>
                 <span className="text-newTableText">{new Date(post.publishDate).toLocaleDateString()}</span>
               </div>
@@ -128,12 +147,12 @@ export const DashboardComponent = () => {
 
       {recsLoading ? (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px]">
-          <h2 className="text-[18px] font-[600] text-textColor mb-[12px]">Recommendations</h2>
+          <h2 className="text-[18px] font-[600] mb-[12px]">Recommendations</h2>
           <div className="animate-pulse h-[100px] bg-newTableHeader rounded-[4px]" />
         </div>
       ) : recItems.length > 0 ? (
         <div>
-          <h2 className="text-[18px] font-[600] text-textColor mb-[12px]">Recommendations</h2>
+          <h2 className="text-[18px] font-[600] mb-[12px]">Recommendations</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
             {recItems.map((item: RecommendationItem, index: number) => (
               <div
@@ -150,7 +169,7 @@ export const DashboardComponent = () => {
                   </span>
                   <span className="text-[11px] text-newTableText capitalize">{item.type.replace(/_/g, ' ')}</span>
                 </div>
-                <h3 className="text-[15px] font-semibold text-textColor">{item.title}</h3>
+                <h3 className="text-[15px] font-semibold text-newTextColor/80">{item.title}</h3>
                 <p className="text-[13px] text-newTableText leading-relaxed">{item.description}</p>
                 <button
                   type="button"

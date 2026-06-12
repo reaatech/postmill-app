@@ -1,13 +1,13 @@
 'use client';
 
 import React, { FC, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useCalendar } from './context';
 import type { Integrations } from './context';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
-import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Fragment } from 'react';
@@ -209,6 +209,7 @@ export const usePostActions = (onMutate?: () => void) => {
   const fetch = useFetch();
   const modal = useModals();
   const toaster = useToaster();
+  const router = useRouter();
   const { integrations, reloadCalendarView } = useCalendar();
 
   const mutate = useCallback(() => {
@@ -217,22 +218,21 @@ export const usePostActions = (onMutate?: () => void) => {
   }, [reloadCalendarView, onMutate]);
 
   const editPost = useCallback(
-    (loadPost: any, isDuplicate?: boolean) => async () => {
+    (loadPost: Post & { actualDate?: string }, isDuplicate?: boolean) =>
+      async () => {
+      if (!isDuplicate) {
+        router.push(`/schedule/post/${loadPost.group}`);
+        return;
+      }
+
       const post = {
         ...loadPost,
         publishDate: loadPost.actualDate || loadPost.publishDate,
       };
 
       const data = await (await fetch(`/posts/group/${post.group}`)).json();
-      const date = !isDuplicate
-        ? null
-        : (await (await fetch('/posts/find-slot')).json()).date;
-      const publishDate = dayjs
-        .utc(date || data.posts[0].publishDate)
-        .local();
-      const ExistingData = !isDuplicate
-        ? ExistingDataContextProvider
-        : Fragment;
+      const date = (await (await fetch('/posts/find-slot')).json()).date;
+      const publishDate = dayjs.utc(date).local();
       modal.openModal({
         id: 'add-edit-modal',
         closeOnClickOutside: false,
@@ -245,42 +245,32 @@ export const usePostActions = (onMutate?: () => void) => {
           modal: 'w-[100%] max-w-[1400px] text-textColor',
         },
         children: (
-          <ExistingData value={data}>
+          <Fragment>
             <AddEditModal
-              {...(isDuplicate
-                ? {
-                    onlyValues: data.posts.map(
-                      ({ image, settings, content }: any) => ({
-                        image,
-                        settings,
-                        content,
-                      })
-                    ),
-                  }
-                : {})}
+              onlyValues={data.posts.map(
+                ({
+                  image,
+                  settings,
+                  content,
+                }: Pick<Post, 'image' | 'settings' | 'content'>) => ({
+                  image,
+                  settings,
+                  content,
+                })
+              )}
               allIntegrations={integrations.map((p) => ({ ...p }))}
-              reopenModal={editPost(post)}
+              reopenModal={() => router.push(`/schedule/post/${post.group}`)}
               mutate={mutate}
-              integrations={
-                isDuplicate
-                  ? integrations
-                  : integrations
-                      .slice(0)
-                      .filter((f) => f.id === data.integration)
-                      .map((p) => ({
-                        ...p,
-                        picture: data.integrationPicture,
-                      }))
-              }
+              integrations={integrations}
               date={publishDate}
             />
-          </ExistingData>
+          </Fragment>
         ),
         size: '80%',
         title: ``,
       });
     },
-    [integrations, fetch, modal, mutate]
+    [integrations, fetch, modal, mutate, router]
   );
 
   const copyDebugJson = useCallback(

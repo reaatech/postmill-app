@@ -2,6 +2,7 @@ import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
 import {
   IsOptional,
   IsString,
+  MaxLength,
   MinLength,
   ValidateNested,
 } from 'class-validator';
@@ -11,6 +12,11 @@ export class UserDetailDto {
   @MinLength(3)
   fullname: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  lastName: string;
+
   @IsString()
   @IsOptional()
   bio: string;
@@ -18,4 +24,8 @@ export class UserDetailDto {
   @IsOptional()
   @ValidateNested()
   picture: MediaDto;
+
+  @IsOptional()
+  @IsString()
+  timezone: string;
 }

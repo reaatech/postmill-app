@@ -9,6 +9,11 @@ configured from the in-app Settings -> Storage page.
 on LOCAL first. Cloud providers are configured per-organization in-app; the old global-env
 `STORAGE_PROVIDER`/`CLOUDFLARE_*` path has been removed.
 
+**v3.8.10:** local storage is **partitioned per tenant** (`<UPLOAD_DIRECTORY>/<tenantId>/`), the
+default local quota is driven by the `LOCAL_STORAGE_QUOTA_GB` env var (default 5), each provider
+config must be a **unique account** (credential fingerprint), and the Settings → Storage UI was
+rebuilt to mirror the AI page (including a fix for the first-load render inconsistency).
+
 ## Storage model
 
 ### `StorageProviderConfig`
@@ -27,13 +32,16 @@ Each storage provider mount is a row in the `StorageProviderConfig` table:
 | `lastHealthCheck` | Timestamp of last connection test |
 | `lastHealthError` | Error message from last failed connection test |
 | `defaultFolderId` | Folder-level routing: uploads to this folder use this provider |
+| `accountFingerprint` | **(v3.8.10)** SHA-256 of the distinguishing credentials (provider type + access-key ID). Unique per org — the same account cannot be added twice. |
 
 > **v3.8.3:** `StorageProviderConfig.isDefault` was removed. The `set-default` API route is gone.
 > There is no default provider — LOCAL is the always-on base that every org has.
 
 ### Per-org quota
 
-Each organization starts with a 5 GB quota (`localStorageQuotaBytes`). At 80% usage, a warning
+Each organization's local storage has a **soft quota**: the default is driven by
+`LOCAL_STORAGE_QUOTA_GB` (default `5`, v3.8.10), and each org can carry an explicit override in
+`localStorageQuotaBytes` (explicit value wins, else the env default). At 80% usage, a warning
 banner appears in the storage settings. At 100%, new uploads are blocked until space is freed or
 quota is raised.
 
@@ -43,6 +51,9 @@ quota is raised.
 
 Files are written to `UPLOAD_DIRECTORY` (e.g. `/uploads/`) on the container's filesystem, served
 at `/uploads`. Simple but not redundant — a single container's disk, not shared across replicas.
+Since v3.8.10, each tenant's files are written under its own partition,
+`<UPLOAD_DIRECTORY>/<tenantId>/` (previously date-partitioned only); files uploaded before the
+change remain readable at their recorded paths.
 
 Avatars and all app-internal image writes always target LOCAL storage.
 
@@ -183,4 +194,4 @@ uploads, large files go through the backend as well.
 - [Configuration](./configuration.md) — all storage env vars
 - [Requirements](./requirements.md) — object storage options
 
-> Verified against v3.8.3
+> Verified against v3.8.10

@@ -141,9 +141,10 @@ export class AiModule implements OnModuleInit, NestModule {
     const compatAdapters = [
       new OpenAICompatibleAdapter('siliconflow', 'SiliconFlow', 'https://api.siliconflow.cn/v1', { image: true, embeddings: true }),
       new OpenAICompatibleAdapter('deepinfra', 'DeepInfra', 'https://api.deepinfra.com/v1/openai', { embeddings: true }),
-      new OpenAICompatibleAdapter('minimax', 'MiniMax', 'https://api.minimax.chat/v1', { image: true }),
-      new OpenAICompatibleAdapter('qwen', 'Qwen (Model Studio)', 'https://dashscope.aliyuncs.com/compatible-mode/v1', { image: true, vision: true }),
-      new OpenAICompatibleAdapter('meta-llama', 'Meta AI (Llama API)', 'https://api.llama-api.com'),
+      // First-party model makers (Direct) that happen to use the OpenAI-compatible adapter.
+      new OpenAICompatibleAdapter('minimax', 'MiniMax', 'https://api.minimax.chat/v1', { image: true }, undefined, 'direct'),
+      new OpenAICompatibleAdapter('qwen', 'Qwen', 'https://dashscope.aliyuncs.com/compatible-mode/v1', { image: true, vision: true }, undefined, 'direct'),
+      new OpenAICompatibleAdapter('meta-llama', 'Llama', 'https://api.llama-api.com', undefined, undefined, 'direct'),
       new OpenAICompatibleAdapter('gmihub', 'GMI Cloud', 'https://api.gmihub.ai/v1'),
       new OpenAICompatibleAdapter('bitdeer', 'Bitdeer AI', 'https://ai.bitdeer.com/v1'),
       new OpenAICompatibleAdapter('lightning', 'Lightning AI', 'https://api.lightning.ai/v1'),

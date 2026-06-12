@@ -31,7 +31,7 @@ const TOGETHER_AI_MODELS: ModelInfo[] = [
   { id: 'meta-llama/Llama-3.1-405B-Instruct-Turbo', label: 'Llama 3.1 405B', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
   { id: 'meta-llama/Llama-3.2-90B-Vision-Instruct-Turbo', label: 'Llama 3.2 90B Vision', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
   { id: 'mistralai/Mixtral-8x22B-Instruct-v0.1', label: 'Mixtral 8x22B', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
-  { id: 'deepseek-ai/DeepSeek-R1', label: 'DeepSeek R1', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
+  { id: 'deepseek-ai/DeepSeek-R1', label: 'DeepSeek R1', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true }, reasoning: true },
   { id: 'black-forest-labs/FLUX.1-dev', label: 'FLUX.1 Dev', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'black-forest-labs/FLUX.1-schnell', label: 'FLUX.1 Schnell', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'stabilityai/stable-diffusion-xl-base-1.0', label: 'Stable Diffusion XL', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
@@ -46,7 +46,8 @@ const TOGETHER_AI_BASE_URL = 'https://api.together.xyz/v1';
 export class TogetherAIAdapter implements AIProviderAdapter {
   readonly identifier = 'togetherai';
   readonly name = 'Together AI';
-  readonly type = 'direct' as const;
+  // Hub: inference platform hosting 200+ open-weight models (not a model maker).
+  readonly type = 'hub' as const;
   readonly credentialFields = TOGETHER_AI_CREDENTIAL_FIELDS;
   readonly capabilities = TOGETHER_AI_CAPABILITIES;
   readonly privacy = {

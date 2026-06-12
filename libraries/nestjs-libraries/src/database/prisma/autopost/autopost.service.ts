@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import Parser from 'rss-parser';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
@@ -55,7 +56,8 @@ export class AutopostService {
     private _temporalService: TemporalService,
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
-    private _aiModelProvider: AIModelProvider
+    private _aiModelProvider: AIModelProvider,
+    private _aiMediaService: AiMediaService
   ) {}
 
   async stopAll(org: string) {
@@ -254,8 +256,12 @@ export class AutopostService {
           content: state.load.description || state.description,
         });
 
-    const imageModel = await this._aiModelProvider.imageModel('utility', orgId);
-    const image = await imageModel.generate(generatedTextToBeSentToDallE);
+    // §10.3: image generation routes through the media surface (org media providers
+    // first, AI-facade imageModel() fallback inside AiMediaService).
+    const image = await this._aiMediaService.generateImage(
+      generatedTextToBeSentToDallE,
+      { orgId }
+    );
 
     return { ...state, image };
   }

@@ -96,10 +96,10 @@ export class NotificationService {
       // 'info' type is always sent regardless of preferences
       if (type !== 'info') {
         // Filter users based on their email preferences
-        if (type === 'success' && !user.user.sendSuccessEmails) {
+        if (type === 'success' && user.user.profile && !user.user.profile.sendSuccessEmails) {
           continue;
         }
-        if (type === 'fail' && !user.user.sendFailureEmails) {
+        if (type === 'fail' && user.user.profile && !user.user.profile.sendFailureEmails) {
           continue;
         }
       }

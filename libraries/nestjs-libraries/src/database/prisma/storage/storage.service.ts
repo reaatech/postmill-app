@@ -5,6 +5,7 @@ import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { StorageAdapterFactory } from '@gitroom/nestjs-libraries/upload/adapters/adapter.factory';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
+import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 
 type StorageConfigRow = {
   id: string;
@@ -81,9 +82,27 @@ export class StorageService {
   }
 
   async getProviderConfigs(orgId: string) {
-    await this.ensureLocalProvider(orgId);
     const configs = await this._storageRepository.findByOrg(orgId);
-    return configs.map((c) => this.#sanitize(c));
+    const results = configs.map((c) => this.#sanitize(c));
+
+    if (!configs.some((c) => c.type === StorageProviderType.LOCAL)) {
+      results.unshift({
+        id: '__virtual_local__',
+        organizationId: orgId,
+        type: StorageProviderType.LOCAL,
+        name: 'Local Storage',
+        region: null,
+        bucket: null,
+        endpoint: null,
+        publicUrl: null,
+        mounted: false,
+        quotaBytes: null,
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      });
+    }
+
+    return results;
   }
 
   getMountedConfigs(orgId: string) {
@@ -108,6 +127,17 @@ export class StorageService {
       ? this._encryptionService.encrypt(JSON.stringify(data.credentials))
       : undefined;
 
+    const fp = this.#computeFingerprint(data.type, data.credentials);
+    if (fp) {
+      const existing = await this._storageRepository.findByFingerprint(orgId, fp);
+      if (existing) {
+        throw new HttpException(
+          'A storage provider with these credentials is already configured for this organization',
+          409
+        );
+      }
+    }
+
     const created = await this._storageRepository.create({
       organizationId: orgId,
       type: data.type,
@@ -118,10 +148,29 @@ export class StorageService {
       endpoint: data.endpoint,
       publicUrl: data.publicUrl,
       quotaBytes: data.quotaBytes,
+      accountFingerprint: fp,
     });
 
     await this.#audit('create', orgId, created, userId);
     return this.#sanitize(created);
+  }
+
+  #computeFingerprint(
+    type: StorageProviderType,
+    credentials?: Record<string, string>
+  ): string | undefined {
+    if (!credentials) return undefined;
+    if (type === 'S3' || type === 'CLOUDFLARE_R2' || type === 'IDRIVE_E2') {
+      return credentials.accessKeyId
+        ? accountFingerprint(type, credentials.accessKeyId)
+        : undefined;
+    }
+    if (type === 'BACKBLAZE_B2') {
+      return credentials.keyId
+        ? accountFingerprint(type, credentials.keyId)
+        : undefined;
+    }
+    return undefined;
   }
 
   async updateConfig(
@@ -199,13 +248,26 @@ export class StorageService {
   }
 
   // Force the org's LOCAL adapter — used for avatars and app-internal writes (v3.8.2).
-  async getLocalAdapterForOrg(orgId: string): Promise<IStorageAdapter> {
-    await this.ensureLocalProvider(orgId);
+  async getLocalAdapterForOrg(orgId: string, createIfMissing = false): Promise<IStorageAdapter> {
     const configs = await this._storageRepository.findByOrg(orgId);
     const local = configs.find(
       (c) => c.type === StorageProviderType.LOCAL
-    ) as StorageConfigRow;
-    return this.#buildAdapter(local);
+    ) as StorageConfigRow | undefined;
+
+    if (local) {
+      return this.#buildAdapter(local);
+    }
+
+    if (createIfMissing) {
+      await this.ensureLocalProvider(orgId);
+      const updated = await this._storageRepository.findByOrg(orgId);
+      const created = updated.find(
+        (c) => c.type === StorageProviderType.LOCAL
+      ) as StorageConfigRow;
+      return this.#buildAdapter(created);
+    }
+
+    return StorageAdapterFactory.createLocal(orgId);
   }
 
   // Upload routing (#56): oldest mounted → local/first.
@@ -411,6 +473,10 @@ export class StorageService {
       quotaBytes,
       providers: providerUsage,
     };
+  }
+
+  async setOrgQuota(orgId: string, quotaBytes: bigint): Promise<void> {
+    await this._storageRepository.setOrgQuota(orgId, quotaBytes);
   }
 
   async getQuotaStatus(orgId: string): Promise<{

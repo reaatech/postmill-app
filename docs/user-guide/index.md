@@ -31,7 +31,7 @@ ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
 | [Campaigns](./campaigns.md) | Group posts into campaigns for unified analytics, media organisation, and comment tracking. |
 | [Media Library](./media-library.md) | Folder tree, drag/drop uploads, file metadata, bulk actions, trash with restore, and storage provider routing. |
 | [AI Tools](./ai-tools.md) | Text generation, hashtags, comment replies, content compliance, brand voice, RAG search, image/video/TTS/STT, and spending dashboard. |
-| [Settings](./settings.md) | Profile, teams, channels, AI configuration, brand voice, media providers, storage, webhooks, auto posting, sets, signatures, developers, and approved apps. |
+| [Settings](./settings.md) | Profile (with sessions/devices), teams & roles, channels, AI configuration, brands, media providers, storage, shortlinks, webhooks, auto posting, sets, signatures, developers, and approved apps. |
 | [Billing](./billing.md) | Subscription plans, payment methods, invoice history, and lifetime deal (when Stripe is configured). |
 
-> Verified against v3.8.3
+> Verified against v3.8.10

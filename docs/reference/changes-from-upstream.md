@@ -1,12 +1,45 @@
 # Changes From Upstream
 
 Postmill is a fork of [gitroomhq/postiz-app](https://github.com/gitroomhq/postiz-app) that has
-diverged substantially across eight major releases. The upstream documentation at `docs.postiz.com`
+diverged substantially across nine major releases. The upstream documentation at `docs.postiz.com`
 no longer describes this fork's behavior. This page is the canonical summary of every change,
 organized by release. The [CHANGELOG](https://github.com/reaatech/postmill-app/blob/main/CHANGELOG.md)
 has the full per-commit detail.
 
 ---
+
+### v3.8.10 (June 2026)
+
+Identity, tenancy, RBAC & provider-surface redesign:
+
+- **Identity/profile split** — `User` keeps auth columns; profile fields (name, bio, avatar, IANA
+  timezone, notification prefs) moved to a 1:1 `UserProfile`
+- **Full RBAC** — `AppRole`/`Permission`/`AppRolePermission` with seeded system roles
+  (owner/admin/editor/member/viewer), per-org custom roles, and `@RequirePermission` (HTTP 403)
+  orthogonal to the billing gate (HTTP 402); replaces the flat `Role` enum
+- **Sessions** — refresh-token rotation backed by a `Session` model (hashed tokens,
+  reuse-revokes), device list with per-session revoke
+- **Platform `/admin`** — super-admin-managed login providers (`AuthProviderConfig`, encrypted),
+  incl. OIDC SSO via the generic provider; env vars remain the bootstrap fallback
+- **Multi-brand** — many `AIBrandProfile`s per org with a default and per-post selection
+  (`Post.brandId`)
+- **AI provider config** — two-step (auth → model defaults) with a standard/reasoning model split;
+  `imageModel` removed from AI config
+- **Media providers** — per-org `MediaProviderConfig` + adapter layer (fal.ai, OpenAI, ElevenLabs,
+  HeyGen, Runway, Black Forest Labs, Vertex AI, Replicate, Stability, Tavus, D-ID, Hedra, MiniMax,
+  Deepgram, Luma) with tenant-storage binding and typed output folders
+- **Storage** — per-tenant local partition, `LOCAL_STORAGE_QUOTA_GB` env default, unique-account
+  fingerprints, AI-style settings UI
+- **Shortlinks** — multiple named accounts per provider, real brand icons, preference card removed
+  from Settings
+- **Schedule pages** — composer moved from a modal to `/schedule/post` and `/schedule/post/:id`,
+  timezone-aware time picker
+
+**Breaking changes:**
+- Single destructive schema push (snapshot first): dead Gitroom marketplace/GitHub-stars tables
+  dropped (`SocialMediaAgency`, `Orders`, `Messages`, `GitHub`, `Star`, `Trending`, …), legacy
+  `UserOrganization.role` enum column dropped, `imageModel` columns dropped, migrated `User`
+  profile columns dropped. See [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10).
 
 ### v3.8.8 (June 2026)
 - Per-user API keys with hashed storage, role inheritance, and show-once plaintext
@@ -30,7 +63,9 @@ has the full per-commit detail.
 | Channel credentials | Environment variables only | Per-tenant OAuth credentials in **Settings → Channels** (no env fallback) |
 | Storage | Single cloud storage via env vars | Per-tenant storage adapters (S3/R2/B2/IDrive/local) in **Settings → Storage** |
 | AI provider config | Single `OPENAI_API_KEY` | Per-tenant providers in **Settings → AI** (no env fallback) |
-| Admin UI | Separate `/admin/*` routes | Admin functionality moved to per-tenant settings tabs |
+| Admin UI | Separate `/admin/*` routes | Per-tenant settings tabs for org config; a platform `/admin` (super-admin only) manages login providers (v3.8.10) |
+| Roles | Flat 3-value enum | Full RBAC — seeded system roles + per-org custom roles, fine-grained permissions (v3.8.10) |
+| Marketplace / GitHub-stars | Creator marketplace, trending feed | Removed (dead code + tables dropped in v3.8.10) |
 | Media library | Basic upload/list | Media manager with folders, tags, bulk actions, search |
 | Channel count | Upstream set | **36** providers (adds Tumblr, Pixelfed, PeerTube) |
 | Analytics | Single-channel, live fetch on demand | Persisted multi-channel dashboard from daily snapshots (`/analytics/v2`) |
@@ -460,6 +495,9 @@ This fork is run in production. Two invariants are deliberately preserved:
 1. **Legacy public analytics route** — the original public API analytics route keeps its response
    shape for n8n/Zapier/Make compatibility; a parallel v2 route was added rather than changing it.
 2. **Schema changes are additive** — new tables, nullable-or-defaulted columns. The `db push` model
-   never drops or renames columns without a manual backfill plan.
+   never drops or renames columns without a manual backfill plan. (v3.8.10 was the deliberate
+   exception: a single reviewed destructive push, preceded by a DB snapshot, after all readers had
+   been cut over and backfilled — see
+   [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10).)
 
-> Verified against v3.8.8
+> Verified against v3.8.10

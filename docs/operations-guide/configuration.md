@@ -23,9 +23,10 @@ Every environment variable Postmill recognises, sourced from `.env.example` and
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `UPLOAD_DIRECTORY` | — | Local path for file uploads (e.g. `/uploads`). Avatars and app-internal images always use LOCAL. |
+| `UPLOAD_DIRECTORY` | — | Local path for file uploads (e.g. `/uploads`). Avatars and app-internal images always use LOCAL. Since v3.8.10, local files are partitioned per tenant under `<UPLOAD_DIRECTORY>/<tenantId>/`. |
 | `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | — | Public URL path serving uploads (e.g. `/uploads`) |
 | `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/media/upload-server` (default 1 GB) |
+| `LOCAL_STORAGE_QUOTA_GB` | `5` | **(v3.8.10)** Default soft quota for each org's local storage, in GB. Per-org override via the org's `localStorageQuotaBytes`. |
 
 ## Email (v3.8.1+)
 
@@ -54,7 +55,7 @@ advance log rows through `delivered`/`bounced`/`complained`/`opened`/`clicked`.
 | `EMAIL_SMTP_USER` | — | SMTP authentication username (optional for open relays) |
 | `EMAIL_SMTP_PASS` | — | SMTP authentication password |
 | `EMAIL_LOG_RETENTION_DAYS` | `90` | Days to keep email log metadata before pruning |
-| `DISABLE_REGISTRATION` | `false` | Set to `true` to disable self-registration |
+| `DISABLE_REGISTRATION` | `false` | Set to `true` to disable self-registration. The very first user (empty instance) can always register, and `GENERIC` OIDC sign-ins are exempt (SSO users still provision). |
 
 The webhook endpoint is at `POST /webhooks/email`, signature-verified, and registered outside CSRF
 (same as Stripe). SES uses SNS topic verification; the `EMAIL_WEBHOOK_SECRET` can optionally hold
@@ -126,6 +127,12 @@ optionally hold the expected SNS TopicArn to restrict incoming notifications.
 
 See [OAuth / SSO](./oauth-sso.md) for a complete setup walkthrough.
 
+> **v3.8.10:** login providers (Google, GitHub, generic OIDC) are now managed **in-app** by a
+> super-admin at `/admin` (stored encrypted in `AuthProviderConfig`). The env vars below remain
+> supported as the **bootstrap fallback** — they are used only when no enabled DB config exists
+> for that provider, so the first operator can always log in. Email/password (`LOCAL`) login is
+> always available regardless of provider config.
+
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `IS_GENERAL` | — | Required to be `true` for the standard self-hosted deployment |
@@ -143,8 +150,11 @@ See [OAuth / SSO](./oauth-sso.md) for a complete setup walkthrough.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID |
-| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret |
+| `GITHUB_CLIENT_ID` | — | GitHub OAuth app client ID (bootstrap fallback; configure in `/admin` since v3.8.10) |
+| `GITHUB_CLIENT_SECRET` | — | GitHub OAuth app client secret (bootstrap fallback) |
+
+Google login similarly reads `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` as its bootstrap
+fallback (login only — channel credentials are configured in Settings → Channels).
 
 ## Browser extension
 
@@ -182,4 +192,9 @@ The following patterns are no longer supported as environment variables. Configu
 - **Short-link provider vars** (removed v3.8.0): `DUB_TOKEN`, `DUB_API_ENDPOINT`, `DUB_SHORT_LINK_DOMAIN`, `SHORT_IO_SECRET_KEY`, `KUTT_API_KEY`, `KUTT_API_ENDPOINT`, `KUTT_SHORT_LINK_DOMAIN`, `LINK_DRIP_API_KEY`, `LINK_DRIP_API_ENDPOINT`, `LINK_DRIP_SHORT_LINK_DOMAIN` — now configured per-org in Settings → Shortlinks
 - **Storage env vars** (removed v3.8.2): `STORAGE_PROVIDER`, `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_ACCESS_KEY`, `CLOUDFLARE_SECRET_ACCESS_KEY`, `CLOUDFLARE_BUCKETNAME`, `CLOUDFLARE_BUCKET_URL`, `CLOUDFLARE_REGION` — storage is now per-tenant via Settings → Storage. The built-in default is LOCAL.
 
-> Verified against v3.8.4
+The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*` for Google login,
+`POSTMILL_OAUTH_*`) are an exception to the no-env rule: they remain readable as the bootstrap
+fallback for `/admin`-managed auth providers (v3.8.10) and must never be used for channel or AI
+credentials.
+
+> Verified against v3.8.10

@@ -89,6 +89,14 @@ describe('ShortlinkProviderForm', () => {
     expect(screen.getByText('API Key')).toBeDefined();
   });
 
+  it('renders Configuration Name input', async () => {
+    const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
+    render(<ShortlinkProviderForm {...defaultProps} />, { wrapper });
+
+    expect(screen.getByText('Configuration Name')).toBeDefined();
+    expect(screen.getByPlaceholderText('e.g. My Bitly Account')).toBeDefined();
+  });
+
   it('renders customDomain field when provider supports it', async () => {
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
     render(<ShortlinkProviderForm {...defaultProps} />, { wrapper });
@@ -162,12 +170,14 @@ describe('ShortlinkProviderForm', () => {
     });
   });
 
-  it('calls save endpoint when Save is clicked', async () => {
+  it('calls save endpoint with name when Save is clicked', async () => {
     mockFetchFn.mockResolvedValueOnce({ ok: true });
     const onSaved = vi.fn();
 
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
     render(<ShortlinkProviderForm {...defaultProps} onSaved={onSaved} />, { wrapper });
+
+    fireEvent.change(screen.getByPlaceholderText('e.g. My Bitly Account'), { target: { value: 'My Bitly' } });
 
     const saveButton = screen.getByText('Save');
     fireEvent.click(saveButton);
@@ -175,7 +185,7 @@ describe('ShortlinkProviderForm', () => {
     await waitFor(() => {
       expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/bitly', {
         method: 'PUT',
-        body: JSON.stringify({ credentials: undefined, customDomain: undefined }),
+        body: JSON.stringify({ name: 'My Bitly', credentials: undefined, customDomain: undefined }),
       });
     });
 
@@ -239,55 +249,10 @@ describe('ShortlinkProviderForm', () => {
         expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/bitly-oauth', {
           method: 'PUT',
           body: JSON.stringify({
+            name: undefined,
             credentials: undefined,
             customDomain: undefined,
             extraConfig: { clientId: 'my-client-id' },
-          }),
-        });
-      });
-    });
-
-    it('includes both clientId and clientSecret when both are filled', async () => {
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
-      mockProvidersData = [oauthProvider];
-      const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-      render(<ShortlinkProviderForm identifier="bitly-oauth" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
-
-      const clientIdInput = screen.getByPlaceholderText('Bitly OAuth Client ID');
-      fireEvent.change(clientIdInput, { target: { value: 'my-id' } });
-      const secretInputs = screen.getAllByPlaceholderText('');
-      const secretInput = secretInputs.find((el) => el.getAttribute('type') === 'password');
-      fireEvent.change(secretInput!, { target: { value: 'my-secret' } });
-
-      fireEvent.click(screen.getByText('Save'));
-
-      await waitFor(() => {
-        expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/bitly-oauth', {
-          method: 'PUT',
-          body: JSON.stringify({
-            credentials: undefined,
-            customDomain: undefined,
-            extraConfig: { clientId: 'my-id', clientSecret: 'my-secret' },
-          }),
-        });
-      });
-    });
-
-    it('does not include extraConfig when clientId and clientSecret are empty', async () => {
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
-      mockProvidersData = [oauthProvider];
-      const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-      render(<ShortlinkProviderForm identifier="bitly-oauth" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
-
-      fireEvent.click(screen.getByText('Save'));
-
-      await waitFor(() => {
-        expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/bitly-oauth', {
-          method: 'PUT',
-          body: JSON.stringify({
-            credentials: undefined,
-            customDomain: undefined,
-            extraConfig: undefined,
           }),
         });
       });

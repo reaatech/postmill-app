@@ -25,14 +25,11 @@ model Organization {
   credits             Credits[]
   customers           Customer[]
   errors              Errors[]
-  github              GitHub[]
   Integration         Integration[]
   media               Media[]
-  buyerOrganization   MessagesGroup[]
   notifications       Notifications[]
   plugs               Plugs[]
   post                Post[]               @relation("organization")
-  submittedPost       Post[]               @relation("submittedForOrg")
   socialComments      SocialComment[]
   watchedAccounts     WatchedAccount[]
   campaigns           Campaign[]
@@ -47,7 +44,7 @@ model Organization {
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
   aiOrgProviderConfigs AIOrgProviderConfig[]
-  aiBrandProfile      AIBrandProfile?
+  aiBrandProfiles     AIBrandProfile[]
   aiPromptTemplates   AIPromptTemplate[]
   aiSpendLogs         AISpendLog[]     // only includes rows where organizationId IS NOT null (nullable FK means null-org rows are excluded from back-relation)
   aiMediaJobs         AIMediaJob[]
@@ -58,11 +55,13 @@ model Organization {
   mediaFolders        MediaFolder[]
   storageProviders    StorageProviderConfig[]
   orgProviderConfigs  OrgProviderConfiguration[]
+  mediaProviderConfigs MediaProviderConfig[]
   auditLogs           AuditLog[]
   orgShortLinkConfigs  OrgShortLinkConfig[]
   shortLinks           ShortLink[]
   shortLinkSnapshots   ShortLinkSnapshot[]
   apiKeys              ApiKey[]
+  roles                AppRole[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -101,37 +100,18 @@ model User {
   email                 String
   password              String?
   providerName          Provider
-  name                  String?
-  lastName              String?
   isSuperAdmin          Boolean              @default(false)
-  bio                   String?
-  audience              Int                  @default(0)
-  pictureId             String?
   providerId            String?
-  timezone              Int
   createdAt             DateTime             @default(now())
   updatedAt             DateTime             @updatedAt
   lastReadNotifications DateTime             @default(now())
   inviteId              String?
   activated             Boolean              @default(true)
-  account               String?
-  connectedAccount      Boolean              @default(false)
   lastOnline            DateTime             @default(now())
   ip                    String?
   agent                 String?
   comments              Comments[]
-  items                 ItemUser[]
-  groupBuyer            MessagesGroup[]      @relation("groupBuyer")
-  groupSeller           MessagesGroup[]      @relation("groupSeller")
-  orderBuyer            Orders[]             @relation("orderBuyer")
-  orderSeller           Orders[]             @relation("orderSeller")
-  payoutProblems        PayoutProblems[]
-  agencies              SocialMediaAgency?
-  picture               Media?               @relation(fields: [pictureId], references: [id])
   organizations         UserOrganization[]
-  sendSuccessEmails     Boolean              @default(true)
-  sendFailureEmails     Boolean              @default(true)
-  sendStreakEmails      Boolean              @default(true)
   oauthAuthorizations   OAuthAuthorization[]
   commentReads          PostCommentRead[]
   assignedComments      SocialComment[]
@@ -139,13 +119,13 @@ model User {
   aiSpendLogs           AISpendLog[]
   aiMediaJobs           AIMediaJob[]
   apiKeys               ApiKey[]
+  profile               UserProfile?
+  sessions              Session[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
   @@index([inviteId])
-  @@index([account])
   @@index([lastOnline])
-  @@index([pictureId])
 }
 
 model UsedCodes {
@@ -164,7 +144,8 @@ model UserOrganization {
   userId         String
   organizationId String
   disabled       Boolean      @default(false)
-  role           Role         @default(USER)
+  roleId         String?
+  roleRef        AppRole?     @relation(fields: [roleId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -172,65 +153,10 @@ model UserOrganization {
 
   @@unique([userId, organizationId])
   @@index([disabled])
+  @@index([roleId])
 }
 
-model GitHub {
-  id             String       @id @default(uuid())
-  login          String?
-  name           String?
-  token          String
-  jobId          String?
-  organizationId String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@index([login])
-  @@index([organizationId])
-}
-
-model Trending {
-  id           String   @id @default(uuid())
-  trendingList String
-  language     String?  @unique
-  hash         String
-  date         DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  @@index([hash])
-}
-
-model TrendingLog {
-  id       String   @id @default(uuid())
-  language String?
-  date     DateTime
-}
-
-model ItemUser {
-  id     String @id @default(uuid())
-  userId String
-  key    String
-  user   User   @relation(fields: [userId], references: [id])
-
-  @@unique([userId, key])
-  @@index([userId])
-  @@index([key])
-}
-
-model Star {
-  id         String   @id @default(uuid())
-  stars      Int
-  totalStars Int
-  forks      Int
-  totalForks Int
-  login      String
-  date       DateTime @default(now()) @db.Date
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  @@unique([login, date])
-}
 
 model Media {
   id                 String              @id @default(uuid())
@@ -249,10 +175,10 @@ model Media {
   folderId           String?
   tags               String?    // JSON: string[]
   description        String?
+  metadata           Json?
   folder             MediaFolder? @relation(fields: [folderId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id])
-  agencies           SocialMediaAgency[]
-  userPicture        User[]
+  userProfiles       UserProfile[]
   oauthApps          OAuthApp[]
 
   @@index([name])
@@ -261,42 +187,7 @@ model Media {
   @@index([folderId])
 }
 
-model SocialMediaAgency {
-  id               String                   @id @default(uuid())
-  userId           String                   @unique
-  name             String
-  logoId           String?
-  website          String?
-  slug             String?
-  facebook         String?
-  instagram        String?
-  twitter          String?
-  linkedIn         String?
-  youtube          String?
-  tiktok           String?
-  otherSocialMedia String?
-  shortDescription String
-  description      String
-  approved         Boolean                  @default(false)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
-  deletedAt        DateTime?
-  logo             Media?                   @relation(fields: [logoId], references: [id])
-  user             User                     @relation(fields: [userId], references: [id])
-  niches           SocialMediaAgencyNiche[]
 
-  @@index([userId])
-  @@index([deletedAt])
-  @@index([id])
-}
-
-model SocialMediaAgencyNiche {
-  agencyId String
-  niche    String
-  agency   SocialMediaAgency @relation(fields: [agencyId], references: [id])
-
-  @@id([agencyId, niche])
-}
 
 model Credits {
   id             String       @id @default(uuid())
@@ -369,7 +260,6 @@ model Integration {
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
   webhooks              IntegrationsWebhooks[]
-  orderItems            OrderItems[]
   plugs                 Plugs[]
   posts                     Post[]
   analyticsSnapshots        AnalyticsSnapshot[]
@@ -492,11 +382,7 @@ model Post {
   releaseURL                 String?
   settings                   String?
   image                      String?
-  submittedForOrderId        String?
-  submittedForOrganizationId String?
-  approvedSubmitForOrder     APPROVED_SUBMIT_FOR_ORDER @default(NO)
   creationMethod             CreationMethod            @default(UNKNOWN)
-  lastMessageId              String?
   intervalInDays             Int?
   error                      String?
   createdAt                  DateTime                  @default(now())
@@ -504,14 +390,10 @@ model Post {
   deletedAt                  DateTime?
   comments                   Comments[]
   errors                     Errors[]
-  payoutProblems             PayoutProblems[]
   integration                Integration               @relation(fields: [integrationId], references: [id])
-  lastMessage                Messages?                 @relation(fields: [lastMessageId], references: [id])
   organization               Organization              @relation("organization", fields: [organizationId], references: [id])
   parentPost                 Post?                     @relation("parentPostId", fields: [parentPostId], references: [id])
   childrenPost               Post[]                    @relation("parentPostId")
-  submittedForOrder          Orders?                   @relation(fields: [submittedForOrderId], references: [id])
-  submittedForOrganization   Organization?             @relation("submittedForOrg", fields: [submittedForOrganizationId], references: [id])
   tags                       TagsPosts[]
   lastViews                  Float?
   lastLikes                  Float?
@@ -519,6 +401,8 @@ model Post {
   commentCount               Int                       @default(0)
   campaignId                 String?
   campaign                   Campaign?                 @relation(fields: [campaignId], references: [id])
+  brandId                    String?
+  brand                      AIBrandProfile?          @relation(fields: [brandId], references: [id])
   analyticsSnapshots         PostAnalyticsSnapshot[]
   socialComments             SocialComment[]
   commentReads               PostCommentRead[]
@@ -529,11 +413,8 @@ model Post {
   @@index([state])
   @@index([organizationId])
   @@index([parentPostId])
-  @@index([submittedForOrderId])
   @@index([intervalInDays])
-  @@index([approvedSubmitForOrder])
   @@index([creationMethod])
-  @@index([lastMessageId])
   @@index([createdAt])
   @@index([updatedAt])
   @@index([releaseURL])
@@ -612,91 +493,7 @@ model Notifications {
   @@index([deletedAt])
 }
 
-model MessagesGroup {
-  id                  String       @id @default(uuid())
-  buyerOrganizationId String
-  buyerId             String
-  sellerId            String
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
-  messages            Messages[]
-  buyer               User         @relation("groupBuyer", fields: [buyerId], references: [id])
-  buyerOrganization   Organization @relation(fields: [buyerOrganizationId], references: [id])
-  seller              User         @relation("groupSeller", fields: [sellerId], references: [id])
-  orders              Orders[]
 
-  @@unique([buyerId, sellerId])
-  @@index([createdAt])
-  @@index([updatedAt])
-  @@index([buyerOrganizationId])
-}
-
-model PayoutProblems {
-  id        String   @id @default(uuid())
-  status    String
-  orderId   String
-  userId    String
-  postId    String?
-  amount    Int
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  order     Orders   @relation(fields: [orderId], references: [id])
-  post      Post?    @relation(fields: [postId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
-}
-
-model Orders {
-  id             String           @id @default(uuid())
-  buyerId        String
-  sellerId       String
-  status         OrderStatus
-  messageGroupId String
-  captureId      String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
-  ordersItems    OrderItems[]
-  buyer          User             @relation("orderBuyer", fields: [buyerId], references: [id])
-  messageGroup   MessagesGroup    @relation(fields: [messageGroupId], references: [id])
-  seller         User             @relation("orderSeller", fields: [sellerId], references: [id])
-  payoutProblems PayoutProblems[]
-  posts          Post[]
-
-  @@index([buyerId])
-  @@index([sellerId])
-  @@index([updatedAt])
-  @@index([createdAt])
-  @@index([messageGroupId])
-}
-
-model OrderItems {
-  id            String      @id @default(uuid())
-  orderId       String
-  integrationId String
-  quantity      Int
-  price         Int
-  integration   Integration @relation(fields: [integrationId], references: [id])
-  order         Orders      @relation(fields: [orderId], references: [id])
-
-  @@index([orderId])
-  @@index([integrationId])
-}
-
-model Messages {
-  id        String        @id @default(uuid())
-  from      From
-  content   String?
-  groupId   String
-  special   String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  deletedAt DateTime?
-  group     MessagesGroup @relation(fields: [groupId], references: [id])
-  posts     Post[]
-
-  @@index([groupId])
-  @@index([createdAt])
-  @@index([deletedAt])
-}
 
 model Plugs {
   id             String       @id @default(uuid())
@@ -883,11 +680,14 @@ model StorageProviderConfig {
   lastHealthCheck  DateTime?           // last successful testConnection
   lastHealthError  String?             // error message from last failed testConnection
   defaultFolderId  String?             // default folder for uploads to this provider
+  accountFingerprint String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   organization     Organization        @relation(fields: [organizationId], references: [id])
   folders          MediaFolder[]
+  mediaProviderConfigs MediaProviderConfig[]
 
+  @@unique([organizationId, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, mounted])
 }
@@ -1149,7 +949,7 @@ model AIProviderConfig {
   enabled       Boolean  @default(false)
   credentials   String?
   defaultModel  String?
-  imageModel    String?
+  reasoningModel String?
   extraConfig   String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -1212,7 +1012,7 @@ model AIOrgProviderConfig {
   isActive       Boolean      @default(false) // only one can be active per org
   credentials    String?
   defaultModel   String?
-  imageModel     String?
+  reasoningModel String?
   extraConfig    String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -1233,12 +1033,14 @@ model OrgShortLinkConfig {
   isActive       Boolean  @default(false)
   credentials    String?
   customDomain   String?
+  name           String?
+  accountFingerprint String?
   extraConfig    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, isActive])
 }
@@ -1295,18 +1097,143 @@ model ApiKey {
   @@index([hashedKey])
 }
 
+// ── v3.8.10: App-level RBAC role. Org-scoped when organizationId is set; NULL = system/template ──
+model AppRole {
+  id             String           @id @default(uuid())
+  organizationId String?
+  key            String
+  name           String
+  description    String?
+  isSystem       Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization?    @relation(fields: [organizationId], references: [id])
+  permissions    AppRolePermission[]
+  memberships    UserOrganization[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+}
+
+// ── v3.8.10: Fine-grained capability ──
+model Permission {
+  id          String           @id @default(uuid())
+  resource    String
+  action      String
+  description String?
+  roles       AppRolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+}
+
+// ── v3.8.10: Join table for roles ↔ permissions ──
+model AppRolePermission {
+  roleId       String
+  permissionId String
+  role         AppRole    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+}
+
+// ── v3.8.10: 1:1 profile split from User ──
+model UserProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  name              String?
+  lastName          String?
+  bio               String?
+  avatarUrl         String?
+  pictureId         String?
+  timezone          String?  // IANA tz
+  sendSuccessEmails Boolean  @default(true)
+  sendFailureEmails Boolean  @default(true)
+  sendStreakEmails  Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  picture           Media?   @relation(fields: [pictureId], references: [id])
+
+  @@index([pictureId])
+}
+
+// ── v3.8.10: Login session backing refresh-token rotation ──
+model Session {
+  id                String    @id @default(uuid())
+  userId            String
+  tokenHash         String    @unique
+  previousTokenHash String? // last rotated-out hash — reuse of it revokes the session
+  userAgent         String?
+  ip                String?
+  createdAt         DateTime  @default(now())
+  lastUsedAt        DateTime  @default(now())
+  expiresAt         DateTime
+  revokedAt         DateTime?
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([previousTokenHash])
+}
+
+// ── v3.8.10: Platform-wide login provider config ──
+model AuthProviderConfig {
+  id            String   @id @default(uuid())
+  provider      Provider
+  enabled       Boolean  @default(false)
+  clientId      String?
+  clientSecret  String?
+  authUrl       String?
+  tokenUrl      String?
+  userInfoUrl   String?
+  scopes        String?  @default("openid profile email")
+  displayName   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([provider])
+}
+
+// ── v3.8.10: Per-org media provider config ──
+model MediaProviderConfig {
+  id                  String         @id @default(uuid())
+  organizationId      String
+  identifier          String
+  enabled             Boolean        @default(false)
+  credentials         String?        // encrypted
+  storageProviderId   String?        // null = LOCAL
+  storageRootFolderId String?        // root folder in storage
+  accountFingerprint  String?
+  extraConfig         String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  organization        Organization   @relation(fields: [organizationId], references: [id])
+  storageProvider     StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+}
+
 // Per-org brand voice / custom instructions + localization
 model AIBrandProfile {
   id                String       @id @default(cuid())
-  organizationId    String       @unique
+  organizationId    String
   instructions      String?
   language          String?
   platformInstructions Json?    @default("{}")
   enabled           Boolean      @default(true)
+  name              String?
+  isDefault         Boolean      @default(false)
+  slug              String?
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
   organization      Organization @relation(fields: [organizationId], references: [id])
+  posts             Post[]
+
+  @@index([organizationId])
 }
 
 // Editable prompt templates — NOT seeded; in-code PROMPT_CONSTANTS is canonical
@@ -1405,18 +1332,6 @@ model AIContentIndex {
   @@index([contentHash])
 }
 
-enum OrderStatus {
-  PENDING
-  ACCEPTED
-  CANCELED
-  COMPLETED
-}
-
-enum From {
-  BUYER
-  SELLER
-}
-
 enum State {
   QUEUE
   PUBLISHED
@@ -1443,18 +1358,6 @@ enum Provider {
   FARCASTER
   WALLET
   GENERIC
-}
-
-enum Role {
-  SUPERADMIN
-  ADMIN
-  USER
-}
-
-enum APPROVED_SUBMIT_FOR_ORDER {
-  NO
-  WAITING_CONFIRMATION
-  YES
 }
 
 enum CreationMethod {

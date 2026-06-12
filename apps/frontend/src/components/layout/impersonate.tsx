@@ -218,7 +218,7 @@ export const Subscription = () => {
         }
       }
     },
-    [toaster, fetch, t]
+    [toaster, fetch]
   );
   return (
     <Select
@@ -423,7 +423,7 @@ export const Impersonate = () => {
     return data?.map(
       (curr: any) => ({
         id: curr.id,
-        name: curr.user.name,
+        name: curr.user.profile?.name,
         email: curr.user.email,
       })
     );

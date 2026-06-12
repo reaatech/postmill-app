@@ -31,7 +31,7 @@ export class AnthropicAdapter implements AIProviderAdapter {
       { id: 'claude-4-20250514', label: 'Claude 4', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
       { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
       { id: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
+      { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true }, reasoning: true },
     ];
   }
 

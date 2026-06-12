@@ -66,4 +66,66 @@ export class UsersService {
 
     return this._usersRepository.updatePassword(userId, newPassword);
   }
+
+  // ── Sessions ──
+  createSession(data: { userId: string; tokenHash: string; expiresAt: Date; ip: string; userAgent: string }) {
+    return this._usersRepository.createSession(data);
+  }
+
+  getUserSessions(userId: string) {
+    return this._usersRepository.getUserSessions(userId);
+  }
+
+  getSessionById(id: string) {
+    return this._usersRepository.getSessionById(id);
+  }
+
+  findSessionByTokenHash(tokenHash: string) {
+    return this._usersRepository.findSessionByTokenHash(tokenHash);
+  }
+
+  findSessionByPreviousTokenHash(previousTokenHash: string) {
+    return this._usersRepository.findSessionByPreviousTokenHash(previousTokenHash);
+  }
+
+  revokeSession(id: string) {
+    return this._usersRepository.revokeSession(id);
+  }
+
+  revokeAllSessionsExcept(userId: string, currentTokenHash: string) {
+    return this._usersRepository.revokeAllSessionsExcept(userId, currentTokenHash);
+  }
+
+  revokeAllUserSessions(userId: string) {
+    return this._usersRepository.revokeAllUserSessions(userId);
+  }
+
+  rotateSessionToken(
+    id: string,
+    newTokenHash: string,
+    previousTokenHash: string,
+    ip: string,
+    userAgent: string
+  ) {
+    return this._usersRepository.rotateSessionToken(
+      id,
+      newTokenHash,
+      previousTokenHash,
+      ip,
+      userAgent
+    );
+  }
+
+  cleanupExpiredSessions() {
+    return this._usersRepository.cleanupExpiredSessions();
+  }
+
+  // ── Profile ──
+  updateUserAvatar(userId: string, avatarUrl: string) {
+    return this._usersRepository.updateUserAvatar(userId, avatarUrl);
+  }
+
+  getProfileByUserId(userId: string) {
+    return this._usersRepository.getProfileByUserId(userId);
+  }
 }

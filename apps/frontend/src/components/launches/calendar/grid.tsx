@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, Fragment, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useDrop } from 'react-dnd';
 import { Post } from '@prisma/client';
@@ -15,7 +16,6 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useAddProvider } from '@gitroom/frontend/components/launches/add.provider.component';
 import SafeImage from '@gitroom/react/helpers/safe.image';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { usePostActions } from './helpers';
 import { CalendarItem } from './card';
 import { Button } from '@gitroom/react/form/button';
@@ -69,7 +69,7 @@ export const CalendarColumn: FC<{
   const t = useT();
 
   const { getDate, randomHour } = props;
-  const [num, setNum] = useState(0);
+  const [now, setNow] = useState(() => newDayjs());
   const user = useUser();
   const {
     integrations,
@@ -115,17 +115,15 @@ export const CalendarColumn: FC<{
 
   const isBeforeNow = useMemo(() => {
     const originalUtc = getDate.startOf('hour');
-    return originalUtc
-      .startOf('hour')
-      .isBefore(newDayjs().startOf('hour').utc());
-  }, [getDate, num]);
+    return originalUtc.startOf('hour').isBefore(now.startOf('hour').utc());
+  }, [getDate, now]);
 
   const { start, stop } = useInterval(
     useCallback(() => {
       if (isBeforeNow) {
         return;
       }
-      setNum((n) => n + 1);
+      setNow(newDayjs());
     }, [isBeforeNow]),
     random(120000, 150000)
   );
@@ -223,6 +221,7 @@ export const CalendarColumn: FC<{
     }),
   }), [posts, isBeforeNow, changeDate, getDate, fetch, modal, t, reloadCalendarView]);
 
+  const router = useRouter();
   const addModal = useCallback(async () => {
     const set: any = !sets.length
       ? undefined
@@ -252,50 +251,33 @@ export const CalendarColumn: FC<{
 
     if (set === 'exit') return;
 
-    modal.openModal({
-      id: 'add-edit-modal',
-      closeOnClickOutside: false,
-      removeLayout: true,
-      closeOnEscape: false,
-      withCloseButton: false,
-      askClose: true,
-      fullScreen: true,
-      classNames: {
-        modal: 'w-[100%] max-w-[1400px] text-textColor',
-      },
-      children: (
-        <AddEditModal
-          allIntegrations={integrations.map((p) => ({
-            ...p,
-          }))}
-          integrations={integrations.slice(0).map((p) => ({
-            ...p,
-          }))}
-          mutate={reloadCalendarView}
-          {...(signature?.id && !set
-            ? {
-                onlyValues: [
-                  {
-                    content: '\n' + signature.content,
-                  },
-                ],
-              }
-            : {})}
-          date={
-            randomHour
-              ? getDate.hour(Math.floor(Math.random() * 24))
-              : getDate.format('YYYY-MM-DDTHH:mm:ss') ===
-                newDayjs().startOf('hour').format('YYYY-MM-DDTHH:mm:ss')
-              ? newDayjs().add(10, 'minute')
-              : getDate
-          }
-          {...(set?.content ? { set: JSON.parse(set.content) } : {})}
-          reopenModal={() => ({})}
-        />
-      ),
-      size: '80%',
-    });
-  }, [integrations, getDate, sets, signature]);
+    const date =
+      randomHour
+        ? getDate.hour(Math.floor(Math.random() * 24))
+        : getDate.format('YYYY-MM-DDTHH:mm:ss') ===
+          newDayjs().startOf('hour').format('YYYY-MM-DDTHH:mm:ss')
+        ? newDayjs().add(10, 'minute')
+        : getDate;
+
+    const params = new URLSearchParams();
+    params.set('date', date.format('YYYY-MM-DDTHH:mm:ss'));
+
+    if (set?.content) {
+      const parsedSet = JSON.parse(set.content);
+      if (parsedSet?.posts?.[0]?.value?.[0]?.content) {
+        params.set(
+          'content',
+          encodeURIComponent(parsedSet.posts[0].value[0].content)
+        );
+      }
+    }
+
+    if (signature?.id && !set) {
+      params.set('content', encodeURIComponent('\n' + signature.content));
+    }
+
+    router.push(`/schedule/post?${params.toString()}`);
+  }, [getDate, sets, signature, router, modal, randomHour, t]);
 
   const addProvider = useAddProvider();
   return (
@@ -424,8 +406,9 @@ export const CalendarColumn: FC<{
                           height={32}
                         />
                         {selectedIntegrations.identifier === 'youtube' ? (
-                          <img
+                          <SafeImage
                             src="/icons/platforms/youtube.svg"
+                            alt={selectedIntegrations.identifier}
                             className="absolute z-10 -bottom-[5px] -end-[5px]"
                             width={20}
                           />

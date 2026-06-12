@@ -5,7 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import Link from 'next/link';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { GithubProvider } from '@gitroom/frontend/components/auth/providers/github.provider';
@@ -33,6 +33,7 @@ const WalletProvider = dynamic(
 type Inputs = {
   email: string;
   password: string;
+  name: string;
   company: string;
   providerToken: string;
   provider: string;
@@ -43,25 +44,33 @@ export function Register() {
   const [provider] = useState(getQuery?.get('provider')?.toUpperCase());
   const [code, setCode] = useState(getQuery?.get('code') || '');
   const [show, setShow] = useState(false);
+  const load = useCallback(() => {
+    fetch(`/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`, {
+      method: 'POST',
+      body: JSON.stringify({
+        code,
+      }),
+    })
+      .then((response) => response.json())
+      .then(({ token }: { token: string }) => {
+        if (token) {
+          setCode(token);
+          setShow(true);
+        }
+      });
+  }, [provider, code, fetch]);
+  // The oauth code exchange must run exactly once on mount (load() itself
+  // replaces `code` with the returned token) — guard with a ref.
+  const exchangedRef = useRef(false);
   useEffect(() => {
+    if (exchangedRef.current) {
+      return;
+    }
+    exchangedRef.current = true;
     if (provider && code) {
       load();
     }
-  }, []);
-  const load = useCallback(async () => {
-    const { token } = await (
-      await fetch(`/auth/oauth/${provider?.toUpperCase() || 'LOCAL'}/exists`, {
-        method: 'POST',
-        body: JSON.stringify({
-          code,
-        }),
-      })
-    ).json();
-    if (token) {
-      setCode(token);
-      setShow(true);
-    }
-  }, [provider, code]);
+  }, [provider, code, load]);
   if (!code && !provider) {
     return <RegisterAfter token="" provider="LOCAL" />;
   }
@@ -200,6 +209,14 @@ export function RegisterAfter({
                       autoComplete="off"
                       type="password"
                       placeholder={t('label_password', 'Password')}
+                    />
+                    <Input
+                      label="Name"
+                      translationKey="label_name"
+                      {...form.register('name')}
+                      autoComplete="name"
+                      type="text"
+                      placeholder={t('label_name', 'Name')}
                     />
                   </>
                 )}

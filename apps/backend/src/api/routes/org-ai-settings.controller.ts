@@ -19,6 +19,13 @@ import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/
 import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-config.types';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+
+export type ProviderConfigSummary = Pick<
+  ProviderConfigDto,
+  'identifier' | 'name' | 'enabled' | 'isActive'
+>;
 
 @ApiTags('Org AI Settings')
 @Controller('/settings/ai')
@@ -29,6 +36,7 @@ export class OrgAiSettingsController {
   ) {}
 
   @Get('/providers')
+  @RequirePermission('settings', 'read')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
     const adapters = this._registry.list();
@@ -43,8 +51,12 @@ export class OrgAiSettingsController {
   }
 
   @Get('/config')
+  @RequirePermission('settings', 'read')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  async getConfig(@GetOrgFromRequest() org: Organization) {
+  async getConfig(@GetOrgFromRequest() org: Organization): Promise<{
+    active: ProviderConfigSummary | null;
+    providers: ProviderConfigSummary[];
+  }> {
     const active = await this._orgAiSettings.getActiveProvider(org.id);
     const allConfigs = await this._orgAiSettings.getProviders(org.id);
     // Never ship decrypted provider credentials to the client (#53). The active
@@ -59,6 +71,7 @@ export class OrgAiSettingsController {
   }
 
   @Put('/config/:identifier')
+  @RequirePermission('settings', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
@@ -67,7 +80,7 @@ export class OrgAiSettingsController {
     body: {
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
     },
   ) {
     const adapter = this._registry.getAdapter(identifier);
@@ -77,13 +90,14 @@ export class OrgAiSettingsController {
       enabled: true,
       credentials: body.credentials,
       defaultModel: body.defaultModel,
-      imageModel: body.imageModel,
+      reasoningModel: body.reasoningModel,
     });
 
     return { identifier, success: true };
   }
 
   @Post('/config/:identifier/set-active')
+  @RequirePermission('settings', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setActive(
     @GetOrgFromRequest() org: Organization,
@@ -99,6 +113,7 @@ export class OrgAiSettingsController {
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
+  @RequirePermission('settings', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
@@ -123,6 +138,7 @@ export class OrgAiSettingsController {
   }
 
   @Delete('/config/:identifier')
+  @RequirePermission('settings', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
@@ -133,6 +149,7 @@ export class OrgAiSettingsController {
   }
 
   @Get('/spend')
+  @RequirePermission('settings', 'read')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getSpend(
     @GetOrgFromRequest() org: Organization,
@@ -146,6 +163,7 @@ export class OrgAiSettingsController {
   }
 
   @Get('/budget')
+  @RequirePermission('settings', 'read')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getBudget(@GetOrgFromRequest() org: Organization) {
     const budget = await this._orgAiSettings.getBudget(org.id);
@@ -153,6 +171,7 @@ export class OrgAiSettingsController {
   }
 
   @Put('/budget')
+  @RequirePermission('settings', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateBudget(
     @GetOrgFromRequest() org: Organization,

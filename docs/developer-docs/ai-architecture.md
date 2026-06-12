@@ -103,6 +103,61 @@ message pointing the user to Settings → AI.
 
 ---
 
+## Two-Step Config & Reasoning Split (v3.8.10)
+
+Per-org provider configuration is a two-step flow, focused on **LLM text** use:
+
+1. **Auth** — API credentials (encrypted at rest; OAuth where a provider offers it).
+2. **Model defaults** — the tenant picks a **standard** default (`defaultModel`) and an optional
+   **reasoning** default (`reasoningModel`, nullable on both `AIOrgProviderConfig` and
+   `AIProviderConfig`).
+
+Supporting pieces:
+
+- **`ModelInfo.reasoning?: boolean`** (TS type, not a DB column) splits the model picker into
+  *Standard* vs *Reasoning* groups. Known reasoning models are matched by prefix in
+  `libraries/nestjs-libraries/src/ai/reasoning-models.ts` (`isReasoningModel`).
+- **Resolution:** a call may request the reasoning axis; `AIModelProvider` resolves
+  `reasoningModel || defaultModel || SURFACE_DEFAULTS[scope].textModel` — existing configs with a
+  null `reasoningModel` behave exactly as before.
+- **`imageModel` is gone** — the `AIOrgProviderConfig.imageModel`/`AIProviderConfig.imageModel`
+  columns were dropped in v3.8.10. Image, video, audio, and avatar generation belong to the
+  **Media provider system** (below), not the AI-provider config. Embeddings remain an internal
+  capability for RAG only.
+- Tenants may configure **all** providers at once (`enabled` per row); one row per org is
+  `isActive` — the default everywhere, with per-scope overrides via `scopeModels`.
+
+---
+
+## Media Provider System (v3.8.10)
+
+Media generation moved off the AI-provider surface onto a pluggable per-org system in
+`libraries/nestjs-libraries/src/media/`, mirroring the AI and short-link patterns:
+
+- **`MediaProviderAdapter`** interface — each adapter declares `identifier`, `name`, and a
+  capability matrix (`image`/`video`/`audio`/`avatar`/`tts`/`stt`/`upscale`/`bgRemove`/`inpaint`)
+  and implements generation per media type. All outbound HTTP goes through `safeFetch`.
+- **Registered adapters** (`MediaModule` → `MediaProviderRegistry`): fal.ai, OpenAI, ElevenLabs,
+  HeyGen, Runway, Black Forest Labs, Google Vertex AI, Replicate, Stability AI, Tavus, D-ID,
+  Hedra, MiniMax, Deepgram, Luma.
+- **Delivery semantics:** images are **synchronous** with a standardized result —
+  `{ multi: false, image }` or `{ multi: true, images }`. Video/audio/avatar are **asynchronous**
+  (`{ jobId }`), tracked in `AIMediaJob` (`pending → processing → completed/failed`) with
+  webhook-preferred completion and a `pollJob` fallback; the completion handler lands the artifact
+  in the tenant's storage and records extracted metadata on `Media.metadata`.
+- **`MediaProviderConfig`** — per-org config row (encrypted credentials + storage binding:
+  `storageProviderId` (null = LOCAL) and `storageRootFolderId`, the provider root under which the
+  typed `documents/ audio/ images/ video/ other/` folder tree lives).
+- **API:** `/settings/media` — `GET /providers`, `GET /config`, `PUT /config/:identifier` (auth),
+  `PUT /config/:identifier/storage` (storage binding), `POST /config/:identifier/set-active`,
+  `POST /config/:identifier/test`, `DELETE /config/:identifier` — every route gated with
+  `@RequirePermission('media-config', 'manage')`, like the storage and shortlink surfaces.
+- **Auto-config:** **OpenAI** and **MiniMax** credentials are live-linked between the AI provider
+  config and the matching `MediaProviderConfig` — saving credentials on one surface upserts the
+  other (best-effort, non-fatal).
+
+---
+
 ## Governance Layer
 
 All governance services live in `libraries/nestjs-libraries/src/ai/governance/`.
@@ -199,17 +254,12 @@ through `observability` settings in `AISystemSettings`.
 
 ## AiMediaService
 
-Seven production media operations in `libraries/nestjs-libraries/src/ai/governance/media.service.ts`:
-
-| Operation | Primary provider | Fallback |
-|---|---|---|
-| `image` | Active AI provider's image model | `fallbackImageProvider` |
-| `video` | Luma (`@reaatech/media-pipeline-mcp-video`) | — |
-| `tts` | ElevenLabs → OpenAI | — |
-| `stt` | Deepgram → OpenAI | — |
-| `upscale` | Replicate → OpenAI | — |
-| `bg-remove` | Replicate | — |
-| `inpaint` | Replicate | — |
+`AiMediaService` (`libraries/nestjs-libraries/src/ai/governance/media.service.ts`) wraps the
+media operations (`image`, `video`, `tts`, `stt`, `upscale`, `bg-remove`, `inpaint`). Since
+v3.8.10 the provider resolution behind these operations goes through the per-org **Media provider
+system** (see above — `OrgMediaProviderSettingsService` + `MediaProviderRegistry`) rather than
+hardcoded MCP wrappers; each operation is gated on its provider being configured and enabled in
+`MediaProviderConfig`.
 
 Media operations are credit-gated: `image`/`upscale`/`bg-remove`/`inpaint` consume `ai_images`
 credits; `video` consumes `ai_videos` credits; `tts`/`stt` have no legacy credit equivalent.
@@ -244,9 +294,9 @@ tenant's AI provider.
 
 | Model | Purpose |
 |---|---|
-| `AIOrgProviderConfig` | Per-org provider credentials (encrypted), active flag, default/image model |
+| `AIOrgProviderConfig` | Per-org provider credentials (encrypted), active flag, `defaultModel` + `reasoningModel` (`imageModel` dropped v3.8.10) |
 | `AISpendLog` | Cost ledger — input/output tokens, cost, provider, model, scope |
-| `AIBrandProfile` | Per-org brand voice instructions + language localization |
+| `AIBrandProfile` | Brand voice instructions + language. Many per org since v3.8.10 (`name`/`isDefault`/`slug`), selectable per-post via `Post.brandId` |
 | `AIPromptTemplate` | Editable prompt templates (org-scoped or global) |
 | `AISettingsAudit` | Append-only audit log of AI-settings changes |
 | `AIMediaJob` | Media pipeline job/artifact tracking + provenance |
@@ -255,4 +305,8 @@ tenant's AI provider.
 | `AIProviderConfig` | **DEPRECATED v3.6.0** — replaced by `AIOrgProviderConfig` |
 | `AISystemSettings` | **DEPRECATED v3.6.0** — active provider moved to per-tenant; kept for scope models, fallback config, and governance toggles |
 
-> Verified against v3.7.0
+Two related models live outside the AI group since v3.8.10: `MediaProviderConfig` (per-org media
+provider + storage binding) and `Post.brandId` (per-post brand selection). See
+[Data Model](./data-model.md).
+
+> Verified against v3.8.10

@@ -86,7 +86,7 @@ export const ProviderCapabilityMatrix = () => {
 
   return (
     <div className="overflow-auto p-[16px]">
-      <h2 className="text-[20px] font-bold mb-[16px] text-textColor">
+      <h2 className="text-[20px] font-bold mb-[16px]">
         {t('provider_capability_matrix', 'Provider Capability Matrix')}
       </h2>
       <DataTable

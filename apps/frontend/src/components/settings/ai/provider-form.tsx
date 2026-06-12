@@ -20,6 +20,7 @@ interface ModelInfo {
   label: string;
   kind: 'text' | 'image' | 'embedding';
   capabilities?: Record<string, boolean>;
+  reasoning?: boolean;
 }
 
 interface ProviderInfo {
@@ -56,10 +57,28 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
   const provider = providers?.find((p) => p.identifier === identifier);
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [defaultModel, setDefaultModel] = useState('');
+  const [reasoningModel, setReasoningModel] = useState('');
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'failure' | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const loadModels = useCallback(async (creds: Record<string, string>) => {
+    try {
+      const res = await fetch(`/admin/ai-settings/providers/${identifier}`, {
+        method: 'GET',
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setModels(data.models || []);
+        if (data.defaultModel) setDefaultModel(data.defaultModel);
+        if (data.reasoningModel) setReasoningModel(data.reasoningModel);
+        if (data.credentials) {
+          setCreds((prev) => ({ ...prev, ...data.credentials }));
+        }
+      }
+    } catch { /* ignore */ }
+  }, [fetch, identifier]);
 
   useEffect(() => {
     if (!provider) return;
@@ -69,23 +88,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
     });
     setCreds(defaults);
     loadModels(defaults);
-  }, [provider]);
-
-  const loadModels = async (creds: Record<string, string>) => {
-    try {
-      const res = await fetch(`/admin/ai-settings/providers/${identifier}`, {
-        method: 'GET',
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setModels(data.models || []);
-        if (data.defaultModel) setDefaultModel(data.defaultModel);
-        if (data.credentials) {
-          setCreds((prev) => ({ ...prev, ...data.credentials }));
-        }
-      }
-    } catch { /* ignore */ }
-  };
+  }, [provider, loadModels]);
 
   const handleSave = useCallback(async () => {
     if (!provider) return;
@@ -96,6 +99,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
         body: JSON.stringify({
           credentials: creds,
           defaultModel: defaultModel || undefined,
+          reasoningModel: reasoningModel || undefined,
         }),
       });
       if (!res.ok) {
@@ -107,7 +111,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
     } finally {
       setSaving(false);
     }
-  }, [provider, identifier, creds, defaultModel, fetch, toaster, t, onSaved]);
+  }, [provider, identifier, creds, defaultModel, reasoningModel, fetch, toaster, t, onSaved]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -182,25 +186,71 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
         </div>
       ))}
 
-      {models.length > 0 && (
-        <div className="flex flex-col gap-[4px]">
-          <label className="text-[13px] text-newTableText">
-            {t('default_model', 'Default Model')}
-          </label>
-          <select
-            className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-            value={defaultModel}
-            onChange={(e) => setDefaultModel(e.target.value)}
-          >
-            <option value="">{t('select_model', 'Select a model...')}</option>
-            {models
-              .filter((m) => m.kind === 'text')
-              .map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))}
-          </select>
+      {models.filter((m) => m.kind === 'text').length > 0 && (
+        <div className="grid grid-cols-2 gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <label className="text-[13px] text-newTableText">
+              {t('default_model', 'Standard Model')}
+            </label>
+            <select
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+              value={defaultModel}
+              onChange={(e) => setDefaultModel(e.target.value)}
+            >
+              <option value="">{t('select_model', 'Select a model...')}</option>
+              <optgroup label={t('standard_models', 'Standard')}>
+                {models
+                  .filter((m) => m.kind === 'text' && !m.reasoning)
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+              </optgroup>
+              {models.some((m) => m.kind === 'text' && m.reasoning) && (
+                <optgroup label={t('reasoning_models', 'Reasoning')}>
+                  {models
+                    .filter((m) => m.kind === 'text' && m.reasoning)
+                    .map((model) => (
+                      <option key={model.id} value={model.id}>
+                        {model.label}
+                      </option>
+                    ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+          <div className="flex flex-col gap-[4px]">
+            <label className="text-[13px] text-newTableText">
+              {t('reasoning_model', 'Reasoning Model')}
+              <span className="text-newTableText/50 ml-[4px]">{t('optional', '(optional)')}</span>
+            </label>
+            <select
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+              value={reasoningModel}
+              onChange={(e) => setReasoningModel(e.target.value)}
+            >
+              <option value="">{t('no_reasoning_model', 'No reasoning model')}</option>
+              <optgroup label={t('reasoning_models', 'Reasoning')}>
+                {models
+                  .filter((m) => m.kind === 'text' && m.reasoning)
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+              </optgroup>
+              <optgroup label={t('standard_models', 'Standard')}>
+                {models
+                  .filter((m) => m.kind === 'text' && !m.reasoning)
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.label}
+                    </option>
+                  ))}
+              </optgroup>
+            </select>
+          </div>
         </div>
       )}
 

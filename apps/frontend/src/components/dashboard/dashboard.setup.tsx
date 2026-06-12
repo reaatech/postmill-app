@@ -7,12 +7,12 @@ import { useIntegrationList } from '@gitroom/frontend/components/launches/helper
 import { useDashboardSummary } from './hooks/useDashboardSummary';
 
 const SETUP_STEPS = [
-  { key: 'channel', label: 'Connect your first channel', href: '/third-party' },
-  { key: 'ai', label: 'Configure an AI provider', href: '/settings?tab=ai' },
-  { key: 'shortlink', label: 'Configure a short-link provider', href: '/settings?tab=shortlinks' },
-  { key: 'media', label: 'Configure a media provider', href: '/settings?tab=media_providers' },
-  { key: 'team', label: 'Invite a team member', href: '/settings?tab=teams' },
-  { key: 'post', label: 'Create your first post', href: '/schedule' },
+  { key: 'ai', label: 'Connect an AI (LLM) Provider', hint: 'OpenAI, Anthropic, DeepSeek', href: '/settings?tab=ai' },
+  { key: 'media', label: 'Connect an AI Media Provider', hint: 'OpenAI, Replicate, Luma', href: '/settings?tab=media_providers' },
+  { key: 'storage', label: 'Connect a Storage Provider', hint: 'AWS S3, Cloudflare R2, Backblaze B2', href: '/settings?tab=storage' },
+  { key: 'channel', label: 'Connect a Social Channel', hint: 'Instagram, TikTok, YouTube', href: '/third-party' },
+  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/schedule' },
+  { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings?tab=teams' },
 ];
 
 export const DashboardSetup: FC = () => {
@@ -27,12 +27,12 @@ export const DashboardSetup: FC = () => {
   });
 
   const steps: Record<string, boolean> = useMemo(() => ({
-    channel: (integrations?.length || 0) > 0,
     ai: summary?.aiProviderActive === true,
-    shortlink: summary?.shortlinkProviderActive === true,
     media: summary?.mediaProviderActive === true,
-    team: (summary?.teamMembers || 0) > 1,
+    storage: summary?.storageProviderActive === true,
+    channel: (integrations?.length || 0) > 0,
     post: (summary?.totalPosts || 0) > 0,
+    team: (summary?.teamMembers || 0) > 1,
   }), [integrations, summary]);
 
   const completedCount = Object.values(steps).filter(Boolean).length;
@@ -51,7 +51,7 @@ export const DashboardSetup: FC = () => {
     <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] mb-[24px]">
       <div className="flex items-center justify-between mb-[16px]">
         <div>
-          <h2 className="text-[16px] font-[600] text-textColor">Welcome to Postmill!</h2>
+          <h2 className="text-[16px] font-[600]">Welcome to Postmill</h2>
           <p className="text-[12px] text-newTableText">Let&apos;s get you set up</p>
         </div>
         <button onClick={handleDismiss} className="text-[12px] text-newTableText hover:text-textColor cursor-pointer" type="button">Dismiss</button>
@@ -68,7 +68,7 @@ export const DashboardSetup: FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[8px]">
-        {SETUP_STEPS.map((step) => {
+        {SETUP_STEPS.map((step, idx) => {
           const done = steps[step.key];
           return (
             <button
@@ -82,16 +82,21 @@ export const DashboardSetup: FC = () => {
               )}
             >
               <div className={clsx(
-                'w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0',
-                done ? 'bg-green-500' : 'bg-newTableHeader'
+                'w-[20px] h-[20px] rounded-full flex items-center justify-center shrink-0 text-[10px] font-[600]',
+                done ? 'bg-green-500 text-white' : 'border-2 border-newTableText text-newTableText'
               )}>
-                {done && (
+                {done ? (
                   <svg viewBox="0 0 15 15" fill="none" width="10" height="10">
                     <path d="M11.4669 3.72684C11.7558 3.91574 11.8369 4.30308 11.648 4.592L7.39799 11.092C7.29783 11.2452 7.13556 11.3467 6.95402 11.3699C6.77247 11.3931 6.58989 11.3355 6.45446 11.2124L3.20446 8.21243C2.94715 7.97215 2.93374 7.56924 3.17402 7.31193C3.4143 7.05462 3.81721 7.04122 4.07452 7.2815L6.69638 9.73846L10.352 3.90804C10.5409 3.61913 10.9282 3.53795 11.2171 3.72684C11.4669 3.88593 11.5532 4.17873 11.4669 3.72684Z" fill="white" fillRule="evenodd" clipRule="evenodd" />
                   </svg>
+                ) : (
+                  idx + 1
                 )}
               </div>
-              <span className={clsx('text-[12px]', done ? 'text-green-500 line-through' : 'text-textColor')}>{step.label}</span>
+              <div className="flex flex-col min-w-0">
+                <span className={clsx('text-[12px]', done ? 'text-green-500 line-through' : 'text-textColor')}>{step.label}</span>
+                <span className="text-[10px] text-newTableText truncate">{step.hint}</span>
+              </div>
             </button>
           );
         })}

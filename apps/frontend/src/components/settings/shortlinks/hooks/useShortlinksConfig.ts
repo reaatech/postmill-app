@@ -29,6 +29,21 @@ export interface ShortlinkProviderInfo {
   isActive: boolean;
   isConfigured: boolean;
   customDomain: string;
+  configName: string;
+  accountFingerprint: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  configs: ShortlinkAccountConfig[];
+}
+
+export interface ShortlinkAccountConfig {
+  id: string;
+  name: string;
+  accountFingerprint: string;
+  isActive: boolean;
+  customDomain: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ShortlinksConfigResponse {

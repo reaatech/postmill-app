@@ -1,21 +1,31 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
+import { randomBytes } from 'crypto';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
+import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
+import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import {
+  MediaProviderAdapter,
+  MediaProviderCapabilities,
+  MediaGenerationResult,
+} from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { CapabilityNotAvailable } from './errors';
-import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
-export type MediaOperation = 'image' | 'video' | 'tts' | 'stt' | 'upscale' | 'bg-remove' | 'inpaint';
-
-interface MediaProviderConfig {
-  enabled: boolean;
-  operations: string[];
-  c2paAvailable?: boolean;
-  credentials?: Record<string, string>;
-}
+export type MediaOperation =
+  | 'image'
+  | 'video'
+  | 'audio'
+  | 'avatar'
+  | 'tts'
+  | 'stt'
+  | 'upscale'
+  | 'bg-remove'
+  | 'inpaint';
 
 // Read-only, credential-free view of which media providers are active per operation.
-// Surfaced to non-admin users (4F) so they can see what media capabilities the instance
+// Surfaced to non-admin users (4F) so they can see what media capabilities the org
 // has configured without exposing any provider secrets.
 export interface MediaProviderSummaryEntry {
   operation: MediaOperation;
@@ -26,6 +36,8 @@ export interface MediaProviderSummaryEntry {
 const ALL_MEDIA_OPERATIONS: MediaOperation[] = [
   'image',
   'video',
+  'audio',
+  'avatar',
   'tts',
   'stt',
   'upscale',
@@ -33,15 +45,31 @@ const ALL_MEDIA_OPERATIONS: MediaOperation[] = [
   'inpaint',
 ];
 
+// Capability-driven resolution (§11.2): each media operation maps onto the adapter
+// capability flag that declares support for it.
+const OPERATION_CAPABILITY: Record<MediaOperation, keyof MediaProviderCapabilities> = {
+  image: 'image',
+  video: 'video',
+  audio: 'audio',
+  avatar: 'avatar',
+  tts: 'tts',
+  stt: 'stt',
+  upscale: 'upscale',
+  'bg-remove': 'bgRemove',
+  inpaint: 'inpaint',
+};
+
 // §6.4 reconciliation — map each media operation back onto the legacy ai_images /
 // ai_videos credit counters so SubscriptionService.getCreditsFrom keeps seeing
-// consumption. TTS/STT have no legacy credit equivalent → undefined.
+// consumption. TTS/STT/audio have no legacy credit equivalent → undefined.
 const OPERATION_CREDIT_TYPE: Record<MediaOperation, 'ai_images' | 'ai_videos' | undefined> = {
   image: 'ai_images',
   upscale: 'ai_images',
   'bg-remove': 'ai_images',
   inpaint: 'ai_images',
   video: 'ai_videos',
+  avatar: 'ai_videos',
+  audio: undefined,
   tts: undefined,
   stt: undefined,
 };
@@ -53,6 +81,8 @@ const OPERATION_CREDIT_TYPE: Record<MediaOperation, 'ai_images' | 'ai_videos' | 
 const OPERATION_COST_USD: Record<MediaOperation, number> = {
   image: 0.04,
   video: 0.5,
+  audio: 0.1,
+  avatar: 0.5,
   upscale: 0.01,
   'bg-remove': 0.01,
   inpaint: 0.02,
@@ -62,104 +92,159 @@ const OPERATION_COST_USD: Record<MediaOperation, number> = {
 
 // Operations whose output is freshly generated/edited visual media — eligible for
 // C2PA provenance signing (§3.5.20). TTS/STT audio + transcription are excluded.
-const PROVENANCE_OPERATIONS = new Set<MediaOperation>(['image', 'video', 'upscale', 'inpaint', 'bg-remove']);
+const PROVENANCE_OPERATIONS = new Set<MediaOperation>(['image', 'video', 'avatar', 'upscale', 'inpaint', 'bg-remove']);
 
 interface ProvenanceSettings {
   enabled?: boolean;
-  signingKey?: any;
+  signingKey?: unknown;
   signGenerativeOnly?: boolean;
   embedMode?: 'in-file' | 'sidecar' | 'both';
 }
 
-interface MediaStorageSettings {
-  type?: 'local' | 's3' | 'gcs';
-  config?: Record<string, any>;
+interface CostLedgerLike {
+  charge(entry: {
+    id: string;
+    runId: string;
+    tenantId?: string;
+    stepId: string;
+    provider: string;
+    operation: string;
+    modelId: string;
+    inputUnits: number;
+    outputUnits: number;
+    inputUnitType: string;
+    outputUnitType: string;
+    usd: number;
+    at: string;
+  }): Promise<unknown>;
 }
+
+interface ProvenanceSignerLike {
+  sign(
+    artifactUrl: string,
+    manifest: {
+      title: string;
+      format: string;
+      claimGenerator: string;
+      pipelineDefHash: string;
+      runId: string;
+      generatedAt: string;
+      assertions: unknown[];
+    },
+  ): Promise<{ manifestUri?: string } | undefined>;
+}
+
+interface ResolvedMediaProvider {
+  adapter: MediaProviderAdapter;
+  credentials: Record<string, string>;
+}
+
+type AsyncOperation = 'video' | 'audio' | 'avatar';
 
 @Injectable()
 export class AiMediaService {
   private _logger = new Logger(AiMediaService.name);
-  private _providerCache = new Map<string, any>();
-  private _providerConfigCache: { data: Record<string, MediaProviderConfig>; ts: number } | null = null;
-  private readonly _configTtl = 60_000;
 
   constructor(
     private _aiSettings: AiSettingsService,
     private _aiModelProvider: AIModelProvider,
     private _aiSettingsManager: AiSettingsManager,
+    @Optional() private _orgMediaProviderSettings?: OrgMediaProviderSettingsService,
+    @Optional() private _mediaRegistry?: MediaProviderRegistry,
+    @Optional() private _lifecycle?: MediaJobLifecycleService,
   ) {}
 
   // Lazy, guarded singletons for the @reaatech media-pipeline infra packages.
   // `null` = not yet resolved; `false` = resolved-and-unavailable (don't retry).
-  private _costLedger: any | null | false = null;
-  private _artifactStore: any | null | false = null;
-  private _provenanceSigner: any | null | false = null;
+  private _costLedger: CostLedgerLike | null | false = null;
+  private _provenanceSigner: ProvenanceSignerLike | null | false = null;
 
   invalidateProviderCache(): void {
-    this._providerCache.clear();
-    this._providerConfigCache = null;
     this._costLedger = null;
-    this._artifactStore = null;
     this._provenanceSigner = null;
   }
 
   // 4F — read-only summary of configured media providers for the user-facing Brand & AI
-  // settings panel. Returns one entry per media operation listing the enabled providers
-  // (by id) and whether C2PA provenance is available. Never returns credentials.
-  async getMediaProviderSummary(): Promise<MediaProviderSummaryEntry[]> {
-    const configs = await this._getMediaProviderConfigs();
+  // settings panel. Returns one entry per media operation listing the org-enabled
+  // providers (by id) whose adapter declares the capability. Never returns credentials.
+  async getMediaProviderSummary(orgId?: string): Promise<MediaProviderSummaryEntry[]> {
+    const enabled =
+      orgId && this._orgMediaProviderSettings
+        ? await this._safeGetEnabledProviders(orgId)
+        : [];
+
     return ALL_MEDIA_OPERATIONS.map((operation) => {
-      const providers = Object.entries(configs)
-        .filter(
-          ([, cfg]) => !!cfg?.enabled && (cfg.operations?.includes(operation) ?? false),
-        )
-        .map(([id, cfg]) => ({
-          id,
-          enabled: !!cfg.enabled,
-          c2paAvailable: !!cfg.c2paAvailable,
+      const capability = OPERATION_CAPABILITY[operation];
+      const providers = enabled
+        .filter((cfg) => {
+          const adapter = this._mediaRegistry?.get(cfg.identifier);
+          if (!adapter?.capabilities[capability]) return false;
+          const ops = cfg.extraConfig.operations;
+          return !ops || ops.length === 0 || ops.includes(operation);
+        })
+        .map((cfg) => ({
+          id: cfg.identifier,
+          enabled: true,
+          c2paAvailable: !!cfg.extraConfig.c2paAvailable,
         }));
       return { operation, available: providers.length > 0, providers };
     });
   }
 
+  private async _safeGetEnabledProviders(orgId: string) {
+    try {
+      return (await this._orgMediaProviderSettings?.getEnabledProviders(orgId)) || [];
+    } catch (err) {
+      this._logger.warn(`Could not load media provider configs: ${(err as Error).message}`);
+      return [];
+    }
+  }
+
+  // Capability-driven, deterministic (alphabetical) resolution over the org's enabled +
+  // credentialed `MediaProviderConfig` rows. Per-org rows are the single source of
+  // truth — the legacy `ragSettings.mediaProviders` blob is gone (plan step 6).
+  private async _resolveForOperation(
+    orgId: string | undefined,
+    operation: MediaOperation,
+  ): Promise<ResolvedMediaProvider[]> {
+    if (!orgId || !this._orgMediaProviderSettings || !this._mediaRegistry) return [];
+
+    const enabled = await this._safeGetEnabledProviders(orgId);
+    const capability = OPERATION_CAPABILITY[operation];
+    const resolved: ResolvedMediaProvider[] = [];
+
+    for (const cfg of [...enabled].sort((a, b) => a.identifier.localeCompare(b.identifier))) {
+      const adapter = this._mediaRegistry.get(cfg.identifier);
+      if (!adapter || !adapter.capabilities[capability]) continue;
+
+      const ops = cfg.extraConfig.operations;
+      if (ops && ops.length > 0 && !ops.includes(operation)) continue;
+
+      const full = await this._orgMediaProviderSettings.getConfigForProvider(orgId, cfg.identifier);
+      if (!full || Object.keys(full.credentials).length === 0) continue;
+
+      resolved.push({ adapter, credentials: full.credentials });
+    }
+    return resolved;
+  }
+
   // ── @reaatech/media-pipeline-mcp-cost — per-call cost ledger (§2.4/§6.4) ──
-  private async _getCostLedger(): Promise<any | null> {
+  private async _getCostLedger(): Promise<CostLedgerLike | null> {
     if (this._costLedger !== null) return this._costLedger || null;
     try {
       const { InMemoryCostLedger } = await import('@reaatech/media-pipeline-mcp-cost');
-      this._costLedger = new InMemoryCostLedger();
-    } catch (err: any) {
-      this._logger.warn(`media-pipeline-mcp-cost unavailable: ${err?.message}`);
+      this._costLedger = new InMemoryCostLedger() as CostLedgerLike;
+    } catch (err) {
+      this._logger.warn(`media-pipeline-mcp-cost unavailable: ${(err as Error)?.message}`);
       this._costLedger = false;
     }
     return this._costLedger || null;
   }
 
-  // ── @reaatech/media-pipeline-mcp-storage — artifact persistence (§2.4) ──
-  // Configured via settings.ragSettings.mediaStorage; absent = no storage (outputs
-  // keep their provider-hosted URL — byte-for-byte today's behaviour).
-  private async _getArtifactStore(): Promise<any | null> {
-    if (this._artifactStore !== null) return this._artifactStore || null;
-    try {
-      const settings = await this._aiSettingsManager.getSettings();
-      const storageCfg: MediaStorageSettings | undefined = settings?.ragSettings?.mediaStorage;
-      if (!storageCfg?.type || !storageCfg?.config) {
-        this._artifactStore = false;
-        return null;
-      }
-      const { createStorage } = await import('@reaatech/media-pipeline-mcp-storage');
-      this._artifactStore = createStorage({ type: storageCfg.type, config: storageCfg.config } as any);
-    } catch (err: any) {
-      this._logger.warn(`media-pipeline-mcp-storage unavailable: ${err?.message}`);
-      this._artifactStore = false;
-    }
-    return this._artifactStore || null;
-  }
-
   // ── @reaatech/media-pipeline-mcp-provenance — C2PA signing (§3.5.20) ──
   // Off unless settings.ragSettings.provenance.enabled with a signing key. Degrades
   // to unsigned output silently when disabled or unavailable (risk register).
-  private async _getProvenanceSigner(): Promise<any | null> {
+  private async _getProvenanceSigner(): Promise<ProvenanceSignerLike | null> {
     if (this._provenanceSigner !== null) return this._provenanceSigner || null;
     try {
       const settings = await this._aiSettingsManager.getSettings();
@@ -174,9 +259,9 @@ export class AiMediaService {
         signingKey: prov.signingKey,
         signGenerativeOnly: prov.signGenerativeOnly ?? true,
         embedMode: prov.embedMode ?? 'sidecar',
-      } as any);
-    } catch (err: any) {
-      this._logger.warn(`media-pipeline-mcp-provenance unavailable: ${err?.message}`);
+      } as ConstructorParameters<typeof ProvenanceSigner>[0]) as ProvenanceSignerLike;
+    } catch (err) {
+      this._logger.warn(`media-pipeline-mcp-provenance unavailable: ${(err as Error)?.message}`);
       this._provenanceSigner = false;
     }
     return this._provenanceSigner || null;
@@ -192,8 +277,7 @@ export class AiMediaService {
     const signer = await this._getProvenanceSigner();
     if (!signer) return undefined;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const runId = `media-${Date.now()}-${require('crypto').randomBytes(3).toString('hex')}`;
+      const runId = `media-${Date.now()}-${randomBytes(3).toString('hex')}`;
       const result = await signer.sign(artifactUrl, {
         title: `AI ${operation}`,
         format: 'application/octet-stream',
@@ -210,8 +294,8 @@ export class AiMediaService {
         ],
       });
       return result?.manifestUri;
-    } catch (err: any) {
-      this._logger.warn(`Provenance signing failed (continuing unsigned): ${err?.message}`);
+    } catch (err) {
+      this._logger.warn(`Provenance signing failed (continuing unsigned): ${(err as Error)?.message}`);
       return undefined;
     }
   }
@@ -227,8 +311,7 @@ export class AiMediaService {
     if (ledger) {
       try {
         await ledger.charge({
-          // eslint-disable-next-line @typescript-eslint/no-require-imports
-          id: `media-${Date.now()}-${require('crypto').randomBytes(3).toString('hex')}`,
+          id: `media-${Date.now()}-${randomBytes(3).toString('hex')}`,
           runId: orgId ?? 'system',
           tenantId: orgId,
           stepId: operation,
@@ -242,16 +325,16 @@ export class AiMediaService {
           usd,
           at: new Date().toISOString(),
         });
-      } catch (err: any) {
-        this._logger.warn(`Cost ledger charge failed: ${err?.message}`);
+      } catch (err) {
+        this._logger.warn(`Cost ledger charge failed: ${(err as Error)?.message}`);
       }
     }
     return usd;
   }
 
-  // Single funnel for persisting a finished media job with the §2.4/§6.4 metadata:
-  // real $ cost (-cost), legacy creditType mapping, optional C2PA provenance
-  // (-provenance) and optional artifact persistence (-storage).
+  // Single funnel for persisting a finished (synchronous) media job with the §2.4/§6.4
+  // metadata: real $ cost (-cost), legacy creditType mapping and optional C2PA
+  // provenance (-provenance). Async jobs go through MediaJobLifecycleService instead.
   private async _persistJob(params: {
     operation: MediaOperation;
     provider: string;
@@ -289,357 +372,308 @@ export class AiMediaService {
     return { artifactUrl: params.artifactUrl, provenance, costUsd };
   }
 
-  private async _getMediaProviderConfigs(): Promise<Record<string, MediaProviderConfig>> {
-    if (this._providerConfigCache && Date.now() - this._providerConfigCache.ts < this._configTtl) {
-      return this._providerConfigCache.data;
-    }
+  // ── Image (synchronous, §10.3/§11.2) ──
 
-    const settings = await this._aiSettingsManager.getSettings();
-    const result: Record<string, MediaProviderConfig> = {};
+  // All image generation routes through the media surface: org-configured image-capable
+  // media providers first (standardized result), then the AI facade's imageModel() as a
+  // behaviour-preserving fallback for orgs with no image-capable media provider.
+  async generateImageResult(
+    prompt: string,
+    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean },
+  ): Promise<MediaGenerationResult> {
+    const size = options?.size || (options?.isVertical ? '1024x1536' : undefined);
+    const candidates = await this._resolveForOperation(options?.orgId, 'image');
 
-    if (settings?.ragSettings && typeof settings.ragSettings === 'object') {
-      const mp = settings.ragSettings.mediaProviders;
-      if (mp && typeof mp === 'object') {
-        Object.assign(result, mp);
-      }
-    }
-
-    // Also read provider configs for credentials
-    const configs = await this._aiSettings.getProviderConfigs();
-    for (const cfg of configs) {
-      if (result[cfg.identifier]) {
-        try {
-          const decrypted = AuthService.fixedDecryption(cfg.credentials || '');
-          result[cfg.identifier].credentials = JSON.parse(decrypted);
-        } catch {
-          // credentials not available or invalid
-        }
-      }
-    }
-
-    this._providerConfigCache = { data: result, ts: Date.now() };
-    return result;
-  }
-
-  private _hasOperation(providerId: string, operation: string): boolean {
-    const configs = this._providerConfigCache?.data;
-    if (!configs) return false;
-    const cfg = configs[providerId];
-    if (!cfg?.enabled) return false;
-    return cfg.operations?.includes(operation) ?? false;
-  }
-
-  private _getProviderCreds(providerId: string): Record<string, string> | undefined {
-    return this._providerConfigCache?.data?.[providerId]?.credentials;
-  }
-
-  private async _getOrCreateReplicateProvider(): Promise<any> {
-    if (this._providerCache.has('replicate')) return this._providerCache.get('replicate');
-
-    try {
-      const { defineReplicateProvider } = await import('@reaatech/media-pipeline-mcp-replicate');
-      const creds = this._getProviderCreds('replicate');
-      if (!creds?.apiKey) {
-        throw new CapabilityNotAvailable(
-          'Replicate API key not configured. Please add credentials in Admin > AI Settings.',
-          'image_edit',
+    for (const candidate of candidates) {
+      try {
+        const result = await candidate.adapter.generateImage(prompt, {
+          credentials: candidate.credentials,
+          size,
+        });
+        const first = result.image || result.images?.[0];
+        if (!first) throw new Error('adapter returned no image');
+        await this._persistJob({
+          operation: 'image',
+          provider: candidate.adapter.identifier,
+          model: result.metadata?.model,
+          orgId: options?.orgId,
+          userId: options?.userId,
+          artifactUrl: first,
+        });
+        return {
+          multi: !!result.multi && (result.images?.length || 0) > 1,
+          image: first,
+          images: result.images?.length ? result.images : [first],
+          metadata: result.metadata,
+        };
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} image generation failed: ${(err as Error).message} — trying next`,
         );
       }
-      const provider = defineReplicateProvider({ apiKey: creds.apiKey });
-      this._providerCache.set('replicate', provider);
-      return provider;
-    } catch (err: any) {
-      if (err instanceof CapabilityNotAvailable) throw err;
-      throw new CapabilityNotAvailable(
-        `Replicate provider not available: ${err.message}`,
-        'image_edit',
-      );
     }
-  }
 
-  private async _getOrCreateLumaProvider(): Promise<any> {
-    if (this._providerCache.has('luma')) return this._providerCache.get('luma');
-
-    try {
-      const { LumaProvider } = await import('@reaatech/media-pipeline-mcp-luma');
-      const creds = this._getProviderCreds('luma');
-      if (!creds?.apiKey) {
-        throw new CapabilityNotAvailable(
-          'Luma API key not configured. Please add credentials in Admin > AI Settings.',
-          'video',
-        );
-      }
-      const provider = new LumaProvider({ apiKey: creds.apiKey });
-      this._providerCache.set('luma', provider);
-      return provider;
-    } catch (err: any) {
-      if (err instanceof CapabilityNotAvailable) throw err;
-      throw new CapabilityNotAvailable(
-        `Luma video provider not available: ${err.message}`,
-        'video',
-      );
-    }
-  }
-
-  private async _getOrCreateElevenLabsProvider(): Promise<any> {
-    if (this._providerCache.has('elevenlabs')) return this._providerCache.get('elevenlabs');
-
-    try {
-      const { defineElevenLabsProvider } = await import('@reaatech/media-pipeline-mcp-elevenlabs');
-      const creds = this._getProviderCreds('elevenlabs');
-      if (!creds?.apiKey) {
-        throw new CapabilityNotAvailable(
-          'ElevenLabs API key not configured. Please add credentials in Admin > AI Settings.',
-          'speech',
-        );
-      }
-      const provider = defineElevenLabsProvider({ apiKey: creds.apiKey });
-      this._providerCache.set('elevenlabs', provider);
-      return provider;
-    } catch (err: any) {
-      if (err instanceof CapabilityNotAvailable) throw err;
-      throw new CapabilityNotAvailable(
-        `ElevenLabs TTS provider not available: ${err.message}`,
-        'speech',
-      );
-    }
-  }
-
-  private async _getOrCreateDeepgramProvider(): Promise<any> {
-    if (this._providerCache.has('deepgram')) return this._providerCache.get('deepgram');
-
-    try {
-      const { defineDeepgramProvider } = await import('@reaatech/media-pipeline-mcp-deepgram');
-      const creds = this._getProviderCreds('deepgram');
-      if (!creds?.apiKey) {
-        throw new CapabilityNotAvailable(
-          'Deepgram API key not configured. Please add credentials in Admin > AI Settings.',
-          'speech',
-        );
-      }
-      const provider = defineDeepgramProvider({ apiKey: creds.apiKey });
-      this._providerCache.set('deepgram', provider);
-      return provider;
-    } catch (err: any) {
-      if (err instanceof CapabilityNotAvailable) throw err;
-      throw new CapabilityNotAvailable(
-        `Deepgram STT provider not available: ${err.message}`,
-        'speech',
-      );
-    }
-  }
-
-  async generateImage(prompt: string, options?: { size?: string; orgId?: string; userId?: string }): Promise<string> {
+    // Fallback: the AI provider facade (today's behaviour when no media provider is set).
     const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
     if (!model) {
       throw new CapabilityNotAvailable('Image generation is not available on the current AI provider', 'image');
     }
-
-    const result = await model.generate(prompt, { size: options?.size });
+    const url = await model.generate(prompt, { size });
 
     await this._persistJob({
       operation: 'image',
       provider: 'ai-media',
       orgId: options?.orgId,
       userId: options?.userId,
-      artifactUrl: result,
+      artifactUrl: url,
     });
 
-    return result;
+    return { multi: false, image: url, images: [url] };
   }
 
-  async generateVideo(prompt: string, options?: { orgId?: string; userId?: string }): Promise<string> {
-    try {
-      await this._getMediaProviderConfigs();
-      if (!this._hasOperation('luma', 'video')) {
-        throw new CapabilityNotAvailable(
-          'Video generation is not enabled. Enable Luma in Admin > AI Settings > Media Providers.',
-          'video',
-        );
-      }
+  async generateImage(
+    prompt: string,
+    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean },
+  ): Promise<string> {
+    const result = await this.generateImageResult(prompt, options);
+    return result.image || '';
+  }
 
-      const luma = await this._getOrCreateLumaProvider();
-      const result = await luma.execute({
-        operation: 'video.generate',
-        input: { prompt },
-        options: {},
-      });
+  // ── Async generation (video / audio / avatar, §11.2) ──
 
-      const outputUrl = result?.output?.uri || result?.output?.url || result?.uri || result?.url;
-
-      await this._persistJob({
-        operation: 'video',
-        provider: 'luma',
-        orgId: options?.orgId,
-        userId: options?.userId,
-        artifactUrl: outputUrl,
-      });
-
-      return outputUrl || 'video_generation_completed';
-    } catch (err: any) {
-      if (err instanceof CapabilityNotAvailable) {
-        this._logger.warn('Video generation not available — falling back to image');
-        const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
-        const result = await model.generate(prompt, { size: '1024x1024' });
-        return result;
-      }
-      this._logger.error(`Video generation failed: ${err.message}`);
-      const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
-      const result = await model.generate(prompt, { size: '1024x1024' });
-      return result;
+  // Starts a tracked async job. Returns the AIMediaJob id (poll `/ai/media-jobs`), or —
+  // for providers that complete synchronously — the stored artifact URL.
+  private async _startAsyncJob(
+    operation: AsyncOperation,
+    prompt: string,
+    options?: { orgId?: string; userId?: string; sourceUrl?: string; voice?: string },
+  ): Promise<string> {
+    const candidates = await this._resolveForOperation(options?.orgId, operation);
+    if (candidates.length === 0) {
+      throw new CapabilityNotAvailable(
+        `No media provider with ${operation} capability is configured. Configure one in Settings > Media.`,
+        operation === 'audio' ? 'speech' : 'video',
+      );
     }
-  }
 
-  async textToSpeech(text: string, options?: { voice?: string; orgId?: string; userId?: string }): Promise<Buffer> {
-    await this._getMediaProviderConfigs();
+    let lastError: Error | undefined;
+    for (const candidate of candidates) {
+      const method =
+        operation === 'video'
+          ? candidate.adapter.generateVideo.bind(candidate.adapter)
+          : operation === 'audio'
+            ? candidate.adapter.generateAudio.bind(candidate.adapter)
+            : candidate.adapter.generateAvatar.bind(candidate.adapter);
 
-    if (this._hasOperation('elevenlabs', 'tts')) {
-      try {
-        const elevenlabs = await this._getOrCreateElevenLabsProvider();
-        const result = await elevenlabs.execute({
-          operation: 'audio.tts',
-          input: { text },
-          options: { voice: options?.voice || 'alloy' },
+      // Tracked path — requires an org (the job ledger is org-scoped) and the lifecycle service.
+      if (options?.orgId && this._lifecycle) {
+        const costUsd = await this._chargeCost(
+          operation,
+          candidate.adapter.identifier,
+          candidate.adapter.identifier,
+          options.orgId,
+        );
+        const job = await this._lifecycle.createPendingJob({
+          organizationId: options.orgId,
+          userId: options.userId,
+          provider: candidate.adapter.identifier,
+          operation,
+          costUsd,
+          creditType: OPERATION_CREDIT_TYPE[operation],
         });
 
-        const audioData = result?.output?.data || result?.output;
+        try {
+          const submission = await method(prompt, {
+            credentials: candidate.credentials,
+            sourceUrl: options?.sourceUrl,
+            voice: options?.voice,
+            webhookUrl: this._lifecycle.webhookUrlFor(job.id, options.orgId),
+          });
+
+          if (submission.artifactUrl) {
+            // Synchronous provider — complete immediately (download + store + notify).
+            await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
+            const finished = await this._lifecycle.getJob(job.id);
+            return finished?.artifactUrl || job.id;
+          }
+
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          return job.id;
+        } catch (err) {
+          lastError = err as Error;
+          this._logger.warn(
+            `Media provider ${candidate.adapter.identifier} ${operation} failed: ${lastError.message} — trying next`,
+          );
+          await this._lifecycle.failJob(job, lastError.message, { notify: false });
+        }
+        continue;
+      }
+
+      // Untracked path (no org context) — submit and return the provider's raw job id.
+      try {
+        const submission = await method(prompt, {
+          credentials: candidate.credentials,
+          sourceUrl: options?.sourceUrl,
+          voice: options?.voice,
+        });
         await this._persistJob({
-          operation: 'tts',
-          provider: 'elevenlabs',
+          operation,
+          provider: candidate.adapter.identifier,
           orgId: options?.orgId,
           userId: options?.userId,
         });
-        if (Buffer.isBuffer(audioData)) return audioData;
-        if (typeof audioData === 'string') return Buffer.from(audioData, 'base64');
-        return Buffer.from(JSON.stringify(result), 'utf-8');
-      } catch (err: any) {
-        this._logger.warn(`ElevenLabs TTS failed: ${err.message}`);
-      }
-    }
-
-    if (this._hasOperation('openai', 'tts')) {
-      try {
-        const { defineOpenAIProvider } = await import('@reaatech/media-pipeline-mcp-openai' as any);
-        const creds = this._getProviderCreds('openai');
-        if (creds?.apiKey) {
-          const openai = defineOpenAIProvider({ apiKey: creds.apiKey });
-          const result = await openai.execute({
-            operation: 'audio.tts',
-            input: { text },
-            options: { voice: options?.voice || 'alloy' },
-          });
-          const audioData = result?.output?.data || result?.output;
-          if (Buffer.isBuffer(audioData)) return audioData;
-          if (typeof audioData === 'string') return Buffer.from(audioData, 'base64');
-        }
-      } catch (err: any) {
-        this._logger.warn(`OpenAI TTS failed: ${err.message}`);
+        return submission.artifactUrl || submission.jobId;
+      } catch (err) {
+        lastError = err as Error;
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} ${operation} failed: ${lastError.message} — trying next`,
+        );
       }
     }
 
     throw new CapabilityNotAvailable(
-      'Text-to-speech is not available. Enable ElevenLabs or OpenAI TTS in Admin > AI Settings > Media Providers with valid API keys.',
-      'speech',
+      `All configured ${operation} providers failed${lastError ? `: ${lastError.message}` : ''}`,
+      operation === 'audio' ? 'speech' : 'video',
     );
   }
 
-  async speechToText(audio: Buffer, options?: { orgId?: string }): Promise<string> {
-    await this._getMediaProviderConfigs();
+  async generateVideo(
+    prompt: string,
+    options?: { orgId?: string; userId?: string; sourceUrl?: string },
+  ): Promise<string> {
+    try {
+      return await this._startAsyncJob('video', prompt, options);
+    } catch (err) {
+      // Behaviour-preserving fallback: orgs with no video provider get an image instead.
+      if (err instanceof CapabilityNotAvailable) {
+        this._logger.warn('Video generation not available — falling back to image');
+      } else {
+        this._logger.error(`Video generation failed: ${(err as Error).message}`);
+      }
+      const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
+      return model.generate(prompt, { size: '1024x1024' });
+    }
+  }
 
-    if (this._hasOperation('deepgram', 'stt')) {
+  generateAudio(
+    prompt: string,
+    options?: { orgId?: string; userId?: string; voice?: string },
+  ): Promise<string> {
+    return this._startAsyncJob('audio', prompt, options);
+  }
+
+  generateAvatar(
+    prompt: string,
+    options?: { orgId?: string; userId?: string; sourceUrl?: string },
+  ): Promise<string> {
+    return this._startAsyncJob('avatar', prompt, options);
+  }
+
+  // ── Speech (synchronous) ──
+
+  async textToSpeech(
+    text: string,
+    options?: { voice?: string; orgId?: string; userId?: string },
+  ): Promise<Buffer> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'tts');
+
+    for (const candidate of candidates) {
+      if (!candidate.adapter.textToSpeech) continue;
       try {
-        const deepgram = await this._getOrCreateDeepgramProvider();
-        const result = await deepgram.execute({
-          operation: 'audio.stt',
-          input: { audio },
-          options: {},
+        const result = await candidate.adapter.textToSpeech(text, {
+          credentials: candidate.credentials,
+          voice: options?.voice,
         });
-        const text =
-          typeof result?.output?.text === 'string'
-            ? result.output.text
-            : typeof result?.output === 'string'
-              ? result.output
-              : undefined;
-        if (typeof text === 'string') {
-          await this._persistJob({
-            operation: 'stt',
-            provider: 'deepgram',
-            orgId: options?.orgId,
-          });
-          return text;
-        }
-      } catch (err: any) {
-        this._logger.warn(`Deepgram STT failed: ${err.message}`);
-      }
-    }
-
-    if (this._hasOperation('openai', 'stt')) {
-      try {
-        const { defineOpenAIProvider } = await import('@reaatech/media-pipeline-mcp-openai' as any);
-        const creds = this._getProviderCreds('openai');
-        if (creds?.apiKey) {
-          const openai = defineOpenAIProvider({ apiKey: creds.apiKey });
-          const result = await openai.execute({
-            operation: 'audio.stt',
-            input: { audio },
-            options: {},
-          });
-          if (typeof result?.output?.text === 'string') return result.output.text;
-          if (typeof result?.output === 'string') return result.output;
-        }
-      } catch (err: any) {
-        this._logger.warn(`OpenAI STT failed: ${err.message}`);
+        await this._persistJob({
+          operation: 'tts',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          userId: options?.userId,
+        });
+        if (Buffer.isBuffer(result)) return result;
+        if (typeof result === 'string') return Buffer.from(result, 'base64');
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} TTS failed: ${(err as Error).message} — trying next`,
+        );
       }
     }
 
     throw new CapabilityNotAvailable(
-      'Speech-to-text is not available. Enable Deepgram or OpenAI STT in Admin > AI Settings > Media Providers with valid API keys.',
+      'Text-to-speech is not available. Configure a TTS-capable media provider (ElevenLabs or OpenAI) in Settings > Media.',
       'speech',
     );
   }
+
+  async speechToText(
+    audio: Buffer,
+    options?: { orgId?: string; userId?: string },
+  ): Promise<string> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'stt');
+
+    for (const candidate of candidates) {
+      if (!candidate.adapter.speechToText) continue;
+      try {
+        const text = await candidate.adapter.speechToText(audio, {
+          credentials: candidate.credentials,
+        });
+        await this._persistJob({
+          operation: 'stt',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          userId: options?.userId,
+        });
+
+        // §11.1: persist the transcript as a document under documents/ (best-effort).
+        if (options?.orgId && this._lifecycle) {
+          try {
+            await this._lifecycle.storeTranscript({
+              organizationId: options.orgId,
+              provider: candidate.adapter.identifier,
+              text,
+            });
+          } catch (err) {
+            this._logger.warn(`Transcript storage failed (non-fatal): ${(err as Error).message}`);
+          }
+        }
+
+        return text;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} STT failed: ${(err as Error).message} — trying next`,
+        );
+      }
+    }
+
+    throw new CapabilityNotAvailable(
+      'Speech-to-text is not available. Configure an STT-capable media provider (Deepgram or OpenAI) in Settings > Media.',
+      'speech',
+    );
+  }
+
+  // ── Image edits (synchronous) ──
 
   async upscaleImage(imageUrl: string, options?: { orgId?: string }): Promise<string> {
-    await this._getMediaProviderConfigs();
+    const candidates = await this._resolveForOperation(options?.orgId, 'upscale');
 
-    if (this._hasOperation('replicate', 'upscale')) {
+    for (const candidate of candidates) {
+      if (!candidate.adapter.upscaleImage) continue;
       try {
-        const replicate = await this._getOrCreateReplicateProvider();
-        const result = await replicate.execute({
-          operation: 'image.upscale',
-          input: { image: imageUrl },
-          options: {},
+        const result = await candidate.adapter.upscaleImage(imageUrl, {
+          credentials: candidate.credentials,
         });
-        const outputUrl = result?.output?.uri || result?.output?.url || result?.uri || result?.url;
-        if (outputUrl) {
-          const persisted = await this._persistJob({
-            operation: 'upscale',
-            provider: 'replicate',
-            orgId: options?.orgId,
-            artifactUrl: outputUrl,
-          });
-          return persisted.artifactUrl || outputUrl;
-        }
-      } catch (err: any) {
-        this._logger.warn(`Replicate upscale failed: ${err.message}`);
-      }
-    }
-
-    if (this._hasOperation('openai', 'upscale')) {
-      try {
-        const { defineOpenAIProvider } = await import('@reaatech/media-pipeline-mcp-openai' as any);
-        const creds = this._getProviderCreds('openai');
-        if (creds?.apiKey) {
-          const openai = defineOpenAIProvider({ apiKey: creds.apiKey });
-          const result = await openai.execute({
-            operation: 'image.upscale',
-            input: { image: imageUrl },
-            options: {},
-          });
-          const outputUrl = result?.output?.uri || result?.output?.url || result?.uri || result?.url;
-          if (outputUrl) return outputUrl;
-        }
-      } catch {
-        // OpenAI upscale not supported by all models
+        if (!result) continue;
+        const persisted = await this._persistJob({
+          operation: 'upscale',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          artifactUrl: result,
+        });
+        return persisted.artifactUrl || result;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} upscale failed: ${(err as Error).message} — trying next`,
+        );
       }
     }
 
@@ -648,65 +682,66 @@ export class AiMediaService {
   }
 
   async removeBackground(imageUrl: string, options?: { orgId?: string }): Promise<string> {
-    await this._getMediaProviderConfigs();
+    const candidates = await this._resolveForOperation(options?.orgId, 'bg-remove');
 
-    if (this._hasOperation('replicate', 'bg-remove')) {
+    for (const candidate of candidates) {
+      if (!candidate.adapter.removeBackground) continue;
       try {
-        const replicate = await this._getOrCreateReplicateProvider();
-        const result = await replicate.execute({
-          operation: 'image.remove_background',
-          input: { image: imageUrl },
-          options: {},
+        const result = await candidate.adapter.removeBackground(imageUrl, {
+          credentials: candidate.credentials,
         });
-        const outputUrl = result?.output?.uri || result?.output?.url || result?.uri || result?.url;
-        if (outputUrl) {
-          const persisted = await this._persistJob({
-            operation: 'bg-remove',
-            provider: 'replicate',
-            orgId: options?.orgId,
-            artifactUrl: outputUrl,
-          });
-          return persisted.artifactUrl || outputUrl;
-        }
-      } catch (err: any) {
-        this._logger.warn(`Replicate bg-remove failed: ${err.message}`);
+        if (!result) continue;
+        const persisted = await this._persistJob({
+          operation: 'bg-remove',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          artifactUrl: result,
+        });
+        return persisted.artifactUrl || result;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} bg-remove failed: ${(err as Error).message} — trying next`,
+        );
       }
     }
 
     throw new CapabilityNotAvailable(
-      'Background removal is not available. Enable Replicate in Admin > AI Settings > Media Providers with a valid API key.',
+      'Background removal is not available. Configure a media provider with image-edit support (Replicate) in Settings > Media.',
       'image_edit',
     );
   }
 
-  async inpaintImage(imageUrl: string, maskUrl: string, prompt: string, options?: { orgId?: string }): Promise<string> {
-    await this._getMediaProviderConfigs();
+  async inpaintImage(
+    imageUrl: string,
+    maskUrl: string,
+    prompt: string,
+    options?: { orgId?: string },
+  ): Promise<string> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'inpaint');
 
-    if (this._hasOperation('replicate', 'inpaint')) {
+    for (const candidate of candidates) {
+      if (!candidate.adapter.inpaintImage) continue;
       try {
-        const replicate = await this._getOrCreateReplicateProvider();
-        const result = await replicate.execute({
-          operation: 'image.inpaint',
-          input: { image: imageUrl, mask: maskUrl, prompt },
-          options: {},
+        const result = await candidate.adapter.inpaintImage(imageUrl, maskUrl, prompt, {
+          credentials: candidate.credentials,
         });
-        const outputUrl = result?.output?.uri || result?.output?.url || result?.uri || result?.url;
-        if (outputUrl) {
-          const persisted = await this._persistJob({
-            operation: 'inpaint',
-            provider: 'replicate',
-            orgId: options?.orgId,
-            artifactUrl: outputUrl,
-          });
-          return persisted.artifactUrl || outputUrl;
-        }
-      } catch (err: any) {
-        this._logger.warn(`Replicate inpaint failed: ${err.message}`);
+        if (!result) continue;
+        const persisted = await this._persistJob({
+          operation: 'inpaint',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          artifactUrl: result,
+        });
+        return persisted.artifactUrl || result;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} inpaint failed: ${(err as Error).message} — trying next`,
+        );
       }
     }
 
     throw new CapabilityNotAvailable(
-      'Inpainting is not available. Enable Replicate in Admin > AI Settings > Media Providers with a valid API key.',
+      'Inpainting is not available. Configure a media provider with image-edit support (Replicate) in Settings > Media.',
       'image_edit',
     );
   }

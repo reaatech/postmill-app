@@ -191,21 +191,6 @@ export class IntegrationsController {
     return this._integrationService.updateNameAndUrl(id, name, url);
   }
 
-  @Get('/:id')
-  getSingleIntegration(
-    @Param('id') id: string,
-    @Query('order') order: string,
-    @GetUserFromRequest() user: User,
-    @GetOrgFromRequest() org: Organization
-  ) {
-    return this._integrationService.getIntegrationForOrder(
-      id,
-      order,
-      user.id,
-      org.id
-    );
-  }
-
   @Get('/social/:integration')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
   async getIntegrationUrl(

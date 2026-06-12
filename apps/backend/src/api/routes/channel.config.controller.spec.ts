@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
+import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 vi.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
   socialIntegrationList: [
@@ -55,8 +56,6 @@ function createDbConfig(overrides: Record<string, any> = {}): Record<string, any
 }
 
 const adminUser = { id: '1', isSuperAdmin: true } as any;
-const nonAdminUser = { id: '2', isSuperAdmin: false } as any;
-const nullUser = null as any;
 
 let controller: ChannelConfigController;
 
@@ -68,27 +67,46 @@ beforeEach(() => {
   );
   mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: undefined, clientSecret: undefined });
   mockProviderConfigManager.refreshCache.mockResolvedValue(undefined);
-});
-
-describe('assertSuperAdmin', () => {
-  it('should not throw when user.isSuperAdmin is true', () => {
-    expect(() => (controller as any).assertSuperAdmin(adminUser)).not.toThrow();
   });
 
-  it('should throw ForbiddenException when isSuperAdmin is false', () => {
-    expect(() => (controller as any).assertSuperAdmin(nonAdminUser)).toThrow(ForbiddenException);
+  // ---------------------------------------------------------------------------
+  // Permission guards
+  // ---------------------------------------------------------------------------
+  describe('permission guards', () => {
+    it('listConfigs is gated with channels:manage permission', () => {
+      const metadata = Reflect.getMetadata(
+        REQUIRE_PERMISSION_KEY,
+        controller.listConfigs,
+      );
+      expect(metadata).toEqual({ resource: 'channels', action: 'manage' });
+    });
+
+    it('getConfig is gated with channels:manage permission', () => {
+      const metadata = Reflect.getMetadata(
+        REQUIRE_PERMISSION_KEY,
+        controller.getConfig,
+      );
+      expect(metadata).toEqual({ resource: 'channels', action: 'manage' });
+    });
+
+    it('saveConfig is gated with channels:manage permission', () => {
+      const metadata = Reflect.getMetadata(
+        REQUIRE_PERMISSION_KEY,
+        controller.saveConfig,
+      );
+      expect(metadata).toEqual({ resource: 'channels', action: 'manage' });
+    });
+
+    it('deleteConfig is gated with channels:manage permission', () => {
+      const metadata = Reflect.getMetadata(
+        REQUIRE_PERMISSION_KEY,
+        controller.deleteConfig,
+      );
+      expect(metadata).toEqual({ resource: 'channels', action: 'manage' });
+    });
   });
 
-  it('should throw ForbiddenException when user is null', () => {
-    expect(() => (controller as any).assertSuperAdmin(nullUser)).toThrow(ForbiddenException);
-  });
-
-  it('should throw ForbiddenException when user is undefined', () => {
-    expect(() => (controller as any).assertSuperAdmin(undefined)).toThrow(ForbiddenException);
-  });
-});
-
-describe('listConfigs', () => {
+  describe('listConfigs', () => {
   it('should return all integrations with config data merged in', async () => {
     const dbConfigs = [
       createDbConfig({ identifier: 'x', enabled: true, scopes: null, setupInstructions: 'Setup X' }),
@@ -204,10 +222,6 @@ describe('listConfigs', () => {
     const web3 = result.find((r: any) => r.identifier === 'web3-test');
     expect(web3.description).toBe('');
   });
-
-  it('should throw ForbiddenException for non-admin user', async () => {
-    await expect(controller.listConfigs(nonAdminUser)).rejects.toThrow(ForbiddenException);
-  });
 });
 
 describe('getConfig', () => {
@@ -285,10 +299,6 @@ describe('getConfig', () => {
     const result = await controller.getConfig(adminUser, 'x');
 
     expect(result.isConfigured).toBe(true);
-  });
-
-  it('should throw ForbiddenException for non-admin user', async () => {
-    await expect(controller.getConfig(nonAdminUser, 'x')).rejects.toThrow(ForbiddenException);
   });
 });
 
@@ -399,11 +409,6 @@ describe('saveConfig', () => {
     );
     warnSpy.mockRestore();
   });
-
-  it('should throw ForbiddenException for non-admin user', async () => {
-    await expect(controller.saveConfig(nonAdminUser, 'x', validBody))
-      .rejects.toThrow(ForbiddenException);
-  });
 });
 
 describe('deleteConfig', () => {
@@ -451,9 +456,5 @@ describe('deleteConfig', () => {
     mockProviderConfigService.delete.mockRejectedValue(genericError);
 
     await expect(controller.deleteConfig(adminUser, 'x')).rejects.toThrow('DB connection failed');
-  });
-
-  it('should throw ForbiddenException for non-admin user', async () => {
-    await expect(controller.deleteConfig(nonAdminUser, 'x')).rejects.toThrow(ForbiddenException);
   });
 });

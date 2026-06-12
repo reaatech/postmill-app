@@ -25,6 +25,7 @@ const XAI_CREDENTIAL_FIELDS: CredentialField[] = [
 ];
 
 const XAI_MODELS: ModelInfo[] = [
+  { id: 'grok-3-reasoning', label: 'Grok 3 Reasoning', kind: 'text', capabilities: XAI_CAPABILITIES, reasoning: true },
   { id: 'grok-4', label: 'Grok 4', kind: 'text', capabilities: XAI_CAPABILITIES },
   { id: 'grok-4-mini', label: 'Grok 4 Mini', kind: 'text', capabilities: XAI_CAPABILITIES },
   { id: 'grok-2-1212', label: 'Grok 2', kind: 'text', capabilities: { ...XAI_CAPABILITIES, vision: false } },

@@ -27,7 +27,7 @@ const VERTEX_CREDENTIAL_FIELDS: CredentialField[] = [
 ];
 
 const VERTEX_MODELS: ModelInfo[] = [
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', kind: 'text', capabilities: { ...VERTEX_CAPABILITIES, embeddings: false } },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', kind: 'text', capabilities: { ...VERTEX_CAPABILITIES, embeddings: false }, reasoning: true },
   { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', kind: 'text', capabilities: { ...VERTEX_CAPABILITIES, embeddings: false } },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', kind: 'text', capabilities: { ...VERTEX_CAPABILITIES, embeddings: false } },
   { id: 'text-embedding-004', label: 'Text Embedding 004', kind: 'embedding', dimension: 768, capabilities: { text: false, image: false, vision: false, embeddings: true, speech: false, tools: false } },
@@ -40,7 +40,8 @@ export class VertexAdapter implements AIProviderAdapter {
   private readonly _logger = new Logger(VertexAdapter.name);
   readonly identifier = 'vertex';
   readonly name = 'Google Vertex AI';
-  readonly type = 'direct' as const;
+  // Hub: Google cloud aggregator fronting Gemini + Anthropic + Llama + others.
+  readonly type = 'hub' as const;
   readonly credentialFields = VERTEX_CREDENTIAL_FIELDS;
   readonly capabilities = VERTEX_CAPABILITIES;
   readonly privacy = {

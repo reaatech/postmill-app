@@ -165,8 +165,9 @@ export class StripeService {
     }
 
     const users = await this._organizationService.getTeam(organization.id);
+    const email = users!.users[0].user.email;
     const customer = await stripe.customers.create({
-      email: users.users[0].user.email.indexOf('@') > -1 ? users.users[0].user.email : `${users.users[0].user.email}@postiz.com`,
+      email: email.indexOf('@') > -1 ? email : `${email}@postiz.com`,
       name: organization.name,
     });
     await this._subscriptionService.updateCustomerId(

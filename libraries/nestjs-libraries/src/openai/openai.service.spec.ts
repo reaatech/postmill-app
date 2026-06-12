@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BudgetExceeded, GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
 
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { OpenaiService, PROMPT_CONSTANTS } from './openai.service';
 
 function mockAIModelProvider() {
@@ -32,22 +33,26 @@ function mockAIModelProvider() {
 describe('OpenaiService', () => {
   let service: OpenaiService;
   let aiModelProvider: AIModelProvider;
+  let aiMediaService: { generateImage: ReturnType<typeof vi.fn> };
   let mocks: ReturnType<typeof mockAIModelProvider>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mocks = mockAIModelProvider();
     aiModelProvider = mocks.provider as unknown as AIModelProvider;
-    service = new OpenaiService(aiModelProvider);
+    aiMediaService = {
+      generateImage: vi.fn().mockResolvedValue('https://cdn.example.com/image.png'),
+    };
+    service = new OpenaiService(aiModelProvider, aiMediaService as unknown as AiMediaService);
   });
 
-  describe('generateImage', () => {
-    it('calls imageModel with scope "utility" and passes prompt', async () => {
+  describe('generateImage (§10.3 — routed through the media surface)', () => {
+    it('delegates to AiMediaService.generateImage with the prompt', async () => {
       const result = await service.generateImage('a dragon in flight');
 
-      expect(aiModelProvider.imageModel).toHaveBeenCalledWith('utility', undefined);
-      expect(mocks.mockImageGenerator.generate).toHaveBeenCalledWith('a dragon in flight', {
+      expect(aiMediaService.generateImage).toHaveBeenCalledWith('a dragon in flight', {
         size: '1024x1024',
+        orgId: undefined,
       });
       expect(result).toBe('https://cdn.example.com/image.png');
     });
@@ -55,15 +60,19 @@ describe('OpenaiService', () => {
     it('uses vertical size when isVertical is true', async () => {
       await service.generateImage('a dragon', true);
 
-      expect(mocks.mockImageGenerator.generate).toHaveBeenCalledWith('a dragon', {
+      expect(aiMediaService.generateImage).toHaveBeenCalledWith('a dragon', {
         size: '1024x1536',
+        orgId: undefined,
       });
     });
 
-    it('threads orgId through to imageModel', async () => {
+    it('threads orgId through to the media surface', async () => {
       await service.generateImage('prompt', false, 'org-42');
 
-      expect(aiModelProvider.imageModel).toHaveBeenCalledWith('utility', 'org-42');
+      expect(aiMediaService.generateImage).toHaveBeenCalledWith('prompt', {
+        size: '1024x1024',
+        orgId: 'org-42',
+      });
     });
   });
 

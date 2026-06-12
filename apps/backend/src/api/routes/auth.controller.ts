@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpException,
   Logger,
   Param,
   Post,
@@ -17,6 +18,7 @@ import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { ForgotPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot.password.dto';
 import { ResendActivationDto } from '@gitroom/nestjs-libraries/dtos/auth/resend-activation.dto';
+import { RefreshTokenDto } from '@gitroom/nestjs-libraries/dtos/auth/refresh-token.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
@@ -26,14 +28,61 @@ import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { Provider } from '@prisma/client';
 import * as Sentry from '@sentry/nestjs';
 import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
+import { AuthProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/auth-providers/auth-provider.repository';
 
 @ApiTags('Auth')
 @Controller('/auth')
 export class AuthController {
   constructor(
     private _authService: AuthService,
-    private _emailService: EmailService
+    private _emailService: EmailService,
+    private _authProviderRepository: AuthProviderRepository
   ) {}
+
+  @Get('/providers')
+  async getProviders() {
+    const dbProviders = await this._authProviderRepository.list();
+    const enabledFromDb = dbProviders.filter((p) => p.enabled);
+
+    if (enabledFromDb.length > 0) {
+      return {
+        providers: enabledFromDb.map((p) => ({
+          provider: p.provider,
+          displayName:
+            p.displayName ||
+            (p.provider === 'GENERIC'
+              ? process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC'
+              : p.provider.charAt(0) + p.provider.slice(1).toLowerCase()),
+        })),
+      };
+    }
+
+    const providers: { provider: string; displayName: string }[] = [
+      { provider: 'LOCAL', displayName: 'Email' },
+    ];
+
+    if (process.env.IS_GENERAL) {
+      if (process.env.POSTMILL_GENERIC_OAUTH) {
+        providers.push({
+          provider: 'GENERIC',
+          displayName:
+            process.env.NEXT_PUBLIC_POSTMILL_OAUTH_DISPLAY_NAME || 'OIDC',
+        });
+      } else {
+        providers.push({ provider: 'GOOGLE', displayName: 'Google' });
+        if (process.env.NEYNAR_CLIENT_ID) {
+          providers.push({ provider: 'FARCASTER', displayName: 'Farcaster' });
+        }
+        if (process.env.STRIPE_PUBLISHABLE_KEY) {
+          providers.push({ provider: 'WALLET', displayName: 'Wallet' });
+        }
+      }
+    } else {
+      providers.push({ provider: 'GITHUB', displayName: 'GitHub' });
+    }
+
+    return { providers };
+  }
 
   @Get('/can-register')
   async canRegister() {
@@ -56,7 +105,7 @@ export class AuthController {
         req?.cookies?.org
       );
 
-      const { jwt, addedOrg } = await this._authService.routeAuth(
+      const { jwt, refreshToken, addedOrg } = await this._authService.routeAuth(
         body.provider,
         body,
         ip,
@@ -83,6 +132,18 @@ export class AuthController {
             }
           : {}),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      });
+
+      response.cookie('refresh_token', refreshToken, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
       });
 
       issueCsrfToken(response);
@@ -127,7 +188,7 @@ export class AuthController {
         req?.cookies?.org
       );
 
-      const { jwt, addedOrg } = await this._authService.routeAuth(
+      const { jwt, refreshToken, addedOrg } = await this._authService.routeAuth(
         body.provider,
         body,
         ip,
@@ -145,6 +206,18 @@ export class AuthController {
             }
           : {}),
         expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      });
+
+      response.cookie('refresh_token', refreshToken, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
       });
 
       if (typeof addedOrg !== 'boolean' && addedOrg?.organizationId) {
@@ -271,9 +344,11 @@ export class AuthController {
     @Body('code') code: string,
     @Body('redirect_uri') redirect_uri: string,
     @Param('provider') provider: string,
-    @Res({ passthrough: false }) response: Response
+    @Res({ passthrough: false }) response: Response,
+    @RealIP() ip: string,
+    @UserAgent() userAgent: string
   ) {
-    const { jwt, token } = await this._authService.checkExists(
+    const { jwt, token, userId } = await this._authService.checkExists(
       provider,
       code,
       redirect_uri
@@ -295,6 +370,21 @@ export class AuthController {
       expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
     });
 
+    if (userId) {
+      const refreshToken = await this._authService.createSession(userId, ip, userAgent);
+      response.cookie('refresh_token', refreshToken, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      });
+    }
+
     issueCsrfToken(response);
 
     response.header('reload', 'true');
@@ -302,5 +392,55 @@ export class AuthController {
     response.status(200).json({
       login: true,
     });
+  }
+
+  @Post('/refresh')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  async refresh(
+    @Req() req: Request,
+    @Body() body: RefreshTokenDto,
+    @Res({ passthrough: false }) response: Response,
+    @RealIP() ip: string,
+    @UserAgent() userAgent: string
+  ) {
+    try {
+      const refreshToken = body.refreshToken || req.cookies?.refresh_token;
+      if (!refreshToken) {
+        throw new HttpException('Refresh token is missing', 400);
+      }
+
+      const { jwt, refreshToken: newRefreshToken } =
+        await this._authService.refreshAccessToken(refreshToken, ip, userAgent);
+
+      response.cookie('auth', jwt, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      });
+
+      response.cookie('refresh_token', newRefreshToken, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      });
+
+      issueCsrfToken(response);
+      response.status(200).json({ login: true });
+    } catch (e: unknown) {
+      Logger.error('Refresh failed', e instanceof Error ? e.message : String(e), AuthController.name);
+      response.status(401).json({ error: 'Invalid or expired refresh token' });
+    }
   }
 }

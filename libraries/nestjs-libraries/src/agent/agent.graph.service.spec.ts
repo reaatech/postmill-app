@@ -129,6 +129,7 @@ import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/po
 import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AgentGraphService } from './agent.graph.service';
+import type { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 
 describe('AgentGraphService', () => {
   let service: AgentGraphService;
@@ -136,6 +137,7 @@ describe('AgentGraphService', () => {
   let postsService: PostsService;
   let mediaService: MediaService;
   let storageService: StorageService;
+  let aiMediaService: { generateImage: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -143,7 +145,16 @@ describe('AgentGraphService', () => {
     mediaService = new (MediaService as any)();
     aiModelProvider = new (AIModelProvider as any)();
     storageService = new (StorageService as any)();
-    service = new AgentGraphService(postsService, mediaService, aiModelProvider, storageService);
+    aiMediaService = {
+      generateImage: vi.fn().mockResolvedValue('https://cdn.example.com/agent-image.png'),
+    };
+    service = new AgentGraphService(
+      postsService,
+      mediaService,
+      aiModelProvider,
+      storageService,
+      aiMediaService as unknown as AiMediaService,
+    );
   });
 
   describe('constructor', () => {
@@ -172,8 +183,8 @@ describe('AgentGraphService', () => {
     });
   });
 
-  describe('generatePictures', () => {
-    it('calls imageModel with scope "generator" and orgId', async () => {
+  describe('generatePictures (§10.3 — routed through the media surface)', () => {
+    it('calls AiMediaService.generateImage with the prompt and orgId', async () => {
       const state = {
         isPicture: true,
         orgId: 'org-1',
@@ -182,7 +193,10 @@ describe('AgentGraphService', () => {
 
       const result = await service.generatePictures(state);
 
-      expect(aiModelProvider.imageModel).toHaveBeenCalledWith('generator', 'org-1');
+      expect(aiMediaService.generateImage).toHaveBeenCalledWith(
+        'A scenic landscape at sunset',
+        { orgId: 'org-1' },
+      );
       expect(result.content[0].image).toBe('https://cdn.example.com/agent-image.png');
     });
 
@@ -195,19 +209,21 @@ describe('AgentGraphService', () => {
 
       const result = await service.generatePictures(state);
 
-      expect(aiModelProvider.imageModel).not.toHaveBeenCalled();
+      expect(aiMediaService.generateImage).not.toHaveBeenCalled();
       expect(result).toEqual({});
     });
 
     it('handles image generation failure gracefully', async () => {
-      const failProvider = {
-        imageModel: vi.fn().mockResolvedValue({
-          generate: vi.fn().mockRejectedValue(new Error('Image gen failed')),
-        }),
-        langchainModel: vi.fn().mockResolvedValue(mockLangchainModel),
-        languageModel: vi.fn().mockResolvedValue(mockLanguageModel),
+      const failingMedia = {
+        generateImage: vi.fn().mockRejectedValue(new Error('Image gen failed')),
       };
-      const svc = new AgentGraphService(postsService, mediaService, failProvider as any);
+      const svc = new AgentGraphService(
+        postsService,
+        mediaService,
+        aiModelProvider,
+        storageService,
+        failingMedia as unknown as AiMediaService,
+      );
 
       const state = {
         isPicture: true,

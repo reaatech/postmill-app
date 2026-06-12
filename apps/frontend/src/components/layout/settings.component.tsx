@@ -37,6 +37,8 @@ import { MediaProvidersTab } from '@gitroom/frontend/components/settings/media-p
 import { StorageTab } from '@gitroom/frontend/components/settings/storage/storage.tab';
 import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/channels.tab';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
+import { RolesTab } from '@gitroom/frontend/components/settings/roles/roles.tab';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -46,33 +48,35 @@ export const SettingsPopup: FC<{
   const toast = useToaster();
   const swr = useSWRConfig();
   const user = useUser();
+  const permissions = usePermissions();
+  const t = useT();
   const resolver = useMemo(() => {
     return classValidatorResolver(UserDetailDto);
   }, []);
   const form = useForm({
     resolver,
   });
-  const picture = form.watch('picture');
   const modal = useModals();
   const close = useCallback(() => {
     return modal.closeAll();
-  }, []);
+  }, [modal]);
   const url = useSearchParams();
   const showLogout = !url.get('onboarding') || user?.tier?.current === 'FREE';
   const loadProfile = useCallback(async () => {
     const personal = await (await fetch('/user/personal')).json();
     form.setValue('fullname', personal.name || '');
+    form.setValue('lastName', personal.lastName || '');
     form.setValue('bio', personal.bio || '');
     form.setValue('picture', personal.picture);
-  }, []);
+  }, [fetch, form]);
   const openMedia = useCallback(() => {
     showMediaBox((values) => {
       form.setValue('picture', values);
     });
-  }, []);
+  }, [form]);
   const remove = useCallback(() => {
     form.setValue('picture', null);
-  }, []);
+  }, [form]);
 
   const submit = useCallback(async (val: any) => {
     await fetch('/user/personal', {
@@ -84,18 +88,26 @@ export const SettingsPopup: FC<{
     }
     toast.show(t('profile_updated', 'Profile updated'));
     close();
-  }, []);
+  }, [close, fetch, getRef, t, toast]);
 
-  const [tab, setTab] = useState(url.get('tab') || 'channels');
-
-  useEffect(() => {
-    const tabParam = url.get('tab');
+  const tabParam = url.get('tab');
+  const [tab, setTab] = useState(tabParam || 'channels');
+  // Sync the active tab when the URL's ?tab= changes (derived state during
+  // render — https://react.dev/learn/you-might-not-need-an-effect).
+  const [prevTabParam, setPrevTabParam] = useState(tabParam);
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam);
     if (tabParam && tabParam !== tab) {
       setTab(tabParam);
     }
-  }, [url, tab]);
-
-  const t = useT();
+  }
+  const canManageRoles =
+    permissions.hasPermission('members', 'manage') ||
+    permissions.hasPermission('settings', 'update');
+  // R5: members whose role lacks settings:read get a no-access state instead
+  // of the settings surface (the backend 403s the underlying calls anyway).
+  const settingsDenied =
+    permissions.isResolved && !permissions.hasPermission('settings', 'read');
   interface SettingsTab {
     tab: string;
     label: string;
@@ -106,10 +118,15 @@ export const SettingsPopup: FC<{
   const list = useMemo(() => {
     const arr: SettingsTab[] = [];
     if (user?.tier?.team_members && isGeneral) {
-      arr.push({ tab: 'teams', label: t('teams', 'Teams'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> });
+      arr.push({ tab: 'teams', label: t('team', 'Team'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> });
+    }
+    // Custom-role editor (§17.1) — admins only (members:manage, or an explicit
+    // settings grant on a custom role).
+    if (canManageRoles) {
+      arr.push({ tab: 'roles', label: t('roles', 'Roles'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> });
     }
     if (user?.tier.current !== 'FREE') {
-      arr.push({ tab: 'brand', label: t('brand', 'Brand'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> });
+      arr.push({ tab: 'brand', label: t('brands', 'Brands'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> });
     }
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'signatures', label: t('signatures', 'Signatures'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> });
@@ -117,10 +134,10 @@ export const SettingsPopup: FC<{
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'sets', label: t('sets', 'Sets'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> });
     }
-    arr.push({ tab: 'channels', label: t('channels', 'Channels'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2a2 2 0 0 0-1.66-.9H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z"/></svg> });
-    arr.push({ tab: 'ai', label: t('ai', 'AI'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 3h.01M12 21h.01M3 12h.01M21 12h.01M4.5 4.5l.01.01M19.5 19.5l.01.01M4.5 19.5l.01.01M19.5 4.5l.01.01"/><circle cx="12" cy="12" r="2"/></svg> });
+    arr.push({ tab: 'channels', label: t('channels', 'Channels'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> });
+    arr.push({ tab: 'ai', label: t('ai_llm', "AI (LLM's)"), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10l5.1-1.7z"/><path d="M18.5 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg> });
     arr.push({ tab: 'shortlinks', label: t('shortlinks', 'Shortlinks'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> });
-    arr.push({ tab: 'media_providers', label: t('media_providers', 'Media'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="2" width="20" height="20" rx="2.18"/><line x1="8" y1="2" x2="8" y2="22"/><line x1="16" y1="2" x2="16" y2="22"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="2" y1="16" x2="22" y2="16"/></svg> });
+    arr.push({ tab: 'media_providers', label: t('media_providers', 'AI Media'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 20 21" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7.50008 3L6.66675 7.16667M13.3334 3L12.5001 7.16667M18.3334 7.16667H1.66675M5.66675 18H14.3334C15.7335 18 16.4336 18 16.9684 17.7275C17.4388 17.4878 17.8212 17.1054 18.0609 16.635C18.3334 16.1002 18.3334 15.4001 18.3334 14V7C18.3334 5.59987 18.3334 4.8998 18.0609 4.36502C17.8212 3.89462 17.4388 3.51217 16.9684 3.27248C16.4336 3 15.7335 3 14.3334 3H5.66675C4.26662 3 3.56655 3 3.03177 3.27248C2.56137 3.51217 2.17892 3.89462 1.93923 4.36502C1.66675 4.8998 1.66675 5.59987 1.66675 7V14C1.66675 15.4001 1.66675 16.1002 1.93923 16.635C2.17892 17.1054 2.56137 17.4878 3.03177 17.7275C3.56655 18 4.26662 18 5.66675 18Z"/></svg> });
     arr.push({ tab: 'storage', label: t('storage', 'Storage'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> });
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks'), section: 'Automation', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="M6 17L3 2l3.05 2.66"/><path d="M16.54 6.76a3 3 0 0 1 3.05 3.64"/><path d="M6 17.01l-2.5 4.99"/></svg> });
@@ -132,18 +149,48 @@ export const SettingsPopup: FC<{
       arr.push({ tab: 'api', label: t('developers', 'Developers'), section: 'Developer', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg> });
     }
     arr.push({ tab: 'approved_apps', label: t('approved_apps', 'Approved Apps'), section: 'Developer', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><polyline points="9 11 12 14 22 4"/></svg> });
+    // Keep the category order, but sort entries alphabetically within each category.
+    const sectionOrder = ['Providers', 'Workspace', 'Automation', 'Developer'];
+    arr.sort((a, b) => {
+      const sectionDiff =
+        sectionOrder.indexOf(a.section || '') - sectionOrder.indexOf(b.section || '');
+      if (sectionDiff !== 0) return sectionDiff;
+      return a.label.localeCompare(b.label);
+    });
     return arr;
-  }, [user, isGeneral, showLogout, t]);
+  }, [user, isGeneral, showLogout, t, canManageRoles]);
 
-  useEffect(() => {
-    if (list.length > 0 && !list.some((item) => item.tab === tab)) {
-      setTab(list[0]?.tab || 'channels');
-    }
-  }, [list, tab]);
+  // If the current tab isn't available for this user/tier, fall back to the
+  // first available tab (guarded so it converges in a single re-render).
+  if (list.length > 0 && !list.some((item) => item.tab === tab)) {
+    setTab(list[0]?.tab || 'channels');
+  }
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [loadProfile]);
+
+  if (settingsDenied) {
+    return (
+      <div className="bg-newBgColorInner flex-1 flex flex-col items-center justify-center p-[40px] gap-[12px]">
+        <div className="text-[20px] font-[600]">
+          {t('settings_no_access_title', 'No access to settings')}
+        </div>
+        <div className="text-[14px] text-newTableText text-center max-w-[420px]">
+          {t(
+            'settings_no_access_description',
+            'Your role does not include access to organization settings. Ask an organization admin if you need it.'
+          )}
+        </div>
+        <a
+          href="/dashboard"
+          className="text-[14px] text-btnPrimary hover:underline"
+        >
+          {t('back_to_dashboard', 'Back to dashboard')}
+        </a>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -214,6 +261,12 @@ export const SettingsPopup: FC<{
               {tab === 'teams' && !!user?.tier?.team_members && isGeneral && (
                 <div>
                   <TeamsComponent />
+                </div>
+              )}
+
+              {tab === 'roles' && canManageRoles && (
+                <div>
+                  <RolesTab />
                 </div>
               )}
 

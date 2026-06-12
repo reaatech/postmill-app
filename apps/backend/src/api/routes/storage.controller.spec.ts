@@ -14,6 +14,10 @@ const serviceMock = {
   migrate: vi.fn(),
 };
 
+const auditMock = {
+  createLog: vi.fn(),
+};
+
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
     getProviderConfigs = serviceMock.getProviderConfigs;
@@ -31,12 +35,17 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () 
 
 import { StorageController } from './storage.controller';
 import { HttpException } from '@nestjs/common';
+import type { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import type { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 
 const org: Organization = { id: 'org-1' } as any;
 const user: User = { id: 'user-1' } as any;
 
 function makeController() {
-  return new StorageController(serviceMock as any);
+  return new StorageController(
+    serviceMock as unknown as StorageService,
+    auditMock as unknown as AuditRepository
+  );
 }
 
 beforeEach(() => {
@@ -158,7 +167,7 @@ describe('StorageController', () => {
       });
       const controller = makeController();
 
-      const result = await controller.mountProvider(org, user, 's3-1');
+      const result = await controller.mountProvider(org, 's3-1');
 
       expect(result.mounted).toBe(true);
     });
@@ -172,7 +181,7 @@ describe('StorageController', () => {
       });
       const controller = makeController();
 
-      const result = await controller.unmountProvider(org, user, 's3-1');
+      const result = await controller.unmountProvider(org, 's3-1');
 
       expect(result.mounted).toBe(false);
     });

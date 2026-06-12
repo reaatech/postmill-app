@@ -12,4 +12,12 @@ export class UpsertShortlinkConfigDto {
   @IsOptional()
   @IsObject()
   extraConfig?: Record<string, string>;
+
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  accountFingerprint?: string;
 }

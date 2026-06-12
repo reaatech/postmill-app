@@ -37,7 +37,8 @@ const AZURE_MODELS: ModelInfo[] = [
 export class AzureAdapter implements AIProviderAdapter {
   readonly identifier = 'azure';
   readonly name = 'Azure OpenAI';
-  readonly type = 'direct' as const;
+  // Hub: hosts OpenAI (and other) models — a cloud aggregator, not a model maker.
+  readonly type = 'hub' as const;
   readonly credentialFields = AZURE_CREDENTIAL_FIELDS;
   readonly capabilities = AZURE_CAPABILITIES;
   readonly privacy = {

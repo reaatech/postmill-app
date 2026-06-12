@@ -40,7 +40,8 @@ const BEDROCK_MODELS: ModelInfo[] = [
 export class BedrockAdapter implements AIProviderAdapter {
   readonly identifier = 'bedrock';
   readonly name = 'Amazon Bedrock';
-  readonly type = 'direct' as const;
+  // Hub: AWS aggregator fronting Anthropic/Meta/Mistral/Amazon/Cohere models.
+  readonly type = 'hub' as const;
   readonly credentialFields = BEDROCK_CREDENTIAL_FIELDS;
   readonly capabilities = BEDROCK_CAPABILITIES;
   readonly privacy = {

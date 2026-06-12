@@ -28,7 +28,7 @@ export class AiSettingsRepository {
         identifier: true,
         enabled: true,
         defaultModel: true,
-        imageModel: true,
+        reasoningModel: true,
         extraConfig: true,
         createdAt: true,
         updatedAt: true,
@@ -49,7 +49,7 @@ export class AiSettingsRepository {
       enabled?: boolean;
       credentials?: string;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: string;
     },
   ) {
@@ -146,20 +146,32 @@ export class AiSettingsRepository {
   }
 
   // ── AIBrandProfile ──
-  getBrandProfile(organizationId: string) {
-    return this._aiBrandProfile.model.aIBrandProfile.findUnique({
-      where: { organizationId },
+  getBrandProfile(organizationId: string, brandId?: string) {
+    if (brandId) {
+      return this._aiBrandProfile.model.aIBrandProfile.findFirst({
+        where: { id: brandId, organizationId },
+      });
+    }
+    return this._aiBrandProfile.model.aIBrandProfile.findFirst({
+      where: { organizationId, isDefault: true },
     });
   }
 
-  upsertBrandProfile(
+  async upsertBrandProfile(
     organizationId: string,
     data: { instructions?: string; language?: string; enabled?: boolean; platformInstructions?: Record<string, string> },
   ) {
-    return this._aiBrandProfile.model.aIBrandProfile.upsert({
-      where: { organizationId },
-      create: { organizationId, ...data },
-      update: data,
+    const existing = await this._aiBrandProfile.model.aIBrandProfile.findFirst({
+      where: { organizationId, isDefault: true },
+    });
+    if (existing) {
+      return this._aiBrandProfile.model.aIBrandProfile.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+    return this._aiBrandProfile.model.aIBrandProfile.create({
+      data: { organizationId, ...data, isDefault: true, name: 'Default Brand' },
     });
   }
 
@@ -252,7 +264,16 @@ export class AiSettingsRepository {
     return this._aiMediaJob.model.aIMediaJob.create({ data });
   }
 
-  updateMediaJob(id: string, data: Record<string, any>) {
+  updateMediaJob(
+    id: string,
+    data: {
+      status?: string;
+      artifactUrl?: string | null;
+      provenance?: string;
+      costUsd?: number;
+      error?: string | null;
+    },
+  ) {
     return this._aiMediaJob.model.aIMediaJob.update({
       where: { id },
       data,
@@ -263,6 +284,19 @@ export class AiSettingsRepository {
     return this._aiMediaJob.model.aIMediaJob.findMany({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  getMediaJobById(id: string) {
+    return this._aiMediaJob.model.aIMediaJob.findUnique({ where: { id } });
+  }
+
+  // Pending/processing async jobs across all orgs for the polling sweep (§11.2).
+  getPendingMediaJobs(limit = 100) {
+    return this._aiMediaJob.model.aIMediaJob.findMany({
+      where: { status: { in: ['pending', 'processing'] } },
+      orderBy: { createdAt: 'asc' },
       take: limit,
     });
   }
@@ -359,6 +393,14 @@ export class AiSettingsRepository {
     });
   }
 
+  async getAllOrgIds(): Promise<string[]> {
+    const rows = await this._aiOrgProviderConfig.model.aIOrgProviderConfig.findMany({
+      select: { organizationId: true },
+      distinct: ['organizationId'],
+    });
+    return rows.map((r) => r.organizationId);
+  }
+
   getOrgProviderConfig(organizationId: string, identifier: string) {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.findUnique({
       where: { organizationId_identifier: { organizationId, identifier } },
@@ -372,7 +414,7 @@ export class AiSettingsRepository {
       enabled?: boolean;
       credentials?: string;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: string;
     },
   ) {

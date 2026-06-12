@@ -29,8 +29,8 @@ describe('AzureAdapter', () => {
       expect(adapter.name).toBe('Azure OpenAI');
     });
 
-    it('has type "direct"', () => {
-      expect(adapter.type).toBe('direct');
+    it('has type "hub"', () => {
+      expect(adapter.type).toBe('hub');
     });
 
     it('has credentialFields for apiKey, resourceName, and apiVersion', () => {

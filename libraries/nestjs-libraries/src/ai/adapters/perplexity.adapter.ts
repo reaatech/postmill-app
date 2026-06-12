@@ -27,8 +27,8 @@ const PERPLEXITY_CREDENTIAL_FIELDS: CredentialField[] = [
 const PERPLEXITY_MODELS: ModelInfo[] = [
   { id: 'sonar-pro', label: 'Sonar Pro', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES },
   { id: 'sonar', label: 'Sonar', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES },
-  { id: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES },
-  { id: 'sonar-reasoning', label: 'Sonar Reasoning', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES },
+  { id: 'sonar-reasoning-pro', label: 'Sonar Reasoning Pro', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES, reasoning: true },
+  { id: 'sonar-reasoning', label: 'Sonar Reasoning', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES, reasoning: true },
   { id: 'sonar-deep-research', label: 'Sonar Deep Research', kind: 'text', capabilities: PERPLEXITY_CAPABILITIES },
 ];
 

@@ -11,6 +11,7 @@ import {
   Param,
   Post,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -20,6 +21,8 @@ import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/
 import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { UpsertShortlinkConfigDto } from '@gitroom/nestjs-libraries/dtos/short-links/upsert-shortlink-config.dto';
 import { TestShortlinkDto } from '@gitroom/nestjs-libraries/dtos/short-links/test-shortlink.dto';
 import { OAuthUrlDto } from '@gitroom/nestjs-libraries/dtos/short-links/oauth-url.dto';
@@ -29,6 +32,7 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 @ApiTags('Org ShortLink Settings')
 @Controller('/settings/shortlinks')
+@UseGuards(OrgRbacGuard)
 export class OrgShortLinkSettingsController {
   constructor(
     private _orgShortLinkSettings: OrgShortLinkSettingsService,
@@ -36,6 +40,7 @@ export class OrgShortLinkSettingsController {
   ) {}
 
   @Get('/providers')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
     const adapters = this._registry.list();
@@ -51,6 +56,7 @@ export class OrgShortLinkSettingsController {
   }
 
   @Get('/config')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getConfig(@GetOrgFromRequest() org: Organization) {
     const active = await this._orgShortLinkSettings.getActiveProvider(org.id);
@@ -65,6 +71,7 @@ export class OrgShortLinkSettingsController {
   }
 
   @Put('/config/:identifier')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
@@ -79,12 +86,15 @@ export class OrgShortLinkSettingsController {
       credentials: body.credentials,
       customDomain: body.customDomain,
       extraConfig: body.extraConfig,
+      name: body.name,
+      accountFingerprint: body.accountFingerprint,
     });
 
     return { identifier, success: true };
   }
 
   @Post('/config/:identifier/set-active')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setActive(
     @GetOrgFromRequest() org: Organization,
@@ -100,6 +110,7 @@ export class OrgShortLinkSettingsController {
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/config/:identifier/test')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
@@ -127,17 +138,19 @@ export class OrgShortLinkSettingsController {
     }
   }
 
-  @Delete('/config/:identifier')
+  @Delete('/config/:id')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
-    @Param('identifier') identifier: string,
+    @Param('id') id: string,
   ) {
-    await this._orgShortLinkSettings.delete(org.id, identifier);
+    await this._orgShortLinkSettings.deleteById(org.id, id);
     return { success: true };
   }
 
   @Post('/config/:identifier/oauth/url')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async getOAuthUrl(
@@ -179,6 +192,7 @@ export class OrgShortLinkSettingsController {
   }
 
   @Post('/config/:identifier/oauth/callback')
+  @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   async oauthCallback(

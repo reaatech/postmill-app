@@ -8,6 +8,8 @@ import {
   Put,
   HttpException,
   Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -17,9 +19,12 @@ import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storag
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @ApiTags('Storage Settings')
 @Controller('/settings/storage')
+@UseGuards(OrgRbacGuard)
 export class StorageController {
   constructor(
     private _storageService: StorageService,
@@ -27,12 +32,14 @@ export class StorageController {
   ) {}
 
   @Get('/')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders(@GetOrgFromRequest() org: Organization) {
     return this._storageService.getProviderConfigs(org.id);
   }
 
   @Post('/')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async createProvider(
     @GetOrgFromRequest() org: Organization,
@@ -78,6 +85,7 @@ export class StorageController {
   }
 
   @Put('/:id')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateProvider(
     @GetOrgFromRequest() org: Organization,
@@ -114,6 +122,7 @@ export class StorageController {
   }
 
   @Delete('/:id')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteProvider(
     @GetOrgFromRequest() org: Organization,
@@ -125,6 +134,7 @@ export class StorageController {
   }
 
   @Post('/:id/test')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConnection(
     @GetOrgFromRequest() org: Organization,
@@ -134,6 +144,7 @@ export class StorageController {
   }
 
   @Post('/:id/mount')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async mountProvider(
     @GetOrgFromRequest() org: Organization,
@@ -145,6 +156,7 @@ export class StorageController {
   }
 
   @Post('/:id/unmount')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async unmountProvider(
     @GetOrgFromRequest() org: Organization,
@@ -156,6 +168,7 @@ export class StorageController {
   }
 
   @Get('/:sourceId/migrate-preview')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async migratePreview(
     @GetOrgFromRequest() org: Organization,
@@ -165,6 +178,7 @@ export class StorageController {
   }
 
   @Post('/:sourceId/migrate/:targetId')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async migrateStorage(
     @GetOrgFromRequest() org: Organization,
@@ -185,6 +199,7 @@ export class StorageController {
   }
 
   @Get('/usage')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getUsage(@GetOrgFromRequest() org: Organization) {
     const usage = await this._storageService.getUsage(org.id);
@@ -199,6 +214,7 @@ export class StorageController {
   }
 
   @Get('/quota-status')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getQuotaStatus(@GetOrgFromRequest() org: Organization) {
     const status = await this._storageService.getQuotaStatus(org.id);
@@ -210,7 +226,21 @@ export class StorageController {
     };
   }
 
+  @Put('/quota/:orgId')
+  async setOrgQuota(
+    @GetUserFromRequest() user: User,
+    @Param('orgId') orgId: string,
+    @Body() body: { quotaBytes: number }
+  ) {
+    if (!user.isSuperAdmin) {
+      throw new ForbiddenException('Super-admin required');
+    }
+    await this._storageService.setOrgQuota(orgId, BigInt(body.quotaBytes));
+    return { orgId, quotaBytes: body.quotaBytes };
+  }
+
   @Get('/usage-breakdown')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getUsageBreakdown(@GetOrgFromRequest() org: Organization) {
     const breakdown = await this._storageService.getUsageBreakdown(org.id);
@@ -227,6 +257,7 @@ export class StorageController {
   }
 
   @Get('/audit-log')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getAuditLog(
     @GetOrgFromRequest() org: Organization,
@@ -253,6 +284,7 @@ export class StorageController {
   }
 
   @Post('/:id/set-default-folder')
+  @RequirePermission('storage-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async setDefaultFolder(
     @GetOrgFromRequest() org: Organization,

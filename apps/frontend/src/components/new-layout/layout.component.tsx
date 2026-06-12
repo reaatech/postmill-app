@@ -44,6 +44,8 @@ import { PreConditionComponent } from '@gitroom/frontend/components/layout/pre-c
 import { AttachToFeedbackIcon } from '@gitroom/frontend/components/new-layout/sentry.feedback.component';
 import { FirstBillingComponent } from '@gitroom/frontend/components/billing/first.billing.component';
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+import SafeImage from '@gitroom/react/helpers/safe.image';
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -58,9 +60,12 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 
   // Feedback icon component attaches Sentry feedback to a top-bar icon when DSN is present
   const searchParams = useSearchParams();
-  const load = useCallback(async (path: string) => {
-    return await (await fetch(path)).json();
-  }, []);
+  const load = useCallback(
+    async (path: string) => {
+      return await (await fetch(path)).json();
+    },
+    [fetch]
+  );
   const { data: user, mutate } = useSWR('/user/self', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -132,11 +137,11 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                           <div className="flex items-center justify-center w-[36px] h-[36px]">
                             <LanguageComponent />
                           </div>
-                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                          <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
                             <ChromeExtensionComponent />
                           </div>
                           <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <div className="flex items-center justify-center w-[36px] h-[36px]">
+                          <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
                             <AttachToFeedbackIcon />
                           </div>
                           <div className="flex items-center justify-center w-[36px] h-[36px]">
@@ -163,8 +168,13 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
 const UserAvatarMenu = () => {
   const user = useUser();
   const t = useT();
+  const permissions = usePermissions();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  // R5: hide the Settings entry for members whose role lacks settings:read.
+  // Shown optimistically while permissions load; backend 403s backstop.
+  const showSettings =
+    !permissions.isResolved || permissions.hasPermission('settings', 'read');
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -199,15 +209,15 @@ const UserAvatarMenu = () => {
         aria-haspopup={true}
         className="flex items-center gap-[8px] hover:text-newTextColor"
       >
-        {(user as any).picture ? (
-          <img
-            src={(user as any).picture}
+        {user.profile?.avatarUrl || user.profile?.picture?.path ? (
+          <SafeImage
+            src={user.profile?.avatarUrl || user.profile?.picture?.path || ''}
             alt=""
             className="w-[28px] h-[28px] rounded-full object-cover border border-newTableBorder"
           />
         ) : (
           <div className="w-[28px] h-[28px] rounded-full bg-btnPrimary flex items-center justify-center text-white text-[12px] font-[600]">
-            {(user.name || user.email || '?')[0].toUpperCase()}
+            {(user.profile?.name || user.email || '?')[0].toUpperCase()}
           </div>
         )}
       </button>
@@ -215,7 +225,7 @@ const UserAvatarMenu = () => {
         <div className="absolute right-0 top-[36px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]" role="menu">
           <div className="px-[14px] py-[8px] border-b border-newTableBorder">
             <div className="text-[13px] font-[600] text-textColor truncate">
-              {user.name || user.email}
+              {user.profile?.name || user.email}
             </div>
             {user.email && (
               <div className="text-[11px] text-textColor/60 truncate">
@@ -224,19 +234,21 @@ const UserAvatarMenu = () => {
             )}
           </div>
           <a
-            href="/settings/profile"
+            href="/user/me"
             role="menuitem"
             className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
           >
             {t('profile', 'Profile')}
           </a>
-          <a
-            href="/settings"
-            role="menuitem"
-            className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
-          >
-            {t('settings', 'Settings')}
-          </a>
+          {showSettings && (
+            <a
+              href="/settings"
+              role="menuitem"
+              className="block px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover"
+            >
+              {t('settings', 'Settings')}
+            </a>
+          )}
           <a
             href="/logout"
             role="menuitem"

@@ -5,7 +5,7 @@ import { useClickOutside } from '@mantine/hooks';
 import { Button } from '@gitroom/react/form/button';
 import { isUSCitizen } from './isuscitizen.utils';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
+import { newDayjs, getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
 import { CalendarIcon } from '@gitroom/frontend/components/ui/icons';
 export const DatePicker: FC<{
   date: dayjs.Dayjs;
@@ -31,7 +31,7 @@ export const DatePicker: FC<{
         )
       );
     },
-    [date]
+    [date, onChange]
   );
   return (
     <div
@@ -42,8 +42,11 @@ export const DatePicker: FC<{
       <div className="cursor-pointer">
         <CalendarIcon />
       </div>
-      <div className="cursor-pointer">
+      <div className="cursor-pointer flex items-center gap-[4px]">
         {date.format(isUSCitizen() ? 'MM/DD/YYYY hh:mm A' : 'DD/MM/YYYY HH:mm')}
+        <span className="text-[11px] text-textColor/50 font-[400]">
+          {getTimezone()}
+        </span>
       </div>
       {open && (
         <div

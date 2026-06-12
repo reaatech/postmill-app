@@ -2,14 +2,14 @@
 
 import React from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 
 interface ProviderData {
   identifier: string;
   name: string;
-  supportedOperations: string[];
+  capabilities: string[];
   isConfigured: boolean;
   enabled: boolean;
-  type?: string;
 }
 
 const OPERATION_LABELS: Record<string, string> = {
@@ -46,13 +46,9 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
   return (
     <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[12px]">
       <div className="flex items-start justify-between">
-        <div className="flex flex-col gap-[4px]">
+        <div className="flex items-center gap-[10px]">
+          <ProviderIcon identifier={provider.identifier} name={provider.name} size={28} />
           <span className="text-[15px] font-semibold">{provider.name}</span>
-          {provider.type && (
-            <span className="text-[11px] text-newTableText uppercase tracking-wider">
-              {provider.type}
-            </span>
-          )}
         </div>
         <span
           className={`text-[11px] rounded-[4px] px-[8px] py-[3px] font-medium ${
@@ -72,7 +68,7 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
       </div>
 
       <div className="flex flex-wrap gap-[4px]">
-        {provider.supportedOperations.map((op) => (
+        {provider.capabilities.map((op) => (
           <span
             key={op}
             className={`text-[11px] rounded-[4px] px-[6px] py-[2px] ${

@@ -54,15 +54,16 @@ beforeEach(() => {
 });
 
 describe('MediaProvidersTab (F2)', () => {
-  it('fetches the user-scoped /ai/media-providers endpoint, not the admin one', async () => {
+  it('fetches the /settings/media endpoint, not the admin one', async () => {
     render(<MediaProvidersTab />, { wrapper });
 
     await waitFor(() => {
-      expect(mockFetchFn).toHaveBeenCalledWith('/ai/media-providers');
+      expect(mockFetchFn).toHaveBeenCalledWith('/settings/media/providers');
     });
 
     const requestedUrls = mockFetchFn.mock.calls.map((call) => call[0]);
-    expect(requestedUrls).toContain('/ai/media-providers');
+    expect(requestedUrls).toContain('/settings/media/providers');
+    expect(requestedUrls).toContain('/settings/media/config');
     for (const url of requestedUrls) {
       expect(url).not.toContain('/admin/ai-settings');
     }
@@ -112,7 +113,7 @@ describe('MediaProvidersTab (F2)', () => {
     render(<MediaProvidersTab />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('No media providers configured')).toBeTruthy();
+      expect(screen.getByText('No providers configured. Use the button above to add one.')).toBeTruthy();
     });
   });
 

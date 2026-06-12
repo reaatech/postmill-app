@@ -113,7 +113,7 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
               ).arrayBuffer()
             );
 
-            const adapter = orgId ? await this._storageService.getLocalAdapterForOrg(orgId) : null;
+            const adapter = orgId ? await this._storageService.getLocalAdapterForOrg(orgId, true) : null;
             const { path } = adapter
               ? await adapter.uploadFile({
                   buffer,

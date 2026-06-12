@@ -50,7 +50,7 @@ const OPENAI_MODELS: ModelInfo[] = [
   { id: 'gpt-4o', label: 'GPT-4o', kind: 'text', capabilities: { ...OPENAI_CAPABILITIES, image: true } },
   { id: 'gpt-4o-mini', label: 'GPT-4o Mini', kind: 'text', capabilities: { ...OPENAI_CAPABILITIES, image: true } },
   { id: 'gpt-5.2', label: 'GPT-5.2', kind: 'text', capabilities: { ...OPENAI_CAPABILITIES, image: true } },
-  { id: 'o3', label: 'o3', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
+  { id: 'o3', label: 'o3', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true }, reasoning: true },
   { id: 'chatgpt-image-latest', label: 'ChatGPT Image (DALL·E)', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'dall-e-3', label: 'DALL·E 3', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'dall-e-2', label: 'DALL·E 2', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },

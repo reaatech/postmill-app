@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { CopilotChat, CopilotKitCSSProperties, InputProps, UserMessageProps } from '@copilotkit/react-ui';
@@ -24,7 +25,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { TextMessage } from '@copilotkit/runtime-client-gql';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { PostComposer } from '@gitroom/frontend/components/launches/post-composer';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
@@ -137,7 +138,7 @@ const LoadMessages: FC<{ id: string }> = ({ id }) => {
         });
       })
     );
-  }, []);
+  }, [fetch, setMessages]);
 
   useEffect(() => {
     if (id === 'new') {
@@ -145,7 +146,7 @@ const LoadMessages: FC<{ id: string }> = ({ id }) => {
       return;
     }
     loadMessages(id);
-  }, [id]);
+  }, [id, loadMessages, setMessages]);
 
   return null;
 };
@@ -342,7 +343,6 @@ const OpenModal: FC<{
                     .picture || '',
                 settings: integration.settings || {},
                 posts: integration.posts.map((p) => ({
-                  approvedSubmitForOrder: 'NO',
                   content: p.content,
                   createdAt: new Date().toISOString(),
                   state: 'DRAFT',
@@ -361,7 +361,7 @@ const OpenModal: FC<{
                 })),
               }}
             >
-              <AddEditModal
+              <PostComposer
                 date={dayjs.utc(integration.date)}
                 allIntegrations={properties}
                 integrations={properties.filter(
@@ -378,6 +378,7 @@ const OpenModal: FC<{
                 }))}
                 reopenModal={() => {}}
                 mutate={() => res(true)}
+                customClose={() => res(true)}
               />
             </ExistingDataContextProvider>
           ),
@@ -386,11 +387,18 @@ const OpenModal: FC<{
     }
 
     respond('User scheduled all the posts');
-  }, [args, respond, properties]);
+  }, [args, respond, properties, modals]);
 
+  // The modal sequence must start exactly once on mount — guard with a ref so
+  // the dependency list can stay exhaustive without reopening the modals.
+  const startedRef = useRef(false);
   useEffect(() => {
+    if (startedRef.current) {
+      return;
+    }
+    startedRef.current = true;
     startModal();
-  }, []);
+  }, [startModal]);
   return (
     <div onClick={() => respond('continue')}>
       Opening manually ${JSON.stringify(args)}

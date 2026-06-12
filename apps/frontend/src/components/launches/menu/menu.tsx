@@ -27,9 +27,7 @@ import { CustomVariables } from '@gitroom/frontend/components/launches/add.provi
 import { useRouter } from 'next/navigation';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import dayjs from 'dayjs';
-import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
 import copy from 'copy-to-clipboard';
 
 export const Menu: FC<{
@@ -125,7 +123,7 @@ export const Menu: FC<{
     toast.show(t('channel_disabled', 'Channel Disabled'), 'success');
     setShow(false);
     onChange(false);
-  }, [t]);
+  }, [t, fetch, id, onChange, toast]);
   const deleteChannel = useCallback(async () => {
     if (
       !(await deleteDialog(
@@ -167,7 +165,7 @@ export const Menu: FC<{
     toast.show(t('channel_deleted', 'Channel Deleted'), 'success');
     setShow(false);
     onChange(true);
-  }, [t, extensionId, id]);
+  }, [t, extensionId, id, fetch, onChange, toast]);
 
   const enableChannel = useCallback(async () => {
     await fetch('/integrations/enable', {
@@ -179,7 +177,7 @@ export const Menu: FC<{
     toast.show(t('channel_enabled', 'Channel Enabled'), 'success');
     setShow(false);
     onChange(false);
-  }, [t]);
+  }, [t, fetch, id, onChange, toast]);
 
   const editTimeTable = useCallback(() => {
     const findIntegration = integrations.find(
@@ -194,7 +192,7 @@ export const Menu: FC<{
       children: <TimeTable integration={findIntegration!} mutate={mutate} />,
     });
     setShow(false);
-  }, [integrations, t]);
+  }, [integrations, t, id, modal, mutate]);
 
   const copyChannelId = useCallback(
     (integration: Integrations) => async () => {
@@ -203,7 +201,7 @@ export const Menu: FC<{
       copy(channelId);
       toast.show(t('channel_id_copied', 'Channel ID copied to clipboard'), 'success');
     },
-    [t]
+    [t, toast]
   );
 
   const createPost = useCallback(
@@ -214,35 +212,12 @@ export const Menu: FC<{
         await fetch(`/posts/find-slot/${integration.id}`)
       ).json();
 
-      modal.openModal({
-        id: 'add-edit-modal',
-        closeOnClickOutside: false,
-        removeLayout: true,
-        closeOnEscape: false,
-        withCloseButton: false,
-        askClose: true,
-        fullScreen: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px] text-textColor',
-        },
-        children: (
-          <AddEditModal
-            allIntegrations={integrations.map((p) => ({
-              ...p,
-            }))}
-            reopenModal={createPost(integration)}
-            mutate={reloadCalendarView}
-            integrations={integrations}
-            selectedChannels={[integration.id]}
-            // focusedChannel={integration.id}
-            date={dayjs.utc(date).local()}
-          />
-        ),
-        size: '80%',
-        title: ``,
-      });
+      const params = new URLSearchParams();
+      params.set('date', dayjs.utc(date).local().format('YYYY-MM-DDTHH:mm:ss'));
+      params.set('channel', integration.id);
+      router.push(`/schedule/post?${params.toString()}`);
     },
-    [integrations]
+    [router, fetch]
   );
 
   const changeBotPicture = useCallback(() => {
@@ -267,7 +242,7 @@ export const Menu: FC<{
       ),
     });
     setShow(false);
-  }, [integrations]);
+  }, [integrations, canChangeNickName, canChangeProfilePicture, id, modal, mutate]);
   const additionalSettings = useCallback(() => {
     const findIntegration = integrations.find(
       (integration) => integration.id === id
@@ -286,7 +261,7 @@ export const Menu: FC<{
       ),
     });
     setShow(false);
-  }, [integrations, t]);
+  }, [integrations, t, id, modal, mutate, toast]);
   const addToCustomer = useCallback(() => {
     const findIntegration = integrations.find(
       (integration) => integration.id === id
@@ -311,7 +286,7 @@ export const Menu: FC<{
       ),
     });
     setShow(false);
-  }, [integrations, t]);
+  }, [integrations, t, id, modal, mutate, toast]);
   const updateCredentials = useCallback(() => {
     modal.openModal({
       title: t('custom_url', 'Custom URL'),
@@ -327,7 +302,7 @@ export const Menu: FC<{
         />
       ),
     });
-  }, [t]);
+  }, [t, findIntegration, modal, router]);
 
   return (
     <div

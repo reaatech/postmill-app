@@ -10,6 +10,8 @@ function createMockPrismaRepo() {
         findFirst: vi.fn().mockResolvedValue(null),
         upsert: vi.fn().mockResolvedValue({}),
         delete: vi.fn().mockResolvedValue({}),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        create: vi.fn().mockResolvedValue({}),
         update: vi.fn().mockResolvedValue({}),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
@@ -77,14 +79,15 @@ describe('OrgShortLinkSettingsRepository', () => {
   });
 
   describe('getByIdentifier', () => {
-    it('queries by compound unique key', async () => {
+    it('queries by compound key with orderBy', async () => {
       const mockData = { id: 'c1', organizationId: orgId, identifier };
-      config.model.orgShortLinkConfig.findUnique.mockResolvedValue(mockData);
+      config.model.orgShortLinkConfig.findFirst.mockResolvedValue(mockData);
 
       const result = await repo.getByIdentifier(orgId, identifier);
 
-      expect(config.model.orgShortLinkConfig.findUnique).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      expect(config.model.orgShortLinkConfig.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: orgId, identifier },
+        orderBy: { createdAt: 'desc' },
       });
       expect(result).toEqual(mockData);
     });
@@ -107,12 +110,48 @@ describe('OrgShortLinkSettingsRepository', () => {
   describe('upsert', () => {
     it('creates or updates a config entry', async () => {
       const data = { enabled: true, credentials: 'encrypted' };
+      config.model.orgShortLinkConfig.findFirst.mockResolvedValue(null);
+      config.model.orgShortLinkConfig.create.mockResolvedValue({ id: 'c1', ...data });
+
+      await repo.upsert(orgId, identifier, data);
+
+      expect(config.model.orgShortLinkConfig.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: orgId, identifier },
+        orderBy: { createdAt: 'desc' },
+      });
+      expect(config.model.orgShortLinkConfig.create).toHaveBeenCalledWith({
+        data: { organizationId: orgId, identifier, ...data },
+      });
+    });
+
+    it('updates existing entry when found', async () => {
+      const existing = { id: 'c1', organizationId: orgId, identifier };
+      const data = { enabled: true, credentials: 'encrypted' };
+      config.model.orgShortLinkConfig.findFirst.mockResolvedValue(existing);
+      config.model.orgShortLinkConfig.update.mockResolvedValue({ ...existing, ...data });
+
+      await repo.upsert(orgId, identifier, data);
+
+      expect(config.model.orgShortLinkConfig.update).toHaveBeenCalledWith({
+        where: { id: 'c1' },
+        data,
+      });
+    });
+
+    it('uses triple unique when accountFingerprint is provided', async () => {
+      const data = { enabled: true, credentials: 'encrypted', accountFingerprint: 'fp-1' };
       config.model.orgShortLinkConfig.upsert.mockResolvedValue({ id: 'c1', ...data });
 
       await repo.upsert(orgId, identifier, data);
 
       expect(config.model.orgShortLinkConfig.upsert).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: orgId, identifier } },
+        where: {
+          organizationId_identifier_accountFingerprint: {
+            organizationId: orgId,
+            identifier,
+            accountFingerprint: 'fp-1',
+          },
+        },
         create: { organizationId: orgId, identifier, ...data },
         update: data,
       });
@@ -123,25 +162,43 @@ describe('OrgShortLinkSettingsRepository', () => {
     it('deletes by compound key', async () => {
       await repo.delete(orgId, identifier);
 
+      expect(config.model.orgShortLinkConfig.deleteMany).toHaveBeenCalledWith({
+        where: { organizationId: orgId, identifier },
+      });
+    });
+  });
+
+  describe('deleteById', () => {
+    it('deletes by id', async () => {
+      config.model.orgShortLinkConfig.delete.mockResolvedValue({ id: 'c1' });
+
+      await repo.deleteById('c1');
+
       expect(config.model.orgShortLinkConfig.delete).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: orgId, identifier } },
+        where: { id: 'c1' },
       });
     });
   });
 
   describe('setActive', () => {
     it('deactivates all active configs then activates the target', async () => {
+      const mockConfig = { id: 'c1', organizationId: orgId, identifier };
+      config.model.orgShortLinkConfig.findFirst.mockResolvedValue(mockConfig);
       config.model.orgShortLinkConfig.updateMany.mockResolvedValue({ count: 1 });
-      config.model.orgShortLinkConfig.update.mockResolvedValue({ id: 'c1', isActive: true });
+      config.model.orgShortLinkConfig.update.mockResolvedValue({ ...mockConfig, isActive: true });
 
       await repo.setActive(orgId, identifier);
 
+      expect(config.model.orgShortLinkConfig.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: orgId, identifier },
+        orderBy: { createdAt: 'desc' },
+      });
       expect(config.model.orgShortLinkConfig.updateMany).toHaveBeenCalledWith({
         where: { organizationId: orgId, isActive: true },
         data: { isActive: false },
       });
       expect(config.model.orgShortLinkConfig.update).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: orgId, identifier } },
+        where: { id: 'c1' },
         data: { isActive: true, enabled: true },
       });
     });

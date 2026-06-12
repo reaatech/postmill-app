@@ -39,7 +39,11 @@ export class ApiKeysRepository {
         },
         user: {
           include: {
-            organizations: true,
+            organizations: {
+              include: {
+                roleRef: true,
+              },
+            },
           },
         },
       },

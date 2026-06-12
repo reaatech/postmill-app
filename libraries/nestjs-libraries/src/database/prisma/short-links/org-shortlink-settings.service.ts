@@ -17,7 +17,8 @@ export class OrgShortLinkSettingsService {
     const configs = await this._repository.getByOrg(orgId);
     const adapters = this._registry.list();
     return adapters.map((adapter) => {
-      const dbConfig = configs.find((c) => c.identifier === adapter.identifier);
+      const dbConfigs = configs.filter((c) => c.identifier === adapter.identifier);
+      const dbConfig = dbConfigs[dbConfigs.length - 1];
       const isConfigured = this._isConfigured(adapter, dbConfig);
       return {
         identifier: adapter.identifier,
@@ -31,8 +32,19 @@ export class OrgShortLinkSettingsService {
         isActive: dbConfig?.isActive || false,
         isConfigured,
         customDomain: dbConfig?.customDomain || '',
+        configName: dbConfig?.name || '',
+        accountFingerprint: dbConfig?.accountFingerprint || '',
         createdAt: dbConfig?.createdAt || null,
         updatedAt: dbConfig?.updatedAt || null,
+        configs: dbConfigs.map((c) => ({
+          id: c.id,
+          name: c.name || '',
+          accountFingerprint: c.accountFingerprint || '',
+          isActive: c.isActive,
+          customDomain: c.customDomain || '',
+          createdAt: c.createdAt,
+          updatedAt: c.updatedAt,
+        })),
       };
     });
   }
@@ -63,6 +75,8 @@ export class OrgShortLinkSettingsService {
       credentials?: Record<string, string>;
       customDomain?: string;
       extraConfig?: Record<string, string>;
+      name?: string;
+      accountFingerprint?: string;
     },
   ) {
     const encryptedCredentials = data.credentials
@@ -78,6 +92,8 @@ export class OrgShortLinkSettingsService {
       credentials: encryptedCredentials,
       extraConfig: encryptedExtraConfig,
       customDomain: data.customDomain,
+      name: data.name,
+      accountFingerprint: data.accountFingerprint,
     });
   }
 
@@ -102,6 +118,12 @@ export class OrgShortLinkSettingsService {
 
   async delete(orgId: string, identifier: string) {
     return this._repository.delete(orgId, identifier);
+  }
+
+  async deleteById(orgId: string, id: string) {
+    const config = await this._repository.getById(orgId, id);
+    if (!config) throw new Error('Configuration not found');
+    return this._repository.deleteById(id);
   }
 
   getLinksForOrg(orgId: string) {

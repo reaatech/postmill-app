@@ -50,8 +50,16 @@ describe('AiSettingsRepository', () => {
       create: vi.fn().mockResolvedValue({}),
     };
     mockBrandProfile = {
+      findFirst: vi.fn().mockResolvedValue(null),
       findUnique: vi.fn().mockResolvedValue(null),
       upsert: vi.fn().mockResolvedValue({}),
+      update: vi.fn().mockResolvedValue({}),
+      create: vi.fn().mockResolvedValue({}),
+      findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
+      delete: vi.fn().mockResolvedValue({}),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
     };
     mockPromptTemplate = {
       findMany: vi.fn().mockResolvedValue([]),
@@ -172,7 +180,7 @@ describe('AiSettingsRepository', () => {
           identifier: true,
           enabled: true,
           defaultModel: true,
-          imageModel: true,
+          reasoningModel: true,
           extraConfig: true,
           createdAt: true,
           updatedAt: true,
@@ -411,38 +419,70 @@ describe('AiSettingsRepository', () => {
   // ── AIBrandProfile ──
 
   describe('getBrandProfile', () => {
-    it('fetches by organizationId', async () => {
-      const profile = { organizationId: 'org1', instructions: 'Be concise' };
-      mockBrandProfile.findUnique.mockResolvedValue(profile);
+    it('fetches default brand for org', async () => {
+      const profile = { organizationId: 'org1', instructions: 'Be concise', isDefault: true };
+      mockBrandProfile.findFirst.mockResolvedValue(profile);
 
       const result = await repository.getBrandProfile('org1');
 
-      expect(mockBrandProfile.findUnique).toHaveBeenCalledWith({
-        where: { organizationId: 'org1' },
+      expect(mockBrandProfile.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', isDefault: true },
+      });
+      expect(result).toEqual(profile);
+    });
+
+    it('fetches specific brand when brandId is provided', async () => {
+      const profile = { id: 'brand-2', organizationId: 'org1', instructions: 'Be funny', isDefault: false };
+      mockBrandProfile.findFirst.mockResolvedValue(profile);
+
+      const result = await repository.getBrandProfile('org1', 'brand-2');
+
+      expect(mockBrandProfile.findFirst).toHaveBeenCalledWith({
+        where: { id: 'brand-2', organizationId: 'org1' },
       });
       expect(result).toEqual(profile);
     });
 
     it('returns null when none exists', async () => {
-      mockBrandProfile.findUnique.mockResolvedValue(null);
+      mockBrandProfile.findFirst.mockResolvedValue(null);
       expect(await repository.getBrandProfile('unknown')).toBeNull();
     });
   });
 
   describe('upsertBrandProfile', () => {
-    it('upserts with organizationId in create', async () => {
-      const data = { instructions: 'Be helpful', language: 'en', enabled: true };
-      const upserted = { organizationId: 'org1', ...data };
-      mockBrandProfile.upsert.mockResolvedValue(upserted);
+    it('updates existing default brand', async () => {
+      const existing = { id: 'brand-1', organizationId: 'org1', name: 'Default' };
+      mockBrandProfile.findFirst.mockResolvedValue(existing);
+      mockBrandProfile.update.mockResolvedValue({ ...existing, instructions: 'Be helpful' });
 
+      const data = { instructions: 'Be helpful', language: 'en', enabled: true };
       const result = await repository.upsertBrandProfile('org1', data);
 
-      expect(mockBrandProfile.upsert).toHaveBeenCalledWith({
-        where: { organizationId: 'org1' },
-        create: { organizationId: 'org1', ...data },
-        update: data,
+      expect(mockBrandProfile.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', isDefault: true },
       });
-      expect(result).toEqual(upserted);
+      expect(mockBrandProfile.update).toHaveBeenCalledWith({
+        where: { id: 'brand-1' },
+        data,
+      });
+      expect(result.instructions).toBe('Be helpful');
+    });
+
+    it('creates new brand when no default exists', async () => {
+      mockBrandProfile.findFirst.mockResolvedValue(null);
+      const created = { id: 'brand-new', organizationId: 'org1', name: 'Default Brand', isDefault: true };
+      mockBrandProfile.create.mockResolvedValue(created);
+
+      const data = { instructions: 'Be concise', language: 'en', enabled: true };
+      const result = await repository.upsertBrandProfile('org1', data);
+
+      expect(mockBrandProfile.findFirst).toHaveBeenCalledWith({
+        where: { organizationId: 'org1', isDefault: true },
+      });
+      expect(mockBrandProfile.create).toHaveBeenCalledWith({
+        data: { organizationId: 'org1', ...data, isDefault: true, name: 'Default Brand' },
+      });
+      expect(result).toEqual(created);
     });
   });
 

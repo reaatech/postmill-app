@@ -11,6 +11,7 @@ import { EmailActivity } from '@gitroom/orchestrator/activities/email.activity';
 import { IntegrationsActivity } from '@gitroom/orchestrator/activities/integrations.activity';
 import { AnalyticsActivity } from '@gitroom/orchestrator/activities/analytics.activity';
 import { CommentsActivity } from '@gitroom/orchestrator/activities/comments.activity';
+import { MediaJobsActivity } from '@gitroom/orchestrator/activities/media-jobs.activity';
 import { HealthController } from '@gitroom/orchestrator/health.controller';
 import { UploadModule } from '@gitroom/nestjs-libraries/upload/upload.module';
 
@@ -21,6 +22,7 @@ const activities = [
   IntegrationsActivity,
   AnalyticsActivity,
   CommentsActivity,
+  MediaJobsActivity,
 ];
 @Module({
   imports: [

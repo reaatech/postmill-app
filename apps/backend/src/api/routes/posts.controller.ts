@@ -3,12 +3,12 @@ import {
   Controller,
   Delete,
   Get,
-  HttpException,
   Param,
   Post,
   Put,
   Query,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
@@ -32,9 +32,12 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 @ApiTags('Posts')
 @Controller('/posts')
+@UseGuards(OrgRbacGuard)
 export class PostsController {
   constructor(
     private _postsService: PostsService,
@@ -155,14 +158,11 @@ export class PostsController {
   }
 
   @Get('/group/:group/debug-export')
+  @RequirePermission('posts', 'manage')
   async getPostGroupDebugExport(
     @GetOrgFromRequest() org: Organization,
-    @GetUserFromRequest() user: User,
     @Param('group') group: string
   ) {
-    if (!user.isSuperAdmin) {
-      throw new HttpException('Forbidden', 403);
-    }
     return this._postsService.getPostGroupDebugExport(org.id, group);
   }
 

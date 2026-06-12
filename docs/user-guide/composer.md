@@ -6,8 +6,15 @@ validation panel.
 
 ## Opening the Composer
 
-From the **Schedule** page (`/schedule`), click the **New Post** button in the top-right
-corner. The composer opens as a full-screen modal with all options visible.
+Since v3.8.10 the composer lives on dedicated pages instead of a modal:
+
+- **`/schedule/post`** — create a new post. From the **Schedule** page (`/schedule`), the
+  **New Post** button navigates here; clicking a calendar slot prefills the slot's date and time
+  (in your timezone).
+- **`/schedule/post/<post-id>`** — edit an existing post. The edit action on a calendar card
+  opens this page.
+
+Create and edit share the same composer form.
 
 ## Channel Multi-Select
 
@@ -53,7 +60,14 @@ Each attached media item shows a preview thumbnail with a remove button.
 ### Date/Time Picker
 
 Select a date and time for publication. The picker uses a calendar widget and time dropdown.
-Scheduled times respect your configured timezone (set in Settings → Profile).
+The time is displayed and edited **in your timezone** and saved as UTC (v3.8.10 made the picker
+timezone-aware end-to-end, including dates prefilled from a calendar slot).
+
+### Brand Picker (v3.8.10)
+
+If your organisation has [brands](./settings.md#brands-tab) configured, a brand picker in the
+composer selects which brand voice AI generation uses for this post. Leaving it unset uses the
+organisation's default brand.
 
 ### Scheduling Options
 
@@ -164,4 +178,4 @@ You can import multiple posts at once via CSV. The bulk import flow uses the sam
 validation as the composer — each row is validated individually, and per-row successes, warnings,
 and errors are reported. Failed rows do not block successful rows. See [Bulk Import](./bulk-import.md) for details.
 
-> Verified against v3.8.3
+> Verified against v3.8.10

@@ -1,15 +1,83 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
+import { stat } from 'fs/promises';
+import { extname } from 'path';
+
+const MIME_MAP: Record<string, string> = {
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.png': 'image/png',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.avif': 'image/avif',
+  '.bmp': 'image/bmp',
+  '.tiff': 'image/tiff',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+  '.mov': 'video/quicktime',
+  '.avi': 'video/x-msvideo',
+  '.mkv': 'video/x-matroska',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.flac': 'audio/flac',
+  '.aac': 'audio/aac',
+  '.pdf': 'application/pdf',
+  '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xls': 'application/vnd.ms-excel',
+  '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.zip': 'application/zip',
+  '.tar': 'application/x-tar',
+  '.gz': 'application/gzip',
+  '.txt': 'text/plain',
+  '.csv': 'text/csv',
+  '.json': 'application/json',
+};
+
+const IMAGE_EXTS = new Set(['.jpg','.jpeg','.png','.gif','.webp','.avif','.bmp','.tiff']);
+const VIDEO_EXTS = new Set(['.mp4','.webm','.mov','.avi','.mkv']);
+
+function mimeFromName(name: string): string {
+  const ext = extname(name).toLowerCase();
+  return MIME_MAP[ext] || 'application/octet-stream';
+}
 
 @Injectable()
 export class MediaRepository {
+  private readonly _logger = new Logger(MediaRepository.name);
+
   constructor(
     private _media: PrismaRepository<'media'>,
     private _mediaFolder: PrismaRepository<'mediaFolder'>
   ) {}
 
-  saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
+  async saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
+    const mimeType = mimeFromName(fileName);
+    const meta: Record<string, unknown> = {
+      mimeType,
+      originalName: originalName || fileName,
+    };
+
+    try {
+      const s = await stat(filePath);
+      meta.fileSize = s.size;
+
+      if (IMAGE_EXTS.has(extname(fileName).toLowerCase())) {
+        try {
+          const sharp = (await import('sharp')).default;
+          const metadata = await sharp(filePath).metadata();
+          meta.dimensions = { width: metadata.width, height: metadata.height };
+        } catch {
+        }
+      }
+    } catch {
+      this._logger.warn(`Could not stat file for metadata: ${filePath}`);
+    }
+
     const data: any = {
       organization: {
         connect: {
@@ -19,6 +87,8 @@ export class MediaRepository {
       name: fileName,
       path: filePath,
       originalName: originalName || null,
+      fileSize: (meta.fileSize as number) || 0,
+      metadata: JSON.stringify(meta),
     };
 
     if (folderId) {
@@ -34,6 +104,39 @@ export class MediaRepository {
         path: true,
         thumbnail: true,
         alt: true,
+        folderId: true,
+      },
+    });
+  }
+
+  // AI-generated artifacts (§11.5/§11.7): the file already lives in tenant storage
+  // (possibly cloud — no local stat), and provider metadata is supplied by the caller.
+  saveGeneratedMedia(
+    org: string,
+    data: {
+      name: string;
+      path: string;
+      type: string;
+      folderId?: string | null;
+      fileSize?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    return this._media.model.media.create({
+      data: {
+        organization: { connect: { id: org } },
+        name: data.name,
+        path: data.path,
+        type: data.type,
+        fileSize: data.fileSize ?? 0,
+        ...(data.folderId ? { folder: { connect: { id: data.folderId } } } : {}),
+        ...(data.metadata ? { metadata: JSON.stringify(data.metadata) } : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        path: true,
+        type: true,
         folderId: true,
       },
     });
@@ -175,6 +278,13 @@ export class MediaRepository {
   }
 
   // ── Folder CRUD ──────────────────────────────────────────────
+
+  findFoldersByParent(org: string, parentId: string) {
+    return this._mediaFolder.model.mediaFolder.findMany({
+      where: { organizationId: org, parentId },
+      select: { id: true, name: true },
+    });
+  }
 
   createFolder(org: string, data: {
     name: string;

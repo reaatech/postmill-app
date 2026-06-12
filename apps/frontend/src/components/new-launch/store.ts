@@ -137,6 +137,8 @@ interface StoreState {
   setFirstComment: (firstComment: string) => void;
   campaignId: string | null;
   setCampaignId: (campaignId: string | null) => void;
+  brandId: string | null;
+  setBrandId: (brandId: string | null) => void;
 }
 
 const initialState = {
@@ -161,6 +163,7 @@ const initialState = {
   chars: {},
   firstComment: '',
   campaignId: null as string | null,
+  brandId: null as string | null,
 };
 
 export const useLaunchStore = create<StoreState>()((set) => ({
@@ -645,6 +648,10 @@ export const useLaunchStore = create<StoreState>()((set) => ({
   setCampaignId: (campaignId: string | null) =>
     set((state) => ({
       campaignId,
+    })),
+  setBrandId: (brandId: string | null) =>
+    set((state) => ({
+      brandId,
     })),
   setGlobalDelay: (index: number, minutes: number) =>
     set((state) => ({

@@ -126,7 +126,7 @@ export class MediaService {
           org.id
         );
 
-        const file = await (await this._storageService.getLocalAdapterForOrg(org.id)).uploadSimple(loadedData);
+        const file = await (await this._storageService.getLocalAdapterForOrg(org.id, true)).uploadSimple(loadedData);
         return this.saveFile(org.id, file.split('/').pop(), file);
       }
     );

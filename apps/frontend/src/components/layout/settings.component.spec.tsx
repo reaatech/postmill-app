@@ -88,11 +88,40 @@ vi.mock('@gitroom/frontend/components/settings/channels/channels.tab', () => ({
   ChannelsTab: () => null,
 }));
 
+vi.mock('@gitroom/frontend/components/settings/roles/roles.tab', () => ({
+  RolesTab: () => <div>Roles Tab Content</div>,
+}));
+
+let mockPermissions = {
+  isLoaded: true,
+  isResolved: true,
+  role: 'owner' as string | null,
+  isSuperAdmin: false,
+  isOwner: true,
+  isAdmin: true,
+  hasPermission: (_resource: string, _action: string) => true,
+  refresh: vi.fn(),
+};
+
+vi.mock('@gitroom/frontend/components/layout/use-permissions', () => ({
+  usePermissions: () => mockPermissions,
+}));
+
 import { SettingsPopup } from './settings.component';
 
 describe('SettingsPopup', () => {
   beforeEach(() => {
     mockSearchParams = 'tab=channels';
+    mockPermissions = {
+      isLoaded: true,
+      isResolved: true,
+      role: 'owner',
+      isSuperAdmin: false,
+      isOwner: true,
+      isAdmin: true,
+      hasPermission: () => true,
+      refresh: vi.fn(),
+    };
   });
 
   it('groups tabs into sections', () => {
@@ -117,5 +146,64 @@ describe('SettingsPopup', () => {
 
     const channelsButtons = screen.getAllByText('Channels');
     expect(channelsButtons.length).toBeGreaterThan(0);
+  });
+
+  it('shows the Roles tab for members who can manage members', () => {
+    mockPermissions.hasPermission = (resource, action) =>
+      resource === 'settings' || (resource === 'members' && action === 'manage');
+
+    render(<SettingsPopup />);
+
+    expect(screen.getByText('Roles')).toBeDefined();
+  });
+
+  it('hides the Roles tab for members without members:manage or settings:update', () => {
+    mockPermissions.hasPermission = (resource, action) =>
+      resource === 'settings' && action === 'read';
+
+    render(<SettingsPopup />);
+
+    expect(screen.queryByText('Roles')).toBeNull();
+  });
+
+  it('renders the Roles tab content when selected', () => {
+    mockSearchParams = 'tab=roles';
+
+    render(<SettingsPopup />);
+
+    expect(screen.getByText('Roles Tab Content')).toBeDefined();
+  });
+
+  it('R5: renders a no-access state for members without settings:read', () => {
+    mockPermissions.hasPermission = () => false;
+    mockPermissions.isOwner = false;
+    mockPermissions.isAdmin = false;
+    mockPermissions.role = 'viewer';
+
+    render(<SettingsPopup />);
+
+    expect(screen.getByText('No access to settings')).toBeDefined();
+    expect(screen.queryByText('Channels')).toBeNull();
+  });
+
+  it('R5: keeps rendering settings while permissions are loading (no flash)', () => {
+    mockPermissions.isResolved = false;
+    mockPermissions.isLoaded = false;
+    mockPermissions.hasPermission = () => false;
+
+    render(<SettingsPopup />);
+
+    expect(screen.queryByText('No access to settings')).toBeNull();
+    expect(screen.getAllByText('Channels').length).toBeGreaterThan(0);
+  });
+
+  it('R5: platform super-admin always passes', () => {
+    mockPermissions.hasPermission = () => true; // hook returns true for super-admin
+    mockPermissions.isSuperAdmin = true;
+    mockPermissions.role = null;
+
+    render(<SettingsPopup />);
+
+    expect(screen.queryByText('No access to settings')).toBeNull();
   });
 });

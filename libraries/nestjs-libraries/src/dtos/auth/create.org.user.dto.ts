@@ -37,6 +37,18 @@ export class CreateOrgUserDto {
   @MaxLength(128)
   company: string;
 
+  @IsString()
+  @MinLength(1)
+  @MaxLength(128)
+  @IsDefined()
+  @ValidateIf((o) => !o.providerToken)
+  name: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(128)
+  lastName: string;
+
   // Optional analytics cookie sent by the frontend; must be declared so the global
   // forbidNonWhitelisted pipe (3Y) doesn't 400 the request.
   @IsOptional()

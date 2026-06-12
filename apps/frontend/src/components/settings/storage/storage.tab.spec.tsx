@@ -1,5 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { SWRConfig } from 'swr';
+import React from 'react';
 
 const mockToasterShow = vi.fn();
 
@@ -25,20 +27,49 @@ vi.mock('@gitroom/frontend/components/settings/storage/audit.tab', () => ({
   AuditTab: () => null,
 }));
 
-let mockProviders: any[] = [];
+type MockProvider = {
+  id: string;
+  type: string;
+  name: string;
+  mounted: boolean;
+  quotaBytes: string | null;
+  bucket: string | null;
+  region: string | null;
+};
+
+type MockUsage = {
+  providers: Array<{ id: string; name: string; usageBytes: number | null }>;
+};
+
+type MockQuotaStatus = {
+  usedBytes: number;
+  quotaBytes: number;
+  percentUsed: number;
+  warning: boolean;
+} | null;
+
+type MockUsageBreakdown = {
+  byFolder: Array<{ folderId: string; folderName: string; totalBytes: number }>;
+  byProvider: Array<{ providerId: string; providerName: string; totalBytes: number }>;
+} | null;
+
+let mockProviders: MockProvider[] = [];
+let mockUsage: MockUsage = { providers: [] };
+let mockQuotaStatus: MockQuotaStatus = null;
+let mockUsageBreakdown: MockUsageBreakdown = null;
 
 const mockFetchFn = vi.fn(async (url: string) => {
   if (url === '/settings/storage') {
     return { ok: true, json: () => Promise.resolve(mockProviders) };
   }
   if (typeof url === 'string' && url.startsWith('/settings/storage/usage-breakdown')) {
-    return { ok: true, json: () => Promise.resolve(null) };
+    return { ok: true, json: () => Promise.resolve(mockUsageBreakdown) };
   }
   if (typeof url === 'string' && url.startsWith('/settings/storage/usage')) {
-    return { ok: true, json: () => Promise.resolve({ providers: [] }) };
+    return { ok: true, json: () => Promise.resolve(mockUsage) };
   }
   if (typeof url === 'string' && url.startsWith('/settings/storage/quota-status')) {
-    return { ok: true, json: () => Promise.resolve(null) };
+    return { ok: true, json: () => Promise.resolve(mockQuotaStatus) };
   }
   return { ok: true, json: () => Promise.resolve({}) };
 });
@@ -70,18 +101,29 @@ const s3Provider = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockProviders = [];
+  mockUsage = { providers: [] };
+  mockQuotaStatus = null;
+  mockUsageBreakdown = null;
 });
+
+function renderWithSWR(ui: React.ReactElement) {
+  return render(
+    <SWRConfig value={{ dedupingInterval: 0, provider: () => new Map() }}>
+      {ui}
+    </SWRConfig>
+  );
+}
 
 describe('StorageTab', () => {
   describe('Base Storage (always on)', () => {
-    it('renders the "Base Storage (always on)" heading when LOCAL providers exist', async () => {
+    it('renders the "Base Storage" heading when LOCAL providers exist', async () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage (always on)')).toBeDefined();
+        expect(screen.getByText('Base Storage')).toBeDefined();
       });
     });
 
@@ -89,7 +131,7 @@ describe('StorageTab', () => {
       mockProviders = [localProvider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
         expect(screen.getByText('Always on')).toBeDefined();
@@ -103,7 +145,7 @@ describe('StorageTab', () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
         expect(screen.getByText('Additional Providers')).toBeDefined();
@@ -114,7 +156,7 @@ describe('StorageTab', () => {
       mockProviders = [s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
         expect(screen.getByText('Mounted')).toBeDefined();
@@ -126,10 +168,10 @@ describe('StorageTab', () => {
       mockProviders = [localProvider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage (always on)')).toBeDefined();
+        expect(screen.getByText('Base Storage')).toBeDefined();
       });
 
       expect(screen.queryByText('Additional Providers')).toBeNull();
@@ -139,7 +181,7 @@ describe('StorageTab', () => {
       mockProviders = [localProvider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
         expect(
@@ -154,10 +196,10 @@ describe('StorageTab', () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
-      render(<StorageTab />);
+      renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage (always on)')).toBeDefined();
+        expect(screen.getByText('Base Storage')).toBeDefined();
       });
 
       expect(screen.queryByText('Set Default')).toBeNull();

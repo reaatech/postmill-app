@@ -54,7 +54,8 @@ export class StorageAdapterFactory {
     switch (config.type) {
       case 'LOCAL':
         return new LocalAdapter(
-          process.env.UPLOAD_DIRECTORY || './uploads'
+          process.env.UPLOAD_DIRECTORY || './uploads',
+          config.organizationId
         );
       case 'S3':
         return new S3Adapter(
@@ -92,9 +93,10 @@ export class StorageAdapterFactory {
     }
   }
 
-  static createLocal(): IStorageAdapter {
+  static createLocal(tenantId?: string): IStorageAdapter {
     return new LocalAdapter(
-      process.env.UPLOAD_DIRECTORY || './uploads'
+      process.env.UPLOAD_DIRECTORY || './uploads',
+      tenantId
     );
   }
 }

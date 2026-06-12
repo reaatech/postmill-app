@@ -50,9 +50,13 @@ import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { MediaProviderController } from '@gitroom/backend/api/routes/media-provider.controller';
 import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
+import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
+import { RolesController } from '@gitroom/backend/api/routes/roles.controller';
 import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
+import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jobs-webhook.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
@@ -61,6 +65,9 @@ import { GoogleProvider } from '@gitroom/backend/services/auth/providers/google.
 import { FarcasterProvider } from '@gitroom/backend/services/auth/providers/farcaster.provider';
 import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.provider';
 import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
+import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 
 const authenticatedController = [
   UsersController,
@@ -93,8 +100,12 @@ const authenticatedController = [
   OrgAiSettingsController,
   RagController,
   OrgShortLinkSettingsController,
+  MediaProviderController,
   ApiKeysController,
   DashboardController,
+  BrandsController,
+  RolesController,
+  AdminController,
 ];
 @Module({
   imports: [UploadModule],
@@ -108,6 +119,7 @@ const authenticatedController = [
     NoAuthIntegrationsController,
     OAuthController,
     EmailWebhooksController,
+    MediaJobsWebhookController,
     ...authenticatedController,
   ],
   providers: [
@@ -117,6 +129,7 @@ const authenticatedController = [
     ExtractContentService,
     AuthMiddleware,
     PoliciesGuard,
+    OrgRbacGuard,
     PermissionsService,
     CodesService,
     IntegrationManager,
@@ -130,6 +143,7 @@ const authenticatedController = [
     OauthProvider,
     AnalyticsService,
     AiGuardMiddleware,
+    SessionCleanupService,
   ],
   get exports() {
     return [...this.imports, ...this.providers];

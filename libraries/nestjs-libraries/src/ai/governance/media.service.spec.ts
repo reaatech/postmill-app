@@ -12,19 +12,11 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
   },
 }));
 
-const mockCreateMediaJob = vi.fn().mockResolvedValue(undefined);
-const mockGetProviderConfigs = vi.fn().mockResolvedValue([]);
+const mockCreateMediaJob = vi.fn().mockResolvedValue({ id: 'job-1' });
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service', () => ({
   AiSettingsService: class MockAiSettings {
     createMediaJob = mockCreateMediaJob;
-    getProviderConfigs = mockGetProviderConfigs;
-  },
-}));
-
-vi.mock('@gitroom/helpers/auth/auth.service', () => ({
-  AuthService: {
-    fixedDecryption: vi.fn().mockReturnValue(JSON.stringify({ apiKey: 'test-key' })),
   },
 }));
 
@@ -33,44 +25,6 @@ const mockGetSettings = vi.fn().mockResolvedValue(null);
 vi.mock('@gitroom/nestjs-libraries/ai/ai-settings.manager', () => ({
   AiSettingsManager: class MockManager {
     getSettings = mockGetSettings;
-  },
-}));
-
-// Mock media pipeline providers
-const mockReplicateExecute = vi.fn().mockResolvedValue({ output: { uri: 'https://replicate.example.com/result.png' } });
-const mockOpenAIExecute = vi.fn().mockResolvedValue({ output: { data: Buffer.from('fake-audio'), text: 'openai transcript' } });
-const mockElevenLabsExecute = vi.fn().mockResolvedValue({ output: { data: Buffer.from('fake-tts') } });
-const mockDeepgramExecute = vi.fn().mockResolvedValue({ output: { text: 'transcribed text' } });
-const mockLumaExecute = vi.fn().mockResolvedValue({ output: { uri: 'https://luma.example.com/video.mp4' } });
-
-vi.mock('@reaatech/media-pipeline-mcp-replicate', () => ({
-  defineReplicateProvider: vi.fn(() => ({
-    execute: mockReplicateExecute,
-  })),
-}));
-
-vi.mock('@reaatech/media-pipeline-mcp-openai', () => ({
-  defineOpenAIProvider: vi.fn(() => ({
-    execute: mockOpenAIExecute,
-  })),
-}));
-
-vi.mock('@reaatech/media-pipeline-mcp-elevenlabs', () => ({
-  defineElevenLabsProvider: vi.fn(() => ({
-    execute: mockElevenLabsExecute,
-  })),
-}));
-
-vi.mock('@reaatech/media-pipeline-mcp-deepgram', () => ({
-  defineDeepgramProvider: vi.fn(() => ({
-    execute: mockDeepgramExecute,
-  })),
-}));
-
-vi.mock('@reaatech/media-pipeline-mcp-luma', () => ({
-  LumaProvider: class MockLuma {
-    constructor(_config?: any) {}
-    execute = mockLumaExecute;
   },
 }));
 
@@ -85,73 +39,146 @@ vi.mock('@reaatech/media-pipeline-mcp-cost', () => ({
 const mockSign = vi.fn().mockResolvedValue({ signedArtifactId: 'signed-1', manifestUri: 'c2pa:manifest-1' });
 vi.mock('@reaatech/media-pipeline-mcp-provenance', () => ({
   ProvenanceSigner: class MockSigner {
-    constructor(_config?: any) {}
+    constructor(_config?: unknown) {}
     sign = mockSign;
   },
-}));
-
-const mockStoragePut = vi.fn().mockResolvedValue('stored://artifact-1');
-vi.mock('@reaatech/media-pipeline-mcp-storage', () => ({
-  createStorage: vi.fn(() => ({ put: mockStoragePut })),
 }));
 
 import { AiMediaService } from './media.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
+import {
+  MediaProviderAdapter,
+  MediaProviderCapabilities,
+} from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 
-function createService() {
+const NO_CAPS: MediaProviderCapabilities = {
+  image: false,
+  video: false,
+  audio: false,
+  avatar: false,
+  tts: false,
+  stt: false,
+  upscale: false,
+  bgRemove: false,
+  inpaint: false,
+};
+
+function makeAdapter(
+  identifier: string,
+  caps: Partial<MediaProviderCapabilities>,
+  overrides: Partial<MediaProviderAdapter> = {},
+): MediaProviderAdapter {
+  return {
+    identifier,
+    name: identifier,
+    capabilities: { ...NO_CAPS, ...caps },
+    generateImage: vi.fn().mockResolvedValue({
+      multi: false,
+      image: `https://provider.example.com/${identifier}.png`,
+      images: [`https://provider.example.com/${identifier}.png`],
+      metadata: { provider: identifier, model: 'test-model' },
+    }),
+    generateVideo: vi.fn().mockResolvedValue({ jobId: `${identifier}-job-1` }),
+    generateAudio: vi.fn().mockResolvedValue({ jobId: `${identifier}-audio-1` }),
+    generateAvatar: vi.fn().mockResolvedValue({ jobId: `${identifier}-avatar-1` }),
+    ...overrides,
+  };
+}
+
+interface TestSetup {
+  registry: { get: (id: string) => MediaProviderAdapter | undefined };
+  orgSettings: {
+    getEnabledProviders: ReturnType<typeof vi.fn>;
+    getConfigForProvider: ReturnType<typeof vi.fn>;
+  };
+  lifecycle: {
+    createPendingJob: ReturnType<typeof vi.fn>;
+    webhookUrlFor: ReturnType<typeof vi.fn>;
+    attachProviderJob: ReturnType<typeof vi.fn>;
+    completeJob: ReturnType<typeof vi.fn>;
+    failJob: ReturnType<typeof vi.fn>;
+    getJob: ReturnType<typeof vi.fn>;
+    storeTranscript: ReturnType<typeof vi.fn>;
+  };
+}
+
+function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]): TestSetup & { service: AiMediaService } {
+  const map = new Map(adapters.map((a) => [a.identifier, a]));
+  const enabled = (enabledIdentifiers ?? adapters.map((a) => a.identifier)).map((identifier) => ({
+    identifier,
+    storageProviderId: null,
+    storageRootFolderId: null,
+    extraConfig: {},
+  }));
+
+  const registry = { get: (id: string) => map.get(id) };
+  const orgSettings = {
+    getEnabledProviders: vi.fn().mockResolvedValue(enabled),
+    getConfigForProvider: vi.fn().mockImplementation(async (_orgId: string, id: string) => ({
+      credentials: { apiKey: `${id}-key` },
+      storageProviderId: null,
+      storageRootFolderId: null,
+    })),
+  };
+  const lifecycle = {
+    createPendingJob: vi.fn().mockResolvedValue({ id: 'tracked-job-1' }),
+    webhookUrlFor: vi.fn().mockReturnValue('https://backend.example.com/media-jobs/webhook/tracked-job-1/tok'),
+    attachProviderJob: vi.fn().mockResolvedValue(undefined),
+    completeJob: vi.fn().mockResolvedValue(undefined),
+    failJob: vi.fn().mockResolvedValue(undefined),
+    getJob: vi.fn().mockResolvedValue({ id: 'tracked-job-1', artifactUrl: '/uploads/stored.mp4', status: 'completed' }),
+    storeTranscript: vi.fn().mockResolvedValue({ mediaId: 'm-1', path: '/uploads/t.txt', fileSize: 3 }),
+  };
+
+  const service = new AiMediaService(
+    new (AiSettingsService as never)(),
+    new (AIModelProvider as never)(),
+    new (AiSettingsManager as never)(),
+    orgSettings as never,
+    registry as never,
+    lifecycle as never,
+  );
+
+  return { service, registry, orgSettings, lifecycle };
+}
+
+function bareService() {
   return new AiMediaService(
-    new (AiSettingsService as any)(),
-    new (AIModelProvider as any)(),
-    new (AiSettingsManager as any)(),
+    new (AiSettingsService as never)(),
+    new (AIModelProvider as never)(),
+    new (AiSettingsManager as never)(),
   );
 }
 
-function enableMediaProvider(providerId: string, operations: string[], _credentials?: Record<string, string>) {
-  mockGetSettings.mockResolvedValue({
-    ragSettings: {
-      mediaProviders: {
-        [providerId]: {
-          enabled: true,
-          operations,
-          c2paAvailable: false,
-        },
-      },
-    },
-  });
-}
-
 describe('AiMediaService', () => {
-  let service: AiMediaService;
-
   beforeEach(() => {
     vi.clearAllMocks();
     mockImageModelGenerate.mockResolvedValue('https://cdn.example.com/image.png');
+    mockImageModel.mockResolvedValue({ generate: mockImageModelGenerate });
     mockGetSettings.mockResolvedValue(null);
-    mockGetProviderConfigs.mockResolvedValue([]);
-    service = createService();
+    mockCreateMediaJob.mockResolvedValue({ id: 'job-1' });
   });
 
-  describe('generateImage', () => {
-    it('returns an image URL string', async () => {
+  // ── Image: facade fallback (no media providers — today's behaviour) ──
+
+  describe('generateImage without media providers (facade fallback)', () => {
+    it('returns an image URL string from the AI facade', async () => {
+      const service = bareService();
       const result = await service.generateImage('a cat wearing a hat');
-      expect(typeof result).toBe('string');
       expect(result).toBe('https://cdn.example.com/image.png');
-    });
-
-    it('calls the image model with the prompt', async () => {
-      await service.generateImage('a cat wearing a hat');
       expect(mockImageModel).toHaveBeenCalledWith('utility', undefined);
-      expect(mockImageModelGenerate).toHaveBeenCalledWith('a cat wearing a hat', { size: undefined });
     });
 
-    it('passes size option to the model', async () => {
+    it('passes size option through to the facade model', async () => {
+      const service = bareService();
       await service.generateImage('a cat', { size: '512x512' });
       expect(mockImageModelGenerate).toHaveBeenCalledWith('a cat', { size: '512x512' });
     });
 
     it('records a media job with cost + creditType when orgId is provided', async () => {
+      const service = bareService();
       await service.generateImage('a cat', { orgId: 'org-123', userId: 'user-1' });
       expect(mockCreateMediaJob).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -161,22 +188,19 @@ describe('AiMediaService', () => {
           operation: 'image',
           status: 'done',
           artifactUrl: 'https://cdn.example.com/image.png',
-          // §6.4: image maps onto the legacy ai_images credit counter
           creditType: 'ai_images',
         }),
       );
       const job = mockCreateMediaJob.mock.calls[0][0];
       expect(typeof job.costUsd).toBe('number');
       expect(job.costUsd).toBeGreaterThan(0);
-      // -cost ledger was charged
       expect(mockCharge).toHaveBeenCalled();
     });
 
-    it('does not sign provenance when signing is disabled', async () => {
-      await service.generateImage('a cat', { orgId: 'org-123' });
-      const job = mockCreateMediaJob.mock.calls[0][0];
-      expect(job.provenance).toBeUndefined();
-      expect(mockSign).not.toHaveBeenCalled();
+    it('does not record a media job when orgId is not provided', async () => {
+      const service = bareService();
+      await service.generateImage('a cat');
+      expect(mockCreateMediaJob).not.toHaveBeenCalled();
     });
 
     it('signs C2PA provenance when enabled in settings', async () => {
@@ -188,381 +212,405 @@ describe('AiMediaService', () => {
           },
         },
       });
-      const fresh = createService();
-      await fresh.generateImage('a cat', { orgId: 'org-123' });
+      const service = bareService();
+      await service.generateImage('a cat', { orgId: 'org-123' });
       expect(mockSign).toHaveBeenCalled();
-      const job = mockCreateMediaJob.mock.calls[0][0];
-      expect(job.provenance).toBe('c2pa:manifest-1');
+      expect(mockCreateMediaJob.mock.calls[0][0].provenance).toBe('c2pa:manifest-1');
     });
 
-    it('does not record a media job when orgId is not provided', async () => {
-      await service.generateImage('a cat');
-      expect(mockCreateMediaJob).not.toHaveBeenCalled();
-    });
-
-    it('throws CapabilityNotAvailable when image model is null', async () => {
+    it('throws CapabilityNotAvailable when the facade image model is null', async () => {
       mockImageModel.mockResolvedValueOnce(null);
+      const service = bareService();
       await expect(service.generateImage('a cat')).rejects.toThrow(CapabilityNotAvailable);
     });
 
     it('passes through the model error when generate fails', async () => {
       mockImageModelGenerate.mockRejectedValueOnce(new Error('API rate limit exceeded'));
+      const service = bareService();
       await expect(service.generateImage('a cat')).rejects.toThrow('API rate limit exceeded');
     });
   });
 
+  // ── Image: capability-driven adapter resolution (§11.2) ──
+
+  describe('generateImage with org media providers', () => {
+    it('uses an org-configured image-capable adapter with decrypted credentials', async () => {
+      const adapter = makeAdapter('openai', { image: true });
+      const { service, orgSettings } = setup([adapter]);
+
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+
+      expect(result).toBe('https://provider.example.com/openai.png');
+      expect(orgSettings.getConfigForProvider).toHaveBeenCalledWith('org-1', 'openai');
+      expect(adapter.generateImage).toHaveBeenCalledWith('a cat', {
+        credentials: { apiKey: 'openai-key' },
+        size: undefined,
+      });
+      expect(mockImageModel).not.toHaveBeenCalled();
+      expect(mockCreateMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'openai', operation: 'image' }),
+      );
+    });
+
+    it('returns the standardized result shape from generateImageResult', async () => {
+      const adapter = makeAdapter('fal', { image: true }, {
+        generateImage: vi.fn().mockResolvedValue({
+          multi: true,
+          image: 'https://x/1.png',
+          images: ['https://x/1.png', 'https://x/2.png'],
+        }),
+      });
+      const { service } = setup([adapter]);
+
+      const result = await service.generateImageResult('two cats', { orgId: 'org-1' });
+      expect(result).toEqual({
+        multi: true,
+        image: 'https://x/1.png',
+        images: ['https://x/1.png', 'https://x/2.png'],
+        metadata: undefined,
+      });
+    });
+
+    it('resolves adapters deterministically (alphabetical) and falls through on failure', async () => {
+      const failing = makeAdapter('fal', { image: true }, {
+        generateImage: vi.fn().mockRejectedValue(new Error('fal down')),
+      });
+      const working = makeAdapter('openai', { image: true });
+      const { service } = setup([working, failing]);
+
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+
+      // 'fal' sorts before 'openai' and is tried first.
+      expect(failing.generateImage).toHaveBeenCalled();
+      expect(result).toBe('https://provider.example.com/openai.png');
+    });
+
+    it('skips adapters that do not declare the image capability', async () => {
+      const videoOnly = makeAdapter('luma', { video: true });
+      const { service } = setup([videoOnly]);
+
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+
+      expect(videoOnly.generateImage).not.toHaveBeenCalled();
+      expect(result).toBe('https://cdn.example.com/image.png'); // facade fallback
+    });
+
+    it('honours extraConfig.operations gating', async () => {
+      const adapter = makeAdapter('replicate', { image: true, upscale: true });
+      const { service, orgSettings } = setup([adapter]);
+      orgSettings.getEnabledProviders.mockResolvedValue([
+        {
+          identifier: 'replicate',
+          storageProviderId: null,
+          storageRootFolderId: null,
+          extraConfig: { operations: ['upscale'] },
+        },
+      ]);
+
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+      expect(adapter.generateImage).not.toHaveBeenCalled();
+      expect(result).toBe('https://cdn.example.com/image.png');
+    });
+
+    it('skips providers whose credentials are empty', async () => {
+      const adapter = makeAdapter('openai', { image: true });
+      const { service, orgSettings } = setup([adapter]);
+      orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: {},
+        storageProviderId: null,
+        storageRootFolderId: null,
+      });
+
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+      expect(adapter.generateImage).not.toHaveBeenCalled();
+      expect(result).toBe('https://cdn.example.com/image.png');
+    });
+  });
+
+  // ── Async generation (§11.2) ──
+
   describe('generateVideo', () => {
-    it('falls back to image generation when no media provider configured', async () => {
+    it('falls back to image generation when no media provider is configured', async () => {
+      const service = bareService();
       const result = await service.generateVideo('a sunset');
       expect(result).toBe('https://cdn.example.com/image.png');
       expect(mockImageModel).toHaveBeenCalledWith('utility', undefined);
     });
 
-    it('passes orgId through to image model', async () => {
-      await service.generateVideo('a sunset', { orgId: 'org-789', userId: 'user-2' });
-      expect(mockImageModel).toHaveBeenCalledWith('utility', 'org-789');
+    it('creates a tracked AIMediaJob, passes the webhook URL, and returns the job id', async () => {
+      const adapter = makeAdapter('luma', { video: true });
+      const { service, lifecycle } = setup([adapter]);
+
+      const result = await service.generateVideo('a sunset', { orgId: 'org-1', userId: 'u-1' });
+
+      expect(lifecycle.createPendingJob).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org-1',
+          userId: 'u-1',
+          provider: 'luma',
+          operation: 'video',
+          creditType: 'ai_videos',
+        }),
+      );
+      expect(adapter.generateVideo).toHaveBeenCalledWith('a sunset', expect.objectContaining({
+        credentials: { apiKey: 'luma-key' },
+        webhookUrl: 'https://backend.example.com/media-jobs/webhook/tracked-job-1/tok',
+      }));
+      expect(lifecycle.attachProviderJob).toHaveBeenCalledWith('tracked-job-1', 'luma-job-1');
+      expect(result).toBe('tracked-job-1');
     });
 
-    it('falls back to image when luma is not enabled', async () => {
-      enableMediaProvider('luma', []);
+    it('completes inline submissions immediately and returns the stored artifact URL', async () => {
+      const adapter = makeAdapter('stability-ai', { video: true }, {
+        generateVideo: vi.fn().mockResolvedValue({
+          jobId: 'inline-1',
+          artifactUrl: 'data:video/mp4;base64,AAA',
+          metadata: { mime: 'video/mp4' },
+        }),
+      });
+      const { service, lifecycle } = setup([adapter]);
+
+      const result = await service.generateVideo('a sunset', { orgId: 'org-1' });
+
+      expect(lifecycle.completeJob).toHaveBeenCalledWith(
+        { id: 'tracked-job-1' },
+        'data:video/mp4;base64,AAA',
+        { mime: 'video/mp4' },
+      );
+      expect(result).toBe('/uploads/stored.mp4');
+    });
+
+    it('marks the job failed (without notifying) and tries the next provider', async () => {
+      const failing = makeAdapter('heygen', { video: true }, {
+        generateVideo: vi.fn().mockRejectedValue(new Error('heygen down')),
+      });
+      const working = makeAdapter('luma', { video: true });
+      const { service, lifecycle } = setup([failing, working]);
+
+      const result = await service.generateVideo('a sunset', { orgId: 'org-1' });
+
+      expect(lifecycle.failJob).toHaveBeenCalledWith(
+        { id: 'tracked-job-1' },
+        'heygen down',
+        { notify: false },
+      );
+      expect(result).toBe('tracked-job-1');
+      expect(working.generateVideo).toHaveBeenCalled();
+    });
+
+    it('falls back to image when every provider fails', async () => {
+      const failing = makeAdapter('luma', { video: true }, {
+        generateVideo: vi.fn().mockRejectedValue(new Error('down')),
+      });
+      const { service } = setup([failing]);
+
+      const result = await service.generateVideo('a sunset', { orgId: 'org-1' });
+      expect(result).toBe('https://cdn.example.com/image.png');
+    });
+
+    it('submits untracked when there is no org context', async () => {
+      const adapter = makeAdapter('luma', { video: true });
+      const { service, lifecycle, orgSettings } = setup([adapter]);
+      // _resolveForOperation requires an orgId — without one there are no candidates
+      // and the image fallback applies.
       const result = await service.generateVideo('a sunset');
+      expect(orgSettings.getEnabledProviders).not.toHaveBeenCalled();
+      expect(lifecycle.createPendingJob).not.toHaveBeenCalled();
       expect(result).toBe('https://cdn.example.com/image.png');
     });
   });
 
+  describe('generateAudio / generateAvatar', () => {
+    it('throws CapabilityNotAvailable when no audio provider is configured', async () => {
+      const service = bareService();
+      await expect(service.generateAudio('a jingle', { orgId: 'org-1' })).rejects.toThrow(CapabilityNotAvailable);
+    });
+
+    it('tracks an avatar job via the lifecycle', async () => {
+      const adapter = makeAdapter('heygen', { avatar: true });
+      const { service, lifecycle } = setup([adapter]);
+
+      const result = await service.generateAvatar('hello world', { orgId: 'org-1' });
+
+      expect(lifecycle.createPendingJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'heygen', operation: 'avatar', creditType: 'ai_videos' }),
+      );
+      expect(adapter.generateAvatar).toHaveBeenCalled();
+      expect(result).toBe('tracked-job-1');
+    });
+
+    it('tracks an audio job via the lifecycle', async () => {
+      const adapter = makeAdapter('fal', { audio: true });
+      const { service, lifecycle } = setup([adapter]);
+
+      const result = await service.generateAudio('a jingle', { orgId: 'org-1' });
+
+      expect(lifecycle.createPendingJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'fal', operation: 'audio' }),
+      );
+      expect(result).toBe('tracked-job-1');
+    });
+  });
+
+  // ── Speech ──
+
   describe('textToSpeech', () => {
     it('throws CapabilityNotAvailable when no TTS provider configured', async () => {
+      const service = bareService();
       await expect(service.textToSpeech('hello world')).rejects.toThrow(CapabilityNotAvailable);
-      await expect(service.textToSpeech('hello world')).rejects.toThrow(
-        'Text-to-speech is not available',
+      await expect(service.textToSpeech('hello world')).rejects.toThrow('Text-to-speech is not available');
+    });
+
+    it('uses a TTS-capable adapter and returns a Buffer', async () => {
+      const adapter = makeAdapter('elevenlabs', { tts: true }, {
+        textToSpeech: vi.fn().mockResolvedValue(Buffer.from('audio-bytes')),
+      });
+      const { service } = setup([adapter]);
+
+      const result = await service.textToSpeech('hello', { orgId: 'org-1', voice: 'adam' });
+
+      expect(Buffer.isBuffer(result)).toBe(true);
+      expect(result.toString()).toBe('audio-bytes');
+      expect(adapter.textToSpeech).toHaveBeenCalledWith('hello', {
+        credentials: { apiKey: 'elevenlabs-key' },
+        voice: 'adam',
+      });
+      expect(mockCreateMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'elevenlabs', operation: 'tts' }),
       );
     });
 
-    it('throws CapabilityNotAvailable with options', async () => {
-      await expect(
-        service.textToSpeech('hello', { voice: 'alloy', orgId: 'org-1' }),
-      ).rejects.toThrow(CapabilityNotAvailable);
+    it('decodes base64 string results', async () => {
+      const adapter = makeAdapter('openai', { tts: true }, {
+        textToSpeech: vi.fn().mockResolvedValue(Buffer.from('raw').toString('base64')),
+      });
+      const { service } = setup([adapter]);
+
+      const result = await service.textToSpeech('hello', { orgId: 'org-1' });
+      expect(result.toString()).toBe('raw');
     });
   });
 
   describe('speechToText', () => {
     it('throws CapabilityNotAvailable when no STT provider configured', async () => {
-      const audioBuffer = Buffer.from('fake-audio-data');
-      await expect(service.speechToText(audioBuffer)).rejects.toThrow(CapabilityNotAvailable);
+      const service = bareService();
+      await expect(service.speechToText(Buffer.from('audio'))).rejects.toThrow(CapabilityNotAvailable);
     });
 
-    it('throws CapabilityNotAvailable with options', async () => {
-      const audioBuffer = Buffer.from('fake-audio-data');
-      await expect(
-        service.speechToText(audioBuffer, { orgId: 'org-1' }),
-      ).rejects.toThrow(CapabilityNotAvailable);
+    it('transcribes via an STT-capable adapter and stores the transcript document (§11.1)', async () => {
+      const adapter = makeAdapter('deepgram', { stt: true }, {
+        speechToText: vi.fn().mockResolvedValue('the transcript'),
+      });
+      const { service, lifecycle } = setup([adapter]);
+
+      const result = await service.speechToText(Buffer.from('audio'), { orgId: 'org-1' });
+
+      expect(result).toBe('the transcript');
+      expect(lifecycle.storeTranscript).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        provider: 'deepgram',
+        text: 'the transcript',
+      });
+      expect(mockCreateMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'deepgram', operation: 'stt' }),
+      );
+    });
+
+    it('still returns the transcript when storing the document fails', async () => {
+      const adapter = makeAdapter('deepgram', { stt: true }, {
+        speechToText: vi.fn().mockResolvedValue('text'),
+      });
+      const { service, lifecycle } = setup([adapter]);
+      lifecycle.storeTranscript.mockRejectedValue(new Error('storage down'));
+
+      const result = await service.speechToText(Buffer.from('audio'), { orgId: 'org-1' });
+      expect(result).toBe('text');
     });
   });
 
+  // ── Image edits ──
+
   describe('upscaleImage', () => {
     it('returns the original image URL when no upscale provider configured', async () => {
+      const service = bareService();
       const url = 'https://cdn.example.com/low-res.png';
-      const result = await service.upscaleImage(url);
-      expect(result).toBe(url);
+      expect(await service.upscaleImage(url)).toBe(url);
+      expect(await service.upscaleImage(url, { orgId: 'org-1' })).toBe(url);
     });
 
-    it('returns the original URL even with orgId provided', async () => {
-      const url = 'https://cdn.example.com/low-res.png';
-      const result = await service.upscaleImage(url, { orgId: 'org-1' });
-      expect(result).toBe(url);
+    it('uses an upscale-capable adapter', async () => {
+      const adapter = makeAdapter('replicate', { upscale: true }, {
+        upscaleImage: vi.fn().mockResolvedValue('https://x/upscaled.png'),
+      });
+      const { service } = setup([adapter]);
+
+      const result = await service.upscaleImage('https://x/low.png', { orgId: 'org-1' });
+      expect(result).toBe('https://x/upscaled.png');
     });
 
-    it('returns the original URL for empty string', async () => {
-      const result = await service.upscaleImage('');
-      expect(result).toBe('');
+    it('returns the original when the adapter fails', async () => {
+      const adapter = makeAdapter('replicate', { upscale: true }, {
+        upscaleImage: vi.fn().mockRejectedValue(new Error('boom')),
+      });
+      const { service } = setup([adapter]);
+
+      const url = 'https://x/low.png';
+      expect(await service.upscaleImage(url, { orgId: 'org-1' })).toBe(url);
     });
   });
 
   describe('removeBackground', () => {
     it('throws CapabilityNotAvailable when no provider configured', async () => {
-      await expect(service.removeBackground('https://example.com/img.png')).rejects.toThrow(
-        CapabilityNotAvailable,
+      const service = bareService();
+      await expect(service.removeBackground('https://x/img.png')).rejects.toThrow(CapabilityNotAvailable);
+      await expect(service.removeBackground('https://x/img.png', { orgId: 'org-1' })).rejects.toThrow(
+        'Background removal is not available',
       );
     });
 
-    it('throws regardless of options', async () => {
-      await expect(
-        service.removeBackground('https://example.com/img.png', { orgId: 'org-1' }),
-      ).rejects.toThrow('Background removal is not available');
+    it('uses a bgRemove-capable adapter', async () => {
+      const adapter = makeAdapter('replicate', { bgRemove: true }, {
+        removeBackground: vi.fn().mockResolvedValue('https://x/nobg.png'),
+      });
+      const { service } = setup([adapter]);
+
+      const result = await service.removeBackground('https://x/img.png', { orgId: 'org-1' });
+      expect(result).toBe('https://x/nobg.png');
     });
   });
 
   describe('inpaintImage', () => {
     it('throws CapabilityNotAvailable when no provider configured', async () => {
-      await expect(
-        service.inpaintImage('https://example.com/img.png', 'https://example.com/mask.png', 'fill gap'),
-      ).rejects.toThrow(CapabilityNotAvailable);
+      const service = bareService();
+      await expect(service.inpaintImage('img.png', 'mask.png', 'fill')).rejects.toThrow(CapabilityNotAvailable);
     });
 
-    it('throws regardless of options', async () => {
-      await expect(
-        service.inpaintImage('img.png', 'mask.png', 'fill', { orgId: 'org-1' }),
-      ).rejects.toThrow('Inpainting is not available');
-    });
-  });
-
-  describe('with mock media pipeline providers', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-      mockImageModelGenerate.mockResolvedValue('https://cdn.example.com/image.png');
-      mockGetSettings.mockResolvedValue(null);
-      mockGetProviderConfigs.mockResolvedValue([]);
-      mockReplicateExecute.mockResolvedValue({ output: { uri: 'https://replicate.example.com/result.png' } });
-      mockOpenAIExecute.mockResolvedValue({ output: { data: Buffer.from('fake-audio'), text: 'openai transcript' } });
-      mockElevenLabsExecute.mockResolvedValue({ output: { data: Buffer.from('fake-tts') } });
-      mockDeepgramExecute.mockResolvedValue({ output: { text: 'transcribed text' } });
-      mockLumaExecute.mockResolvedValue({ output: { uri: 'https://luma.example.com/video.mp4' } });
-    });
-
-    describe('textToSpeech with provider', () => {
-      it('uses ElevenLabs when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'elevenlabs', credentials: 'encrypted-elevenlabs-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              elevenlabs: { enabled: true, operations: ['tts'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        await freshService.textToSpeech('hello', { voice: 'adam' });
-        expect(mockElevenLabsExecute).toHaveBeenCalledWith(
-          expect.objectContaining({ operation: 'audio.tts' }),
-        );
+    it('uses an inpaint-capable adapter', async () => {
+      const adapter = makeAdapter('replicate', { inpaint: true }, {
+        inpaintImage: vi.fn().mockResolvedValue('https://x/inpainted.png'),
       });
+      const { service } = setup([adapter]);
 
-      it('uses OpenAI TTS when ElevenLabs not configured', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'openai', credentials: 'encrypted-openai-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              openai: { enabled: true, operations: ['tts'], c2paAvailable: false },
-            },
-          },
-        });
-
-        mockElevenLabsExecute.mockRejectedValueOnce(new Error('elevenlabs down'));
-
-        const freshService = createService();
-        await freshService.textToSpeech('hello');
-        expect(mockOpenAIExecute).toHaveBeenCalledWith(
-          expect.objectContaining({ operation: 'audio.tts' }),
-        );
-      });
-    });
-
-    describe('speechToText with provider', () => {
-      it('uses Deepgram when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'deepgram', credentials: 'encrypted-deepgram-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              deepgram: { enabled: true, operations: ['stt'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        await freshService.speechToText(Buffer.from('audio'));
-        expect(mockDeepgramExecute).toHaveBeenCalledWith(
-          expect.objectContaining({ operation: 'audio.stt' }),
-        );
-      });
-
-      it('uses OpenAI STT when Deepgram not configured', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'openai', credentials: 'encrypted-openai-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              openai: { enabled: true, operations: ['stt'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        const result = await freshService.speechToText(Buffer.from('audio'));
-        expect(result).toBe('openai transcript');
-      });
-    });
-
-    describe('generateVideo with Luma', () => {
-      it('uses Luma when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'luma', credentials: 'encrypted-luma-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              luma: { enabled: true, operations: ['video'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const result = await freshService.generateVideo('a beautiful sunset');
-        expect(result).toBe('https://luma.example.com/video.mp4');
-      });
-
-      it('records a video job mapped to the ai_videos credit counter (§6.4)', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'luma', credentials: 'encrypted-luma-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              luma: { enabled: true, operations: ['video'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        await freshService.generateVideo('a beautiful sunset', { orgId: 'org-9', userId: 'u-9' });
-        expect(mockCreateMediaJob).toHaveBeenCalledWith(
-          expect.objectContaining({
-            organizationId: 'org-9',
-            operation: 'video',
-            creditType: 'ai_videos',
-          }),
-        );
-      });
-
-      it('falls back to image when luma execution fails', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'luma', credentials: 'encrypted-luma-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              luma: { enabled: true, operations: ['video'], c2paAvailable: false },
-            },
-          },
-        });
-
-        mockLumaExecute.mockRejectedValueOnce(new Error('Luma API error'));
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const result = await freshService.generateVideo('a beautiful sunset');
-        expect(result).toBe('https://cdn.example.com/image.png');
-      });
-    });
-
-    describe('upscaleImage with provider', () => {
-      it('uses Replicate when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'replicate', credentials: 'encrypted-replicate-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              replicate: { enabled: true, operations: ['upscale'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const result = await freshService.upscaleImage('https://img.example.com/low-res.png');
-        expect(result).toBe('https://replicate.example.com/result.png');
-      });
-
-      it('returns original when replicate fails', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'replicate', credentials: 'encrypted-replicate-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              replicate: { enabled: true, operations: ['upscale'], c2paAvailable: false },
-            },
-          },
-        });
-
-        mockReplicateExecute.mockRejectedValueOnce(new Error('Upscale failed'));
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const url = 'https://img.example.com/low-res.png';
-        const result = await freshService.upscaleImage(url);
-        expect(result).toBe(url);
-      });
-    });
-
-    describe('removeBackground with provider', () => {
-      it('uses Replicate when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'replicate', credentials: 'encrypted-replicate-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              replicate: { enabled: true, operations: ['bg-remove'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const result = await freshService.removeBackground('https://img.example.com/photo.png');
-        expect(result).toBe('https://replicate.example.com/result.png');
-      });
-    });
-
-    describe('inpaintImage with provider', () => {
-      it('uses Replicate when configured and enabled', async () => {
-        mockGetProviderConfigs.mockResolvedValue([
-          { identifier: 'replicate', credentials: 'encrypted-replicate-key' },
-        ]);
-        mockGetSettings.mockResolvedValue({
-          ragSettings: {
-            mediaProviders: {
-              replicate: { enabled: true, operations: ['inpaint'], c2paAvailable: false },
-            },
-          },
-        });
-
-        const freshService = createService();
-        freshService.invalidateProviderCache();
-        const result = await freshService.inpaintImage('photo.png', 'mask.png', 'fill sky');
-        expect(result).toBe('https://replicate.example.com/result.png');
-      });
-    });
-
-    describe('invalidateProviderCache', () => {
-      it('clears provider and config caches', () => {
-        const freshService = createService();
-        expect(() => freshService.invalidateProviderCache()).not.toThrow();
+      const result = await service.inpaintImage('img.png', 'mask.png', 'fill sky', { orgId: 'org-1' });
+      expect(result).toBe('https://x/inpainted.png');
+      expect(adapter.inpaintImage).toHaveBeenCalledWith('img.png', 'mask.png', 'fill sky', {
+        credentials: { apiKey: 'replicate-key' },
       });
     });
   });
+
+  // ── 4F summary ──
 
   describe('getMediaProviderSummary (4F)', () => {
-    it('returns one entry per media operation, all unavailable when nothing is configured', async () => {
-      mockGetSettings.mockResolvedValue(null);
-      mockGetProviderConfigs.mockResolvedValue([]);
-      const freshService = createService();
-
-      const summary = await freshService.getMediaProviderSummary();
+    it('returns one entry per media operation, all unavailable without an org', async () => {
+      const service = bareService();
+      const summary = await service.getMediaProviderSummary();
 
       expect(summary.map((e) => e.operation)).toEqual([
         'image',
         'video',
+        'audio',
+        'avatar',
         'tts',
         'stt',
         'upscale',
@@ -573,67 +621,128 @@ describe('AiMediaService', () => {
       expect(summary.every((e) => e.providers.length === 0)).toBe(true);
     });
 
-    it('marks an operation available and lists the enabled provider id', async () => {
-      mockGetSettings.mockResolvedValue({
-        ragSettings: {
-          mediaProviders: {
-            elevenlabs: { enabled: true, operations: ['tts'], c2paAvailable: false },
-          },
+    it('marks operations available per adapter capability and never leaks credentials', async () => {
+      const adapter = makeAdapter('replicate', { image: true, upscale: true });
+      const { service, orgSettings } = setup([adapter]);
+      orgSettings.getEnabledProviders.mockResolvedValue([
+        {
+          identifier: 'replicate',
+          storageProviderId: null,
+          storageRootFolderId: null,
+          extraConfig: { c2paAvailable: true },
         },
-      });
-      mockGetProviderConfigs.mockResolvedValue([]);
-      const freshService = createService();
-
-      const summary = await freshService.getMediaProviderSummary();
-      const tts = summary.find((e) => e.operation === 'tts')!;
-
-      expect(tts.available).toBe(true);
-      expect(tts.providers).toEqual([
-        { id: 'elevenlabs', enabled: true, c2paAvailable: false },
       ]);
-    });
 
-    it('excludes disabled providers', async () => {
-      mockGetSettings.mockResolvedValue({
-        ragSettings: {
-          mediaProviders: {
-            replicate: { enabled: false, operations: ['image'], c2paAvailable: true },
-          },
-        },
-      });
-      mockGetProviderConfigs.mockResolvedValue([]);
-      const freshService = createService();
-
-      const summary = await freshService.getMediaProviderSummary();
+      const summary = await service.getMediaProviderSummary('org-1');
       const image = summary.find((e) => e.operation === 'image')!;
+      const video = summary.find((e) => e.operation === 'video')!;
 
-      expect(image.available).toBe(false);
-      expect(image.providers).toEqual([]);
-    });
+      expect(image.available).toBe(true);
+      expect(image.providers).toEqual([{ id: 'replicate', enabled: true, c2paAvailable: true }]);
+      expect(video.available).toBe(false);
 
-    it('reflects the c2paAvailable flag and never leaks credentials', async () => {
-      mockGetSettings.mockResolvedValue({
-        ragSettings: {
-          mediaProviders: {
-            replicate: { enabled: true, operations: ['image', 'upscale'], c2paAvailable: true },
-          },
-        },
-      });
-      mockGetProviderConfigs.mockResolvedValue([
-        { identifier: 'replicate', credentials: 'encrypted-secret' },
-      ]);
-      const freshService = createService();
-
-      const summary = await freshService.getMediaProviderSummary();
-      const image = summary.find((e) => e.operation === 'image')!;
-
-      expect(image.providers).toEqual([
-        { id: 'replicate', enabled: true, c2paAvailable: true },
-      ]);
-      // No credential material in any returned entry.
       const serialized = JSON.stringify(summary);
       expect(serialized).not.toContain('credentials');
-      expect(serialized).not.toContain('encrypted-secret');
+      expect(serialized).not.toContain('replicate-key');
+    });
+
+    it('honours extraConfig.operations gating in the summary', async () => {
+      const adapter = makeAdapter('replicate', { image: true, upscale: true });
+      const { service, orgSettings } = setup([adapter]);
+      orgSettings.getEnabledProviders.mockResolvedValue([
+        {
+          identifier: 'replicate',
+          storageProviderId: null,
+          storageRootFolderId: null,
+          extraConfig: { operations: ['upscale'] },
+        },
+      ]);
+
+      const summary = await service.getMediaProviderSummary('org-1');
+      expect(summary.find((e) => e.operation === 'image')!.available).toBe(false);
+      expect(summary.find((e) => e.operation === 'upscale')!.available).toBe(true);
+    });
+  });
+
+  describe('invalidateProviderCache', () => {
+    it('clears the lazy infra singletons without throwing', () => {
+      const service = bareService();
+      expect(() => service.invalidateProviderCache()).not.toThrow();
+    });
+  });
+
+  describe('untracked async path (no lifecycle service wired)', () => {
+    it('submits and returns the raw provider job id', async () => {
+      const adapter = makeAdapter('luma', { video: true });
+      const map = new Map([[adapter.identifier, adapter]]);
+      const orgSettings = {
+        getEnabledProviders: vi.fn().mockResolvedValue([
+          { identifier: 'luma', storageProviderId: null, storageRootFolderId: null, extraConfig: {} },
+        ]),
+        getConfigForProvider: vi.fn().mockResolvedValue({
+          credentials: { apiKey: 'k' },
+          storageProviderId: null,
+          storageRootFolderId: null,
+        }),
+      };
+      const service = new AiMediaService(
+        new (AiSettingsService as never)(),
+        new (AIModelProvider as never)(),
+        new (AiSettingsManager as never)(),
+        orgSettings as never,
+        { get: (id: string) => map.get(id) } as never,
+        // no lifecycle
+      );
+
+      const result = await service.generateVideo('a sunset', { orgId: 'org-1' });
+      expect(result).toBe('luma-job-1');
+      expect(mockCreateMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'luma', operation: 'video' }),
+      );
+    });
+
+    it('throws CapabilityNotAvailable when every untracked provider fails (audio path)', async () => {
+      const adapter = makeAdapter('fal', { audio: true }, {
+        generateAudio: vi.fn().mockRejectedValue(new Error('down')),
+      });
+      const map = new Map([[adapter.identifier, adapter]]);
+      const orgSettings = {
+        getEnabledProviders: vi.fn().mockResolvedValue([
+          { identifier: 'fal', storageProviderId: null, storageRootFolderId: null, extraConfig: {} },
+        ]),
+        getConfigForProvider: vi.fn().mockResolvedValue({
+          credentials: { apiKey: 'k' },
+          storageProviderId: null,
+          storageRootFolderId: null,
+        }),
+      };
+      const service = new AiMediaService(
+        new (AiSettingsService as never)(),
+        new (AIModelProvider as never)(),
+        new (AiSettingsManager as never)(),
+        orgSettings as never,
+        { get: (id: string) => map.get(id) } as never,
+      );
+
+      await expect(service.generateAudio('a jingle', { orgId: 'org-1' })).rejects.toThrow(
+        CapabilityNotAvailable,
+      );
+    });
+
+    it('tolerates a failing org-settings lookup (resolution returns empty)', async () => {
+      const orgSettings = {
+        getEnabledProviders: vi.fn().mockRejectedValue(new Error('db down')),
+        getConfigForProvider: vi.fn(),
+      };
+      const service = new AiMediaService(
+        new (AiSettingsService as never)(),
+        new (AIModelProvider as never)(),
+        new (AiSettingsManager as never)(),
+        orgSettings as never,
+        { get: () => undefined } as never,
+      );
+      const result = await service.generateImage('a cat', { orgId: 'org-1' });
+      expect(result).toBe('https://cdn.example.com/image.png');
     });
   });
 });

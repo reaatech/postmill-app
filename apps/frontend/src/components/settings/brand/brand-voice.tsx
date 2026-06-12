@@ -2,7 +2,6 @@
 
 import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import useSWR from 'swr';
 import { Slider } from '@gitroom/react/form/slider';
 import { Select } from '@gitroom/react/form/select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -53,24 +52,7 @@ const LANGUAGES = [
   { value: 'fi', label: 'Finnish' },
 ];
 
-const useBrandProfile = () => {
-  const fetch = useFetch();
-  const load = useCallback(async () => {
-    const res = await fetch('/ai/brand-profile');
-    if (!res.ok) throw new Error('Failed to load brand profile');
-    return res.json();
-  }, [fetch]);
-  return useSWR<BrandProfile>('ai-brand-profile', load, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-    revalidateOnMount: true,
-    refreshWhenHidden: false,
-    refreshWhenOffline: false,
-  });
-};
-
-const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutate?: () => void }) => {
+const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile; brandId?: string; onMutate?: () => void }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -82,7 +64,8 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
   const [selectedPlatform, setSelectedPlatform] = useState('');
 
   const handleSave = useCallback(async () => {
-    const res = await fetch('/ai/brand-profile', {
+    const url = brandId ? `/brands/${brandId}` : '/ai/brand-profile';
+    const res = await fetch(url, {
       method: 'PUT',
       body: JSON.stringify({
         instructions,
@@ -97,7 +80,7 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
     }
     toaster.show(t('brand_profile_saved', 'Brand profile saved'), 'success');
     onMutate?.();
-  }, [instructions, language, enabled, platformInstructions, fetch, toaster, t, onMutate]);
+  }, [instructions, language, enabled, platformInstructions, fetch, toaster, t, onMutate, brandId]);
 
   const handlePlatformSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedPlatform(e.target.value);
@@ -252,17 +235,8 @@ const BrandVoiceForm = ({ initial, onMutate }: { initial?: BrandProfile; onMutat
   );
 };
 
-export const BrandVoice = () => {
-  const { data, isLoading, mutate } = useBrandProfile();
+export const BrandVoice = ({ brandId, initial, onSaved }: { brandId?: string; initial?: BrandProfile; onSaved?: () => void }) => {
   const translate = useT();
 
-  if (isLoading) {
-    return (
-      <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-        <div className="animate-pulse">{translate('loading', 'Loading...')}</div>
-      </div>
-    );
-  }
-
-  return <BrandVoiceForm key={data ? 'loaded' : 'empty'} initial={data} onMutate={() => mutate()} />;
+  return <BrandVoiceForm key={brandId || 'default'} initial={initial} brandId={brandId} onMutate={onSaved} />;
 };

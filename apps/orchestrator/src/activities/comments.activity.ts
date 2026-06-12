@@ -167,7 +167,7 @@ export class CommentsActivity {
     const memberships = await this._prisma.userOrganization.findMany({
       where: { organizationId: orgId },
       include: {
-        user: { select: { id: true, email: true, name: true } },
+        user: { select: { id: true, email: true } },
       },
     });
     const members = memberships.map((m) => m.user);

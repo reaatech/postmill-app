@@ -21,7 +21,7 @@ Controller → Manager → Service → Repository
 
 | Layer | Responsibility | Must NOT |
 |---|---|---|
-| **Controller** | HTTP route wiring (`@Get`, `@Post`), `@Body`/`@Query`/`@Param` extraction, `@UseGuards` decorators, `@CheckPolicies` | Call Prisma, contain business logic |
+| **Controller** | HTTP route wiring (`@Get`, `@Post`), `@Body`/`@Query`/`@Param` extraction, `@UseGuards` decorators, `@CheckPolicies`, `@RequirePermission` | Call Prisma, contain business logic |
 | **Service** | Business logic, validation, cross-domain coordination | Call Prisma directly |
 | **Manager** | Multi-step orchestration, transaction boundaries, workflow coordination | Call Prisma directly |
 | **Repository** | Prisma queries ONLY — `findMany`, `create`, `update`, `$queryRaw` | Contain business logic |
@@ -66,6 +66,35 @@ new ValidationPipe({
 | `forbidNonWhitelisted` | Returns a 400 error when unknown properties are sent |
 
 **Rule:** Every new optional field must be declared on its DTO class. Unknown fields are rejected.
+
+---
+
+## Two Orthogonal Access Gates (v3.8.10)
+
+Routes are gated by two independent guards. **Do not merge them.**
+
+| Gate | Decorator | Guard | Question | Failure |
+|---|---|---|---|---|
+| Billing/tier | `@CheckPolicies([Action, Section])` | `PoliciesGuard` | Has this org **paid** for this feature? | `SubscriptionException` → HTTP **402** |
+| RBAC | `@RequirePermission(resource, action)` | `OrgRbacGuard` | Is this member **allowed** to do this? | `ForbiddenException` → HTTP **403** |
+
+```ts
+@CheckPolicies([AuthorizationActions.Create, Sections.TEAM_MEMBERS]) // 402 if plan lacks it
+@RequirePermission('settings', 'update')                             // 403 if role lacks it
+@Post('/team')
+```
+
+Rules:
+
+- `@RequirePermission` resolves the acting user's membership (`UserOrganization.roleId` →
+  `AppRole` → permissions). `manage` on a resource implies every action on it.
+- `User.isSuperAdmin` (the **platform operator** flag) bypasses RBAC — it does **not** bypass
+  billing. It is a different axis from the org `owner` role.
+- The seeded system roles are `owner`, `admin`, `editor`, `member`, `viewer` (see
+  `libraries/nestjs-libraries/src/database/seeds/rbac-seeder.ts` for the exact catalog); orgs can
+  define custom roles via `/settings/roles`.
+- Guard sources: `apps/backend/src/services/auth/rbac/org-rbac.guard.ts` and
+  `require-permission.decorator.ts`.
 
 ---
 
@@ -160,22 +189,28 @@ Each domain has its own directory under `database/prisma/<domain>/`:
 
 ```
 database/prisma/
-├── agencies/          → agencies.repository.ts
 ├── ai-rag/            → ai-rag.repository.ts
 ├── ai-settings/       → ai-settings.repository.ts, org-ai-settings.repository.ts
 ├── analytics/         → analytics.repository.ts
 ├── announcements/     → announcements.repository.ts
+├── api-keys/          → api-keys.repository.ts
 ├── audit/             → audit.repository.ts
+├── auth-providers/    → auth-provider.repository.ts
 ├── autopost/          → autopost.repository.ts
+├── brands/            → brands.repository.ts
 ├── campaigns/         → campaigns.repository.ts
+├── emails/            → email-log.repository.ts
 ├── integrations/      → integration.repository.ts
 ├── media/             → media.repository.ts, multipart-upload.repository.ts
+├── media-providers/   → org-media-provider-settings.repository.ts
 ├── notifications/     → notifications.repository.ts
 ├── oauth/             → oauth.repository.ts
 ├── organizations/     → organization.repository.ts
 ├── posts/             → posts.repository.ts
 ├── provider-configs/  → provider-config.repository.ts, org-provider-config.repository.ts
+├── roles/             → roles.repository.ts
 ├── sets/              → sets.repository.ts
+├── short-links/       → org-shortlink-settings.repository.ts
 ├── signatures/        → signature.repository.ts
 ├── social-comments/   → social.comments.repository.ts
 ├── storage/           → storage.repository.ts
@@ -200,4 +235,8 @@ available providers — `AIModelProvider` resolves adapters by identifier throug
 Channel provider integrations follow a similar pattern with `IntegrationManager` and social
 provider classes implementing the `SocialAbstract` interface.
 
-> Verified against v3.7.0
+Media-generation providers follow the same shape: `MediaProviderRegistry`
+(`libraries/nestjs-libraries/src/media/`) registers every `MediaProviderAdapter` at module init
+(`MediaModule.onModuleInit`).
+
+> Verified against v3.8.10

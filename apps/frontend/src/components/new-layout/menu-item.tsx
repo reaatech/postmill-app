@@ -17,7 +17,7 @@ export const MenuItem: FC<{ label: string; icon: ReactNode; path: string; onClic
   const className = clsx(
     'group relative w-full minCustom:h-[54px] custom:h-[44px] py-[8px] px-[6px] minCustom:gap-[4px] custom:gap-[2px] flex flex-col font-[600] items-center justify-center rounded-[12px] hover:text-textItemFocused hover:bg-boxFocused transition-colors',
     isActive
-      ? 'text-textItemFocused bg-boxHover before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[4px] before:h-[20px] before:bg-btnPrimary before:rounded-r-[4px]'
+      ? 'text-textItemFocused bg-boxFocused before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-[4px] before:h-[20px] before:bg-btnPrimary before:rounded-r-[4px]'
       : 'text-textItemBlur'
   );
 
