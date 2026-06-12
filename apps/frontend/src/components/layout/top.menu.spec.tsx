@@ -37,6 +37,21 @@ vi.mock('next/navigation', () => ({
   usePathname: () => '/schedule',
 }));
 
+let mockPermissions = {
+  isLoaded: true,
+  isResolved: true,
+  role: 'owner' as string | null,
+  isSuperAdmin: false,
+  isOwner: true,
+  isAdmin: true,
+  hasPermission: (_resource: string, _action: string) => true,
+  refresh: vi.fn(),
+};
+
+vi.mock('@gitroom/frontend/components/layout/use-permissions', () => ({
+  usePermissions: () => mockPermissions,
+}));
+
 import { TopMenu } from './top.menu';
 
 describe('TopMenu', () => {
@@ -65,6 +80,45 @@ describe('TopMenu', () => {
       render(<TopMenu />);
 
       expect(screen.getByTitle('Launches')).toBeDefined();
+    });
+  });
+
+  describe('R5 settings gating', () => {
+    beforeEach(() => {
+      mockIsGeneral = true;
+      mockBillingEnabled = false;
+      mockPermissions = {
+        isLoaded: true,
+        isResolved: true,
+        role: 'owner',
+        isSuperAdmin: false,
+        isOwner: true,
+        isAdmin: true,
+        hasPermission: () => true,
+        refresh: vi.fn(),
+      };
+    });
+
+    it('shows Settings for members with settings:read', () => {
+      render(<TopMenu />);
+      expect(screen.getByTitle('Settings')).toBeDefined();
+    });
+
+    it('hides Settings for members lacking settings:read', () => {
+      mockPermissions.hasPermission = () => false;
+      mockPermissions.isOwner = false;
+      mockPermissions.isAdmin = false;
+      mockPermissions.role = 'viewer';
+      render(<TopMenu />);
+      expect(screen.queryByTitle('Settings')).toBeNull();
+    });
+
+    it('shows Settings optimistically while permissions load (no flash)', () => {
+      mockPermissions.isResolved = false;
+      mockPermissions.isLoaded = false;
+      mockPermissions.hasPermission = () => false;
+      render(<TopMenu />);
+      expect(screen.getByTitle('Settings')).toBeDefined();
     });
   });
 });

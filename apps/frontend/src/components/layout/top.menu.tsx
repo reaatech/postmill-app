@@ -7,12 +7,12 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItem } from '@gitroom/frontend/components/new-layout/menu-item';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AgentMediaModal } from '@gitroom/frontend/components/layout/agent.media.modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 
 interface MenuItemInterface {
   name: string;
   icon: ReactNode;
   path: string;
-  role?: string[];
   hide?: boolean;
   requireBilling?: boolean;
   onClick?: () => void;
@@ -22,6 +22,7 @@ export const useMenuItem = () => {
   const { isGeneral } = useVariables();
   const t = useT();
   const { openModal } = useModals();
+  const permissions = usePermissions();
 
   const handleAgentMediaClick = useCallback(() => {
     openModal({
@@ -123,25 +124,23 @@ export const useMenuItem = () => {
       path: '/analytics',
     },
     {
-      name: t('media', 'Media'),
+      name: t('files', 'Files'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="20"
           height="20"
-          viewBox="0 0 20 21"
+          viewBox="0 0 24 24"
           fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         >
-          <path
-            d="M7.50008 3L6.66675 7.16667M13.3334 3L12.5001 7.16667M18.3334 7.16667H1.66675M5.66675 18H14.3334C15.7335 18 16.4336 18 16.9684 17.7275C17.4388 17.4878 17.8212 17.1054 18.0609 16.635C18.3334 16.1002 18.3334 15.4001 18.3334 14V7C18.3334 5.59987 18.3334 4.8998 18.0609 4.36502C17.8212 3.89462 17.4388 3.51217 16.9684 3.27248C16.4336 3 15.7335 3 14.3334 3H5.66675C4.26662 3 3.56655 3 3.03177 3.27248C2.56137 3.51217 2.17892 3.89462 1.93923 4.36502C1.66675 4.8998 1.66675 5.59987 1.66675 7V14C1.66675 15.4001 1.66675 16.1002 1.93923 16.635C2.17892 17.1054 2.56137 17.4878 3.03177 17.7275C3.56655 18 4.26662 18 5.66675 18Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
+          <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2a2 2 0 0 0-1.66-.9H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2z" />
         </svg>
       ),
-      path: '/media',
+      path: '/files',
     },
     {
       name: t('plugs', 'Plugs'),
@@ -236,7 +235,6 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '#',
-      role: ['ADMIN', 'SUPERADMIN', 'USER'],
       requireBilling: true,
       onClick: handleAgentMediaClick,
     },
@@ -295,7 +293,6 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: 'https://affiliate.postmill.com',
-      role: ['ADMIN', 'SUPERADMIN', 'USER'],
       requireBilling: true,
     },
     {
@@ -318,11 +315,15 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/billing',
-      role: ['ADMIN', 'SUPERADMIN'],
       requireBilling: true,
+      // Owner/admin only (billing:read is seeded to those roles); same
+      // optimistic-while-loading pattern as the Settings entry below.
+      hide:
+        permissions.isResolved &&
+        !permissions.hasPermission('billing', 'read'),
     },
     {
-      name: t('profile', 'Profile'),
+      name: t('admin', 'Admin'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -335,12 +336,14 @@ export const useMenuItem = () => {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
+          <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
         </svg>
       ),
-      path: '/settings/profile',
-      role: ['ADMIN', 'USER', 'SUPERADMIN'],
+      path: '/admin',
+      // Platform operator only (User.isSuperAdmin) — hidden until the
+      // permission fetch confirms it, since this is the sensitive axis.
+      hide: !(permissions.isResolved && permissions.isSuperAdmin),
     },
     {
       name: t('settings', 'Settings'),
@@ -369,7 +372,12 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/settings',
-      role: ['ADMIN', 'USER', 'SUPERADMIN'],
+      // R5: hidden for members whose role lacks settings:read. Shown
+      // optimistically while permissions load (no flash for allowed users);
+      // the /settings route guard + backend 403s backstop denied members.
+      hide:
+        permissions.isResolved &&
+        !permissions.hasPermission('settings', 'read'),
     },
   ] satisfies MenuItemInterface[] as MenuItemInterface[];
 
@@ -399,9 +407,6 @@ export const TopMenu: FC = () => {
                 }
                 if (f.requireBilling && !billingEnabled) {
                   return false;
-                }
-                if (f.role) {
-                  return f.role.includes(user?.role!);
                 }
                 return true;
               })
@@ -435,9 +440,6 @@ export const TopMenu: FC = () => {
             }
             if (f.requireBilling && !billingEnabled) {
               return false;
-            }
-            if (f.role) {
-              return f.role.includes(user?.role!);
             }
             return true;
           })

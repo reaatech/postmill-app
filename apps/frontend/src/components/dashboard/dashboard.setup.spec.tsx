@@ -26,20 +26,20 @@ import { DashboardSetup } from './dashboard.setup.tsx';
 
 const emptySummary = () => ({
   aiProviderActive: false,
-  shortlinkProviderActive: false,
   mediaProviderActive: false,
+  storageProviderActive: false,
   teamMembers: 1,
   totalPosts: 0,
 });
 
 const stepLabel = (key: string) =>
   ({
-    channel: 'Connect your first channel',
-    ai: 'Configure an AI provider',
-    shortlink: 'Configure a short-link provider',
-    media: 'Configure a media provider',
-    team: 'Invite a team member',
-    post: 'Create your first post',
+    channel: 'Connect a Social Channel',
+    ai: 'Connect an AI (LLM) Provider',
+    media: 'Connect an AI Media Provider',
+    storage: 'Connect a Storage Provider',
+    team: 'Invite a Team Member',
+    post: 'Create your First Post',
   }[key]!);
 
 const isStepDone = (key: string) => {
@@ -58,9 +58,9 @@ describe('DashboardSetup (Part G)', () => {
   it('shows all six steps incomplete with empty data and 0/6 progress', () => {
     render(<DashboardSetup />);
 
-    expect(screen.getByText('Welcome to Postmill!')).toBeTruthy();
+    expect(screen.getByText('Welcome to Postmill')).toBeTruthy();
     expect(screen.getByText('0/6')).toBeTruthy();
-    for (const key of ['channel', 'ai', 'shortlink', 'media', 'team', 'post']) {
+    for (const key of ['channel', 'ai', 'storage', 'media', 'team', 'post']) {
       expect(isStepDone(key)).toBe(false);
     }
   });
@@ -88,11 +88,11 @@ describe('DashboardSetup (Part G)', () => {
     expect(isStepDone('ai')).toBe(true);
   });
 
-  it('completes "shortlink" when summary.shortlinkProviderActive is true', () => {
-    mockSummary = { ...emptySummary(), shortlinkProviderActive: true };
+  it('completes "storage" when summary.storageProviderActive is true', () => {
+    mockSummary = { ...emptySummary(), storageProviderActive: true };
     render(<DashboardSetup />);
 
-    expect(isStepDone('shortlink')).toBe(true);
+    expect(isStepDone('storage')).toBe(true);
   });
 
   it('completes "media" when summary.mediaProviderActive is true', () => {
@@ -126,7 +126,7 @@ describe('DashboardSetup (Part G)', () => {
     expect(isStepDone('channel')).toBe(true);
     expect(isStepDone('ai')).toBe(true);
     expect(isStepDone('post')).toBe(true);
-    expect(isStepDone('shortlink')).toBe(false);
+    expect(isStepDone('storage')).toBe(false);
     expect(isStepDone('media')).toBe(false);
     expect(isStepDone('team')).toBe(false);
   });
@@ -135,21 +135,21 @@ describe('DashboardSetup (Part G)', () => {
     mockIntegrations = [{ id: 'int-1' }];
     mockSummary = {
       aiProviderActive: true,
-      shortlinkProviderActive: true,
       mediaProviderActive: true,
+      storageProviderActive: true,
       teamMembers: 3,
       totalPosts: 10,
     };
     const { container } = render(<DashboardSetup />);
 
     expect(container.firstChild).toBeNull();
-    expect(screen.queryByText('Welcome to Postmill!')).toBeNull();
+    expect(screen.queryByText('Welcome to Postmill')).toBeNull();
   });
 
   it('dismiss persists to localStorage and hides the panel', () => {
     const { container } = render(<DashboardSetup />);
 
-    expect(screen.getByText('Welcome to Postmill!')).toBeTruthy();
+    expect(screen.getByText('Welcome to Postmill')).toBeTruthy();
     fireEvent.click(screen.getByText('Dismiss'));
 
     expect(localStorage.getItem('onboarding_dismissed')).toBe('true');

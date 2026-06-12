@@ -18,24 +18,28 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-function resolveCSSVar(value: string): string {
-  if (typeof document === 'undefined') return value;
+function resolveCSSVar(value: string, fallback?: string): string {
+  if (typeof document === 'undefined') return fallback ?? value;
   const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
   if (match) {
     const cssVar = `--${match[1]}`;
-    const computed = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-    return computed || match[2]?.trim() || value;
+    // Theme class (.dark/.light) lives on <body>, and the --new-* tokens are
+    // scoped there — resolve against <body>, not <html>, or they come back empty.
+    const scope = document.body || document.documentElement;
+    const computed = getComputedStyle(scope).getPropertyValue(cssVar).trim();
+    return computed || match[2]?.trim() || fallback || value;
   }
   return value;
 }
 
 function useCSSToken(token: string, fallback: string): string {
-  const [resolved, setResolved] = useState(() => resolveCSSVar(token) || fallback);
+  const [resolved, setResolved] = useState(() => resolveCSSVar(token, fallback));
   useEffect(() => {
+    const target = document.body || document.documentElement;
     const observer = new MutationObserver(() => {
-      setResolved(resolveCSSVar(token) || fallback);
+      setResolved(resolveCSSVar(token, fallback));
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(target, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, [token, fallback]);
   return resolved;
@@ -70,7 +74,7 @@ export const LineChart: FC<LineChartProps> = ({
   const borderColor = useCSSToken('var(--new-table-border)', '#2b2b2b');
   const gridColor = useCSSToken('var(--new-bgLineColor)', '#212121');
   const gridDottedColor = (() => {
-    const c = resolveCSSVar('var(--new-table-border)') || '#2b2b2b';
+    const c = resolveCSSVar('var(--new-table-border)', '#2b2b2b');
     return hexToRgba(c, 0.4);
   })();
 
@@ -126,7 +130,6 @@ export const LineChart: FC<LineChartProps> = ({
         type: 'line',
         data: {
           labels,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           datasets: datasets as any[],
         },
       options: {

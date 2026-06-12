@@ -8,7 +8,7 @@ export const Title = () => {
   const { all: menuItems } = useMenuItem();
   const currentTitle = useMemo(() => {
     return menuItems.find((item) => path.indexOf(item.path) > -1)?.name;
-  }, [path]);
+  }, [path, menuItems]);
 
-  return <h1>{currentTitle}</h1>;
+  return <h1 className="text-[color:var(--heading-h1)]">{currentTitle}</h1>;
 };

@@ -11,18 +11,18 @@ export const useFireEvents = () => {
   const user = useUser();
 
   return useCallback(
-    (name: string, props?: any) => {
+    (name: string, props?: Record<string, unknown>) => {
       if (!billingEnabled) {
         return;
       }
 
       if (user) {
-        posthog.identify(user.id, { email: user.email, name: user.name });
+        posthog.identify(user.id, { email: user.email, name: user.profile?.name });
       }
 
       posthog.capture(name, props);
       plausible(name, { props });
     },
-    [user]
+    [user, billingEnabled, plausible, posthog]
   );
 };

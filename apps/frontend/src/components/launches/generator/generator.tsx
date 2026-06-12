@@ -5,7 +5,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useRouter } from 'next/navigation';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { FormProvider, SubmitHandler, useForm } from 'react-hook-form';
+import { FormProvider, SubmitHandler, useForm, useWatch } from 'react-hook-form';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { Button } from '@gitroom/react/form/button';
@@ -20,11 +20,10 @@ import {
 import dayjs from 'dayjs';
 import { Select } from '@gitroom/react/form/select';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 
 const FirstStep: FC = (props) => {
+  const router = useRouter();
   const { integrations, reloadCalendarView } = useCalendar();
-  const modal = useModals();
   const fetch = useFetch();
   const [loading, setLoading] = useState(false);
   const [showStep, setShowStep] = useState('');
@@ -42,12 +41,15 @@ const FirstStep: FC = (props) => {
       tone: 'personal',
     },
   });
-  const [research] = form.watch(['research']);
+  const research = useWatch({
+    control: form.control,
+    name: 'research',
+    defaultValue: '',
+  });
   const generateStep = useCallback(
     async (reader: ReadableStreamDefaultReader) => {
       const decoder = new TextDecoder('utf-8');
       let lastResponse = {} as any;
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) return lastResponse.data.output;
@@ -151,36 +153,13 @@ const FirstStep: FC = (props) => {
         };
       });
       setShowStep('');
-      modal.openModal({
-        id: 'add-edit-modal',
-        closeOnClickOutside: false,
-        removeLayout: true,
-        closeOnEscape: false,
-        withCloseButton: false,
-        askClose: true,
-        fullScreen: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px] text-textColor',
-        },
-        children: (
-          <AddEditModal
-            allIntegrations={integrations.map((p) => ({
-              ...p,
-            }))}
-            integrations={integrations.slice(0).map((p) => ({
-              ...p,
-            }))}
-            mutate={reloadCalendarView}
-            date={dayjs.utc(load.date).local()}
-            reopenModal={() => ({})}
-            onlyValues={messages}
-          />
-        ),
-        size: '80%',
-      });
+      const params = new URLSearchParams();
+      params.set('date', dayjs.utc(load.date).local().format('YYYY-MM-DDTHH:mm:ss'));
+      params.set('content', encodeURIComponent(messages[0]?.content || ''));
+      router.push(`/schedule/post?${params.toString()}`);
       setLoading(false);
     },
-    [integrations, reloadCalendarView]
+    [fetch, generateStep, router]
   );
   return (
     <form
@@ -280,7 +259,7 @@ export const GeneratorPopup = () => {
   const modals = useModals();
   const closeAll = useCallback(() => {
     modals.closeAll();
-  }, []);
+  }, [modals]);
   return (
     <div className="w-full flex flex-col rounded-[4px] relative">
       <FirstStep />
@@ -319,7 +298,7 @@ export const GeneratorComponent = () => {
         </CalendarWeekProvider>
       ),
     });
-  }, [user, all]);
+  }, [user, all, modal, router, t]);
   return (
     <div
       className="h-[44px] w-[44px] group-[.sidebar]:w-full bg-ai justify-center items-center flex rounded-[8px] cursor-pointer"

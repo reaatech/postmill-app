@@ -42,10 +42,12 @@ import {
 } from '@gitroom/frontend/components/ui/icons';
 import { useHasScroll } from '@gitroom/frontend/components/ui/is.scroll.hook';
 import { useShortlinkPreference } from '@gitroom/frontend/components/settings/shortlink-preference.component';
+import { BrandPicker } from '@gitroom/frontend/components/launches/brand-picker';
 import { usePreflight, PreflightResponse } from '@gitroom/frontend/components/new-launch/content-qa/usePreflight';
 import { PreflightPanel } from '@gitroom/frontend/components/new-launch/content-qa/preflight.panel';
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
+import SafeImage from '@gitroom/react/helpers/safe.image';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -80,6 +82,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     current,
     activateExitButton,
     setHide,
+    brandId,
   } = useLaunchStore(
     useShallow((state) => ({
       hide: state.hide,
@@ -96,6 +99,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setSelectedIntegrations: state.setSelectedIntegrations,
       locked: state.locked,
       activateExitButton: state.activateExitButton,
+      brandId: state.brandId,
     }))
   );
 
@@ -103,7 +107,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     if (hide) {
       setHide(false);
     }
-  }, [hide]);
+  }, [hide, setHide]);
 
   const currentIntegrationText = useMemo(() => {
     if (current === 'global') {
@@ -122,7 +126,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     return (
       <div className="flex items-center gap-[10px]">
         <div className="relative">
-          <img
+          <SafeImage
             src={`/icons/platforms/${currentIntegration.identifier}.png`}
             className="w-[20px] h-[20px] rounded-[4px]"
             alt={currentIntegration.identifier}
@@ -137,7 +141,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         </div>
       </div>
     );
-  }, [current]);
+  }, [current, integrations, t]);
 
   const changeCustomer = useCallback(
     (customer: string) => {
@@ -151,7 +155,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         }))
       );
     },
-    [integrations]
+    [integrations, setSelectedIntegrations]
   );
 
   const askClose = useCallback(async () => {
@@ -174,7 +178,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       }
       modal.closeAll();
     }
-  }, [activateExitButton, dummy]);
+  }, [activateExitButton, dummy, customClose, modal, t]);
 
   const deletePost = useCallback(async () => {
     setLoading(true);
@@ -194,9 +198,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       method: 'DELETE',
     });
     mutate();
+    if (customClose) {
+      customClose();
+      return;
+    }
     modal.closeAll();
     return;
-  }, [existingData, mutate, modal]);
+  }, [existingData, mutate, modal, customClose, fetch, t]);
 
   const schedule = useCallback(
     (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
@@ -425,6 +433,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         ...(repeater ? { inter: repeater } : {}),
         tags,
         shortLink,
+        brandId,
         date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
         posts,
       };
@@ -446,12 +455,14 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       }
 
       if (!dummy) {
-        addEditSets
-          ? addEditSets(data)
-          : await fetch('/posts', {
-              method: 'POST',
-              body: JSON.stringify(data),
-            });
+        if (addEditSets) {
+          addEditSets(data);
+        } else {
+          await fetch('/posts', {
+            method: 'POST',
+            body: JSON.stringify(data),
+          });
+        }
 
         if (!addEditSets) {
           mutate();
@@ -465,6 +476,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           setTimeout(() => {
             customClose();
           }, 2000);
+          setLoading(false);
+          return;
         }
 
         if (!addEditSets) {
@@ -472,7 +485,25 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         }
       }
     },
-    [ref, repeater, tags, date, addEditSets, dummy, shortlinkPreferenceData]
+    [
+      ref,
+      repeater,
+      tags,
+      date,
+      addEditSets,
+      dummy,
+      shortlinkPreferenceData,
+      brandId,
+      customClose,
+      existingData,
+      fetch,
+      modal,
+      mutate,
+      runPreflight,
+      selectedIntegrations,
+      t,
+      toaster,
+    ]
   );
 
   return (
@@ -602,6 +633,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             {!dummy && (
               <RepeatComponent repeat={repeater} onChange={setRepeater} />
             )}
+            {!dummy && <BrandPicker />}
           </div>
           <div className="pe-[20px] flex items-center justify-end gap-[8px]">
             {existingData?.integration && (

@@ -71,12 +71,30 @@ export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3
 };
 
 // Lightweight label/value stat card (no chart/sparkline) for simple KPIs.
-export const KpiCard: FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[12px] px-[16px] py-[14px] flex flex-col gap-[6px]">
-    <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">
+// Accepts an optional accent `color` (a chart-palette token) to match the
+// look of the analytics KPICard without needing sparkline data.
+export const KpiCard: FC<{ label: string; value: string; color?: string }> = ({
+  label,
+  value,
+  color,
+}) => (
+  <div className="group relative flex-1 overflow-hidden bg-newBgColorInner border border-newTableBorder rounded-[12px] px-[16px] py-[14px] flex flex-col gap-[6px] transition-all duration-200 hover:border-newTableText/30">
+    {color && (
+      <>
+        <span
+          className="pointer-events-none absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: color }}
+        />
+        <span
+          className="pointer-events-none absolute inset-0 opacity-[0.07] transition-opacity duration-200 group-hover:opacity-[0.12]"
+          style={{ background: color }}
+        />
+      </>
+    )}
+    <span className="relative text-[13px] font-medium text-newTableText uppercase tracking-wide">
       {label}
     </span>
-    <span className="text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
+    <span className="relative text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
       {value}
     </span>
   </div>
