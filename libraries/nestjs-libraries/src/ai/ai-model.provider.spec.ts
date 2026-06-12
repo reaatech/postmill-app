@@ -138,6 +138,15 @@ import { ProviderHealthService } from './governance/provider-health.service';
 import { BudgetService } from './governance/budget.service';
 import { GuardrailService } from './governance/guardrail.service';
 
+vi.mock('@gitroom/nestjs-libraries/brands/brands.service', () => ({
+  BrandsService: class MockBrands {
+    getBrand = vi.fn().mockResolvedValue(null);
+    getDefaultBrand = vi.fn().mockResolvedValue(null);
+  },
+}));
+
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
+
 describe('AIModelProvider', () => {
   let provider: AIModelProvider;
   let registry: AIProviderRegistry;
@@ -148,6 +157,7 @@ describe('AIModelProvider', () => {
   let health: ProviderHealthService;
   let budget: BudgetService;
   let guardrails: GuardrailService;
+  let brandsService: BrandsService;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -168,6 +178,7 @@ describe('AIModelProvider', () => {
     health = new (ProviderHealthService as any)();
     budget = new (BudgetService as any)();
     guardrails = new (GuardrailService as any)();
+    brandsService = new (BrandsService as unknown as new () => BrandsService)();
 
     provider = new AIModelProvider(
       registry as any,
@@ -178,6 +189,7 @@ describe('AIModelProvider', () => {
       health as any,
       budget as any,
       guardrails as any,
+      brandsService,
     );
   });
 
@@ -516,6 +528,7 @@ describe('AIModelProvider', () => {
         health as any,
         budget as any,
         guardrails as any,
+        brandsService,
         cache,
         router,
       );

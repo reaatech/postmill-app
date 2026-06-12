@@ -77,7 +77,7 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
           throw new Error('Unsupported file type.');
         }
 
-        const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+        const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
         const getFile = await adapter.uploadFile({
           buffer,
           mimetype: detected.mime,

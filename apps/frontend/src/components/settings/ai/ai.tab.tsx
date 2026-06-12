@@ -12,6 +12,8 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ProviderForm } from '@gitroom/frontend/components/settings/ai/provider-form';
 import { SpendTab } from '@gitroom/frontend/components/settings/ai/spend-tab';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 
 interface OrgProviderInfo {
   identifier: string;
@@ -21,7 +23,7 @@ interface OrgProviderInfo {
   isActive: boolean;
   isConfigured: boolean;
   defaultModel: string;
-  imageModel: string;
+  reasoningModel: string;
 }
 
 interface OrgConfigResponse {
@@ -30,6 +32,7 @@ interface OrgConfigResponse {
     name: string;
     type: string;
     defaultModel: string;
+    reasoningModel: string;
     credentials?: Record<string, string>;
   } | null;
   providers: OrgProviderInfo[];
@@ -143,11 +146,17 @@ export const AITab = () => {
                   <div className="animate-pulse">{t('loading', 'Loading...')}</div>
                 ) : config?.active ? (
                   <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center justify-between">
-                    <div className="flex flex-col gap-[4px]">
-                      <span className="text-[14px] font-semibold">{config.active.name}</span>
-                      <span className="text-[12px] text-newTableText">
-                        {config.active.defaultModel || t('no_model_selected', 'No model selected')}
-                      </span>
+                    <div className="flex items-center gap-[12px]">
+                      <ProviderIcon identifier={config.active.identifier} name={config.active.name} />
+                      <div className="flex flex-col gap-[4px]">
+                        <span className="text-[14px] font-semibold">{config.active.name}</span>
+                        <span className="text-[12px] text-newTableText">
+                          {config.active.defaultModel || t('no_model_selected', 'No model selected')}
+                          {config.active.reasoningModel && (
+                            <> · {t('reasoning', 'Reasoning')}: {config.active.reasoningModel}</>
+                          )}
+                        </span>
+                      </div>
                     </div>
                     <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px]">
                       {t('active', 'Active')}
@@ -162,89 +171,79 @@ export const AITab = () => {
                 )}
               </div>
 
-              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
-                <div className="flex items-center justify-between">
-                  <div className="mt-[4px]">{t('all_providers', 'All Providers')}</div>
-                </div>
-                {isLoading ? (
-                  <div className="animate-pulse">{t('loading', 'Loading...')}</div>
-                ) : (
-                  <div className="flex flex-col gap-[16px]">
-                    {[
-                      { type: 'direct', label: t('direct_providers', 'Direct Providers') },
-                      { type: 'hub', label: t('hub_providers', 'Hub Providers') },
-                    ].map((group) => {
-                      const groupProviders = config?.providers?.filter((p) => p.type === group.type) || [];
-                      if (groupProviders.length === 0) return null;
-                      return (
-                        <div key={group.type}>
-                          <div className="text-[11px] uppercase text-newTableText mb-[6px] tracking-wide">
-                            {group.label}
-                          </div>
-                          <div className="flex flex-col gap-[8px]">
-                            {groupProviders.map((provider) => (
-                              <div
-                                key={provider.identifier}
-                                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center justify-between"
+              {isLoading ? (
+                <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading...')}</div>
+              ) : (
+                [
+                  { type: 'direct', label: t('direct_providers', 'Direct Providers') },
+                  { type: 'hub', label: t('hub_providers', 'Hub Providers') },
+                ].map((group) => {
+                  const groupProviders = (config?.providers || []).filter((p) => p.type === group.type);
+                  if (groupProviders.length === 0) return null;
+                  return (
+                    <ProviderListShell
+                      key={group.type}
+                      title={group.label}
+                      providers={groupProviders.map((p) => ({
+                        id: p.identifier,
+                        identifier: p.identifier,
+                        name: p.name,
+                        enabled: p.enabled,
+                        isActive: p.isActive,
+                        isConfigured: p.isConfigured,
+                      }))}
+                      onConfigure={(id) => setConfiguringProvider(id)}
+                      onSetActive={(id) => handleSetActive(id)}
+                      onRemove={(id) => handleDelete(id)}
+                      ProviderIconComponent={ProviderIcon}
+                      renderBadges={(provider) =>
+                        groupProviders.find((p) => p.identifier === provider.identifier)?.defaultModel ? (
+                          <span className="text-[12px] text-newTableText">
+                            {groupProviders.find((p) => p.identifier === provider.identifier)!.defaultModel}
+                            {groupProviders.find((p) => p.identifier === provider.identifier)!.reasoningModel && (
+                              <> · {t('reasoning', 'Reasoning')}: {groupProviders.find((p) => p.identifier === provider.identifier)!.reasoningModel}</>
+                            )}
+                          </span>
+                        ) : null
+                      }
+                      renderActions={(provider) => {
+                        const p = groupProviders.find((pr) => pr.identifier === provider.identifier);
+                        return (
+                          <>
+                            <button
+                              className="text-[12px] text-textColor hover:underline"
+                              onClick={() => setConfiguringProvider(provider.identifier)}
+                            >
+                              {p?.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
+                            </button>
+                            {!p?.isActive && p?.isConfigured && (
+                              <button
+                                className="text-[12px] text-textColor hover:underline"
+                                onClick={() => handleSetActive(provider.identifier)}
                               >
-                                <div className="flex flex-col gap-[4px] flex-1">
-                                  <div className="flex items-center gap-[8px]">
-                                    <span className="text-[14px] font-semibold">{provider.name}</span>
-                                    {provider.isActive && (
-                                      <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px]">
-                                        {t('active', 'Active')}
-                                      </span>
-                                    )}
-                                    {provider.isConfigured && !provider.isActive && (
-                                      <span className="text-[11px] bg-blue-900/20 text-blue-400 rounded-[4px] px-[8px] py-[2px]">
-                                        {t('configured', 'Configured')}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {provider.defaultModel && (
-                                    <span className="text-[12px] text-newTableText">
-                                      {provider.defaultModel}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-[8px]">
-                                  <button
-                                    className="text-[12px] text-textColor hover:underline"
-                                    onClick={() => setConfiguringProvider(provider.identifier)}
-                                  >
-                                    {provider.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
-                                  </button>
-                                  {!provider.isActive && provider.isConfigured && (
-                                    <button
-                                      className="text-[12px] text-textColor hover:underline"
-                                      onClick={() => handleSetActive(provider.identifier)}
-                                    >
-                                      {t('set_active', 'Set Active')}
-                                    </button>
-                                  )}
-                                  {provider.isConfigured && (
-                                    <button
-                                      className="text-[12px] text-red-500 hover:underline"
-                                      onClick={() => handleDelete(provider.identifier)}
-                                    >
-                                      {t('remove', 'Remove')}
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
-                    {(!config?.providers || config.providers.length === 0) && (
-                      <div className="text-[12px] text-newTableText">
-                        {t('no_providers', 'No providers available')}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+                                {t('set_active', 'Set Active')}
+                              </button>
+                            )}
+                            {p?.isConfigured && (
+                              <button
+                                className="text-[12px] text-red-500 hover:underline"
+                                onClick={() => handleDelete(provider.identifier)}
+                              >
+                                {t('remove', 'Remove')}
+                              </button>
+                            )}
+                          </>
+                        );
+                      }}
+                    />
+                  );
+                })
+              )}
+              {(!config?.providers || config.providers.length === 0) && !isLoading && (
+                <div className="text-[12px] text-newTableText">
+                  {t('no_providers', 'No providers available')}
+                </div>
+              )}
             </>
           )}
         </div>

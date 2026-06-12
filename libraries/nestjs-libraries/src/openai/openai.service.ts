@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { shuffle } from 'lodash';
 import { z } from 'zod';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { BudgetExceeded, GuardrailViolation } from '@gitroom/nestjs-libraries/ai/governance/errors';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 export { PROMPT_CONSTANTS };
@@ -37,14 +38,18 @@ const SlidesSchema = z.object({
 export class OpenaiService {
   private readonly _logger = new Logger(OpenaiService.name);
 
-  constructor(private readonly _aiModelProvider: AIModelProvider) {}
+  constructor(
+    private readonly _aiModelProvider: AIModelProvider,
+    private readonly _aiMediaService: AiMediaService,
+  ) {}
 
+  // §10.3: image generation routes through the media surface (org media providers
+  // first, AI-facade imageModel() fallback inside AiMediaService).
   async generateImage(prompt: string, isVertical = false, orgId?: string) {
-    const model = await this._aiModelProvider.imageModel('utility', orgId);
-    const result = await model.generate(prompt, {
+    return this._aiMediaService.generateImage(prompt, {
       size: isVertical ? '1024x1536' : '1024x1024',
+      orgId,
     });
-    return result;
   }
 
   async generatePromptForPicture(prompt: string, orgId?: string) {

@@ -146,7 +146,9 @@ describe('AiSettingsService', () => {
     });
 
     it('accepts valid JSON string for extraConfig', async () => {
-      const data = { extraConfig: '{"region":"us-west"}' };
+      const data = {
+        extraConfig: '{"region":"us-west"}' as unknown as Record<string, string>,
+      };
       mockRepo.upsertProviderConfig.mockResolvedValue({ identifier: 'openai' });
 
       await service.upsertProviderConfig('openai', data);
@@ -159,7 +161,9 @@ describe('AiSettingsService', () => {
     });
 
     it('throws when extraConfig is an invalid JSON string', async () => {
-      const data = { extraConfig: '{invalid json' };
+      const data = {
+        extraConfig: '{invalid json' as unknown as Record<string, string>,
+      };
 
       await expect(
         service.upsertProviderConfig('openai', data),
@@ -619,17 +623,27 @@ describe('AiSettingsService', () => {
 
       const result = service.getBrandProfile('org1');
 
-      expect(mockRepo.getBrandProfile).toHaveBeenCalledWith('org1');
+      expect(mockRepo.getBrandProfile).toHaveBeenCalledWith('org1', undefined);
+      expect(result).toBe(profile);
+    });
+
+    it('delegates to repository with brandId', () => {
+      const profile = { id: 'brand-2', organizationId: 'org1', instructions: 'Be funny' };
+      mockRepo.getBrandProfile.mockReturnValue(profile);
+
+      const result = service.getBrandProfile('org1', 'brand-2');
+
+      expect(mockRepo.getBrandProfile).toHaveBeenCalledWith('org1', 'brand-2');
       expect(result).toBe(profile);
     });
   });
 
   describe('upsertBrandProfile', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const data = { instructions: 'Be helpful', language: 'en' };
       mockRepo.upsertBrandProfile.mockReturnValue({ organizationId: 'org1', ...data });
 
-      const result = service.upsertBrandProfile('org1', data);
+      const result = await service.upsertBrandProfile('org1', data);
 
       expect(mockRepo.upsertBrandProfile).toHaveBeenCalledWith('org1', data);
       expect(result.instructions).toBe('Be helpful');
@@ -651,10 +665,10 @@ describe('AiSettingsService', () => {
   });
 
   describe('upsertPromptTemplate', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       mockRepo.upsertPromptTemplate.mockReturnValue({ key: 'greeting', content: 'Hi' });
 
-      const result = service.upsertPromptTemplate('org1', 'greeting', 'Hi');
+      const result = await service.upsertPromptTemplate('org1', 'greeting', 'Hi');
 
       expect(mockRepo.upsertPromptTemplate).toHaveBeenCalledWith('org1', 'greeting', 'Hi');
       expect(result.key).toBe('greeting');
@@ -662,10 +676,10 @@ describe('AiSettingsService', () => {
   });
 
   describe('deletePromptTemplate', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       mockRepo.deletePromptTemplate.mockReturnValue({ key: 'greeting' });
 
-      const result = service.deletePromptTemplate('org1', 'greeting');
+      const result = await service.deletePromptTemplate('org1', 'greeting');
 
       expect(mockRepo.deletePromptTemplate).toHaveBeenCalledWith('org1', 'greeting');
       expect(result.key).toBe('greeting');
@@ -675,7 +689,7 @@ describe('AiSettingsService', () => {
   // ── AIMediaJob ──
 
   describe('createMediaJob', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const data = {
         organizationId: 'org1',
         provider: 'openai',
@@ -683,7 +697,7 @@ describe('AiSettingsService', () => {
       };
       mockRepo.createMediaJob.mockReturnValue({ id: 'mj1', ...data });
 
-      const result = service.createMediaJob(data);
+      const result = await service.createMediaJob(data);
 
       expect(mockRepo.createMediaJob).toHaveBeenCalledWith(data);
       expect(result.id).toBe('mj1');
@@ -691,11 +705,11 @@ describe('AiSettingsService', () => {
   });
 
   describe('updateMediaJob', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const updated = { id: 'mj1', status: 'completed' };
       mockRepo.updateMediaJob.mockReturnValue(updated);
 
-      const result = service.updateMediaJob('mj1', { status: 'completed' });
+      const result = await service.updateMediaJob('mj1', { status: 'completed' });
 
       expect(mockRepo.updateMediaJob).toHaveBeenCalledWith('mj1', { status: 'completed' });
       expect(result.status).toBe('completed');
@@ -732,11 +746,11 @@ describe('AiSettingsService', () => {
   });
 
   describe('createPromptLibraryItem', () => {
-    it('delegates to repository', () => {
+    it('delegates to repository', async () => {
       const data = { organizationId: 'org1', title: 'My Prompt', content: 'Act as...' };
       mockRepo.createPromptLibraryItem.mockReturnValue({ id: '1', ...data });
 
-      const result = service.createPromptLibraryItem(data);
+      const result = await service.createPromptLibraryItem(data);
 
       expect(mockRepo.createPromptLibraryItem).toHaveBeenCalledWith(data);
       expect(result.title).toBe('My Prompt');

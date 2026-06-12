@@ -22,3 +22,4 @@ export { AiSettingsManager } from './ai-settings.manager';
 export { BudgetService } from './governance/budget.service';
 export { BudgetMiddleware } from './governance/budget.middleware';
 export { PROMPT_CONSTANTS } from './prompt-constants.const';
+export { isReasoningModel, REASONING_MODEL_PREFIXES } from './reasoning-models';

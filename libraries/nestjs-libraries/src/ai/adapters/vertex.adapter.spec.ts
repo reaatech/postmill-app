@@ -35,8 +35,8 @@ describe('VertexAdapter', () => {
       expect(adapter.name).toBe('Google Vertex AI');
     });
 
-    it('has type "direct"', () => {
-      expect(adapter.type).toBe('direct');
+    it('has type "hub"', () => {
+      expect(adapter.type).toBe('hub');
     });
 
     it('has credentialFields for project, location, googleCredentials', () => {

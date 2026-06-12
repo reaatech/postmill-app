@@ -15,6 +15,7 @@ import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/me
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 
 const tools = !process.env.TAVILY_API_KEY
@@ -102,6 +103,7 @@ export class AgentGraphService {
     private _mediaService: MediaService,
     private _aiModelProvider: AIModelProvider,
     private _storageService: StorageService,
+    private _aiMediaService: AiMediaService,
   ) {}
   static state = () =>
     new StateGraph<WorkflowChannelsState>({
@@ -262,12 +264,14 @@ export class AgentGraphService {
       return {};
     }
 
-    const imageGenerator = await this._aiModelProvider.imageModel('generator', state.orgId);
-
+    // §10.3: image generation routes through the media surface (org media providers
+    // first, AI-facade imageModel() fallback inside AiMediaService).
     const newContent = await Promise.all(
       (state.content || []).map(async (p) => {
         try {
-          const image = await imageGenerator.generate(p.prompt!);
+          const image = await this._aiMediaService.generateImage(p.prompt!, {
+            orgId: state.orgId,
+          });
           return { ...p, image };
         } catch {
           return { ...p, image: undefined };
@@ -285,7 +289,7 @@ export class AgentGraphService {
       (state.content || []).map(async (p) => {
         if (p.image) {
           try {
-            const adapter = await this._storageService.getLocalAdapterForOrg(state.orgId);
+            const adapter = await this._storageService.getLocalAdapterForOrg(state.orgId, true);
             const upload = await adapter.uploadSimple(p.image);
             const name = upload.split('/').pop()!;
             const uploadWithId = await this._mediaService.saveFile(

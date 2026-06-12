@@ -45,7 +45,7 @@ export class GenerateImageTool implements AgentToolInterface {
           org
         );
 
-        const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
+        const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
         const file = await adapter.uploadSimple(
           'data:image/png;base64,' + image
         );

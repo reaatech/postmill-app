@@ -3,7 +3,6 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Param,
   Post,
@@ -11,6 +10,7 @@ import {
   Query,
   HttpException,
   HttpStatus,
+  UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
@@ -25,9 +25,13 @@ import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardr
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { AIScope } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
+import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 @ApiTags('AI Settings')
 @Controller('/admin/ai-settings')
+@UseGuards(OrgRbacGuard)
 export class AiSettingsController {
   private readonly VALID_SCOPES: AIScope[] = ['utility', 'generator', 'agent', 'mcp'];
   private readonly SENSITIVE_KEY_PATTERNS = [
@@ -51,13 +55,8 @@ export class AiSettingsController {
     private _guardrails: GuardrailService,
     private _budgetService: BudgetService,
     private _ragService: RagService,
+    private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
   ) {}
-
-  private assertSuperAdmin(user: User) {
-    if (!user?.isSuperAdmin) {
-      throw new ForbiddenException('Forbidden');
-    }
-  }
 
   private _isSensitiveKey(key: string) {
     const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -113,8 +112,8 @@ export class AiSettingsController {
   }
 
   @Get('/providers')
+  @RequirePermission('ai-config', 'manage')
   async listProviders(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const adapters = this._registry.list();
     const dbConfigs = await this._aiSettingsService.getProviderConfigs();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
@@ -137,11 +136,11 @@ export class AiSettingsController {
   }
 
   @Get('/providers/:identifier')
+  @RequirePermission('ai-config', 'manage')
   async getProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
   ) {
-    this.assertSuperAdmin(user);
     const adapter = this._registry.getAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -167,13 +166,14 @@ export class AiSettingsController {
       enabled: config?.enabled || false,
       isConfigured,
       defaultModel: config?.defaultModel || '',
-      imageModel: config?.imageModel || '',
+      reasoningModel: config?.reasoningModel || '',
       extraConfig: this._safeJson(config?.extraConfig),
       models,
     };
   }
 
   @Put('/providers/:identifier')
+  @RequirePermission('ai-config', 'manage')
   async saveProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
@@ -182,11 +182,10 @@ export class AiSettingsController {
       enabled?: boolean;
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: Record<string, any>;
     },
   ) {
-    this.assertSuperAdmin(user);
     const adapter = this._registry.getAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -195,7 +194,7 @@ export class AiSettingsController {
       enabled: body.enabled,
       credentials: body.credentials,
       defaultModel: body.defaultModel,
-      imageModel: body.imageModel,
+      reasoningModel: body.reasoningModel,
       extraConfig: body.extraConfig,
     });
 
@@ -208,14 +207,12 @@ export class AiSettingsController {
           ? {
               enabled: before.enabled,
               defaultModel: before.defaultModel,
-              imageModel: before.imageModel,
               hasCredentials: !!before.credentials,
             }
           : null,
         after: {
           enabled: result.enabled,
           defaultModel: result.defaultModel,
-          imageModel: result.imageModel,
           hasCredentials: !!result.credentials,
         },
         credentialsUpdated: body.credentials !== undefined,
@@ -229,12 +226,12 @@ export class AiSettingsController {
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @Post('/providers/:identifier/test')
+  @RequirePermission('ai-config', 'manage')
   async testProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string> },
   ) {
-    this.assertSuperAdmin(user);
     const adapter = this._registry.getAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -253,11 +250,11 @@ export class AiSettingsController {
   }
 
   @Put('/active')
+  @RequirePermission('ai-config', 'manage')
   async setActive(
     @GetUserFromRequest() user: User,
     @Body() body: { provider?: string | null; model?: string | null },
   ) {
-    this.assertSuperAdmin(user);
     if (!body.provider) {
       await this._aiSettingsService.upsertSystemSettings({
         activeProvider: null,
@@ -303,8 +300,8 @@ export class AiSettingsController {
   }
 
   @Get('/governance')
+  @RequirePermission('ai-config', 'manage')
   async getGovernance(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getSystemSettings();
     if (!settings) return {};
 
@@ -330,24 +327,11 @@ export class AiSettingsController {
   }
 
   @Put('/governance')
+  @RequirePermission('ai-config', 'manage')
   async saveGovernance(
     @GetUserFromRequest() user: User,
     @Body() body: SaveGovernanceDto,
   ) {
-    this.assertSuperAdmin(user);
-
-    if (body.ragSettings !== undefined) {
-      const settings = await this._aiSettingsService.getSystemSettings();
-      if (settings?.ragSettings) {
-        try {
-          const existing = JSON.parse(settings.ragSettings);
-          if (existing.mediaProviders && !body.ragSettings.mediaProviders) {
-            body.ragSettings = { ...body.ragSettings, mediaProviders: existing.mediaProviders };
-          }
-        } catch { /* ignore */ }
-      }
-    }
-
     await this._aiSettingsService.upsertSystemSettings({
       guardrailSettings: body.guardrailSettings,
       budgetSettings: body.budgetSettings,
@@ -372,6 +356,7 @@ export class AiSettingsController {
   }
 
   @Get('/spend')
+  @RequirePermission('ai-config', 'manage')
   async getSpend(
     @GetUserFromRequest() user: User,
     @Query('scope') scope?: string,
@@ -379,7 +364,6 @@ export class AiSettingsController {
     @Query('offset') offset?: string,
     @Query('limit') limit?: string,
   ) {
-    this.assertSuperAdmin(user);
     const parsedOffset = offset ? parseInt(offset, 10) : undefined;
     const parsedLimit = limit ? parseInt(limit, 10) : 100;
     return this._aiSettingsService.getSpendLogs({
@@ -391,20 +375,20 @@ export class AiSettingsController {
   }
 
   @Get('/spend/summary')
+  @RequirePermission('ai-config', 'manage')
   async getSpendSummary(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     return this._aiSettingsService.getSpendSummary();
   }
 
   @Get('/audit')
+  @RequirePermission('ai-config', 'manage')
   async getAudit(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     return this._aiSettingsService.getAuditLogs();
   }
 
   @Get('/health')
+  @RequirePermission('ai-config', 'manage')
   async getHealth(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const settings = await this._aiSettingsManager.getSettings();
     return {
       hasActiveGlobalConfig: !!settings?.activeProvider,
@@ -415,12 +399,12 @@ export class AiSettingsController {
   }
 
   @Post('/providers/:id/preview')
+  @RequirePermission('ai-config', 'manage')
   async previewProvider(
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body() body: { prompt?: string },
   ) {
-    this.assertSuperAdmin(user);
     const adapter = this._registry.getAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -472,11 +456,11 @@ export class AiSettingsController {
   }
 
   @Put('/scope-models')
+  @RequirePermission('ai-config', 'manage')
   async setScopeModels(
     @GetUserFromRequest() user: User,
     @Body() body: { scopeModels: Record<string, { provider?: string; model?: string }> },
   ) {
-    this.assertSuperAdmin(user);
     const scopes = Object.keys(body.scopeModels);
     for (const scope of scopes) {
       if (!(this.VALID_SCOPES as string[]).includes(scope)) {
@@ -496,8 +480,8 @@ export class AiSettingsController {
   }
 
   @Get('/scope-models')
+  @RequirePermission('ai-config', 'manage')
   async getScopeModels(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getSystemSettings();
     if (!settings?.scopeModels) return {};
     if (typeof settings.scopeModels === 'string') {
@@ -507,31 +491,21 @@ export class AiSettingsController {
   }
 
   @Get('/rag')
+  @RequirePermission('ai-config', 'manage')
   async getRagSettings(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getSystemSettings();
     return settings?.ragSettings ? JSON.parse(settings.ragSettings) : {};
   }
 
   @Put('/rag')
+  @RequirePermission('ai-config', 'manage')
   async saveRagSettings(
     @GetUserFromRequest() user: User,
     @Body() body: { ragSettings: Record<string, any> },
   ) {
-    this.assertSuperAdmin(user);
     const rag = body.ragSettings;
     if (rag.vectorStore && !['pgvector', 'qdrant'].includes(rag.vectorStore)) {
       throw new BadRequestException('vectorStore must be "pgvector" or "qdrant"');
-    }
-
-    const settings = await this._aiSettingsService.getSystemSettings();
-    if (settings?.ragSettings) {
-      try {
-        const existing = JSON.parse(settings.ragSettings);
-        if (existing.mediaProviders && !rag.mediaProviders) {
-          rag.mediaProviders = existing.mediaProviders;
-        }
-      } catch { /* ignore */ }
     }
 
     await this._aiSettingsService.upsertSystemSettings({ ragSettings: rag });
@@ -546,8 +520,8 @@ export class AiSettingsController {
   }
 
   @Get('/media-providers')
+  @RequirePermission('ai-config', 'manage')
   async listMediaProviders(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const adapters = this._registry.list().filter(
       (a) =>
         typeof a.createImageModel === 'function' ||
@@ -557,23 +531,16 @@ export class AiSettingsController {
     const dbConfigs = await this._aiSettingsService.getProviderConfigs();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
-    const settings = await this._aiSettingsService.getSystemSettings();
-    let mediaProviderSettings: Record<string, any> = {};
-    if (settings?.ragSettings) {
-      try {
-        const rag = JSON.parse(settings.ragSettings);
-        mediaProviderSettings = rag.mediaProviders || {};
-      } catch {
-        /* ignore parse error */
-      }
-    }
+    // Per-org media-provider state lives in MediaProviderConfig (Settings →
+    // Media); the old ragSettings.mediaProviders blob is migrated + removed.
+    // "enabled" here means enabled in at least one org.
+    const enabledIdentifiers = new Set(
+      await this._orgMediaProviderSettings.getEnabledIdentifiers(),
+    );
 
     return adapters.map((adapter) => {
       const dbConfig = dbConfigMap.get(adapter.identifier);
       const isConfigured = this._isProviderConfigured(adapter, dbConfig);
-
-      const providerSettings =
-        mediaProviderSettings[adapter.identifier] || {};
 
       const hasImage =
         typeof adapter.createImageModel === 'function' ||
@@ -595,44 +562,37 @@ export class AiSettingsController {
         name: adapter.name,
         capabilities: adapter.capabilities,
         isConfigured,
-        enabled: providerSettings.enabled ?? false,
-        operations: providerSettings.operations ?? [],
+        enabled: enabledIdentifiers.has(adapter.identifier),
+        operations: [] as string[],
         supportedOperations,
-        c2paAvailable: providerSettings.c2paAvailable ?? false,
+        c2paAvailable: false,
       };
     });
   }
 
   @Put('/media-providers/:id')
+  @RequirePermission('ai-config', 'manage')
   async saveMediaProvider(
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
     @Body() body: { enabled?: boolean; operations?: string[]; c2paAvailable?: boolean },
   ) {
-    this.assertSuperAdmin(user);
     const adapter = this._registry.getAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
-    const settings = await this._aiSettingsService.getSystemSettings();
-    let rag: Record<string, any> = {};
-    if (settings?.ragSettings) {
-      try {
-        rag = JSON.parse(settings.ragSettings);
-      } catch {
-        /* ignore parse error */
-      }
-    }
-
-    const mediaProviders: Record<string, any> = rag.mediaProviders || {};
-    const existing = mediaProviders[id] || {};
+    const existing: { enabled?: boolean; operations?: string[]; c2paAvailable?: boolean } = {};
     if (body.enabled !== undefined) existing.enabled = body.enabled;
     if (body.operations !== undefined) existing.operations = body.operations;
     if (body.c2paAvailable !== undefined) existing.c2paAvailable = body.c2paAvailable;
-    mediaProviders[id] = existing;
 
-    rag.mediaProviders = mediaProviders;
+    const orgIds = await this._aiSettingsService.getAllOrgIds();
 
-    await this._aiSettingsService.upsertSystemSettings({ ragSettings: rag });
+    for (const orgId of orgIds) {
+      await this._orgMediaProviderSettings.upsert(orgId, id, {
+        enabled: existing.enabled,
+      });
+    }
+
     await this._aiSettingsService.createAuditLog({
       userId: user.id,
       action: 'update-media-provider',
@@ -644,11 +604,11 @@ export class AiSettingsController {
   }
 
   @Post('/rag/backfill')
+  @RequirePermission('ai-config', 'manage')
   async triggerRagBackfill(
     @GetUserFromRequest() user: User,
     @Body() body: { organizationId?: string },
   ) {
-    this.assertSuperAdmin(user);
     const orgId = body.organizationId;
     if (!orgId) {
       throw new BadRequestException('organizationId is required for RAG backfill');
@@ -682,11 +642,11 @@ export class AiSettingsController {
   }
 
   @Put('/secret-settings')
+  @RequirePermission('ai-config', 'manage')
   async updateSecretSettings(
     @GetUserFromRequest() user: User,
     @Body() body: { secretSettings: Record<string, string> },
   ) {
-    this.assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getDecryptedSystemSettings();
     const existing = settings?.secretSettings || {};
     const merged = { ...existing, ...body.secretSettings };
@@ -703,11 +663,11 @@ export class AiSettingsController {
   }
 
   @Get('/org-providers/:orgId')
+  @RequirePermission('ai-config', 'manage')
   async listOrgProviderConfigs(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
   ) {
-    this.assertSuperAdmin(user);
     const configs = await this._aiSettingsService.getOrgProviderConfigs(orgId);
     return configs.map((c) => ({
       id: c.id,
@@ -715,7 +675,7 @@ export class AiSettingsController {
       identifier: c.identifier,
       enabled: c.enabled,
       defaultModel: c.defaultModel,
-      imageModel: c.imageModel,
+      reasoningModel: c.reasoningModel,
       extraConfig: this._safeJson(c.extraConfig),
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
@@ -723,6 +683,7 @@ export class AiSettingsController {
   }
 
   @Put('/org-providers/:orgId/:identifier')
+  @RequirePermission('ai-config', 'manage')
   async upsertOrgProviderConfig(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
@@ -732,11 +693,10 @@ export class AiSettingsController {
       enabled?: boolean;
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: Record<string, any>;
     },
   ) {
-    this.assertSuperAdmin(user);
     const before = await this._aiSettingsService.getOrgProviderConfig(orgId, identifier);
     const result = await this._aiSettingsService.upsertOrgProviderConfig(
       orgId,
@@ -754,30 +714,43 @@ export class AiSettingsController {
           ? {
               enabled: before.enabled,
               defaultModel: before.defaultModel,
-              imageModel: before.imageModel,
               hasCredentials: !!before.credentials,
             }
           : null,
         after: {
           enabled: result.enabled,
           defaultModel: result.defaultModel,
-          imageModel: result.imageModel,
           hasCredentials: !!result.credentials,
         },
         credentialsUpdated: body.credentials !== undefined,
       }),
     });
 
+    // Auto-create matching MediaProviderConfig for OpenAI/MiniMax (§11.4)
+    if (
+      body.credentials &&
+      (identifier === 'openai' || identifier === 'minimax')
+    ) {
+      try {
+        await this._orgMediaProviderSettings.upsert(orgId, identifier, {
+          enabled: true,
+          credentials: body.credentials,
+        });
+      } catch (err) {
+        // non-fatal — media auto-config failing should not break AI provider save
+      }
+    }
+
     return { identifier: result.identifier, enabled: result.enabled, updatedAt: result.updatedAt };
   }
 
   @Delete('/org-providers/:orgId/:identifier')
+  @RequirePermission('ai-config', 'manage')
   async deleteOrgProviderConfig(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
     @Param('identifier') identifier: string,
   ) {
-    this.assertSuperAdmin(user);
     await this._aiSettingsService.deleteOrgProviderConfig(orgId, identifier);
 
     await this._aiSettingsService.createAuditLog({

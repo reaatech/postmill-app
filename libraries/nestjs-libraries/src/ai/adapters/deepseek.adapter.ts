@@ -26,7 +26,7 @@ const DEEPSEEK_CREDENTIAL_FIELDS: CredentialField[] = [
 
 const DEEPSEEK_MODELS: ModelInfo[] = [
   { id: 'deepseek-chat', label: 'DeepSeek-V3', kind: 'text', capabilities: DEEPSEEK_CAPABILITIES },
-  { id: 'deepseek-reasoner', label: 'DeepSeek-R1', kind: 'text', capabilities: DEEPSEEK_CAPABILITIES },
+  { id: 'deepseek-reasoner', label: 'DeepSeek-R1', kind: 'text', capabilities: DEEPSEEK_CAPABILITIES, reasoning: true },
 ];
 
 const DEEPSEEK_BASE_URL = 'https://api.deepseek.com/v1';

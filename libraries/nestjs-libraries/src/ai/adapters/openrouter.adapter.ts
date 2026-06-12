@@ -49,7 +49,7 @@ export class OpenRouterAdapter implements AIProviderAdapter {
     return [
       { id: 'openai/gpt-4o', label: 'OpenAI GPT-4o', kind: 'text', capabilities: { text: true, image: true, vision: true, embeddings: false, speech: false, tools: true } },
       { id: 'openai/gpt-4o-mini', label: 'OpenAI GPT-4o Mini', kind: 'text', capabilities: { text: true, image: true, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'openai/o3-mini', label: 'OpenAI o3-mini', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
+      { id: 'openai/o3-mini', label: 'OpenAI o3-mini', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true }, reasoning: true },
       { id: 'anthropic/claude-sonnet-4-20250514', label: 'Anthropic Claude Sonnet 4', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
       { id: 'anthropic/claude-3-5-haiku-20241022', label: 'Anthropic Claude 3.5 Haiku', kind: 'text', capabilities: { text: true, image: true, vision: true, embeddings: false, speech: false, tools: true } },
       { id: 'google/gemini-2.0-flash-001', label: 'Google Gemini 2.0 Flash', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },

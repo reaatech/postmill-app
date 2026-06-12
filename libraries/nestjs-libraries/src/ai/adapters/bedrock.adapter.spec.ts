@@ -29,8 +29,8 @@ describe('BedrockAdapter', () => {
       expect(adapter.name).toBe('Amazon Bedrock');
     });
 
-    it('has type "direct"', () => {
-      expect(adapter.type).toBe('direct');
+    it('has type "hub"', () => {
+      expect(adapter.type).toBe('hub');
     });
 
     it('has credentialFields for region, accessKeyId, secretAccessKey, sessionToken', () => {

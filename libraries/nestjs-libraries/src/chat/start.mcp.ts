@@ -222,10 +222,10 @@ export const startMcp = async (app: INestApplication) => {
       (o) => o.organizationId === apiKey.organizationId,
     );
     const role =
-      userOrg?.role ??
-      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+      userOrg?.roleRef?.key ??
+      (apiKey.user.isSuperAdmin ? 'owner' : 'member');
     const scopes =
-      role === 'SUPERADMIN' || role === 'ADMIN'
+      role === 'owner' || role === 'admin'
         ? ORG_API_KEY_MCP_SCOPES
         : DEFAULT_MCP_SCOPES;
     return {
@@ -569,8 +569,8 @@ export const startMcp = async (app: INestApplication) => {
       (o) => o.organizationId === apiKey.organizationId,
     );
     const role =
-      userOrg?.role ??
-      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+      userOrg?.roleRef?.key ??
+      (apiKey.user.isSuperAdmin ? 'owner' : 'member');
     req.auth = { org: apiKey.organization, userId: apiKey.user.id, role };
 
     // NOTE: The raw API key from the URL param is passed as `Bearer ${id}` to
@@ -677,8 +677,8 @@ export const startMcp = async (app: INestApplication) => {
       (o) => o.organizationId === apiKey.organizationId,
     );
     const sseRole =
-      sseUserOrg?.role ??
-      (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+      sseUserOrg?.roleRef?.key ??
+      (apiKey.user.isSuperAdmin ? 'owner' : 'member');
     req.auth = { org: apiKey.organization, userId: apiKey.user.id, role: sseRole };
 
     const authResult = await scopeStrategy.authenticate({

@@ -31,7 +31,7 @@ const FIREWORKS_MODELS: ModelInfo[] = [
   { id: 'accounts/fireworks/models/llama-v3p1-405b-instruct', label: 'Llama 3.1 405B', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
   { id: 'accounts/fireworks/models/llama-v3p2-90b-vision-instruct', label: 'Llama 3.2 90B Vision', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
   { id: 'accounts/fireworks/models/mixtral-8x7b-instruct', label: 'Mixtral 8x7B', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
-  { id: 'accounts/fireworks/models/deepseek-r1', label: 'DeepSeek R1', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true } },
+  { id: 'accounts/fireworks/models/deepseek-r1', label: 'DeepSeek R1', kind: 'text', capabilities: { text: true, image: false, vision: false, embeddings: false, speech: false, tools: true }, reasoning: true },
   { id: 'accounts/fireworks/models/flux-1-dev-fp8', label: 'FLUX.1 Dev', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'accounts/fireworks/models/stable-diffusion-xl-1024', label: 'Stable Diffusion XL', kind: 'image', capabilities: { text: false, image: true, vision: false, embeddings: false, speech: false, tools: false } },
   { id: 'nomic-ai/text-embed-v2-moushikada-lora', label: 'Text Embed v2', kind: 'embedding', dimension: 768, capabilities: { text: false, image: false, vision: false, embeddings: true, speech: false, tools: false } },
@@ -43,7 +43,8 @@ const FIREWORKS_BASE_URL = 'https://api.fireworks.ai/inference/v1';
 export class FireworksAdapter implements AIProviderAdapter {
   readonly identifier = 'fireworks';
   readonly name = 'Fireworks AI';
-  readonly type = 'direct' as const;
+  // Hub: inference platform hosting many open-weight models (not a model maker).
+  readonly type = 'hub' as const;
   readonly credentialFields = FIREWORKS_CREDENTIAL_FIELDS;
   readonly capabilities = FIREWORKS_CAPABILITIES;
   readonly privacy = {

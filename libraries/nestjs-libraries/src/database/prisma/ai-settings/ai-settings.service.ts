@@ -26,7 +26,7 @@ export class AiSettingsService {
       enabled?: boolean;
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: Record<string, any>;
     },
   ) {
@@ -244,6 +244,10 @@ export class AiSettingsService {
     return this._repository.getOrgProviderConfigs(organizationId);
   }
 
+  getAllOrgIds() {
+    return this._repository.getAllOrgIds();
+  }
+
   getOrgProviderConfig(organizationId: string, identifier: string) {
     return this._repository.getOrgProviderConfig(organizationId, identifier);
   }
@@ -255,7 +259,7 @@ export class AiSettingsService {
       enabled?: boolean;
       credentials?: Record<string, string>;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: Record<string, any>;
     },
   ) {
@@ -290,8 +294,8 @@ export class AiSettingsService {
 
   // ── AIBrandProfile ──
 
-  getBrandProfile(organizationId: string) {
-    return this._repository.getBrandProfile(organizationId);
+  getBrandProfile(organizationId: string, brandId?: string) {
+    return this._repository.getBrandProfile(organizationId, brandId);
   }
 
   upsertBrandProfile(
@@ -336,12 +340,29 @@ export class AiSettingsService {
     return this._repository.createMediaJob(data);
   }
 
-  updateMediaJob(id: string, data: Record<string, any>) {
+  updateMediaJob(
+    id: string,
+    data: {
+      status?: string;
+      artifactUrl?: string | null;
+      provenance?: string;
+      costUsd?: number;
+      error?: string | null;
+    },
+  ) {
     return this._repository.updateMediaJob(id, data);
   }
 
   getMediaJobs(organizationId: string, limit = 50) {
     return this._repository.getMediaJobs(organizationId, limit);
+  }
+
+  getMediaJobById(id: string) {
+    return this._repository.getMediaJobById(id);
+  }
+
+  getPendingMediaJobs(limit = 100) {
+    return this._repository.getPendingMediaJobs(limit);
   }
 
   // ── AIPromptLibraryItem ──

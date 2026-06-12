@@ -9,7 +9,9 @@ import {
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from './ai-settings.manager';
-import type { LanguageModel } from './ai-provider.interface';
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
+import type { ImageModel, LanguageModel } from './ai-provider.interface';
+
 import { CapabilityNotAvailable, BudgetExceeded, GuardrailViolation } from './governance/errors';
 import { TelemetryService } from './governance/telemetry.service';
 import { ProviderHealthService } from './governance/provider-health.service';
@@ -46,14 +48,16 @@ const SURFACE_DEFAULTS: Record<AIScope, SurfaceDefaults> = {
   mcp: { textModel: 'gpt-4.1' },
 };
 
+export interface ReasoningOptions {
+  reasoning?: boolean;
+}
+
 export interface ResolvedConfig {
   adapter: any;
   modelId: string;
   creds: Record<string, string>;
   providerId: string;
   defaultSurface?: SurfaceDefaults;
-  providerImageModel?: string;
-  orgImageModel?: string;
   settings?: any;
 }
 
@@ -99,6 +103,7 @@ export class AIModelProvider {
     private readonly _health: ProviderHealthService,
     private readonly _budget: BudgetService,
     private readonly _guardrails: GuardrailService,
+    private readonly _brands: BrandsService,
     private readonly _semanticCache?: SemanticCacheService,
     private readonly _modelRouter?: ModelRouterService,
     private readonly _circuitBreaker: CircuitBreakerService = new CircuitBreakerService(),
@@ -144,7 +149,7 @@ export class AIModelProvider {
     });
   }
 
-  private async _resolveConfig(scope: AIScope, _orgId?: string): Promise<ResolvedConfig> {
+  private async _resolveConfig(scope: AIScope, _orgId?: string, options?: ReasoningOptions): Promise<ResolvedConfig> {
     const settings = await this._aiSettingsManager.getSettings();
     this._ensureTelemetryConfigured(settings);
 
@@ -163,7 +168,7 @@ export class AIModelProvider {
     }
 
     const selectedProviderId = orgActive.identifier;
-    let adapter = this._registry.getAdapter(selectedProviderId);
+    const adapter = this._registry.getAdapter(selectedProviderId);
     if (!adapter) {
       throw new Error(
         `AI provider adapter "${selectedProviderId}" is not registered. ` +
@@ -175,7 +180,9 @@ export class AIModelProvider {
     const scopedModels = this._isValidScopedModels(rawScopedModels) ? rawScopedModels : undefined;
     const scopeConfig = scopedModels?.[scope];
 
-    const baseModel = scopeConfig?.model || orgActive.defaultModel || SURFACE_DEFAULTS[scope].textModel;
+    const baseModel = options?.reasoning
+      ? (orgActive.reasoningModel || orgActive.defaultModel || SURFACE_DEFAULTS[scope].textModel)
+      : (scopeConfig?.model || orgActive.defaultModel || SURFACE_DEFAULTS[scope].textModel);
     const selectedModel = await this._routeModel(scope, orgId, baseModel);
 
     const resolvedConfig = {
@@ -184,8 +191,6 @@ export class AIModelProvider {
       creds: orgActive.credentials || {},
       providerId: selectedProviderId,
       defaultSurface: SURFACE_DEFAULTS[scope],
-      providerImageModel: undefined as string | undefined,
-      orgImageModel: orgActive.imageModel || undefined,
       settings,
     };
 
@@ -199,11 +204,11 @@ export class AIModelProvider {
     return resolvedConfig;
   }
 
-  private async _resolveWithRetry(scope: AIScope, orgId?: string): Promise<ResolvedConfig> {
+  private async _resolveWithRetry(scope: AIScope, orgId?: string, options?: ReasoningOptions): Promise<ResolvedConfig> {
     let lastError: Error | null = null;
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
-        const config = await this._resolveConfig(scope, orgId);
+        const config = await this._resolveConfig(scope, orgId, options);
         return config;
       } catch (err) {
         if (err instanceof BudgetExceeded || err instanceof GuardrailViolation) {
@@ -223,10 +228,11 @@ export class AIModelProvider {
     fn: (config: ResolvedConfig) => Promise<T>,
     scope: AIScope,
     orgId?: string,
+    options?: ReasoningOptions,
   ): Promise<T> {
     let attemptedFallbackProvider: string | null = null;
     try {
-      const config = await this._resolveWithRetry(scope, orgId);
+      const config = await this._resolveWithRetry(scope, orgId, options);
 
       const isGovernanceError = (e: unknown) =>
         e instanceof BudgetExceeded || e instanceof GuardrailViolation;
@@ -308,19 +314,13 @@ export class AIModelProvider {
   }
 
   private _resolveImageModelId(config: ResolvedConfig): string {
-    if (config.orgImageModel) {
-      return config.orgImageModel;
-    }
-    if (config.providerImageModel) {
-      return config.providerImageModel;
-    }
     if (config.defaultSurface?.imageModel) {
       return config.defaultSurface.imageModel;
     }
     return config.modelId;
   }
 
-  async languageModel(scope: AIScope, orgId?: string): Promise<LanguageModel> {
+  async languageModel(scope: AIScope, orgId?: string, options?: ReasoningOptions): Promise<LanguageModel> {
     return this._withFallback(
       async (config) => {
         return this._telemetry.startSpan(
@@ -339,10 +339,11 @@ export class AIModelProvider {
       },
       scope,
       orgId,
+      options,
     );
   }
 
-  async langchainModel(scope: AIScope, orgId?: string): Promise<BaseChatModel> {
+  async langchainModel(scope: AIScope, orgId?: string, options?: ReasoningOptions): Promise<BaseChatModel> {
     return this._withFallback(
       async (config) => {
         return this._telemetry.startSpan(
@@ -361,6 +362,7 @@ export class AIModelProvider {
       },
       scope,
       orgId,
+      options,
     );
   }
 
@@ -371,7 +373,7 @@ export class AIModelProvider {
         span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, config.modelId);
         if (orgId) span.setAttribute('ai.organizationId', orgId);
         const imageModelId = this._resolveImageModelId(config);
-        let imageModel: any;
+        let imageModel: ImageModel | undefined;
         if (config.adapter.createImageModel) {
           imageModel = config.adapter.createImageModel(config.creds, imageModelId);
         }
@@ -386,7 +388,6 @@ export class AIModelProvider {
                 : null;
               const fallbackCreds = fallbackOrgActive?.credentials || {};
               const fallbackModelId =
-                fallbackOrgActive?.imageModel ||
                 fallbackOrgActive?.defaultModel ||
                 SURFACE_DEFAULTS[scope].imageModel ||
                 imageModelId;
@@ -446,9 +447,17 @@ export class AIModelProvider {
   private async _loadBrandVoice(
     orgId?: string,
     platform?: string,
+    brandId?: string,
   ): Promise<{ instructions: string; language: string }> {
     if (!orgId) return { instructions: '', language: '' };
-    const brand = await this._aiSettings.getBrandProfile(orgId);
+
+    let brand;
+    if (brandId) {
+      brand = await this._brands.getBrand(orgId, brandId);
+    } else {
+      brand = await this._brands.getDefaultBrand(orgId);
+    }
+
     if (!brand?.enabled) return { instructions: '', language: '' };
 
     let instructions = brand.instructions || '';
@@ -550,7 +559,7 @@ export class AIModelProvider {
   private async _prepareGeneration(
     scope: AIScope,
     prompt: string,
-    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string; brandId?: string },
   ): Promise<{
     checkedPrompt: string;
     brand: { instructions: string; language: string };
@@ -561,7 +570,7 @@ export class AIModelProvider {
       throw new BudgetExceeded(budgetCheck.reason || 'Budget exceeded', scope, options?.orgId);
     }
 
-    const brand = await this._loadBrandVoice(options?.orgId, options?.platform);
+    const brand = await this._loadBrandVoice(options?.orgId, options?.platform, options?.brandId);
     const resolvedSystem = options?.promptKey
       ? await this._resolvePromptTemplate(options.promptKey, options?.orgId)
       : undefined;
@@ -605,7 +614,7 @@ export class AIModelProvider {
   async generateText(
     scope: AIScope,
     prompt: string,
-    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string; brandId?: string },
   ): Promise<string> {
     const { checkedPrompt, brand, effectiveSystem } = await this._prepareGeneration(scope, prompt, options);
 
@@ -685,7 +694,7 @@ export class AIModelProvider {
     scope: AIScope,
     prompt: string,
     _schema: any,
-    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string },
+    options?: { system?: string; promptKey?: string; orgId?: string; userId?: string; platform?: string; brandId?: string },
   ): Promise<T> {
     const { checkedPrompt, brand, effectiveSystem } = await this._prepareGeneration(scope, prompt, options);
     const systemPrompt = this._buildSystemPrompt(effectiveSystem, brand);

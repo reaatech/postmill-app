@@ -23,6 +23,7 @@ export interface ModelInfo {
   kind: 'text' | 'image' | 'embedding';
   dimension?: number;
   capabilities: AICapabilities;
+  reasoning?: boolean; // true for reasoning-capable models
 }
 
 export interface AICapabilities {

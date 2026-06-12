@@ -137,8 +137,9 @@ describe('AiUserController', () => {
 
   describe('getMediaProviders (4F)', () => {
     it('returns the credential-free media provider summary', async () => {
-      const result = await controller.getMediaProviders();
+      const result = await controller.getMediaProviders(mockOrg);
       expect(mediaService.getMediaProviderSummary).toHaveBeenCalledTimes(1);
+      expect(mediaService.getMediaProviderSummary).toHaveBeenCalledWith(mockOrg.id);
       expect(result).toEqual([
         { operation: 'image', available: true, providers: [{ id: 'replicate', enabled: true, c2paAvailable: true }] },
         { operation: 'tts', available: false, providers: [] },
@@ -307,7 +308,7 @@ describe('AiUserController', () => {
       const callArgs = (mediaService.speechToText as any).mock.calls[0];
       expect(Buffer.isBuffer(callArgs[0])).toBe(true);
       expect(callArgs[0].toString()).toBe('raw-audio');
-      expect(callArgs[1]).toEqual({ orgId: 'org-1' });
+      expect(callArgs[1]).toEqual({ orgId: 'org-1', userId: 'user-1' });
     });
 
     it('unknown operation → 400', async () => {

@@ -35,7 +35,7 @@ export class OrgAiSettingsRepository {
       isActive?: boolean;
       credentials?: string;
       defaultModel?: string;
-      imageModel?: string;
+      reasoningModel?: string;
       extraConfig?: string;
     },
   ) {

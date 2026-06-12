@@ -26,8 +26,8 @@ describe('GoogleAdapter', () => {
       expect(adapter.identifier).toBe('google');
     });
 
-    it('has name "Google Generative AI"', () => {
-      expect(adapter.name).toBe('Google Generative AI');
+    it('has name "Google Gemini"', () => {
+      expect(adapter.name).toBe('Google Gemini');
     });
 
     it('has type "direct"', () => {

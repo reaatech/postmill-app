@@ -24,8 +24,8 @@ const GOOGLE_CREDENTIAL_FIELDS: CredentialField[] = [
 ];
 
 const GOOGLE_MODELS: ModelInfo[] = [
-  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false } },
-  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false } },
+  { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false }, reasoning: true },
+  { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false }, reasoning: true },
   { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false } },
   { id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite', kind: 'text', capabilities: { ...GOOGLE_CAPABILITIES, embeddings: false } },
   { id: 'text-embedding-004', label: 'Text Embedding 004', kind: 'embedding', dimension: 768, capabilities: { text: false, image: false, vision: false, embeddings: true, speech: false, tools: false } },
@@ -35,14 +35,14 @@ const GOOGLE_MODELS: ModelInfo[] = [
 @Injectable()
 export class GoogleAdapter implements AIProviderAdapter {
   readonly identifier = 'google';
-  readonly name = 'Google Generative AI';
+  readonly name = 'Google Gemini';
   readonly type = 'direct' as const;
   readonly credentialFields = GOOGLE_CREDENTIAL_FIELDS;
   readonly capabilities = GOOGLE_CAPABILITIES;
   readonly privacy = {
     dataRetention: 'Per Google AI Terms of Service — data may be retained for up to 30 days',
     trainingOnData: true,
-    description: 'Google Generative AI (Gemini) API',
+    description: 'Google Gemini API',
   };
 
   private _buildProvider(creds: Record<string, string>) {
