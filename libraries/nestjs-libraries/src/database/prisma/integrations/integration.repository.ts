@@ -384,42 +384,6 @@ export class IntegrationRepository {
     return decryptIntegrationTokens(result);
   }
 
-  async getIntegrationForOrder(
-    id: string,
-    order: string,
-    user: string,
-    org: string
-  ) {
-    const integration = await this._posts.model.post.findFirst({
-      where: {
-        integrationId: id,
-        submittedForOrder: {
-          id: order,
-          messageGroup: {
-            OR: [
-              { sellerId: user },
-              { buyerId: user },
-              { buyerOrganizationId: org },
-            ],
-          },
-        },
-      },
-      select: {
-        integration: {
-          select: {
-            id: true,
-            name: true,
-            picture: true,
-            inBetweenSteps: true,
-            providerIdentifier: true,
-          },
-        },
-      },
-    });
-
-    return integration?.integration;
-  }
-
   async updateOnCustomerName(org: string, id: string, name: string) {
     const customer = !name
       ? undefined

@@ -111,7 +111,7 @@ export class IntegrationService {
     customInstanceDetails?: string
   ) {
     const uploadedPicture = picture
-      ? await (await this._storageService.getLocalAdapterForOrg(org)).uploadSimple(picture)
+      ? await (await this._storageService.getLocalAdapterForOrg(org, true)).uploadSimple(picture)
       : undefined;
 
     return this._integrationRepository.createOrUpdateIntegration(
@@ -148,15 +148,6 @@ export class IntegrationService {
 
   getIntegrationsForHealth(orgId: string) {
     return this._integrationRepository.getIntegrationsForHealth(orgId);
-  }
-
-  getIntegrationForOrder(id: string, order: string, user: string, org: string) {
-    return this._integrationRepository.getIntegrationForOrder(
-      id,
-      order,
-      user,
-      org
-    );
   }
 
   updateNameAndUrl(id: string, name: string, url: string) {
@@ -331,7 +322,7 @@ export class IntegrationService {
     let picture = getIntegrationInformation.picture;
     const localBase = `${process.env.FRONTEND_URL || ''}/uploads`;
     if (picture && picture.indexOf(localBase) === -1) {
-      const adapter = await this._storageService.getLocalAdapterForOrg(org);
+      const adapter = await this._storageService.getLocalAdapterForOrg(org, true);
       picture = await adapter.uploadSimple(picture);
     }
 

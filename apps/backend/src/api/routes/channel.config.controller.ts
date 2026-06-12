@@ -3,10 +3,10 @@ import {
   Body,
   Controller,
   Delete,
-  ForbiddenException,
   Get,
   Param,
   Put,
+  UseGuards,
 } from '@nestjs/common';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { User } from '@prisma/client';
@@ -15,24 +15,21 @@ import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { Prisma } from '@prisma/client';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 @ApiTags('Channel Config')
 @Controller('/admin/channel-configs')
+@UseGuards(OrgRbacGuard)
 export class ChannelConfigController {
   constructor(
     private _providerConfigService: ProviderConfigService,
     private _providerConfigManager: ProviderConfigManager
   ) {}
 
-  private assertSuperAdmin(user: User) {
-    if (!user?.isSuperAdmin) {
-      throw new ForbiddenException('Forbidden');
-    }
-  }
-
   @Get('/')
+  @RequirePermission('channels', 'manage')
   async listConfigs(@GetUserFromRequest() user: User) {
-    this.assertSuperAdmin(user);
     const dbConfigs = await this._providerConfigService.getAll();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
@@ -68,11 +65,11 @@ export class ChannelConfigController {
   }
 
   @Get('/:identifier')
+  @RequirePermission('channels', 'manage')
   async getConfig(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string
   ) {
-    this.assertSuperAdmin(user);
     const config = await this._providerConfigService.getByIdentifier(
       identifier
     );
@@ -100,6 +97,7 @@ export class ChannelConfigController {
   }
 
   @Put('/:identifier')
+  @RequirePermission('channels', 'manage')
   async saveConfig(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
@@ -114,7 +112,6 @@ export class ChannelConfigController {
       setupInstructions?: string;
     }
   ) {
-    this.assertSuperAdmin(user);
     if (typeof body.enabled !== 'boolean') {
       throw new BadRequestException('enabled must be a boolean');
     }
@@ -181,11 +178,11 @@ export class ChannelConfigController {
   }
 
   @Delete('/:identifier')
+  @RequirePermission('channels', 'manage')
   async deleteConfig(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string
   ) {
-    this.assertSuperAdmin(user);
 
     const config = await this._providerConfigService.getByIdentifier(
       identifier

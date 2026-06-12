@@ -14,6 +14,7 @@ export class InfiniteWorkflowRegister implements OnModuleInit {
       { name: 'missingPostWorkflow', id: 'missing-post-workflow' },
       { name: 'analyticsCollectionWorkflow', id: 'analytics-collection-workflow' },
       { name: 'commentsCollectionWorkflow', id: 'comments-collection-workflow' },
+      { name: 'mediaJobsPollWorkflow', id: 'media-jobs-poll-workflow' },
     ];
 
     for (const { name, id } of workflows) {

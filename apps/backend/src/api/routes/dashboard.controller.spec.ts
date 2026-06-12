@@ -25,6 +25,7 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/media.service', () => ({
 }));
 
 import { DashboardController } from './dashboard.controller';
+import type { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 
 const org = { id: 'org-1' } as any;
 const user = { id: 'user-1' } as any;
@@ -37,6 +38,7 @@ describe('DashboardController', () => {
   let orgAiSettingsService: any;
   let orgShortLinkSettingsService: any;
   let aiMediaService: any;
+  let storageService: { getProviderConfigs: ReturnType<typeof vi.fn> };
   let controller: DashboardController;
 
   beforeEach(() => {
@@ -74,6 +76,9 @@ describe('DashboardController', () => {
         .fn()
         .mockResolvedValue([{ available: false }, { available: true }]),
     };
+    storageService = {
+      getProviderConfigs: vi.fn().mockResolvedValue([]),
+    };
 
     controller = new DashboardController(
       postsService,
@@ -83,6 +88,7 @@ describe('DashboardController', () => {
       orgAiSettingsService,
       orgShortLinkSettingsService,
       aiMediaService,
+      storageService as unknown as StorageService,
     );
   });
 
@@ -119,6 +125,7 @@ describe('DashboardController', () => {
       aiProviderActive: true,
       shortlinkProviderActive: false,
       mediaProviderActive: true,
+      storageProviderActive: false,
       teamMembers: 3,
     });
   });

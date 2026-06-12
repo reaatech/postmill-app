@@ -392,7 +392,7 @@ describe('PostsService.updateMedia', () => {
 
     await service.updateMedia('post-123', imagesList, true, 'org-42');
 
-    expect(storageServiceMock.getLocalAdapterForOrg).toHaveBeenCalledWith('org-42');
+    expect(storageServiceMock.getLocalAdapterForOrg).toHaveBeenCalledWith('org-42', true);
     expect(mockAdapter.uploadFile).toHaveBeenCalled();
     expect(postRepositoryMock.updateImages).toHaveBeenCalled();
   });

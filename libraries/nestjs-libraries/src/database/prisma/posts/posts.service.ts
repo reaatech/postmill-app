@@ -19,7 +19,6 @@ import {
   Integration,
   Post,
   Media,
-  From,
   CreationMethod,
   State,
 } from '@prisma/client';
@@ -516,7 +515,7 @@ export class PostsService {
                 .jpeg({ quality: 100 })
                 .toBuffer();
 
-              const adapter = await this._storageService.getLocalAdapterForOrg(orgId);
+              const adapter = await this._storageService.getLocalAdapterForOrg(orgId, true);
               const { path, originalname } = adapter
                 ? await adapter.uploadFile({
                     buffer,
@@ -1059,7 +1058,8 @@ export class PostsService {
         body.tags,
         creationMethod,
         body.inter,
-        body.campaignId
+        body.campaignId,
+        body.brandId,
       );
 
       if (!posts?.length) {

@@ -8,6 +8,7 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { Organization, User } from '@prisma/client';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -24,6 +25,7 @@ export class DashboardController {
     private _orgAiSettingsService: OrgAiSettingsService,
     private _orgShortLinkSettingsService: OrgShortLinkSettingsService,
     private _aiMediaService: AiMediaService,
+    private _storageService: StorageService,
   ) {}
 
   @Get('/summary')
@@ -43,6 +45,7 @@ export class DashboardController {
       team,
       aiConfig,
       shortlinkConfig,
+      storageConfigs,
       totalPosts,
       scheduledPosts,
       publishedNext7,
@@ -53,6 +56,7 @@ export class DashboardController {
       this._organizationService.getTeam(orgId),
       this._orgAiSettingsService.getActiveProvider(orgId),
       this._orgShortLinkSettingsService.getActiveProvider(orgId),
+      this._storageService.getProviderConfigs(orgId),
       this._postsService.getTotalCount(orgId),
       this._postsService.getScheduledCount(orgId),
       this._postsService.getPublishedCountSince(orgId, sevenDaysAgo),
@@ -60,12 +64,18 @@ export class DashboardController {
       this._postsService.getUpcomingPosts(orgId, 5),
     ]);
 
+    // LOCAL is seeded at org creation, so "storage connected" means a real
+    // cloud provider (non-LOCAL) has been configured.
+    const storageProviderActive = (storageConfigs || []).some(
+      (c: { type?: string }) => c.type && c.type !== 'LOCAL',
+    );
+
     const commentUnread = await this._socialCommentsService.getInboxUnreadCount(
       orgId,
       user?.id,
     );
 
-    const mediaSummary = await this._aiMediaService.getMediaProviderSummary();
+    const mediaSummary = await this._aiMediaService.getMediaProviderSummary(orgId);
     const mediaProviderActive = mediaSummary.some((e) => e.available);
 
     return {
@@ -86,6 +96,7 @@ export class DashboardController {
       aiProviderActive: !!aiConfig,
       shortlinkProviderActive: !!shortlinkConfig,
       mediaProviderActive,
+      storageProviderActive,
       teamMembers: team?.users?.length ?? 0,
     };
   }
