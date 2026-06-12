@@ -20,6 +20,10 @@ export const ProfileComponent: FC<{
         label={t('full_name', 'Full Name')}
         {...form.register('fullname')}
       />
+      <Input
+        label={t('last_name', 'Last Name')}
+        {...form.register('lastName')}
+      />
       <div className="flex flex-col gap-[8px]">
         <label className="text-[14px] font-[500]">{t('bio', 'Bio')}</label>
         <textarea

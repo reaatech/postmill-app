@@ -15,6 +15,31 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { FarcasterProvider } from '@gitroom/frontend/components/auth/providers/farcaster.provider';
 import WalletProvider from '@gitroom/frontend/components/auth/providers/wallet.provider';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import useSWR from 'swr';
+
+interface AuthProvider {
+  provider: string;
+  displayName: string;
+}
+
+const useAuthProviders = () => {
+  const { backendUrl } = useVariables();
+  return useSWR<{ providers: AuthProvider[] }>('auth-providers', async () => {
+    const res = await fetch(`${backendUrl}/auth/providers`);
+    if (!res.ok) throw new Error('Failed to fetch auth providers');
+    return res.json();
+  });
+};
+
+const providerComponents: Record<string, React.ComponentType> = {
+  LOCAL: () => null,
+  GITHUB: GithubProvider,
+  GOOGLE: GoogleProvider,
+  FARCASTER: FarcasterProvider,
+  GENERIC: OauthProvider,
+  WALLET: WalletProvider,
+};
+
 type Inputs = {
   email: string;
   password: string;
@@ -27,6 +52,7 @@ export function Login() {
   const [notActivated, setNotActivated] = useState(false);
   const { isGeneral, neynarClientId, billingEnabled, genericOauth } =
     useVariables();
+  const { data: providersData, error: providersError } = useAuthProviders();
   const resolver = useMemo(() => {
     return classValidatorResolver(LoginUserDto);
   }, []);
@@ -62,6 +88,43 @@ export function Login() {
       localStorage.setItem('lastLogin', new Date().toISOString());
     }
   };
+
+  const renderProviders = () => {
+    const fetchedProviders = providersData?.providers?.filter(
+      (p) => p.provider !== 'LOCAL'
+    );
+
+    if (fetchedProviders && fetchedProviders.length > 0) {
+      return (
+        <div className="gap-[8px] flex flex-wrap">
+          {fetchedProviders.map((p) => {
+            const Component = providerComponents[p.provider];
+            if (!Component) return null;
+            return <Component key={p.provider} />;
+          })}
+        </div>
+      );
+    }
+
+    if (providersError) {
+      return null;
+    }
+
+    if (isGeneral && genericOauth) {
+      return <OauthProvider />;
+    }
+    if (!isGeneral) {
+      return <GithubProvider />;
+    }
+    return (
+      <div className="gap-[8px] flex">
+        <GoogleProvider />
+        {!!neynarClientId && <FarcasterProvider />}
+        {billingEnabled && <WalletProvider />}
+      </div>
+    );
+  };
+
   return (
     <FormProvider {...form}>
       <form className="flex-1 flex" onSubmit={form.handleSubmit(onSubmit)}>
@@ -75,17 +138,7 @@ export function Login() {
             {t('continue_with', 'Continue With')}
           </div>
           <div className="flex flex-col">
-            {isGeneral && genericOauth ? (
-              <OauthProvider />
-            ) : !isGeneral ? (
-              <GithubProvider />
-            ) : (
-              <div className="gap-[8px] flex">
-                <GoogleProvider />
-                {!!neynarClientId && <FarcasterProvider />}
-                {billingEnabled && <WalletProvider />}
-              </div>
-            )}
+            {renderProviders()}
             <div className="h-[20px] mb-[24px] mt-[24px] relative">
               <div className="absolute w-full h-[1px] bg-newTableBorder top-[50%] -translate-y-[50%]" />
               <div

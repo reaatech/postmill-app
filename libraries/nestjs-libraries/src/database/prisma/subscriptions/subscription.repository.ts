@@ -18,33 +18,10 @@ export class SubscriptionRepository {
     private _prisma: PrismaService,
   ) {}
 
-  getUserAccount(userId: string) {
-    return this._user.model.user.findFirst({
-      where: {
-        id: userId,
-      },
-      select: {
-        account: true,
-        connectedAccount: true,
-      },
-    });
-  }
-
   getCode(code: string) {
     return this._usedCodes.model.usedCodes.findFirst({
       where: {
         code,
-      },
-    });
-  }
-
-  updateAccount(userId: string, account: string) {
-    return this._user.model.user.update({
-      where: {
-        id: userId,
-      },
-      data: {
-        account,
       },
     });
   }
@@ -54,17 +31,6 @@ export class SubscriptionRepository {
       where: {
         organizationId,
         deletedAt: null,
-      },
-    });
-  }
-
-  updateConnectedStatus(account: string, accountCharges: boolean) {
-    return this._user.model.user.updateMany({
-      where: {
-        account,
-      },
-      data: {
-        connectedAccount: accountCharges,
       },
     });
   }

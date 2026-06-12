@@ -1,0 +1,128 @@
+import 'reflect-metadata';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ForbiddenException, ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
+import { OrgRbacGuard } from './org-rbac.guard';
+import { RequirePermissionMetadata } from './require-permission.decorator';
+
+interface MockRolesService {
+  getEffectivePermissions: ReturnType<typeof vi.fn>;
+}
+
+const buildContext = (request: Record<string, unknown>): ExecutionContext =>
+  ({
+    getHandler: () => ({}),
+    getClass: () => ({}),
+    switchToHttp: () => ({
+      getRequest: () => request,
+    }),
+  } as unknown as ExecutionContext);
+
+describe('OrgRbacGuard', () => {
+  let reflector: Reflector;
+  let rolesService: MockRolesService;
+  let guard: OrgRbacGuard;
+  let metadata: RequirePermissionMetadata | undefined;
+
+  beforeEach(() => {
+    metadata = { resource: 'settings', action: 'read' };
+    reflector = {
+      getAllAndOverride: vi.fn(() => metadata),
+    } as unknown as Reflector;
+    rolesService = {
+      getEffectivePermissions: vi.fn(),
+    };
+    guard = new OrgRbacGuard(reflector, rolesService as never);
+  });
+
+  it('allows routes without @RequirePermission metadata', async () => {
+    metadata = undefined;
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1' }, orgId: 'o1' })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
+  it('rejects unauthenticated requests', async () => {
+    await expect(guard.canActivate(buildContext({}))).rejects.toThrow(
+      ForbiddenException
+    );
+  });
+
+  it('rejects requests without a resolved org', async () => {
+    await expect(
+      guard.canActivate(buildContext({ user: { id: 'u1' } }))
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('bypasses for platform super-admin', async () => {
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1', isSuperAdmin: true }, orgId: 'o1' })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
+  it('403s when the user is not a member (null resolution)', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue(null);
+    await expect(
+      guard.canActivate(buildContext({ user: { id: 'u1' }, orgId: 'o1' }))
+    ).rejects.toThrow('Not a member of this organization');
+  });
+
+  it('allows when the role carries the exact permission', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'admin',
+      permissions: ['settings:read'],
+    });
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1' }, orgId: 'o1' })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).toHaveBeenCalledWith(
+      'o1',
+      'u1'
+    );
+  });
+
+  it('allows when the role carries manage on the resource (manage implies all)', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'owner',
+      permissions: ['settings:manage'],
+    });
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1' }, orgId: 'o1' })
+    );
+    expect(result).toBe(true);
+  });
+
+  it('403s when the role lacks the permission', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'member',
+      permissions: ['posts:read'],
+    });
+    await expect(
+      guard.canActivate(buildContext({ user: { id: 'u1' }, orgId: 'o1' }))
+    ).rejects.toThrow('Insufficient permissions');
+  });
+
+  it('caches resolution per (user, org) on the request', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'admin',
+      permissions: ['settings:read'],
+    });
+    const request = { user: { id: 'u1' }, orgId: 'o1' };
+    await guard.canActivate(buildContext(request));
+    await guard.canActivate(buildContext(request));
+    expect(rolesService.getEffectivePermissions).toHaveBeenCalledTimes(1);
+  });
+
+  it('caches null resolutions too (no repeat lookup for non-members)', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue(null);
+    const request = { user: { id: 'u1' }, orgId: 'o1' };
+    await expect(guard.canActivate(buildContext(request))).rejects.toThrow();
+    await expect(guard.canActivate(buildContext(request))).rejects.toThrow();
+    expect(rolesService.getEffectivePermissions).toHaveBeenCalledTimes(1);
+  });
+});

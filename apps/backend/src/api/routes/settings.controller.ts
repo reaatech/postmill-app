@@ -7,7 +7,8 @@ import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.te
 import { ShortlinkPreferenceDto } from '@gitroom/nestjs-libraries/dtos/settings/shortlink-preference.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { IsDefined, IsEmail, IsString, MinLength } from 'class-validator';
+import { IsDefined, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 class CreateTeamUserDto {
   @IsDefined()
@@ -21,6 +22,10 @@ class CreateTeamUserDto {
 
   @IsString()
   role: 'USER' | 'ADMIN' = 'USER';
+
+  @IsOptional()
+  @IsString()
+  roleId?: string;
 }
 
 @ApiTags('Settings')
@@ -31,6 +36,7 @@ export class SettingsController {
   ) {}
 
   @Get('/team')
+  @RequirePermission('settings', 'read')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
     [AuthorizationActions.Create, Sections.ADMIN]
@@ -40,6 +46,7 @@ export class SettingsController {
   }
 
   @Post('/team')
+  @RequirePermission('settings', 'update')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
     [AuthorizationActions.Create, Sections.ADMIN]
@@ -52,6 +59,7 @@ export class SettingsController {
   }
 
   @Put('/team/:id/role')
+  @RequirePermission('settings', 'update')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
     [AuthorizationActions.Create, Sections.ADMIN]
@@ -59,16 +67,19 @@ export class SettingsController {
   changeTeamMemberRole(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body('role') role: 'USER' | 'ADMIN'
+    @Body('role') role: 'USER' | 'ADMIN',
+    @Body('roleId') roleId?: string,
   ) {
     return this._organizationService.changeTeamMemberRole(
       org,
       id,
-      role === 'ADMIN' ? 'ADMIN' : 'USER'
+      role === 'ADMIN' ? 'ADMIN' : 'USER',
+      roleId,
     );
   }
 
   @Post('/team/create-user')
+  @RequirePermission('settings', 'update')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
     [AuthorizationActions.Create, Sections.ADMIN]
@@ -77,10 +88,17 @@ export class SettingsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateTeamUserDto
   ) {
-    return this._organizationService.createTeamUser(org.id, body.email, body.password, body.role);
+    return this._organizationService.createTeamUser(
+      org.id,
+      body.email,
+      body.password,
+      body.role,
+      body.roleId,
+    );
   }
 
   @Delete('/team/:id')
+  @RequirePermission('settings', 'update')
   @CheckPolicies(
     [AuthorizationActions.Create, Sections.TEAM_MEMBERS],
     [AuthorizationActions.Create, Sections.ADMIN]
@@ -93,11 +111,13 @@ export class SettingsController {
   }
 
   @Get('/shortlink')
+  @RequirePermission('settings', 'read')
   async getShortlinkPreference(@GetOrgFromRequest() org: Organization) {
     return this._organizationService.getShortlinkPreference(org.id);
   }
 
   @Post('/shortlink')
+  @RequirePermission('organization', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateShortlinkPreference(
     @GetOrgFromRequest() org: Organization,

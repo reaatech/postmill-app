@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpException,
+  Param,
   Post,
   Query,
   Req,
@@ -33,6 +34,7 @@ import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import crypto from 'crypto';
 
 @ApiTags('User')
 @Controller('/user')
@@ -76,6 +78,7 @@ export class UsersController {
     }
 
     const impersonate = req.cookies.impersonate || req.headers.impersonate;
+    const profile = await this._userService.getProfileByUserId(user.id);
     // @ts-ignore
     return {
       ...user,
@@ -85,7 +88,7 @@ export class UsersController {
       // @ts-ignore
       tier: organization?.subscription?.subscriptionTier || (!process.env.STRIPE_PUBLISHABLE_KEY ? 'ULTIMATE' : 'FREE'),
       // @ts-ignore
-      role: organization?.users[0]?.role,
+      role: organization?.users[0]?.roleId,
       // @ts-ignore
       isLifetime: !!organization?.subscription?.isLifetime,
       admin: !!user.isSuperAdmin,
@@ -93,6 +96,15 @@ export class UsersController {
       isTrailing: !process.env.STRIPE_PUBLISHABLE_KEY ? false : organization?.isTrailing,
       allowTrial: organization?.allowTrial,
       streakSince: organization?.streakSince || null,
+      profile: profile ? {
+        name: profile.name,
+        lastName: profile.lastName,
+        bio: profile.bio,
+        avatarUrl: profile.avatarUrl,
+        timezone: profile.timezone,
+        pictureId: profile.pictureId,
+        picture: profile.picture || null,
+      } : null,
     };
   }
 
@@ -204,7 +216,8 @@ export class UsersController {
       user.id,
       getOrgFromCookie.id,
       getOrgFromCookie.orgId,
-      getOrgFromCookie.role
+      getOrgFromCookie.role,
+      getOrgFromCookie.roleId,
     );
 
     response.status(200).json({
@@ -218,7 +231,7 @@ export class UsersController {
     // here → 500 → the frontend org selector receives a non-array error body
     // and crashes the whole tree (white screen on every page). Treat a missing
     // membership row as not-disabled rather than 500ing.
-    return (await this._orgService.getOrgsByUserId(user.id)).filter(
+      return (await this._orgService.getOrgsByUserId(user.id)).filter(
       (f) => !f.users?.[0]?.disabled
     );
   }
@@ -248,7 +261,11 @@ export class UsersController {
   }
 
   @Post('/logout')
-  logout(@Res({ passthrough: true }) response: Response) {
+  async logout(
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    await this._authService.revokeAllSessions(user.id);
     response.header('logout', 'true');
     response.cookie('auth', '', {
       domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
@@ -289,7 +306,48 @@ export class UsersController {
       expires: new Date(0),
     });
 
+    response.cookie('refresh_token', '', {
+      domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+      ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+        ? {
+            secure: true,
+            httpOnly: true,
+            sameSite: 'none',
+          }
+        : {}),
+      maxAge: -1,
+      expires: new Date(0),
+    });
+
     response.status(200).send();
+  }
+
+  @Get('/sessions')
+  async getSessions(@GetUserFromRequest() user: User) {
+    return this._authService.getUserSessions(user.id);
+  }
+
+  @Post('/sessions/:id/revoke')
+  async revokeSession(
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string
+  ) {
+    await this._authService.revokeSession(user.id, id);
+    return { success: true };
+  }
+
+  @Post('/sessions/revoke-all')
+  async revokeAllSessions(
+    @GetUserFromRequest() user: User,
+    @Req() req: Request
+  ) {
+    const refreshToken = req.cookies?.refresh_token;
+    let currentTokenHash: string | undefined;
+    if (refreshToken) {
+      currentTokenHash = crypto.createHash('sha256').update(refreshToken).digest('hex');
+    }
+    await this._authService.revokeAllSessions(user.id, currentTokenHash || '');
+    return { success: true };
   }
 
   @Post('/t')

@@ -6,26 +6,41 @@ import {
   pricing,
   PricingInnerInterface,
 } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+
+/** Profile fields returned by GET /user/self (UserProfile split, v3.8.10). */
+export interface UserSelfProfile {
+  name: string | null;
+  lastName: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  timezone: string | null;
+  pictureId: string | null;
+  picture: { id: string; path: string } | null;
+}
+
 export const UserContext = createContext<
   | undefined
   | (User & {
       orgId: string;
       tier: PricingInnerInterface;
-      role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+      /** The member's AppRole reference for the current org (v3.8.10 RBAC). */
+      role: string;
       totalChannels: number;
       isLifetime?: boolean;
       impersonate: boolean;
       allowTrial: boolean;
       isTrailing: boolean;
       streakSince: string | null;
+      profile: UserSelfProfile | null;
     })
 >(undefined);
 export const ContextWrapper: FC<{
   user: User & {
     orgId: string;
     tier: 'FREE' | 'STANDARD' | 'PRO' | 'ULTIMATE' | 'TEAM';
-    role: 'USER' | 'ADMIN' | 'SUPERADMIN';
+    role: string;
     totalChannels: number;
+    profile: UserSelfProfile | null;
   };
   children: ReactNode;
 }> = ({ user, children }) => {

@@ -19,13 +19,17 @@ import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.content.service';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
-import { AgenciesService } from '@gitroom/nestjs-libraries/database/prisma/agencies/agencies.service';
-import { AgenciesRepository } from '@gitroom/nestjs-libraries/database/prisma/agencies/agencies.repository';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { AuthProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/auth-providers/auth-provider.repository';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
+import { MediaModule } from '@gitroom/nestjs-libraries/media/media.module';
+import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
+import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
+import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
+import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { BitlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/bitly.adapter';
 import { BlinkAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/blink.adapter';
 import { CuttlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/cuttly.adapter';
@@ -86,6 +90,8 @@ import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/w
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
+import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 import { ApiKeysRepository } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.repository';
 import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
@@ -99,10 +105,14 @@ import { MailgunAdapter } from '@gitroom/nestjs-libraries/emails/adapters/mailgu
 import { PostmarkAdapter } from '@gitroom/nestjs-libraries/emails/adapters/postmark.adapter';
 import { SesAdapter } from '@gitroom/nestjs-libraries/emails/adapters/ses.adapter';
 import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adapter';
+import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder';
+import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
+import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
+import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 
 @Global()
 @Module({
-  imports: [],
+  imports: [MediaModule],
   controllers: [],
   providers: [
     PrismaService,
@@ -129,8 +139,6 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
     SignatureService,
     MediaService,
     MediaRepository,
-    AgenciesService,
-    AgenciesRepository,
     IntegrationManager,
     RefreshIntegrationService,
     ExtractContentService,
@@ -169,6 +177,8 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
     WatchlistService,
     CampaignsRepository,
     CampaignsService,
+    BrandsService,
+    BrandsRepository,
     OrgProviderConfigService,
     OrgProviderConfigRepository,
     OrgProviderConfigManager,
@@ -188,6 +198,14 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
     ShortLinkRegistry,
     OrgShortLinkSettingsService,
     OrgShortLinkSettingsRepository,
+    AuthProviderRepository,
+    // MediaProviderRegistry intentionally comes from MediaModule (imported + re-exported
+    // below) — providing it here would create a second, EMPTY registry instance that
+    // never receives the adapter registrations from MediaModule.onModuleInit.
+    OrgMediaProviderSettingsService,
+    OrgMediaProviderSettingsRepository,
+    ProviderCredentialLinkService,
+    MediaJobLifecycleService,
     BitlyAdapter,
     BlinkAdapter,
     CuttlyAdapter,
@@ -274,6 +292,22 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
         T2mAdapter,
       ],
     },
+    RbacSeeder,
+    BackfillService,
+    RolesRepository,
+    RolesService,
+    {
+      provide: 'RBAC_SEED_ON_INIT',
+      useFactory: (seeder: RbacSeeder, backfill: BackfillService) => {
+        // Run idempotently on every app bootstrap — safe and cheap.
+        seeder.seed().then(() => backfill.backfill()).catch((e: unknown) => {
+          const msg = e instanceof Error ? e.message : String(e);
+          console.error('RBAC seed/backfill failed:', msg);
+        });
+        return true;
+      },
+      inject: [RbacSeeder, BackfillService],
+    },
     {
       provide: 'EMAIL_ADAPTER_REGISTRATION',
       useFactory: (
@@ -307,7 +341,9 @@ import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adap
     },
   ],
   get exports() {
-    return this.providers;
+    // Re-export MediaModule so the populated MediaProviderRegistry (adapters are
+    // registered in MediaModule.onModuleInit) is globally injectable.
+    return [...this.providers, MediaModule];
   },
 })
 export class DatabaseModule {}

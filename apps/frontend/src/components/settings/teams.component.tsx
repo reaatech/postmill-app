@@ -17,24 +17,26 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { DataTable, StatusPill, AvatarCell } from '@gitroom/frontend/components/ui/data-table';
+import { useRoles, RoleItem } from '@gitroom/frontend/components/settings/roles/hooks/use-roles';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 
 const PAGE_SIZE = 25;
-
-const roles = [
-  { name: 'User', value: 'USER' },
-  { name: 'Admin', value: 'ADMIN' },
-];
 
 const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
   const fetch = useFetch();
   const toast = useToaster();
   const t = useT();
-  const form = useForm({ values: { email: '', password: '', role: 'USER' }, mode: 'onChange' });
+  const { data: rolesList } = useRoles();
+  const form = useForm({ values: { email: '', password: '', roleId: '' }, mode: 'onChange' });
 
-  const submit = useCallback(async (values: { email: string; password: string; role: string }) => {
+  const submit = useCallback(async (values: { email: string; password: string; roleId: string }) => {
     await fetch('/settings/team/create-user', {
       method: 'POST',
-      body: JSON.stringify(values),
+      body: JSON.stringify({
+        email: values.email,
+        password: values.password,
+        ...(values.roleId ? { roleId: values.roleId } : {}),
+      }),
     });
     toast.show(t('user_created', 'User created successfully'), 'success');
     onDone();
@@ -45,9 +47,11 @@ const CreateUserForm = ({ onDone }: { onDone: () => void }) => {
       <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-[10px] p-[16px] pt-0">
         <Input label="Email" name="email" placeholder={t('enter_email', 'Enter email')} />
         <Input label="Password" name="password" type="password" placeholder={t('enter_password', 'Enter password')} />
-        <Select label="Role" name="role">
-          <option value="USER">{t('user', 'User')}</option>
-          <option value="ADMIN">{t('admin', 'Admin')}</option>
+        <Select label="Role" name="roleId">
+          <option value="">{t('select_role', 'Select Role')}</option>
+          {(rolesList || []).map((r: RoleItem) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
         </Select>
         <Button type="submit" className="mt-[18px]">{t('create_user', 'Create User')}</Button>
       </form>
@@ -59,13 +63,18 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
   const fetch = useFetch();
   const toast = useToaster();
   const t = useT();
+  const { data: rolesList } = useRoles();
   const resolver = useMemo(() => classValidatorResolver(AddTeamMemberDto), []);
-  const form = useForm({ values: { email: '', role: 'USER', sendEmail: true }, resolver, mode: 'onChange' });
+  const form = useForm({ values: { email: '', roleId: '', sendEmail: true }, resolver, mode: 'onChange' });
 
-  const submit = useCallback(async (values: { email: string; role: string; sendEmail: boolean }) => {
+  const submit = useCallback(async (values: { email: string; roleId: string; sendEmail: boolean }) => {
     const { url } = await (await fetch('/settings/team', {
       method: 'POST',
-      body: JSON.stringify(values),
+      body: JSON.stringify({
+        email: values.email,
+        sendEmail: values.sendEmail,
+        ...(values.roleId ? { roleId: values.roleId } : {}),
+      }),
     })).json();
     if (values.sendEmail) {
       toast.show(t('invitation_link_sent', 'Invitation link sent'), 'success');
@@ -80,9 +89,11 @@ const InviteMemberForm = ({ onDone }: { onDone: () => void }) => {
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(submit)} className="flex flex-col gap-[10px] p-[16px] pt-0">
         <Input label="Email" name="email" placeholder={t('enter_email', 'Enter email')} />
-        <Select label="Role" name="role">
+        <Select label="Role" name="roleId">
           <option value="">{t('select_role', 'Select Role')}</option>
-          {roles.map((r) => <option key={r.value} value={r.value}>{r.name}</option>)}
+          {(rolesList || []).map((r: RoleItem) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
         </Select>
         <div className="flex gap-[5px] items-center">
           <input type="checkbox" {...form.register('sendEmail')} className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary cursor-pointer" />
@@ -107,17 +118,37 @@ export const TeamsComponent = () => {
   const [page, setPage] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  const myLevel = user?.role === 'USER' ? 0 : user?.role === 'ADMIN' ? 1 : 2;
-  const getLevel = useCallback((r: 'USER' | 'ADMIN' | 'SUPERADMIN') => r === 'USER' ? 0 : r === 'ADMIN' ? 1 : 2, []);
-  const isAdmin = myLevel >= 1;
+  const { hasPermission, isOwner } = usePermissions();
+  const { data: rolesList } = useRoles();
+  const canManageMembers = hasPermission('members', 'manage');
+
+  const roleById = useMemo(() => {
+    const map = new Map<string, RoleItem>();
+    (rolesList || []).forEach((r) => map.set(r.id, r));
+    return map;
+  }, [rolesList]);
+
+  // Members can be managed when the actor has members:manage, isn't acting on
+  // themselves, and only the owner may touch another owner.
+  const canManageMember = useCallback(
+    (m: { roleId: string | null; user: { id: string } }) =>
+      canManageMembers &&
+      m.user.id !== user?.id &&
+      (isOwner || roleById.get(m.roleId || '')?.key !== 'owner'),
+    [canManageMembers, isOwner, roleById, user?.id]
+  );
 
   const loadTeam = useCallback(async () => {
     return (await (await fetch('/settings/team')).json()).users as Array<{
-      id: string;
-      role: 'SUPERADMIN' | 'ADMIN' | 'USER';
-      user: { email: string; id: string; name?: string | null; pictureId?: string | null };
+      roleId: string | null;
+      user: {
+        email: string;
+        id: string;
+        activated?: boolean;
+        profile?: { name?: string | null; pictureId?: string | null } | null;
+      };
     }>;
-  }, []);
+  }, [fetch]);
 
   const { data, mutate, isLoading, error } = useSWR('/api/teams', loadTeam, {
     revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false,
@@ -125,19 +156,19 @@ export const TeamsComponent = () => {
 
   const members = useMemo(() => {
     if (!data) return [];
-    let list = data.map((m: any, idx: number) => ({ ...m, _sortIdx: idx }));
+    let list = data.map((m, idx) => ({ ...m, _sortIdx: idx }));
 
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((m: any) => m.user.email.toLowerCase().includes(q) || (m.user.name || '').toLowerCase().includes(q));
+      list = list.filter((m) => m.user.email.toLowerCase().includes(q) || (m.user.profile?.name || '').toLowerCase().includes(q));
     }
 
     if (roleFilter !== 'all') {
-      list = list.filter((m: any) => m.role === roleFilter);
+      list = list.filter((m) => m.roleId === roleFilter);
     }
 
     if (sortBy === 'name') {
-      list.sort((a: any, b: any) => (a.user.name || a.user.email).localeCompare(b.user.name || b.user.email));
+      list.sort((a, b) => (a.user.profile?.name || a.user.email).localeCompare(b.user.profile?.name || b.user.email));
     }
 
     const start = page * PAGE_SIZE;
@@ -169,9 +200,10 @@ export const TeamsComponent = () => {
   }, [fetch, mutate, t]);
 
   const changeRole = useCallback((member: { user: { id: string } }) => async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    await fetch(`/settings/team/${member.user.id}/role`, {
+    if (!e.target.value) return;
+    await fetch(`/settings/roles/team/${member.user.id}/role`, {
       method: 'PUT',
-      body: JSON.stringify({ role: e.target.value }),
+      body: JSON.stringify({ roleId: e.target.value }),
     });
     await mutate();
   }, [fetch, mutate]);
@@ -185,11 +217,10 @@ export const TeamsComponent = () => {
     await mutate();
   }, [fetch, selected, mutate, t]);
 
-  const memberRoleDisplay = useCallback((role: string) => {
-    if (role === 'SUPERADMIN') return t('super_admin', 'Super Admin');
-    if (role === 'ADMIN') return t('admin', 'Admin');
-    return t('user', 'User');
-  }, [t]);
+  const memberRoleDisplay = useCallback((roleId: string | null) => {
+    if (!roleId) return '—';
+    return roleById.get(roleId)?.name || '—';
+  }, [roleById]);
 
   const getAvatarUrl = useCallback((email: string, name?: string | null) => {
     const displayName = name || email.split('@')[0];
@@ -211,7 +242,7 @@ export const TeamsComponent = () => {
         </div>
         <div className="flex gap-[8px]">
           <Button onClick={openInvite}>{t('invite_member', 'Invite Member')}</Button>
-          {isAdmin && <Button secondary onClick={openCreateUser}>{t('create_user', 'Create User')}</Button>}
+          {canManageMembers && <Button secondary onClick={openCreateUser}>{t('create_user', 'Create User')}</Button>}
         </div>
       </div>
 
@@ -231,8 +262,9 @@ export const TeamsComponent = () => {
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
         >
           <option value="all">{t('all_roles', 'All Roles')}</option>
-          {roles.map((r) => <option key={r.value} value={r.value}>{r.name}</option>)}
-          <option value="SUPERADMIN">{t('super_admin', 'Super Admin')}</option>
+          {(rolesList || []).map((r) => (
+            <option key={r.id} value={r.id}>{r.name}</option>
+          ))}
         </select>
         <select
           value={sortBy}
@@ -282,8 +314,8 @@ export const TeamsComponent = () => {
                   header: t('name', 'Name'),
                   render: (m: any) => (
                     <AvatarCell
-                      src={getAvatarUrl(m.user.email, m.user.name)}
-                      name={capitalize(m.user.name || m.user.email.split('@')[0]).split('.')[0]}
+                      src={getAvatarUrl(m.user.email, m.user.profile?.name)}
+                      name={capitalize(m.user.profile?.name || m.user.email.split('@')[0]).split('.')[0]}
                       subtitle={m.user.email}
                     />
                   ),
@@ -292,16 +324,19 @@ export const TeamsComponent = () => {
                   key: 'role',
                   header: t('role', 'Role'),
                   render: (m: any) =>
-                    myLevel > getLevel(m.role) && m.role !== 'SUPERADMIN' ? (
+                    canManageMember(m) ? (
                       <select
-                        value={m.role}
+                        value={m.roleId || ''}
                         onChange={changeRole(m)}
                         className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"
                       >
-                        {roles.map((r) => <option key={r.value} value={r.value}>{r.name}</option>)}
+                        {!m.roleId && <option value="">{t('select_role', 'Select Role')}</option>}
+                        {(rolesList || []).map((r) => (
+                          <option key={r.id} value={r.id}>{r.name}</option>
+                        ))}
                       </select>
                     ) : (
-                      <span className="text-newTableText">{memberRoleDisplay(m.role)}</span>
+                      <span className="text-newTableText">{memberRoleDisplay(m.roleId)}</span>
                     ),
                 },
                 {
@@ -319,7 +354,7 @@ export const TeamsComponent = () => {
                   header: t('actions', 'Actions'),
                   align: 'right',
                   render: (m: any) =>
-                    myLevel > getLevel(m.role) ? (
+                    canManageMember(m) ? (
                       <button onClick={remove(m)} className="text-[12px] text-red-400 hover:text-red-300 transition-colors">
                         {t('remove', 'Remove')}
                       </button>

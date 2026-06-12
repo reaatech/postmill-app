@@ -56,7 +56,6 @@ export class PermissionsService {
       }
       return build({
         detectSubjectType: (item) =>
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-ignore
           item.constructor,
       });
@@ -126,14 +125,6 @@ export class PermissionsService {
         continue;
       }
 
-      if (
-        section === Sections.ADMIN &&
-        ['ADMIN', 'SUPERADMIN'].includes(permission)
-      ) {
-        can(action, section);
-        continue;
-      }
-
       // Media management is not a billed dimension — any authenticated org
       // member may manage their org's media. The guard still enforces auth +
       // org resolution; this branch just keeps MEDIA from being paywalled.
@@ -168,12 +159,17 @@ export class PermissionsService {
         options.import_from_channels
       ) {
         can(action, section);
+        continue;
+      }
+
+      if (section === Sections.ADMIN) {
+        can(action, section);
+        continue;
       }
     }
 
     return build({
       detectSubjectType: (item) =>
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
         // @ts-ignore
         item.constructor,
     });

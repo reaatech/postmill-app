@@ -3,6 +3,7 @@ import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/databa
 import { ApiModule } from '@gitroom/backend/api/api.module';
 import { APP_GUARD } from '@nestjs/core';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { PublicApiModule } from '@gitroom/backend/public-api/public.api.module';
 import { ThrottlerBehindProxyGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -20,11 +21,13 @@ import { InfiniteWorkflowRegisterModule } from '@gitroom/nestjs-libraries/tempor
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Global()
 @Module({
   imports: [
     SentryModule.forRoot(),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     ApiModule,
     PublicApiModule,
@@ -64,6 +67,10 @@ import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
     {
       provide: APP_GUARD,
       useClass: PoliciesGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: OrgRbacGuard,
     },
   ],
   exports: [

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -9,9 +9,12 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { Request } from 'express';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 @ApiTags('Billing')
 @Controller('/billing')
+@UseGuards(OrgRbacGuard)
 export class BillingController {
   constructor(
     private _subscriptionService: SubscriptionService,
@@ -143,52 +146,37 @@ export class BillingController {
   }
 
   @Get('/charges')
+  @RequirePermission('billing', 'manage')
   async getCharges(
-    @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization
   ) {
-    if (!user.isSuperAdmin) {
-      throw new HttpException('Unauthorized', 400);
-    }
-
     return this._stripeService.getCharges(org.id);
   }
 
   @Post('/refund-charges')
+  @RequirePermission('billing', 'manage')
   async refundCharges(
-    @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization,
     @Body() body: { chargeIds: string[] }
   ) {
-    if (!user.isSuperAdmin) {
-      throw new HttpException('Unauthorized', 400);
-    }
-
     return this._stripeService.refundCharges(org.id, body.chargeIds);
   }
 
   @Post('/cancel-subscription')
+  @RequirePermission('billing', 'manage')
   async cancelSubscription(
-    @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization
   ) {
-    if (!user.isSuperAdmin) {
-      throw new HttpException('Unauthorized', 400);
-    }
-
     return this._stripeService.cancelSubscription(org.id);
   }
 
   @Post('/add-subscription')
+  @RequirePermission('billing', 'manage')
   async addSubscription(
     @Body() body: { subscription: string },
     @GetUserFromRequest() user: User,
     @GetOrgFromRequest() org: Organization
   ) {
-    if (!user.isSuperAdmin) {
-      throw new Error('Unauthorized');
-    }
-
     await this._subscriptionService.addSubscription(
       org.id,
       user.id,

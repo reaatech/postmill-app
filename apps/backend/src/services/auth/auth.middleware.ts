@@ -40,7 +40,9 @@ export class AuthMiddleware implements NestMiddleware {
       // Verify the JWT signature only. Never trust authorization-relevant
       // claims (id, isSuperAdmin, activated) from the token body — always
       // re-resolve the user from the database using the id.
-      const payload = AuthService.verifyJWT(auth) as User | null;
+      const payload = AuthService.verifyJWT(auth) as
+        | (User & { exp?: number })
+        | null;
       const orgHeader = req.cookies.showorg || req.headers.showorg;
 
       if (!payload?.id) {
@@ -68,16 +70,13 @@ export class AuthMiddleware implements NestMiddleware {
           user.isSuperAdmin = true;
           delete user.password;
 
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-expect-error
           req.user = user;
 
-          // @ts-ignore
           loadImpersonate.organization.users =
             loadImpersonate.organization.users.filter(
               (f) => f.userId === user.id
             );
-          // eslint-disable-next-line @typescript-eslint/ban-ts-comment
           // @ts-expect-error
           req.org = loadImpersonate.organization;
           next();
@@ -96,17 +95,15 @@ export class AuthMiddleware implements NestMiddleware {
         throw new HttpForbiddenException();
       }
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       req.user = user;
 
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
       // @ts-expect-error
       req.org = setOrg;
       // Sliding re-issue: if token is within 7 days of expiry, re-issue a new 30-day token
-      const expMs = (payload as any)?.exp;
+      const expMs = payload?.exp;
       if (expMs && expMs * 1000 - Date.now() < 7 * 24 * 60 * 60 * 1000) {
-        const newJwt = AuthService.signJWT(user as any);
+        const newJwt = AuthService.signJWT(user);
         res.cookie('auth', newJwt, {
           domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
           ...(!process.env.NOT_SECURED

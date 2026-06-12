@@ -5,7 +5,12 @@ export abstract class AuthProviderAbstract {
   abstract getToken(code: string, redirectUri?: string): Promise<string>;
   abstract getUser(
     providerToken: string
-  ): Promise<{ email: string; id: string }> | false;
+  ): Promise<{
+    email: string;
+    id: string;
+    picture?: string | null;
+    name?: string | null;
+  }> | false;
   async postRegistration(
     providerToken: string,
     orgId: string

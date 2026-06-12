@@ -58,11 +58,14 @@ export class PublicAuthMiddleware implements NestMiddleware {
         const userOrg = apiKey.user.organizations?.find(
           (o) => o.organizationId === apiKey.organizationId,
         );
-        const role =
-          userOrg?.role ??
-          (apiKey.user.isSuperAdmin ? 'SUPERADMIN' : 'USER');
+        const roleKey =
+          userOrg?.roleRef?.key ??
+          (apiKey.user.isSuperAdmin ? 'owner' : 'member');
         // @ts-ignore
-        req.org = { ...apiKey.organization, users: [{ users: { role } }] };
+        req.org = {
+          ...apiKey.organization,
+          users: [{ roleId: userOrg?.roleId ?? undefined, users: { role: roleKey } }],
+        };
         // @ts-ignore
         req.user = apiKey.user;
 

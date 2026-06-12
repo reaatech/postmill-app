@@ -3,6 +3,7 @@ import {
   IsDefined,
   IsEmail,
   IsIn,
+  IsOptional,
   IsString,
   ValidateIf,
 } from 'class-validator';
@@ -13,9 +14,15 @@ export class AddTeamMemberDto {
   @ValidateIf((o) => o.sendEmail)
   email: string;
 
+  /** @deprecated Use roleId instead */
+  @IsOptional()
   @IsString()
   @IsIn(['USER', 'ADMIN'])
-  role: string;
+  role?: string;
+
+  @IsOptional()
+  @IsString()
+  roleId?: string;
 
   @IsDefined()
   @IsBoolean()

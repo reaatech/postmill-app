@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import type { Mock } from 'vitest';
 import { HttpStatus } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import * as crypto from 'crypto';
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service', () => ({
@@ -25,18 +27,30 @@ import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/excep
 const sha256 = (value: string) =>
   crypto.createHash('sha256').update(value).digest('hex');
 
+type PublicRequest = Request & {
+  org: { id?: string; users: { users: { role: string } }[] };
+  user: unknown;
+};
+
+type MockResponse = Response & {
+  status: Mock<(code: number) => MockResponse>;
+  json: Mock<(body: unknown) => MockResponse>;
+};
+
 function mockRes() {
   return {
     status: vi.fn().mockReturnThis(),
     json: vi.fn().mockReturnThis(),
-  } as any;
+  } as unknown as MockResponse;
 }
 
 function mockReq(authorization?: string) {
-  return { headers: authorization ? { authorization } : {} } as any;
+  return {
+    headers: authorization ? { authorization } : {},
+  } as unknown as PublicRequest;
 }
 
-function makeApiKey(overrides: Record<string, any> = {}) {
+function makeApiKey(overrides: Record<string, unknown> = {}) {
   return {
     id: 'key-1',
     organizationId: 'org-1',
@@ -49,7 +63,14 @@ function makeApiKey(overrides: Record<string, any> = {}) {
       id: 'user-1',
       email: 'user@example.com',
       isSuperAdmin: false,
-      organizations: [{ organizationId: 'org-1', userId: 'user-1', role: 'ADMIN' }],
+      organizations: [
+        {
+          organizationId: 'org-1',
+          userId: 'user-1',
+          roleId: 'role-admin',
+          roleRef: { id: 'role-admin', key: 'admin' },
+        },
+      ],
     },
     ...overrides,
   };
@@ -62,7 +83,7 @@ describe('PublicAuthMiddleware', () => {
     touchLastUsed: ReturnType<typeof vi.fn>;
   };
   let middleware: PublicAuthMiddleware;
-  let next: ReturnType<typeof vi.fn>;
+  let next: Mock<(err?: unknown) => void>;
   const originalStripeKey = process.env.STRIPE_SECRET_KEY;
 
   beforeEach(() => {
@@ -72,10 +93,10 @@ describe('PublicAuthMiddleware', () => {
       findActiveByHash: vi.fn(),
       touchLastUsed: vi.fn().mockResolvedValue({ count: 1 }),
     };
-    next = vi.fn();
+    next = vi.fn<(err?: unknown) => void>();
     middleware = new PublicAuthMiddleware(
-      oauthService as any,
-      apiKeysService as any,
+      oauthService as unknown as ConstructorParameters<typeof PublicAuthMiddleware>[0],
+      apiKeysService as unknown as ConstructorParameters<typeof PublicAuthMiddleware>[1],
     );
   });
 
@@ -119,7 +140,14 @@ describe('PublicAuthMiddleware', () => {
       user: {
         id: 'user-1',
         isSuperAdmin: true, // must NOT win over the real membership role
-        organizations: [{ organizationId: 'org-1', userId: 'user-1', role: 'ADMIN' }],
+        organizations: [
+          {
+            organizationId: 'org-1',
+            userId: 'user-1',
+            roleId: 'role-admin',
+            roleRef: { id: 'role-admin', key: 'admin' },
+          },
+        ],
       },
     });
     apiKeysService.findActiveByHash.mockResolvedValue(apiKey);
@@ -130,10 +158,10 @@ describe('PublicAuthMiddleware', () => {
 
     expect(res.status).not.toHaveBeenCalled();
     expect(next).toHaveBeenCalledTimes(1);
-    expect((req as any).org.id).toBe('org-1');
-    expect((req as any).org.users[0].users.role).toBe('ADMIN');
-    expect((req as any).org.users[0].users.role).not.toBe('SUPERADMIN');
-    expect((req as any).user).toBe(apiKey.user);
+    expect(req.org.id).toBe('org-1');
+    expect(req.org.users[0].users.role).toBe('admin');
+    expect(req.org.users[0].users.role).not.toBe('owner');
+    expect(req.user).toBe(apiKey.user);
     expect(apiKeysService.touchLastUsed).toHaveBeenCalledWith('key-1');
   });
 
@@ -143,8 +171,8 @@ describe('PublicAuthMiddleware', () => {
         id: 'user-1',
         isSuperAdmin: false,
         organizations: [
-          { organizationId: 'other-org', userId: 'user-1', role: 'SUPERADMIN' },
-          { organizationId: 'org-1', userId: 'user-1', role: 'USER' },
+          { organizationId: 'other-org', userId: 'user-1', roleId: 'role-owner', roleRef: { id: 'role-owner', key: 'owner' } },
+          { organizationId: 'org-1', userId: 'user-1', roleId: 'role-member', roleRef: { id: 'role-member', key: 'member' } },
         ],
       },
     });
@@ -154,11 +182,11 @@ describe('PublicAuthMiddleware', () => {
 
     await middleware.use(req, res, next);
 
-    expect((req as any).org.users[0].users.role).toBe('USER');
+    expect(req.org.users[0].users.role).toBe('member');
     expect(next).toHaveBeenCalled();
   });
 
-  it('falls back to SUPERADMIN when the user has no UserOrganization but isSuperAdmin', async () => {
+  it('falls back to owner when the user has no UserOrganization but isSuperAdmin', async () => {
     const apiKey = makeApiKey({
       user: { id: 'user-1', isSuperAdmin: true, organizations: [] },
     });
@@ -168,11 +196,11 @@ describe('PublicAuthMiddleware', () => {
 
     await middleware.use(req, res, next);
 
-    expect((req as any).org.users[0].users.role).toBe('SUPERADMIN');
+    expect(req.org.users[0].users.role).toBe('owner');
     expect(next).toHaveBeenCalled();
   });
 
-  it('falls back to USER when the user has no UserOrganization and is not a super admin', async () => {
+  it('falls back to member when the user has no UserOrganization and is not a super admin', async () => {
     const apiKey = makeApiKey({
       user: { id: 'user-1', isSuperAdmin: false, organizations: [] },
     });
@@ -182,7 +210,7 @@ describe('PublicAuthMiddleware', () => {
 
     await middleware.use(req, res, next);
 
-    expect((req as any).org.users[0].users.role).toBe('USER');
+    expect(req.org.users[0].users.role).toBe('member');
     expect(next).toHaveBeenCalled();
   });
 
@@ -197,7 +225,7 @@ describe('PublicAuthMiddleware', () => {
 
     expect(oauthService.getOrgByOAuthToken).toHaveBeenCalledWith('pos_oauthtoken');
     expect(apiKeysService.findActiveByHash).not.toHaveBeenCalled();
-    expect((req as any).org.users[0].users.role).toBe('SUPERADMIN');
+    expect(req.org.users[0].users.role).toBe('SUPERADMIN');
     expect(next).toHaveBeenCalled();
   });
 

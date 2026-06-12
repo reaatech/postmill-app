@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Provider, User } from '@prisma/client';
+import { Provider, User, UserOrganization } from '@prisma/client';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { LoginUserDto } from '@gitroom/nestjs-libraries/dtos/auth/login.user.dto';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -11,6 +11,7 @@ import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/n
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
+import crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
@@ -21,6 +22,49 @@ export class AuthService {
     private _emailService: EmailService,
     private _providerManager: AuthProviderManager
   ) {}
+
+  private generateRefreshToken(): string {
+    return crypto.randomBytes(64).toString('hex');
+  }
+
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
+  async createSession(userId: string, ip: string, userAgent: string) {
+    const refreshToken = this.generateRefreshToken();
+    const tokenHash = this.hashToken(refreshToken);
+
+    await this._userService.createSession({
+      userId,
+      tokenHash,
+      expiresAt: dayjs().add(30, 'day').toDate(),
+      ip,
+      userAgent,
+    });
+
+    return refreshToken;
+  }
+
+  private async handleProviderPicture(
+    userId: string,
+    email: string,
+    pictureUrl?: string | null
+  ) {
+    let avatarUrl: string | null = null;
+
+    if (pictureUrl) {
+      avatarUrl = pictureUrl;
+    } else if (email) {
+      const md5 = crypto.createHash('md5').update(email.toLowerCase().trim()).digest('hex');
+      avatarUrl = `https://www.gravatar.com/avatar/${md5}?d=404&s=200`;
+    }
+
+    if (avatarUrl) {
+      await this._userService.updateUserAvatar(userId, avatarUrl);
+    }
+  }
+
   async canRegister(provider: string) {
     if (
       process.env.DISABLE_REGISTRATION !== 'true' ||
@@ -37,8 +81,11 @@ export class AuthService {
     body: CreateOrgUserDto | LoginUserDto,
     ip: string,
     userAgent: string,
-    addToOrg?: boolean | { orgId: string; role: 'USER' | 'ADMIN'; id: string }
+    addToOrg?: boolean | { orgId: string; role: 'USER' | 'ADMIN'; id: string; roleId?: string }
   ) {
+    let user: User;
+    let addedOrg: UserOrganization | false = false;
+
     if (provider === Provider.LOCAL) {
       if (process.env.DISALLOW_PLUS && body.email.includes('+')) {
         throw new Error('Email with plus sign is not allowed');
@@ -46,9 +93,9 @@ export class AuthService {
       if (body instanceof CreateOrgUserDto) {
         body.email = body.email.toLowerCase();
       }
-      const user = await this._userService.getUserByEmail(body.email);
+      const existingUser = await this._userService.getUserByEmail(body.email);
       if (body instanceof CreateOrgUserDto) {
-        if (user) {
+        if (existingUser) {
           throw new Error('Email already exists');
         }
 
@@ -62,54 +109,64 @@ export class AuthService {
           userAgent
         );
 
-        const addedOrg =
+        addedOrg =
           addToOrg && typeof addToOrg !== 'boolean'
             ? await this._organizationService.addUserToOrg(
                 create.users[0].user.id,
                 addToOrg.id,
                 addToOrg.orgId,
-                addToOrg.role
+                addToOrg.role,
+                addToOrg.roleId,
               )
             : false;
 
-        const obj = { addedOrg, jwt: await this.jwt(create.users[0].user) };
+        user = create.users[0].user;
+
+        const jwt = await this.jwt(user);
+        const refreshToken = await this.createSession(user.id, ip, userAgent);
+
         await this._emailService.sendEmail(
           body.email,
           'Activate your account',
-          `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${obj.jwt}">here</a> to activate your account`,
+          `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`,
           'top'
         );
-        return obj;
+        return { addedOrg, jwt, refreshToken };
       }
 
-      if (!user || !AuthChecker.comparePassword(body.password, user.password)) {
+      if (!existingUser || !AuthChecker.comparePassword(body.password, existingUser.password)) {
         throw new Error('Invalid user name or password');
       }
 
-      if (!user.activated) {
+      if (!existingUser.activated) {
         throw new Error('User is not activated');
       }
 
-      return { addedOrg: false, jwt: await this.jwt(user) };
+      user = existingUser;
+    } else {
+      user = await this.loginOrRegisterProvider(
+        provider,
+        body as CreateOrgUserDto,
+        ip,
+        userAgent
+      );
     }
 
-    const user = await this.loginOrRegisterProvider(
-      provider,
-      body as CreateOrgUserDto,
-      ip,
-      userAgent
-    );
-
-    const addedOrg =
+    addedOrg =
       addToOrg && typeof addToOrg !== 'boolean'
         ? await this._organizationService.addUserToOrg(
             user.id,
             addToOrg.id,
             addToOrg.orgId,
-            addToOrg.role
+            addToOrg.role,
+            addToOrg.roleId,
           )
         : false;
-    return { addedOrg, jwt: await this.jwt(user) };
+
+    const jwt = await this.jwt(user);
+    const refreshToken = await this.createSession(user.id, ip, userAgent);
+
+    return { addedOrg, jwt, refreshToken };
   }
 
   public getOrgFromCookie(cookie?: string) {
@@ -126,6 +183,7 @@ export class AuthService {
       return getOrg as {
         email: string;
         role: 'USER' | 'ADMIN';
+        roleId?: string;
         orgId: string;
         id: string;
       };
@@ -167,6 +225,8 @@ export class AuthService {
         provider,
         providerId: providerUser.id,
         datafast_visitor_id: body.datafast_visitor_id,
+        name: providerUser.name || body.name || undefined,
+        lastName: body.lastName || undefined,
       },
       ip,
       userAgent
@@ -186,7 +246,12 @@ export class AuthService {
       // Don't fail registration if postRegistration fails
     }
 
-    return create.users[0].user;
+    // Handle provider picture
+    const newUser = create.users[0].user;
+    const pictureUrl = providerUser.picture ?? null;
+    await this.handleProviderPicture(newUser.id, newUser.email, pictureUrl);
+
+    return newUser;
   }
 
   private async _track(
@@ -259,7 +324,7 @@ export class AuthService {
       user.activated = true;
       this._track('register', user.email, tracking).catch((err) => {});
       await NewsletterService.register(user.email);
-      return this.jwt(user as any);
+      return this.jwt(user);
     }
 
     return false;
@@ -305,13 +370,82 @@ export class AuthService {
       provider as Provider
     );
     if (checkExists) {
-      return { jwt: await this.jwt(checkExists) };
+      const jwt = await this.jwt(checkExists);
+      return { jwt, userId: checkExists.id };
     }
 
-    return { token };
+    return { token, userId: undefined as string | undefined };
   }
 
-  private async jwt(user: User) {
+  async refreshAccessToken(refreshToken: string, ip: string, userAgent: string) {
+    const tokenHash = this.hashToken(refreshToken);
+    const session = await this._userService.findSessionByTokenHash(tokenHash);
+
+    if (!session) {
+      // Reuse of a rotated-out token revokes the live session it belonged to.
+      const rotatedSession =
+        await this._userService.findSessionByPreviousTokenHash(tokenHash);
+      if (rotatedSession && !rotatedSession.revokedAt) {
+        await this._userService.revokeSession(rotatedSession.id);
+        throw new Error('Refresh token reuse detected — session revoked');
+      }
+      throw new Error('Invalid refresh token');
+    }
+
+    if (session.revokedAt) {
+      throw new Error('Refresh token has been revoked');
+    }
+
+    if (session.expiresAt < new Date()) {
+      await this._userService.revokeSession(session.id);
+      throw new Error('Refresh token has expired');
+    }
+
+    // Rotate: generate new token, update session
+    const newRefreshToken = this.generateRefreshToken();
+    const newTokenHash = this.hashToken(newRefreshToken);
+
+    await this._userService.rotateSessionToken(
+      session.id,
+      newTokenHash,
+      session.tokenHash,
+      ip,
+      userAgent
+    );
+
+    // Issue new JWT
+    const user = await this._userService.getUserById(session.userId);
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return { jwt: await this.jwt(user), refreshToken: newRefreshToken };
+  }
+
+  async getUserSessions(userId: string) {
+    return this._userService.getUserSessions(userId);
+  }
+
+  async revokeSession(userId: string, sessionId: string) {
+    const session = await this._userService.getSessionById(sessionId);
+    if (!session || session.userId !== userId) {
+      throw new Error('Session not found');
+    }
+    await this._userService.revokeSession(sessionId);
+  }
+
+  async revokeAllSessions(userId: string, currentTokenHash?: string) {
+    if (currentTokenHash) {
+      return this._userService.revokeAllSessionsExcept(userId, currentTokenHash);
+    }
+    return this._userService.revokeAllUserSessions(userId);
+  }
+
+  async getSessionByTokenHash(tokenHash: string) {
+    return this._userService.findSessionByTokenHash(tokenHash);
+  }
+
+  private async jwt(user: Partial<User> & Pick<User, 'id'>) {
     if (user.password) {
       delete user.password;
     }

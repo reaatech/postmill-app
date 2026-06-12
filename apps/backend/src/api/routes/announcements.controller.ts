@@ -6,15 +6,18 @@ import {
   HttpException,
   Param,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { AnnouncementsService } from '@gitroom/nestjs-libraries/database/prisma/announcements/announcements.service';
 import { AnnouncementDto } from '@gitroom/nestjs-libraries/dtos/announcements/announcements.dto';
+import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 
 @ApiTags('Announcements')
 @Controller('/announcements')
+@UseGuards(OrgRbacGuard)
 export class AnnouncementsController {
   constructor(private _announcementsService: AnnouncementsService) {}
 

@@ -6,8 +6,14 @@ import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.te
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { Organization, Role, ShortLinkPreference } from '@prisma/client';
+import { Organization, ShortLinkPreference } from '@prisma/client';
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
+
+// The org attached to the request carries the caller's membership row
+// (see org.from.request decorator) — surface just the roleId we read here.
+type OrganizationWithMembership = Organization & {
+  users?: { roleId: string | null }[];
+};
 
 @Injectable()
 export class OrganizationService {
@@ -21,7 +27,7 @@ export class OrganizationService {
     userAgent: string
   ) {
     return this._organizationRepository.createOrgAndUser(
-      body,
+      { ...body, name: body.name, lastName: body.lastName },
       this._notificationsService.hasEmailProvider(),
       ip,
       userAgent
@@ -44,9 +50,10 @@ export class OrganizationService {
     userId: string,
     id: string,
     orgId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    roleId?: string,
   ) {
-    return this._organizationRepository.addUserToOrg(userId, id, orgId, role);
+    return this._organizationRepository.addUserToOrg(userId, id, orgId, role, roleId);
   }
 
   getOrgById(id: string) {
@@ -65,9 +72,9 @@ export class OrganizationService {
     return this._organizationRepository.getTeam(orgId);
   }
 
-  async createTeamUser(orgId: string, email: string, password: string, userRole: string) {
-    const role = userRole === 'ADMIN' ? Role.ADMIN : Role.USER;
-    return this._organizationRepository.createTeamUser(orgId, email, password, role);
+  async createTeamUser(orgId: string, email: string, password: string, userRole: string, roleId?: string) {
+    const roleKey = userRole === 'ADMIN' ? 'admin' : 'member';
+    return this._organizationRepository.createTeamUser(orgId, email, password, roleKey, roleId);
   }
 
   async setStreak(organizationId: string, type: 'start' | 'end') {
@@ -101,11 +108,12 @@ export class OrganizationService {
       throw new Error('User is not part of this organization');
     }
 
-    // @ts-ignore
-    const myRole = org.users[0].role;
-    const userRole = findOrgToDelete.users[0].role;
-    const myLevel = myRole === 'USER' ? 0 : myRole === 'ADMIN' ? 1 : 2;
-    const userLevel = userRole === 'USER' ? 0 : userRole === 'ADMIN' ? 1 : 2;
+    const myRole = (org as OrganizationWithMembership).users?.[0]?.roleId;
+    const userRole = findOrgToDelete.users?.[0]?.roleId;
+    const ownerRole = await this._organizationRepository.getOwnerRoleId();
+    const isOwner = (id: string | null | undefined) => id === ownerRole;
+    const myLevel = isOwner(myRole) ? 2 : myRole ? 1 : 0;
+    const userLevel = isOwner(userRole) ? 2 : userRole ? 1 : 0;
 
     if (myLevel < userLevel) {
       throw new Error('You do not have permission to delete this user');
@@ -117,7 +125,8 @@ export class OrganizationService {
   async changeTeamMemberRole(
     org: Organization,
     userId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    roleId?: string,
   ) {
     const userOrgs = await this._organizationRepository.getOrgsByUserId(userId);
     const findOrg = userOrgs.find((orgUser) => orgUser.id === org.id);
@@ -125,22 +134,24 @@ export class OrganizationService {
       throw new Error('User is not part of this organization');
     }
 
-    // @ts-ignore
-    const myRole = org.users[0].role;
-    // @ts-ignore
-    const userRole = findOrg.users[0].role;
-    const myLevel = myRole === 'USER' ? 0 : myRole === 'ADMIN' ? 1 : 2;
-    const userLevel = userRole === 'USER' ? 0 : userRole === 'ADMIN' ? 1 : 2;
+    const myRole = (org as OrganizationWithMembership).users?.[0]?.roleId;
+    const userRole = findOrg.users?.[0]?.roleId;
+    const ownerRole = await this._organizationRepository.getOwnerRoleId();
+    const isOwner = (id: string | null | undefined) => id === ownerRole;
+    const myLevel = isOwner(myRole) ? 2 : myRole ? 1 : 0;
+    const userLevel = isOwner(userRole) ? 2 : userRole ? 1 : 0;
 
     // Only act on members strictly below you, and never promote above your own level.
-    if (myLevel <= userLevel || myLevel <= (role === 'ADMIN' ? 1 : 0)) {
+    const targetLevel = role === 'ADMIN' ? 1 : 0;
+    if (myLevel <= userLevel || myLevel <= targetLevel) {
       throw new Error('You do not have permission to change this user role');
     }
 
     return this._organizationRepository.changeTeamMemberRole(
       org.id,
       userId,
-      role
+      role,
+      roleId,
     );
   }
 

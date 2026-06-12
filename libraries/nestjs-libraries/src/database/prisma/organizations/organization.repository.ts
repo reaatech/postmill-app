@@ -1,5 +1,5 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { Role, ShortLinkPreference, SubscriptionTier, Provider } from '@prisma/client';
+import { ShortLinkPreference, SubscriptionTier, Provider, StorageProviderType } from '@prisma/client';
 import { Injectable } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
@@ -10,10 +10,12 @@ export class OrganizationRepository {
   constructor(
     private _organization: PrismaRepository<'organization'>,
     private _userOrg: PrismaRepository<'userOrganization'>,
-    private _user: PrismaRepository<'user'>
+    private _user: PrismaRepository<'user'>,
+    private _storage: PrismaRepository<'storageProviderConfig'>,
+    private _appRole: PrismaRepository<'appRole'>
   ) {}
 
-  createMaxUser(id: string, name: string, saasName: string, email: string) {
+  async createMaxUser(id: string, name: string, saasName: string, email: string) {
     return this._organization.model.organization.create({
       select: {
         id: true,
@@ -31,19 +33,28 @@ export class OrganizationRepository {
         },
         users: {
           create: {
-            role: Role.SUPERADMIN,
+            roleRef: { connect: { organizationId_key: { organizationId: null, key: 'owner' } } },
             user: {
               create: {
                 activated: true,
                 email: email
                   ? email.split('@').join(`+${saasName}@`)
                   : `${saasName}+` + makeId(10) + '@postiz.com',
-                name: name ? `${name}###${id}` : `Unnamed User###${id}`,
                 providerName: 'LOCAL',
                 password: AuthService.hashPassword(makeId(500)),
-                timezone: 0,
+                profile: {
+                  create: {
+                    name: name ? `${name}###${id}` : `Unnamed User###${id}`,
+                  },
+                },
               },
             },
+          },
+        },
+        storageProviders: {
+          create: {
+            type: StorageProviderType.LOCAL,
+            name: 'Local Storage',
           },
         },
       },
@@ -73,7 +84,7 @@ export class OrganizationRepository {
               select: {
                 id: true,
                 disabled: true,
-                role: true,
+                roleId: true,
                 userId: true,
               },
             },
@@ -103,8 +114,10 @@ export class OrganizationRepository {
             user: {
               OR: [
                 {
-                  name: {
-                    contains: name,
+                  profile: {
+                    name: {
+                      contains: name,
+                    },
                   },
                 },
                 {
@@ -132,8 +145,12 @@ export class OrganizationRepository {
         user: {
           select: {
             id: true,
-            name: true,
             email: true,
+            profile: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },
@@ -156,7 +173,7 @@ export class OrganizationRepository {
           },
           select: {
             disabled: true,
-            role: true,
+            roleId: true,
           },
         },
         subscription: {
@@ -183,7 +200,8 @@ export class OrganizationRepository {
     userId: string,
     id: string,
     orgId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    roleId?: string,
   ) {
     const checkIfInviteExists = await this._user.model.user.findFirst({
       where: {
@@ -213,9 +231,15 @@ export class OrganizationRepository {
       return false;
     }
 
+    const appRole = roleId
+      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
+      : await this._appRole.model.appRole.findFirst({
+          where: { organizationId: null, key: role === 'ADMIN' ? 'admin' : 'member', isSystem: true },
+        });
+
     const create = await this._userOrg.model.userOrganization.create({
       data: {
-        role,
+        roleId: appRole?.id,
         userId,
         organizationId: orgId,
       },
@@ -234,7 +258,7 @@ export class OrganizationRepository {
   }
 
   async createOrgAndUser(
-    body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string },
+    body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string; name?: string; lastName?: string },
     hasEmail: boolean,
     ip: string,
     userAgent: string
@@ -246,7 +270,7 @@ export class OrganizationRepository {
         isTrailing: true,
         users: {
           create: {
-            role: Role.SUPERADMIN,
+            roleRef: { connect: { organizationId_key: { organizationId: null, key: 'owner' } } },
             user: {
               create: {
                 activated: body.provider !== 'LOCAL' || !hasEmail,
@@ -256,11 +280,22 @@ export class OrganizationRepository {
                   : '',
                 providerName: body.provider,
                 providerId: body.providerId || '',
-                timezone: 0,
                 ip,
                 agent: userAgent,
+                profile: {
+                  create: {
+                    name: body.name || null,
+                    lastName: body.lastName || null,
+                  },
+                },
               },
             },
+          },
+        },
+        storageProviders: {
+          create: {
+            type: StorageProviderType.LOCAL,
+            name: 'Local Storage',
           },
         },
       },
@@ -268,7 +303,11 @@ export class OrganizationRepository {
         id: true,
         users: {
           select: {
-            user: true,
+            user: {
+              include: {
+                profile: true,
+              },
+            },
           },
         },
       },
@@ -302,26 +341,31 @@ export class OrganizationRepository {
     } catch (err) {}
   }
 
-  async createTeamUser(orgId: string, email: string, password: string, role: Role) {
+  async createTeamUser(orgId: string, email: string, password: string, roleKey: string, roleId?: string) {
     const user = await this._user.model.user.create({
       data: {
         email,
         password: AuthService.hashPassword(password),
         providerName: Provider.LOCAL,
-        timezone: 0,
         activated: true,
       },
     });
+
+    const appRole = roleId
+      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
+      : await this._appRole.model.appRole.findFirst({
+          where: { organizationId: null, key: roleKey, isSystem: true },
+        });
 
     await this._userOrg.model.userOrganization.create({
       data: {
         userId: user.id,
         organizationId: orgId,
-        role,
+        roleId: appRole?.id,
       },
     });
 
-    return { id: user.id, email: user.email, role };
+    return { id: user.id, email: user.email, role: appRole?.key ?? roleKey };
   }
 
   async getTeam(orgId: string) {
@@ -332,16 +376,20 @@ export class OrganizationRepository {
       select: {
         users: {
           select: {
-            role: true,
+            roleId: true,
             user: {
               select: {
                 email: true,
                 id: true,
-                name: true,
-                pictureId: true,
-                sendSuccessEmails: true,
-                sendFailureEmails: true,
-                sendStreakEmails: true,
+                profile: {
+                  select: {
+                    name: true,
+                    pictureId: true,
+                    sendSuccessEmails: true,
+                    sendFailureEmails: true,
+                    sendStreakEmails: true,
+                  },
+                },
               },
             },
           },
@@ -362,8 +410,12 @@ export class OrganizationRepository {
               select: {
                 email: true,
                 id: true,
-                sendSuccessEmails: true,
-                sendFailureEmails: true,
+                profile: {
+                  select: {
+                    sendSuccessEmails: true,
+                    sendFailureEmails: true,
+                  },
+                },
               },
             },
           },
@@ -386,8 +438,14 @@ export class OrganizationRepository {
   async changeTeamMemberRole(
     orgId: string,
     userId: string,
-    role: 'USER' | 'ADMIN'
+    role: 'USER' | 'ADMIN',
+    roleId?: string,
   ) {
+    const appRole = roleId
+      ? await this._appRole.model.appRole.findUnique({ where: { id: roleId } })
+      : await this._appRole.model.appRole.findFirst({
+          where: { organizationId: null, key: role === 'ADMIN' ? 'admin' : 'member', isSystem: true },
+        });
     return this._userOrg.model.userOrganization.update({
       where: {
         userId_organizationId: {
@@ -395,16 +453,26 @@ export class OrganizationRepository {
           organizationId: orgId,
         },
       },
-      data: { role },
+      data: { roleId: appRole?.id },
     });
   }
 
-  disableOrEnableNonSuperAdminUsers(orgId: string, disable: boolean) {
+  async getOwnerRoleId() {
+    const role = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+    });
+    return role?.id || '';
+  }
+
+  async disableOrEnableNonSuperAdminUsers(orgId: string, disable: boolean) {
+    const ownerRole = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+    });
     return this._userOrg.model.userOrganization.updateMany({
       where: {
         organizationId: orgId,
-        role: {
-          not: Role.SUPERADMIN,
+        roleId: {
+          not: ownerRole?.id || '',
         },
       },
       data: {
