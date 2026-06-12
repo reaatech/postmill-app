@@ -216,6 +216,32 @@ post's `campaignId`.
 **Storage Provider**
 A media storage backend configured per organization. Supports S3, R2, B2, IDrive e2, and local
 disk. Configured via `StorageProviderConfig` in Settings → Storage with per-folder routing and
-a 5 GB default quota.
+a 5 GB default quota (`LOCAL_STORAGE_QUOTA_GB`).
 
-> Verified against v3.7.0
+**Role (AppRole)**
+An RBAC role assigned to an org membership (v3.8.10). Five system roles are seeded —
+`owner`, `admin`, `editor`, `member`, `viewer` — and organizations can define custom roles. A
+role carries fine-grained `(resource, action)` permissions; routes gate on them with
+`@RequirePermission` (HTTP 403 on failure).
+
+**Super-admin**
+The platform operator flag (`User.isSuperAdmin`) — a different axis from the org `owner` role.
+Grants access to platform surfaces (`/admin`, AI admin settings, impersonation) and bypasses
+RBAC, but not billing gates.
+
+**Session**
+A login session backing refresh-token rotation (v3.8.10). Stores only the SHA-256 hash of the
+refresh token; rotated on every refresh, revoked on logout or token reuse. Backs the per-user
+device list.
+
+**Brand**
+A brand voice profile (`AIBrandProfile`) — instructions, language, and per-platform overrides
+injected into AI generation. Since v3.8.10 an org can have many brands with one default;
+individual posts can select a brand (`Post.brandId`).
+
+**Media Provider**
+An AI media-generation backend (fal.ai, Runway, ElevenLabs, HeyGen, …) configured per
+organization via `MediaProviderConfig` (v3.8.10), with credentials encrypted at rest and output
+bound to the tenant's own storage under typed folders.
+
+> Verified against v3.8.10

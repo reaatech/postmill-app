@@ -7,12 +7,15 @@ channel, and scheduling your first post.
 
 Visit your Postmill instance and complete the signup form. You will need:
 
+- Your name
 - An email address
 - A secure password
 - Your organization name
 
 After registration, check your email for the activation link. Click it to verify your account and
-log in.
+log in. The first user of an organization becomes its **Owner** (full access including billing —
+see [team roles](./settings.md#teams-tab)). Depending on how your instance is configured, you may
+also be able to sign in with Google, GitHub, or your company's OIDC identity provider.
 
 ## 2. Connect Your First Channel
 
@@ -104,4 +107,4 @@ Postmill is organized into these sections, accessible from the left sidebar:
 - Set up campaigns to organize posts into themed folders: [Campaigns](./campaigns.md).
 - Explore the full composer capabilities: [Composer](./composer.md).
 
-> Verified against v3.8.3
+> Verified against v3.8.10

@@ -8,6 +8,26 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## [3.8.10] — 2026-06-11
+
+### Breaking changes (single destructive push)
+- Dropped dead Gitroom marketplace/GitHub-stars tables and columns.
+- Legacy `UserOrganization.role` enum column removed (replaced by AppRole-based RBAC).
+- `AIOrgProviderConfig.imageModel` / `AIProviderConfig.imageModel` columns removed (moved to Media providers).
+
+### New features
+- **RBAC system**: `AppRole`, `Permission`, `AppRolePermission` models with `@RequirePermission` decorator and `OrgRbacGuard` (HTTP 403 orthogonal to billing HTTP 402).
+- **Identity/Profile split**: `UserProfile` model (1:1 with User) carrying profile/notification fields.
+- **Sessions**: `Session` model with refresh-token rotation, device list, per-session revoke.
+- **Platform admin panel**: `/admin` with DB-managed auth providers (incl. OIDC SSO), encrypted at rest.
+- **Multi-brand**: `AIBrandProfile` now supports many brands per org with per-post brand selection via `Post.brandId`.
+- **AI provider config**: 2-step auth + model defaults with reasoning/non-reasoning split.
+- **Media providers**: `MediaProviderConfig` model + adapter interface with storage binding.
+- **Storage**: UI redesigned to mirror AI page, render-bug fixed, per-tenant partition, unique-account enforcement. New env var `LOCAL_STORAGE_QUOTA_GB` (default 5) drives the default local quota.
+- **Shortlinks**: UI redesigned with real icons, multi-account support, preference card removed from Settings.
+- **Schedule dedicated pages**: `/schedule/post` (create) and `/schedule/post/:id` (edit) with tz-aware time picker.
+- **Shared foundation**: `ProviderIcon`, `accountFingerprint`, `ProviderListShell` reused across all provider surfaces.
+
 ## [3.8.9] - 2026-06-11
 
 ### Fixed

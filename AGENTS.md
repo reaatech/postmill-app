@@ -401,3 +401,41 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
   integration/enterprise return URLs (3AB).
 - `SSRF_ALLOWED_PRIVATE_CIDRS` — opt-in admin allowlist of private CIDRs for self-hosted provider
   instances (1H).
+
+## Identity-vs-profile split (v3.8.10)
+
+User model keeps identity/auth columns (email, password, providerName, providerId, isSuperAdmin, activated, lastOnline, ip, agent, lastReadNotifications). Profile fields (name, lastName, bio, pictureId, timezone, notification prefs) moved to `UserProfile` (1:1). See `schema.prisma:1356-1376`.
+
+## RBAC model (v3.8.10)
+
+- `AppRole` — org-scoped roles (NULL org = system template). `key` is stable machine name (owner/admin/editor/member/viewer). `isSystem` = seeded, non-deletable.
+- `Permission` — fine-grained `(resource, action)` catalog. 16 resources × 5 actions = 80 seeded permissions.
+- `AppRolePermission` — join table linking roles to permissions.
+- `OrgRbacGuard` + `@RequirePermission(resource, action)` — decorator-based gating at the controller level. Orthogonal to billing `@CheckPolicies`.
+
+## Two orthogonal access gates
+
+- **Billing gate** (`@CheckPolicies` + `PoliciesGuard`): "Has this org paid for this feature?" → HTTP 402.
+- **RBAC gate** (`@RequirePermission` + `OrgRbacGuard`): "Is this member allowed to do this?" → HTTP 403.
+- A route may carry both; they are independent.
+- `User.isSuperAdmin` (platform operator) bypasses RBAC (but not billing).
+
+## Sessions & refresh tokens (v3.8.10)
+
+`Session` model backs refresh-token rotation: login creates a session, refresh rotates `tokenHash`, reuse of a rotated hash revokes the session, logout sets `revokedAt`. `/user/sessions` lists active devices with per-session revoke. JWT access token is unchanged (HS256, sliding renewal).
+
+## Platform admin & auth providers (v3.8.10)
+
+`AuthProviderConfig` stores platform-wide login provider configs (encrypted at rest). Managed in `/admin` (super-admin only). `getLoginEnv()` env vars serve as bootstrap fallback when DB has no enabled config. `LOCAL` auth is always available regardless of DB config (unless `DISABLE_REGISTRATION` is set). OIDC SSO via `Provider.GENERIC` with user-configurable endpoints.
+
+## Shared provider-surface foundation (v3.8.10)
+
+AI, Media, Storage, and Shortlinks settings surfaces share:
+- `ProviderIcon` component (`apps/frontend/src/components/shared/provider-icon.tsx`) — brand SVG icons for all providers across all four surfaces.
+- `accountFingerprint` util (`libraries/nestjs-libraries/src/utils/account-fingerprint.ts`) — stable SHA-256 fingerprint for unique-account constraints.
+- `ProviderConfigDto` type (`libraries/nestjs-libraries/src/types/provider-config.types.ts`) — shared config response shape.
+- `ProviderListShell` component (`apps/frontend/src/components/settings/shared/provider-list-shell.tsx`) — reusable provider-list layout.
+
+## Dropped Gitroom subsystems (v3.8.10)
+
+Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `MessagesGroup`, `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`, `Messages` + associated enums (`OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`) and their relations on `User`, `Post`, `Organization`, `Media`, `Integration`. Code-only removal in step 6, schema drops in step 7. The legacy `Role` enum and its `UserOrganization.role` column were also dropped — superseded by `AppRole`-based RBAC (`UserOrganization.roleId`).

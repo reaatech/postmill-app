@@ -44,6 +44,13 @@ This also runs automatically after `pnpm install` via a `postinstall` script.
 | Renames/drops need an **expand-contract plan** | Deploy the new column, backfill data, switch reads, then remove the old column in a follow-up |
 | Always test `prisma-generate` after edits | Prevents type mismatches between the client and the schema |
 
+> **Destructive pushes are exceptional.** v3.8.10 executed a single reviewed destructive push
+> (dropping the dead marketplace/stars models, the legacy `UserOrganization.role` enum column, the
+> migrated `User` profile columns, and the `imageModel` columns) — only after every reader/writer
+> had been cut over, a grep proved zero source references, and a **DB snapshot was taken
+> immediately before the push**. Follow that procedure for any future drop; see
+> [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10).
+
 ---
 
 ## Repository-Only Prisma Access
@@ -79,28 +86,34 @@ repository.
 
 | Directory | Repository |
 |---|---|
-| `agencies/` | Social media agency operations |
 | `ai-rag/` | RAG index operations (raw SQL for vector side table) |
-| `ai-settings/` | AI provider config, spend logs, brand profiles |
+| `ai-settings/` | AI provider config, spend logs |
 | `analytics/` | Snapshot queries and rollup |
 | `announcements/` | System announcements |
+| `api-keys/` | Per-user hashed API keys |
 | `audit/` | Audit log writes |
+| `auth-providers/` | Platform login provider config (`AuthProviderConfig`) |
 | `autopost/` | AutoPost CRUD |
+| `brands/` | Brand profiles (`AIBrandProfile`, many-per-org) |
 | `campaigns/` | Campaign CRUD + post association |
+| `emails/` | Email send-log lifecycle |
 | `integrations/` | Integration/plug/webhook management |
 | `media/` | Media CRUD, folder operations, multipart uploads |
+| `media-providers/` | Per-org media provider config (`MediaProviderConfig`) |
 | `notifications/` | Notification delivery |
 | `oauth/` | OAuth app and authorization management |
 | `organizations/` | Organization and user-org relationship |
 | `posts/` | Post CRUD, state transitions, recursive queries |
 | `provider-configs/` | `OrgProviderConfiguration` and legacy `ProviderConfiguration` |
+| `roles/` | RBAC roles and permissions (`AppRole`/`Permission`) |
 | `sets/` | Content set management |
+| `short-links/` | Per-org short-link provider config |
 | `signatures/` | Signature management |
 | `social-comments/` | Social comment sync, read-state tracking |
 | `storage/` | Storage provider config (S3, R2, B2, etc.) |
 | `subscriptions/` | Billing subscriptions |
 | `third-party/` | Third-party API key management |
-| `users/` | User CRUD and profile |
+| `users/` | User CRUD, profiles (`UserProfile`), sessions |
 | `watchlist/` | Competitor account and metric tracking |
 | `webhooks/` | Webhook CRUD + integration-webhook linking |
 
@@ -117,8 +130,14 @@ Models with encrypted fields:
 - `OrgProviderConfiguration` — `clientId`, `clientSecret`, `additionalConfig`
 - `AIOrgProviderConfig` — `credentials`
 - `StorageProviderConfig` — `credentials`
+- `OrgShortLinkConfig` — `credentials`
+- `MediaProviderConfig` — `credentials`
+- `AuthProviderConfig` — `clientId`, `clientSecret`
 - `OAuthApp` — `clientSecret`
 - `OAuthAuthorization` — `accessToken`, `refreshToken`
+
+Refresh tokens for login sessions are **hashed**, not encrypted — `Session.tokenHash` stores
+`sha256(refreshToken)`; the token itself is never persisted.
 
 ---
 
@@ -130,4 +149,4 @@ lifecycle management. It emits query-level log events for debugging.
 `PrismaRepository<T>` is a generic base class that provides typed access to a single Prisma model.
 `PrismaTransaction` wraps `$transaction` for multi-repository transactional workflows.
 
-> Verified against v3.7.0
+> Verified against v3.8.10

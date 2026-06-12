@@ -186,9 +186,14 @@ function getEncryptionKey(): Buffer {
 - `OrgProviderConfiguration` credentials — `clientId`, `clientSecret`, per-provider config
 - `AIOrgProviderConfig` credentials — AI provider API keys
 - `StorageProviderConfig` credentials — storage access keys
+- `OrgShortLinkConfig` credentials — short-link provider API keys
+- `MediaProviderConfig` credentials — media-generation provider API keys (v3.8.10)
+- `AuthProviderConfig` — login provider `clientId`/`clientSecret` (v3.8.10)
 - Nostr private keys
 - Browser extension cookies (Skool)
 - Third-party API keys
+
+Login refresh tokens are **hashed** (`sha256`), not encrypted — see Sessions below.
 
 ## JWT security
 
@@ -209,6 +214,16 @@ static verifyJWT(token: string) {
   return verify(token, process.env.JWT_SECRET!, { algorithms: ['HS256'] });
 }
 ```
+
+### Sessions & refresh tokens (v3.8.10)
+
+Login also issues a **refresh token** backed by a `Session` row. The token itself is never
+stored — only its SHA-256 hash (`Session.tokenHash`). `POST /auth/refresh` rotates the hash on
+every use; **reuse of an already-rotated token revokes the session** (theft detection). Logout
+revokes all of the user's sessions. Users see an active-device list (user agent, IP, last used)
+with per-session revoke under Profile → Security (`GET /user/sessions`,
+`POST /user/sessions/:id/revoke`, `POST /user/sessions/revoke-all`). The JWT access token above
+is unchanged.
 
 ## Sentry scrubbing
 
@@ -245,6 +260,15 @@ actually take effect (unlike earlier versions where most routes bypassed the thr
 
 ## Additional security invariants
 
+### RBAC (v3.8.10)
+
+Member actions inside an organisation are gated by role-based access control: five seeded system
+roles (`owner`/`admin`/`editor`/`member`/`viewer`) plus per-org custom roles, enforced by
+`@RequirePermission` → HTTP **403**. This is orthogonal to the billing/tier gate
+(`@CheckPolicies` → HTTP **402**). The platform super-admin flag (`isSuperAdmin`) bypasses RBAC
+only — it is a separate axis from the org owner role. See
+[Backend Conventions](../developer-docs/backend-conventions.md#two-orthogonal-access-gates-v3-8-10).
+
 ### OAuth 2.0 / PKCE
 
 OAuth flows enforce redirect-URI matching, PKCE code challenges, scope validation, and token
@@ -280,4 +304,4 @@ fields on all DTOs. Declare new optional fields explicitly on their DTO.
 - [Configuration](./configuration.md) — `ENCRYPTION_KEY`, `SSRF_ALLOWED_PRIVATE_CIDRS`,
   `INTEGRATION_RETURN_URL_ALLOWLIST`, `NOT_SECURED`
 
-> Verified against v3.7.0
+> Verified against v3.8.10

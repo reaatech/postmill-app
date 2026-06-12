@@ -1,8 +1,33 @@
 # OAuth / SSO
 
 Postmill supports generic OpenID Connect (OIDC) providers for user authentication. This lets
-self-hosters integrate with Authentik, Keycloak, Authelia, Dex, or any OIDC-compliant identity
-provider.
+self-hosters integrate with Authentik, Keycloak, Authelia, Dex, Supabase, or any OIDC-compliant
+identity provider. SAML is not supported — OIDC only.
+
+## Admin-managed login providers (v3.8.10)
+
+Since v3.8.10, login providers are configured **in-app** by the instance super-admin at `/admin`,
+stored platform-wide in the `AuthProviderConfig` table with client ID/secret **encrypted at
+rest** (one config per provider: Google, GitHub, or generic OIDC). For each provider you can set:
+
+- **Enabled** — whether the provider's button appears on the login page
+- **Client ID / Client Secret** — encrypted; never returned to the browser after save
+- **OIDC endpoints** (generic provider only) — authorization, token, and userinfo URLs
+- **Scopes** — defaults to `openid profile email`
+- **Display name** — the login button label (e.g. "Sign in with Supabase")
+
+The API is super-admin-only: `GET/POST /admin/auth-providers` and
+`DELETE /admin/auth-providers/:provider`. The login page reads `GET /auth/providers`: when any
+enabled DB config exists, only the DB-configured providers are offered; otherwise the env-derived
+provider list is shown.
+
+**Bootstrap fallback (the chicken-and-egg):** when no enabled DB config exists for a provider,
+the env vars below are used instead — so the very first operator can log in and reach `/admin`
+before anything is configured in the database. Email/password (`LOCAL`) login is always available
+regardless of provider config (subject to `DISABLE_REGISTRATION`).
+
+OAuth logins also import the user's display name and avatar from the provider; accounts without a
+provider picture fall back to a Gravatar generated from their email, then to initials.
 
 ## Generic OIDC setup
 
@@ -16,9 +41,14 @@ Create a new OIDC client in your identity provider. You will need:
 
 Example redirect URI: `https://postmill.example.com/auth/callback`
 
-### 2. Configure environment variables
+### 2. Configure the provider
 
-Set these in your `.env` file or Docker Compose environment:
+**Preferred (v3.8.10):** as a super-admin, open `/admin`, enable the **Generic OIDC** provider,
+and enter the client ID/secret, the three endpoints, scopes, and a display name. No redeploy
+needed.
+
+**Or via env vars (bootstrap fallback)** — set these in your `.env` file or Docker Compose
+environment; they apply only while no enabled DB config exists for the provider:
 
 ```yaml
 # Required for any self-hosted deployment
@@ -123,7 +153,8 @@ POSTMILL_OAUTH_USERINFO_URL: 'https://dex.example.com/userinfo'
 
 ## GitHub login
 
-In addition to generic OIDC, Postmill supports GitHub OAuth as a login provider:
+In addition to generic OIDC, Postmill supports GitHub OAuth as a login provider. Configure it in
+`/admin` (preferred), or via the bootstrap env vars:
 
 ```yaml
 GITHUB_CLIENT_ID: '<your-github-oauth-app-client-id>'
@@ -135,9 +166,10 @@ URL set to `https://<your-domain>/auth/callback`.
 
 ## Google login
 
-Google OAuth login is also supported. Use `YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` for the
-Google OAuth credentials (these are for **login only** — channel Google/YouTube/GMB credentials
-are configured in-app via Settings -> Channels).
+Google OAuth login is also supported. Configure it in `/admin` (preferred), or use
+`YOUTUBE_CLIENT_ID` / `YOUTUBE_CLIENT_SECRET` as the bootstrap env credentials (these are for
+**login only** — channel Google/YouTube/GMB credentials are configured in-app via
+Settings -> Channels).
 
 ## auth/callback route
 
@@ -148,12 +180,14 @@ Ensure your reverse proxy passes this path through to the backend without modifi
 ## Disable registration
 
 To restrict who can sign up, set `DISABLE_REGISTRATION=true`. New users cannot self-register via
-any OAuth provider. Existing users can still log in. Create new users through the Teams settings
-page as a super-admin.
+`LOCAL` (email/password) or the Google/GitHub providers — with two exceptions: the very first
+user of an empty instance can always register (so the operator can bootstrap), and **`GENERIC`
+OIDC sign-ins are exempt** (users authenticated by your identity provider still provision).
+Existing users can still log in. Create new users through the Teams settings page.
 
 ## Related
 
 - [Configuration](./configuration.md) — full env var reference including `IS_GENERAL`, GitHub, and SSO vars
 - [Security](./security.md) — OAuth 2.0 / PKCE hardening, open-redirect allowlisting
 
-> Verified against v3.7.0
+> Verified against v3.8.10
