@@ -35,7 +35,10 @@ export class LocalAdapter implements IStorageAdapter {
   readonly type = StorageProviderType.LOCAL;
   private readonly _logger = new Logger(LocalAdapter.name);
 
-  constructor(private uploadDirectory: string) {}
+  constructor(
+    private uploadDirectory: string,
+    private tenantId?: string
+  ) {}
 
   async testConnection(): Promise<{ ok: boolean; error?: string }> {
     try {
@@ -50,9 +53,12 @@ export class LocalAdapter implements IStorageAdapter {
   }
 
   async listFiles(prefix?: string): Promise<StorageFileEntry[]> {
-    const dir = prefix
-      ? path.join(this.uploadDirectory, prefix)
+    const baseDir = this.tenantId
+      ? path.join(this.uploadDirectory, this.tenantId)
       : this.uploadDirectory;
+    const dir = prefix
+      ? path.join(baseDir, prefix)
+      : baseDir;
     const entries: StorageFileEntry[] = [];
 
     const walk = (dirPath: string, relativePrefix: string) => {
@@ -109,6 +115,9 @@ export class LocalAdapter implements IStorageAdapter {
   async getUsageBytes(): Promise<bigint | null> {
     try {
       let total = BigInt(0);
+      const rootDir = this.tenantId
+        ? path.join(this.uploadDirectory, this.tenantId)
+        : this.uploadDirectory;
       const walk = (dirPath: string) => {
         let files: string[];
         try {
@@ -131,7 +140,7 @@ export class LocalAdapter implements IStorageAdapter {
           }
         }
       };
-      walk(this.uploadDirectory);
+      walk(rootDir);
       return total;
     } catch {
       return null;
@@ -160,7 +169,8 @@ export class LocalAdapter implements IStorageAdapter {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
 
-    const innerPath = `/${year}/${month}/${day}`;
+    const tenantPart = this.tenantId ? `/${this.tenantId}` : '';
+    const innerPath = `${tenantPart}/${year}/${month}/${day}`;
     const dir = `${this.uploadDirectory}${innerPath}`;
     mkdirSync(dir, { recursive: true });
 
@@ -198,7 +208,8 @@ export class LocalAdapter implements IStorageAdapter {
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
 
-      const innerPath = `/${year}/${month}/${day}`;
+      const tenantPart = this.tenantId ? `/${this.tenantId}` : '';
+      const innerPath = `${tenantPart}/${year}/${month}/${day}`;
       const dir = `${this.uploadDirectory}${innerPath}`;
       mkdirSync(dir, { recursive: true });
 
@@ -276,7 +287,8 @@ export class LocalAdapter implements IStorageAdapter {
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
 
-    const innerPath = `/${year}/${month}/${day}`;
+    const tenantPart = this.tenantId ? `/${this.tenantId}` : '';
+    const innerPath = `${tenantPart}/${year}/${month}/${day}`;
     const dir = `${this.uploadDirectory}${innerPath}`;
     mkdirSync(dir, { recursive: true });
 

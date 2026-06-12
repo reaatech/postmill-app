@@ -1,25 +1,21 @@
 'use client';
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ProviderCard } from '@gitroom/frontend/components/settings/media-providers/provider-card';
 import { ProviderModal } from '@gitroom/frontend/components/settings/media-providers/provider-modal';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
-import type { Column } from '@gitroom/frontend/components/ui/data-table';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 
 interface MediaProvider {
   identifier: string;
   name: string;
-  type?: string;
   capabilities: string[];
   isConfigured: boolean;
   enabled: boolean;
-  operations: string[];
-  supportedOperations: string[];
-  c2paAvailable: boolean;
 }
 
 const OPERATION_LABELS: Record<string, string> = {
@@ -33,34 +29,72 @@ const OPERATION_LABELS: Record<string, string> = {
   embedding: 'Embeddings',
 };
 
+const OPERATION_SHORT_LABELS: Record<string, string> = {
+  image: 'Image',
+  video: 'Video',
+  tts: 'TTS',
+  stt: 'STT',
+  upscale: 'Upscale',
+  'bg-remove': 'Bg Remove',
+  inpaint: 'Inpaint',
+  embedding: 'Embedding',
+};
+
+const OPERATION_COLORS: Record<string, string> = {
+  image: 'bg-blue-500/20 text-blue-400',
+  video: 'bg-red-500/20 text-red-400',
+  tts: 'bg-green-500/20 text-green-400',
+  stt: 'bg-emerald-500/20 text-emerald-400',
+  upscale: 'bg-orange-500/20 text-orange-400',
+  'bg-remove': 'bg-pink-500/20 text-pink-400',
+  inpaint: 'bg-cyan-500/20 text-cyan-400',
+  embedding: 'bg-yellow-500/20 text-yellow-400',
+};
+
 const ALL_OPERATIONS = ['image', 'video', 'tts', 'stt', 'upscale', 'bg-remove', 'inpaint'];
 
-interface AiMediaProviderSummary {
+interface MediaProviderConfig {
   identifier: string;
-  name: string;
-  type?: string;
-  capabilities: string[];
-  configured: boolean;
+  isConfigured: boolean;
   enabled: boolean;
+}
+
+interface OperationRow {
+  op: string;
+  supportedMap: Record<string, boolean>;
 }
 
 const useMediaProviders = () => {
   const fetch = useFetch();
   const load = useCallback(async () => {
-    const res = await fetch('/ai/media-providers');
-    if (!res.ok) throw new Error('Failed to load media providers');
-    const data: AiMediaProviderSummary[] = await res.json();
-    return data.map((p) => ({
-      identifier: p.identifier,
-      name: p.name,
-      type: p.type,
-      capabilities: p.capabilities || [],
-      isConfigured: p.configured,
-      enabled: p.enabled,
-      operations: [],
-      supportedOperations: p.capabilities || [],
-      c2paAvailable: false,
-    })) as MediaProvider[];
+    const [providersRes, configRes] = await Promise.all([
+      fetch('/settings/media/providers'),
+      fetch('/settings/media/config'),
+    ]);
+    if (!providersRes.ok) throw new Error('Failed to load media providers');
+    const providers: { identifier: string; name: string; capabilities: { image: boolean; video: boolean; audio: boolean; avatar: boolean } }[] = await providersRes.json();
+    const configData: { providers?: MediaProviderConfig[] } = configRes.ok
+      ? await configRes.json()
+      : { providers: [] };
+    const configs: Record<string, MediaProviderConfig> = {};
+    for (const cfg of configData.providers || []) {
+      configs[cfg.identifier] = cfg;
+    }
+    return providers.map((p) => {
+      const cfg = configs[p.identifier];
+      const caps: string[] = [];
+      if (p.capabilities.image) caps.push('image');
+      if (p.capabilities.video) caps.push('video');
+      if (p.capabilities.audio) caps.push('audio');
+      if (p.capabilities.avatar) caps.push('avatar');
+      return {
+        identifier: p.identifier,
+        name: p.name,
+        capabilities: caps,
+        isConfigured: cfg?.isConfigured || false,
+        enabled: cfg?.enabled || false,
+      } as MediaProvider;
+    });
   }, [fetch]);
   return useSWR<MediaProvider[]>('media-providers', load, {
     revalidateOnFocus: false,
@@ -78,10 +112,9 @@ export const MediaProvidersTab = () => {
 
   const handleToggle = useCallback(async (identifier: string, enabled: boolean) => {
     try {
-      const res = await fetch(`/ai/media-providers/${identifier}`, {
-        method: 'PUT',
-        body: JSON.stringify({ enabled }),
-      });
+      const res = enabled
+        ? await fetch(`/settings/media/config/${identifier}/set-active`, { method: 'POST' })
+        : await fetch(`/settings/media/config/${identifier}`, { method: 'DELETE' });
       if (!res.ok) {
         toaster.show(t('toggle_failed', 'Failed to toggle provider'), 'warning');
         return;
@@ -100,10 +133,12 @@ export const MediaProvidersTab = () => {
     mutate();
   }, [mutate]);
 
+  const title = t('media_providers', 'Media Providers');
+
   if (error) {
     return (
       <div className="flex flex-col">
-        <h3 className="text-[20px] mb-[16px]">{t('media_providers', 'Media Providers')}</h3>
+        <h3 className="text-[20px] mb-[16px]">{title}</h3>
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">{t('failed_to_load_media_providers', 'Failed to load media providers')}</span>
           <button
@@ -120,7 +155,7 @@ export const MediaProvidersTab = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col">
-        <h3 className="text-[20px] mb-[16px]">{t('media_providers', 'Media Providers')}</h3>
+        <h3 className="text-[20px] mb-[16px]">{title}</h3>
         <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
           <div className="animate-pulse">{t('loading', 'Loading...')}</div>
         </div>
@@ -128,22 +163,8 @@ export const MediaProvidersTab = () => {
     );
   }
 
-  if (!providers || providers.length === 0) {
-    return (
-      <div className="flex flex-col">
-        <h3 className="text-[20px] mb-[16px]">{t('media_providers', 'Media Providers')}</h3>
-        <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
-          <p className="text-[14px] text-newTableText">
-            {t('no_media_providers', 'No media providers configured')}
-          </p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col">
-      <h3 className="text-[20px] mb-[16px]">{t('media_providers', 'Media Providers')}</h3>
 
       {configuringProvider && (
         <ProviderModal
@@ -153,95 +174,123 @@ export const MediaProvidersTab = () => {
         />
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[12px] mb-[24px]">
-        {providers.map((provider) => (
-          <ProviderCard
-            key={provider.identifier}
-            provider={provider}
-            onConfigure={(id) => setConfiguringProvider(id)}
-            onToggle={handleToggle}
-          />
-        ))}
-      </div>
-
-      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
-        <div className="text-[14px]">{t('operations_overview', 'Operations Overview')}</div>
-        <div className="text-[12px] text-newTableText">
-          {t('operations_overview_description', 'Which providers support each media operation')}
-        </div>
-
-        <DataTable
-          columns={[
-            { key: 'operation', header: t('operation', 'Operation'), render: (row: any) => <span className="font-medium">{OPERATION_LABELS[row.op] || row.op}</span> },
-            ...providers.map((p) => ({
-              key: p.identifier,
-              header: p.name,
-              align: 'center' as const,
-              render: (row: any) => {
-                const supports = row.supportedMap[p.identifier];
-                const configEnabled = p.enabled && p.isConfigured;
-                if (supports) {
-                  return configEnabled
-                    ? <span className="text-green-500 text-[16px]">✓</span>
-                    : <span className="text-yellow-500 text-[16px]">○</span>;
-                }
-                return <span className="text-newTableText text-[16px]">—</span>;
-              },
-            })),
-          ]}
-          data={ALL_OPERATIONS.map((op) => ({
-            op,
-            supportedMap: Object.fromEntries(
-              providers.map((p) => [p.identifier, p.supportedOperations.includes(op)])
-            ),
-          }))}
-          keyExtractor={(row: any) => row.op}
-        />
-
-        <div className="flex items-center gap-[16px] text-[12px] text-newTableText">
-          <span className="flex items-center gap-[4px]">
-            <span className="text-green-500">✓</span> {t('available', 'Available & Enabled')}
-          </span>
-          <span className="flex items-center gap-[4px]">
-            <span className="text-yellow-500">○</span> {t('configured_disabled', 'Configured but Disabled')}
-          </span>
-          <span className="flex items-center gap-[4px]">
-            <span className="text-newTableText">—</span> {t('not_supported', 'Not Supported')}
-          </span>
-        </div>
-      </div>
-
-      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[12px]">
-        {ALL_OPERATIONS.map((op) => {
-          const supported = providers.filter(
-            (p) =>
-              p.supportedOperations.includes(op) && p.enabled && p.isConfigured,
-          );
+      <ProviderListShell
+        title={title}
+        providers={(providers || []).map((p) => ({
+          id: p.identifier,
+          identifier: p.identifier,
+          name: p.name,
+          enabled: p.enabled && p.isConfigured,
+          isActive: p.enabled && p.isConfigured,
+          isConfigured: p.isConfigured,
+          capabilities: p.capabilities,
+        }))}
+        onConfigure={(id) => setConfiguringProvider(id)}
+        onRemove={(id) => handleToggle(id, false)}
+        onToggle={(id, enabled) => handleToggle(id, enabled)}
+        ProviderIconComponent={ProviderIcon}
+        renderBadges={(provider) => {
+          const caps = provider.capabilities || [];
+          if (caps.length === 0) return null;
           return (
-            <div key={op} className="flex items-center gap-[12px]">
-              <div className="w-[140px] shrink-0 text-[13px] font-medium">
-                {OPERATION_LABELS[op] || op}
-              </div>
-              <div className="flex gap-[6px] flex-wrap">
-                {supported.length > 0 ? (
-                  supported.map((p) => (
-                    <span
-                      key={p.identifier}
-                      className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[3px] text-[12px]"
-                    >
-                      {p.name}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-[12px] text-newTableText">
-                    {t('no_provider_available', 'No provider available')}
-                  </span>
-                )}
-              </div>
+            <div className="flex gap-[4px] mt-[4px] flex-wrap">
+              {caps.map((cap) => (
+                <span
+                  key={cap}
+                  className={`text-[10px] rounded-[4px] px-[6px] py-[2px] ${
+                    OPERATION_COLORS[cap] || 'bg-newTableHeader text-newTableText'
+                  }`}
+                >
+                  {OPERATION_SHORT_LABELS[cap] || cap}
+                </span>
+              ))}
             </div>
           );
-        })}
-      </div>
+        }}
+      />
+
+      {providers && providers.length > 0 && (
+        <>
+          <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px] mt-[24px]">
+            <div className="text-[14px]">{t('operations_overview', 'Operations Overview')}</div>
+            <div className="text-[12px] text-newTableText">
+              {t('operations_overview_description', 'Which providers support each media operation')}
+            </div>
+
+            <DataTable
+              columns={[
+                { key: 'operation', header: t('operation', 'Operation'), render: (row: OperationRow) => <span className="font-medium">{OPERATION_LABELS[row.op] || row.op}</span> },
+                ...providers.map((p) => ({
+                  key: p.identifier,
+                  header: p.name,
+                  align: 'center' as const,
+                  render: (row: OperationRow) => {
+                    const supports = row.supportedMap[p.identifier];
+                    const configEnabled = p.enabled && p.isConfigured;
+                    if (supports) {
+                      return configEnabled
+                        ? <span className="text-green-500 text-[16px]">✓</span>
+                        : <span className="text-yellow-500 text-[16px]">○</span>;
+                    }
+                    return <span className="text-newTableText text-[16px]">—</span>;
+                  },
+                })),
+              ]}
+              data={ALL_OPERATIONS.map((op) => ({
+                op,
+                supportedMap: Object.fromEntries(
+                  providers.map((p) => [p.identifier, p.capabilities.includes(op)])
+                ),
+              }))}
+              keyExtractor={(row: OperationRow) => row.op}
+            />
+
+            <div className="flex items-center gap-[16px] text-[12px] text-newTableText">
+              <span className="flex items-center gap-[4px]">
+                <span className="text-green-500">✓</span> {t('available', 'Available & Enabled')}
+              </span>
+              <span className="flex items-center gap-[4px]">
+                <span className="text-yellow-500">○</span> {t('configured_disabled', 'Configured but Disabled')}
+              </span>
+              <span className="flex items-center gap-[4px]">
+                <span className="text-newTableText">—</span> {t('not_supported', 'Not Supported')}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[12px] mt-[16px]">
+            {ALL_OPERATIONS.map((op) => {
+              const supported = providers.filter(
+                (p) =>
+                  p.capabilities.includes(op) && p.enabled && p.isConfigured,
+              );
+              return (
+                <div key={op} className="flex items-center gap-[12px]">
+                  <div className="w-[140px] shrink-0 text-[13px] font-medium">
+                    {OPERATION_LABELS[op] || op}
+                  </div>
+                  <div className="flex gap-[6px] flex-wrap">
+                    {supported.length > 0 ? (
+                      supported.map((p) => (
+                        <span
+                          key={p.identifier}
+                          className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[3px] text-[12px]"
+                        >
+                          {p.name}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-[12px] text-newTableText">
+                        {t('no_provider_available', 'No provider available')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
     </div>
   );
 };

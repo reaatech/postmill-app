@@ -19,6 +19,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
   const { data: providers } = useShortlinksProviders();
 
   const provider = providers?.find((p: any) => p.identifier === identifier);
+  const [name, setName] = useState('');
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [customDomain, setCustomDomain] = useState('');
   const [testing, setTesting] = useState(false);
@@ -46,6 +47,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
       const res = await fetch(`/settings/shortlinks/config/${identifier}`, {
         method: 'PUT',
         body: JSON.stringify({
+          name: name || undefined,
           credentials: Object.values(creds).some(v => v) ? creds : undefined,
           customDomain: customDomain || undefined,
           extraConfig: (clientId || clientSecret)
@@ -62,7 +64,7 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
     } finally {
       setSaving(false);
     }
-  }, [provider, identifier, creds, customDomain, fetch, toaster, t, onSaved]);
+  }, [provider, identifier, name, creds, customDomain, clientId, clientSecret, fetch, toaster, t, onSaved]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -125,6 +127,19 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
         >
           {t('close', 'Close')}
         </button>
+      </div>
+
+      <div className="flex flex-col gap-[4px]">
+        <label className="text-[13px] text-newTableText">
+          {t('config_name', 'Configuration Name')}
+        </label>
+        <input
+          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+          type="text"
+          placeholder={t('config_name_placeholder', 'e.g. My Bitly Account')}
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
       </div>
 
       {provider.credentialFields.map((field: any) => (

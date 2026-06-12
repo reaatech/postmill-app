@@ -109,7 +109,12 @@ function stubAdapter(overrides: Record<string, any> = {}) {
     linkStatistics: vi.fn(),
     validateCredentials: vi.fn(),
     resolveDomain: vi.fn(),
-    credentialFields: [],
+    credentialFields: [] as Array<{
+      key: string;
+      label: string;
+      type: string;
+      required: boolean;
+    }>,
     authType: 'apiKey',
     ...overrides,
   };

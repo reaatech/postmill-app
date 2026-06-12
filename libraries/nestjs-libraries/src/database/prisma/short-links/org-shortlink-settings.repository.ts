@@ -17,8 +17,15 @@ export class OrgShortLinkSettingsRepository {
   }
 
   getByIdentifier(orgId: string, identifier: string) {
-    return this._orgShortLinkConfig.model.orgShortLinkConfig.findUnique({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.findFirst({
+      where: { organizationId: orgId, identifier },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  getById(orgId: string, id: string) {
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.findFirst({
+      where: { id, organizationId: orgId },
     });
   }
 
@@ -28,7 +35,7 @@ export class OrgShortLinkSettingsRepository {
     });
   }
 
-  upsert(
+  async upsert(
     orgId: string,
     identifier: string,
     data: {
@@ -37,18 +44,44 @@ export class OrgShortLinkSettingsRepository {
       credentials?: string;
       customDomain?: string;
       extraConfig?: string;
+      name?: string;
+      accountFingerprint?: string;
     },
   ) {
-    return this._orgShortLinkConfig.model.orgShortLinkConfig.upsert({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
-      create: { organizationId: orgId, identifier, ...data },
-      update: data,
+    if (data.accountFingerprint) {
+      return this._orgShortLinkConfig.model.orgShortLinkConfig.upsert({
+        where: {
+          organizationId_identifier_accountFingerprint: {
+            organizationId: orgId,
+            identifier,
+            accountFingerprint: data.accountFingerprint,
+          },
+        },
+        create: { organizationId: orgId, identifier, ...data },
+        update: data,
+      });
+    }
+    const existing = await this.getByIdentifier(orgId, identifier);
+    if (existing) {
+      return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
+        where: { id: existing.id },
+        data,
+      });
+    }
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.create({
+      data: { organizationId: orgId, identifier, ...data },
     });
   }
 
-  delete(orgId: string, identifier: string) {
+  deleteById(id: string) {
     return this._orgShortLinkConfig.model.orgShortLinkConfig.delete({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { id },
+    });
+  }
+
+  async delete(orgId: string, identifier: string) {
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.deleteMany({
+      where: { organizationId: orgId, identifier },
     });
   }
 
@@ -57,8 +90,10 @@ export class OrgShortLinkSettingsRepository {
       where: { organizationId: orgId, isActive: true },
       data: { isActive: false },
     });
+    const config = await this.getByIdentifier(orgId, identifier);
+    if (!config) throw new Error('Configuration not found');
     return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { id: config.id },
       data: { isActive: true, enabled: true },
     });
   }

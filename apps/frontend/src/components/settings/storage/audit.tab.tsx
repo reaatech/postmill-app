@@ -1,42 +1,45 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useToaster } from '@gitroom/react/toaster/toaster';
+import useSWR from 'swr';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
-export const AuditTab: React.FC = () => {
+const limit = 25;
+
+interface AuditLogRow {
+  id: string;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  entityName: string | null;
+  userId: string | null;
+  createdAt: string;
+}
+
+const useAuditLog = (page: number) => {
   const fetch = useFetch();
-  const toast = useToaster();
-  const [logs, setLogs] = useState<any[]>([]);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    const res = await fetch(
+      `/settings/storage/audit-log?limit=${limit}&offset=${page * limit}`
+    );
+    if (!res.ok) throw new Error('Failed to load audit logs');
+    return res.json();
+  }, [fetch, page]);
+  return useSWR<{ logs: AuditLogRow[]; total: number }>(
+    `audit-log:${page}`,
+    load,
+    { revalidateOnFocus: false }
+  );
+};
+
+export const AuditTab: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(0);
-  const limit = 25;
 
-  const loadLogs = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(
-        `/settings/storage/audit-log?limit=${limit}&offset=${currentPage * limit}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setLogs(data.logs);
-        setTotal(data.total);
-      } else {
-        toast.show('Failed to load audit logs', 'warning');
-      }
-    } catch {
-      toast.show('Failed to load audit logs', 'warning');
-    } finally {
-      setLoading(false);
-    }
-  }, [fetch, currentPage, toast]);
+  const { data, isLoading } = useAuditLog(currentPage);
 
-  useEffect(() => {
-    loadLogs();
-  }, [loadLogs]);
+  const logs = data?.logs ?? [];
+  const total = data?.total ?? 0;
 
   const formatDate = (date: string) => {
     return new Date(date).toLocaleString();
@@ -55,8 +58,6 @@ export const AuditTab: React.FC = () => {
     return map[action] || action;
   };
 
-  const pages = Math.ceil(total / limit);
-
   return (
     <div className="flex flex-col gap-[20px]">
       <h3 className="text-[20px] text-textColor">Audit Log</h3>
@@ -70,7 +71,7 @@ export const AuditTab: React.FC = () => {
         ]}
         data={logs}
         keyExtractor={(log: any) => log.id}
-        loading={loading}
+        loading={isLoading}
         page={currentPage + 1}
         total={total}
         limit={limit}

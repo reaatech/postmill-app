@@ -13,3 +13,4 @@ export * from './streak.workflow';
 export * from './analytics.collection.workflow';
 export * from './analytics.backfill.workflow';
 export * from './comments.collection.workflow';
+export * from './media.jobs.workflow';

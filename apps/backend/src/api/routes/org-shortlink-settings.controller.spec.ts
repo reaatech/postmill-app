@@ -21,6 +21,7 @@ vi.mock(
       upsert = mockUpsert;
       setActive = mockSetActive;
       delete = mockDelete;
+      deleteById = mockDelete;
       testConnection = mockTestConnection;
       getConfigForProvider = mockGetConfigForProvider;
     },
@@ -58,6 +59,7 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
 import { OrgShortLinkSettingsController } from './org-shortlink-settings.controller';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import type { ShortLinkAdapter } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
 
 const org = { id: 'org-1' } as any;
 
@@ -81,7 +83,7 @@ function stubAdapter(overrides: Record<string, any> = {}) {
     validateCredentials: vi.fn().mockResolvedValue({ ok: true }),
     resolveDomain: vi.fn().mockReturnValue('bit.ly'),
     createShortLink: vi.fn(),
-    oauth: undefined,
+    oauth: undefined as ShortLinkAdapter['oauth'],
     ...overrides,
   };
 }

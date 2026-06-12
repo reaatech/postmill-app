@@ -88,6 +88,10 @@ import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/in
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 import { timer } from '@gitroom/helpers/utils/timer';
+import type { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
+import type { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
+import type { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import type { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 import { log } from '@temporalio/activity';
 
 type Mocked<T> = T & { [K in keyof T]: T[K] extends (...args: any[]) => any ? ReturnType<typeof vi.fn> : T[K] };
@@ -163,7 +167,19 @@ describe('AnalyticsActivity', () => {
       integrationService as any,
       refreshIntegrationService as any,
       webhooksService as any,
-      watchlistService as any
+      watchlistService,
+      {
+        getActiveProvider: vi.fn().mockResolvedValue(null),
+      } as unknown as OrgShortLinkSettingsService,
+      {
+        getByOrg: vi.fn().mockResolvedValue([]),
+      } as unknown as OrgShortLinkSettingsRepository,
+      {
+        getAdapter: vi.fn().mockReturnValue(null),
+      } as unknown as ShortLinkRegistry,
+      {
+        recordSent: vi.fn().mockResolvedValue(undefined),
+      } as unknown as EmailLogService
     );
   });
 

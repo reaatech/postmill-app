@@ -41,8 +41,8 @@ export async function digestEmailWorkflow({
     const org = await getUserOrgs(organizationId);
 
     for (const user of org.users) {
-      const allowFailure = user.user.sendFailureEmails ? 'fail' : null;
-      const allowSuccess = user.user.sendSuccessEmails ? 'success' : null;
+      const allowFailure = user.user.profile?.sendFailureEmails ? 'fail' : null;
+      const allowSuccess = user.user.profile?.sendSuccessEmails ? 'success' : null;
 
       const toSend = batch.filter(
         (email) =>

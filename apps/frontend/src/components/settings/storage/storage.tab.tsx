@@ -1,131 +1,162 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { ProviderCard } from '@gitroom/frontend/components/settings/storage/provider-card';
+import useSWR from 'swr';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 import { ProviderFormModal } from '@gitroom/frontend/components/settings/storage/provider-form.modal';
 import { MigrationModal } from '@gitroom/frontend/components/settings/storage/migration.modal';
 import { AuditTab } from '@gitroom/frontend/components/settings/storage/audit.tab';
-import { useToaster } from '@gitroom/react/toaster/toaster';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 
-export const StorageTab: React.FC = () => {
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
+  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
+};
+
+export interface StorageProviderRow {
+  id: string;
+  organizationId: string;
+  type: string;
+  name: string;
+  region: string | null;
+  bucket: string | null;
+  endpoint: string | null;
+  publicUrl: string | null;
+  mounted: boolean;
+  quotaBytes: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface StorageUsageResponse {
+  totalBytes: number;
+  quotaBytes: number;
+  providers: Array<{ id: string; name: string; usageBytes: number | null }>;
+}
+
+interface QuotaStatusResponse {
+  usedBytes: number;
+  quotaBytes: number;
+  percentUsed: number;
+  warning: boolean;
+}
+
+interface UsageBreakdownResponse {
+  byFolder: Array<{ folderId: string; folderName: string; totalBytes: number }>;
+  byProvider: Array<{ providerId: string; providerName: string; totalBytes: number }>;
+}
+
+const useStorageProviders = () => {
   const fetch = useFetch();
-  const toast = useToaster();
-  const [providers, setProviders] = useState<any[]>([]);
-  const [usage, setUsage] = useState<Record<string, string>>({});
-  const [quotaStatus, setQuotaStatus] = useState<any>(null);
-  const [usageBreakdown, setUsageBreakdown] = useState<any>(null);
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/storage');
+    if (!res.ok) throw new Error('Failed to load storage providers');
+    return res.json();
+  }, [fetch]);
+  return useSWR<StorageProviderRow[]>('storage-providers', load, { revalidateOnFocus: false });
+};
+
+const useStorageUsage = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/storage/usage');
+    if (!res.ok) throw new Error('Failed to load storage usage');
+    return res.json();
+  }, [fetch]);
+  return useSWR<StorageUsageResponse>('storage-usage', load, { revalidateOnFocus: false });
+};
+
+const useQuotaStatus = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/storage/quota-status');
+    if (!res.ok) throw new Error('Failed to load quota status');
+    return res.json();
+  }, [fetch]);
+  return useSWR<QuotaStatusResponse>('storage-quota-status', load, { revalidateOnFocus: false });
+};
+
+const useUsageBreakdown = () => {
+  const fetch = useFetch();
+  const load = useCallback(async () => {
+    const res = await fetch('/settings/storage/usage-breakdown');
+    if (!res.ok) throw new Error('Failed to load usage breakdown');
+    return res.json();
+  }, [fetch]);
+  return useSWR<UsageBreakdownResponse>('storage-usage-breakdown', load, { revalidateOnFocus: false });
+};
+
+const PROVIDER_TYPE_LABELS: Record<string, string> = {
+  LOCAL: 'Local Storage',
+  S3: 'AWS S3',
+  CLOUDFLARE_R2: 'Cloudflare R2',
+  BACKBLAZE_B2: 'Backblaze B2',
+  IDRIVE_E2: 'IDrive e2',
+};
+
+type SubTab = 'providers' | 'audit' | 'breakdown';
+
+export const StorageTab: React.FC = () => {
+  const t = useT();
+  const fetch = useFetch();
+  const toaster = useToaster();
+
+  const { data: providers, isLoading: providersLoading, mutate: mutateProviders } = useStorageProviders();
+  const { data: usage, mutate: mutateUsage } = useStorageUsage();
+  const { data: quotaStatus, mutate: mutateQuota } = useQuotaStatus();
+  const { data: usageBreakdown, mutate: mutateBreakdown } = useUsageBreakdown();
+
+  const [subTab, setSubTab] = useState<SubTab>('providers');
   const [showModal, setShowModal] = useState(false);
-  const [editProvider, setEditProvider] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [migrateSource, setMigrateSource] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<'providers' | 'quota' | 'breakdown' | 'audit'>('providers');
+  const [editProvider, setEditProvider] = useState<StorageProviderRow | null>(null);
+  const [migrateSource, setMigrateSource] = useState<StorageProviderRow | null>(null);
 
-  const loadProviders = useCallback(async () => {
-    try {
-      const res = await fetch('/settings/storage');
-      if (res.ok) {
-        const data = await res.json();
-        setProviders(data || []);
+  const usageMap: Record<string, number> = {};
+  if (usage?.providers) {
+    for (const p of usage.providers) {
+      if (p.usageBytes !== null) {
+        usageMap[p.id] = p.usageBytes;
       }
-    } catch {
-      toast.show('Failed to load storage providers', 'warning');
-    } finally {
-      setLoading(false);
     }
-  }, [fetch, toast]);
+  }
 
-  const loadUsage = useCallback(async () => {
-    try {
-      const res = await fetch('/settings/storage/usage');
-      if (res.ok) {
-        const data = await res.json();
-        const usageMap: Record<string, string> = {};
-        if (data.providers) {
-          for (const p of data.providers) {
-            if (p.usageBytes !== null) {
-              usageMap[p.id] = p.usageBytes;
-            }
-          }
-        }
-        setUsage(usageMap);
-      }
-    } catch {
-      toast.show('Failed to load storage usage', 'warning');
+  const refresh = useCallback(() => {
+    mutateProviders();
+    mutateUsage();
+    mutateQuota();
+    mutateBreakdown();
+  }, [mutateProviders, mutateUsage, mutateQuota, mutateBreakdown]);
+
+  const handleMount = useCallback(async (id: string) => {
+    const res = await fetch('/settings/storage/' + id + '/mount', { method: 'POST' });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toaster.show(body?.message || 'Failed to mount storage provider', 'warning');
+      return;
     }
-  }, [fetch, toast]);
+    refresh();
+    toaster.show('Storage provider mounted', 'success');
+  }, [fetch, refresh, toaster]);
 
-  const loadQuotaStatus = useCallback(async () => {
-    try {
-      const res = await fetch('/settings/storage/quota-status');
-      if (res.ok) {
-        setQuotaStatus(await res.json());
-      }
-    } catch {
-      toast.show('Failed to load quota status', 'warning');
+  const handleUnmount = useCallback(async (id: string) => {
+    const res = await fetch('/settings/storage/' + id + '/unmount', { method: 'POST' });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      toaster.show(body?.message || 'Failed to unmount storage provider', 'warning');
+      return;
     }
-  }, [fetch, toast]);
+    refresh();
+    toaster.show('Storage provider unmounted', 'success');
+  }, [fetch, refresh, toaster]);
 
-  const loadUsageBreakdown = useCallback(async () => {
-    try {
-      const res = await fetch('/settings/storage/usage-breakdown');
-      if (res.ok) {
-        setUsageBreakdown(await res.json());
-      }
-    } catch {
-      toast.show('Failed to load usage breakdown', 'warning');
-    }
-  }, [fetch, toast]);
-
-  useEffect(() => {
-    loadProviders();
-    loadUsage();
-    loadQuotaStatus();
-    loadUsageBreakdown();
-  }, [loadProviders, loadUsage, loadQuotaStatus, loadUsageBreakdown]);
-
-  const handleMount = async (id: string) => {
-    try {
-      const res = await fetch('/settings/storage/' + id + '/mount', { method: 'POST' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast.show(body?.message || 'Failed to mount storage provider', 'warning');
-        return;
-      }
-      loadProviders();
-      loadUsage();
-      loadQuotaStatus();
-      toast.show('Storage provider mounted', 'success');
-    } catch {
-      toast.show('Failed to mount storage provider', 'warning');
-    }
-  };
-
-  const handleUnmount = async (id: string) => {
-    try {
-      const res = await fetch('/settings/storage/' + id + '/unmount', { method: 'POST' });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        toast.show(body?.message || 'Failed to unmount storage provider', 'warning');
-        return;
-      }
-      loadProviders();
-      loadUsage();
-      loadQuotaStatus();
-      toast.show('Storage provider unmounted', 'success');
-    } catch {
-      toast.show('Failed to unmount storage provider', 'warning');
-    }
-  };
-
-  const handleEdit = (id: string) => {
-    const provider = providers.find((p) => p.id === id);
-    setEditProvider(provider);
-    setShowModal(true);
-  };
-
-  const handleDelete = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     const confirmed = await deleteDialog(
       'Are you sure you want to delete this storage provider?',
       'Delete Storage Provider',
@@ -133,235 +164,295 @@ export const StorageTab: React.FC = () => {
     );
     if (!confirmed) return;
 
-    try {
-      const res = await fetch('/settings/storage/' + id, { method: 'DELETE' });
-      if (res.ok) {
-        loadProviders();
-        loadUsage();
-        loadQuotaStatus();
-        loadUsageBreakdown();
-        toast.show('Storage provider deleted', 'success');
-      }
-    } catch {
-      toast.show('Failed to delete storage provider', 'warning');
+    const res = await fetch('/settings/storage/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      refresh();
+      toaster.show('Storage provider deleted', 'success');
+    } else {
+      toaster.show('Failed to delete storage provider', 'warning');
     }
-  };
+  }, [fetch, refresh, toaster]);
 
-  const handleMigrate = (id: string) => {
-    const provider = providers.find((p) => p.id === id);
-    if (provider) {
-      setMigrateSource(provider);
+  const handleTest = useCallback(async (id: string) => {
+    const res = await fetch('/settings/storage/' + id + '/test', { method: 'POST' });
+    const data = await res.json();
+    if (data.ok) {
+      toaster.show('Connection test successful!', 'success');
+    } else {
+      toaster.show('Connection test failed: ' + (data.error || 'Unknown error'), 'warning');
     }
-  };
+  }, [fetch, toaster]);
 
-  const handleTest = async (id: string) => {
-    try {
-      const res = await fetch('/settings/storage/' + id + '/test', {
-        method: 'POST',
-      });
-      const data = await res.json();
-      if (data.ok) {
-        toast.show('Connection test successful!', 'success');
-      } else {
-        toast.show('Connection test failed: ' + (data.error || 'Unknown error'), 'warning');
-      }
-    } catch {
-      toast.show('Test request failed', 'warning');
-    }
-  }; 
-
-  const handleSaved = () => {
+  const handleSaved = useCallback(() => {
     setShowModal(false);
     setEditProvider(null);
-    loadProviders();
-    loadUsage();
-    loadQuotaStatus();
-    loadUsageBreakdown();
-  };
+    refresh();
+  }, [refresh]);
 
-  const formatBytes = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(k)), sizes.length - 1);
-    return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i];
-  };
+  const otherProviders = (providers || []).filter((p) => p.type !== 'LOCAL');
+  const localProvider = (providers || []).find((p) => p.type === 'LOCAL');
+
+  const subTabs: { key: SubTab; label: string }[] = [
+    { key: 'providers', label: t('providers', 'Providers') },
+    { key: 'audit', label: t('audit_log', 'Audit Log') },
+    { key: 'breakdown', label: t('usage_breakdown', 'Usage Breakdown') },
+  ];
 
   return (
-    <div className="flex flex-col gap-[20px]">
-      {/* Tab Navigation */}
-      <div className="flex gap-[16px] border-b border-newTableBorder">
-        {['providers', 'quota', 'breakdown', 'audit'].map((tab) => (
+    <div className="flex flex-col gap-[16px]">
+      <div className="flex items-center justify-between">
+        <h3 className="text-[20px]">{t('storage_settings', 'Storage Settings')}</h3>
+      </div>
+
+      <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
+        {subTabs.map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab as typeof activeTab)}
-            className={`px-[16px] py-[12px] text-[14px] font-medium transition-colors ${
-              activeTab === tab
-                ? 'text-textColor border-b-2 border-btnPrimary'
+            key={tab.key}
+            className={`text-[13px] px-[16px] py-[8px] rounded-t-[4px] transition-colors ${
+              subTab === tab.key
+                ? 'bg-newBgColorInner border border-newTableBorder border-b-transparent text-textColor'
                 : 'text-newTableText hover:text-textColor'
             }`}
+            onClick={() => setSubTab(tab.key)}
           >
-            {tab === 'providers' && 'Providers'}
-            {tab === 'quota' && 'Quota Status'}
-            {tab === 'breakdown' && 'Usage Breakdown'}
-            {tab === 'audit' && 'Audit Log'}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Quota Warning Banner */}
+      {/* Quota warning banner */}
       {quotaStatus?.warning && (
         <div className="px-[16px] py-[12px] rounded-[8px] bg-[#2a2a1a] border border-[#f59e0b] text-[#f59e0b] text-[13px]">
-          ⚠️ You're using {quotaStatus.percentUsed}% of your storage quota ({formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)})
+          {'⚠️ You\'re using '}{quotaStatus.percentUsed}% of your storage quota ({formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)})
         </div>
       )}
 
-      {/* Tab Content */}
-      {activeTab === 'providers' && (
-        <>
-          <div className="flex items-center justify-between">
-            <h3 className="text-[20px] text-textColor">Storage Providers</h3>
-            <button
-              onClick={() => {
-                setEditProvider(null);
-                setShowModal(true);
-              }}
-              className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors"
-            >
-              Add Provider
-            </button>
-          </div>
-
-          {loading ? (
-            <div className="text-[14px] text-newTableText">Loading...</div>
-          ) : (
-            <>
-              <div className="flex flex-col gap-[12px]">
-                <h3 className="text-[16px] text-textColor font-medium">
-                  Base Storage (always on)
-                </h3>
-                {providers
-                  .filter((p) => p.type === 'LOCAL')
-                  .map((provider) => (
-                    <ProviderCard
-                      key={provider.id}
-                      provider={provider}
-                      usageBytes={usage[provider.id] || null}
-                      hasOtherProviders={providers.filter((p) => p.type !== 'LOCAL').length > 0}
-                      onMount={handleMount}
-                      onUnmount={handleUnmount}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onTest={handleTest}
-                      onMigrate={handleMigrate}
-                    />
-                  ))}
-              </div>
-
-              {providers.filter((p) => p.type !== 'LOCAL').length > 0 ? (
-                <div className="flex flex-col gap-[12px]">
-                  <h3 className="text-[16px] text-textColor font-medium">
-                    Additional Providers
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
-                    {providers
-                      .filter((p) => p.type !== 'LOCAL')
-                      .map((provider) => (
-                        <ProviderCard
-                          key={provider.id}
-                          provider={provider}
-                          usageBytes={usage[provider.id] || null}
-                          hasOtherProviders={providers.filter((p) => p.type !== 'LOCAL').length > 1}
-                          onMount={handleMount}
-                          onUnmount={handleUnmount}
-                          onEdit={handleEdit}
-                          onDelete={handleDelete}
-                          onTest={handleTest}
-                          onMigrate={handleMigrate}
-                        />
-                      ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="text-[14px] text-newTableText text-center py-[40px]">
-                  No additional storage providers configured yet.
-                </div>
-              )}
-            </>
-          )}
-        </>
-      )}
-
-      {activeTab === 'quota' && (
-        <div className="flex flex-col gap-[20px]">
-          <h3 className="text-[20px] text-textColor">Quota Status</h3>
-          {quotaStatus ? (
-            <div className="flex flex-col gap-[16px]">
-              <div className="p-[16px] rounded-[8px] bg-btnSimple">
-                <div className="text-[13px] text-newTableText mb-[8px]">Used / Quota</div>
-                <div className="text-[24px] text-textColor font-semibold mb-[12px]">
+      {subTab === 'providers' && (
+        <div className="flex flex-col gap-[24px]">
+          {quotaStatus && (
+            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex items-center justify-between">
+              <div className="flex flex-col gap-[4px]">
+                <span className="text-[12px] text-newTableText">{t('storage_used', 'Storage Used')}</span>
+                <span className="text-[20px] font-semibold text-textColor">
                   {formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)}
-                </div>
-                <div className="w-full bg-newTableHeader rounded-[4px] h-[8px] overflow-hidden">
+                </span>
+              </div>
+              <div className="flex flex-col items-end gap-[4px]">
+                <div className="w-[120px] bg-newTableHeader rounded-[4px] h-[8px] overflow-hidden">
                   <div
-                    className={`h-full ${quotaStatus.percentUsed >= 90 ? 'bg-[#ef4444]' : quotaStatus.percentUsed >= 80 ? 'bg-[#f59e0b]' : 'bg-[#10b981]'}`}
+                    className={`h-full rounded-[4px] ${
+                      quotaStatus.percentUsed >= 90
+                        ? 'bg-[#ef4444]'
+                        : quotaStatus.percentUsed >= 80
+                          ? 'bg-[#f59e0b]'
+                          : 'bg-[#10b981]'
+                    }`}
                     style={{ width: `${Math.min(quotaStatus.percentUsed, 100)}%` }}
                   />
                 </div>
-                <div className="text-[13px] text-newTableText mt-[8px]">
-                  {quotaStatus.percentUsed.toFixed(1)}% Used
-                </div>
+                <span className="text-[11px] text-newTableText">
+                  {quotaStatus.percentUsed.toFixed(1)}% used
+                </span>
               </div>
             </div>
-          ) : (
-            <div className="text-[14px] text-newTableText">Loading quota status...</div>
           )}
+
+          {localProvider && (
+            <ProviderListShell
+              title={t('base_storage', 'Base Storage')}
+              providers={[{
+                id: localProvider.id,
+                identifier: localProvider.type,
+                name: localProvider.name,
+                enabled: true,
+                mounted: true,
+                status: ['always_on'],
+              }]}
+              onConfigure={() => {
+                setEditProvider(localProvider);
+                setShowModal(true);
+              }}
+              onRemove={() => {}}
+              ProviderIconComponent={ProviderIcon}
+              renderBadges={(provider) => {
+                const usageBytes = usageMap[provider.id] || null;
+                const quota = localProvider.quotaBytes ? BigInt(localProvider.quotaBytes) : null;
+                const usage = usageBytes ? BigInt(usageBytes) : null;
+                const usagePercent = quota && usage !== null && quota > 0
+                  ? Number((usage * BigInt(100)) / quota)
+                  : null;
+                return (
+                  <div className="flex flex-col gap-[2px]">
+                    <span className="text-[12px] text-newTableText">
+                      {PROVIDER_TYPE_LABELS[localProvider.type] || localProvider.type}
+                      {localProvider.bucket ? ` · ${localProvider.bucket}` : ''}
+                      {localProvider.region ? ` · ${localProvider.region}` : ''}
+                    </span>
+                    {usagePercent !== null && (
+                      <div className="flex items-center gap-[6px] mt-[4px]">
+                        <div className="w-[60px] bg-newTableHeader rounded-[2px] h-[4px] overflow-hidden">
+                          <div
+                            className="h-full bg-btnPrimary rounded-[2px]"
+                            style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-newTableText">{usagePercent}%</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              }}
+              renderActions={(provider) => (
+                <>
+                  <button onClick={() => { setEditProvider(localProvider); setShowModal(true); }} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
+                    Edit
+                  </button>
+                  <button onClick={() => handleTest(localProvider.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors">
+                    Test
+                  </button>
+                </>
+              )}
+            />
+          )}
+
+          <ProviderListShell
+            title={t('additional_providers', 'Additional Providers')}
+            providers={(otherProviders || []).map((p) => ({
+              id: p.id,
+              identifier: p.type,
+              name: p.name,
+              enabled: true,
+              mounted: p.mounted,
+              status: p.mounted ? ['mounted'] : ['unmounted'],
+            }))}
+            onConfigure={(id) => {
+              const p = otherProviders.find((pr) => pr.id === id);
+              if (p) {
+                setEditProvider(p);
+                setShowModal(true);
+              }
+            }}
+            onRemove={(id) => handleDelete(id)}
+            addProviderButton={
+              <button
+                onClick={() => {
+                  setEditProvider(null);
+                  setShowModal(true);
+                }}
+                className="px-[12px] py-[6px] rounded-[6px] bg-btnPrimary text-white text-[12px] font-medium hover:bg-btnPrimary/80 transition-colors"
+              >
+                {t('add_provider', 'Add Provider')}
+              </button>
+            }
+            ProviderIconComponent={ProviderIcon}
+            renderBadges={(provider) => {
+              const p = otherProviders.find((pr) => pr.id === provider.id);
+              if (!p) return null;
+              const usageBytes = usageMap[provider.id] || null;
+              const quota = p.quotaBytes ? BigInt(p.quotaBytes) : null;
+              const usage = usageBytes ? BigInt(usageBytes) : null;
+              const usagePercent = quota && usage !== null && quota > 0
+                ? Number((usage * BigInt(100)) / quota)
+                : null;
+              return (
+                <div className="flex flex-col gap-[2px]">
+                  <span className="text-[12px] text-newTableText">
+                    {PROVIDER_TYPE_LABELS[p.type] || p.type}
+                    {p.bucket ? ` · ${p.bucket}` : ''}
+                    {p.region ? ` · ${p.region}` : ''}
+                  </span>
+                  {usagePercent !== null && (
+                    <div className="flex items-center gap-[6px] mt-[4px]">
+                      <div className="w-[60px] bg-newTableHeader rounded-[2px] h-[4px] overflow-hidden">
+                        <div
+                          className="h-full bg-btnPrimary rounded-[2px]"
+                          style={{ width: `${Math.min(usagePercent, 100)}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-newTableText">{usagePercent}%</span>
+                    </div>
+                  )}
+                </div>
+              );
+            }}
+            renderActions={(provider) => {
+              const p = otherProviders.find((pr) => pr.id === provider.id);
+              if (!p) return null;
+              return (
+                <>
+                  {p.mounted ? (
+                    <button onClick={() => handleUnmount(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a2a2a] transition-colors">
+                      Unmount
+                    </button>
+                  ) : (
+                    <button onClick={() => handleMount(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-textColor hover:bg-[#1a3a1a] transition-colors">
+                      Mount
+                    </button>
+                  )}
+                  <button onClick={() => { setEditProvider(p); setShowModal(true); }} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
+                    Edit
+                  </button>
+                  <button onClick={() => handleTest(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors">
+                    Test
+                  </button>
+                  {otherProviders.length > 1 && (
+                    <button onClick={() => setMigrateSource(p)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f59e0b] hover:bg-[#3a2a1a] transition-colors">
+                      Migrate
+                    </button>
+                  )}
+                  <button onClick={() => handleDelete(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f87171] hover:bg-[#3a1a1a] transition-colors">
+                    Delete
+                  </button>
+                </>
+              );
+            }}
+          />
         </div>
       )}
 
-      {activeTab === 'breakdown' && (
+      {subTab === 'audit' && <AuditTab />}
+
+      {subTab === 'breakdown' && (
         <div className="flex flex-col gap-[20px]">
-          <h3 className="text-[20px] text-textColor">Usage Breakdown</h3>
+          <h3 className="text-[18px] text-textColor">{t('usage_breakdown', 'Usage Breakdown')}</h3>
           {usageBreakdown ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-[20px]">
-              <div className="flex flex-col gap-[12px]">
-                <h4 className="text-[16px] text-textColor font-medium">By Folder</h4>
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex flex-col gap-[12px]">
+                <h4 className="text-[14px] text-textColor font-medium">{t('by_folder', 'By Folder')}</h4>
                 {usageBreakdown.byFolder?.length > 0 ? (
-                  <div className="space-y-[8px]">
+                  <div className="space-y-[6px]">
                     {usageBreakdown.byFolder.map((folder: any) => (
-                      <div key={folder.folderId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-btnSimple text-[13px]">
+                      <div key={folder.folderId} className="flex items-center justify-between text-[13px]">
                         <span className="text-textColor">{folder.folderName}</span>
                         <span className="text-newTableText">{formatBytes(folder.totalBytes)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-[13px] text-newTableText">No usage data</div>
+                  <div className="text-[13px] text-newTableText">{t('no_data', 'No data')}</div>
                 )}
               </div>
-              <div className="flex flex-col gap-[12px]">
-                <h4 className="text-[16px] text-textColor font-medium">By Provider</h4>
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex flex-col gap-[12px]">
+                <h4 className="text-[14px] text-textColor font-medium">{t('by_provider', 'By Provider')}</h4>
                 {usageBreakdown.byProvider?.length > 0 ? (
-                  <div className="space-y-[8px]">
+                  <div className="space-y-[6px]">
                     {usageBreakdown.byProvider.map((provider: any) => (
-                      <div key={provider.providerId} className="flex items-center justify-between p-[12px] rounded-[8px] bg-btnSimple text-[13px]">
+                      <div key={provider.providerId} className="flex items-center justify-between text-[13px]">
                         <span className="text-textColor">{provider.providerName}</span>
                         <span className="text-newTableText">{formatBytes(provider.totalBytes)}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-[13px] text-newTableText">No usage data</div>
+                  <div className="text-[13px] text-newTableText">{t('no_data', 'No data')}</div>
                 )}
               </div>
             </div>
           ) : (
-            <div className="text-[14px] text-newTableText">Loading usage breakdown...</div>
+            <div className="text-[13px] text-newTableText animate-pulse">{t('loading', 'Loading...')}</div>
           )}
         </div>
       )}
-
-      {activeTab === 'audit' && <AuditTab />}
 
       {showModal && (
         <ProviderFormModal
@@ -377,16 +468,12 @@ export const StorageTab: React.FC = () => {
       {migrateSource && (
         <MigrationModal
           source={migrateSource}
-          targets={providers.filter((p) => p.id !== migrateSource.id)}
+          targets={otherProviders.filter((p) => p.id !== migrateSource.id)}
           onClose={() => setMigrateSource(null)}
-          onComplete={() => {
-            loadProviders();
-            loadUsage();
-            loadQuotaStatus();
-            loadUsageBreakdown();
-          }}
+          onComplete={refresh}
         />
       )}
     </div>
   );
 };
+

@@ -1,6 +1,9 @@
-const { writeFileSync } = require('fs');
-const { join } = require('path');
-const { deflateSync } = require('zlib');
+import { writeFileSync } from 'fs';
+import { dirname, join } from 'path';
+import { deflateSync } from 'zlib';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const OUT = join(__dirname, '..', 'apps', 'frontend', 'public', 'icons', 'shortlinks');
 const SIZE = 48;

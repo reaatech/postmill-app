@@ -1,19 +1,7 @@
 'use client';
 
 import React from 'react';
-import { S3Icon } from '@gitroom/frontend/components/settings/storage/icons/s3-icon';
-import { R2Icon } from '@gitroom/frontend/components/settings/storage/icons/r2-icon';
-import { B2Icon } from '@gitroom/frontend/components/settings/storage/icons/b2-icon';
-import { IdriveIcon } from '@gitroom/frontend/components/settings/storage/icons/idrive-icon';
-import { LocalIcon } from '@gitroom/frontend/components/settings/storage/icons/local-icon';
-
-const typeIcons: Record<string, React.FC<{ className?: string }>> = {
-  LOCAL: LocalIcon,
-  S3: S3Icon,
-  CLOUDFLARE_R2: R2Icon,
-  BACKBLAZE_B2: B2Icon,
-  IDRIVE_E2: IdriveIcon,
-};
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 
 const typeLabels: Record<string, string> = {
   LOCAL: 'Local Storage',
@@ -54,7 +42,6 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   onTest,
   onMigrate,
 }) => {
-  const Icon = typeIcons[provider.type] || LocalIcon;
   const quota = provider.quotaBytes ? BigInt(provider.quotaBytes) : null;
   const usage = usageBytes ? BigInt(usageBytes) : null;
   const usagePercent =
@@ -65,7 +52,11 @@ export const ProviderCard: React.FC<ProviderCardProps> = ({
   return (
     <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex flex-col gap-[12px]">
       <div className="flex items-center gap-[12px]">
-        <Icon />
+        <ProviderIcon
+          identifier={provider.type}
+          name={provider.name}
+          size={36}
+        />
         <div className="flex-1 min-w-0">
           <h4 className="text-[14px] font-medium text-textColor truncate">
             {provider.name}

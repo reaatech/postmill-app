@@ -8,16 +8,21 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 interface ProviderDetail {
   identifier: string;
   name: string;
-  credentialFields: Array<{
-    key: string;
-    label: string;
-    type: string;
-    required: boolean;
-    placeholder?: string;
-  }>;
+  capabilities: { image: boolean; video: boolean; audio: boolean; avatar: boolean };
   isConfigured: boolean;
   enabled: boolean;
-  capabilities: string[];
+}
+
+interface ProviderListItem {
+  identifier: string;
+  name: string;
+  capabilities: ProviderDetail['capabilities'];
+}
+
+interface ProviderConfigItem {
+  identifier: string;
+  isConfigured: boolean;
+  enabled: boolean;
 }
 
 interface ProviderModalProps {
@@ -36,17 +41,37 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message?: string } | null>(null);
   const [provider, setProvider] = useState<ProviderDetail | null>(null);
-  const [credentials, setCredentials] = useState<Record<string, string>>({});
-  const [enabled, setEnabled] = useState(false);
+  const [apiKey, setApiKey] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/admin/ai-settings/providers/${identifier}`);
-        if (res.ok) {
-          const data = await res.json();
-          setProvider(data);
-          setEnabled(data.enabled);
+        const [providersRes, configRes] = await Promise.all([
+          fetch('/settings/media/providers'),
+          fetch('/settings/media/config'),
+        ]);
+        if (providersRes.ok) {
+          const providers: ProviderListItem[] = await providersRes.json();
+          const match = providers.find((p) => p.identifier === identifier);
+          if (match) {
+            setProvider({
+              identifier: match.identifier,
+              name: match.name,
+              capabilities: match.capabilities,
+              isConfigured: false,
+              enabled: false,
+            });
+          }
+        }
+        if (configRes.ok) {
+          const configData: { providers?: ProviderConfigItem[] } =
+            await configRes.json();
+          const cfg = (configData.providers || []).find(
+            (p) => p.identifier === identifier
+          );
+          if (cfg) {
+            setProvider((prev) => prev ? { ...prev, isConfigured: cfg.isConfigured, enabled: cfg.enabled } : prev);
+          }
         }
       } catch {
         toaster.show('Failed to load provider details', 'warning');
@@ -60,11 +85,10 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     setSaving(true);
     setTestResult(null);
     try {
-      const res = await fetch(`/admin/ai-settings/providers/${identifier}`, {
+      const res = await fetch(`/settings/media/config/${identifier}`, {
         method: 'PUT',
         body: JSON.stringify({
-          enabled,
-          credentials: Object.keys(credentials).length > 0 ? credentials : undefined,
+          credentials: apiKey ? { apiKey } : undefined,
         }),
       });
       if (!res.ok) {
@@ -79,28 +103,28 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     } finally {
       setSaving(false);
     }
-  }, [identifier, enabled, credentials, fetch, toaster, t, onSaved, onClose]);
+  }, [identifier, apiKey, fetch, toaster, t, onSaved, onClose]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
     try {
       const body: any = {};
-      if (Object.keys(credentials).length > 0) {
-        body.credentials = credentials;
+      if (apiKey) {
+        body.credentials = { apiKey };
       }
-      const res = await fetch(`/admin/ai-settings/providers/${identifier}/test`, {
+      const res = await fetch(`/settings/media/config/${identifier}/test`, {
         method: 'POST',
         body: JSON.stringify(body),
       });
       const data = await res.json();
-      setTestResult({ success: res.ok, message: data.message || (res.ok ? 'Connection successful' : 'Connection failed') });
+      setTestResult({ success: data.ok, message: data.message || (res.ok ? 'Connection successful' : 'Connection failed') });
     } catch {
       setTestResult({ success: false, message: 'Connection test failed' });
     } finally {
       setTesting(false);
     }
-  }, [identifier, credentials, fetch]);
+  }, [identifier, apiKey, fetch]);
 
   if (loading) {
     return (
@@ -142,46 +166,18 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
         </div>
 
         <div className="flex flex-col gap-[16px]">
-          {provider.credentialFields.map((field) => (
-            <div key={field.key} className="flex flex-col gap-[4px]">
-              <label className="text-[13px] text-newTableText">
-                {field.label}
-                {field.required && <span className="text-red-500 ml-[2px]">*</span>}
-              </label>
-              {field.type === 'textarea' ? (
-                <textarea
-                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] resize-y min-h-[60px]"
-                  placeholder={field.placeholder || field.label}
-                  value={credentials[field.key] || ''}
-                  onChange={(e) =>
-                    setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
-                  }
-                />
-              ) : (
-                <input
-                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-                  type={field.type === 'password' ? 'password' : 'text'}
-                  placeholder={field.placeholder || field.label}
-                  value={credentials[field.key] || ''}
-                  onChange={(e) =>
-                    setCredentials((prev) => ({ ...prev, [field.key]: e.target.value }))
-                  }
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="flex items-center gap-[12px]">
-          <label className="flex items-center gap-[6px] cursor-pointer">
+          <div className="flex flex-col gap-[4px]">
+            <label className="text-[13px] text-newTableText">
+              API Key <span className="text-red-500 ml-[2px]">*</span>
+            </label>
             <input
-              type="checkbox"
-              className="accent-btnPrimary"
-              checked={enabled}
-              onChange={(e) => setEnabled(e.target.checked)}
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+              type="password"
+              placeholder="Enter your API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
             />
-            <span className="text-[13px]">{t('enabled', 'Enabled')}</span>
-          </label>
+          </div>
         </div>
 
         {testResult && (

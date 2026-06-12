@@ -18,6 +18,12 @@ export class StorageRepository {
     });
   }
 
+  findByFingerprint(orgId: string, fingerprint: string) {
+    return this._storage.model.storageProviderConfig.findFirst({
+      where: { organizationId: orgId, accountFingerprint: fingerprint },
+    });
+  }
+
   findById(id: string) {
     return this._storage.model.storageProviderConfig.findUnique({
       where: { id },
@@ -34,6 +40,7 @@ export class StorageRepository {
     endpoint?: string;
     publicUrl?: string;
     quotaBytes?: bigint;
+    accountFingerprint?: string;
   }) {
     return this._storage.model.storageProviderConfig.create({ data });
   }
@@ -82,7 +89,17 @@ export class StorageRepository {
       where: { id: orgId },
       select: { localStorageQuotaBytes: true },
     });
-    return org?.localStorageQuotaBytes ?? BigInt(5368709120);
+    if (org?.localStorageQuotaBytes) return org.localStorageQuotaBytes;
+
+    const envGb = parseInt(process.env.LOCAL_STORAGE_QUOTA_GB || '5', 10);
+    return BigInt(envGb) * BigInt(1024 * 1024 * 1024);
+  }
+
+  async setOrgQuota(orgId: string, quotaBytes: bigint): Promise<void> {
+    await this._org.model.organization.update({
+      where: { id: orgId },
+      data: { localStorageQuotaBytes: quotaBytes },
+    });
   }
 
   // ── Migration source-media resolution (#48/#50) ──
