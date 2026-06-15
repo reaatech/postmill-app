@@ -25,6 +25,10 @@ overrides:
   # pulled by @aws-sdk/client-sesv2@3.800.0 -> @aws-sdk/core@3.799.0 (pins 4.4.1). Bump the
   # vulnerable 4.x to patched 4.5.x (same major, API-compatible); newer aws-sdk paths use 5.x.
   'fast-xml-parser@<4.5.4': '>=4.5.4 <5'
+  # esbuild <0.28.1: high missing binary integrity verification in Deno module enables remote
+  # code execution via NPM_CONFIG_REGISTRY (GHSA-gv7w-rqvm-qjhr), pulled by terser-webpack-plugin,
+  # vite, and @prisma/config. Bump vulnerable <0.28.1 to patched 0.28.x (same major).
+  'esbuild@<0.28.1': '>=0.28.1 <0.29'
 
 onlyBuiltDependencies:
   - bcrypt
