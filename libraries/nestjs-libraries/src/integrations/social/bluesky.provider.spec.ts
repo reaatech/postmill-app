@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import EventEmitter from 'events';
 
 vi.mock('sharp', () => ({ default: vi.fn() }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));

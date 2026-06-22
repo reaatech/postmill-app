@@ -11,7 +11,6 @@ vi.mock('sharp', () => ({ default: vi.fn(function() { return ({
   resize: vi.fn(() => ({ gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })) })),
   gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
 }); }) }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 // safeFetch's SSRF pre-validation does real DNS; delegate to the mocked global
@@ -177,6 +176,7 @@ process.env.FRONTEND_URL = 'http://localhost:5000';
 process.env.NEXT_PUBLIC_BACKEND_URL = 'http://localhost:5000';
 process.env.NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY = '/uploads';
 
+import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { BlueskyProvider } from './bluesky.provider';
 import { LemmyProvider } from './lemmy.provider';
 import { NostrProvider } from './nostr.provider';
@@ -204,6 +204,15 @@ function respCreated() {
     status: 201, ok: true,
     json: vi.fn().mockResolvedValue({}),
     text: vi.fn().mockResolvedValue('{}'),
+    headers: new Map(),
+  };
+}
+
+function respError(body: string, status: number) {
+  return {
+    status, ok: false,
+    json: vi.fn().mockResolvedValue({}),
+    text: vi.fn().mockResolvedValue(body),
     headers: new Map(),
   };
 }
@@ -1199,6 +1208,12 @@ describe('skool deep', () => {
 
   it('handleErrors returns undefined for unknown', () => {
     expect(provider.handleErrors('ok')).toBeUndefined();
+  });
+
+  it('propagates BadBodyError when post encounters a bad-body error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('must be admin or level', 403));
+    const integration = { customInstanceDetails: JSON.stringify({ client_id: 'client-123', auth_token: 'auth-token-123' }) } as any;
+    await expect(provider.post('user-123', 'tok', [{ id: 'p1', message: 'Hello Skool!', settings: { group: 'group-1', title: 'My Post' } }], integration)).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken returns static value', async () => {

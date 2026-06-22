@@ -15,11 +15,10 @@ import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.se
 import Parser from 'rss-parser';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
-import { TemporalService } from 'nestjs-temporal-core';
-import { TypedSearchAttributes } from '@temporalio/common';
 import {
-  organizationId,
-} from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 const parser = new Parser();
 
@@ -53,7 +52,6 @@ const dallePrompt = z.object({
 export class AutopostService {
   constructor(
     private _autopostsRepository: AutopostRepository,
-    private _temporalService: TemporalService,
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
     private _aiModelProvider: AIModelProvider,
@@ -95,25 +93,36 @@ export class AutopostService {
 
   async processCron(active: boolean, orgId: string, id: string) {
     if (active) {
+      if (!isInngestEnabled()) {
+        Logger.debug(
+          `Skipping autopost/process event for ${id} — Inngest is disabled`
+        );
+        return;
+      }
+
       try {
-        return this._temporalService.client
-          .getRawClient()
-          ?.workflow.start('autoPostWorkflow', {
-            workflowId: `autopost-${id}`,
-            taskQueue: 'main',
-            args: [{ id, immediately: true }],
-            typedSearchAttributes: new TypedSearchAttributes([
-              {
-                key: organizationId,
-                value: orgId,
-              },
-            ]),
-          });
-      } catch (err) { Logger.warn(`Failed to start Temporal workflow: ${(err as Error)?.message}`); }
+        return await inngest.send({
+          name: 'autopost/process',
+          data: { id },
+          id: `autopost-${id}`,
+        });
+      } catch (err) {
+        Logger.warn(`Failed to send autopost/process event: ${(err as Error)?.message}`);
+      }
+    }
+
+    if (!isInngestEnabled()) {
+      Logger.debug(
+        `Skipping autopost/cancel event for ${id} — Inngest is disabled`
+      );
+      return false;
     }
 
     try {
-      return await this._temporalService.terminateWorkflow(`autopost-${id}`);
+      return await inngest.send({
+        name: 'autopost/cancel',
+        data: { id },
+      });
     } catch (err) {
       return false;
     }

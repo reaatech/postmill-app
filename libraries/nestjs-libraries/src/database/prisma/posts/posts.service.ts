@@ -43,17 +43,12 @@ import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 dayjs.extend(utc);
 import * as Sentry from '@sentry/nestjs';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
-import { TemporalService } from 'nestjs-temporal-core';
-import { TypedSearchAttributes } from '@temporalio/common';
-import {
-  organizationId,
-  postId as postIdSearchParam,
-} from '@gitroom/nestjs-libraries/temporal/temporal.search.attribute';
+import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { AnalyticsData } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { RefreshTokenError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { stripLinks } from '@gitroom/helpers/utils/strip.links';
@@ -78,7 +73,6 @@ export class PostsService {
     private _mediaService: MediaService,
     private _shortLinkService: ShortLinkService,
     private _openaiService: OpenaiService,
-    private _temporalService: TemporalService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _ragService: RagService,
     private _storageService: StorageService,
@@ -152,7 +146,7 @@ export class PostsService {
       );
     } catch (e) {
       Logger.warn(`getMissingContent error: ${(e as Error)?.message}`);
-      if (e instanceof RefreshToken) {
+      if (e instanceof RefreshTokenError) {
         return this.getMissingContent(orgId, postId, true);
       }
     }
@@ -252,7 +246,7 @@ export class PostsService {
       return loadAnalytics;
     } catch (e) {
       Logger.warn(`checkPostAnalytics error: ${(e as Error)?.message}`);
-      if (e instanceof RefreshToken) {
+      if (e instanceof RefreshTokenError) {
         return this.checkPostAnalytics(orgId, postId, date, true);
       }
     }
@@ -785,25 +779,15 @@ export class PostsService {
 
     if (post?.id) {
       try {
-        const workflows = this._temporalService.client
-          .getRawClient()
-          ?.workflow.list({
-            query: `postId="${post.id}" AND ExecutionStatus="Running"`,
+        if (isInngestEnabled()) {
+          await inngest.send({
+            name: 'post/cancel',
+            data: { postId: post.id },
           });
-
-        for await (const executionInfo of workflows) {
-          try {
-            const workflow =
-              await this._temporalService.client.getWorkflowHandle(
-                executionInfo.workflowId
-              );
-            if (
-              workflow &&
-              (await workflow.describe()).status.name !== 'TERMINATED'
-            ) {
-              await workflow.terminate();
-            }
-          } catch (err) {}
+        } else {
+          Logger.debug(
+            `Skipping post/cancel event for post ${post.id} — Inngest is disabled`
+          );
         }
       } catch (err) {}
     }
@@ -820,30 +804,26 @@ export class PostsService {
   }
 
   async startWorkflow(
-    taskQueue: string,
+    providerIdentifier: string,
     postId: string,
     orgId: string,
     state: State
   ) {
-    try {
-      const workflows = this._temporalService.client
-        .getRawClient()
-        ?.workflow.list({
-          query: `postId="${postId}" AND ExecutionStatus="Running"`,
-        });
+    const provider =
+      this._integrationManager.getSocialIntegrationUnchecked(providerIdentifier);
+    const taskQueue = providerIdentifier.split('-')[0].toLowerCase();
+    const maxConcurrentJob = provider?.maxConcurrentJob ?? 1;
 
-      for await (const executionInfo of workflows) {
-        try {
-          const workflow = await this._temporalService.client.getWorkflowHandle(
-            executionInfo.workflowId
-          );
-          if (
-            workflow &&
-            (await workflow.describe()).status.name !== 'TERMINATED'
-          ) {
-            await workflow.terminate();
-          }
-        } catch (err) {}
+    try {
+      if (isInngestEnabled()) {
+        await inngest.send({
+          name: 'post/cancel',
+          data: { postId },
+        });
+      } else {
+        Logger.debug(
+          `Skipping post/cancel event for post ${postId} — Inngest is disabled`
+        );
       }
     } catch (err) {}
 
@@ -852,52 +832,22 @@ export class PostsService {
     }
 
     try {
-      const postData = await this._postRepository.getPostById(
-        orgId,
-        postId
-      );
-      let workflowName = 'postWorkflowV105';
-      if (postData?.settings) {
-        try {
-          const settings = JSON.parse(
-            typeof postData.settings === 'string'
-              ? postData.settings
-              : JSON.stringify(postData.settings)
-          );
-          if (
-            settings?.firstComment &&
-            !settings?.firstCommentPostedAt &&
-            !settings?.firstCommentId
-          ) {
-            workflowName = 'postWorkflowV106';
-          }
-        } catch {}
-      }
-
-      await this._temporalService.client
-        .getRawClient()
-        ?.workflow.start(workflowName, {
-          workflowId: `post_${postId}`,
-          taskQueue: 'main',
-          workflowIdConflictPolicy: 'TERMINATE_EXISTING',
-          args: [
-            {
-              taskQueue: taskQueue,
-              postId: postId,
-              organizationId: orgId,
-            },
-          ],
-          typedSearchAttributes: new TypedSearchAttributes([
-            {
-              key: postIdSearchParam,
-              value: postId,
-            },
-            {
-              key: organizationId,
-              value: orgId,
-            },
-          ]),
+      if (isInngestEnabled()) {
+        await inngest.send({
+          name: 'post/publish',
+          data: {
+            postId,
+            organizationId: orgId,
+            taskQueue,
+            maxConcurrentJob,
+          },
+          id: `post_${postId}`,
         });
+      } else {
+        Logger.debug(
+          `Skipping post/publish event for post ${postId} — Inngest is disabled`
+        );
+      }
     } catch (err) {}
   }
 
@@ -1068,7 +1018,7 @@ export class PostsService {
 
       if (body.type !== 'update') {
         this.startWorkflow(
-          post.settings.__type.split('-')[0].toLowerCase(),
+          (post.settings as any)?.__type,
           posts[0].id,
           orgId,
           posts[0].state
@@ -1270,7 +1220,7 @@ export class PostsService {
 
     try {
       await this.startWorkflow(
-        getPostById.integration.providerIdentifier.split('-')[0].toLowerCase(),
+        getPostById.integration.providerIdentifier,
         getPostById.id,
         orgId,
         state
@@ -1301,9 +1251,7 @@ export class PostsService {
     if (action === 'schedule') {
       try {
         await this.startWorkflow(
-          getPostById.integration.providerIdentifier
-            .split('-')[0]
-            .toLowerCase(),
+          getPostById.integration.providerIdentifier,
           getPostById.id,
           orgId,
           getPostById.state === 'DRAFT' ? 'DRAFT' : 'QUEUE'

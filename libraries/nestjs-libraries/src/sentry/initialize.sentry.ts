@@ -61,6 +61,50 @@ function scrubRequestBody(body: any): any {
   return scrubbed;
 }
 
+function isInngestRequest(request?: Record<string, any>): boolean {
+  if (!request) return false;
+
+  const url = request.url || request.path || '';
+  if (typeof url === 'string' && url.indexOf('/api/inngest') > -1) {
+    return true;
+  }
+
+  const headers = request.headers || {};
+  if (headers && typeof headers === 'object') {
+    for (const key of Object.keys(headers)) {
+      if (key.toLowerCase().startsWith('x-inngest-')) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function scrubEvent(event: any): any {
+  if (event.request) {
+    // Inngest payloads are large (but not PII) — drop the body entirely.
+    if (isInngestRequest(event.request)) {
+      delete event.request.data;
+    }
+    event.request = scrubRequestData(event.request);
+  }
+  if (event.user) {
+    const user = { ...event.user };
+    user.email = '[REDACTED]';
+    user.username = '[REDACTED]';
+    event.user = user;
+  }
+  if (event.extra) {
+    const extra = { ...event.extra };
+    for (const key of Object.keys(extra)) {
+      extra[key] = scrubRequestBody(extra[key]);
+    }
+    event.extra = extra;
+  }
+  return event;
+}
+
 export const initializeSentry = (appName: string, allowLogs = false) => {
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
     return null;
@@ -101,23 +145,11 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
       profileLifecycle: 'trace',
 
       beforeSend(event, _hint) {
-        if (event.request) {
-          event.request = scrubRequestData(event.request);
-        }
-        if (event.user) {
-          const user = { ...event.user };
-          user.email = '[REDACTED]';
-          user.username = '[REDACTED]';
-          event.user = user;
-        }
-        if (event.extra) {
-          const extra = { ...event.extra };
-          for (const key of Object.keys(extra)) {
-            extra[key] = scrubRequestBody(extra[key]);
-          }
-          event.extra = extra;
-        }
-        return event;
+        return scrubEvent(event);
+      },
+
+      beforeSendTransaction(event, _hint) {
+        return scrubEvent(event);
       },
 
       beforeBreadcrumb(breadcrumb, _hint) {

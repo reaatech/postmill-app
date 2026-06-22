@@ -579,53 +579,47 @@ export class RagService implements OnModuleInit {
   private _workerDelayMs = 2000;
   private readonly _QUEUE_KEY = 'rag:index:queue';
   private readonly _PROCESSING_KEY = 'rag:index:processing';
-  private _blockingRedis?: typeof ioRedis;
 
   private async _startWorker(): Promise<void> {
     if (this._workerRunning) return;
     this._workerRunning = true;
 
-    // BRPOPLPUSH blocks the connection it runs on. ioredis pipelines every
-    // command in the app onto the shared connection, so running it there
-    // stalls all other Redis ops — including the per-request throttler check —
-    // for up to the block timeout (~2s on EVERY request). Blocking commands
-    // must use their own dedicated connection.
-    if (!this._blockingRedis) {
-      this._blockingRedis = ioRedis.duplicate();
-      this._blockingRedis.on('error', () => {
-        /* reconnects are handled by ioredis; pollLoop backs off on throw */
-      });
-    }
-
+    // Upstash (and some other remote Redis providers) do not support blocking
+    // list commands such as BRPOPLPUSH. Use the non-blocking RPOPLPUSH in a poll
+    // loop instead. This keeps the atomic move from queue -> processing while
+    // staying compatible with serverless Redis endpoints.
     const pollLoop = async () => {
       while (this._workerRunning) {
+        let item: string | null = null;
         try {
-          const item = await this._blockingRedis!.brpoplpush(
-            this._QUEUE_KEY,
-            this._PROCESSING_KEY,
-            this._workerDelayMs / 1000,
-          );
-          if (item) {
-            const job = JSON.parse(item);
-            try {
-              await this._doIndex(
-                job.organizationId,
-                job.sourceType,
-                job.sourceId,
-                job.chunks,
-                job.contentHash,
-              );
-              await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
-            } catch (err) {
-              this._logger.error(
-                `RAG worker failed for ${job.sourceType}:${job.sourceId}: ${(err as Error).message}`,
-              );
-              await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
-              await ioRedis.lpush(this._QUEUE_KEY, item);
-            }
-          }
+          item = await ioRedis.rpoplpush(this._QUEUE_KEY, this._PROCESSING_KEY);
         } catch {
+          // Redis unavailable — back off and retry.
           await new Promise((r) => setTimeout(r, this._workerDelayMs));
+          continue;
+        }
+
+        if (!item) {
+          await new Promise((r) => setTimeout(r, this._workerDelayMs));
+          continue;
+        }
+
+        const job = JSON.parse(item);
+        try {
+          await this._doIndex(
+            job.organizationId,
+            job.sourceType,
+            job.sourceId,
+            job.chunks,
+            job.contentHash,
+          );
+          await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
+        } catch (err) {
+          this._logger.error(
+            `RAG worker failed for ${job.sourceType}:${job.sourceId}: ${(err as Error).message}`,
+          );
+          await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
+          await ioRedis.lpush(this._QUEUE_KEY, item);
         }
       }
     };

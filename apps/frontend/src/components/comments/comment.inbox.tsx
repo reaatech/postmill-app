@@ -6,7 +6,6 @@ import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CommentInboxFilters, InboxFilters } from './comment.inbox.filters';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
 interface InboxComment {
@@ -36,7 +35,6 @@ interface InboxResponse {
 export const CommentInbox: FC = () => {
   const t = useT();
   const fetch = useFetch();
-  const { runCron } = useVariables();
   const [filters, setFilters] = useState<InboxFilters>({ unreadOnly: false });
   const [cursor, setCursor] = useState<string | undefined>(undefined);
   const [statusCode, setStatusCode] = useState<number | null>(null);
@@ -189,19 +187,6 @@ export const CommentInbox: FC = () => {
   return (
     <div className="flex flex-col gap-[16px]">
       <PageHeader title="Inbox" description="Manage and respond to comments across channels" action={syncAction} />
-
-      {!runCron && (
-        <div className="flex items-center gap-[8px] px-[16px] py-[10px] bg-amber-500/10 border border-amber-500/30 rounded-[8px] text-[12px] text-amber-400">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0">
-            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-            <line x1="12" y1="9" x2="12" y2="13" />
-            <line x1="12" y1="17" x2="12.01" y2="17" />
-          </svg>
-          <span>
-            {t('comment_inbox.cron_banner', 'Comment sync requires the background cron worker to be running. Set RUN_CRON=true in your environment to enable automatic comment collection.')}
-          </span>
-        </div>
-      )}
 
       <div className="flex items-center justify-between gap-[12px]">
         <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />

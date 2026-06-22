@@ -30,9 +30,47 @@ export class ConfigurationChecker {
     this.checkIsValidUrl('FRONTEND_URL');
     this.checkIsValidUrl('NEXT_PUBLIC_BACKEND_URL');
     this.checkIsValidUrl('BACKEND_INTERNAL_URL');
+    this.checkInngest();
+    this.checkInngestUrl();
     this.checkDeprecatedStorageVars();
     this.checkDeprecatedChannelVars();
     this.checkDeprecatedAiVars();
+  }
+
+  checkInngest() {
+    const devMode = this.get('INNGEST_DEV') === '1';
+
+    if (!devMode) {
+      this.checkNonEmpty('INNGEST_EVENT_KEY', 'Required when INNGEST_DEV is not set.');
+      this.checkNonEmpty('INNGEST_SIGNING_KEY', 'Required when INNGEST_DEV is not set.');
+    }
+
+    const fallback = this.get('INNGEST_SIGNING_KEY_FALLBACK');
+    const primary = this.get('INNGEST_SIGNING_KEY');
+    if (fallback && !primary) {
+      this.issues.push('INNGEST_SIGNING_KEY_FALLBACK is set but INNGEST_SIGNING_KEY is empty. Set the primary key first.');
+    }
+  }
+
+  checkInngestUrl() {
+    const urlVars = ['INNGEST_BASE_URL', 'INNGEST_SERVE_ORIGIN'];
+    for (const key of urlVars) {
+      const value = this.get(key);
+      if (!value) continue;
+      try {
+        new URL(value);
+      } catch (error) {
+        this.issues.push(key + ' is not a valid URL');
+      }
+      if (value.endsWith('/')) {
+        this.issues.push(key + ' should not end with /');
+      }
+    }
+
+    const path = this.get('INNGEST_SERVE_PATH');
+    if (path && !path.startsWith('/')) {
+      this.issues.push('INNGEST_SERVE_PATH must start with /');
+    }
   }
 
   checkDeprecatedStorageVars() {
@@ -117,13 +155,14 @@ export class ConfigurationChecker {
   checkRedis() {
     if (!this.cfg.REDIS_URL) {
       this.issues.push('REDIS_URL not set');
+      return;
     }
 
     try {
       const redisUrl = new URL(this.cfg.REDIS_URL);
 
-      if (redisUrl.protocol !== 'redis:') {
-        this.issues.push('REDIS_URL must start with redis://');
+      if (redisUrl.protocol !== 'redis:' && redisUrl.protocol !== 'rediss:') {
+        this.issues.push('REDIS_URL must start with redis:// or rediss://');
       }
     } catch (error) {
       this.issues.push('REDIS_URL is not a valid URL');

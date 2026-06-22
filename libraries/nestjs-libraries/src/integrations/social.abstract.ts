@@ -1,9 +1,12 @@
 import { timer } from '@gitroom/helpers/utils/timer';
 import { Integration } from '@prisma/client';
-import { ApplicationFailure } from '@temporalio/activity';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import sharp from 'sharp';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import {
+  RefreshTokenError,
+  BadBodyError,
+} from '@gitroom/nestjs-libraries/inngest/errors';
 // undici's own fetch — the global fetch is Node's built-in undici (v6) and throws
 // `invalid onRequestStart method` when handed an Agent from npm undici (v8), breaking
 // every outbound provider call (publish/refresh/analytics). Same version = dispatcher works.
@@ -14,29 +17,17 @@ export type ValidityMedia = {
   thumbnail?: string;
 };
 
-export class RefreshToken extends ApplicationFailure {
-  constructor(identifier: string, json: string, body: BodyInit, message = '') {
-    super(message, 'refresh_token', true, [
-      {
-        identifier,
-        json,
-        body,
-      },
-    ]);
-  }
-}
+/**
+ * Retryable error thrown when a provider access token needs to be refreshed.
+ * @deprecated Use `RefreshTokenError` from `@gitroom/nestjs-libraries/inngest/errors`.
+ */
+export const RefreshToken = RefreshTokenError;
 
-export class BadBody extends ApplicationFailure {
-  constructor(identifier: string, json: string, body: BodyInit, message = '') {
-    super(message, 'bad_body', true, [
-      {
-        identifier,
-        json,
-        body,
-      },
-    ]);
-  }
-}
+/**
+ * Non-retryable error thrown when a provider rejects the request body.
+ * @deprecated Use `BadBodyError` from `@gitroom/nestjs-libraries/inngest/errors`.
+ */
+export const BadBody = BadBodyError;
 
 export class NotEnoughScopes {
   constructor(

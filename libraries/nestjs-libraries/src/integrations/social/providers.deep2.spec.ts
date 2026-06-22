@@ -13,7 +13,6 @@ vi.mock('sharp', () => ({ default: vi.fn(function() {
     gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
   };
 }) }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 // safeFetch's SSRF pre-validation does real DNS; delegate to the mocked global
@@ -94,6 +93,7 @@ vi.mock('googleapis', () => {
 
 process.env.FRONTEND_URL = 'http://localhost:5000';
 
+import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { DribbbleProvider } from './dribbble.provider';
 import { DiscordProvider } from './discord.provider';
 import { SlackProvider } from './slack.provider';
@@ -111,6 +111,17 @@ function resp(data: any) {
     status: 200, ok: true,
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+    blob: vi.fn().mockResolvedValue(new Blob()),
+    arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
+    headers: new Map(),
+  } as any;
+}
+
+function respError(body: string, status: number) {
+  return {
+    status, ok: false,
+    json: vi.fn().mockResolvedValue({}),
+    text: vi.fn().mockResolvedValue(body),
     blob: vi.fn().mockResolvedValue(new Blob()),
     arrayBuffer: vi.fn().mockResolvedValue(new ArrayBuffer(8)),
     headers: new Map(),
@@ -229,6 +240,11 @@ describe('discord deep', () => {
     expect(provider.handleErrors('40005')?.type).toBe('bad-body');
     expect(provider.handleErrors('20028')?.type).toBe('retry');
     expect(provider.handleErrors('random error')).toBeUndefined();
+  });
+
+  it('propagates BadBodyError when post encounters a bad-body error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('50001', 403));
+    await expect(provider.post('guild-123', 'tok', [{ id: 'p1', message: 'Hello Discord!', settings: { channel: 'ch-1' }, media: [] }])).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken calls token and @me endpoints', async () => {

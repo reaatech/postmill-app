@@ -13,7 +13,6 @@ vi.mock('sharp', () => ({ default: vi.fn(function() {
     gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
   };
 }) }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 vi.mock('@prisma/client', () => ({ PrismaClient: vi.fn(), ProviderConfiguration: class {}, Integration: class {} }));
@@ -96,6 +95,7 @@ vi.mock('googleapis', () => {
 
 process.env.FRONTEND_URL = 'http://localhost:5000';
 
+import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { XProvider } from './x.provider';
 import { FacebookProvider } from './facebook.provider';
 import { InstagramProvider } from './instagram.provider';
@@ -132,6 +132,15 @@ function respEtag() {
     json: vi.fn().mockResolvedValue({}),
     text: vi.fn().mockResolvedValue('{}'),
     headers: new Map([['etag', '"etag-123"'], ['get', (k: string) => k === 'etag' ? '"etag-123"' : undefined]]),
+  };
+}
+
+function respError(body: string, status: number) {
+  return {
+    status, ok: false,
+    json: vi.fn().mockResolvedValue({}),
+    text: vi.fn().mockResolvedValue(body),
+    headers: new Map(),
   };
 }
 
@@ -521,6 +530,16 @@ describe('instagram deep', () => {
     expect(provider.handleErrors('too little or too many attachments', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('2207027', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('param collaborators is not allowed', 400)?.type).toBe('bad-body');
+  });
+
+  it('propagates RefreshTokenError when fetch encounters a refresh-token error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('REVOKED_ACCESS_TOKEN', 401));
+    await expect(provider.post('ig-123', 'tok___userTok', [{ id: 'p1', message: 'x', settings: {}, media: [{ type: 'image', path: 'https://ex.com/img.jpg' }] }], {} as any)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError when fetch encounters a bad-body error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('2207081', 400));
+    await expect(provider.post('ig-123', 'tok___userTok', [{ id: 'p1', message: 'x', settings: {}, media: [{ type: 'image', path: 'https://ex.com/img.jpg' }] }], {} as any)).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken returns static value', async () => {

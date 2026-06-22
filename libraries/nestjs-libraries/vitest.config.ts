@@ -7,7 +7,6 @@ export default defineConfig({
       '@gitroom/nestjs-libraries': path.resolve(__dirname, 'src'),
       '@gitroom/helpers': path.resolve(__dirname, '../helpers/src'),
       '@gitroom/backend': path.resolve(__dirname, '../../apps/backend/src'),
-      '@gitroom/orchestrator': path.resolve(__dirname, '../../apps/orchestrator/src'),
     },
   },
   test: {

@@ -76,3 +76,4 @@ coolify-compose.yml
 .env.coolify
 /.pnpm-store/
 /node-compile-cache/
+/.kimi-code/

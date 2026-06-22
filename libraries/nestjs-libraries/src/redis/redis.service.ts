@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Redis } from 'ioredis';
 
 // Create a mock Redis implementation for testing environments
@@ -22,15 +22,54 @@ class MockRedis {
   async exists(key: string) {
     return this.data.has(key) ? 1 : 0;
   }
+
+  async ping() {
+    return 'PONG';
+  }
+}
+
+function buildRedisClient(): Redis {
+  const url = process.env.REDIS_URL;
+
+  if (!url) {
+    return new MockRedis() as unknown as Redis;
+  }
+
+  const isTls = url.startsWith('rediss://');
+
+  const client = new Redis(url, {
+    maxRetriesPerRequest: null,
+    connectTimeout: 10000,
+    enableReadyCheck: false,
+    enableOfflineQueue: true,
+    retryStrategy: (times) => Math.min(times * 100, 3000),
+    reconnectOnError: (err) => {
+      const message = err.message.toLowerCase();
+      // Reconnect on read-only or connection errors; otherwise surface the error.
+      return message.includes('ereadonly') || message.includes('econnreset');
+    },
+    ...(isTls ? { tls: { rejectUnauthorized: false } } : {}),
+  });
+
+  client.on('error', (err) => {
+    Logger.error(`Redis connection error: ${err.message}`, RedisService.name);
+  });
+
+  client.on('connect', () => {
+    Logger.log('Redis client connected', RedisService.name);
+  });
+
+  // Best-effort boot-time connectivity check. A failure is logged but not fatal;
+  // individual callers already degrade when Redis is unavailable.
+  client.ping().catch((err) => {
+    Logger.warn(`Redis ping failed at startup: ${err.message}`, RedisService.name);
+  });
+
+  return client;
 }
 
 // Use real Redis if REDIS_URL is defined, otherwise use MockRedis
-const rawClient = process.env.REDIS_URL
-  ? new Redis(process.env.REDIS_URL, {
-      maxRetriesPerRequest: null,
-      connectTimeout: 10000,
-    })
-  : (new MockRedis() as unknown as Redis);
+const rawClient = buildRedisClient();
 
 /**
  * @deprecated Use RedisService instead

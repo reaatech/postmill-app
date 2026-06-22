@@ -44,6 +44,14 @@ describe('OrgRbacGuard', () => {
     expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
   });
 
+  it('bypasses /api/inngest even when metadata is present', async () => {
+    const result = await guard.canActivate(
+      buildContext({ path: '/api/inngest' })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
   it('rejects unauthenticated requests', async () => {
     await expect(guard.canActivate(buildContext({}))).rejects.toThrow(
       ForbiddenException

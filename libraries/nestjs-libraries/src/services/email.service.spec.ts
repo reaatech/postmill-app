@@ -37,22 +37,19 @@ vi.mock(
   }),
 );
 
-const mockSignalWithStart = vi.fn();
-vi.mock('nestjs-temporal-core', () => ({
-  TemporalService: class {
-    client = {
-      getRawClient: () => ({
-        workflow: { signalWithStart: mockSignalWithStart },
-      }),
-    };
-  },
+vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
+  inngest: { send: vi.fn() },
+  isInngestEnabled: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
-import { TemporalService } from 'nestjs-temporal-core';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { EmailService } from './email.service';
 
@@ -60,21 +57,21 @@ describe('EmailService', () => {
   let service: EmailService;
   let registry: EmailAdapterRegistry;
   let logService: EmailLogService;
-  let temporal: TemporalService;
 
   const OLD_ENV = { ...process.env };
 
   beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
     process.env.EMAIL_FROM_ADDRESS = 'noreply@test.com';
     process.env.EMAIL_FROM_NAME = 'Test Sender';
     process.env.FRONTEND_URL = 'https://app.test.com';
 
     vi.clearAllMocks();
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
 
-    temporal = new TemporalService();
     registry = new EmailAdapterRegistry();
     logService = new EmailLogService();
-    service = new EmailService(registry, logService, temporal);
+    service = new EmailService(registry, logService);
   });
 
   afterEach(() => {
@@ -101,40 +98,42 @@ describe('EmailService', () => {
 
   // --- sendEmail ---
 
-  it('delegates to temporal workflow.signalWithStart with correct args when addTo is top', async () => {
+  it('delegates to inngest.send with correct args when addTo is top', async () => {
     vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
-    mockSignalWithStart.mockResolvedValue(undefined);
 
     await service.sendEmail('a@b.com', 'Subject', '<p>Hi</p>', 'top', 'reply@b.com');
 
-    expect(mockSignalWithStart).toHaveBeenCalledWith('sendEmailWorkflow', {
-      taskQueue: 'main',
-      workflowId: 'send_email',
-      signal: 'sendEmail',
-      args: [{ queue: [] }],
-      signalArgs: [{
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'email/send',
+      data: {
         to: 'a@b.com',
         subject: 'Subject',
         html: '<p>Hi</p>',
         replyTo: 'reply@b.com',
         addTo: 'top',
-      }],
-      workflowIdConflictPolicy: 'USE_EXISTING',
+      },
     });
   });
 
-  it('delegates to temporal with addTo bottom', async () => {
+  it('delegates to inngest.send with addTo bottom', async () => {
     vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
-    mockSignalWithStart.mockResolvedValue(undefined);
 
     await service.sendEmail('a@b.com', 'S', '<p>H</p>', 'bottom');
 
-    expect(mockSignalWithStart).toHaveBeenCalledWith(
-      expect.any(String),
+    expect(inngest.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        signalArgs: [expect.objectContaining({ addTo: 'bottom' })],
+        data: expect.objectContaining({ addTo: 'bottom' }),
       }),
     );
+  });
+
+  it('skips inngest.send when Inngest is disabled', async () => {
+    vi.mocked(isInngestEnabled).mockReturnValue(false);
+    vi.mocked(registry.getActiveAdapter).mockReturnValue(mockAdapter);
+
+    await service.sendEmail('a@b.com', 'S', '<p>H</p>', 'top');
+
+    expect(inngest.send).not.toHaveBeenCalled();
   });
 
   // --- sendEmailSync: early returns ---

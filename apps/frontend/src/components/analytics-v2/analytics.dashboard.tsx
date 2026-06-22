@@ -20,7 +20,6 @@ import { RecommendationsTab } from './views/recommendations.tab';
 import { WatchlistTab } from './views/watchlist.tab';
 import { ShortlinksTab } from './views/shortlinks.tab';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useVariables } from '@gitroom/react/helpers/variable.context';
 
 function getDefaultFrom(): string {
   return dayjs().subtract(30, 'day').format('YYYY-MM-DD');
@@ -42,7 +41,6 @@ export const AnalyticsDashboard: FC = () => {
   const t = useT();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { runCron } = useVariables();
 
   const from = searchParams.get('from') || getDefaultFrom();
   const to = searchParams.get('to') || getDefaultTo();
@@ -304,9 +302,7 @@ export const AnalyticsDashboard: FC = () => {
                 {t('analytics_empty_title', 'No analytics data yet')}
               </div>
               <div className="text-[13px] text-newTableText text-center max-w-[420px] mb-[20px]">
-                {!runCron
-                  ? t('analytics_no_cron', 'Analytics data requires the background cron worker. Set RUN_CRON=true to enable automatic snapshot collection.')
-                  : t('analytics_empty_desc', 'Analytics appears after your first scheduled collection (requires connected channels and RUN_CRON=true).')}
+                {t('analytics_empty_desc', 'Analytics appears after your first scheduled collection (requires connected channels and background jobs configured).')}
               </div>
               <a
                 href="/third-party"

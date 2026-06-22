@@ -36,8 +36,9 @@ vi.mock('@gitroom/nestjs-libraries/integrations/refresh.integration.service', ()
   RefreshIntegrationService: vi.fn(),
 }));
 
-vi.mock('nestjs-temporal-core', () => ({
-  TemporalService: vi.fn(),
+vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
+  inngest: { send: vi.fn() },
+  isInngestEnabled: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('@gitroom/nestjs-libraries/ai/governance/rag.service', () => ({
@@ -68,12 +69,18 @@ import { PostsService } from './posts.service';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { State } from '@prisma/client';
 
 describe('PostsService.enrichPostsWithLatestStats', () => {
   let service: PostsService;
   let analyticsRepository: Record<string, ReturnType<typeof vi.fn>>;
 
   beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
     vi.clearAllMocks();
 
     analyticsRepository = {
@@ -83,7 +90,6 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
     service = new PostsService(
       {} as any,
       analyticsRepository as any,
-      {} as any,
       {} as any,
       {} as any,
       {} as any,
@@ -342,6 +348,7 @@ describe('PostsService.updateMedia', () => {
   });
 
   beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
     vi.clearAllMocks();
 
     mockAdapter = {
@@ -376,7 +383,6 @@ describe('PostsService.updateMedia', () => {
       {} as any,
       {} as any,
       {} as any,
-      {} as any,
       storageServiceMock as any,
     );
   });
@@ -403,5 +409,153 @@ describe('PostsService.updateMedia', () => {
     await service.updateMedia('post-123', imagesList, false, 'org-42');
 
     expect(storageServiceMock.getLocalAdapterForOrg).not.toHaveBeenCalled();
+  });
+});
+
+describe('PostsService Inngest dispatch', () => {
+  let service: PostsService;
+  let postRepositoryMock: { deletePost: ReturnType<typeof vi.fn> };
+  let integrationManagerMock: {
+    getSocialIntegrationUnchecked: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
+
+    postRepositoryMock = {
+      deletePost: vi.fn().mockResolvedValue({ id: 'post-123' }),
+    };
+
+    integrationManagerMock = {
+      getSocialIntegrationUnchecked: vi.fn().mockReturnValue({
+        maxConcurrentJob: 3,
+      }),
+    };
+
+    service = new PostsService(
+      postRepositoryMock as any,
+      {} as any,
+      integrationManagerMock as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any,
+      {} as any
+    );
+  });
+
+  it('deletePost emits post/cancel with the deleted post id', async () => {
+    await service.deletePost('org-1', 'group-1');
+
+    expect(postRepositoryMock.deletePost).toHaveBeenCalledWith('org-1', 'group-1');
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'post/cancel',
+      data: { postId: 'post-123' },
+    });
+  });
+
+  it('deletePost swallows inngest.send errors and still returns error:true', async () => {
+    vi.mocked(inngest.send).mockRejectedValue(new Error('Inngest down'));
+
+    const result = await service.deletePost('org-1', 'group-1');
+
+    expect(inngest.send).toHaveBeenCalled();
+    expect(result).toEqual({ error: true });
+  });
+
+  it('startWorkflow emits post/publish with idempotency id and current payload fields', async () => {
+    await service.startWorkflow('youtube', 'post-456', 'org-2', 'QUEUE' as State);
+
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'post/publish',
+      data: {
+        postId: 'post-456',
+        organizationId: 'org-2',
+        taskQueue: 'youtube',
+        maxConcurrentJob: 3,
+      },
+      id: 'post_post-456',
+    });
+  });
+
+  it('startWorkflow emits post/cancel before post/publish', async () => {
+    await service.startWorkflow('linkedin', 'post-789', 'org-3', 'QUEUE' as State);
+
+    expect(inngest.send).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(inngest.send).mock.calls[0][0]).toMatchObject({
+      name: 'post/cancel',
+      data: { postId: 'post-789' },
+    });
+    expect(vi.mocked(inngest.send).mock.calls[1][0]).toMatchObject({
+      name: 'post/publish',
+      data: { postId: 'post-789', taskQueue: 'linkedin', maxConcurrentJob: 3 },
+    });
+  });
+
+  it('startWorkflow returns early for DRAFT state after sending cancel', async () => {
+    await service.startWorkflow('youtube', 'post-draft', 'org-4', 'DRAFT' as State);
+
+    expect(inngest.send).toHaveBeenCalledTimes(1);
+    expect(inngest.send).toHaveBeenCalledWith({
+      name: 'post/cancel',
+      data: { postId: 'post-draft' },
+    });
+  });
+
+  it('deletePost skips inngest.send when Inngest is disabled', async () => {
+    vi.mocked(isInngestEnabled).mockReturnValue(false);
+
+    await service.deletePost('org-1', 'group-1');
+
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('startWorkflow skips all events when Inngest is disabled', async () => {
+    vi.mocked(isInngestEnabled).mockReturnValue(false);
+
+    await service.startWorkflow('youtube', 'post-456', 'org-2', 'QUEUE' as State);
+
+    expect(inngest.send).not.toHaveBeenCalled();
+  });
+
+  it('startWorkflow resolves taskQueue from providerIdentifier.split("-")[0]', async () => {
+    integrationManagerMock.getSocialIntegrationUnchecked.mockReturnValue({
+      maxConcurrentJob: 2,
+    });
+
+    await service.startWorkflow('linkedin-page', 'post-page', 'org-5', 'QUEUE' as State);
+
+    expect(integrationManagerMock.getSocialIntegrationUnchecked).toHaveBeenCalledWith(
+      'linkedin-page'
+    );
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'post/publish',
+        data: expect.objectContaining({
+          taskQueue: 'linkedin',
+          maxConcurrentJob: 2,
+        }),
+      })
+    );
+  });
+
+  it('startWorkflow defaults maxConcurrentJob to 1 when provider is not found', async () => {
+    integrationManagerMock.getSocialIntegrationUnchecked.mockReturnValue(undefined);
+
+    await service.startWorkflow('unknown-provider', 'post-unknown', 'org-6', 'QUEUE' as State);
+
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'post/publish',
+        data: expect.objectContaining({
+          taskQueue: 'unknown',
+          maxConcurrentJob: 1,
+        }),
+      })
+    );
   });
 });

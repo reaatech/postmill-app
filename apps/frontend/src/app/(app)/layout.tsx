@@ -73,7 +73,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           mainUrl={process.env.MAIN_URL || ''}
           mcpUrl={process.env.MCP_URL}
           dub={!!process.env.STRIPE_PUBLISHABLE_KEY}
-          runCron={!!process.env.RUN_CRON}
           facebookPixel={process.env.NEXT_PUBLIC_FACEBOOK_PIXEL!}
           telegramBotName={process.env.TELEGRAM_BOT_NAME!}
           neynarClientId={process.env.NEYNAR_CLIENT_ID!}

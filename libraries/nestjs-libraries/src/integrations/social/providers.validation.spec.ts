@@ -2,7 +2,6 @@ import 'reflect-metadata';
 import { describe, it, expect } from 'vitest';
 
 vi.mock('sharp', () => ({ default: vi.fn(function() { return { metadata: vi.fn() }; }) }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('ws', () => ({ default: class MockWs {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn() }));

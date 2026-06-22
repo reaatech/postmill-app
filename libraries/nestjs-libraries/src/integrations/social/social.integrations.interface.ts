@@ -208,6 +208,7 @@ export interface SocialProvider
   stripLinks?: () => boolean;
   refreshCron?: boolean;
   dto?: any;
+  maxConcurrentJob: number;
   maxLength: (additionalSettings?: any) => number;
   checkValidity(
     posts: Array<{ path: string; thumbnail?: string }[]>,
