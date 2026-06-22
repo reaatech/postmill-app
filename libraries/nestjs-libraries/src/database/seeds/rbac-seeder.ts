@@ -65,11 +65,16 @@ export class RbacSeeder {
     }
 
     for (const { key, name, description } of ROLES) {
-      const role = await this.prisma.appRole.upsert({
-        where: { organizationId_key: { organizationId: null, key } },
-        update: {},
-        create: { key, name, description, isSystem: true, organizationId: null },
-      });
+      // Prisma can't target a compound-unique `where` that includes a NULL column
+      // (`organizationId` is null for system-template roles), so upsert isn't usable
+      // here — find-or-create the system role instead.
+      const role =
+        (await this.prisma.appRole.findFirst({
+          where: { organizationId: null, key, isSystem: true },
+        })) ??
+        (await this.prisma.appRole.create({
+          data: { key, name, description, isSystem: true, organizationId: null },
+        }));
 
       const perms = ROLE_PERMISSIONS[key];
       const data = perms.map(p => ({
