@@ -8,6 +8,19 @@
 > cross-channel comment inbox, campaigns, native polls, 36+ channels, and a security-hardened,
 > self-hosted stack. Full release history below (newest first).
 
+## Unreleased
+
+### Changed
+- **Inngest migration** — Replaced Temporal with Inngest Cloud for durable background jobs.
+  - Removed `RUN_CRON`, `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, and Temporal/Elasticsearch
+    services from Docker Compose and Coolify compose.
+  - Added Inngest env vars (`INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `INNGEST_DEV`,
+    `INNGEST_BASE_URL`, `USE_INNGEST`, etc.) to `.env.example` and configuration docs.
+  - Added `ConfigurationChecker.checkInngest()` / `checkInngestUrl()` validation.
+  - Updated frontend empty states/banners to remove `RUN_CRON` messaging.
+  - Renamed `docs/operations-guide/temporal-and-cron.md` to `inngest-and-cron.md` and rewrote it
+    for Inngest cron triggers, dev server, and env vars.
+
 ## [3.8.10] — 2026-06-11
 
 ### Breaking changes (single destructive push)
@@ -95,7 +108,7 @@
 - **Legacy token migration:** 100+ component files migrated from deprecated customColor/bg-sixth/border-fifth/bg-forth tokens to canonical design tokens
 
 ### Fixed
-- Comments inbox showing empty despite real comments: added on-demand sync + clarified RUN_CRON requirement
+- Comments inbox showing empty despite real comments: added on-demand sync + clarified background-jobs requirement
 - Onboarding overlay leaking onto analytics page: removed global overlay; replaced with in-page dashboard section
 - Analytics empty state masked by onboarding overlay: added proper empty state with cron guidance
 - Media settings tab "Failed to load" error: endpoints already corrected to user-scoped /ai/media-providers
@@ -628,7 +641,7 @@ A codebase-hardening + feature-expansion release: a 30-item security cluster, 18
 - **Social: Poll posts (3F)** — Poll creation wired through `post()` for X and LinkedIn (incl. LinkedIn page) when `settings.poll` is set; inline poll builder (2-4 options + duration). Poll validity is checked before publish (never publishes a plain post when a poll was requested) and gated on `providerCapabilities.poll`.
 - **AI: Per-platform brand voice (3G)** — `AIBrandProfile.platformInstructions` JSON field (`{ "x": "...", "linkedin": "..." }`); nullable, falls back to the global `instructions` (backward compatible). Resolved per-platform in `AIModelProvider`.
 - **AI: Brand memory / RAG from top posts (3M)** — "Write like our best posts" generation mode indexing high-performing posts and returning source snippets in the response metadata for transparency.
-- **Analytics: Competitor/watchlist tracking (3N)** — New `WatchedAccount`/`WatchedAccountMetric` models, watchlist service/repo, and analytics tab. Lightweight public-metric probes ride the existing collection sweep (`RUN_CRON=true`), are capability-gated, and gracefully auto-disable (logging `lastError`) on probe failure rather than crashing the sweep.
+- **Analytics: Competitor/watchlist tracking (3N)** — New `WatchedAccount`/`WatchedAccountMetric` models, watchlist service/repo, and analytics tab. Lightweight public-metric probes ride the existing collection sweep, are capability-gated, and gracefully auto-disable (logging `lastError`) on probe failure rather than crashing the sweep.
 - **Campaign folders (3O)** — New `Campaign` model + nullable `Post.campaignId` (existing rows stay `NULL`); campaigns service/repo/controller and page to group posts/assets/analytics/comments by campaign. Grouping for media/analytics/comments derives transitively through the post's campaign.
 - **Admin provider capability matrix (3P)** — Central `provider-capabilities.ts` matrix (analytics, comments, first comment, polls, video, carousel, alt text, max media, link preview, refresh token) exposed via `provider-capabilities.controller.ts` and an admin matrix view; composer controls read it so unsupported options are hidden/disabled consistently. Built early as the foundation for 2F/2J/3E/3F.
 
@@ -719,7 +732,7 @@ A codebase-hardening + feature-expansion release: a 30-item security cluster, 18
 
 - **Calendar upgrade (Track A)** — Card body opens new Post Detail modal with KPI header and thread view; settings/edit icon added to card hover strip; scheduled/published state pill; card stats footer (views/likes/comments) sourced from `PostAnalyticsSnapshot`.
 - **Post Detail modal** — New `PostDetailModal` with KPI strip from `/analytics/v2/post/:postId` (live-fallback added for un-snapshotted posts), full thread from `getPostsRecursively`, and capability-aware comments section.
-- **Social comments foundation (Track B)** — `ISocialMediaComments` provider capability interface, `SocialComment` and `PostCommentRead` Prisma models, social comments Controller/Service/Repository, and Temporal `CommentsActivity` + `commentsCollectionWorkflow` (gated by `RUN_CRON=true`, 30-min sweep cadence, configurable retention).
+- **Social comments foundation (Track B)** — `ISocialMediaComments` provider capability interface, `SocialComment` and `PostCommentRead` Prisma models, social comments Controller/Service/Repository, and background `CommentsActivity` + `commentsCollectionWorkflow` (gated by background jobs configured, 30-min sweep cadence, configurable retention).
 
 ### Docs
 
@@ -756,7 +769,7 @@ A code review of the new-provider implementation against the plan (`dev/NEW_PROV
 ### Added
 - Analytics refactor — persisted multi-channel dashboard
 - New data models: AnalyticsSnapshot, PostAnalyticsSnapshot (Prisma)
-- Daily collection via Temporal workflow (RUN_CRON-gated)
+- Daily collection via background workflow (jobs-gated)
 - Metric normalization map supporting 10 providers
 - New /analytics/v2 API with real period-over-period comparisons
 - Frontend analytics-v2 dashboard with drill-down navigation

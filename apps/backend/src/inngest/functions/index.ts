@@ -1,0 +1,42 @@
+import { PostActivity } from '@gitroom/nestjs-libraries/inngest/activities/post.activity';
+import { AnalyticsActivity } from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
+import { CommentsActivity } from '@gitroom/nestjs-libraries/inngest/activities/comments.activity';
+import { EmailActivity } from '@gitroom/nestjs-libraries/inngest/activities/email.activity';
+import { IntegrationsActivity } from '@gitroom/nestjs-libraries/inngest/activities/integrations.activity';
+import { AutopostActivity } from '@gitroom/nestjs-libraries/inngest/activities/autopost.activity';
+import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/media-jobs.activity';
+import { createAnalyticsCollection } from './analytics-collection';
+import { createCommentsCollection } from './comments-collection';
+import { createMissingPostFinder } from './missing-post-finder';
+import { createMediaJobsPoll } from './media-jobs-poll';
+import { createSendEmail } from './send-email';
+import { createDigestEmail } from './digest-email';
+import { createAutopostProcess } from './autopost-process';
+import { createRefreshToken } from './refresh-token';
+import { createStreakTracker } from './streak-tracker';
+import { createAnalyticsBackfill } from './analytics-backfill';
+import { createPostPublishFunctions } from './post-publish';
+
+export interface InngestActivities {
+  postActivity: PostActivity;
+  analyticsActivity: AnalyticsActivity;
+  commentsActivity: CommentsActivity;
+  emailActivity: EmailActivity;
+  integrationsActivity: IntegrationsActivity;
+  autopostActivity: AutopostActivity;
+  mediaJobsActivity: MediaJobsActivity;
+}
+
+export const createFunctions = (activities: InngestActivities) => [
+  createAnalyticsCollection(activities.analyticsActivity),
+  createCommentsCollection(activities.commentsActivity),
+  createMissingPostFinder(activities.postActivity),
+  createMediaJobsPoll(activities.mediaJobsActivity),
+  createSendEmail(activities.emailActivity),
+  createDigestEmail(activities.emailActivity),
+  createAutopostProcess(activities.autopostActivity),
+  createRefreshToken(activities.integrationsActivity),
+  createStreakTracker(activities.emailActivity),
+  createAnalyticsBackfill(activities.analyticsActivity),
+  ...createPostPublishFunctions(activities.postActivity),
+];

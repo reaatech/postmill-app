@@ -68,6 +68,8 @@ import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.pr
 import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
+import { HealthController } from '@gitroom/backend/api/routes/health.controller';
+import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
 
 const authenticatedController = [
   UsersController,
@@ -108,9 +110,10 @@ const authenticatedController = [
   AdminController,
 ];
 @Module({
-  imports: [UploadModule],
+  imports: [UploadModule, InngestModule],
   controllers: [
     RootController,
+    HealthController,
     StripeController,
     AuthController,
     PublicController,

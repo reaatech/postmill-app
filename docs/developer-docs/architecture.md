@@ -11,8 +11,7 @@ Workspaces are driven by `pnpm --filter`.
 ```
 postmill-app/
 ├── apps/
-│   ├── backend/        # NestJS REST API
-│   ├── orchestrator/   # NestJS + Temporal workflows
+│   ├── backend/        # NestJS REST API + Inngest job handler
 │   ├── frontend/       # Next.js App Router (port 4200)
 │   ├── extension/      # Browser extension
 │   ├── commands/       # CLI commands
@@ -28,8 +27,7 @@ postmill-app/
 
 | App | Stack | Purpose |
 |-----|-------|---------|
-| `backend` | NestJS REST API | Thin controllers + module wiring. Real logic in `nestjs-libraries`. |
-| `orchestrator` | NestJS + Temporal | Background jobs: workflows and activities. |
+| `backend` | NestJS REST API | Thin controllers + module wiring. Real logic in `nestjs-libraries`. Serves Inngest handler at `/api/inngest`. |
 | `frontend` | Next.js App Router, React 19, Tailwind 3 | User-facing web app on port 4200. |
 | `extension` | Browser extension | Chrome extension for cross-platform posting. |
 | `commands` | CLI | Command-line operations. |
@@ -86,9 +84,9 @@ API-key authenticated.
 1. User creates a post in the composer. A **preflight** validation
    (`/posts/preflight`) checks content, media, and provider capabilities.
 2. Post is saved to the database with a scheduled date.
-3. At the scheduled time, a **Temporal workflow** picks up the post:
-   - `post.workflow.v1.0.5.ts` — base publish workflow.
-   - `post.workflow.v1.0.6.ts` — adds optional **first comment** support.
+3. At the scheduled time, an **Inngest function** picks up the post:
+   - v1.0.5 — base publish flow.
+   - v1.0.6 — adds optional **first comment** support.
 4. The workflow calls `PostActivity` which resolves the provider through
    `IntegrationManager` and calls `provider.post()`.
 5. After successful publish:
@@ -102,8 +100,8 @@ API-key authenticated.
 
 ## How analytics works
 
-1. A Temporal **`analyticsCollectionWorkflow`** runs one sweep per org, then
-   `continueAsNew`s every 24h. Requires `RUN_CRON=true`.
+1. An Inngest **`analyticsCollection`** function runs one sweep per org on a daily cron
+   schedule.
 2. Each sweep calls `AnalyticsActivity` which queries channel analytics (7-day
    lookback for channel metrics, 30-day lookback for per-post metrics).
 3. Results are saved as daily **`AnalyticsSnapshot`** and

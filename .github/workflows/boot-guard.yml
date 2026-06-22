@@ -2,8 +2,8 @@
 # Boot Guard — prevents the v3.5.9 class of failures from shipping again.
 #
 # v3.5.9 went out fully broken: the lockfile had drifted from package.json
-# (node-telegram-bot-api pinned to an ESM-only 1.0.0-rc.0), and the backend +
-# orchestrator crash-looped on boot through six chained DI/route/workflow errors.
+# (node-telegram-bot-api pinned to an ESM-only 1.0.0-rc.0), and the backend
+# crash-looped on boot through six chained DI/route/workflow errors.
 # Every one of them COMPILED fine — the existing Build workflow (plain `pnpm install`,
 # `pnpm run build`) passed and the image was tagged and deployed without ever booting.
 #
@@ -88,6 +88,7 @@ jobs:
       BACKEND_INTERNAL_URL: http://localhost:3000
       # Dev toggle: skip helmet/HSTS/CSRF so a plain-HTTP curl reaches the API.
       NOT_SECURED: 'true'
+      INNGEST_DEV: '1'
       PORT: '3000'
     steps:
       - uses: actions/checkout@v4
@@ -129,27 +130,39 @@ jobs:
               cat backend-boot.log
               exit 1
             fi
-            status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/user/self || echo 000)
+            status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/user/self || true)
             if [ "$status" != "000" ]; then
               break
             fi
             sleep 2
           done
 
-          kill "$BACKEND_PID" 2>/dev/null || true
-
-          echo "backend responded with HTTP $status"
           if [ "$status" = "000" ]; then
+            kill "$BACKEND_PID" 2>/dev/null || true
             echo "::error::backend never bound :3000 (crash-loop / boot blocker). See log:"
             cat backend-boot.log
             exit 1
           fi
           if [ "$status" -ge 500 ]; then
+            kill "$BACKEND_PID" 2>/dev/null || true
             echo "::error::backend returned $status (server error on boot). See log:"
             cat backend-boot.log
             exit 1
           fi
           echo "Boot OK: backend bound and returned $status (expected 401 unauthenticated)."
+
+          # Reuse the already-booted backend to assert the Inngest handler is served.
+          # GET /api/inngest returns 200 (introspection) in dev mode (INNGEST_DEV=1).
+          inngest_status=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/api/inngest || true)
+          kill "$BACKEND_PID" 2>/dev/null || true
+
+          echo "Inngest endpoint responded with HTTP $inngest_status"
+          if [ "$inngest_status" != "200" ]; then
+            echo "::error::/api/inngest did not return 200 (got $inngest_status). See log:"
+            cat backend-boot.log
+            exit 1
+          fi
+          echo "Inngest OK: /api/inngest served HTTP 200."
 
       - name: Upload boot log on failure
         if: failure()

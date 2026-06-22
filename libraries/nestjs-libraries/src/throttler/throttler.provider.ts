@@ -12,6 +12,10 @@ export class ThrottlerBehindProxyGuard extends ThrottlerGuard {
     // per-route @Throttle override automatically. (Previously this guard
     // returned true for all non-decorated routes, making the global throttle —
     // and every @Throttle added by 3Q/3AC — inert.)
+    const req = context.switchToHttp().getRequest<Request>();
+    if (req.url?.indexOf('/api/inngest') === 0) {
+      return true;
+    }
     return super.canActivate(context);
   }
 

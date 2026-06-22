@@ -8,6 +8,7 @@ const RBAC_PERMS_CACHE = Symbol('rbacPermsCache');
 interface RbacRequest {
   user?: { id?: string; isSuperAdmin?: boolean };
   orgId?: string;
+  path?: string;
   [RBAC_PERMS_CACHE]?: Map<string, string[] | null>;
 }
 
@@ -19,6 +20,13 @@ export class OrgRbacGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest<RbacRequest>();
+
+    // Explicit public bypass for the Inngest handler (signed requests, not org-authenticated).
+    if (request.path && request.path.indexOf('/api/inngest') > -1) {
+      return true;
+    }
+
     const metadata = this.reflector.getAllAndOverride<RequirePermissionMetadata>(
       REQUIRE_PERMISSION_KEY,
       [context.getHandler(), context.getClass()]
@@ -27,8 +35,6 @@ export class OrgRbacGuard implements CanActivate {
     if (!metadata) {
       return true;
     }
-
-    const request = context.switchToHttp().getRequest<RbacRequest>();
     const userId = request?.user?.id;
     const orgId = request?.orgId;
 

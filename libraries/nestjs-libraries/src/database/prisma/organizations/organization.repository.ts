@@ -16,6 +16,9 @@ export class OrganizationRepository {
   ) {}
 
   async createMaxUser(id: string, name: string, saasName: string, email: string) {
+    const ownerRole = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+    });
     return this._organization.model.organization.create({
       select: {
         id: true,
@@ -33,7 +36,7 @@ export class OrganizationRepository {
         },
         users: {
           create: {
-            roleRef: { connect: { organizationId_key: { organizationId: null, key: 'owner' } } },
+            roleRef: ownerRole ? { connect: { id: ownerRole.id } } : undefined,
             user: {
               create: {
                 activated: true,
@@ -263,6 +266,9 @@ export class OrganizationRepository {
     ip: string,
     userAgent: string
   ) {
+    const ownerRole = await this._appRole.model.appRole.findFirst({
+      where: { organizationId: null, key: 'owner', isSystem: true },
+    });
     return this._organization.model.organization.create({
       data: {
         name: body.company,
@@ -270,7 +276,7 @@ export class OrganizationRepository {
         isTrailing: true,
         users: {
           create: {
-            roleRef: { connect: { organizationId_key: { organizationId: null, key: 'owner' } } },
+            roleRef: ownerRole ? { connect: { id: ownerRole.id } } : undefined,
             user: {
               create: {
                 activated: body.provider !== 'LOCAL' || !hasEmail,

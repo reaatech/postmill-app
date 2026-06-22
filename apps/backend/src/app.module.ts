@@ -15,12 +15,11 @@ import { FILTER } from '@gitroom/nestjs-libraries/sentry/sentry.exception';
 import { PROVIDER_NOT_CONFIGURED_FILTER } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.filter';
 import { SHORT_LINK_PROVIDER_FILTER } from '@gitroom/nestjs-libraries/short-linking/short-link-provider.filter';
 import { ChatModule } from '@gitroom/nestjs-libraries/chat/chat.module';
-import { getTemporalModule } from '@gitroom/nestjs-libraries/temporal/temporal.module';
-import { TemporalRegisterMissingSearchAttributesModule } from '@gitroom/nestjs-libraries/temporal/temporal.register';
-import { InfiniteWorkflowRegisterModule } from '@gitroom/nestjs-libraries/temporal/infinite.workflow.register';
+import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
+import { InngestController } from '@gitroom/backend/api/controllers/inngest.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Global()
@@ -35,9 +34,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     ThirdPartyModule,
     VideoModule,
     ChatModule,
-    getTemporalModule(false),
-    TemporalRegisterMissingSearchAttributesModule,
-    InfiniteWorkflowRegisterModule,
+    InngestModule,
     AiModule,
     ThrottlerModule.forRoot({
       throttlers: [
@@ -55,7 +52,7 @@ import { ScheduleModule } from '@nestjs/schedule';
       storage: new ThrottlerStorageRedisService(ioRedis),
     }),
   ],
-  controllers: [],
+  controllers: [InngestController],
   providers: [
     FILTER,
     PROVIDER_NOT_CONFIGURED_FILTER,

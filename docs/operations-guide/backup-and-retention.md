@@ -43,36 +43,26 @@ These secrets encrypt all OAuth tokens, AI provider credentials, and storage cre
 - Never in the database backup alone — if you restore to a fresh instance with a different
   `JWT_SECRET`, all tokens will fail to decrypt
 
-### 4. Temporal Postgres
-
-Temporal persists workflow state in its own Postgres database. While workflow history is
-recoverable (workflows are idempotent), backing it up avoids replay storms on restore.
-
-```bash
-docker exec temporal-postgresql pg_dump -U temporal temporal > temporal_$(date +%Y%m%d).sql
-```
-
 ## What not to back up
 
 - **Redis** — cache only; data is rebuilt on restart. AOF/RDB persistence is useful for avoiding
   cold-cache latency but is not a backup.
-- **Temporal Elasticsearch** — visibility index, rebuilt from Temporal Postgres on restart.
 - **node_modules** or build artifacts
 
 ## Automated data retention
 
-Postmill handles analytics data retention automatically through Temporal workflows. You do not
-need to run manual cleanup queries.
+Postmill handles analytics data retention automatically through Inngest scheduled functions. You do
+not need to run manual cleanup queries.
 
 | Data | Retention | Mechanism |
 |------|-----------|-----------|
-| Daily `AnalyticsSnapshot` rows | 548 days (~18 months) by default | Rolled into weekly rows by `analyticsCollectionWorkflow` |
-| `PostAnalyticsSnapshot` rows | 90 days by default | Pruned by `analyticsCollectionWorkflow` |
-| Social comments | 90 days by default | Soft-deleted by `commentsCollectionWorkflow` |
+| Daily `AnalyticsSnapshot` rows | 548 days (~18 months) by default | Rolled into weekly rows by the analytics collection function |
+| `PostAnalyticsSnapshot` rows | 90 days by default | Pruned by the analytics collection function |
+| Social comments | 90 days by default | Soft-deleted by the comments collection function |
 
 Tune retention with `ANALYTICS_DAILY_RETENTION_DAYS`, `ANALYTICS_POST_RETENTION_DAYS`, and
-`SOCIAL_COMMENT_RETENTION_DAYS`. See [Temporal & Cron](./temporal-and-cron.md) for how the
-workflows operate.
+`SOCIAL_COMMENT_RETENTION_DAYS`. See [Inngest & Cron](./inngest-and-cron.md) for how the
+functions operate.
 
 ## Why backups are critical with `db push --accept-data-loss`
 
@@ -111,16 +101,12 @@ reminder to back up first when using `--accept-data-loss`:
 4. **Verify `JWT_SECRET` and `ENCRYPTION_KEY`** match the values from the backup:
    - If you changed `JWT_SECRET` since the backup, all encrypted tokens will fail to decrypt.
    - Test by logging in and checking that connected channels still work.
-5. **Restore Temporal Postgres** (optional but recommended):
-   ```bash
-   docker exec -i temporal-postgresql psql -U temporal temporal < temporal_20260609.sql
-   ```
-6. **Start the application** and verify:
+5. **Start the application** and verify:
    - Users can log in
    - Channels are connected (no auth errors)
    - Uploaded media is accessible
-   - Temporal workflows are visible in the UI
-7. **Take a fresh post-restore backup**
+   - Inngest functions are registered and scheduled runs appear in the dashboard
+6. **Take a fresh post-restore backup**
 
 ## Backup automation example
 

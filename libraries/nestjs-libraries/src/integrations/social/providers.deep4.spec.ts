@@ -12,7 +12,6 @@ vi.mock('sharp', () => ({ default: vi.fn(function() {
     gif: vi.fn(() => ({ toBuffer: vi.fn().mockResolvedValue(Buffer.from('gif')) })),
   };
 }) }));
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({ timer: vi.fn() }));
 vi.mock('@gitroom/helpers/utils/read.or.fetch', () => ({ readOrFetch: vi.fn().mockResolvedValue(Buffer.from('data')) }));
 // safeFetch's SSRF pre-validation does real DNS; delegate to the mocked global
@@ -44,11 +43,21 @@ vi.mock('@gitroom/nestjs-libraries/integrations/credentials', () => ({
 }));
 vi.mock('form-data', () => ({ default: class FormData { append = vi.fn(); } }));
 
+import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors';
 import { TumblrProvider } from './tumblr.provider';
 import { PixelfedProvider } from './pixelfed.provider';
 import { PeerTubeProvider } from './peertube.provider';
 import { socialIntegrationList } from '../integration.manager';
 import { getProviderMock } from './provider-mocks';
+
+function respError(body: string, status: number) {
+  return {
+    status, ok: false,
+    json: vi.fn().mockResolvedValue({}),
+    text: vi.fn().mockResolvedValue(body),
+    headers: new Map(),
+  };
+}
 
 // ─────────────────────────────────────────────────────────────
 // TUMBLR
@@ -149,6 +158,18 @@ describe('tumblr deep', () => {
     (globalThis as any).fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}) });
 
     await expect(provider.post('testblog', 'tok', [{ id: 'p1', message: 'Hello', settings: {}, media: [] }])).rejects.toThrow('Failed to create Tumblr post - no post ID returned');
+  });
+
+  it('propagates RefreshTokenError on 401 from fetch', async () => {
+    (globalThis as any).fetch = vi.fn().mockResolvedValueOnce(respError('Unauthorized', 401));
+
+    await expect(provider.post('testblog', 'tok', [{ id: 'p1', message: 'Hello', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError on 400 from fetch', async () => {
+    (globalThis as any).fetch = vi.fn().mockResolvedValueOnce(respError('Bad Request', 400));
+
+    await expect(provider.post('testblog', 'tok', [{ id: 'p1', message: 'Hello', settings: {}, media: [] }])).rejects.toThrow(BadBodyError);
   });
 
   it('authenticate throws when no blogs returned', async () => {

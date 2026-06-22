@@ -11,8 +11,8 @@ overrides:
   # Security overrides — see dev/PACKAGE_UPGRADE.md §4. Both parents are at their
   # latest and pin the vulnerable version *exactly*, so there is no upgrade-the-parent
   # path; these patched ranges are the only way to close the high advisories.
-  # protobufjs <=7.5.5: 4 high GHSAs, pinned exactly by @temporalio/proto@1.17.2.
-  #   Constrained to the 7.x patch line so Temporal's generated code stays API-compatible.
+  # protobufjs <=7.5.5: 4 high GHSAs. Constrained to the 7.x patch line for
+  #   API compatibility with consumers that use protobufjs 7.x.
   protobufjs: '>=7.5.6 <8'
   # rollup <2.80.0: high path-traversal, pinned exactly by @crxjs/vite-plugin@2.4.0.
   rollup: '>=2.80.0'

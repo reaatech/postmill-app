@@ -84,7 +84,7 @@ env-based approach.
 ### Data model
 3 Prisma models: `OrgShortLinkConfig` (per-org provider config with encrypted credentials and custom
 domain), `ShortLink` (generated short link ledger — original URL, short URL, provider, optional post
-reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the Temporal analytics sweep).
+reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the analytics sweep).
 
 ### No-provider behaviour
 No active short-link provider for an org = the `ShortLinkService` returns the original URL
@@ -93,7 +93,7 @@ short-link toggle is hidden when no provider is configured, and the Settings →
 an empty state guiding the admin to configure one.
 
 ### Analytics
-Daily click-count snapshots collected in the Temporal analytics sweep (`ShortLinkSnapshot`, best-effort,
+Daily click-count snapshots collected in the analytics sweep (`ShortLinkSnapshot`, best-effort,
 never throws). Dashboard includes a **Links** tab for click-count views.
 
 ## Feature surfaces (v3.5.0)
@@ -117,8 +117,8 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 - **Campaign folders (3O)** — additive `Campaign` model + nullable `Post.campaignId`; grouping for
   media/analytics/comments derives transitively through the post's `campaignId`.
 - **Watchlist (3N)** — `WatchedAccount`/`WatchedAccountMetric`; lightweight public probes ride the
-  existing collection sweep (`RUN_CRON=true`), capability-gated, auto-disable on probe failure
-  (record `lastError`, never crash the sweep), probe via `safeFetch`.
+  existing collection sweep, capability-gated, auto-disable on probe failure (record `lastError`,
+  never crash the sweep), probe via `safeFetch`.
 - **Bulk import (2L)** — `POST /posts/bulk` via shared post-creation logic (3C) + 2J preflight,
   per-row results without failing the batch; can target a campaign (3O).
 - **Best-time / recommendations (2G/2H)** — `GET /analytics/v2/best-time` (structured day×hour

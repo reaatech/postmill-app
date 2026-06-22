@@ -20,7 +20,6 @@ wait_tcp() {  # host port name
 
 wait_tcp postmill-postgres 5432 postgres
 wait_tcp postmill-redis 6379 redis
-wait_tcp temporal 7233 temporal
 
 # node_modules lives in a named volume, so install only on first boot.
 # Delete /app/node_modules/.docker-deps-installed (or `docker volume rm`) to force a reinstall.
@@ -52,16 +51,6 @@ if [ "${START_FRONTEND:-true}" = "true" ]; then
   wait_tcp 127.0.0.1 4200 frontend
 else
   echo "[dev] frontend NOT started (START_FRONTEND != true). Run it on the host: pnpm run dev:frontend"
-fi
-
-# The orchestrator (Temporal worker) is opt-in: three resident Node watchers don't
-# fit the ~7.7 GB Docker VM. Set START_ORCHESTRATOR=true (and raise Docker RAM) to run it.
-if [ "${START_ORCHESTRATOR:-false}" = "true" ]; then
-  echo "[dev] starting orchestrator (:3002)..."
-  NODE_OPTIONS="--max-old-space-size=2560" pnpm run --filter ./apps/orchestrator dev &
-  wait_tcp 127.0.0.1 3002 orchestrator
-else
-  echo "[dev] orchestrator NOT started (START_ORCHESTRATOR != true). Backend + frontend only."
 fi
 
 echo "[dev] all watchers started — editing files on the host now hot-reloads."

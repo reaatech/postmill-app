@@ -1,8 +1,9 @@
 # Docker Deployment
 
-The `docker-compose.yaml` at the repository root defines the full production stack in 9 services
-across two bridge networks. This file is the canonical deployment reference and is used as-is or
-adapted to Coolify, Portainer, Kubernetes, or a raw `docker compose up`.
+The `docker-compose.yaml` at the repository root defines the full production stack. PostgreSQL and
+Spotlight run in containers; Redis is expected as an external endpoint (e.g. Upstash). This file is
+the canonical deployment reference and is used as-is or adapted to Coolify, Portainer, Kubernetes,
+or a raw `docker compose up`.
 
 ## Quick start
 
@@ -19,8 +20,7 @@ cp .env.example .env
 docker compose up -d
 ```
 
-The application will be available at `http://localhost:4007`. Temporal UI will be at
-`http://localhost:8080`.
+The application will be available at `http://localhost:4007`.
 
 ## Service inventory
 
@@ -30,7 +30,6 @@ The application will be available at `http://localhost:4007`. Temporal UI will b
 |--------------------|----------------------------------------|-----------------|---------|
 | `postmill`         | `ghcr.io/reaatech/postmill-app:latest` | `4007:5000`     | API + frontend (Next.js server on port 5000 internally) |
 | `postmill-postgres`| `postgres:17-alpine`                   | —               | Application database |
-| `postmill-redis`   | `redis:7.2`                            | —               | Session cache, throttle, analytics cache |
 | `spotlight`        | `ghcr.io/getsentry/spotlight:latest`   | `8969:8969`     | Sentry debug proxy (dev/monitoring) |
 
 **Postmill container environment** (the minimum required):
@@ -41,9 +40,9 @@ FRONTEND_URL: 'http://localhost:4007'
 NEXT_PUBLIC_BACKEND_URL: 'http://localhost:4007/api'
 JWT_SECRET: 'your-random-secret-here'
 DATABASE_URL: 'postgresql://postmill-user:postmill-password@postmill-postgres:5432/postmill-db-local'
-REDIS_URL: 'redis://postmill-redis:6379'
+# Redis is an external endpoint (e.g. Upstash). Provide a redis:// or rediss:// URL.
+REDIS_URL: '${REDIS_URL}'
 BACKEND_INTERNAL_URL: 'http://localhost:3000'
-TEMPORAL_ADDRESS: 'temporal:7233'
 IS_GENERAL: 'true'
 DISABLE_REGISTRATION: 'false'
 UPLOAD_DIRECTORY: '/uploads'
@@ -51,58 +50,50 @@ MEDIA_UPLOAD_MAX_BYTES: '1073741824'
 API_LIMIT: 600
 ```
 
-### Temporal stack (temporal-network)
-
-| Service                  | Image                                  | Port       | Purpose |
-|--------------------------|----------------------------------------|------------|---------|
-| `temporal`               | `temporalio/auto-setup:1.28.1`         | `7233:7233`| Temporal server (gRPC) |
-| `temporal-postgresql`    | `postgres:16`                          | —          | Temporal persistence (user `temporal`, db `temporal`) |
-| `temporal-elasticsearch` | `elasticsearch:7.17.27`                | —          | Visibility store (single-node, 256 MB heap) |
-| `temporal-admin-tools`   | `temporalio/admin-tools:1.28.1-tctl-1.18.4-cli-1.4.1` | — | tctl + tcli |
-| `temporal-ui`            | `temporalio/ui:2.34.0`                 | `8080:8080`| Web UI to inspect workflows |
-
 ### Networks
 
 | Network            | Type   | Services |
 |--------------------|--------|----------|
-| `postmill-network` | bridge | postmill, postmill-postgres, postmill-redis, spotlight |
-| `temporal-network` | bridge (named) | All Temporal services; the postmill container attaches here for gRPC |
+| `postmill-network` | bridge | postmill, postmill-postgres, spotlight |
 
 ### Volumes
 
 | Volume               | Mount point             | Purpose |
 |----------------------|-------------------------|---------|
 | `postgres-volume`    | `/var/lib/postgresql/data` | Application Postgres data |
-| `postmill-redis-data`| `/data`                 | Redis AOF/RDB persistence |
 | `postmill-config`    | `/config/`              | Application runtime config |
 | `postmill-uploads`   | `/uploads/`             | Uploaded media (always local) |
-| ephemeral (ES)       | `/var/lib/elasticsearch/data` | Temporal ES indices |
-| ephemeral (Temporal PG) | `/var/lib/postgresql/data` | Temporal Postgres data |
-
-> The Temporal Postgres and Elasticsearch volumes are **ephemeral** (not named volumes) — they
-> are lost on `docker compose down -v`. For production, convert them to named volumes and
-> configure regular backups.
 
 The `:latest` tag shown above is suitable for quick-start. In production, pin a specific
 version tag (e.g., `ghcr.io/reaatech/postmill-app:v3.7.0`) to get a known rollback target.
 
-## RUN_CRON
+## Background jobs
 
-The orchestrator runs inside the `postmill` container. To activate the three perpetual background
-workflows, set `RUN_CRON=true` on **exactly one** instance:
+Background jobs are handled by Inngest. Set the required environment variables on the `postmill`
+service:
 
 ```yaml
 environment:
-  RUN_CRON: 'true'
+  USE_INNGEST: 'true'
+  INNGEST_EVENT_KEY: '...'
+  INNGEST_SIGNING_KEY: '...'
+  INNGEST_SERVE_ORIGIN: 'https://postmill.example.com'
 ```
 
-The perpetual workflows are:
+For local development, use the Inngest dev server instead:
+
+```yaml
+environment:
+  INNGEST_DEV: '1'
+  INNGEST_BASE_URL: 'http://localhost:8288'
+```
+
+The main scheduled functions are:
 - **Analytics collection** — daily sweep per org (channel snapshots, post snapshots, rollup/prune, watchlist probes)
 - **Comments collection** — per-org comment sync (fetch, reply, prune, notify)
 - **Missing post scanner** — hourly scan for stuck posts
 
-If you run multiple replicas, **only one should have `RUN_CRON=true`** to avoid duplicate workflow
-executions. See [Temporal & Cron](./temporal-and-cron.md) for details.
+See [Inngest & Cron](./inngest-and-cron.md) for details.
 
 ## Production hardening
 
@@ -129,7 +120,7 @@ server {
 ### Secrets management
 
 Never commit `.env` to version control. Use Docker secrets, a `.env` file with restricted
-permissions, or your orchestrator's secret store.
+permissions, or your orchestration platform's secret store.
 
 ### Backups
 
@@ -142,23 +133,12 @@ Add resource constraints to the compose file for production:
 
 ```yaml
 services:
-  temporal-elasticsearch:
-    deploy:
-      resources:
-        limits:
-          memory: 512M
   postmill:
     deploy:
       resources:
         limits:
           memory: 2G
 ```
-
-### Temporal production config
-
-The compose file uses `development-sql.yaml` for Temporal's dynamic config. For production,
-replace with `development-cass.yaml` tuned for persistence and history retention. See
-[Temporal's production deployment guide](https://docs.temporal.io/production-deployment).
 
 ## Migrating from a Postiz-branded deployment
 

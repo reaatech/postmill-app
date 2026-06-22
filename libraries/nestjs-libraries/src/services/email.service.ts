@@ -1,7 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
-import { TemporalService } from 'nestjs-temporal-core';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { timer } from '@gitroom/helpers/utils/timer';
 
 @Injectable()
@@ -11,7 +14,6 @@ export class EmailService {
   constructor(
     private _registry: EmailAdapterRegistry,
     private _emailLogService: EmailLogService,
-    private _temporalService: TemporalService,
   ) {}
 
   hasProvider() {
@@ -26,16 +28,15 @@ export class EmailService {
     addTo: 'top' | 'bottom',
     replyTo?: string,
   ) {
-    return this._temporalService.client
-      .getRawClient()
-      ?.workflow.signalWithStart('sendEmailWorkflow', {
-        taskQueue: 'main',
-        workflowId: 'send_email',
-        signal: 'sendEmail',
-        args: [{ queue: [] }],
-        signalArgs: [{ to, subject, html, replyTo, addTo }],
-        workflowIdConflictPolicy: 'USE_EXISTING',
-      });
+    if (!isInngestEnabled()) {
+      this._logger.debug('Skipping email/send event — Inngest is disabled');
+      return;
+    }
+
+    return inngest.send({
+      name: 'email/send',
+      data: { to, subject, html, replyTo, addTo },
+    });
   }
 
   async sendEmailSync(

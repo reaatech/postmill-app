@@ -1,4 +1,9 @@
-import { forwardRef, Inject, Injectable } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { Integration } from '@prisma/client';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -6,15 +11,17 @@ import {
   AuthTokenDetails,
   SocialProvider,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { TemporalService } from 'nestjs-temporal-core';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 
 @Injectable()
 export class RefreshIntegrationService {
   constructor(
     private _integrationManager: IntegrationManager,
     @Inject(forwardRef(() => IntegrationService))
-    private _integrationService: IntegrationService,
-    private _temporalService: TemporalService
+    private _integrationService: IntegrationService
   ) {}
   async refresh(
     integration: Integration,
@@ -70,14 +77,18 @@ export class RefreshIntegrationService {
       return false;
     }
 
-    return this._temporalService.client
-      .getRawClient()
-      ?.workflow.start(`refreshTokenWorkflow`, {
-        workflowId: `refresh_${id}`,
-        args: [{ integrationId: id, organizationId: orgId }],
-        taskQueue: 'main',
-        workflowIdConflictPolicy: 'TERMINATE_EXISTING',
-      });
+    if (!isInngestEnabled()) {
+      Logger.debug(
+        `Skipping integration/refresh-token event for ${id} — Inngest is disabled`
+      );
+      return false;
+    }
+
+    return inngest.send({
+      name: 'integration/refresh-token',
+      data: { integrationId: id, organizationId: orgId },
+      id: `refresh_${id}`,
+    });
   }
 
   private async refreshProcess(

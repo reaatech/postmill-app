@@ -6,11 +6,6 @@ vi.mock('sharp', () => ({
   }),
 }));
 
-vi.mock('@temporalio/activity', () => ({ ApplicationFailure: class {
-  constructor(message?: string, type?: string, retryable?: boolean, details?: any[]) {
-    this.message = message;
-  }
-} }));
 vi.mock('@gitroom/helpers/utils/timer', () => ({
   timer: vi.fn().mockResolvedValue(undefined),
 }));
@@ -25,10 +20,12 @@ vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch', () => ({
 
 import {
   SocialAbstract,
-  RefreshToken,
-  BadBody,
   NotEnoughScopes,
 } from './social.abstract';
+import {
+  RefreshTokenError,
+  BadBodyError,
+} from '@gitroom/nestjs-libraries/inngest/errors';
 
 class TestProvider extends SocialAbstract {
   identifier = 'test';
@@ -42,17 +39,23 @@ class TestProvider extends SocialAbstract {
   }
 }
 
-describe('RefreshToken', () => {
-  it('extends ApplicationFailure with refresh_token type', () => {
-    const err = new RefreshToken('x-id', '{"key":"val"}', 'body-content', 'Token expired');
+describe('RefreshTokenError', () => {
+  it('is a retryable Error carrying identifier/json/body', () => {
+    const err = new RefreshTokenError('x-id', '{"key":"val"}', 'body-content', 'Token expired');
     expect(err.message).toBe('Token expired');
+    expect(err.identifier).toBe('x-id');
+    expect(err.json).toBe('{"key":"val"}');
+    expect(err.body).toBe('body-content');
   });
 });
 
-describe('BadBody', () => {
-  it('extends ApplicationFailure with bad_body type', () => {
-    const err = new BadBody('x-id', '{"key":"val"}', 'body-content', 'Invalid request');
+describe('BadBodyError', () => {
+  it('is a non-retryable Inngest error carrying identifier/json/body', () => {
+    const err = new BadBodyError('x-id', '{"key":"val"}', 'body-content', 'Invalid request');
     expect(err.message).toBe('Invalid request');
+    expect(err.identifier).toBe('x-id');
+    expect(err.json).toBe('{"key":"val"}');
+    expect(err.body).toBe('body-content');
   });
 });
 
@@ -115,19 +118,19 @@ describe('SocialAbstract', () => {
       expect(result).toBe('success');
     });
 
-    it('throws RefreshToken when handleErrors returns refresh-token', async () => {
+    it('throws RefreshTokenError when handleErrors returns refresh-token', async () => {
       const fn = vi.fn().mockRejectedValue({ message: 'refresh_me' });
-      await expect(provider.runInConcurrent(fn)).rejects.toThrow(RefreshToken);
+      await expect(provider.runInConcurrent(fn)).rejects.toThrow(RefreshTokenError);
     });
 
-    it('throws BadBody when function fails and handleErrors returns non-refresh', async () => {
+    it('throws BadBodyError when function fails and handleErrors returns non-refresh', async () => {
       const fn = vi.fn().mockRejectedValue(new Error('bad_me'));
-      await expect(provider.runInConcurrent(fn)).rejects.toThrow(BadBody);
+      await expect(provider.runInConcurrent(fn)).rejects.toThrow(BadBodyError);
     });
 
-    it('throws BadBody when handleErrors returns undefined', async () => {
+    it('throws BadBodyError when handleErrors returns undefined', async () => {
       const fn = vi.fn().mockRejectedValue(new Error('some error'));
-      await expect(provider.runInConcurrent(fn)).rejects.toThrow(BadBody);
+      await expect(provider.runInConcurrent(fn)).rejects.toThrow(BadBodyError);
     });
   });
 
@@ -156,16 +159,16 @@ describe('SocialAbstract', () => {
       expect(result).toBe(mockResponse);
     });
 
-    it('throws BadBody after 3 retries', async () => {
+    it('throws BadBodyError after 3 retries', async () => {
       const mockResponse = { status: 500, text: vi.fn().mockResolvedValue('server error') };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
     });
 
     it('retries on status 429', async () => {
       const mockResponse = { status: 429, text: vi.fn().mockResolvedValue('rate limited') };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
     });
 
     it('retries on rate_limit_exceeded in body', async () => {
@@ -177,7 +180,7 @@ describe('SocialAbstract', () => {
           text: vi.fn().mockResolvedValue('rate_limit_exceeded'),
         });
       });
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
       expect(callCount).toBeGreaterThan(1);
     });
 
@@ -190,32 +193,32 @@ describe('SocialAbstract', () => {
           text: vi.fn().mockResolvedValue('retry_me'),
         });
       });
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
       expect(callCount).toBeGreaterThan(1);
     });
 
-    it('throws RefreshToken on 401 when handleErrors returns refresh-token', async () => {
+    it('throws RefreshTokenError on 401 when handleErrors returns refresh-token', async () => {
       const mockResponse = { status: 401, text: vi.fn().mockResolvedValue('refresh_me') };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(RefreshToken);
+      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(RefreshTokenError);
     });
 
-    it('throws RefreshToken on handleErrors type refresh-token regardless of status', async () => {
+    it('throws RefreshTokenError on handleErrors type refresh-token regardless of status', async () => {
       const mockResponse = { status: 403, text: vi.fn().mockResolvedValue('refresh_me') };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(RefreshToken);
+      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(RefreshTokenError);
     });
 
-    it('throws BadBody for other error status codes', async () => {
+    it('throws BadBodyError for other error status codes', async () => {
       const mockResponse = { status: 400, text: vi.fn().mockResolvedValue('bad_me') };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com', {}, 'x-id')).rejects.toThrow(BadBodyError);
     });
 
     it('handles response.text() failure gracefully', async () => {
       const mockResponse = { status: 400, text: vi.fn().mockRejectedValue(new Error('parse fail')) };
       globalThis.fetch = vi.fn().mockResolvedValue(mockResponse);
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
     });
 
     it('retries on 500 when handleErrors returns undefined, exhausting retries', async () => {
@@ -227,11 +230,11 @@ describe('SocialAbstract', () => {
           text: vi.fn().mockResolvedValue('server error'),
         });
       });
-      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBody);
+      await expect(provider.fetch('https://api.example.com')).rejects.toThrow(BadBodyError);
       expect(callCount).toBe(4);
     });
 
-    it('passes the correct message to BadBody on retry exhaustion', async () => {
+    it('passes the correct message to BadBodyError on retry exhaustion', async () => {
       globalThis.fetch = vi.fn().mockResolvedValue({
         status: 429,
         text: vi.fn().mockResolvedValue('rate limited'),

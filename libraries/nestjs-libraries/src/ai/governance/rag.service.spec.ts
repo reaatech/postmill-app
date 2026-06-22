@@ -12,24 +12,14 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
       redisEmitter.emit('push');
       return redisList.length;
     }),
-    brpoplpush: vi.fn(async (src: string, dst: string, timeout: number) => {
-      return new Promise<string | null>((resolve) => {
-        if (redisList.length > 0) {
-          const item = redisList.pop()!;
-          resolve(item);
-        } else {
-          setTimeout(() => resolve(null), timeout * 1000);
-        }
-      });
+    rpoplpush: vi.fn(async (_src: string, _dst: string) => {
+      return redisList.length > 0 ? redisList.pop()! : null;
     }),
     lrem: vi.fn(async (_key: string, _count: number, _value: string) => {
       return 1;
     }),
     on: vi.fn(),
   };
-  // The worker runs blocking commands on a duplicated connection; share the
-  // same mocked fns so assertions on ioRedis.brpoplpush still observe them.
-  mock.duplicate = vi.fn(() => mock);
   return { ioRedis: mock };
 });
 
@@ -715,9 +705,9 @@ describe('RagService', () => {
       const service = createService();
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
 
-      // Stop the loop after the first BRPOP so the test does not hang on the
+      // Stop the loop after the first RPOP so the test does not hang on the
       // worker's `while (this._workerRunning)` poll.
-      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         return JSON.stringify({
           organizationId: 'org-1',
@@ -741,7 +731,7 @@ describe('RagService', () => {
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
       mockRepo.replaceSourceChunks.mockRejectedValue(new Error('boom'));
 
-      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         return JSON.stringify({
           organizationId: 'org-1',
@@ -759,20 +749,20 @@ describe('RagService', () => {
       expect(ioRedis.lpush).toHaveBeenCalled();
     });
 
-    it('swallows a BRPOP error then stops', async () => {
+    it('swallows an RPOP error then stops', async () => {
       enableRag();
       const service = createService();
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
       (service as any)._workerDelayMs = 1;
 
-      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         throw new Error('redis down');
       });
 
       await service.onModuleInit();
       await new Promise((r) => setTimeout(r, 10));
-      expect(ioRedis.brpoplpush).toHaveBeenCalled();
+      expect(ioRedis.rpoplpush).toHaveBeenCalled();
     });
 
     it('is idempotent — a second _startWorker is a no-op while running', async () => {

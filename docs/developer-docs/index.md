@@ -3,8 +3,8 @@
 Technical documentation for developers working on the Postmill codebase. This directory covers
 architecture, conventions, and infrastructure — everything you need to contribute effectively.
 
-**Target audience:** Developers contributing to the Postmill monorepo (NestJS backend, NestJS +
-Temporal orchestrator, Next.js frontend, shared libraries, Prisma).
+**Target audience:** Developers contributing to the Postmill monorepo (NestJS backend + Inngest
+job handler, Next.js frontend, shared libraries, Prisma).
 
 ---
 
@@ -69,8 +69,7 @@ Temporal orchestrator, Next.js frontend, shared libraries, Prisma).
 
 ```
 apps/
-  backend/         NestJS REST API — thin controllers + module wiring
-  orchestrator/    NestJS + Temporal — workflows and activities
+  backend/         NestJS REST API — thin controllers + module wiring + Inngest handler
   frontend/        Next.js (App Router) + React — port 4200
   extension/       Browser extension
   commands/        CLI commands

@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RefreshIntegrationService } from './refresh.integration.service';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 
 const mockAuthTokenDetails = {
   id: 'auth-1',
@@ -25,10 +29,8 @@ const mockIntegration = {
 };
 
 let mockRefreshToken: ReturnType<typeof vi.fn>;
-let mockWorkflowStart: ReturnType<typeof vi.fn>;
 let mockIntegrationManager: any;
 let mockIntegrationService: any;
-let mockTemporalService: any;
 
 vi.mock('./integration.manager', () => ({
   IntegrationManager: vi.fn(() => mockIntegrationManager),
@@ -38,14 +40,17 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.serv
   IntegrationService: vi.fn(() => mockIntegrationService),
 }));
 
-vi.mock('nestjs-temporal-core', () => ({
-  TemporalService: vi.fn(() => mockTemporalService),
+vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
+  inngest: { send: vi.fn() },
+  isInngestEnabled: vi.fn().mockReturnValue(true),
 }));
 
 describe('RefreshIntegrationService', () => {
   let service: RefreshIntegrationService;
 
   beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
     mockRefreshToken = vi.fn().mockResolvedValue(mockAuthTokenDetails);
     mockIntegrationService = {
       createOrUpdateIntegration: vi.fn().mockResolvedValue({}),
@@ -67,18 +72,10 @@ describe('RefreshIntegrationService', () => {
       getSocialIntegrationUnchecked: vi.fn().mockReturnValue(mockProvider),
       requireClientInformation: vi.fn().mockResolvedValue({ client_id: 'mock-id', client_secret: 'mock-secret', instanceUrl: '' }),
     };
-    mockWorkflowStart = vi.fn().mockResolvedValue({ workflowId: 'refresh_integration-1' });
-    mockTemporalService = {
-      client: {
-        getRawClient: vi.fn(() => ({
-          workflow: { start: mockWorkflowStart },
-        })),
-      },
-    };
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
     service = new RefreshIntegrationService(
       mockIntegrationManager as any,
       mockIntegrationService as any,
-      mockTemporalService as any,
     );
   });
 
@@ -130,15 +127,14 @@ describe('RefreshIntegrationService', () => {
   });
 
   describe('startRefreshWorkflow', () => {
-    it('starts Temporal workflow when refreshCron is true', async () => {
+    it('sends integration/refresh-token event when refreshCron is true', async () => {
       const result = await service.startRefreshWorkflow('org-1', 'integration-1', mockIntegrationManager.getSocialIntegration());
-      expect(mockWorkflowStart).toHaveBeenCalledWith('refreshTokenWorkflow', {
-        workflowId: 'refresh_integration-1',
-        args: [{ integrationId: 'integration-1', organizationId: 'org-1' }],
-        taskQueue: 'main',
-        workflowIdConflictPolicy: 'TERMINATE_EXISTING',
+      expect(inngest.send).toHaveBeenCalledWith({
+        name: 'integration/refresh-token',
+        data: { integrationId: 'integration-1', organizationId: 'org-1' },
+        id: 'refresh_integration-1',
       });
-      expect(result).toEqual({ workflowId: 'refresh_integration-1' });
+      expect(result).toBeUndefined();
     });
 
     it('returns false when refreshCron is false', async () => {
@@ -151,10 +147,11 @@ describe('RefreshIntegrationService', () => {
       expect(result).toBe(false);
     });
 
-    it('handles missing raw client gracefully', async () => {
-      mockTemporalService.client.getRawClient.mockReturnValue(undefined);
+    it('returns false and does not send event when Inngest is disabled', async () => {
+      vi.mocked(isInngestEnabled).mockReturnValue(false);
       const result = await service.startRefreshWorkflow('org-1', 'integration-1', mockIntegrationManager.getSocialIntegration());
-      expect(result).toBeUndefined();
+      expect(inngest.send).not.toHaveBeenCalled();
+      expect(result).toBe(false);
     });
   });
 

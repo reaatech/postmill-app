@@ -124,6 +124,15 @@ async function main() {
   await cleanup();
 
   // --- org + user + membership ---
+  // RBAC: the 'owner' system role is seeded by RbacSeeder on backend boot. If the app
+  // hasn't booted yet the lookup returns null — the user is still a platform super-admin
+  // (isSuperAdmin bypasses RBAC), so a null roleId is fine for UI testing.
+  const ownerRole = await prisma.appRole.findFirst({
+    where: { organizationId: null, key: 'owner', isSystem: true },
+  });
+  if (!ownerRole) {
+    console.warn('  ⚠ no "owner" system role found — boot the backend once so RbacSeeder runs; continuing with null roleId');
+  }
   const org = await prisma.organization.create({
     data: {
       name: ORG_NAME,
@@ -131,16 +140,15 @@ async function main() {
       isTrailing: true,
       users: {
         create: {
-          role: 'SUPERADMIN',
+          roleRef: ownerRole ? { connect: { id: ownerRole.id } } : undefined,
           user: {
             create: {
               email: EMAIL,
               password: hashSync(PASSWORD, 12),
               providerName: 'LOCAL',
-              name: 'Test',
-              lastName: 'User',
+              isSuperAdmin: true,
               activated: true,
-              timezone: 0,
+              profile: { create: { name: 'Test', lastName: 'User', timezone: 'UTC' } },
             },
           },
         },
@@ -227,7 +235,7 @@ async function main() {
       data: {
         state: 'PUBLISHED', organizationId: orgId, integrationId, content,
         group: crypto.randomUUID(), publishDate: d, image: '[]', settings: '{}',
-        creationMethod: 'WEB', approvedSubmitForOrder: 'NO',
+        creationMethod: 'WEB',
         releaseURL: 'https://example.com/' + key + '/' + crypto.randomBytes(4).toString('hex'),
       },
       select: { id: true },
@@ -245,7 +253,7 @@ async function main() {
       data: {
         state: 'QUEUE', organizationId: orgId, integrationId, content,
         group: crypto.randomUUID(), publishDate: d, image: '[]', settings: '{}',
-        creationMethod: 'WEB', approvedSubmitForOrder: 'NO',
+        creationMethod: 'WEB',
       },
       select: { id: true },
     });
