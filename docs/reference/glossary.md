@@ -21,19 +21,21 @@ A social media platform or chat service integration (e.g., X, LinkedIn, Discord,
 A single connected channel instance — credentials and settings for one account on one platform.
 Stored as an `Integration` row, encrypted at rest via `EncryptionService`.
 
-**Temporal**
-The workflow engine that schedules and executes publish workflows. Postmill uses Temporal's
-TypeScript SDK to run durable, retryable workflows for post publishing, analytics collection,
-and comment syncing.
+**Inngest**
+The durable job engine that schedules and executes background work. Postmill uses Inngest Cloud
+(or the local Inngest dev server) for event-driven and cron-triggered functions: post publishing,
+analytics collection, comment syncing, email delivery, autopost processing, and token refresh.
+Functions are served by the backend at `/api/inngest`.
 
-**Orchestrator**
-The Temporal worker application (`apps/orchestrator`) that hosts workflow and activity
-implementations. Requires `RUN_CRON=true` to activate scheduled workflows (analytics sweeps,
-comment syncs).
+**Orchestrator** (legacy)
+The former Temporal worker application (`apps/orchestrator`) that hosted workflow and activity
+implementations. Removed in v3.9.0; all background jobs now run through Inngest inside the
+backend.
 
 **Durable Execution**
-A Temporal execution model where workflow state is persisted on every step. If the worker
-restarts mid-workflow, execution resumes from the last persisted step — no lost progress.
+An execution model where job state is persisted on every step. Inngest provides retries,
+concurrency controls, and idempotency so that background work resumes reliably after restarts
+or failures.
 
 ---
 
@@ -48,7 +50,7 @@ The scheduling interface at `/schedule`. A grid view where users create, schedul
 manage posts.
 
 **Workflow**
-A Temporal workflow that executes post publishing. The current version (v1.0.6) handles: preflight
+The Inngest `post-publish` function that executes post publishing. It handles: preflight
 validation, media upload, post creation per channel, optional first comment, and state management
 (draft → publishing → published / failed).
 
@@ -67,8 +69,8 @@ server-side in the workflow before any publish attempt.
 ## Analytics
 
 **AnalyticsSnapshot**
-A daily aggregated metric row per channel/provider. Collected by a Temporal sweep workflow.
-Contains follower counts, engagement metrics, and reach data.
+A daily aggregated metric row per channel/provider. Collected by the Inngest `analytics-collection`
+function (daily cron). Contains follower counts, engagement metrics, and reach data.
 
 **PostAnalyticsSnapshot**
 A daily aggregated metric row per individual post. Contains views, likes, comments, shares, and
@@ -139,7 +141,7 @@ origin claims.
 **SocialComment**
 A synced platform comment from a social provider. Stored in the `SocialComment` table with
 platform ID, parent tracking (threading), status, sentiment, priority, and assignment. Synced
-periodically by the Temporal `commentsCollectionWorkflow`.
+periodically by the Inngest `comments-collection` function.
 
 **PostCommentRead**
 Per-user read-state tracking for the comment inbox. Records which comments each user has seen,

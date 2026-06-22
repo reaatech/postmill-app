@@ -8,6 +8,25 @@ has the full per-commit detail.
 
 ---
 
+### v3.9.0 (June 2026)
+
+Temporal → Inngest migration — background jobs now run through Inngest Cloud (or the local dev
+server) instead of a separate Temporal orchestrator:
+
+- **Removed** `apps/orchestrator`, `libraries/nestjs-libraries/src/temporal/`, `dynamicconfig/`,
+  and all `@temporalio/*` / `nestjs-temporal-core` dependencies
+- **Inngest handler** served by the backend at `/api/inngest`
+- **Activities** moved to `libraries/nestjs-libraries/src/inngest/activities/` and de-Temporalized
+- **Functions** in `apps/backend/src/inngest/functions/` covering post publishing, analytics
+  collection, comment sync, missing-post scan, media-job polling, email delivery, autopost
+  processing, token refresh, streak tracking, and analytics backfill
+- **Environment variables** changed: `USE_INNGEST`, `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`,
+  `INNGEST_SIGNING_KEY_FALLBACK`, `INNGEST_ENV`, `INNGEST_SERVE_ORIGIN`, `INNGEST_SERVE_PATH`,
+  `INNGEST_DEV`, `INNGEST_BASE_URL`; `RUN_CRON` is no longer used
+- **Build/test scripts** no longer reference `apps/orchestrator`
+
+See [Inngest & Cron](../operations-guide/inngest-and-cron.md) for operation details.
+
 ### v3.8.10 (June 2026)
 
 Identity, tenancy, RBAC & provider-surface redesign:

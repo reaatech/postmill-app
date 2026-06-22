@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: "Calendar & Scheduling"
-    details: "Add posts to a calendar; they enter a durable Temporal workflow and publish at the scheduled time across 36+ channels."
+    details: "Add posts to a calendar; they enter a durable Inngest function and publish at the scheduled time across 36+ channels."
     link: /user-guide/calendar
   - title: "Persisted Analytics"
     details: "A multi-channel dashboard built from daily snapshots — period-over-period comparisons, best-time heatmap, and AI-powered recommendations."

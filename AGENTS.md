@@ -15,8 +15,7 @@ PNPM monorepo with a single root `package.json` for dependencies. Workspaces are
 `pnpm --filter`.
 
 Apps (`apps/`):
-- `backend` — NestJS REST API. Kept **thin**: controllers + module wiring. Real logic lives in libraries.
-- `orchestrator` — NestJS + **Temporal**. Background jobs: workflows and activities.
+- `backend` — NestJS REST API. Kept **thin**: controllers + module wiring. Real logic lives in libraries. Serves the Inngest handler.
 - `frontend` — **Next.js (App Router) + React**. Runs on port `4200`. Tailwind 3, Sentry-instrumented.
 - `extension` — browser extension.
 - `commands` — CLI commands.
@@ -46,17 +45,16 @@ Use **pnpm only** — never npm or yarn.
 pnpm install              # also runs prisma-generate via postinstall
 
 # Develop (all apps in parallel)
-pnpm run dev              # extension + orchestrator + backend + frontend
+pnpm run dev              # extension + backend + frontend
 pnpm run dev:backend      # backend only
 pnpm run dev:frontend     # frontend only (port 4200)
-pnpm run dev:orchestrator # orchestrator only
 
 # Build
-pnpm run build            # frontend + backend + orchestrator
+pnpm run build            # frontend + backend
 pnpm run build:frontend   # single app variants also exist
 
 # Test (Vitest, per package)
-pnpm run test             # helpers → nestjs-libraries → backend → orchestrator → frontend
+pnpm run test             # helpers → nestjs-libraries → backend → frontend
 vitest run --root apps/backend            # run one package's tests
 
 # Database (Prisma 6.5.0)
@@ -153,10 +151,10 @@ at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
 Refactored from single-channel live-fetch to a persisted multi-channel dashboard.
 
 - **Data models**: `AnalyticsSnapshot` and `PostAnalyticsSnapshot` (Prisma) — daily snapshots
-  populated by a Temporal workflow.
-- **Collection worker**: the Temporal workflow in `apps/orchestrator` requires `RUN_CRON=true` to
-  activate. It runs one sweep then `continueAsNew`s every 24h — **do not reintroduce an unbounded
-  `while(true)` loop**.
+  populated by an Inngest scheduled function.
+- **Collection worker**: the Inngest function in the backend (`/api/inngest`) requires `USE_INNGEST=true`
+  and valid Inngest credentials (or `INNGEST_DEV=1` locally). It runs one sweep on a daily cron —
+  **do not reintroduce an unbounded `while(true)` loop**.
 - **Retention/rollup**: `AnalyticsActivity.pruneAndRollupSnapshots()` (per-org each sweep) rolls
   daily `AnalyticsSnapshot` rows older than ~18 months into one weekly row per
   `(integration, metric, ISO week)` — flow metrics summed, stock metrics keep the week's latest —
@@ -189,8 +187,8 @@ Two feature tracks added to `/launches`.
 - **`ISocialMediaComments`** interface in `social.integrations.interface.ts` with optional
   `fetchComments` / `replyToComment` / `likeComment`.
 - Social comments **Controller → Service → Repository** layer.
-- Temporal **`CommentsActivity` + `commentsCollectionWorkflow`** for periodic sync (gated by
-  `RUN_CRON=true`).
+- Inngest **`CommentsActivity` + `commentsCollection`** for periodic sync (gated by background jobs
+  configured).
 
 ## AI Providers (v3.4.0)
 
@@ -269,7 +267,7 @@ env-based approach (Dub, Short.io, Kutt, LinkDrip).
 ### Data model
 3 Prisma models: `OrgShortLinkConfig` (per-org provider config with encrypted credentials and custom
 domain), `ShortLink` (generated short link ledger — original URL, short URL, provider, optional post
-reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the Temporal analytics sweep).
+reference), `ShortLinkSnapshot` (daily click-count snapshot collected by the analytics sweep).
 
 ### No-provider behaviour
 No active short-link provider for an org = the `ShortLinkService` returns the original URL
@@ -318,10 +316,10 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 
 ### Competitor / watchlist tracking (3N)
 - New `WatchedAccount` / `WatchedAccountMetric` models (additive). Lightweight public-metric probes
-  ride the **existing analytics collection sweep** (`RUN_CRON=true`), one per enabled account,
-  reusing snapshot retention/rollup. **Capability-gated and graceful:** a probe failure
-  (403/unsupported) auto-disables the capability (records `lastError`) and logs — it never crashes
-  a sweep. Watched-account handles are user input → probe via `safeFetch` (0F).
+  ride the **existing analytics collection sweep**, one per enabled account, reusing snapshot
+  retention/rollup. **Capability-gated and graceful:** a probe failure (403/unsupported) auto-disables
+  the capability (records `lastError`) and logs — it never crashes a sweep. Watched-account handles
+  are user input → probe via `safeFetch` (0F).
 
 ### Bulk import (2L)
 - `POST /posts/bulk` (validated row DTO) creates many posts via the **shared** post-creation logic

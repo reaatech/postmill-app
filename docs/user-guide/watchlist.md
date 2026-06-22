@@ -48,8 +48,9 @@ your own channel metrics in the Analytics dashboard.
 ## Probe Schedule
 
 Watched account probes run as part of the standard analytics collection sweep
-(`analyticsCollectionWorkflow`). Each enabled watched account is probed once per sweep (daily
-cycle). The sweep requires `RUN_CRON=true` on one orchestrator instance.
+(`analyticsCollection`). Each enabled watched account is probed once per sweep (daily cycle).
+The backend must have `USE_INNGEST=true` and valid Inngest Cloud credentials (or `INNGEST_DEV=1`
+for local development).
 
 ## Auto-Disable on Failure
 

@@ -6,16 +6,16 @@ for triage, reply, and assignment.
 
 ## Comment Sync
 
-Comments are collected by a background Temporal workflow (`commentsCollectionWorkflow`). One
-orchestrator instance must run with `RUN_CRON=true` to activate the collection sweep. The
-workflow periodically fetches comments from each connected channel that supports the comments
-capability and syncs them into the `SocialComment` table.
+Comments are collected by a background Inngest function (`commentsCollection`). The backend must
+have `USE_INNGEST=true` and valid Inngest Cloud credentials (or `INNGEST_DEV=1` for local
+development). The function periodically fetches comments from each connected channel that supports
+the comments capability and syncs them into the `SocialComment` table.
 
 Comment data includes the comment text, author information, timestamp, and platform-specific
 metadata. Per-user read state is tracked in the `PostCommentRead` table so each team member sees
 their own unread count.
 
-For operational setup details, see [Temporal and Cron](../operations-guide/temporal-and-cron.md).
+For operational setup details, see [Inngest and Cron](../operations-guide/inngest-and-cron.md).
 
 ## Unified Inbox (`/comments`)
 
@@ -90,7 +90,7 @@ Farcaster, Nostr, VK, ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, P
 ## First-Comment Auto-Post
 
 When you include a first comment in the composer, Postmill automatically posts it after the main
-post publishes successfully. This behavior is defined in the post workflow v1.0.6:
+post publishes successfully. This behavior is defined in the publish function v1.0.6:
 
 1. The main post is published to the selected channels.
 2. If a first comment is configured and the channel supports it (`firstComment: true`), the

@@ -14,7 +14,7 @@ ListMonk, Moltbook, Whop, Skool, MeWe, Tumblr, Pixelfed, PeerTube.
 ## How it works
 
 1. You schedule posts in the composer and place them on the calendar.
-2. Temporal workflows pick up posts at their scheduled time and publish to each channel.
+2. Inngest functions pick up posts at their scheduled time and publish to each channel.
 3. Daily analytics snapshots collect engagement data and populate the dashboard.
 
 ## Guide pages

@@ -151,8 +151,9 @@ handleErrors(body: string, status: number) {
 }
 ```
 
-The temporal workflow automatically handles `RefreshToken` exceptions by
-refreshing the token and retrying.
+The publish function automatically handles `RefreshTokenError` exceptions by
+refreshing the token and retrying. Non-retryable provider errors such as
+`BadBodyError` stop retries and fail the post.
 
 ### Outbound HTTP
 

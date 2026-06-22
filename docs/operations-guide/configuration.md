@@ -12,7 +12,7 @@ Every environment variable Postmill recognises, sourced from `.env.example` and
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `DATABASE_URL` | — | PostgreSQL connection string for the application database |
-| `REDIS_URL` | — | Redis connection string |
+| `REDIS_URL` | — | Redis connection string. Use `redis://` for local Redis or `rediss://` for Upstash / TLS endpoints. |
 | `JWT_SECRET` | — | Secret key for signing JWT tokens; also used as encryption key fallback |
 | `FRONTEND_URL` | — | Public-facing URL of the application (e.g. `https://postmill.example.com`) |
 | `NEXT_PUBLIC_BACKEND_URL` | — | Public URL of the backend API (e.g. `https://postmill.example.com/api`) |
@@ -35,7 +35,7 @@ SMTP (nodemailer). The active provider is selected globally via `EMAIL_PROVIDER`
 email is off (users activate automatically — same as the old `RESEND_API_KEY` absence).
 
 All metadata (to, from, subject, status) is logged in the `EmailLog` table with 90-day retention,
-pruned by the daily analytics sweep (`RUN_CRON=true`). Webhook-capable providers (all except SMTP)
+pruned by the daily analytics sweep. Webhook-capable providers (all except SMTP)
 advance log rows through `delivered`/`bounced`/`complained`/`opened`/`clicked`.
 
 | Variable | Default | Purpose |
@@ -87,13 +87,17 @@ optionally hold the expected SNS TopicArn to restrict incoming notifications.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `RUN_CRON` | `false` | Set to `true` on exactly one orchestrator instance to start perpetual workflows. See [Temporal & Cron](./temporal-and-cron.md). |
+| `USE_INNGEST` | — | Set to `true` to enable Inngest-driven background jobs |
+| `INNGEST_EVENT_KEY` | — | Inngest Cloud event key (required unless `INNGEST_DEV=1`) |
+| `INNGEST_SIGNING_KEY` | — | Inngest Cloud signing key (required unless `INNGEST_DEV=1`) |
+| `INNGEST_SIGNING_KEY_FALLBACK` | — | Optional fallback signing key for rotation |
+| `INNGEST_ENV` | — | Optional branch environment name |
+| `INNGEST_DEV` | — | Set to `1` to use the local Inngest dev server |
+| `INNGEST_BASE_URL` | `http://localhost:8288` | Local dev server URL (only used with `INNGEST_DEV=1`) |
+| `INNGEST_SERVE_ORIGIN` | — | Public backend origin served to Inngest |
+| `INNGEST_SERVE_PATH` | `/api/inngest` | Path where the backend serves the Inngest handler |
 | `ANALYTICS_DAILY_RETENTION_DAYS` | `548` | Days to keep daily channel snapshots before rolling up to weekly (~18 months) |
 | `ANALYTICS_POST_RETENTION_DAYS` | `90` | Days to keep per-post snapshots before pruning |
-| `TEMPORAL_ADDRESS` | `localhost:7233` | Temporal server gRPC address |
-| `TEMPORAL_TLS` | — | Set to enable TLS to Temporal |
-| `TEMPORAL_API_KEY` | — | Temporal API key for cloud or mTLS setups |
-| `TEMPORAL_NAMESPACE` | `default` | Temporal namespace |
 | `COMMENTS_SWEEP_INTERVAL_MINUTES` | `30` | Minutes between comment collection sweeps |
 | `POST_DAYS_BACK` | `30` | Days back to look for posts when fetching comments |
 | `SOCIAL_COMMENT_RETENTION_DAYS` | `90` | Days before social comments are soft-deleted |

@@ -13,8 +13,7 @@ Postmill uses **Vitest** for all tests. There is no Jest configuration in active
 pnpm run test
 ```
 
-This runs packages sequentially: `helpers` → `nestjs-libraries` → `backend` → `orchestrator` →
-`frontend`.
+This runs packages sequentially: `helpers` → `nestjs-libraries` → `backend` → `frontend`.
 
 ### Single package
 
@@ -22,7 +21,6 @@ This runs packages sequentially: `helpers` → `nestjs-libraries` → `backend` 
 vitest run --root apps/backend
 vitest run --root libraries/nestjs-libraries
 vitest run --root apps/frontend
-vitest run --root apps/orchestrator
 ```
 
 ### Single file or pattern

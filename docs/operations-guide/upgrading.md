@@ -162,6 +162,63 @@ pnpm run build
 
 ## Per-release notes
 
+### v3.8.10 -> v3.9.0
+
+v3.9.0 replaces the Temporal orchestrator with Inngest. The orchestrator app,
+Temporal Server, Temporal PostgreSQL, and Temporal Elasticsearch are removed from
+the stack. Background jobs (post publishing, analytics collection, comment sync,
+email, autopost, token refresh, streaks) now run as Inngest functions served by
+the backend at `/api/inngest`.
+
+**No schema migration is required.** This release only removes code,
+infrastructure, and environment variables.
+
+**Removed environment variables:** Remove these from `.env`, `docker-compose.yaml`,
+and any deployment config:
+
+- `TEMPORAL_ADDRESS`
+- `TEMPORAL_TLS`
+- `TEMPORAL_API_KEY`
+- `TEMPORAL_NAMESPACE`
+- `RUN_CRON`
+- `ORCHESTRATOR_PORT`
+- `ENABLE_ES`
+- `ES_SEEDS`
+- `ES_VERSION`
+
+**Added environment variables:**
+
+| Variable | Required? | Notes |
+|----------|-----------|-------|
+| `INNGEST_EVENT_KEY` | Required for Inngest Cloud | Omit when running the local dev server (`INNGEST_DEV=1`) |
+| `INNGEST_SIGNING_KEY` | Required for Inngest Cloud | Omit when running the local dev server |
+| `INNGEST_SIGNING_KEY_FALLBACK` | Optional | Zero-downtime signing-key rotation |
+| `INNGEST_ENV` | Optional | Branch environment name, e.g. `staging` |
+| `INNGEST_DEV` | Local only | Set to `1` when using `npx inngest-cli@latest dev` |
+| `INNGEST_BASE_URL` | Local only | Dev server URL, usually `http://localhost:8288` |
+| `INNGEST_SERVE_ORIGIN` | Optional | Public backend origin if behind a reverse proxy |
+| `INNGEST_SERVE_PATH` | Optional | Defaults to `/api/inngest` |
+| `USE_INNGEST` | Cutover flag | Set to `true` to route background work to Inngest |
+
+**Upgrade steps:**
+
+1. Read the CHANGELOG for any additional v3.9.0 changes.
+2. Back up your database.
+3. Remove Temporal/Elasticsearch containers from `docker-compose.yaml`.
+4. Replace the removed env vars with the Inngest variables above.
+5. Set `USE_INNGEST="true"` after you have stopped the old orchestrator/Temporal
+   stack to avoid double execution.
+6. Bump the image tag and redeploy.
+7. Verify the backend serves `/api/inngest` (HTTP 200) and that functions appear
+   in the Inngest Cloud dashboard (or local dev server).
+
+**Rollback:** If jobs fail after cutover:
+
+1. Unset `USE_INNGEST`.
+2. Redeploy the previous image tag and re-start the orchestrator/Temporal stack.
+3. Cancel any in-flight Inngest runs from the Inngest Cloud dashboard or dev
+   server, then re-dispatch affected posts manually if needed.
+
 ### v3.8.9 -> v3.8.10
 
 v3.8.10 restructures identity, roles, and the provider-surface settings, and — unusually for this

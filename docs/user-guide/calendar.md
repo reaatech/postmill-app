@@ -71,9 +71,9 @@ Numbers are formatted compactly (e.g., 1.2K, 3.4M). Metrics are sourced from
 `PostAnalyticsSnapshot` when available; if no snapshot exists yet (e.g., a just-published post), a
 live-fallback enrich provides the latest data from the platform.
 
-Card stats (views/likes/comments) populate from collected analytics snapshots; for very recent posts
-or instances without scheduled analytics collection (`RUN_CRON`), stats are fetched live on a
-best-effort basis and may lag.
+Card stats (views/likes/comments) populate from collected analytics snapshots; for very recent
+posts or instances without background jobs configured, stats are fetched live on a best-effort
+basis and may lag.
 
 ### Post Time
 
