@@ -1,7 +1,12 @@
 @use './colors.scss';
-@use './polonto.css';
+
 @use '@uppy/core/dist/style.css' as uppyCore;
 @use '@uppy/dashboard/dist/style.css' as uppyDashboard;
+
+/* Designer fonts — open-licensed (SIL OFL) families used by the media Designer
+   font picker / canvas renderer. See
+   apps/frontend/src/components/media-tools/designer/fonts.ts. Additive only. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto:wght@400;500;700&family=Open+Sans:wght@400;600;700&family=Lato:wght@400;700&family=Montserrat:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Oswald:wght@400;500;700&family=Playfair+Display:wght@400;600;700&family=Merriweather:wght@400;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -351,13 +356,6 @@ body * {
   @apply text-textColor;
 }
 
-.editor .polonto * {
-  color: black !important;
-}
-
-.bp5-portal {
-  z-index: 9999 !important;
-}
 
 :empty + .existing-empty {
   display: none;
@@ -881,4 +879,59 @@ html[dir='rtl'] [dir='ltr'] {
 /* Text selection */
 ::selection {
   background: rgba(43, 92, 211, 0.3);
+}
+
+/* Designer range-slider thumb (used by media-tools/designer/controls Slider).
+   The track is painted inline via a gradient; this styles the draggable thumb
+   to match the #2B5CD3 accent across WebKit + Firefox. Additive only. */
+.designer-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #2b5cd3;
+  cursor: pointer;
+}
+
+.designer-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #ffffff;
+  border: 2px solid #2b5cd3;
+  cursor: pointer;
+}
+
+/* Designer motion language + drop affordance (G1/G2). Additive only.
+   All motion is gated behind prefers-reduced-motion. */
+.designer-canvas-container.designer-drop-active {
+  outline: 2px dashed #2b5cd3;
+  outline-offset: -4px;
+  background-color: rgba(43, 92, 211, 0.06);
+}
+
+.designer-fade-in {
+  animation: designerFadeIn 160ms ease-out;
+}
+
+@keyframes designerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .designer-canvas-container *,
+  .designer-fade-in {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

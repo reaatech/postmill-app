@@ -15,6 +15,7 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import { SettingsController } from '@gitroom/backend/api/routes/settings.controller';
 import { PostsController } from '@gitroom/backend/api/routes/posts.controller';
 import { MediaController } from '@gitroom/backend/api/routes/media.controller';
+import { FilesController } from '@gitroom/backend/api/routes/files.controller';
 import { UploadModule } from '@gitroom/nestjs-libraries/upload/upload.module';
 import { BillingController } from '@gitroom/backend/api/routes/billing.controller';
 import { NotificationsController } from '@gitroom/backend/api/routes/notifications.controller';
@@ -55,6 +56,9 @@ import { DashboardController } from '@gitroom/backend/api/routes/dashboard.contr
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
 import { RolesController } from '@gitroom/backend/api/routes/roles.controller';
+import { StockMediaController } from '@gitroom/backend/api/routes/stock-media.controller';
+import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
+import { DesignController, DesignTemplateController, DesignerProxyController } from '@gitroom/backend/api/routes/design.controller';
 import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
 import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jobs-webhook.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
@@ -79,6 +83,7 @@ const authenticatedController = [
   CampaignsController,
   PostsController,
   MediaController,
+  FilesController,
   BillingController,
   NotificationsController,
   CopilotController,
@@ -107,6 +112,10 @@ const authenticatedController = [
   DashboardController,
   BrandsController,
   RolesController,
+  StockMediaController,
+  DesignController,
+  DesignTemplateController,
+  DesignerProxyController,
   AdminController,
 ];
 @Module({
@@ -145,6 +154,7 @@ const authenticatedController = [
     WalletProvider,
     OauthProvider,
     AnalyticsService,
+    StockMediaService,
     AiGuardMiddleware,
     SessionCleanupService,
   ],

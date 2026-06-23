@@ -25,6 +25,9 @@ export class BrandsService {
       language?: string;
       platformInstructions?: Record<string, string>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
     },
   ) {
     const count = await this._repository.countBrands(orgId);
@@ -50,6 +53,9 @@ export class BrandsService {
       language?: string;
       platformInstructions?: Record<string, string>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
     },
   ) {
     return this._repository.updateBrand(orgId, brandId, data);

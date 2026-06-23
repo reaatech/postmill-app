@@ -21,12 +21,21 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
 import { InngestController } from '@gitroom/backend/api/controllers/inngest.controller';
 import { ScheduleModule } from '@nestjs/schedule';
+import { FeatureFlagsModule, FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
+
+// Module-level feature flags are read at bootstrap time. Defaults keep all
+// features enabled for production/CI; local developers opt-out via env vars.
+const featureFlags = new FeatureFlagsService();
+const scheduleModule = featureFlags.isEnabled('cron')
+  ? [ScheduleModule.forRoot()]
+  : [];
 
 @Global()
 @Module({
   imports: [
+    FeatureFlagsModule,
     SentryModule.forRoot(),
-    ScheduleModule.forRoot(),
+    ...scheduleModule,
     DatabaseModule,
     ApiModule,
     PublicApiModule,

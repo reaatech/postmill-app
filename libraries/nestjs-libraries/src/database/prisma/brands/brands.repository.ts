@@ -49,6 +49,9 @@ export class BrandsRepository {
       enabled?: boolean;
       isDefault?: boolean;
       slug?: string;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
     },
   ) {
     return this._aiBrandProfile.model.aIBrandProfile.create({
@@ -61,6 +64,9 @@ export class BrandsRepository {
         enabled: data.enabled ?? true,
         isDefault: data.isDefault ?? false,
         slug: data.slug,
+        logoFileIds: data.logoFileIds ?? [],
+        palette: data.palette ?? [],
+        fontFamilies: data.fontFamilies ?? [],
       },
     });
   }
@@ -74,6 +80,9 @@ export class BrandsRepository {
       language?: string;
       platformInstructions?: Record<string, string>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
     },
   ) {
     const brand = await this._aiBrandProfile.model.aIBrandProfile.findFirst({

@@ -12,6 +12,7 @@ import {
   Sections,
   SubscriptionException,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 
 @Injectable()
 export class MediaService {
@@ -20,8 +21,33 @@ export class MediaService {
     private _openAi: OpenaiService,
     private _subscriptionService: SubscriptionService,
     private _videoManager: VideoManager,
-    private _storageService: StorageService
+    private _storageService: StorageService,
+    private _aiMediaService: AiMediaService
   ) {}
+
+  // ── AI image ops (bg-remove / inpaint / upscale, §2E) ──
+  // Thin pass-throughs to the governed media pipeline (AiMediaService wraps
+  // Replicate et al. via @reaatech/media-pipeline-mcp-*). The image URL is handed
+  // straight to the resolved provider — we never fetch it server-side here.
+
+  removeBackground(org: Organization, imageUrl: string) {
+    return this._aiMediaService.removeBackground(imageUrl, { orgId: org.id });
+  }
+
+  inpaintImage(
+    org: Organization,
+    imageUrl: string,
+    maskUrl: string,
+    prompt: string
+  ) {
+    return this._aiMediaService.inpaintImage(imageUrl, maskUrl, prompt, {
+      orgId: org.id,
+    });
+  }
+
+  upscaleImage(org: Organization, imageUrl: string, scale?: number) {
+    return this._aiMediaService.upscaleImage(imageUrl, { orgId: org.id, scale });
+  }
 
   async deleteMedia(org: string, id: string) {
     return this._mediaRepository.deleteMedia(org, id);

@@ -1,4 +1,5 @@
-import { Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit } from '@nestjs/common';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { MediaProviderRegistry } from './media-provider.registry';
 import { FalAdapter } from './adapters/fal.adapter';
 import { OpenaiMediaAdapter } from './adapters/openai-media.adapter';
@@ -39,9 +40,19 @@ const ALL_ADAPTERS = [
   exports: [MediaProviderRegistry],
 })
 export class MediaModule implements OnModuleInit {
-  constructor(private readonly _registry: MediaProviderRegistry) {}
+  private readonly _logger = new Logger(MediaModule.name);
+
+  constructor(
+    private readonly _registry: MediaProviderRegistry,
+    private readonly _flags: FeatureFlagsService,
+  ) {}
 
   onModuleInit() {
+    if (this._flags.isDisabled('media')) {
+      this._logger.log('Media module is disabled via DEV_DISABLE_MEDIA; skipping adapter registration');
+      return;
+    }
+
     for (const AdapterClass of ALL_ADAPTERS) {
       const adapter = new AdapterClass();
       this._registry.register(adapter);

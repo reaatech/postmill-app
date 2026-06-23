@@ -19,7 +19,7 @@ import {
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray } from 'class-validator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
@@ -41,6 +41,21 @@ class CreateBrandDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  logoFileIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  palette?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fontFamilies?: string[];
 }
 
 class UpdateBrandDto {
@@ -62,6 +77,21 @@ class UpdateBrandDto {
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  logoFileIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  palette?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fontFamilies?: string[];
 }
 
 @ApiTags('Brands')

@@ -653,7 +653,7 @@ export class AiMediaService {
 
   // ── Image edits (synchronous) ──
 
-  async upscaleImage(imageUrl: string, options?: { orgId?: string }): Promise<string> {
+  async upscaleImage(imageUrl: string, options?: { orgId?: string; scale?: number }): Promise<string> {
     const candidates = await this._resolveForOperation(options?.orgId, 'upscale');
 
     for (const candidate of candidates) {
@@ -661,6 +661,7 @@ export class AiMediaService {
       try {
         const result = await candidate.adapter.upscaleImage(imageUrl, {
           credentials: candidate.credentials,
+          scale: options?.scale,
         });
         if (!result) continue;
         const persisted = await this._persistJob({
