@@ -1,6 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import { Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
 const DesignerPage = dynamic(
   () =>
@@ -10,10 +12,41 @@ const DesignerPage = dynamic(
   { ssr: false }
 );
 
+// "Open in Designer" (stock photos/videos) navigates here with the asset in the
+// query string — no modal. When `url` is present we build the same initialAsset
+// the picker used to pass; otherwise the Designer shows its preset picker.
+function DesignerWithParams() {
+  const sp = useSearchParams();
+  const url = sp.get('url') || undefined;
+  const num = (k: string) => (sp.get(k) ? Number(sp.get(k)) : undefined);
+
+  const initialAsset = url
+    ? {
+        url,
+        type: (sp.get('type') as 'photo' | 'video') || 'photo',
+        thumbUrl: sp.get('thumbUrl') || undefined,
+        author: sp.get('author') || undefined,
+        authorUrl: sp.get('authorUrl') || undefined,
+        downloadLocation: sp.get('downloadLocation') || undefined,
+        source: sp.get('source') || undefined,
+        width: num('w'),
+        height: num('h'),
+        naturalWidth: num('nw'),
+        naturalHeight: num('nh'),
+      }
+    : undefined;
+
+  // The Designer initialises its store once from initialAsset, so remount it
+  // when the asset changes (navigating straight from one asset to another).
+  return <DesignerPage key={url || 'blank'} initialAsset={initialAsset} />;
+}
+
 export default function DesignerRoute() {
   return (
     <div className="h-full flex flex-col">
-      <DesignerPage />
+      <Suspense fallback={null}>
+        <DesignerWithParams />
+      </Suspense>
     </div>
   );
 }

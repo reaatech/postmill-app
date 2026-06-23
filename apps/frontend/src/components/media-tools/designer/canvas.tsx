@@ -310,6 +310,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
   );
 
   const fitToScreen = useCallback(() => {
+    if (!stageSize.width || !stageSize.height) return;
     const scaleX = stageSize.width / doc.width;
     const scaleY = stageSize.height / doc.height;
     const next = Math.min(scaleX, scaleY) * 0.9;
@@ -319,6 +320,19 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
       (stageSize.height - doc.height * next) / 2
     );
   }, [stageSize, doc.width, doc.height, setZoom, setViewport]);
+
+  // Auto fit-to-screen once the stage is measured and whenever the doc's
+  // dimensions change (preset pick, magic resize, opening with an asset). Keyed
+  // on doc size so it does NOT refight on panel toggles or after the user zooms
+  // — only a genuine canvas-size change re-fits.
+  const lastFitKey = useRef('');
+  useEffect(() => {
+    if (!stageSize.width || !stageSize.height) return;
+    const key = `${doc.width}x${doc.height}`;
+    if (lastFitKey.current === key) return;
+    lastFitKey.current = key;
+    fitToScreen();
+  }, [stageSize.width, stageSize.height, doc.width, doc.height, fitToScreen]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {

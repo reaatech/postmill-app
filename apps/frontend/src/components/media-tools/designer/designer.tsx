@@ -27,6 +27,7 @@ import { MagicResize } from './magic-resize';
 import { ShortcutsOverlay } from './shortcuts';
 import { Timeline } from './timeline';
 import { ExportDialog } from './export-dialog';
+import { fitWithin } from './panels/fit-within';
 
 interface DesignerProps {
   setMedia?: (media: { id: string; path: string }[]) => void;
@@ -41,8 +42,14 @@ interface DesignerProps {
     authorUrl?: string;
     downloadLocation?: string;
     source?: string;
+    // The chosen CANVAS size (drives the doc).
     width?: number;
     height?: number;
+    // The image's NATURAL pixel size — used to place it aspect-correct inside
+    // the doc (same as adding a photo from a panel). Falls back to filling the
+    // canvas when absent.
+    naturalWidth?: number;
+    naturalHeight?: number;
   };
   designId?: string;
 }
@@ -112,6 +119,7 @@ export const Designer: FC<DesignerProps> = ({
   const [showPresetPicker, setShowPresetPicker] = useState(!initialAsset && !designId);
   const [showSafeZones, setShowSafeZones] = useState(false);
   const [showTimeline, setShowTimeline] = useState(false);
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const aiActive = useAiActive();
   const storeRef = useRef<ReturnType<typeof createDesignerStore> | null>(null);
 
@@ -272,13 +280,23 @@ export const Designer: FC<DesignerProps> = ({
       const imgUrl = initialAsset.type === 'video'
         ? (initialAsset.thumbUrl || initialAsset.url)
         : initialAsset.url;
+      const d = store.getState().doc;
+      // Place the asset aspect-correct and centred — identical to adding a
+      // photo from a panel. Only fills the canvas when natural dims are unknown
+      // or the image already matches the canvas (e.g. "Original size").
+      const { width: w, height: h } = fitWithin(
+        initialAsset.naturalWidth || d.width,
+        initialAsset.naturalHeight || d.height,
+        d.width,
+        d.height
+      );
       store.getState().addElement({
         id: '',
         type: 'image',
-        x: 0,
-        y: 0,
-        width: store.getState().doc.width,
-        height: store.getState().doc.height,
+        x: (d.width - w) / 2,
+        y: (d.height - h) / 2,
+        width: w,
+        height: h,
         rotation: 0,
         opacity: 1,
         locked: false,
@@ -398,6 +416,18 @@ export const Designer: FC<DesignerProps> = ({
               Use in post
             </button>
           )}
+          {closeModal && (
+            <>
+              <div className="w-px h-6 bg-newBorder mx-1" />
+              <button
+                onClick={closeModal}
+                className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[15px]"
+                title="Close"
+              >
+                ✕
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -450,13 +480,32 @@ export const Designer: FC<DesignerProps> = ({
           {showTimeline && <Timeline store={store} setMedia={setMedia} />}
         </div>
 
-        {selectedIds.length >= 1 && (
+        {selectedIds.length >= 1 && !inspectorCollapsed && (
           <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-newBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
-            <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider mb-3">
-              Inspector
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
+                Inspector
+              </div>
+              <button
+                onClick={() => setInspectorCollapsed(true)}
+                className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px]"
+                title="Collapse inspector"
+              >
+                ›
+              </button>
             </div>
             <InspectorPanel store={store} />
           </div>
+        )}
+
+        {selectedIds.length >= 1 && inspectorCollapsed && (
+          <button
+            onClick={() => setInspectorCollapsed(false)}
+            className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-newBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px]"
+            title="Show inspector"
+          >
+            ‹
+          </button>
         )}
       </div>
     </div>

@@ -2,20 +2,12 @@
 
 import React, { FC, useCallback, useState } from 'react';
 import useSWR from 'swr';
+import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPhotoItem } from './stock-photos';
 import { StockVideoItem } from './stock-videos';
-import dynamic from 'next/dynamic';
 import { SaveToFilesModal } from './save-to-files-modal';
-import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
-
-// Client-only: Konva touches `window`/`canvas` at module-eval, so the Designer
-// must never load on the server and should only pull its bundle when opened.
-const Designer = dynamic(
-  () => import('./designer/designer').then((m) => m.Designer),
-  { ssr: false }
-);
 
 interface StockPreviewModalProps {
   item: StockPhotoItem | StockVideoItem;
@@ -25,74 +17,42 @@ interface StockPreviewModalProps {
 export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialItem, type }) => {
   const fetch = useFetch();
   const modal = useModals();
+  const router = useRouter();
   const [item, setItem] = useState(initialItem);
 
+  // "Open in Designer" navigates to the full /media/designer page with the
+  // asset in the query string — there is no Designer modal. `w/h` are the chosen
+  // canvas size (drives the doc); `nw/nh` are the image's real pixel size so it
+  // is placed aspect-correct inside that canvas.
   const openDesignerWith = useCallback(
     (width: number, height: number) => {
+      const params = new URLSearchParams();
+      params.set('url', item.url);
+      params.set('type', type);
+      params.set('source', type === 'photo' ? 'unsplash' : 'pexels');
+      params.set('w', String(width));
+      params.set('h', String(height));
+      params.set('nw', String(item.width));
+      params.set('nh', String(item.height));
+      if (item.author) params.set('author', item.author);
+      if (item.authorUrl) params.set('authorUrl', item.authorUrl);
+      if (type === 'video' && (item as StockVideoItem).thumbUrl) {
+        // The canvas image is the POSTER (thumbUrl), never the .mp4.
+        params.set('thumbUrl', (item as StockVideoItem).thumbUrl);
+      }
+      if (type === 'photo' && (item as StockPhotoItem).downloadLocation) {
+        params.set('downloadLocation', (item as StockPhotoItem).downloadLocation!);
+      }
       modal.closeAll();
-      modal.openModal({
-        title: '',
-        closeOnClickOutside: true,
-        closeOnEscape: true,
-        withCloseButton: true,
-        fullScreen: true,
-        children: (
-          <Designer
-            initialAsset={{
-              url: item.url,
-              // For video, the canvas image is the POSTER (thumbUrl), never the
-              // .mp4 — Konva can't draw a video file as an image.
-              thumbUrl: type === 'video' ? (item as StockVideoItem).thumbUrl : undefined,
-              type,
-              author: item.author,
-              authorUrl: item.authorUrl,
-              downloadLocation: type === 'photo' ? (item as StockPhotoItem).downloadLocation || undefined : undefined,
-              source: type === 'photo' ? 'unsplash' : 'pexels',
-              width,
-              height,
-            }}
-          />
-        ),
-      });
+      router.push(`/media/designer?${params.toString()}`);
     },
-    [modal, item, type]
+    [router, modal, item, type]
   );
 
-  // B7 — let the user pick the canvas size (image-native vs a social preset)
-  // before opening the Designer.
+  // Straight to the Designer at the image's original size — no size picker.
   const handleOpenInDesigner = useCallback(() => {
-    modal.openModal({
-      title: 'Open in Designer',
-      closeOnClickOutside: true,
-      closeOnEscape: true,
-      withCloseButton: true,
-      children: (
-        <div className="p-4 w-[360px] max-w-full">
-          <button
-            onClick={() => openDesignerWith(item.width, item.height)}
-            className="w-full mb-3 px-4 py-3 rounded-lg bg-green-600 text-white text-[13px] font-medium hover:bg-green-700"
-          >
-            Original size · {item.width} × {item.height}
-          </button>
-          <div className="text-[11px] text-textColor/40 uppercase tracking-wider mb-2">Or a channel size</div>
-          <div className="grid grid-cols-2 gap-2">
-            {CHANNEL_PRESETS.filter((p) => p.category !== 'custom').map((p) => (
-              <button
-                key={p.id}
-                onClick={() => openDesignerWith(p.width, p.height)}
-                className="px-3 py-2 rounded-md border border-newBorder text-textColor text-[12px] hover:border-[#2B5CD3] hover:bg-newColColor/20 text-left"
-              >
-                {p.name}
-                <span className="block text-[10px] text-textColor/40">
-                  {p.width} × {p.height}
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      ),
-    });
-  }, [modal, item, openDesignerWith]);
+    openDesignerWith(item.width, item.height);
+  }, [openDesignerWith, item]);
 
   const relatedKey = type === 'photo'
     ? `stock-photos-${(item as StockPhotoItem).id}-related`
