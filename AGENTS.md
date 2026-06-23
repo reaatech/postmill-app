@@ -11,8 +11,10 @@ time.
 
 ## Repository layout
 
-PNPM monorepo with a single root `package.json` for dependencies. Workspaces are driven by
-`pnpm --filter`.
+PNPM monorepo. Workspaces are driven by `pnpm --filter`. Dependencies are split between the root
+`package.json` (shared tooling and cross-cutting packages) and per-workspace `package.json` files in
+`apps/*` and `libraries/*` (feature-specific packages). Do not add a backend-only or frontend-only
+package to the root manifest unless it is genuinely shared across multiple workspaces.
 
 Apps (`apps/`):
 - `backend` — NestJS REST API. Kept **thin**: controllers + module wiring. Real logic lives in libraries. Serves the Inngest handler.
@@ -46,6 +48,7 @@ pnpm install              # also runs prisma-generate via postinstall
 
 # Develop (all apps in parallel)
 pnpm run dev              # extension + backend + frontend
+pnpm run dev:minimal      # backend + frontend only (recommended for daily dev)
 pnpm run dev:backend      # backend only
 pnpm run dev:frontend     # frontend only (port 4200)
 
@@ -66,6 +69,65 @@ pnpm run prisma-db-push   # push schema to the DB (see Database below)
   not add jest-style configuration.
 - **Lint runs from the repo root only**, via the flat `eslint.config.mjs` (eslint 8 +
   `eslint-config-next`). There is no per-package `lint` script.
+
+## Local development performance
+
+The stack is large; use the feature flags and lightweight commands below to keep your machine
+responsive. Full details are in `docs/developer-docs/local-development.md`.
+
+### Infrastructure (Docker)
+
+```bash
+# Required services only: postgres + redis
+docker compose -f docker-compose.dev.yaml up -d
+
+# Add background jobs (Inngest dev server)
+docker compose -f docker-compose.dev.yaml --profile jobs up -d
+
+# Add pgAdmin (convenience UI)
+docker compose -f docker-compose.dev.yaml --profile tools up -d
+```
+
+### Lightweight app startup
+
+```bash
+# Skip heavy optional subsystems you are not working on
+DEV_DISABLE_AI=true \
+DEV_DISABLE_MCP=true \
+DEV_DISABLE_MEDIA=true \
+DEV_DISABLE_SHORTLINKS=true \
+DEV_DISABLE_EMAIL=true \
+pnpm run dev:minimal
+```
+
+Available flags (all default to **enabled**):
+
+- `DEV_DISABLE_AI` — skip AI adapter registration.
+- `DEV_DISABLE_MCP` — skip Mastra/MCP/A2A server startup.
+- `DEV_DISABLE_MEDIA` — skip media-generation adapter registration.
+- `DEV_DISABLE_SHORTLINKS` — skip short-link adapter registration.
+- `DEV_DISABLE_EMAIL` — skip email-provider adapter registration.
+- `DEV_DISABLE_THIRDPARTY` — skip third-party provider registration.
+- `DEV_DISABLE_VIDEO` — skip video-generation adapter registration.
+- `DEV_DISABLE_AGENT` — skip agent-graph services.
+- `DEV_DISABLE_CRON` — skip `ScheduleModule.forRoot()`.
+- `DEV_DISABLE_SENTRY` — skip Sentry initialization.
+- `DEV_DISABLE_OPENTELEMETRY` — skip OpenTelemetry exporter setup.
+
+### Frontend dev variants
+
+- `pnpm run dev:frontend` — default Turbopack dev.
+- `pnpm run dev:webpack` — webpack fallback if Turbopack exhausts memory.
+- `pnpm run analyze` — generate webpack bundle report in `.next/analyze/`.
+- Sentry source-map upload is disabled in dev unless `SENTRY_AUTH_TOKEN` and
+  `NEXT_PUBLIC_SENTRY_DSN` are set.
+- Browser profiling (`Document-Policy: js-profiling`) is disabled in dev unless
+  `FRONTEND_PROFILING=1` is set.
+
+### Backend memory cap
+
+The backend dev script sets `--max-old-space-size=2048`. If you still hit the cap, lower it further
+or disable more feature flags.
 
 ## Backend conventions (NestJS)
 

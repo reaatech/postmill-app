@@ -178,9 +178,15 @@ fallback (login only — channel credentials are configured in Settings → Chan
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `NEXT_PUBLIC_DISCORD_SUPPORT` | — | Discord support server invite URL |
-| `NEXT_PUBLIC_POLOTNO` | — | Polotno license key for the image editor |
 | `NX_ADD_PLUGINS` | — | Nx build plugin setting (development) |
 | `PORT` | `3000` | Backend listen port inside the container |
+
+## Stock Media (v3.8)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `UNSPLASH_ACCESS_KEY` | — | Unsplash API access key for stock photo browsing and download |
+| `PEXELS_API_KEY` | — | Pexels API key for stock video browsing and download |
 
 ## Variables no longer read (v3.7.1+)
 
@@ -201,4 +207,4 @@ The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*` for Googl
 fallback for `/admin`-managed auth providers (v3.8.10) and must never be used for channel or AI
 credentials.
 
-> Verified against v3.8.10
+> Verified against v3.9.0

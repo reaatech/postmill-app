@@ -100,7 +100,7 @@ Verify this signature using your webhook secret on the receiving end.
 ## Data model
 
 - **`Webhooks`**: Stores webhook URL and event subscription.
-- **`IntegrationsWebhooks`**: Pivot model linking integrations to webhook
-  delivery records for tracking.
+- **`Webhooks.integrations`**: Implicit many-to-many relation with `Integration`
+  (Prisma manages the join table).
 
 > Verified against v3.7.0

@@ -33,6 +33,7 @@ job handler, Next.js frontend, shared libraries, Prisma).
 
 | Page | Description |
 |---|---|
+| [Local Development](./local-development.md) | Get the stack running locally with minimal resources: Docker profiles, feature flags, memory guidance |
 | [Architecture](./architecture.md) | High-level monorepo architecture, app/library layout, data flow |
 | [AI Architecture](./ai-architecture.md) | Pluggable multi-provider AI layer: `AIModelProvider`, four scopes, four surfaces, 25 adapters, governance services |
 | [Database](./database.md) | Prisma schema management, `db push` safety rules, repository-only access, encryption at rest |

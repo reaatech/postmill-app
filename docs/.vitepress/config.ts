@@ -51,6 +51,7 @@ export default defineConfig({
             { text: 'Data Model', link: '/developer-docs/data-model' },
             { text: 'Backend Conventions', link: '/developer-docs/backend-conventions' },
             { text: 'Frontend Conventions', link: '/developer-docs/frontend-conventions' },
+            { text: 'Designer', link: '/developer-docs/designer' },
             { text: 'Testing', link: '/developer-docs/testing' },
             { text: 'Contributing', link: '/developer-docs/contributing' },
           ],

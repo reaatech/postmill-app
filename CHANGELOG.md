@@ -10,7 +10,53 @@
 
 ## Unreleased
 
+### Added
+- **Designer** — Native open-source design editor replacing the proprietary Polotno SDK.
+  - Built on react-konva (MIT), no license key required.
+  - Full canvas editor with text, image, and shape elements; drag/resize/rotate via Konva Transformer.
+  - Per-mount Zustand store (no singleton; resets on unmount).
+  - Autosave, export to PNG via `POST /files/upload-simple`, and "Use in post" flow.
+  - Channel size presets + safe-zone overlays from `channel-presets.ts`.
+  - 9 side panels: Templates, Text, Elements, Photos/Videos, Uploads, Background, Layers, AI, Brand.
+  - AI image generation via existing `/media/generate-image` endpoint (tenant's own AI providers).
+  - Brand kit (logos, palette, fonts) via additive fields on `AIBrandProfile`.
+  - Magic resize (proportional scaling to channel presets).
+  - "Open in Designer" from stock photo/video preview.
+  - Route: `/media/designer`, with navbar tab under Media Tools.
+  - Backend: `Design` + `DesignTemplate` Prisma models, `/media/designs`, `/media/design-templates`, `/media/designer/proxy` endpoints.
+- **Designer Phase 2** (`dev/MEDIA_PHASE_2.md`) — completeness pass on the editor:
+  - **Editing:** selection-aware right Inspector + contextual selection toolbar; premium controls
+    (color swatch/popover, slider, segmented, stepper, font-preview picker); opacity, flip, image
+    replace, and crop.
+  - **Canvas:** multi-select (shift/⌘ + marquee), group-aware selection, group/ungroup, snapping &
+    alignment guides, custom transformer handles + dimension HUD, drag-and-drop from panels,
+    clipboard (copy/cut/paste), and a full keyboard-shortcut matrix with a help overlay.
+  - **Panels:** text effects (shadow/outline) + self-hosted OFL fonts, icons/stickers, gradient &
+    image backgrounds, skeleton/retry loading states, and AI panel queued/failed/cancel states.
+  - **Multi-page & export:** page thumbnails strip (add/duplicate/reorder/remove), high-res
+    `pixelRatio` export, transparent-PNG, carousel (multi-page → multi-image) export, and export
+    reusing `SaveToFilesModal`.
+  - **AI & brand:** background-removal / inpaint / upscale endpoints (`/media/remove-background`,
+    `/media/inpaint`, `/media/upscale`, credit-checked); brand-kit logo/palette/font write API;
+    AI panel gated on an active org provider; magic-resize and safe-zone overlays wired.
+  - **Video & animation (Phase 4):** per-element entrance animations + a timeline with live preview
+    and WebM export (via `MediaRecorder`, no ffmpeg dependency).
+  - **Server-side rendering (Phase 4):** headless `DesignRenderService` (node-canvas) renders a
+    design doc to PNG/PDF (`/media/designs/render`); data-driven bulk generation
+    (`/media/designs/bulk-generate`) substitutes `{{variables}}` per row.
+  - **Stock surface:** masonry photo grid, infinite scroll, personality empty/error states, color
+    swatch filters, responsive layout.
+  - **Not included:** real-time multi-user collaboration (O5) — requires adding a WebSocket platform
+    + CRDT (Yjs); tracked in `dev/MEDIA_PHASE_2.md` as the one deferred item.
+- **Stock surface UX hardening** — Grid tiles are now keyboard-accessible buttons; error states don't wipe toolbar; skeleton grid loading; search magnifier + clear button; custom select styling; hover affordances.
+
 ### Changed
+- **Polotno removal** — Removed all `polotno`, `polonto`, `plontoKey` references across the codebase.
+  - Deleted: `polonto.tsx`, `polonto/` directory, `polonto.css`, global.scss imports/rules.
+  - Removed: `NEXT_PUBLIC_POLOTNO` from `.env.example`, `docker-compose.yaml`, and docs.
+  - Removed: `plontoKey` from `VariableContext`, all three `layout.tsx` files.
+  - Removed: `@blueprintjs/core` and `@blueprintjs/icons` (indirect deps no longer pulled in).
+  - Gating: Designer opens on `media:read` for all members (previously `user?.tier?.ai` on multi-file picker).
 - **Inngest migration** — Replaced Temporal with Inngest Cloud for durable background jobs.
   - Removed `RUN_CRON`, `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, and Temporal/Elasticsearch
     services from Docker Compose and Coolify compose.
