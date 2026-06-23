@@ -5,6 +5,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { DesignerElement } from '../designer.store';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { fitWithin } from './fit-within';
 
 interface UploadsPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -34,8 +35,12 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
 
   const addToCanvas = useCallback((file: FileItem) => {
     const state = store.getState();
-    const w = Math.min(file.width || 400, state.doc.width * 0.8);
-    const h = Math.min(file.height || 400, state.doc.height * 0.8);
+    const { width: w, height: h } = fitWithin(
+      file.width || 400,
+      file.height || 400,
+      state.doc.width * 0.8,
+      state.doc.height * 0.8
+    );
     const cx = (state.doc.width - w) / 2;
     const cy = (state.doc.height - h) / 2;
 

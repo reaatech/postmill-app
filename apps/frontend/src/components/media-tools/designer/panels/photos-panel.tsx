@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDebounce } from 'use-debounce';
 import type { DesignerElement } from '../designer.store';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { fitWithin } from './fit-within';
 
 interface PhotosPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -62,8 +63,12 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
 
   const addToCanvas = useCallback((item: StockPhotoItem | StockVideoItem) => {
     const state = store.getState();
-    const imgW = Math.min(item.width || 400, state.doc.width * 0.8);
-    const imgH = Math.min(item.height || 400, state.doc.height * 0.8);
+    const { width: imgW, height: imgH } = fitWithin(
+      item.width || 400,
+      item.height || 400,
+      state.doc.width * 0.8,
+      state.doc.height * 0.8
+    );
     const cx = (state.doc.width - imgW) / 2;
     const cy = (state.doc.height - imgH) / 2;
 
@@ -133,17 +138,24 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
               key={item.id}
               onClick={() => addToCanvas(item)}
               draggable
-              onDragStart={(e) =>
+              onDragStart={(e) => {
+                const state = store.getState();
+                const fit = fitWithin(
+                  item.width || 400,
+                  item.height || 400,
+                  state.doc.width * 0.8,
+                  state.doc.height * 0.8
+                );
                 e.dataTransfer.setData(
                   'application/x-designer-element',
                   JSON.stringify({
                     type: 'image',
                     src: item.thumbUrl,
-                    width: item.width || 400,
-                    height: item.height || 400,
+                    width: fit.width,
+                    height: fit.height,
                   })
-                )
-              }
+                );
+              }}
               className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-[#2B5CD3] transition-all"
             >
               <div className="aspect-[4/3] relative overflow-hidden">
