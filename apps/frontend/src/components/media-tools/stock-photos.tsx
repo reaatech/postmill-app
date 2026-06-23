@@ -95,7 +95,11 @@ export const StockPhotos: FC = () => {
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, isLoading, isValidating]);
+    // `accumulated.length` is required: data arrives (isLoading flips false)
+    // one render BEFORE the accumulate effect mounts the grid + sentinel, so
+    // without it this effect runs while sentinelRef is still null and never
+    // re-runs to attach once the sentinel appears.
+  }, [hasMore, isLoading, isValidating, accumulated.length]);
 
   const openPhoto = useCallback(
     (photo: StockPhotoItem) =>
