@@ -26,7 +26,7 @@ model Organization {
   customers           Customer[]
   errors              Errors[]
   Integration         Integration[]
-  media               Media[]
+  files               File[]
   notifications       Notifications[]
   plugs               Plugs[]
   post                Post[]               @relation("organization")
@@ -52,7 +52,7 @@ model Organization {
   aiContentIndexes    AIContentIndex[]
   multipartUploads    MultipartUpload[]
   localStorageQuotaBytes BigInt @default(5368709120) // 5 GB default
-  mediaFolders        MediaFolder[]
+  fileFolders         FileFolder[]
   storageProviders    StorageProviderConfig[]
   orgProviderConfigs  OrgProviderConfiguration[]
   mediaProviderConfigs MediaProviderConfig[]
@@ -62,6 +62,8 @@ model Organization {
   shortLinkSnapshots   ShortLinkSnapshot[]
   apiKeys              ApiKey[]
   roles                AppRole[]
+  designs              Design[]
+  designTemplates      DesignTemplate[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -121,6 +123,7 @@ model User {
   apiKeys               ApiKey[]
   profile               UserProfile?
   sessions              Session[]
+  designs               Design[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -158,7 +161,7 @@ model UserOrganization {
 
 
 
-model Media {
+model File {
   id                 String              @id @default(uuid())
   name               String
   originalName       String?
@@ -176,10 +179,12 @@ model Media {
   tags               String?    // JSON: string[]
   description        String?
   metadata           Json?
-  folder             MediaFolder? @relation(fields: [folderId], references: [id])
+  folder             FileFolder? @relation(fields: [folderId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id])
   userProfiles       UserProfile[]
   oauthApps          OAuthApp[]
+  designPreviews     Design[]
+  designTemplateThumbnails DesignTemplate[]
 
   @@index([name])
   @@index([organizationId])
@@ -208,7 +213,7 @@ model Subscription {
   subscriptionTier SubscriptionTier
   identifier       String?
   cancelAt         DateTime?
-  period           Period
+  period           String          @default("MONTHLY")
   totalChannels    Int
   isLifetime       Boolean          @default(false)
   createdAt        DateTime         @default(now())
@@ -259,7 +264,7 @@ model Integration {
   exisingPlugData       ExisingPlugData[]
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
-  webhooks              IntegrationsWebhooks[]
+  webhooks              Webhooks[]
   plugs                 Plugs[]
   posts                     Post[]
   analyticsSnapshots        AnalyticsSnapshot[]
@@ -529,28 +534,16 @@ model PopularPosts {
   updatedAt DateTime @updatedAt
 }
 
-model IntegrationsWebhooks {
-  integrationId String
-  webhookId     String
-  integration   Integration @relation(fields: [integrationId], references: [id])
-  webhook       Webhooks    @relation(fields: [webhookId], references: [id])
-
-  @@id([integrationId, webhookId])
-  @@unique([integrationId, webhookId])
-  @@index([integrationId])
-  @@index([webhookId])
-}
-
 model Webhooks {
-  id             String                 @id @default(uuid())
+  id             String        @id @default(uuid())
   name           String
   organizationId String
   url            String
   deletedAt      DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  integrations   IntegrationsWebhooks[]
-  organization   Organization           @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  integrations   Integration[]
+  organization   Organization  @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
   @@index([deletedAt])
@@ -634,8 +627,7 @@ model Mentions {
   @@index([createdAt])
 }
 
-// ── v3.6.0: MediaFolder for the media manager rebuild ──
-model MediaFolder {
+model FileFolder {
   id                String        @id @default(uuid())
   organizationId    String
   parentId          String?
@@ -646,9 +638,9 @@ model MediaFolder {
   storageProviderId String?       // foreign key to StorageProviderConfig (mounted cloud root)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  parent            MediaFolder?  @relation("FolderTree", fields: [parentId], references: [id])
-  children          MediaFolder[] @relation("FolderTree")
-  media             Media[]
+  parent            FileFolder?   @relation("FolderTree", fields: [parentId], references: [id])
+  children          FileFolder[]  @relation("FolderTree")
+  files             File[]
   storageProvider   StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
   organization      Organization  @relation(fields: [organizationId], references: [id])
 
@@ -684,7 +676,7 @@ model StorageProviderConfig {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   organization     Organization        @relation(fields: [organizationId], references: [id])
-  folders          MediaFolder[]
+  folders          FileFolder[]
   mediaProviderConfigs MediaProviderConfig[]
 
   @@unique([organizationId, accountFingerprint])
@@ -901,7 +893,7 @@ model OAuthApp {
   updatedAt      DateTime             @updatedAt
   deletedAt      DateTime?
   organization   Organization         @relation(fields: [organizationId], references: [id])
-  picture        Media?               @relation(fields: [pictureId], references: [id])
+  picture        File?                @relation(fields: [pictureId], references: [id])
   authorizations OAuthAuthorization[]
 
   @@unique([organizationId, deletedAt])
@@ -1154,7 +1146,7 @@ model UserProfile {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  picture           Media?   @relation(fields: [pictureId], references: [id])
+  picture           File?    @relation(fields: [pictureId], references: [id])
 
   @@index([pictureId])
 }
@@ -1227,6 +1219,9 @@ model AIBrandProfile {
   name              String?
   isDefault         Boolean      @default(false)
   slug              String?
+  logoFileIds       Json?        @default("[]")
+  palette           Json?        @default("[]")
+  fontFamilies      Json?        @default("[]")
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -1346,11 +1341,6 @@ enum SubscriptionTier {
   ULTIMATE
 }
 
-enum Period {
-  MONTHLY
-  YEARLY
-}
-
 enum Provider {
   LOCAL
   GITHUB
@@ -1456,8 +1446,57 @@ model Campaign {
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
   posts          Post[]
+  designs        Design[]
 
   @@index([organizationId])
+  @@index([deletedAt])
+}
+
+// Editable design documents — one per org-scoped design
+model Design {
+  id              String        @id @default(cuid())
+  organizationId  String
+  name            String
+  doc             Json
+  width           Int           @default(1080)
+  height          Int           @default(1080)
+  previewDataUrl  String?
+  previewFileId   String?
+  createdById     String
+  campaignId      String?
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id])
+  previewFile     File?         @relation(fields: [previewFileId], references: [id])
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([campaignId])
+  @@index([deletedAt])
+}
+
+// Design templates — system-seeded or org-saved — for the Templates panel
+model DesignTemplate {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  name            String
+  category        String
+  doc             Json
+  thumbnailFileId String?
+  isSystem        Boolean       @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  thumbnailFile   File?         @relation(fields: [thumbnailFileId], references: [id])
+
+  @@index([organizationId])
+  @@index([category])
   @@index([deletedAt])
 }
 
