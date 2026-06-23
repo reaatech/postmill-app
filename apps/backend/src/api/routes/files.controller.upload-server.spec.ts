@@ -6,30 +6,30 @@ const storageMock = {
 };
 
 const storageSvcMock = {
-  assertWithinQuota: vi.fn(),
-  getLocalAdapterForOrg: vi.fn().mockResolvedValue(storageMock),
+  resolveAdapterForFolder: vi.fn().mockResolvedValue(storageMock),
+  assertWithinProviderQuota: vi.fn(),
 };
 
-const mediaSvcMock = {
+const fileSvcMock = {
   saveFile: vi.fn(),
 };
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
-    assertWithinQuota = storageSvcMock.assertWithinQuota;
-    getLocalAdapterForOrg = storageSvcMock.getLocalAdapterForOrg;
+    resolveAdapterForFolder = storageSvcMock.resolveAdapterForFolder;
+    assertWithinProviderQuota = storageSvcMock.assertWithinProviderQuota;
   },
 }));
 
-import { MediaController } from './media.controller';
+import { FilesController } from './files.controller';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
-  const ctrl = new MediaController(
-    mediaSvcMock as any,
-    {} as any,
+  const ctrl = new FilesController(
+    fileSvcMock as any,
     storageSvcMock as any,
+    {} as any,
   );
   return ctrl;
 }
@@ -38,14 +38,14 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('MediaController — uploadServer temp file cleanup', () => {
+describe('FilesController — uploadServer temp file cleanup', () => {
   it('unlinks temp file after successful upload', async () => {
-    storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+    storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
     storageMock.uploadFile.mockResolvedValue({
       originalname: 'abc123.png',
       path: 'http://localhost/uploads/abc123.png',
     });
-    mediaSvcMock.saveFile.mockResolvedValue({ id: 'media-1' });
+    fileSvcMock.saveFile.mockResolvedValue({ id: 'file-1' });
 
     const controller = makeController();
     const file = {
@@ -65,7 +65,7 @@ describe('MediaController — uploadServer temp file cleanup', () => {
   });
 
   it('unlinks temp file when uploadFile throws', async () => {
-    storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+    storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
     storageMock.uploadFile.mockRejectedValue(new Error('Upload failed'));
 
     const controller = makeController();
@@ -85,12 +85,12 @@ describe('MediaController — uploadServer temp file cleanup', () => {
   });
 
   it('unlinks temp file when saveFile throws', async () => {
-    storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+    storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
     storageMock.uploadFile.mockResolvedValue({
       originalname: 'abc123.png',
       path: 'http://localhost/uploads/abc123.png',
     });
-    mediaSvcMock.saveFile.mockRejectedValue(new Error('Save failed'));
+    fileSvcMock.saveFile.mockRejectedValue(new Error('Save failed'));
 
     const controller = makeController();
     const file = {
@@ -109,12 +109,12 @@ describe('MediaController — uploadServer temp file cleanup', () => {
   });
 
   it('does not call unlink when file has no path', async () => {
-    storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+    storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
     storageMock.uploadFile.mockResolvedValue({
       originalname: 'abc123.png',
       path: 'http://localhost/uploads/abc123.png',
     });
-    mediaSvcMock.saveFile.mockResolvedValue({ id: 'media-1' });
+    fileSvcMock.saveFile.mockResolvedValue({ id: 'file-1' });
 
     const controller = makeController();
     const file = {

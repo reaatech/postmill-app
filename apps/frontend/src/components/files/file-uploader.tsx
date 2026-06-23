@@ -2,11 +2,11 @@
 
 import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
+import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import { Dashboard } from '@uppy/react';
 import { PlusIcon } from '@gitroom/frontend/components/ui/icons';
 
-export const MediaUploader: FC<{
+export const FileUploader: FC<{
   folderId: string | null;
   onUploadComplete: () => void;
 }> = ({ folderId, onUploadComplete }) => {
@@ -60,7 +60,7 @@ export const MediaUploader: FC<{
           <div className="absolute left-0 top-0 w-full h-full">
             <Dashboard
               uppy={uppy}
-              id="media-manager-uploader"
+              id="file-manager-uploader"
               showProgressDetails
               hideUploadButton
               hideRetryButton

@@ -4,15 +4,15 @@ import React, { FC, useCallback } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import clsx from 'clsx';
-import type { MediaItem } from './media-manager';
+import type { FileItem } from './file-manager';
 
 export const FileGrid: FC<{
-  files: MediaItem[];
-  selectedFiles: MediaItem[];
-  onToggleSelect: (file: MediaItem) => void;
-  onFileClick: (file: MediaItem) => void;
+  files: FileItem[];
+  selectedFiles: FileItem[];
+  onToggleSelect: (file: FileItem) => void;
+  onFileClick: (file: FileItem) => void;
   standalone?: boolean;
-  onSelect?: (items: MediaItem[]) => void;
+  onSelect?: (items: FileItem[]) => void;
 }> = ({ files, selectedFiles, onToggleSelect, onFileClick }) => {
   const mediaDirectory = useMediaDirectory();
 

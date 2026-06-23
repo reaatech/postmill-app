@@ -114,8 +114,8 @@ vi.mock('../layout/check.payment', () => ({
   CheckPayment: ({ children }: any) => children,
 }));
 
-vi.mock('../media/media.component', () => ({
-  ShowMediaBoxModal: () => null,
+vi.mock('../files/file.component', () => ({
+  ShowFileBoxModal: () => null,
 }));
 
 vi.mock('../launches/helpers/linkedin.component', () => ({

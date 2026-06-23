@@ -309,6 +309,42 @@ export class StorageService {
     }
   }
 
+  // Destination-aware quota check. For LOCAL, uses the existing local quota.
+  // For cloud adapters: if config.quotaBytes is set, compare usage against it;
+  // otherwise skip (cloud billing is provider-side).
+  async assertWithinProviderQuota(
+    adapter: IStorageAdapter,
+    orgId: string,
+    incomingBytes: number
+  ) {
+    if (adapter.type === StorageProviderType.LOCAL) {
+      return this.assertWithinQuota(orgId, incomingBytes);
+    }
+
+    const configs = await this._storageRepository.findByOrg(orgId);
+    const config = configs.find((c) => {
+      const built = this.#buildAdapter(c as StorageConfigRow);
+      return built.type === adapter.type && built.constructor === adapter.constructor;
+    });
+
+    if (!config || !config.quotaBytes) return;
+
+    let usage: bigint | null = null;
+    try {
+      usage = await adapter.getUsageBytes();
+    } catch {
+      usage = null;
+    }
+    if (usage === null) return;
+
+    if (usage + BigInt(Math.max(0, Math.floor(incomingBytes))) > config.quotaBytes) {
+      throw new HttpException(
+        'Storage quota exceeded for this provider. Free up space or increase your quota.',
+        413
+      );
+    }
+  }
+
   async getMigrationPreview(
     sourceId: string,
     orgId: string
@@ -508,17 +544,48 @@ export class StorageService {
     return { byFolder, byProvider };
   }
 
-  async getAdapterForFolder(folderId: string, orgId: string): Promise<IStorageAdapter | null> {
-    // Check if folder has a provider-specific default
-    const folderInfo = await this._storageRepository.getProviderForFolder(folderId);
-    if (folderInfo?.storageProviderId) {
-      const config = await this._storageRepository.findById(folderInfo.storageProviderId);
-      if (config && config.organizationId === orgId) {
-        return this.#buildAdapter(config as StorageConfigRow);
-      }
+  // Resolve the storage adapter for a given folder by walking the parentId
+  // chain up to a mount-root folder carrying storageProviderId. No folder
+  // or null folder → org LOCAL fallback. Never returns null.
+  async resolveAdapterForFolder(
+    folderId: string | null | undefined,
+    orgId: string
+  ): Promise<IStorageAdapter> {
+    if (!folderId) {
+      return this.getLocalAdapterForOrg(orgId, true);
     }
-    // Fall back to org default
-    return this.getAdapterForOrg(orgId);
+
+    const seen = new Set<string>();
+    let currentId: string | null = folderId;
+
+    while (currentId) {
+      if (seen.has(currentId)) {
+        throw new Error('Cyclic parentId chain detected in folder tree');
+      }
+      seen.add(currentId);
+
+      // eslint-disable-next-line no-await-in-loop
+      const folder = await this._storageRepository.findFolderWithProvider(currentId);
+      if (!folder) break;
+
+      if (folder.storageProviderId) {
+        const config = await this._storageRepository.findById(folder.storageProviderId);
+        if (config && config.organizationId === orgId) {
+          return this.#buildAdapter(config as StorageConfigRow);
+        }
+        break;
+      }
+
+      currentId = folder.parentId;
+    }
+
+    return this.getLocalAdapterForOrg(orgId, true);
+  }
+
+  // Legacy — delegates to the ancestor-aware resolver. Kept for backward compat
+  // during the Part 1 rename transition; remove after all callers are migrated.
+  async getAdapterForFolder(folderId: string, orgId: string): Promise<IStorageAdapter | null> {
+    return this.resolveAdapterForFolder(folderId, orgId);
   }
 
   async setDefaultFolderForProvider(

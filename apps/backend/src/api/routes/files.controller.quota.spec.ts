@@ -7,30 +7,30 @@ const storageMock = {
 };
 
 const storageSvcMock = {
-  assertWithinQuota: vi.fn(),
-  getLocalAdapterForOrg: vi.fn().mockResolvedValue(storageMock),
+  resolveAdapterForFolder: vi.fn().mockResolvedValue(storageMock),
+  assertWithinProviderQuota: vi.fn(),
 };
 
-const mediaSvcMock = {
+const fileSvcMock = {
   saveFile: vi.fn(),
 };
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
-    assertWithinQuota = storageSvcMock.assertWithinQuota;
-    getLocalAdapterForOrg = storageSvcMock.getLocalAdapterForOrg;
+    resolveAdapterForFolder = storageSvcMock.resolveAdapterForFolder;
+    assertWithinProviderQuota = storageSvcMock.assertWithinProviderQuota;
   },
 }));
 
-import { MediaController } from './media.controller';
+import { FilesController } from './files.controller';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
-  const ctrl = new MediaController(
-    mediaSvcMock as any,
+  const ctrl = new FilesController(
+    fileSvcMock as any,
+    storageSvcMock as any,
     {} as any,
-    storageSvcMock as any
   );
   return ctrl;
 }
@@ -39,10 +39,10 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('MediaController — quota enforcement (#57)', () => {
+describe('FilesController — quota enforcement', () => {
   describe('uploadServer', () => {
     it('enforces quota before uploading', async () => {
-      storageSvcMock.assertWithinQuota.mockRejectedValue(
+      storageSvcMock.assertWithinProviderQuota.mockRejectedValue(
         new HttpException('Storage quota exceeded', 413)
       );
       const controller = makeController();
@@ -57,17 +57,18 @@ describe('MediaController — quota enforcement (#57)', () => {
         controller.uploadServer(org, file)
       ).rejects.toThrow('Storage quota exceeded');
 
-      expect(storageSvcMock.assertWithinQuota).toHaveBeenCalledWith('org-1', 1000);
+      expect(storageSvcMock.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 1000);
     });
 
     it('allows upload when within quota', async () => {
-      storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+      storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
       storageMock.uploadFile.mockResolvedValue({
         originalname: 'test.png',
         path: 'http://localhost/uploads/test.png',
       });
-      mediaSvcMock.saveFile.mockResolvedValue({
-        id: 'media-1',
+      fileSvcMock.saveFile.mockResolvedValue({
+        id: 'file-1',
         path: 'http://localhost/uploads/test.png',
       });
       const controller = makeController();
@@ -80,7 +81,7 @@ describe('MediaController — quota enforcement (#57)', () => {
 
       const result = await controller.uploadServer(org, file);
 
-      expect(storageSvcMock.assertWithinQuota).toHaveBeenCalledWith('org-1', 100);
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 100);
       expect(storageMock.uploadFile).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
@@ -88,7 +89,7 @@ describe('MediaController — quota enforcement (#57)', () => {
 
   describe('uploadSimple', () => {
     it('enforces quota before uploading', async () => {
-      storageSvcMock.assertWithinQuota.mockRejectedValue(
+      storageSvcMock.assertWithinProviderQuota.mockRejectedValue(
         new HttpException('Over quota', 413)
       );
       const controller = makeController();
@@ -103,11 +104,12 @@ describe('MediaController — quota enforcement (#57)', () => {
         controller.uploadSimple(org, file)
       ).rejects.toThrow('Over quota');
 
-      expect(storageSvcMock.assertWithinQuota).toHaveBeenCalledWith('org-1', 2000);
+      expect(storageSvcMock.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 2000);
     });
 
     it('skips saving when preventSave is true', async () => {
-      storageSvcMock.assertWithinQuota.mockResolvedValue(undefined);
+      storageSvcMock.assertWithinProviderQuota.mockResolvedValue(undefined);
       storageMock.uploadFile.mockResolvedValue({
         originalname: 'test.png',
         path: 'http://localhost/uploads/test.png',
@@ -123,7 +125,7 @@ describe('MediaController — quota enforcement (#57)', () => {
       const result = await controller.uploadSimple(org, file, 'true');
 
       expect(result).toHaveProperty('path');
-      expect(mediaSvcMock.saveFile).not.toHaveBeenCalled();
+      expect(fileSvcMock.saveFile).not.toHaveBeenCalled();
     });
   });
 });

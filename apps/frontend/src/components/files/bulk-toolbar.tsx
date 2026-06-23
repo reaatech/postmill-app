@@ -4,7 +4,7 @@ import React, { FC, useCallback, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
-import type { MediaItem } from './media-manager';
+import type { FileItem } from './file-manager';
 
 type FolderItem = {
   id: string;
@@ -12,11 +12,11 @@ type FolderItem = {
   color: string | null;
   parentId: string | null;
   children: FolderItem[];
-  _count: { media: number; children: number };
+  _count: { files: number; children: number };
 };
 
 export const BulkToolbar: FC<{
-  selectedFiles: MediaItem[];
+  selectedFiles: FileItem[];
   onClearSelection: () => void;
   onRefresh: () => void;
   foldersData: FolderItem[];
@@ -28,7 +28,7 @@ export const BulkToolbar: FC<{
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedFiles.length === 0) return;
-    await fetch('/media/bulk/delete', {
+    await fetch('/files/bulk/delete', {
       method: 'POST',
       body: JSON.stringify({ ids: selectedFiles.map(f => f.id) }),
     });
@@ -39,7 +39,7 @@ export const BulkToolbar: FC<{
 
   const handleBulkMove = useCallback(async () => {
     if (selectedFiles.length === 0) return;
-    await fetch('/media/bulk/move', {
+    await fetch('/files/bulk/move', {
       method: 'POST',
       body: JSON.stringify({
         ids: selectedFiles.map(f => f.id),

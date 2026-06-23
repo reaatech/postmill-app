@@ -15,16 +15,17 @@ import { Button } from '@gitroom/react/form/button';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { Media } from '@prisma/client';
+import { File as PrismaFile } from '@prisma/client';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import EventEmitter from 'events';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import { VideoFrame } from '@gitroom/react/helpers/video.frame';
-import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
+import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import dynamic from 'next/dynamic';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { AiImage } from '@gitroom/frontend/components/launches/ai.image';
 import { DropFiles } from '@gitroom/frontend/components/layout/drop.files';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
@@ -58,8 +59,11 @@ import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useDebounce } from 'use-debounce';
-const Polonto = dynamic(
-  () => import('@gitroom/frontend/components/launches/polonto')
+const Designer = dynamic(
+  () => import('@gitroom/frontend/components/media-tools/designer/designer').then(
+    (m) => m.Designer
+  ),
+  { ssr: false }
 );
 const showModalEmitter = new EventEmitter();
 export const Pagination: FC<{
@@ -174,7 +178,7 @@ export const Pagination: FC<{
     </ul>
   );
 };
-export const ShowMediaBoxModal: FC = () => {
+export const ShowFileBoxModal: FC = () => {
   const [showModal, setShowModal] = useState(false);
   const [callBack, setCallBack] =
     useState<(params: { id: string; path: string }[]) => void | undefined>();
@@ -196,18 +200,18 @@ export const ShowMediaBoxModal: FC = () => {
   if (!showModal) return null;
   return (
     <div className="text-textColor">
-      <MediaBox setMedia={callBack!} closeModal={closeModal} />
+      <FileBox setMedia={callBack!} closeModal={closeModal} />
     </div>
   );
 };
-export const showMediaBox = (
+export const showFileBox = (
   callback: (params: { id: string; path: string }) => void
 ) => {
   showModalEmitter.emit('show-modal', callback);
 };
 const CHUNK_SIZE = 1024 * 1024;
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
-export const MediaBox: FC<{
+export const FileBox: FC<{
   setMedia: (params: { id: string; path: string }[]) => void;
   standalone?: boolean;
   type?: 'image' | 'video';
@@ -227,7 +231,7 @@ export const MediaBox: FC<{
     if (debouncedSearch.trim()) {
       params.set('search', debouncedSearch.trim());
     }
-    return (await fetch(`/media?${params.toString()}`)).json();
+    return (await fetch(`/files?${params.toString()}`)).json();
   }, [page, debouncedSearch]);
   const { data, mutate, isLoading } = useSWR(
     `get-media-${page}-${debouncedSearch}`,
@@ -352,7 +356,7 @@ export const MediaBox: FC<{
   );
 
   const maximize = useCallback(
-    (media: Media) => async (e: any) => {
+    (media: PrismaFile) => async (e: any) => {
       e.stopPropagation();
       modals.openModal({
         title: '',
@@ -381,7 +385,7 @@ export const MediaBox: FC<{
   );
 
   const deleteImage = useCallback(
-    (media: Media) => async (e: any) => {
+    (media: PrismaFile) => async (e: any) => {
       e.stopPropagation();
       if (
         !(await deleteDialog(
@@ -393,7 +397,7 @@ export const MediaBox: FC<{
       ) {
         return;
       }
-      await fetch(`/media/${media.id}`, {
+      await fetch(`/files/${media.id}`, {
         method: 'DELETE',
       });
       mutate();
@@ -634,7 +638,7 @@ export const MediaBox: FC<{
     </DropFiles>
   );
 };
-export const MultiMediaComponent: FC<{
+export const MultiFileComponent: FC<{
   label: string;
   description: string;
   mediaNotAvailable?: boolean;
@@ -684,6 +688,7 @@ export const MultiMediaComponent: FC<{
     mediaNotAvailable,
   } = props;
   const user = useUser();
+  const permissions = usePermissions();
   const modals = useModals();
   const t = useT();
   useEffect(() => {
@@ -727,7 +732,7 @@ export const MultiMediaComponent: FC<{
       size: 'calc(100% - 80px)',
       height: 'calc(100% - 80px)',
       children: (close) => (
-        <MediaBox setMedia={changeMedia} closeModal={close} />
+        <FileBox setMedia={changeMedia} closeModal={close} />
       ),
     });
   }, [changeMedia, t]);
@@ -747,17 +752,17 @@ export const MultiMediaComponent: FC<{
   );
 
   const designMedia = useCallback(() => {
-    if (!!user?.tier?.ai && !dummy) {
+    if (!dummy && permissions.hasPermission('media', 'read')) {
       modals.openModal({
         askClose: false,
         title: t('design_media', 'Design Media'),
         size: '80%',
         children: (close) => (
-          <Polonto setMedia={changeMedia} closeModal={close} />
+          <Designer setMedia={changeMedia} closeModal={close} />
         ),
       });
     }
-  }, [changeMedia, t]);
+  }, [changeMedia, t, permissions]);
 
   return (
     <>
@@ -846,19 +851,21 @@ export const MultiMediaComponent: FC<{
                   </div>
                 </div>
               </div>
-              <div
-                onClick={designMedia}
-                className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
-              >
-                <div className="flex gap-[5px] items-center">
-                  <div>
-                    <DesignMediaIcon />
-                  </div>
-                  <div className="text-[10px] font-[600] iconBreak:hidden block">
-                    {t('design_media', 'Design Media')}
+              {permissions.hasPermission('media', 'read') && (
+                <div
+                  onClick={designMedia}
+                  className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
+                >
+                  <div className="flex gap-[5px] items-center">
+                    <div>
+                      <DesignMediaIcon />
+                    </div>
+                    <div className="text-[10px] font-[600] iconBreak:hidden block">
+                      {t('design_media', 'Design Media')}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               <ThirdPartyMedia allData={allData} onChange={changeMedia} />
 
@@ -896,7 +903,7 @@ export const MultiMediaComponent: FC<{
     </>
   );
 };
-export const MediaComponent: FC<{
+export const FileComponent: FC<{
   label: string;
   description: string;
   value?: {
@@ -923,6 +930,7 @@ export const MediaComponent: FC<{
     props;
   const { getValues } = useSettings();
   const user = useUser();
+  const permissions = usePermissions();
   useEffect(() => {
     const settings = getValues()[props.name];
     if (settings) {
@@ -934,6 +942,7 @@ export const MediaComponent: FC<{
   const mediaDirectory = useMediaDirectory();
 
   const showDesignModal = useCallback(() => {
+    if (!permissions.hasPermission('media', 'read')) return;
     modals.openModal({
       title: t('media_editor', 'Media Editor'),
       askClose: false,
@@ -942,7 +951,7 @@ export const MediaComponent: FC<{
       size: 'calc(100% - 80px)',
       height: 'calc(100% - 80px)',
       children: (close) => (
-        <Polonto
+        <Designer
           width={width}
           height={height}
           setMedia={changeMedia}
@@ -950,7 +959,7 @@ export const MediaComponent: FC<{
         />
       ),
     });
-  }, [t]);
+  }, [t, permissions]);
   const changeMedia = useCallback((m: { path: string; id: string }[]) => {
     setCurrentMedia(m[0]);
     onChange({
@@ -969,7 +978,7 @@ export const MediaComponent: FC<{
       size: 'calc(100% - 80px)',
       height: 'calc(100% - 80px)',
       children: (close) => (
-        <MediaBox setMedia={changeMedia} closeModal={close} type={type} />
+        <FileBox setMedia={changeMedia} closeModal={close} type={type} />
       ),
     });
   }, [t]);
@@ -997,9 +1006,11 @@ export const MediaComponent: FC<{
       )}
       <div className="flex gap-[5px]">
         <Button onClick={showModal}>{t('select', 'Select')}</Button>
-        <Button onClick={showDesignModal} className="!bg-btnPrimary">
-          {t('editor', 'Editor')}
-        </Button>
+        {permissions.hasPermission('media', 'read') && (
+          <Button onClick={showDesignModal} className="!bg-btnPrimary">
+            {t('editor', 'Editor')}
+          </Button>
+        )}
         <Button secondary={true} onClick={clearMedia}>
           {t('clear', 'Clear')}
         </Button>

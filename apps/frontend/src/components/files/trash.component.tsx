@@ -14,7 +14,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
   const loadTrash = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch('/media/trash');
+      const res = await fetch('/files/trash');
       if (res.ok) {
         const data = await res.json();
         setTrashedMedia(data || []);
@@ -34,7 +34,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
 
   const handleRestore = async (id: string) => {
     try {
-      const res = await fetch(`/media/${id}/restore`, { method: 'POST' });
+      const res = await fetch(`/files/${id}/restore`, { method: 'POST' });
       if (res.ok) {
         setTrashedMedia((prev) => prev.filter((m) => m.id !== id));
         toast.show('Media restored successfully', 'success');
@@ -55,7 +55,7 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/media/${id}`, { method: 'DELETE' });
+      const res = await fetch(`/files/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setTrashedMedia((prev) => prev.filter((m) => m.id !== id));
         toast.show('Media permanently deleted', 'success');

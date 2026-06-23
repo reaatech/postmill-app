@@ -18,7 +18,6 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import {
   Integration,
   Post,
-  Media,
   CreationMethod,
   State,
 } from '@prisma/client';

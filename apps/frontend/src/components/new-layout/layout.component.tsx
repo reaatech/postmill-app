@@ -19,7 +19,7 @@ import useSWR from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ShowMediaBoxModal } from '@gitroom/frontend/components/media/media.component';
+import { ShowFileBoxModal } from '@gitroom/frontend/components/files/file.component';
 import { ShowLinkedinCompany } from '@gitroom/frontend/components/launches/helpers/linkedin.component';
 import { MediaSettingsLayout } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { Toaster } from '@gitroom/react/toaster/toaster';
@@ -84,7 +84,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
           <Toaster />
           <TrialTracker />
           <CheckPayment check={searchParams.get('check') || ''} mutate={mutate}>
-            <ShowMediaBoxModal />
+            <ShowFileBoxModal />
             <ShowLinkedinCompany />
             <MediaSettingsLayout />
             <ShowPostSelector />

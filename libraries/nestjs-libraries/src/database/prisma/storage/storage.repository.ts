@@ -6,8 +6,8 @@ import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/pris
 export class StorageRepository {
   constructor(
     private _storage: PrismaRepository<'storageProviderConfig'>,
-    private _folder: PrismaRepository<'mediaFolder'>,
-    private _media: PrismaRepository<'media'>,
+    private _folder: PrismaRepository<'fileFolder'>,
+    private _file: PrismaRepository<'file'>,
     private _org: PrismaRepository<'organization'>
   ) {}
 
@@ -109,7 +109,7 @@ export class StorageRepository {
   #sourceMediaWhere(
     orgId: string,
     source: { id: string; type: StorageProviderType }
-  ): Prisma.MediaWhereInput {
+  ): Prisma.FileWhereInput {
     if (source.type === StorageProviderType.LOCAL) {
       return {
         organizationId: orgId,
@@ -130,8 +130,8 @@ export class StorageRepository {
   ): Promise<{ count: number; totalBytes: bigint }> {
     const where = this.#sourceMediaWhere(orgId, source);
     const [count, agg] = await Promise.all([
-      this._media.model.media.count({ where }),
-      this._media.model.media.aggregate({ where, _sum: { fileSize: true } }),
+      this._file.model.file.count({ where }),
+      this._file.model.file.aggregate({ where, _sum: { fileSize: true } }),
     ]);
     return { count, totalBytes: BigInt(agg._sum.fileSize ?? 0) };
   }
@@ -143,7 +143,7 @@ export class StorageRepository {
     limit: number
   ) {
     const where = this.#sourceMediaWhere(orgId, source);
-    return this._media.model.media.findMany({
+    return this._file.model.file.findMany({
       where,
       orderBy: { id: 'asc' },
       take: limit,
@@ -153,7 +153,7 @@ export class StorageRepository {
   }
 
   updateMediaLocation(id: string, path: string, folderId: string | null) {
-    return this._media.model.media.update({
+    return this._file.model.file.update({
       where: { id },
       data: { path, folderId },
     });
@@ -161,27 +161,27 @@ export class StorageRepository {
 
   // ── Mount-folder lifecycle (#55) ──
   findMountFolder(orgId: string, providerId: string) {
-    return this._folder.model.mediaFolder.findFirst({
+    return this._folder.model.fileFolder.findFirst({
       where: { organizationId: orgId, storageProviderId: providerId },
     });
   }
 
   createMountFolder(orgId: string, providerId: string, name: string) {
-    return this._folder.model.mediaFolder.create({
+    return this._folder.model.fileFolder.create({
       data: { organizationId: orgId, name, storageProviderId: providerId },
     });
   }
 
   async removeOrDetachMountFolders(providerId: string) {
-    const folders = await this._folder.model.mediaFolder.findMany({
+    const folders = await this._folder.model.fileFolder.findMany({
       where: { storageProviderId: providerId },
-      include: { _count: { select: { media: true, children: true } } },
+      include: { _count: { select: { files: true, children: true } } },
     });
     for (const folder of folders) {
-      if (folder._count.media === 0 && folder._count.children === 0) {
-        await this._folder.model.mediaFolder.delete({ where: { id: folder.id } });
+      if (folder._count.files === 0 && folder._count.children === 0) {
+        await this._folder.model.fileFolder.delete({ where: { id: folder.id } });
       } else {
-        await this._folder.model.mediaFolder.update({
+        await this._folder.model.fileFolder.update({
           where: { id: folder.id },
           data: { storageProviderId: null },
         });
@@ -190,7 +190,7 @@ export class StorageRepository {
   }
 
   async getStorageUsedByOrg(orgId: string): Promise<bigint> {
-    const result = await this._media.model.media.aggregate({
+    const result = await this._file.model.file.aggregate({
       where: { organizationId: orgId },
       _sum: { fileSize: true },
     });
@@ -200,7 +200,7 @@ export class StorageRepository {
   async getUsageByFolder(
     orgId: string
   ): Promise<Array<{ folderId: string; folderName: string; totalBytes: bigint }>> {
-    const result = await this._media.model.media.groupBy({
+    const result = await this._file.model.file.groupBy({
       by: ['folderId'],
       where: { organizationId: orgId },
       _sum: { fileSize: true },
@@ -208,7 +208,7 @@ export class StorageRepository {
     const withNames = await Promise.all(
       result.map(async (row) => {
         const folder = row.folderId
-          ? await this._folder.model.mediaFolder.findUnique({ where: { id: row.folderId } })
+          ? await this._folder.model.fileFolder.findUnique({ where: { id: row.folderId } })
           : null;
         return {
           folderId: row.folderId || 'unfoldered',
@@ -223,7 +223,7 @@ export class StorageRepository {
   async getUsageByProvider(
     orgId: string
   ): Promise<Array<{ providerId: string; providerName: string; totalBytes: bigint }>> {
-    const result = await this._media.model.media.groupBy({
+    const result = await this._file.model.file.groupBy({
       by: ['folderId'],
       where: { organizationId: orgId },
       _sum: { fileSize: true },
@@ -231,7 +231,7 @@ export class StorageRepository {
     const byProvider = new Map<string, bigint>();
     for (const row of result) {
       const folder = row.folderId
-        ? await this._folder.model.mediaFolder.findUnique({ where: { id: row.folderId } })
+        ? await this._folder.model.fileFolder.findUnique({ where: { id: row.folderId } })
         : null;
       const providerId = folder?.storageProviderId || 'local';
       const currentBytes = byProvider.get(providerId) || BigInt(0);
@@ -273,9 +273,18 @@ export class StorageRepository {
   }
 
   getProviderForFolder(folderId: string) {
-    return this._folder.model.mediaFolder.findUnique({
+    return this._folder.model.fileFolder.findUnique({
       where: { id: folderId },
       select: { storageProviderId: true },
+    });
+  }
+
+  // Ancestor-aware folder lookup: walks parentId chain to find the mount-root
+  // folder carrying storageProviderId. Returns minimal shape for the walk.
+  findFolderWithProvider(id: string) {
+    return this._folder.model.fileFolder.findUnique({
+      where: { id },
+      select: { id: true, parentId: true, storageProviderId: true, organizationId: true },
     });
   }
 }

@@ -2,7 +2,6 @@
 
 import { EventEmitter } from 'events';
 import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
-import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
@@ -342,7 +341,7 @@ export const MediaComponentInner: FC<{
       formData.append('file', blob, 'media.jpg');
       formData.append('preventSave', 'true');
       const data = await (
-        await newFetch('/media/upload-simple', {
+        await newFetch('/files/upload-simple', {
           method: 'POST',
           body: formData,
         })
@@ -351,7 +350,7 @@ export const MediaComponentInner: FC<{
     }
 
     const media = await (
-      await newFetch('/media/information', {
+      await newFetch('/files/information', {
         method: 'POST',
         body: JSON.stringify({
           id: props.media.id,

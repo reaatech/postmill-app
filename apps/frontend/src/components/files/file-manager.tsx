@@ -4,14 +4,14 @@ import React, { FC, useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDebounce } from 'use-debounce';
-import { FolderTree } from '@gitroom/frontend/components/media/folder-tree';
-import { FileGrid } from '@gitroom/frontend/components/media/file-grid';
-import { FileList } from '@gitroom/frontend/components/media/file-list';
-import { FileDetailsPanel } from '@gitroom/frontend/components/media/file-details-panel';
-import { BulkToolbar } from '@gitroom/frontend/components/media/bulk-toolbar';
-import { MediaUploader } from '@gitroom/frontend/components/media/media-uploader';
+import { FolderTree } from '@gitroom/frontend/components/files/folder-tree';
+import { FileGrid } from '@gitroom/frontend/components/files/file-grid';
+import { FileList } from '@gitroom/frontend/components/files/file-list';
+import { FileDetailsPanel } from '@gitroom/frontend/components/files/file-details-panel';
+import { BulkToolbar } from '@gitroom/frontend/components/files/bulk-toolbar';
+import { FileUploader } from '@gitroom/frontend/components/files/file-uploader';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
-import { TrashComponent } from '@gitroom/frontend/components/media/trash.component';
+import { TrashComponent } from '@gitroom/frontend/components/files/trash.component';
 import clsx from 'clsx';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 
@@ -34,7 +34,7 @@ const ListViewIcon: FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
-export type MediaItem = {
+export type FileItem = {
   id: string;
   name: string;
   originalName: string | null;
@@ -51,7 +51,7 @@ export type MediaItem = {
   folder?: { id: string; name: string } | null;
 };
 
-export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaItem[]) => void }> = ({
+export const FileManager: FC<{ standalone?: boolean; onSelect?: (items: FileItem[]) => void }> = ({
   standalone,
   onSelect,
 }) => {
@@ -60,13 +60,13 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 300);
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<MediaItem[]>([]);
+  const [selectedFiles, setSelectedFiles] = useState<FileItem[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortField, setSortField] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
   const [filterType, setFilterType] = useState('');
   const [filterTag, setFilterTag] = useState('');
-  const [detailsFile, setDetailsFile] = useState<MediaItem | null>(null);
+  const [detailsFile, setDetailsFile] = useState<FileItem | null>(null);
   const [showTrash, setShowTrash] = useState(false);
 
   useEffect(() => { setPage(0); }, [debouncedSearch, selectedFolderId, filterType, filterTag]);
@@ -82,16 +82,16 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
   params.set('limit', '24');
 
   const { data, mutate, isLoading } = useSWR(
-    `media-${page}-${debouncedSearch}-${selectedFolderId || 'root'}-${filterType}-${filterTag}-${sortField}-${sortOrder}`,
-    async () => (await fetch(`/media?${params.toString()}`)).json()
+    `files-${page}-${debouncedSearch}-${selectedFolderId || 'root'}-${filterType}-${filterTag}-${sortField}-${sortOrder}`,
+    async () => (await fetch(`/files?${params.toString()}`)).json()
   );
 
   const { data: foldersData, mutate: mutateFolders } = useSWR(
-    'media-folders',
-    async () => (await fetch('/media/folders')).json()
+    'files-folders',
+    async () => (await fetch('/files/folders')).json()
   );
 
-  const toggleFileSelection = useCallback((file: MediaItem) => {
+  const toggleFileSelection = useCallback((file: FileItem) => {
     setSelectedFiles(prev => {
       const exists = prev.find(f => f.id === file.id);
       if (exists) return prev.filter(f => f.id !== file.id);
@@ -191,7 +191,7 @@ export const MediaManager: FC<{ standalone?: boolean; onSelect?: (items: MediaIt
           foldersData={foldersData || []}
         />
 
-        <MediaUploader
+        <FileUploader
           folderId={selectedFolderId}
           onUploadComplete={refresh}
         />

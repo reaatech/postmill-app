@@ -141,6 +141,23 @@ export const useMenuItem = () => {
         </svg>
       ),
       path: '/files',
+      hide:
+        permissions.isResolved &&
+        !permissions.hasPermission('media', 'read'),
+    },
+    {
+      name: 'Media',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="20" rx="2.18" />
+          <circle cx="8" cy="8" r="1.5" />
+          <path d="M22 15l-5-5-5 5-3-3-5 5" />
+        </svg>
+      ),
+      path: '/media',
+      hide:
+        permissions.isResolved &&
+        !permissions.hasPermission('media', 'read'),
     },
     {
       name: t('plugs', 'Plugs'),

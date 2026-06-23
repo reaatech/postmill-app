@@ -8,7 +8,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import { VideoFrame } from '@gitroom/react/helpers/video.frame';
-import { Pagination } from '@gitroom/frontend/components/media/media.component';
+import { Pagination } from '@gitroom/frontend/components/files/file.component';
 
 const ThirdPartyMediaLibraryBrowser: FC<{
   integration: any;

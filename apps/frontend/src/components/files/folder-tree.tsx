@@ -3,7 +3,14 @@
 import React, { FC, useCallback, useState, useEffect, useRef } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import useSWR from 'swr';
 import clsx from 'clsx';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
+
+type StorageProviderInfo = {
+  type: string;
+  name: string;
+};
 
 type FolderItem = {
   id: string;
@@ -13,7 +20,8 @@ type FolderItem = {
   description: string | null;
   parentId: string | null;
   children: FolderItem[];
-  _count: { media: number; children: number };
+  _count: { files: number; children: number };
+  storageProviderId?: string | null;
 };
 
 export const FolderTree: FC<{
@@ -34,6 +42,23 @@ export const FolderTree: FC<{
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const dragCounterRef = useRef<Map<string, number>>(new Map());
 
+  const fetchProviders = useCallback(async () => {
+    const res = await fetch('/settings/storage');
+    if (!res.ok) return {};
+    const providers = await res.json();
+    const map: Record<string, StorageProviderInfo> = {};
+    for (const p of providers) {
+      map[p.id] = { type: p.type, name: p.name };
+    }
+    return map;
+  }, [fetch]);
+
+  const { data: providersMap } = useSWR<Record<string, StorageProviderInfo>>(
+    'folder-tree-storage-providers',
+    fetchProviders,
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+
   const toggleCollapse = (id: string) => {
     setCollapsed(prev => {
       const next = new Set(prev);
@@ -45,7 +70,7 @@ export const FolderTree: FC<{
 
   const handleCreateFolder = useCallback(async (parentId: string | null) => {
     if (!newFolderName.trim()) return;
-    await fetch('/media/folders', {
+    await fetch('/files/folders', {
       method: 'POST',
       body: JSON.stringify({ name: newFolderName.trim(), parentId }),
     });
@@ -57,7 +82,7 @@ export const FolderTree: FC<{
 
   const handleRename = useCallback(async (id: string) => {
     if (!renamingName.trim()) return;
-    await fetch(`/media/folders/${id}`, {
+    await fetch(`/files/folders/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ name: renamingName.trim() }),
     });
@@ -67,7 +92,7 @@ export const FolderTree: FC<{
   }, [renamingName, fetch, onRefresh]);
 
   const handleDelete = useCallback(async (id: string) => {
-    const res = await fetch(`/media/folders/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/files/folders/${id}`, { method: 'DELETE' });
     if (!res.ok) {
       const text = await res.text();
       toaster.show(text || 'Cannot delete non-empty folder', 'warning');
@@ -87,7 +112,7 @@ export const FolderTree: FC<{
     const fileId = e.dataTransfer.getData('text/plain');
     if (!fileId) return;
 
-    const res = await fetch(`/media/${fileId}/move`, {
+    const res = await fetch(`/files/${fileId}/move`, {
       method: 'PUT',
       body: JSON.stringify({ folderId: targetFolderId }),
     });
@@ -142,6 +167,7 @@ export const FolderTree: FC<{
     const isDragOver = dragOverFolderId === folder.id;
     const hasChildren = folder.children && folder.children.length > 0;
     const folderColor = folder.color || '#2B5CD3';
+    const providerInfo = folder.storageProviderId && providersMap?.[folder.storageProviderId];
 
     return (
       <div key={folder.id}>
@@ -190,7 +216,14 @@ export const FolderTree: FC<{
             <span className="flex-1 truncate">{folder.name}</span>
           )}
 
-          <span className="text-[11px] text-textColor/40 group-hover:text-textColor/60">{folder._count?.media || 0}</span>
+          {providerInfo && (
+            <span className="inline-flex items-center gap-[4px] bg-[#2B5CD3]/15 rounded-[4px] px-[5px] py-[2px] text-[11px] text-newTextColor/70">
+              <ProviderIcon identifier={providerInfo.type} name={providerInfo.name} size={14} />
+              {providerInfo.type}
+            </span>
+          )}
+
+          <span className="text-[11px] text-newTextColor/40 group-hover:text-newTextColor/60">{folder._count?.files || 0}</span>
         </div>
 
         {hasChildren && !isCollapsed && (
@@ -208,7 +241,7 @@ export const FolderTree: FC<{
         <div className="text-[13px] font-[600] text-textColor">Folders</div>
         <button
           onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
-          className="p-[4px] rounded-[4px] text-textColor/60 hover:text-textColor hover:bg-boxHover transition-all"
+          className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
         </button>
@@ -251,7 +284,7 @@ export const FolderTree: FC<{
                 if (e.key === 'Escape') { setNewFolderParent(null); setNewFolderName(''); }
               }}
               placeholder="Folder name..."
-              className="flex-1 bg-transparent border-b border-[#2B5CD3] text-textColor text-[13px] outline-none placeholder:text-textColor/30"
+              className="flex-1 bg-transparent border-b border-[#2B5CD3] text-textColor text-[13px] outline-none placeholder:text-newTextColor/30"
             />
           </div>
         )}

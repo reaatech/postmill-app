@@ -4,7 +4,7 @@ import React, { FC, useCallback, useMemo, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import type { MediaItem } from './media-manager';
+import type { FileItem } from './file-manager';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
@@ -21,10 +21,10 @@ const fileSize = (bytes: number) => {
 };
 
 export const FileList: FC<{
-  files: MediaItem[];
-  selectedFiles: MediaItem[];
-  onToggleSelect: (file: MediaItem) => void;
-  onFileClick: (file: MediaItem) => void;
+  files: FileItem[];
+  selectedFiles: FileItem[];
+  onToggleSelect: (file: FileItem) => void;
+  onFileClick: (file: FileItem) => void;
   sortField: string;
   sortOrder: string;
   onSort: (field: string) => void;
@@ -36,19 +36,19 @@ export const FileList: FC<{
 
   const handleRename = useCallback(async (id: string) => {
     if (!renamingName.trim()) return;
-    await fetch(`/media/${id}/rename`, {
+    await fetch(`/files/${id}/rename`, {
       method: 'PUT',
       body: JSON.stringify({ name: renamingName.trim() }),
     });
     setRenamingId(null);
   }, [renamingName, fetch]);
 
-  const columns: Column<MediaItem>[] = useMemo(() => [
+  const columns: Column<FileItem>[] = useMemo(() => [
     {
       key: 'preview',
       header: '',
       width: '40px',
-      render: (file: MediaItem) => {
+      render: (file: FileItem) => {
         const isVideo = hasExtension(file.path, 'mp4');
         return (
           <div className="w-[36px] h-[36px] rounded-[6px] overflow-hidden bg-newBgColorInner">
@@ -65,7 +65,7 @@ export const FileList: FC<{
       key: 'name',
       header: 'Name',
       sortable: true,
-      render: (file: MediaItem) => {
+      render: (file: FileItem) => {
         if (renamingId === file.id) {
           return (
             <input
@@ -91,17 +91,17 @@ export const FileList: FC<{
         );
       },
     },
-    { key: 'type', header: 'Type', sortable: true, render: (file: MediaItem) => {
+    { key: 'type', header: 'Type', sortable: true, render: (file: FileItem) => {
       const ext = file.name?.split('.').pop()?.toUpperCase() || file.type?.toUpperCase();
       return <span className="text-[12px] text-textColor/60">{ext}</span>;
     }},
-    { key: 'size', header: 'Size', sortable: true, render: (file: MediaItem) => (
+    { key: 'size', header: 'Size', sortable: true, render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60">{fileSize(file.fileSize)}</span>
     )},
-    { key: 'folder', header: 'Folder', render: (file: MediaItem) => (
+    { key: 'folder', header: 'Folder', render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60">{file.folder?.name || '-'}</span>
     )},
-    { key: 'createdAt', header: 'Created', sortable: true, render: (file: MediaItem) => (
+    { key: 'createdAt', header: 'Created', sortable: true, render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60 whitespace-nowrap">{formatDate(file.createdAt)}</span>
     )},
   ], [renamingId, renamingName, mediaDirectory]);
@@ -110,7 +110,7 @@ export const FileList: FC<{
     <DataTable
       columns={columns}
       data={files}
-      keyExtractor={(file: MediaItem) => file.id}
+      keyExtractor={(file: FileItem) => file.id}
       selectedIds={selectedFiles.map((f) => f.id)}
       onSelectionChange={(ids) => {
         const toRemove = selectedFiles.filter((sf) => !ids.includes(sf.id));
@@ -121,7 +121,7 @@ export const FileList: FC<{
       sortKey={sortField}
       sortDir={sortOrder as 'asc' | 'desc'}
       onSort={(key) => onSort(key)}
-      onRowClick={(file: MediaItem) => onToggleSelect(file)}
+      onRowClick={(file: FileItem) => onToggleSelect(file)}
       emptyState={{ title: 'No files found' }}
     />
   );

@@ -235,7 +235,7 @@ export function useUppyUploader(props: {
           await Promise.all(
             toSave.map(async ({ name, path, originalName, order }) => ({
               file: await (
-                await fetch('/media/save-media', {
+                await fetch('/files/save-media', {
                   method: 'POST',
                   body: JSON.stringify({
                     name,

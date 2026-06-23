@@ -5,7 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import type { MediaItem } from './media-manager';
+import type { FileItem } from './file-manager';
 
 const formatDate = (dateStr: string) => {
   const d = new Date(dateStr);
@@ -22,7 +22,7 @@ const fileSize = (bytes: number) => {
 };
 
 export const FileDetailsPanel: FC<{
-  file: MediaItem;
+  file: FileItem;
   onClose: () => void;
   onRefresh: () => void;
 }> = ({ file, onClose, onRefresh }) => {
@@ -42,7 +42,7 @@ export const FileDetailsPanel: FC<{
 
   const handleSaveName = useCallback(async () => {
     if (name.trim() && name !== file.name) {
-      await fetch(`/media/${file.id}/rename`, {
+      await fetch(`/files/${file.id}/rename`, {
         method: 'PUT',
         body: JSON.stringify({ name: name.trim() }),
       });
@@ -52,7 +52,7 @@ export const FileDetailsPanel: FC<{
   }, [name, file, fetch, onRefresh]);
 
   const handleSaveDescription = useCallback(async () => {
-    await fetch(`/media/${file.id}/description`, {
+    await fetch(`/files/${file.id}/description`, {
       method: 'PUT',
       body: JSON.stringify({ description }),
     });
@@ -66,7 +66,7 @@ export const FileDetailsPanel: FC<{
     const newTags = [...tags, trimmed];
     setTags(newTags);
     setTagsInput('');
-    await fetch(`/media/${file.id}/tags`, {
+    await fetch(`/files/${file.id}/tags`, {
       method: 'PUT',
       body: JSON.stringify({ tags: newTags }),
     });
@@ -76,7 +76,7 @@ export const FileDetailsPanel: FC<{
   const handleRemoveTag = useCallback(async (tag: string) => {
     const newTags = tags.filter(t => t !== tag);
     setTags(newTags);
-    await fetch(`/media/${file.id}/tags`, {
+    await fetch(`/files/${file.id}/tags`, {
       method: 'PUT',
       body: JSON.stringify({ tags: newTags }),
     });
@@ -91,7 +91,7 @@ export const FileDetailsPanel: FC<{
   }, [file, mediaDirectory, toaster]);
 
   const handleDelete = useCallback(async () => {
-    await fetch(`/media/${file.id}`, { method: 'DELETE' });
+    await fetch(`/files/${file.id}`, { method: 'DELETE' });
     onRefresh();
     onClose();
     toaster.show('File deleted', 'success');

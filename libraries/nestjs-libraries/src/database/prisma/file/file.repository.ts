@@ -1,6 +1,6 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable, Logger } from '@nestjs/common';
-import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/media/save.media.information.dto';
+import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { stat } from 'fs/promises';
 import { extname } from 'path';
 
@@ -47,8 +47,8 @@ function mimeFromName(name: string): string {
 }
 
 @Injectable()
-export class MediaRepository {
-  private readonly _logger = new Logger(MediaRepository.name);
+export class FileRepository {
+  private readonly _logger = new Logger(FileRepository.name);
 
   constructor(
     private _file: PrismaRepository<'file'>,
@@ -109,8 +109,6 @@ export class MediaRepository {
     });
   }
 
-  // AI-generated artifacts (§11.5/§11.7): the file already lives in tenant storage
-  // (possibly cloud — no local stat), and provider metadata is supplied by the caller.
   saveGeneratedMedia(
     org: string,
     data: {
@@ -142,7 +140,7 @@ export class MediaRepository {
     });
   }
 
-  getMediaById(id: string) {
+  getFileById(id: string) {
     return this._file.model.file.findUnique({
       where: {
         id,
@@ -158,7 +156,7 @@ export class MediaRepository {
     });
   }
 
-  deleteMedia(org: string, id: string) {
+  deleteFile(org: string, id: string) {
     return this._file.model.file.update({
       where: {
         id,
@@ -193,7 +191,7 @@ export class MediaRepository {
     });
   }
 
-  async getMedia(
+  async getFiles(
     org: string,
     page: number,
     search?: string,
@@ -375,11 +373,11 @@ export class MediaRepository {
       }));
   }
 
-  // ── Media Operations ─────────────────────────────────────────
+  // ── File Operations ─────────────────────────────────────────
 
-  moveMedia(mediaId: string, folderId: string | null) {
+  moveFile(fileId: string, folderId: string | null) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { folderId },
     });
   }
@@ -402,7 +400,7 @@ export class MediaRepository {
     });
   }
 
-  async searchMedia(org: string, query: string, folderId?: string) {
+  async searchFiles(org: string, query: string, folderId?: string) {
     const where: any = {
       organizationId: org,
       deletedAt: null as null,
@@ -439,7 +437,7 @@ export class MediaRepository {
     });
   }
 
-  async getMediaByFolder(org: string, folderId: string, page: number, limit: number = 18) {
+  async getFilesByFolder(org: string, folderId: string, page: number, limit: number = 18) {
     const pageNum = (page || 1) - 1;
 
     const where = {
@@ -475,7 +473,7 @@ export class MediaRepository {
   }
 
   async getFolderContents(folderId: string) {
-    const [mediaCount, childFolders] = await Promise.all([
+    const [fileCount, childFolders] = await Promise.all([
       this._file.model.file.count({
         where: { folderId, deletedAt: null as null },
       }),
@@ -485,45 +483,45 @@ export class MediaRepository {
       }),
     ]);
 
-    return { mediaCount, childFolders };
+    return { fileCount, childFolders };
   }
 
-  updateMediaTags(mediaId: string, tags: string[]) {
+  updateFileTags(fileId: string, tags: string[]) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { tags: JSON.stringify(tags) },
     });
   }
 
-  updateMediaDescription(mediaId: string, description: string) {
+  updateFileDescription(fileId: string, description: string) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { description },
     });
   }
 
-  renameMedia(mediaId: string, name: string) {
+  renameFile(fileId: string, name: string) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { name },
     });
   }
 
-  softDeleteMedia(mediaId: string) {
+  softDeleteFile(fileId: string) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { deletedAt: new Date() },
     });
   }
 
-  restoreMedia(mediaId: string) {
+  restoreFile(fileId: string) {
     return this._file.model.file.update({
-      where: { id: mediaId },
+      where: { id: fileId },
       data: { deletedAt: null },
     });
   }
 
-  getTrashedMedia(org: string) {
+  getTrashedFiles(org: string) {
     return this._file.model.file.findMany({
       where: {
         organizationId: org,

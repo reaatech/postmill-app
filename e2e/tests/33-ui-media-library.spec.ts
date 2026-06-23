@@ -23,14 +23,14 @@ test('media library page coverage', async ({ page }) => {
 
   page.on('response', (r) => {
     const u = r.url();
-    if (u.includes('/api/media')) {
-      findings.apiCalls.push(`${r.status()} ${u.split('?')[0].replace('https://postiz.reaatech.com/api/media', '')}`);
+    if (u.includes('/api/files')) {
+      findings.apiCalls.push(`${r.status()} ${u.split('?')[0].replace('https://postiz.reaatech.com/api/files', '')}`);
     }
   });
 
   try {
     // Load media page
-    const r = await page.goto('/media', { timeout: 20000 });
+    const r = await page.goto('/files', { timeout: 20000 });
     findings.pageLoad.status = r?.status() ?? 0;
     findings.pageLoad.url = page.url();
 
