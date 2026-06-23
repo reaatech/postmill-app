@@ -34,6 +34,7 @@ export default defineConfig({
       'src/components/layout/top.menu.spec.{ts,tsx}',
       'src/components/settings/roles/**/*.spec.{ts,tsx}',
       'src/components/new-layout/layout.component.spec.{ts,tsx}',
+      'src/components/media-tools/designer/*.spec.{ts,tsx}',
       'src/redirects.config.spec.ts',
     ],
     coverage: {
