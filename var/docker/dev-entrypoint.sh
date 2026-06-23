@@ -19,7 +19,7 @@ wait_tcp() {  # host port name
 }
 
 wait_tcp postmill-postgres 5432 postgres
-wait_tcp postmill-redis 6379 redis
+# Redis is external now (Upstash via REDIS_URL) — nothing local to wait for.
 
 # node_modules lives in a named volume, so install only on first boot.
 # Delete /app/node_modules/.docker-deps-installed (or `docker volume rm`) to force a reinstall.
