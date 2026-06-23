@@ -10,7 +10,7 @@ import React, {
   useState,
 } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
-import { showMediaBox } from '@gitroom/frontend/components/media/media.component';
+import { showFileBox } from '@gitroom/frontend/components/files/file.component';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
@@ -70,7 +70,7 @@ export const SettingsPopup: FC<{
     form.setValue('picture', personal.picture);
   }, [fetch, form]);
   const openMedia = useCallback(() => {
-    showMediaBox((values) => {
+    showFileBox((values) => {
       form.setValue('picture', values);
     });
   }, [form]);

@@ -25,13 +25,9 @@ export class WebhooksRepository {
       include: {
         integrations: {
           select: {
-            integration: {
-              select: {
-                id: true,
-                picture: true,
-                name: true,
-              },
-            },
+            id: true,
+            picture: true,
+            name: true,
           },
         },
       },
@@ -74,10 +70,7 @@ export class WebhooksRepository {
       },
       data: {
         integrations: {
-          deleteMany: {},
-          create: body.integrations.map((integration) => ({
-            integrationId: integration.id,
-          })),
+          set: body.integrations.map((integration) => ({ id: integration.id })),
         },
       },
     });

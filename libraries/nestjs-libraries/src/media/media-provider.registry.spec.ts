@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { MediaProviderRegistry } from './media-provider.registry';
 import { MediaModule } from './media.module';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { FalAdapter } from './adapters/fal.adapter';
 import { LumaAdapter } from './adapters/luma.adapter';
 
@@ -29,7 +30,8 @@ describe('MediaProviderRegistry', () => {
 describe('MediaModule', () => {
   it('registers all 15 adapters on init', () => {
     const registry = new MediaProviderRegistry();
-    const mediaModule = new MediaModule(registry);
+    const flags = new FeatureFlagsService();
+    const mediaModule = new MediaModule(registry, flags);
     mediaModule.onModuleInit();
 
     const ids = registry.getAll().map((a) => a.identifier).sort();

@@ -74,10 +74,10 @@ vi.mock('@hookform/resolvers/class-validator', () => ({
   classValidatorResolver: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('@gitroom/frontend/components/media/new.uploader', () => ({}));
+vi.mock('@gitroom/frontend/components/files/new.uploader', () => ({}));
 
-vi.mock('@gitroom/frontend/components/media/media.component', () => ({
-  showMediaBox: vi.fn(),
+vi.mock('@gitroom/frontend/components/files/file.component', () => ({
+  showFileBox: vi.fn(),
 }));
 
 vi.mock('@gitroom/frontend/components/launches/launches.component', () => ({

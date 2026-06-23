@@ -61,7 +61,7 @@ const AddOrEditWebhook: FC<{ data?: any; reload: () => void }> = ({ data, reload
       url: data?.url || '',
       secret: data?.secret || '',
       events: data?.events || ['post.published'],
-      integrations: data?.integrations?.map((p: any) => p.integration) || [],
+      integrations: data?.integrations || [],
     },
   });
 

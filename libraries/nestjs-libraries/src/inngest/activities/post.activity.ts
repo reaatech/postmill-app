@@ -350,7 +350,7 @@ export class PostActivity {
       (f) => {
         return (
           f.integrations.length === 0 ||
-          f.integrations.some((i) => i.integration.id === integrationId)
+          f.integrations.some((i) => i.id === integrationId)
         );
       }
     );

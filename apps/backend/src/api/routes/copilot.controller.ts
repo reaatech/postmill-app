@@ -215,7 +215,7 @@ export class CopilotController {
       });
 
       const runtime = new CopilotRuntime({
-        agents,
+        agents: agents as any,
       });
 
       const copilotRuntimeHandler = copilotRuntimeNestEndpoint({

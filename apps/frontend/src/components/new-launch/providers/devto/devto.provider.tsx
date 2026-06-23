@@ -7,7 +7,7 @@ import {
 } from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
 import { DevToSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/dev.to.settings.dto';
 import { Input } from '@gitroom/react/form/input';
-import { MediaComponent } from '@gitroom/frontend/components/media/media.component';
+import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { SelectOrganization } from '@gitroom/frontend/components/new-launch/providers/devto/select.organization';
 import { DevtoTags } from '@gitroom/frontend/components/new-launch/providers/devto/devto.tags';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
@@ -27,7 +27,7 @@ const DevtoSettings: FC = () => {
         label="Canonical Link"
         {...form.register('canonical')}
       />
-      <MediaComponent
+      <FileComponent
         label="Cover picture"
         description="Add a cover picture"
         {...form.register('main_image')}

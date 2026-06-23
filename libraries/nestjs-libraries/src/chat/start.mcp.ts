@@ -1,5 +1,6 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { MCPServer } from '@mastra/mcp';
 import { randomUUID, createHash } from 'crypto';
@@ -175,6 +176,16 @@ export function requireScopes(authResult: AuthResult, required: string[]): boole
 }
 
 export const startMcp = async (app: INestApplication) => {
+  try {
+    const flags = app.get(FeatureFlagsService, { strict: false });
+    if (flags?.isDisabled('mcp')) {
+      new Logger('startMcp').log('MCP is disabled via DEV_DISABLE_MCP; skipping MCP/A2A startup');
+      return;
+    }
+  } catch {
+    // FeatureFlagsService may not be available in some test contexts — proceed normally.
+  }
+
   const mastraService = app.get(MastraService, { strict: false });
   const oauthService = app.get(OAuthService, { strict: false });
   const apiKeysService = app.get(ApiKeysService, { strict: false });

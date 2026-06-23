@@ -25,14 +25,14 @@ import {
 } from '@gitroom/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
 import { AddPostButton } from '@gitroom/frontend/components/new-launch/add.post.button';
-import { MultiMediaComponent } from '@gitroom/frontend/components/media/media.component';
+import { MultiFileComponent } from '@gitroom/frontend/components/files/file.component';
 import { UpDownArrow } from '@gitroom/frontend/components/launches/up.down.arrow';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useExistingData } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { EditorCopilotBridge } from '@gitroom/frontend/components/launches/copilot-bridges';
 import { useDropzone } from 'react-dropzone';
-import { useUppyUploader } from '@gitroom/frontend/components/media/new.uploader';
+import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import { Dashboard } from '@uppy/react';
 import Link from '@tiptap/extension-link';
 import {
@@ -743,7 +743,7 @@ export const Editor: FC<{
             />
             <div className="flex bg-newBgColorInner rounded-b-[6px] cursor-default">
               {setImages && (
-                <MultiMediaComponent
+                <MultiFileComponent
                   mediaNotAvailable={num > 0 && comments === 'no-media'}
                   allData={allValues}
                   text={valueWithoutHtml}

@@ -17,7 +17,7 @@ import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useWaitForClass } from '@gitroom/helpers/utils/use.wait.for.class';
-import { MultiMediaComponent } from '@gitroom/frontend/components/media/media.component';
+import { MultiFileComponent } from '@gitroom/frontend/components/files/file.component';
 import { Integration } from '@prisma/client';
 import Link from 'next/link';
 import { useParams, usePathname, useRouter } from 'next/navigation';
@@ -44,7 +44,7 @@ export const MediaPortal: FC<{
   if (!waitForClass) return null;
   return (
     <div className="pl-[14px] pr-[24px] whitespace-nowrap editor rm-bg">
-      <MultiMediaComponent
+      <MultiFileComponent
         allData={[{ content: value }]}
         text={value}
         label={t('attachments', 'Attachments')}

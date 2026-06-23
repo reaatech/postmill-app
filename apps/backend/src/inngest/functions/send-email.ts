@@ -6,7 +6,9 @@ export const createSendEmail = (emailActivity: EmailActivity) =>
     {
       id: 'send-email',
       rateLimit: {
-        key: 'email-send',
+        // No `key`: Inngest compiles `key` as a CEL expression, so a literal like
+        // 'email-send' fails to register. Omitting it applies one global bucket,
+        // which is the intended 1-email/sec limit across all sends.
         limit: 1,
         period: '1s',
       },

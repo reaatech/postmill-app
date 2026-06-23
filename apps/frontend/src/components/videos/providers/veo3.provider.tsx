@@ -3,7 +3,7 @@ import { FC, useState } from 'react';
 import { useFormContext } from 'react-hook-form';
 import { useVideo } from '@gitroom/frontend/components/videos/video.context.wrapper';
 import { Textarea } from '@gitroom/react/form/textarea';
-import { MultiMediaComponent } from '@gitroom/frontend/components/media/media.component';
+import { MultiFileComponent } from '@gitroom/frontend/components/files/file.component';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
 export interface Voice {
@@ -35,7 +35,7 @@ const VEO3Settings: FC = () => {
         error={formState?.errors?.prompt?.message}
       />
       <div className="mb-[6px]">Images (max 3)</div>
-      <MultiMediaComponent
+      <MultiFileComponent
         allData={[]}
         dummy={true}
         text="Images"
