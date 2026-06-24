@@ -17,7 +17,7 @@ const Btn: FC<{ onClick: () => void; title: string; children: React.ReactNode }>
     onClick={onClick}
     title={title}
     aria-label={title}
-    className="w-8 h-8 flex items-center justify-center rounded text-textColor/80 hover:bg-newColColor/40 hover:text-textColor text-[14px] transition-colors"
+    className="w-8 h-8 flex items-center justify-center rounded text-textColor/80 hover:bg-newColColor/40 hover:text-textColor text-[14px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
   >
     {children}
   </button>
@@ -27,7 +27,7 @@ const Btn: FC<{ onClick: () => void; title: string; children: React.ReactNode }>
 // of the canvas when one or more elements are selected.
 export const SelectionToolbar: FC<ToolbarProps> = ({ store }) => {
   const doc = store((s: any) => s.doc);
-  const currentPage = store((s: any) => s.currentPage);
+  const currentOutput = store((s: any) => s.currentOutput);
   const selectedIds: string[] = store((s: any) => s.selectedIds);
   const updateElements = store((s: any) => s.updateElements);
   const removeElement = store((s: any) => s.removeElement);
@@ -37,7 +37,7 @@ export const SelectionToolbar: FC<ToolbarProps> = ({ store }) => {
   const ungroupSelection = store((s: any) => s.ungroupSelection);
 
   if (!selectedIds.length) return null;
-  const selected: DesignerElement[] = (doc.pages[currentPage]?.children || []).filter(
+  const selected: DesignerElement[] = (doc.outputs[currentOutput]?.children || []).filter(
     (c: DesignerElement) => selectedIds.includes(c.id)
   );
   if (!selected.length) return null;

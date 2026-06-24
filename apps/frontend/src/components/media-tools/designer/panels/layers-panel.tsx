@@ -21,14 +21,19 @@ const elementLabel = (el: DesignerElement): string => {
     return text ? `"${text}"` : 'Text';
   }
   if (el.type === 'image') return 'Image';
+  if (el.type === 'icon') return 'Icon';
   if (el.type === 'shape') return el.shape ? `Shape (${el.shape})` : 'Shape';
   return 'Element';
 };
 
 export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
-  const elements = store((s) => s.doc.pages[s.currentPage]?.children || []);
+  const currentOutput = store((s) => s.currentOutput);
+  const elements = store(
+    (s) =>
+      (s.doc.outputs[s.currentOutput] as import('../designer.store').DesignerOutput)
+        ?.children || []
+  );
   const selectedIds = store((s) => s.selectedIds);
-  const currentPage = store((s) => s.currentPage);
 
   const reversed = [...elements].reverse();
 
@@ -60,64 +65,72 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
     setEditingId(null);
   }, []);
 
+  const getCurrentChildren = useCallback(
+    () =>
+      (
+        store.getState().doc.outputs[currentOutput] as import('../designer.store').DesignerOutput
+      )?.children || [],
+    [store, currentOutput]
+  );
+
   const toggleVisibility = useCallback(
     (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
-      const children = store.getState().doc.pages[currentPage]?.children || [];
+      const children = getCurrentChildren();
       const el = children.find((c) => c.id === id);
       if (el) {
         store.getState().updateElement(id, { hidden: !el.hidden });
         store.getState().pushHistory();
       }
     },
-    [store, currentPage]
+    [store, currentOutput]
   );
 
   const toggleLock = useCallback(
     (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
-      const children = store.getState().doc.pages[currentPage]?.children || [];
+      const children = getCurrentChildren();
       const el = children.find((c) => c.id === id);
       if (el) {
         store.getState().updateElement(id, { locked: !el.locked });
         store.getState().pushHistory();
       }
     },
-    [store, currentPage]
+    [store, currentOutput]
   );
 
   const moveUp = useCallback(
     (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
-      const children = store.getState().doc.pages[currentPage]?.children || [];
+      const children = getCurrentChildren();
       if (index >= children.length - 1) return;
       const newElements = [...children];
       [newElements[index], newElements[index + 1]] = [newElements[index + 1], newElements[index]];
-      const page = store.getState().doc.pages[currentPage];
+      const output = store.getState().doc.outputs[currentOutput];
       store.getState().setDoc({
         ...store.getState().doc,
-        pages: [{ ...page, children: newElements }],
+        outputs: [{ ...output, children: newElements }],
       });
       store.getState().pushHistory();
     },
-    [store, currentPage]
+    [store, currentOutput, getCurrentChildren]
   );
 
   const moveDown = useCallback(
     (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
-      const children = store.getState().doc.pages[currentPage]?.children || [];
+      const children = getCurrentChildren();
       if (index <= 0) return;
       const newElements = [...children];
       [newElements[index], newElements[index - 1]] = [newElements[index - 1], newElements[index]];
-      const page = store.getState().doc.pages[currentPage];
+      const output = store.getState().doc.outputs[currentOutput];
       store.getState().setDoc({
         ...store.getState().doc,
-        pages: [{ ...page, children: newElements }],
+        outputs: [{ ...output, children: newElements }],
       });
       store.getState().pushHistory();
     },
-    [store, currentPage]
+    [store, currentOutput, getCurrentChildren]
   );
 
   const handlePanelKeyDown = useCallback(
@@ -131,7 +144,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
       if (Number.isNaN(idx) || !id) return;
 
       const isActionButton = !!target.closest('[data-row-action]');
-      const children = store.getState().doc.pages[currentPage]?.children || [];
+      const children = getCurrentChildren();
       const total = children.length;
       const el = children.find((c) => c.id === id);
       if (!el) return;
@@ -162,13 +175,13 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
           break;
       }
     },
-    [editingId, store, currentPage, selectElement, startRename]
+    [editingId, store, currentOutput, selectElement, startRename]
   );
 
   if (!elements.length) {
     return (
       <div className="text-[12px] text-newTextColor/40 text-center py-4">
-        No elements on this page
+        No elements on this output
       </div>
     );
   }
@@ -202,13 +215,13 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 selectElement(el.id);
               }
             }}
-            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-[12px] transition-all outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
+            className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-[12px] transition-all outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
               isSelected
-                ? 'bg-[#2B5CD3]/20 text-textColor'
+                ? 'bg-designerAccent/20 text-textColor'
                 : 'text-newTextColor/60 hover:bg-newColColor/10 hover:text-textColor'
             }`}
           >
-            <div className="w-5 h-5 flex items-center justify-center text-[11px] font-bold text-[#2B5CD3] shrink-0">
+            <div className="w-5 h-5 flex items-center justify-center text-[11px] font-bold text-designerAccent shrink-0">
               {elementIcon[el.type] || '?'}
             </div>
 
@@ -227,10 +240,16 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                   }
                 }}
                 autoFocus
-                className="flex-1 h-[22px] px-1.5 rounded-[4px] bg-newBgColor border border-[#2B5CD3] text-[11px] text-textColor outline-none"
+                className="flex-1 h-[22px] px-1.5 rounded-[4px] bg-newBgColor border border-designerAccent text-[11px] text-textColor outline-none"
               />
             ) : (
               <div className="flex-1 truncate text-[11px]">{elementLabel(el)}</div>
+            )}
+
+            {el.originId ? (
+              <span title="Linked — edits here update all formats" className="text-designerAccent shrink-0">🔗</span>
+            ) : (
+              <span title="Unlinked — changes stay in this format only" className="text-gray-500 shrink-0">🔓</span>
             )}
 
             <div className="flex items-center gap-0.5 shrink-0">
@@ -274,7 +293,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 data-row-action
                 onClick={(e) => toggleLock(e, el.id)}
                 className={`w-5 h-5 flex items-center justify-center rounded hover:bg-newColColor/20 text-[10px] ${
-                  el.locked ? 'text-[#2B5CD3]' : 'text-newTextColor/40'
+                  el.locked ? 'text-designerAccent' : 'text-newTextColor/40'
                 }`}
                 title={el.locked ? 'Unlock' : 'Lock'}
                 aria-label={el.locked ? 'Unlock layer' : 'Lock layer'}

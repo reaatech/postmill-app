@@ -1,39 +1,62 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
-import type { DesignerElement } from '../designer.store';
-import { FontPicker } from '../controls';
-import { FONT_FAMILIES, ensureFontLoaded, SYSTEM_FONT_FAMILY } from '../fonts';
+import React, { FC, useCallback } from 'react';
+import type { DesignerElement, VideoClip } from '../designer.store';
+import { ensureFontLoaded } from '../fonts';
+import { TEXT_STYLE_PRESETS, type TextStylePreset } from '../text-styles';
 
 interface TextPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
   onClose?: () => void;
 }
 
-interface TextPreset {
-  label: string;
-  fontSize: number;
-  fontWeight: number;
-  text: string;
-}
-
-const presets: TextPreset[] = [
-  { label: 'Heading', fontSize: 32, fontWeight: 700, text: 'Heading' },
-  { label: 'Subheading', fontSize: 24, fontWeight: 500, text: 'Subheading' },
-  { label: 'Body', fontSize: 16, fontWeight: 400, text: 'Body text goes here' },
-];
+const CATEGORY_LABELS: Record<TextStylePreset['category'], string> = {
+  heading: 'Headings',
+  subheading: 'Subheadings',
+  body: 'Body',
+  caption: 'Captions',
+};
 
 export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
-  // Font applied to newly-added text (C2). Defaults to the safe system font.
-  const [fontFamily, setFontFamily] = useState(SYSTEM_FONT_FAMILY);
-
   const addText = useCallback(
-    (preset: TextPreset) => {
+    (preset: TextStylePreset) => {
       const state = store.getState();
-      const cx = state.doc.width / 2 - 100;
-      const cy = state.doc.height / 2 - 16;
+      const out = state.doc.outputs[state.currentOutput];
 
-      void ensureFontLoaded(fontFamily);
+      void ensureFontLoaded(preset.fontFamily);
+
+      if (state.doc.mode === 'video') {
+        const vo = out as any;
+        let textTrack = vo.tracks?.find((t: any) => t.type === 'text');
+        if (!textTrack) {
+          state.addTrack(state.currentOutput, 'text');
+          textTrack = (store.getState().doc.outputs[state.currentOutput] as any).tracks.find((t: any) => t.type === 'text');
+        }
+        if (!textTrack) return;
+        const durationMs = vo.durationMs || 10000;
+        const startMs = Math.min(state.playheadMs, durationMs - 1000);
+        const clip: VideoClip = {
+          id: '',
+          startMs,
+          endMs: Math.min(startMs + 4000, durationMs),
+          text: preset.name,
+          fontFamily: preset.fontFamily,
+          fontSize: preset.fontSize,
+          fontWeight: preset.fontWeight,
+          fill: preset.fill || '#000000',
+          x: (out.width - 200) / 2,
+          y: (out.height - 40) / 2,
+          width: 200,
+          height: 40,
+          opacity: 1,
+        };
+        store.getState().addClip(state.currentOutput, textTrack.id, clip);
+        onClose?.();
+        return;
+      }
+
+      const cx = out.width / 2 - 100;
+      const cy = out.height / 2 - 16;
 
       const el: DesignerElement = {
         id: '',
@@ -46,55 +69,79 @@ export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
         opacity: 1,
         locked: false,
         hidden: false,
-        text: preset.text,
+        text: preset.name,
         fontSize: preset.fontSize,
         fontWeight: preset.fontWeight,
-        fontFamily,
-        fill: '#000000',
+        fontFamily: preset.fontFamily,
+        fill: preset.fill || '#000000',
         align: 'center',
+        lineHeight: preset.lineHeight,
+        letterSpacing: preset.letterSpacing,
       };
 
       state.addElement(el);
       onClose?.();
     },
-    [store, onClose, fontFamily]
+    [store, onClose]
   );
 
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-1.5">
-        <label className="text-[11px] text-newTextColor/40">Font</label>
-        <FontPicker
-          value={fontFamily}
-          fonts={FONT_FAMILIES}
-          onChange={(family) => {
-            void ensureFontLoaded(family);
-            setFontFamily(family);
-          }}
-        />
-      </div>
+  const categories: TextStylePreset['category'][] = ['heading', 'subheading', 'body', 'caption'];
 
-      {presets.map((preset) => (
-        <button
-          key={preset.label}
-          onClick={() => addText(preset)}
-          className="w-full rounded-lg border border-newBorder bg-newBgColorInner p-4 text-left hover:border-[#2B5CD3] hover:bg-newColColor/10 transition-all group"
-        >
-          <div className="text-[11px] text-newTextColor/40 mb-1">
-            {preset.label}
+  return (
+    <div className="flex flex-col gap-4">
+      {categories.map((category) => {
+        const presets = TEXT_STYLE_PRESETS.filter((p) => p.category === category);
+        if (!presets.length) return null;
+        return (
+          <div key={category} className="flex flex-col gap-2">
+            <div className="text-[11px] text-newTextColor/40 uppercase tracking-wider">
+              {CATEGORY_LABELS[category]}
+            </div>
+            <div className="flex flex-col gap-2">
+              {presets.map((preset) => (
+                <button
+                  key={preset.name}
+                  onClick={() => addText(preset)}
+                  draggable
+                  onDragStart={(e) =>
+                    e.dataTransfer.setData(
+                      'application/x-designer-element',
+                      JSON.stringify({
+                        type: 'text',
+                        text: preset.name,
+                        fontSize: preset.fontSize,
+                        fontWeight: preset.fontWeight,
+                        fontFamily: preset.fontFamily,
+                        width: 200,
+                        height: 40,
+                        fill: preset.fill || '#000000',
+                        align: 'center',
+                        lineHeight: preset.lineHeight,
+                        letterSpacing: preset.letterSpacing,
+                      })
+                    )
+                  }
+                  className="w-full rounded-lg border border-newBorder bg-newBgColorInner p-3 text-left hover:border-designerAccent hover:bg-newColColor/10 transition-all group"
+                >
+                  <div
+                    className="text-textColor"
+                    style={{
+                      fontSize: `${Math.min(preset.fontSize, 20)}px`,
+                      fontWeight: preset.fontWeight,
+                      fontFamily: `"${preset.fontFamily}"`,
+                      lineHeight: preset.lineHeight,
+                      letterSpacing: `${preset.letterSpacing}px`,
+                      color: preset.fill || undefined,
+                    }}
+                  >
+                    {preset.name}
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
-          <div
-            className="text-textColor"
-            style={{
-              fontSize: `${preset.fontSize}px`,
-              fontWeight: preset.fontWeight,
-              fontFamily: `"${fontFamily}"`,
-            }}
-          >
-            {preset.text}
-          </div>
-        </button>
-      ))}
+        );
+      })}
     </div>
   );
 };

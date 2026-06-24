@@ -16,8 +16,32 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 
 const ACCENT = '#2B5CD3';
+
+const MAX_RECENTS = 12;
+
+const recentsKey = (orgId?: string | null) =>
+  `designer-recent-colors${orgId ? `-${orgId}` : ''}`;
+
+const getRecents = (orgId?: string | null): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem(recentsKey(orgId)) || '[]');
+  } catch {
+    return [];
+  }
+};
+
+const addRecent = (color: string, orgId?: string | null) => {
+  const normalized = normalizeHex(color);
+  if (!normalized) return;
+  const recents = [
+    normalized,
+    ...getRecents(orgId).filter((c) => c !== normalized),
+  ].slice(0, MAX_RECENTS);
+  localStorage.setItem(recentsKey(orgId), JSON.stringify(recents));
+};
 
 /** Default preset swatches offered in the ColorSwatch popover. */
 const PRESET_COLORS: string[] = [
@@ -78,15 +102,23 @@ export interface ColorSwatchProps {
   value: string;
   onChange: (hex: string) => void;
   label?: string;
+  brandColors?: string[];
+  brandEnforcement?: boolean;
 }
 
 export const ColorSwatch: React.FC<ColorSwatchProps> = ({
   value,
   onChange,
   label,
+  brandColors,
+  brandEnforcement,
 }) => {
+  const user = useUser();
+  const orgId = user?.orgId;
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(value);
+  const [showEyedropper, setShowEyedropper] = useState(false);
+  const [recents, setRecents] = useState<string[]>([]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   useDismiss(open, () => setOpen(false), wrapRef);
@@ -95,13 +127,49 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
     setDraft(value);
   }, [value]);
 
+  useEffect(() => {
+    setShowEyedropper('EyeDropper' in window);
+  }, []);
+
+  useEffect(() => {
+    if (open) setRecents(getRecents(orgId));
+  }, [open, orgId]);
+
+  const commitColor = useCallback(
+    (hex: string) => {
+      const normalized = normalizeHex(hex);
+      if (!normalized) return;
+      onChange(normalized);
+      addRecent(normalized, orgId);
+      setRecents(getRecents(orgId));
+    },
+    [onChange, orgId],
+  );
+
   const commitDraft = useCallback(
     (raw: string) => {
       const hex = normalizeHex(raw);
-      if (hex) onChange(hex);
+      if (hex) commitColor(hex);
     },
-    [onChange],
+    [commitColor],
   );
+
+  const handleEyedropper = async () => {
+    try {
+      // @ts-expect-error - EyeDropper API
+      const dropper = new window.EyeDropper();
+      const result = await dropper.open();
+      commitColor(result.sRGBHex);
+      setDraft(result.sRGBHex);
+    } catch {
+      // user cancelled
+    }
+  };
+
+  const brandHexes = (brandColors || []).filter(
+    (c) => normalizeHex(c) !== null,
+  );
+  const enforce = !!(brandEnforcement && brandHexes.length > 0);
 
   return (
     <div className="flex flex-col gap-[6px]" ref={wrapRef}>
@@ -114,13 +182,16 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-[8px] h-[34px] px-[8px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[13px] hover:border-[#2B5CD3] focus:border-[#2B5CD3] transition-colors"
+          className="flex items-center gap-[8px] h-[34px] px-[8px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[13px] hover:border-designerAccent focus:border-designerAccent transition-colors"
         >
           <span
             className="w-[18px] h-[18px] rounded-[4px] border border-newBorder shrink-0"
             style={{ backgroundColor: value }}
           />
           <span className="font-mono uppercase">{value}</span>
+          {enforce && (
+            <span className="text-[10px] text-purple-400 ml-1" title="Brand colors enforced">🔒</span>
+          )}
         </button>
 
         {open && (
@@ -128,49 +199,164 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
             role="dialog"
             className="absolute z-50 mt-[6px] left-0 w-[208px] p-[10px] rounded-[10px] bg-newBgColorInner border border-newBorder shadow-menu flex flex-col gap-[10px]"
           >
-            <div className="flex items-center gap-[8px]">
-              <span
-                className="w-[24px] h-[24px] rounded-[6px] border border-newBorder shrink-0"
-                style={{ backgroundColor: normalizeHex(draft) ?? value }}
-              />
-              <input
-                type="text"
-                value={draft}
-                aria-label="Hex color"
-                spellCheck={false}
-                onChange={(e) => setDraft(e.target.value)}
-                onBlur={() => commitDraft(draft)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    commitDraft(draft);
-                    setOpen(false);
-                  }
-                }}
-                className="flex-1 min-w-0 h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-textColor text-[13px] font-mono uppercase focus:border-[#2B5CD3]"
-              />
-            </div>
-            <div className="grid grid-cols-6 gap-[6px]">
-              {PRESET_COLORS.map((c) => {
-                const active = normalizeHex(value) === c;
-                return (
+            {!enforce && (
+              <div className="flex items-center gap-[8px]">
+                <span
+                  className="w-[24px] h-[24px] rounded-[6px] border border-newBorder shrink-0"
+                  style={{ backgroundColor: normalizeHex(draft) ?? value }}
+                />
+                <input
+                  type="text"
+                  value={draft}
+                  aria-label="Hex color"
+                  spellCheck={false}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onBlur={() => commitDraft(draft)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      commitDraft(draft);
+                      setOpen(false);
+                    }
+                  }}
+                  className="flex-1 min-w-0 h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-textColor text-[13px] font-mono uppercase focus:border-designerAccent"
+                />
+                {showEyedropper && (
                   <button
-                    key={c}
                     type="button"
-                    aria-label={c}
-                    title={c}
-                    onClick={() => {
-                      onChange(c);
-                      setDraft(c);
-                    }}
-                    className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
-                    style={{
-                      backgroundColor: c,
-                      borderColor: active ? ACCENT : 'var(--new-border)',
-                    }}
-                  />
-                );
-              })}
-            </div>
+                    aria-label="Pick color from screen"
+                    title="Pick color from screen"
+                    onClick={handleEyedropper}
+                    className="w-[30px] h-[30px] rounded-[6px] border border-newBorder bg-newBgColor hover:border-designerAccent flex items-center justify-center shrink-0 transition-colors"
+                  >
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M2 10a8 8 0 0 1 12-6.93L20 9l-3.5 3.5L21 17l-1.5 1.5-4-4L12 18l-8-8Z" />
+                      <path d="M7 7 2 22" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {enforce && brandHexes.length > 0 && (
+              <div className="flex flex-col gap-[4px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-purple-400 uppercase tracking-wider">Brand (locked)</span>
+                  <span className="text-[10px]" title="Brand colors enforced">🔒</span>
+                </div>
+                <div className="grid grid-cols-6 gap-[6px]">
+                  {brandHexes.map((c) => {
+                    const active = normalizeHex(value) === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={c}
+                        title={c}
+                        onClick={() => {
+                          commitColor(c);
+                          setDraft(c);
+                        }}
+                        className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
+                        style={{
+                          backgroundColor: c,
+                          borderColor: active ? ACCENT : 'var(--new-border)',
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!enforce && brandHexes.length > 0 && (
+              <div className="flex flex-col gap-[4px]">
+                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">Brand</span>
+                <div className="grid grid-cols-6 gap-[6px]">
+                  {brandHexes.map((c) => {
+                    const active = normalizeHex(value) === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={c}
+                        title={c}
+                        onClick={() => {
+                          commitColor(c);
+                          setDraft(c);
+                        }}
+                        className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
+                        style={{
+                          backgroundColor: c,
+                          borderColor: active ? ACCENT : 'var(--new-border)',
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!enforce && recents.length > 0 && (
+              <div className="flex flex-col gap-[4px]">
+                <span className="text-[10px] text-textColor/40 uppercase tracking-wider">Recent</span>
+                <div className="grid grid-cols-6 gap-[6px]">
+                  {recents.map((c) => {
+                    const active = normalizeHex(value) === c;
+                    return (
+                      <button
+                        key={c}
+                        type="button"
+                        aria-label={c}
+                        title={c}
+                        onClick={() => {
+                          commitColor(c);
+                          setDraft(c);
+                        }}
+                        className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
+                        style={{
+                          backgroundColor: c,
+                          borderColor: active ? ACCENT : 'var(--new-border)',
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!enforce && (
+              <div className="grid grid-cols-6 gap-[6px]">
+                {PRESET_COLORS.map((c) => {
+                  const active = normalizeHex(value) === c;
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      aria-label={c}
+                      title={c}
+                      onClick={() => {
+                        commitColor(c);
+                        setDraft(c);
+                      }}
+                      className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
+                      style={{
+                        backgroundColor: c,
+                        borderColor: active ? ACCENT : 'var(--new-border)',
+                      }}
+                    />
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -284,7 +470,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
             }}
             className={`min-w-[34px] px-[10px] h-[28px] rounded-[6px] text-[13px] flex items-center justify-center transition-colors ${
               active
-                ? 'bg-[#2B5CD3] text-white'
+                ? 'bg-designerAccent text-white'
                 : 'text-textColor/70 hover:text-textColor hover:bg-newBgColorInner'
             }`}
           >
@@ -410,7 +596,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
             move(e.key === 'ArrowDown' ? 1 : -1);
           }
         }}
-        className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[14px] hover:border-[#2B5CD3] focus:border-[#2B5CD3] transition-colors"
+        className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[14px] hover:border-designerAccent focus:border-designerAccent transition-colors"
       >
         <span className="truncate" style={{ fontFamily: `"${value}"` }}>
           {value}
@@ -439,7 +625,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
                   onClick={() => select(family)}
                   className={`w-full text-left px-[10px] py-[8px] rounded-[6px] text-[15px] transition-colors ${
                     active
-                      ? 'bg-[#2B5CD3] text-white'
+                      ? 'bg-designerAccent text-white'
                       : 'text-textColor hover:bg-newBgColor'
                   }`}
                   style={{ fontFamily: `"${family}"` }}

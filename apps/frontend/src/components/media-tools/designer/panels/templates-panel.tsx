@@ -3,7 +3,10 @@
 import React, { FC, useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import type { DesignerStore, DesignerDoc } from '../designer.store';
+import { getThumbnailDataUrl } from '../designer';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
 
 interface DesignTemplate {
@@ -21,9 +24,11 @@ interface TemplatesPanelProps {
 
 export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
   const fetch = useFetch();
+  const user = useUser();
+  const toaster = useToaster();
 
   const { data, error, isLoading, mutate } = useSWR(
-    'design-templates',
+    `design-templates-${user.orgId}`,
     async () => {
       const res = await fetch('/media/design-templates');
       if (!res.ok) throw new Error('Failed to load templates');
@@ -32,32 +37,79 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
     { keepPreviousData: true }
   );
 
-  const applyTemplate = useCallback((template: DesignTemplate) => {
-    store.getState().setDoc(JSON.parse(JSON.stringify(template.doc)));
-    store.getState().pushHistory();
+  const applyTemplate = useCallback(async (template: DesignTemplate) => {
+    const res = await fetch('/media/designs', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: template.name,
+        doc: template.doc,
+      }),
+    });
+    if (!res.ok) {
+      toaster.show('Failed to create design from template', 'warning');
+      return;
+    }
+    const data = await res.json();
+    store.getState().loadDesign(template.doc, data.id, template.name, template.id);
     onClose?.();
-  }, [store, onClose]);
+  }, [store, onClose, fetch, toaster]);
 
   const saveAsTemplate = useCallback(async () => {
     const state = store.getState();
     const name = state.designName;
-    const res = await fetch('/media/design-templates', {
-      method: 'POST',
-      body: JSON.stringify({
-        name: `${name} (template)`,
-        doc: state.doc,
-      }),
-    });
-    if (res.ok) {
-      mutate();
+    const stageEl = document.querySelector('.konva-stage canvas') as HTMLCanvasElement;
+    const previewDataUrl = getThumbnailDataUrl(stageEl);
+    let thumbnailFileId: string | undefined;
+    if (previewDataUrl) {
+      try {
+        const blob = await (await fetch(previewDataUrl)).blob();
+        const form = new FormData();
+        form.append('file', blob, 'thumbnail.jpg');
+        const uploadRes = await fetch('/files/upload-simple', { method: 'POST', body: form });
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          thumbnailFileId = uploadData.id;
+        }
+      } catch {}
     }
-  }, [store, fetch, mutate]);
+    const payload: Record<string, unknown> = {
+      name: `${name} (template)`,
+      category: state.doc.outputs[0]?.formatId || 'custom',
+      doc: state.doc,
+    };
+    if (thumbnailFileId) payload.thumbnailFileId = thumbnailFileId;
+    if (state.templateId) {
+      const res = await fetch(`/media/design-templates/${state.templateId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        toaster.show('Template updated', 'success');
+        mutate();
+      } else {
+        toaster.show('Failed to update template', 'warning');
+      }
+    } else {
+      const res = await fetch('/media/design-templates', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        state.setTemplateId(data.id);
+        toaster.show('Saved as template', 'success');
+        mutate();
+      } else {
+        toaster.show('Failed to save template', 'warning');
+      }
+    }
+  }, [store, fetch, mutate, toaster]);
 
   return (
     <div className="flex flex-col gap-3">
       <button
         onClick={saveAsTemplate}
-        className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-[#2B5CD3] text-white hover:bg-[#2B5CD3]/80"
+        className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
       >
         Save current as template
       </button>
@@ -65,7 +117,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
       {isLoading && !data ? (
         <PanelSkeletonGrid count={4} />
       ) : error && !data ? (
-        <PanelError message="Couldn't load templates" onRetry={() => mutate()} />
+        (toaster.show('Couldn\'t load templates', 'warning'), <PanelError message="Couldn\'t load templates" onRetry={() => mutate()} />)
       ) : !data?.length ? (
         <div className="text-[12px] text-newTextColor/40 text-center py-4">
           No templates yet
@@ -87,7 +139,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
                 </div>
                 <button
                   onClick={() => applyTemplate(template)}
-                  className="mt-1 w-full px-2 py-1 rounded text-[11px] bg-[#2B5CD3] text-white hover:bg-[#2B5CD3]/80"
+                  className="mt-1 w-full px-2 py-1 rounded text-[11px] bg-designerAccent text-white hover:bg-designerAccent/80"
                 >
                   Apply
                 </button>

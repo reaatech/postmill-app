@@ -63,7 +63,7 @@ export const PanelError: FC<PanelErrorProps> = ({ message, onRetry }) => {
       <button
         type="button"
         onClick={onRetry}
-        className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-[#2B5CD3] hover:bg-boxHover transition-colors"
+        className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors"
       >
         Try again
       </button>

@@ -24,8 +24,9 @@ const shapes: ShapeOption[] = [
 export const ElementsPanel: FC<ElementsPanelProps> = ({ store, onClose }) => {
   const addShape = useCallback((shapeOption: ShapeOption) => {
     const state = store.getState();
-    const cx = state.doc.width / 2 - 50;
-    const cy = state.doc.height / 2 - 50;
+    const out = state.doc.outputs[state.currentOutput];
+    const cx = out.width / 2 - 50;
+    const cy = out.height / 2 - 50;
 
     const el: DesignerElement = {
       id: '',
@@ -67,9 +68,9 @@ export const ElementsPanel: FC<ElementsPanelProps> = ({ store, onClose }) => {
               })
             )
           }
-          className="flex flex-col items-center gap-2 p-4 rounded-lg border border-newBorder bg-newBgColorInner hover:border-[#2B5CD3] hover:bg-newColColor/10 transition-all"
+          className="flex flex-col items-center gap-2 p-4 rounded-lg border border-newBorder bg-newBgColorInner hover:border-designerAccent hover:bg-newColColor/10 transition-all"
         >
-          <div className="text-[24px] text-[#2B5CD3]">{shape.icon}</div>
+          <div className="text-[24px] text-designerAccent">{shape.icon}</div>
           <div className="text-[11px] text-textColor">{shape.label}</div>
         </button>
       ))}

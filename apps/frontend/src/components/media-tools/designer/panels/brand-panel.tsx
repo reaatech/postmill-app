@@ -1,11 +1,15 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { useCustomFonts, CustomFontEntry } from './use-brand-fonts';
+import { getBrandViolations } from '../brand-compliance';
+import { MediaSelectorModal } from '../../media-selector-modal';
 
 interface BrandProfile {
   id: string;
@@ -13,6 +17,9 @@ interface BrandProfile {
   palette?: string[];
   fontFamilies?: string[];
   logoFileIds?: string[];
+  introFileId?: string | null;
+  outroFileId?: string | null;
+  enforcement?: { enabled?: boolean };
   isDefault: boolean;
 }
 
@@ -28,14 +35,19 @@ interface BrandPanelProps {
 
 export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
   const fetch = useFetch();
+  const user = useUser();
   const toaster = useToaster();
   const selectedIds = store((s: any) => s.selectedIds);
-  const doc = store((s: any) => s.doc);
-  const currentPage = store((s: any) => s.currentPage);
+  const out = store((s: any) => s.doc.outputs[s.currentOutput]);
   const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const { fonts: customFonts, mutate: mutateCustomFonts } = useCustomFonts();
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const { data: brands, mutate } = useSWR<BrandProfile[]>(
-    'brands-list',
+    `brands-list-${user.orgId}`,
     async () => {
       const res = await fetch('/brands');
       if (!res.ok) return [];
@@ -51,10 +63,10 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
 
   const selectedElement = useMemo(() => {
     if (selectedIds.length !== 1) return null;
-    return doc.pages[currentPage]?.children.find(
+    return out?.children.find(
       (el: any) => el.id === selectedIds[0]
     );
-  }, [selectedIds, doc, currentPage]);
+  }, [selectedIds, out]);
 
   const palette: string[] = useMemo(
     () => (Array.isArray(activeBrand?.palette) ? activeBrand!.palette! : []),
@@ -75,6 +87,35 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
     [activeBrand]
   );
 
+  const brandEnforcement = store((s: any) => s.brandEnforcement);
+  const brandAdminOverride = store((s: any) => s.brandAdminOverride);
+  const doc = store((s: any) => s.doc);
+
+  useEffect(() => {
+    const enabled = !!activeBrand?.enforcement?.enabled;
+    store.getState().setBrandEnforcement(enabled);
+  }, [activeBrand, store]);
+
+  const enforcementEnabled = activeBrand?.enforcement?.enabled ?? false;
+
+  const brandFontList = useMemo(
+    () => [...fontFamilies, ...customFonts.map((f) => f.family)],
+    [fontFamilies, customFonts]
+  );
+
+  const violations = useMemo(
+    () =>
+      getBrandViolations(doc, {
+        enforcement: brandEnforcement,
+        adminOverride: brandAdminOverride,
+        brandColors: palette,
+        brandFonts: brandFontList,
+      }),
+    [doc, brandEnforcement, brandAdminOverride, palette, brandFontList]
+  );
+
+  const canAdminOverride = user?.role === 'owner' || user?.role === 'admin';
+
   // Org files for the logo picker.
   const {
     data: files,
@@ -82,18 +123,18 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
     isLoading: filesLoading,
     mutate: mutateFiles,
   } = useSWR(
-    'brand-logo-files',
+    `brand-logo-files-${user.orgId}`,
     async () => {
       const res = await fetch('/files?page=1&limit=20');
       if (!res.ok) throw new Error('Failed to load files');
-      return res.json() as Promise<{ data: FileItem[]; total: number }>;
+      return res.json() as Promise<{ pages: number; results: FileItem[] }>;
     },
     { keepPreviousData: true }
   );
 
   const fileById = useMemo(() => {
     const map = new Map<string, FileItem>();
-    (files?.data || []).forEach((f) => map.set(f.id, f));
+    (files?.results || []).forEach((f) => map.set(f.id, f));
     return map;
   }, [files]);
 
@@ -124,6 +165,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             logoFileIds: activeBrand.logoFileIds || [],
             palette: activeBrand.palette || [],
             fontFamilies: activeBrand.fontFamilies || [],
+            enforcement: activeBrand.enforcement || {},
             ...patch,
           }),
         });
@@ -153,12 +195,13 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
   const addLogoToCanvas = useCallback(
     (file: FileItem) => {
       const state = store.getState();
-      const w = Math.min(300, state.doc.width * 0.5);
+      const out = state.doc.outputs[state.currentOutput];
+      const w = Math.min(300, out.width * 0.5);
       state.addElement({
         id: '',
         type: 'image',
-        x: (state.doc.width - w) / 2,
-        y: (state.doc.height - w) / 2,
+        x: (out.width - w) / 2,
+        y: (out.height - w) / 2,
         width: w,
         height: w,
         rotation: 0,
@@ -170,6 +213,74 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
       });
     },
     [store]
+  );
+
+  const handleModalSelect = useCallback((item: {
+    source: 'stock' | 'file';
+    url: string;
+    fileId?: string;
+    width: number;
+    height: number;
+    type: 'image' | 'video';
+  }) => {
+    if (item.type !== 'image') return;
+    addLogoToCanvas({ id: item.fileId || '', path: item.url, name: 'Logo' });
+    setModalOpen(false);
+  }, [addLogoToCanvas]);
+
+  const handleFontUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!ext || !['ttf', 'otf', 'woff2'].includes(ext)) {
+        toaster.show('Invalid file type. Accepted: .ttf, .otf, .woff2', 'warning');
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        toaster.show('Font file must be under 5MB', 'warning');
+        return;
+      }
+      setUploading(true);
+      try {
+        const form = new FormData();
+        form.append('file', file);
+        const res = await fetch('/media/fonts/upload', {
+          method: 'POST',
+          body: form,
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          toaster.show(err.message || 'Upload failed', 'warning');
+          return;
+        }
+        toaster.show('Font uploaded', 'success');
+        mutateCustomFonts();
+      } finally {
+        setUploading(false);
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    },
+    [fetch, toaster, mutateCustomFonts]
+  );
+
+  const handleFontDelete = useCallback(
+    async (font: CustomFontEntry) => {
+      try {
+        const res = await fetch(`/media/fonts/${font.fileId}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          toaster.show('Failed to remove font', 'warning');
+          return;
+        }
+        toaster.show('Font removed', 'success');
+        mutateCustomFonts();
+      } catch {
+        toaster.show('Failed to remove font', 'warning');
+      }
+    },
+    [fetch, toaster, mutateCustomFonts]
   );
 
   if (!brands || brands.length === 0) {
@@ -196,7 +307,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           onChange={() => {
             // Brand selection is informational; palette/fonts are reactive.
           }}
-          className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+          className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         >
           {brands.map((brand) => (
             <option key={brand.id} value={brand.id}>
@@ -204,6 +315,69 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             </option>
           ))}
         </select>
+      </div>
+
+      {/* Brand enforcement (T-38) */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
+            Brand Enforcement
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={enforcementEnabled}
+            onClick={() =>
+              persist({
+                enforcement: { enabled: !enforcementEnabled },
+              })
+            }
+            className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
+              enforcementEnabled ? 'bg-purple-500' : 'bg-newBorder'
+            }`}
+          >
+            <span
+              className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white transition-transform ${
+                enforcementEnabled ? 'translate-x-[18px]' : ''
+              }`}
+            />
+          </button>
+        </div>
+        <div className="text-[11px] text-newTextColor/50">
+          When on, only brand colors and fonts can be used.
+        </div>
+
+        {brandEnforcement && violations.length > 0 && (
+          <div className="rounded-[6px] border border-red-400/30 bg-red-400/10 p-2">
+            <div className="text-[11px] text-red-400 font-medium mb-1">
+              Off-brand elements detected
+            </div>
+            <ul className="text-[10px] text-newTextColor/60 list-disc pl-4 space-y-0.5 max-h-[120px] overflow-y-auto">
+              {violations.slice(0, 5).map((v, i) => (
+                <li key={i}>{v}</li>
+              ))}
+              {violations.length > 5 && (
+                <li>…and {violations.length - 5} more</li>
+              )}
+            </ul>
+          </div>
+        )}
+
+        {brandEnforcement && canAdminOverride && (
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={brandAdminOverride}
+              onChange={(e) =>
+                store.getState().setBrandAdminOverride(e.target.checked)
+              }
+              className="accent-purple-500 w-[14px] h-[14px]"
+            />
+            <span className="text-[11px] text-newTextColor/70">
+              Admin override — allow save/export
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Logos (E5) */}
@@ -215,6 +389,20 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </span>
         </div>
 
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
+        >
+          Add logo from media…
+        </button>
+
+        <MediaSelectorModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onSelect={handleModalSelect}
+        />
+
         {logoFileIds.length > 0 && (
           <div className="grid grid-cols-3 gap-2">
             {logoFileIds.map((id) => {
@@ -225,7 +413,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   type="button"
                   onClick={() => file && addLogoToCanvas(file)}
                   title={file ? `Add ${file.name} to canvas` : id}
-                  className="group relative aspect-square rounded-lg overflow-hidden border border-[#2B5CD3] bg-newBgColorInner"
+                  className="group relative aspect-square rounded-lg overflow-hidden border border-designerAccent bg-newBgColorInner"
                 >
                   {file ? (
                     <img
@@ -249,14 +437,14 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
-          <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
-        ) : !files?.data?.length ? (
+          (toaster.show('Couldn\'t load files', 'warning'), <PanelError message="Couldn\'t load files" onRetry={() => mutateFiles()} />)
+        ) : !files?.results?.length ? (
           <div className="text-[12px] text-newTextColor/40 text-center py-2">
             No files found
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-2">
-            {files.data.map((file) => {
+            {files.results.map((file) => {
               const picked = logoFileIds.includes(file.id);
               return (
                 <button
@@ -267,8 +455,8 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   title={file.name}
                   className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                     picked
-                      ? 'border-[#2B5CD3] ring-1 ring-[#2B5CD3]'
-                      : 'border-newBorder hover:border-[#2B5CD3]'
+                      ? 'border-designerAccent ring-1 ring-designerAccent'
+                      : 'border-newBorder hover:border-designerAccent'
                   }`}
                 >
                   <img
@@ -278,13 +466,144 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                     loading="lazy"
                   />
                   {picked && (
-                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-[#2B5CD3] text-white text-[10px] flex items-center justify-center">
+                    <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-designerAccent text-white text-[10px] flex items-center justify-center">
                       ✓
                     </span>
                   )}
                 </button>
               );
             })}
+          </div>
+        )}
+      </div>
+
+      {/* Intro / Outro */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          <ProviderIcon identifier="LOCAL" name="Storage" size={16} />
+          <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
+            Intro / Outro
+          </span>
+        </div>
+
+        <div className="text-[11px] text-newTextColor/40">Pick from video files</div>
+        {filesLoading && !files ? (
+          <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
+        ) : filesError && !files ? (
+          (toaster.show('Couldn\'t load files', 'warning'), <PanelError message="Couldn\'t load files" onRetry={() => mutateFiles()} />)
+        ) : !files?.results?.length ? (
+          <div className="text-[12px] text-newTextColor/40 text-center py-2">
+            No files found
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {files.results
+              .filter((f) => /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.path))
+              .map((file) => {
+                const isIntro = activeBrand?.introFileId === file.id;
+                const isOutro = activeBrand?.outroFileId === file.id;
+                return (
+                  <button
+                    key={file.id}
+                    type="button"
+                    onClick={() => {
+                      if (isIntro) persist({ introFileId: null });
+                      else if (isOutro) persist({ outroFileId: null });
+                      else persist({ introFileId: file.id });
+                    }}
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      if (isOutro) persist({ outroFileId: null });
+                      else persist({ outroFileId: file.id });
+                    }}
+                    title={`${file.name} — click=intro, right-click=outro`}
+                    className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
+                      isIntro || isOutro
+                        ? 'border-designerAccent ring-1 ring-designerAccent'
+                        : 'border-newBorder hover:border-designerAccent'
+                    }`}
+                  >
+                    <video
+                      src={file.path}
+                      className="w-full h-full object-cover"
+                      muted
+                      preload="metadata"
+                    />
+                    {(isIntro || isOutro) && (
+                      <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded text-[9px] bg-designerAccent text-white">
+                        {isIntro ? 'INTRO' : 'OUTRO'}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
+        {store((s: any) => s.doc.mode) === 'video' && (
+          <div className="flex gap-2">
+            <button
+              type="button"
+              disabled={!activeBrand?.introFileId}
+              onClick={() => {
+                const state = store.getState();
+                const file = fileById.get(activeBrand?.introFileId || '');
+                if (!file || state.doc.mode !== 'video') return;
+                const vo = state.doc.outputs[state.currentOutput] as any;
+                let track = vo.tracks?.find((t: any) => t.type === 'video');
+                if (!track) {
+                  state.addTrack(state.currentOutput, 'video');
+                  track = (store.getState().doc.outputs[state.currentOutput] as any).tracks.find((t: any) => t.type === 'video');
+                }
+                if (!track) return;
+                const maxIntroMs = Math.min(5000, vo.durationMs / 4);
+                state.addClip(state.currentOutput, track.id, {
+                  id: '',
+                  startMs: 0,
+                  endMs: maxIntroMs,
+                  src: file.path,
+                  fileId: file.id,
+                  width: vo.width,
+                  height: vo.height,
+                });
+                state.pushHistory();
+                toaster.show('Intro added to timeline', 'success');
+              }}
+              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10 disabled:opacity-40"
+            >
+              Apply intro
+            </button>
+            <button
+              type="button"
+              disabled={!activeBrand?.outroFileId}
+              onClick={() => {
+                const state = store.getState();
+                const file = fileById.get(activeBrand?.outroFileId || '');
+                if (!file || state.doc.mode !== 'video') return;
+                const vo = state.doc.outputs[state.currentOutput] as any;
+                let track = vo.tracks?.find((t: any) => t.type === 'video');
+                if (!track) {
+                  state.addTrack(state.currentOutput, 'video');
+                  track = (store.getState().doc.outputs[state.currentOutput] as any).tracks.find((t: any) => t.type === 'video');
+                }
+                if (!track) return;
+                const maxOutroMs = Math.min(5000, vo.durationMs / 4);
+                state.addClip(state.currentOutput, track.id, {
+                  id: '',
+                  startMs: vo.durationMs - maxOutroMs,
+                  endMs: vo.durationMs,
+                  src: file.path,
+                  fileId: file.id,
+                  width: vo.width,
+                  height: vo.height,
+                });
+                state.pushHistory();
+                toaster.show('Outro added to timeline', 'success');
+              }}
+              className="flex-1 px-2 py-1.5 rounded text-[11px] border border-designerAccent/30 text-designerAccent hover:bg-designerAccent/10 disabled:opacity-40"
+            >
+              Apply outro
+            </button>
           </div>
         )}
       </div>
@@ -332,7 +651,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 className={`text-left px-3 py-2 rounded-[6px] border border-newBorder text-[13px] transition-all ${
                   !selectedElement || selectedElement.type !== 'text'
                     ? 'opacity-40 cursor-not-allowed text-textColor/60'
-                    : 'text-textColor hover:border-[#2B5CD3] hover:bg-boxHover cursor-pointer'
+                    : 'text-textColor hover:border-designerAccent hover:bg-boxHover cursor-pointer'
                 }`}
                 style={{ fontFamily: font }}
               >
@@ -348,9 +667,66 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         </div>
       )}
 
+      {/* Custom Fonts (T-32) */}
+      <div className="flex flex-col gap-2">
+        <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
+          Brand Fonts
+        </div>
+
+        {customFonts.length > 0 && (
+          <div className="flex flex-col gap-1">
+            {customFonts.map((f) => (
+              <div
+                key={f.fileId}
+                className="flex items-center justify-between px-3 py-2 rounded-[6px] border border-newBorder bg-newBgColorInner"
+              >
+                <button
+                  type="button"
+                  onClick={() => handleFontClick(f.family)}
+                  disabled={!selectedElement || selectedElement.type !== 'text'}
+                  className={`text-left flex-1 text-[13px] truncate ${
+                    !selectedElement || selectedElement.type !== 'text'
+                      ? 'text-textColor/60'
+                      : 'text-textColor hover:text-designerAccent cursor-pointer'
+                  }`}
+                  style={{ fontFamily: `"${f.family}"` }}
+                >
+                  {f.family}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleFontDelete(f)}
+                  className="ml-2 w-5 h-5 rounded-full border border-newBorder text-[11px] text-textColor/60 hover:text-red-400 hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
+                  title={`Remove ${f.family}`}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".ttf,.otf,.woff2"
+          onChange={handleFontUpload}
+          className="hidden"
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+          className="w-full py-2 rounded-[6px] border border-dashed border-newBorder text-[12px] text-textColor/60 hover:text-textColor hover:border-designerAccent bg-newBgColorInner transition-colors"
+        >
+          {uploading ? 'Uploading...' : '+ Upload font (.ttf, .otf, .woff2)'}
+        </button>
+      </div>
+
       {palette.length === 0 &&
         fontFamilies.length === 0 &&
-        logoFileIds.length === 0 && (
+        logoFileIds.length === 0 &&
+        customFonts.length === 0 && (
           <div className="text-newTextColor/40 text-[12px]">
             This brand has no palette, fonts, or logos configured yet.
           </div>

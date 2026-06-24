@@ -54,19 +54,6 @@ const ICONS: IconDef[] = [
 
 const SIZE = 120;
 
-function svgMarkup(body: string, color: string): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${SIZE}" height="${SIZE}" fill="${color}">${body}</svg>`;
-}
-
-function svgDataUrl(body: string, color: string): string {
-  // base64-encode for a robust data URL (handles all glyph markup).
-  const encoded =
-    typeof window === 'undefined'
-      ? Buffer.from(svgMarkup(body, color)).toString('base64')
-      : window.btoa(svgMarkup(body, color));
-  return `data:image/svg+xml;base64,${encoded}`;
-}
-
 export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
   const [query, setQuery] = useState('');
   const fill = '#2B5CD3';
@@ -83,11 +70,12 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
   const addIcon = useCallback(
     (icon: IconDef) => {
       const state = store.getState();
-      const cx = state.doc.width / 2 - SIZE / 2;
-      const cy = state.doc.height / 2 - SIZE / 2;
+      const out = state.doc.outputs[state.currentOutput];
+      const cx = out.width / 2 - SIZE / 2;
+      const cy = out.height / 2 - SIZE / 2;
       const el: DesignerElement = {
         id: '',
-        type: 'image',
+        type: 'icon',
         x: cx,
         y: cy,
         width: SIZE,
@@ -97,7 +85,8 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
         locked: false,
         hidden: false,
         name: `icon-${icon.name}`,
-        src: svgDataUrl(icon.body, fill),
+        src: icon.body,
+        fill,
       };
       state.addElement(el);
       onClose?.();
@@ -112,7 +101,7 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search icons…"
-        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-[#2B5CD3] text-textColor"
+        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
       />
 
       {filtered.length === 0 ? (
@@ -133,14 +122,15 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
                 e.dataTransfer.setData(
                   'application/x-designer-element',
                   JSON.stringify({
-                    type: 'image',
-                    src: svgDataUrl(icon.body, fill),
+                    type: 'icon',
+                    src: icon.body,
+                    fill,
                     width: SIZE,
                     height: SIZE,
                   })
                 )
               }
-              className="aspect-square flex items-center justify-center rounded-lg border border-newBorder bg-newBgColorInner text-[#2B5CD3] hover:border-[#2B5CD3] hover:bg-newColColor/10 transition-all"
+              className="aspect-square flex items-center justify-center rounded-lg border border-newBorder bg-newBgColorInner text-designerAccent hover:border-designerAccent hover:bg-newColColor/10 transition-all"
             >
               <svg
                 viewBox="0 0 24 24"

@@ -1,0 +1,335 @@
+'use client';
+
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
+import { Group, Image as KonvaImage, Text as KonvaText } from 'react-konva';
+import type { VideoClip, VideoOutput } from './designer.store';
+import { composeClipsAtPlayhead, sourceTimeForPlayhead } from './video-preview';
+
+interface VideoCanvasOverlayProps {
+  store: ReturnType<typeof import('./designer.store').createDesignerStore>;
+  width: number;
+  height: number;
+}
+
+const videoElements = new Map<string, HTMLVideoElement>();
+const imageElements = new Map<string, HTMLImageElement>();
+
+const getOrCreateVideo = (clip: VideoClip): HTMLVideoElement | null => {
+  if (!clip.src) return null;
+  if (videoElements.has(clip.id)) {
+    return videoElements.get(clip.id)!;
+  }
+  const el = document.createElement('video');
+  el.src = clip.src;
+  el.crossOrigin = 'anonymous';
+  el.muted = true;
+  el.playsInline = true;
+  el.style.position = 'fixed';
+  el.style.left = '-10000px';
+  el.style.top = '0';
+  document.body.appendChild(el);
+  videoElements.set(clip.id, el);
+  return el;
+};
+
+const getOrCreateImage = (src?: string): HTMLImageElement | null => {
+  if (!src) return null;
+  const cached = imageElements.get(src);
+  if (cached) return cached;
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.src = src;
+  imageElements.set(src, img);
+  return img;
+};
+
+const seekVideo = (clip: VideoClip, playheadMs: number) => {
+  const el = getOrCreateVideo(clip);
+  if (!el) return;
+  const sourceTime = sourceTimeForPlayhead(clip, playheadMs);
+  if (sourceTime === null) return;
+  const t = sourceTime / 1000;
+  if (Number.isFinite(t) && Math.abs(el.currentTime - t) > 0.05) {
+    el.currentTime = t;
+  }
+};
+
+function mapFiltersToCss(filters?: string[]): string | undefined {
+  if (!filters?.length) return undefined;
+  const parts: string[] = [];
+  for (const f of filters) {
+    if (f === 'grayscale') parts.push('grayscale(100%)');
+    else if (f === 'sepia') parts.push('sepia(100%)');
+    else if (f.startsWith('blur:')) parts.push(`blur(${f.slice(5)}px)`);
+    else if (f.startsWith('brightness:')) parts.push(`brightness(${f.slice(11)})`);
+    else if (f.startsWith('contrast:')) parts.push(`contrast(${f.slice(9)})`);
+    else if (f.startsWith('saturate:')) parts.push(`saturate(${f.slice(9)})`);
+  }
+  return parts.length ? parts.join(' ') : undefined;
+}
+
+function getStickerFrameUrl(clip: VideoClip, relativeMs: number): string | undefined {
+  const frames = clip.frames;
+  if (!frames?.length) return clip.src;
+  let loopMs = 0;
+  for (const f of frames) loopMs += f.durationMs;
+  if (loopMs <= 0) return frames[0].url;
+  const t = relativeMs % loopMs;
+  let acc = 0;
+  for (const f of frames) {
+    acc += f.durationMs;
+    if (t < acc) return f.url;
+  }
+  return frames[frames.length - 1].url;
+}
+
+interface FilteredClipImageProps {
+  clip: VideoClip;
+  width: number;
+  height: number;
+  tick: number;
+  playheadMs: number;
+}
+
+const FilteredClipImage: FC<FilteredClipImageProps> = ({ clip, width, height, tick, playheadMs }) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [imageVersion, setImageVersion] = useState(0);
+
+  const isVideoClip = /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(clip.src || '') && !clip.frames;
+  const isSticker = !!clip.frames;
+  const relativeMs = Math.max(0, playheadMs - clip.startMs);
+  const stickerFrameUrl = isSticker ? getStickerFrameUrl(clip, relativeMs) : undefined;
+  const source = isVideoClip
+    ? getOrCreateVideo(clip)
+    : getOrCreateImage(stickerFrameUrl ?? clip.src);
+  const filterString = useMemo(() => mapFiltersToCss(clip.filters), [clip.filters]);
+
+  useEffect(() => {
+    if (!source || !filterString) return;
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+      canvasRef.current.width = Math.max(1, Math.round(width));
+      canvasRef.current.height = Math.max(1, Math.round(height));
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    if (canvas.width !== Math.round(width) || canvas.height !== Math.round(height)) {
+      canvas.width = Math.max(1, Math.round(width));
+      canvas.height = Math.max(1, Math.round(height));
+    }
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.filter = filterString;
+    ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+    ctx.filter = 'none';
+    setImageVersion((v) => v + 1);
+  }, [source, filterString, width, height, tick]);
+
+  if (!source) return null;
+  if (!filterString) {
+    return (
+      <KonvaImage
+        image={source}
+        width={width}
+        height={height}
+        listening={false}
+      />
+    );
+  }
+
+  return (
+    <KonvaImage
+      image={canvasRef.current || undefined}
+      width={width}
+      height={height}
+      listening={false}
+      key={imageVersion}
+    />
+  );
+};
+
+export const VideoCanvasOverlay: FC<VideoCanvasOverlayProps> = ({
+  store,
+  width,
+  height,
+}) => {
+  const doc = store((s) => s.doc);
+  const currentOutput = store((s) => s.currentOutput);
+  const playheadMs = store((s) => s.playheadMs);
+  const [tick, setTick] = useState(0);
+
+  const vo = doc.outputs[currentOutput] as VideoOutput | undefined;
+  const isVideo = doc.mode === 'video' && !!vo;
+
+  const clipsAtPlayhead = useMemo(() => {
+    if (!isVideo || !vo) return [];
+    return composeClipsAtPlayhead(vo, playheadMs);
+  }, [isVideo, vo, playheadMs]);
+
+  // Preload image sources for image clips.
+  useEffect(() => {
+    for (const { clip, trackType } of clipsAtPlayhead) {
+      if ((trackType === 'image' || trackType === 'sticker') && clip.src) {
+        getOrCreateImage(clip.src);
+      }
+    }
+  }, [clipsAtPlayhead]);
+
+  // Keep redrawing so the video frame updates while playing.
+  useEffect(() => {
+    if (!isVideo) return;
+    let raf: number;
+    const loop = () => {
+      setTick((t) => t + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [isVideo, playheadMs]);
+
+  // Seek/pause video elements so the held frame is rendered when paused.
+  useEffect(() => {
+    if (!isVideo) return;
+    for (const { clip, trackType } of clipsAtPlayhead) {
+      if ((trackType === 'video' || trackType === 'sticker') && clip.src && (clip.speed == null || clip.speed > 0)) {
+        seekVideo(clip, playheadMs);
+      }
+    }
+  }, [isVideo, clipsAtPlayhead, playheadMs]);
+
+const CaptionClip: FC<{ clip: VideoClip; width: number; height: number; playheadMs: number }> = ({
+  clip,
+  width,
+  height,
+  playheadMs,
+}) => {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [version, setVersion] = useState(0);
+  const relativeMs = Math.max(0, playheadMs - clip.startMs);
+  const words = clip.words || [];
+  const activeIndex = words.findIndex((w) => relativeMs >= w.startMs && relativeMs <= w.endMs);
+
+  useEffect(() => {
+    if (!canvasRef.current) {
+      canvasRef.current = document.createElement('canvas');
+      canvasRef.current.width = Math.max(1, Math.round(width));
+      canvasRef.current.height = Math.max(1, Math.round(height));
+    }
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    if (canvas.width !== Math.round(width) || canvas.height !== Math.round(height)) {
+      canvas.width = Math.max(1, Math.round(width));
+      canvas.height = Math.max(1, Math.round(height));
+    }
+
+    ctx.clearRect(0, 0, width, height);
+    const fontSize = clip.fontSize || 28;
+    const fontWeight = clip.fontWeight || 700;
+    const fontFamily = clip.fontFamily || 'Arial';
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.textBaseline = 'top';
+    const lineHeight = fontSize * 1.35;
+    const spaceWidth = ctx.measureText(' ').width;
+    let x = 0;
+    let y = 0;
+    for (let i = 0; i < words.length; i++) {
+      const w = words[i];
+      const wordWidth = ctx.measureText(w.word).width;
+      if (x + wordWidth > width && x > 0) {
+        x = 0;
+        y += lineHeight;
+      }
+      ctx.fillStyle = i === activeIndex ? '#facc15' : (clip.fill || '#ffffff');
+      ctx.fillText(w.word, x, y);
+      x += wordWidth + spaceWidth;
+    }
+    setVersion((v) => v + 1);
+  }, [clip, width, height, activeIndex]);
+
+  return (
+    <KonvaImage
+      image={canvasRef.current || undefined}
+      width={width}
+      height={height}
+      listening={false}
+      key={version}
+    />
+  );
+};
+
+  if (!isVideo) return null;
+
+  return (
+    <>
+      {clipsAtPlayhead.map(({ clip, trackType, props }) => {
+        if (trackType === 'caption') {
+          return (
+            <Group
+              key={clip.id}
+              x={props.x}
+              y={props.y}
+              width={props.width}
+              height={props.height}
+              rotation={props.rotation}
+              opacity={props.opacity}
+              listening={false}
+            >
+              <CaptionClip
+                clip={clip}
+                width={props.width}
+                height={props.height}
+                playheadMs={playheadMs}
+              />
+            </Group>
+          );
+        }
+
+        if (trackType === 'text') {
+          return (
+            <KonvaText
+              key={clip.id}
+              x={props.x}
+              y={props.y}
+              width={props.width}
+              height={props.height}
+              text={clip.text || ''}
+              fontFamily={clip.fontFamily || 'Arial'}
+              fontSize={clip.fontSize || 16}
+              fontStyle={`${clip.fontWeight && clip.fontWeight >= 600 ? 'bold' : 'normal'}`}
+              fill={clip.fill || '#000000'}
+              rotation={props.rotation}
+              opacity={props.opacity}
+              listening={false}
+            />
+          );
+        }
+
+        return (
+          <Group
+            key={clip.id}
+            x={props.x}
+            y={props.y}
+            width={props.width}
+            height={props.height}
+            rotation={props.rotation}
+            opacity={props.opacity}
+            listening={false}
+          >
+            <FilteredClipImage
+              clip={clip}
+              width={props.width}
+              height={props.height}
+              tick={tick}
+              playheadMs={playheadMs}
+            />
+          </Group>
+        );
+      })}
+    </>
+  );
+};
+
+export default VideoCanvasOverlay;

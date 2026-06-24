@@ -4,22 +4,47 @@ import type Konva from 'konva';
 import { CanvasElements, gradientFillProps } from './elements';
 import { TextEditingOverlay } from './text-editing';
 import { SafeZoneOverlay } from './safe-zones';
-import type { DesignerElement } from './designer.store';
+import { Rulers } from './rulers';
+import { ContextMenu } from './context-menu';
+import { fitWithin } from './panels/fit-within';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import type { DesignerElement, DesignerOutput } from './designer.store';
+import { VideoCanvasOverlay } from './video-canvas-overlay';
+import { sharedStageRef } from './stage-ref';
 
 interface CanvasProps {
   store: ReturnType<typeof import('./designer.store').createDesignerStore>;
   showSafeZones?: boolean;
   safeZonePreset?: string;
+  onAddImage?: () => void;
+  sendImageAwareness?: (
+    outputIndex: number,
+    mouseX: number,
+    mouseY: number,
+    selectedIds: string[]
+  ) => void;
 }
 
-const SNAP = 6; // snapping threshold in canvas px
+const SNAP = 6;
 
-export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZonePreset }) => {
+export const DesignerCanvas: FC<CanvasProps> = ({
+  store,
+  showSafeZones,
+  safeZonePreset,
+  onAddImage,
+  sendImageAwareness,
+}) => {
   const stageRef = useRef<Konva.Stage>(null);
+  useEffect(() => {
+    sharedStageRef.current = stageRef.current;
+    return () => {
+      if (sharedStageRef.current === stageRef.current) {
+        sharedStageRef.current = null;
+      }
+    };
+  });
   const transformerRef = useRef<Konva.Transformer>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  // Start at 0 so the fixed stage width never props the flex layout open before
-  // the container is measured; the ResizeObserver sizes it to the real space.
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [isSpacePressed, setIsSpacePressed] = useState(false);
@@ -29,12 +54,18 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
   const [marquee, setMarquee] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   const marqueeStart = useRef<{ x: number; y: number } | null>(null);
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; targetType: 'element' | 'canvas'; elementId?: string } | null>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const rafIdRef = useRef<number | null>(null);
+  const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const toaster = useToaster();
 
   const doc = store((s) => s.doc);
   const selectedIds = store((s) => s.selectedIds);
-  const currentPage = store((s) => s.currentPage);
-  const previewTime = store((s) => s.previewTime);
-  const isPreviewing = previewTime != null;
+  const currentOutput = store((s) => s.currentOutput);
   const zoom = store((s) => s.zoom);
   const viewportX = store((s) => s.viewportX);
   const viewportY = store((s) => s.viewportY);
@@ -47,7 +78,24 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
   const setZoom = store((s) => s.setZoom);
   const setViewport = store((s) => s.setViewport);
 
-  const page = doc.pages[currentPage];
+  const output: any = doc.outputs[currentOutput];
+  const isVideo = doc.mode === 'video';
+
+  const mousePosRef = useRef({ x: 0, y: 0 });
+  const awarenessThrottleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sendAwareness = useCallback(() => {
+    if (!sendImageAwareness || isVideo) return;
+    sendImageAwareness(
+      currentOutput,
+      mousePosRef.current.x,
+      mousePosRef.current.y,
+      selectedIds
+    );
+  }, [sendImageAwareness, currentOutput, selectedIds, isVideo]);
+
+  useEffect(() => {
+    sendAwareness();
+  }, [selectedIds, currentOutput, sendAwareness]);
 
   useEffect(() => {
     const updateSize = () => {
@@ -70,9 +118,9 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
     };
   }, []);
 
-  // Load a page background image when the page uses an image fill (C4).
+  // Load a output background image when the output uses an image fill (C4).
   useEffect(() => {
-    const src = page?.bg?.type === 'image' ? page.bg.src : undefined;
+    const src = output?.bg?.type === 'image' ? output.bg.src : undefined;
     if (!src) {
       setBgImage(null);
       return;
@@ -82,7 +130,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
     img.onload = () => setBgImage(img);
     img.onerror = () => setBgImage(null);
     img.src = src;
-  }, [page?.bg]);
+  }, [output?.bg]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -112,15 +160,17 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
       .filter(Boolean) as Konva.Node[];
     transformerRef.current.nodes(nodes);
     transformerRef.current.getLayer()?.batchDraw();
-  }, [selectedIds, doc, currentPage]);
+  }, [selectedIds, doc, currentOutput]);
 
   // Resolve a click into a selection, honoring group membership and additive (shift/meta) clicks.
   const handleElementSelect = useCallback(
     (id: string, evt?: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
-      const el = page?.children.find((c) => c.id === id);
+      if (isVideo) return;
+      const children = (output as DesignerOutput | undefined)?.children || [];
+      const el = children.find((c) => c.id === id);
       const groupId = el?.groupId;
       const groupIds = groupId
-        ? page!.children.filter((c) => c.groupId === groupId).map((c) => c.id)
+        ? children.filter((c) => c.groupId === groupId).map((c) => c.id)
         : [id];
       const native = evt?.evt as MouseEvent | undefined;
       const additive = !!(native && (native.shiftKey || native.metaKey || native.ctrlKey));
@@ -133,7 +183,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         setSelectedIds(groupIds);
       }
     },
-    [page, selectedIds, setSelectedIds]
+    [output, selectedIds, setSelectedIds]
   );
 
   const handleStageMouseDown = useCallback(
@@ -174,7 +224,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
   const handleStageMouseUp = useCallback(() => {
     setIsPanning(false);
     if (marqueeStart.current && marquee && (marquee.w > 3 || marquee.h > 3)) {
-      const hits = (page?.children || [])
+      const hits = ((output as DesignerOutput | undefined)?.children || [])
         .filter((el) => !el.hidden && !el.locked)
         .filter(
           (el) =>
@@ -188,17 +238,17 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
     }
     marqueeStart.current = null;
     setMarquee(null);
-  }, [marquee, page, setSelectedIds]);
+  }, [marquee, output, setSelectedIds]);
 
-  // Snapping during drag: align edges/centers to other elements + page guides (B3).
+  // Snapping during drag: align edges/centers to other elements + output guides (B3).
   const computeSnap = useCallback(
     (node: Konva.Node) => {
-      if (!page) return;
-      const others = page.children.filter((el) => !selectedIds.includes(el.id) && !el.hidden);
+      if (!output || isVideo) return;
+      const others = ((output as DesignerOutput | undefined)?.children || []).filter((el) => !selectedIds.includes(el.id) && !el.hidden);
       const w = node.width() * node.scaleX();
       const h = node.height() * node.scaleY();
-      const targetsX = [0, doc.width / 2, doc.width];
-      const targetsY = [0, doc.height / 2, doc.height];
+      const targetsX = [0, output.width / 2, output.width];
+      const targetsY = [0, output.height / 2, output.height];
       others.forEach((el) => {
         targetsX.push(el.x, el.x + el.width / 2, el.x + el.width);
         targetsY.push(el.y, el.y + el.height / 2, el.y + el.height);
@@ -212,7 +262,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         targetsX.forEach((tx) => {
           if (Math.abs(ex - tx) <= SNAP && (snapDX === null || Math.abs(tx - ex) < Math.abs(snapDX))) {
             snapDX = tx - ex;
-            lines.push({ points: [tx, 0, tx, doc.height] });
+            lines.push({ points: [tx, 0, tx, output.height] });
           }
         });
       });
@@ -220,7 +270,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         targetsY.forEach((ty) => {
           if (Math.abs(ey - ty) <= SNAP && (snapDY === null || Math.abs(ty - ey) < Math.abs(snapDY))) {
             snapDY = ty - ey;
-            lines.push({ points: [0, ty, doc.width, ty] });
+            lines.push({ points: [0, ty, output.width, ty] });
           }
         });
       });
@@ -229,26 +279,39 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
       setGuides(lines);
       setHud({ x: node.x(), y: node.y() - 22, text: `${Math.round(node.x())}, ${Math.round(node.y())}` });
     },
-    [page, selectedIds, doc.width, doc.height]
+    [output, selectedIds, output.width, output.height]
   );
 
   const handleDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       if (e.target === e.target.getStage()) return;
       computeSnap(e.target);
+      if (rafIdRef.current) return;
+      rafIdRef.current = requestAnimationFrame(() => {
+        const node = e.target;
+        const id = node.id();
+        if (id) {
+          updateElement(id, { x: node.x(), y: node.y() });
+        }
+        rafIdRef.current = null;
+      });
     },
-    [computeSnap]
+    [computeSnap, updateElement]
   );
 
   const handleDragEnd = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       setGuides([]);
       setHud(null);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
       const node = e.target;
       const id = node.id();
       if (id) {
-        pushHistory();
         updateElement(id, { x: node.x(), y: node.y() });
+        pushHistory();
       }
     },
     [pushHistory, updateElement]
@@ -259,15 +322,10 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
     const w = Math.round(node.width() * node.scaleX());
     const h = Math.round(node.height() * node.scaleY());
     setHud({ x: node.x(), y: node.y() - 22, text: `${w} × ${h}` });
-  }, []);
-
-  const handleTransformEnd = useCallback(
-    (e: Konva.KonvaEventObject<Event>) => {
-      setHud(null);
-      const node = e.target;
+    if (rafIdRef.current) return;
+    rafIdRef.current = requestAnimationFrame(() => {
       const id = node.id();
       if (id) {
-        pushHistory();
         updateElement(id, {
           x: node.x(),
           y: node.y(),
@@ -275,6 +333,29 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
           height: Math.max(node.height() * node.scaleY(), 10),
           rotation: node.rotation(),
         });
+      }
+      rafIdRef.current = null;
+    });
+  }, [updateElement]);
+
+  const handleTransformEnd = useCallback(
+    (e: Konva.KonvaEventObject<Event>) => {
+      setHud(null);
+      if (rafIdRef.current) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      const node = e.target;
+      const id = node.id();
+      if (id) {
+        updateElement(id, {
+          x: node.x(),
+          y: node.y(),
+          width: Math.max(node.width() * node.scaleX(), 10),
+          height: Math.max(node.height() * node.scaleY(), 10),
+          rotation: node.rotation(),
+        });
+        pushHistory();
         node.scaleX(1);
         node.scaleY(1);
       }
@@ -311,28 +392,28 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
 
   const fitToScreen = useCallback(() => {
     if (!stageSize.width || !stageSize.height) return;
-    const scaleX = stageSize.width / doc.width;
-    const scaleY = stageSize.height / doc.height;
+    const scaleX = stageSize.width / output.width;
+    const scaleY = stageSize.height / output.height;
     const next = Math.min(scaleX, scaleY) * 0.9;
     setZoom(next);
     setViewport(
-      (stageSize.width - doc.width * next) / 2,
-      (stageSize.height - doc.height * next) / 2
+      (stageSize.width - output.width * next) / 2,
+      (stageSize.height - output.height * next) / 2
     );
-  }, [stageSize, doc.width, doc.height, setZoom, setViewport]);
+  }, [stageSize, output.width, output.height, setZoom, setViewport]);
 
   // Auto fit-to-screen once the stage is measured and whenever the doc's
-  // dimensions change (preset pick, magic resize, opening with an asset). Keyed
+  // dimensions change (preset pick, opening with an asset). Keyed
   // on doc size so it does NOT refight on panel toggles or after the user zooms
   // — only a genuine canvas-size change re-fits.
   const lastFitKey = useRef('');
   useEffect(() => {
     if (!stageSize.width || !stageSize.height) return;
-    const key = `${doc.width}x${doc.height}`;
+    const key = `${output.width}x${output.height}`;
     if (lastFitKey.current === key) return;
     lastFitKey.current = key;
     fitToScreen();
-  }, [stageSize.width, stageSize.height, doc.width, doc.height, fitToScreen]);
+  }, [stageSize.width, stageSize.height, output.width, output.height, fitToScreen]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -345,7 +426,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         setSelectedIds([]);
       } else if (mod && e.key.toLowerCase() === 'a') {
         e.preventDefault();
-        setSelectedIds((page?.children || []).filter((c) => !c.hidden).map((c) => c.id));
+        setSelectedIds(((output as any)?.children || []).filter((c: any) => !c.hidden).map((c: any) => c.id));
       } else if (mod && e.key.toLowerCase() === 'c') {
         e.preventDefault();
         st.copySelection();
@@ -377,18 +458,18 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         if (e.key === 'ArrowLeft') dx = -delta;
         if (e.key === 'ArrowRight') dx = delta;
         selectedIds.forEach((id) => {
-          const el = page?.children.find((c) => c.id === id);
+          const el = ((output as any)?.children || []).find((c: any) => c.id === id);
           if (!el || el.locked || el.hidden) return;
           updateElement(id, { x: el.x + dx, y: el.y + dy });
         });
       } else if (e.key === 'Enter') {
         if (selectedIds.length === 1) {
-          const el = page?.children.find((c) => c.id === selectedIds[0]);
+          const el = ((output as any)?.children || []).find((c: any) => c.id === selectedIds[0]);
           if (el?.type === 'text') setEditingTextId(el.id);
         }
       }
     },
-    [editingTextId, selectedIds, removeElement, setSelectedIds, updateElement, page, duplicateElement, store]
+    [editingTextId, selectedIds, removeElement, setSelectedIds, updateElement, output, duplicateElement, store]
   );
 
   const handleStageDblClick = useCallback(
@@ -397,67 +478,156 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
       const target = e.target;
       const id = target.id() || target.getParent()?.id();
       if (id) {
-        const el = page?.children.find((c) => c.id === id);
+        const el = ((output as any)?.children || []).find((c: any) => c.id === id);
         if (el?.type === 'text') setEditingTextId(id);
       }
     },
-    [page]
+    [output]
   );
 
-  // Drop from panels (B5): payload set on dragstart in panels.
+  // Drop from panels (designer elements) and OS file drops.
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
+      setDragOver(false);
       containerRef.current?.classList.remove('designer-drop-active');
-      const raw = e.dataTransfer.getData('application/x-designer-element');
-      if (!raw) return;
-      let payload: Partial<DesignerElement>;
-      try {
-        payload = JSON.parse(raw);
-      } catch {
-        return;
-      }
-      const stage = stageRef.current;
+
       const rect = containerRef.current?.getBoundingClientRect();
-      if (!stage || !rect) return;
+      if (!rect) return;
+
       const px = (e.clientX - rect.left - viewportX) / zoom;
       const py = (e.clientY - rect.top - viewportY) / zoom;
-      const w = payload.width || 200;
-      const h = payload.height || 200;
-      addElement({
-        id: '',
-        type: payload.type || 'image',
-        x: px - w / 2,
-        y: py - h / 2,
-        width: w,
-        height: h,
-        rotation: 0,
-        opacity: 1,
-        locked: false,
-        hidden: false,
-        ...payload,
-      } as DesignerElement);
+
+      const raw = e.dataTransfer.getData('application/x-designer-element');
+      if (raw) {
+        if (isVideo) return;
+        let payload: Partial<DesignerElement>;
+        try {
+          payload = JSON.parse(raw);
+        } catch {
+          return;
+        }
+        const w = payload.width || 200;
+        const h = payload.height || 200;
+        addElement({
+          id: '',
+          type: payload.type || 'image',
+          x: px,
+          y: py,
+          width: w,
+          height: h,
+          rotation: 0,
+          opacity: 1,
+          locked: false,
+          hidden: false,
+          ...payload,
+        } as DesignerElement);
+        return;
+      }
+
+      const files = e.dataTransfer.files;
+      if (!files.length) return;
+
+      const file = files[0];
+      if (!file.type.startsWith('image/')) return;
+
+      if (isVideo) return;
+
+      setUploadingFile(true);
+      const formData = new FormData();
+      formData.append('file', file);
+
+      fetch('/files/upload-simple', { method: 'POST', body: formData })
+        .then(async (res) => {
+          if (!res.ok) throw new Error('Upload failed');
+          const data = await res.json() as { id: string; path: string };
+
+          const img = new Image();
+          img.onload = () => {
+            const natW = img.naturalWidth || 400;
+            const natH = img.naturalHeight || 400;
+            const { width: w, height: h } = fitWithin(natW, natH, output.width * 0.8, output.height * 0.8);
+
+            store.getState().addElement({
+              id: '',
+              type: 'image',
+              x: px,
+              y: py,
+              width: w,
+              height: h,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              src: data.path,
+              fileId: data.id,
+              naturalWidth: natW,
+              naturalHeight: natH,
+              fitMode: 'cover',
+              focalPoint: { x: 0.5, y: 0.5 },
+            });
+            setUploadingFile(false);
+          };
+          img.onerror = () => {
+            setUploadingFile(false);
+            toaster.show('Failed to load dropped image', 'warning');
+          };
+          img.src = data.path;
+        })
+        .catch(() => {
+          setUploadingFile(false);
+          toaster.show('Failed to upload file', 'warning');
+        });
     },
-    [addElement, viewportX, viewportY, zoom]
+    [addElement, viewportX, viewportY, zoom, store, output, toaster]
   );
 
-  const bg = page?.bg;
+  const bg = output?.bg;
   const bgGrad =
-    bg?.type === 'gradient' ? gradientFillProps(bg.gradient, doc.width, doc.height) : {};
+    bg?.type === 'gradient' ? gradientFillProps(bg.gradient, output.width, output.height) : {};
 
   return (
     <div
       ref={containerRef}
-      className={`flex-1 min-w-0 relative overflow-hidden bg-[#1a1a2e] designer-canvas-container ${
+      className={`flex-1 min-w-0 relative overflow-hidden bg-[#e5e7eb] designer-canvas-container ${
         isPanning ? 'cursor-grabbing' : isSpacePressed ? 'cursor-grab' : 'cursor-default'
       }`}
       tabIndex={0}
+      role="region"
+      aria-label="Design canvas"
       onKeyDown={handleKeyDown}
+      onMouseMove={(e) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        mousePosRef.current = {
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        };
+        if (!sendImageAwareness || isVideo) return;
+        if (awarenessThrottleRef.current) return;
+        awarenessThrottleRef.current = setTimeout(() => {
+          awarenessThrottleRef.current = null;
+          sendAwareness();
+        }, 50);
+      }}
       onDragOver={(e) => {
         e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (rect) {
+          setDragPosition({
+            x: (e.clientX - rect.left - viewportX) / zoom,
+            y: (e.clientY - rect.top - viewportY) / zoom,
+          });
+        }
+        setDragOver(true);
         containerRef.current?.classList.add('designer-drop-active');
       }}
-      onDragLeave={() => containerRef.current?.classList.remove('designer-drop-active')}
+      onDragLeave={(e) => {
+        if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+        setDragOver(false);
+        containerRef.current?.classList.remove('designer-drop-active');
+      }}
       onDrop={handleDrop}
     >
       <Stage
@@ -487,32 +657,47 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
             setViewport(e.target.x(), e.target.y());
           }
         }}
+        onContextMenu={(e) => {
+          e.evt.preventDefault();
+          if (e.target === e.target.getStage()) {
+            setContextMenu({ x: e.evt.clientX, y: e.evt.clientY, targetType: 'canvas' });
+          }
+        }}
       >
         <Layer>
           <Rect
             x={0}
             y={0}
-            width={doc.width}
-            height={doc.height}
-            fill={bg?.type === 'gradient' ? undefined : bg?.color || page?.background || '#ffffff'}
+            width={output.width}
+            height={output.height}
+            fill={bg?.type === 'gradient' ? undefined : bg?.color || output?.background || '#ffffff'}
             {...bgGrad}
             shadowColor="rgba(0,0,0,0.3)"
             shadowBlur={20}
             shadowOffset={{ x: 0, y: 4 }}
           />
           {bg?.type === 'image' && bgImage && (
-            <KonvaImage image={bgImage} x={0} y={0} width={doc.width} height={doc.height} listening={false} />
+            <KonvaImage image={bgImage} x={0} y={0} width={output.width} height={output.height} listening={false} />
           )}
           <CanvasElements
-            elements={page?.children || []}
+            elements={isVideo ? [] : (output?.children || [])}
             onSelect={handleElementSelect}
-            previewTime={previewTime}
+            onContextMenu={(elementId, clientX, clientY) => {
+              setContextMenu({ x: clientX, y: clientY, targetType: 'element', elementId });
+            }}
           />
-          {!isPreviewing && guides.map((g, i) => (
+          {isVideo && (
+            <VideoCanvasOverlay
+              store={store}
+              width={output.width}
+              height={output.height}
+            />
+          )}
+          {guides.map((g, i) => (
             <KonvaLine key={i} points={g.points} stroke="#FF3B7F" strokeWidth={1 / zoom} dash={[4, 4]} listening={false} />
           ))}
           {showSafeZones && safeZonePreset && (
-            <SafeZoneOverlay presetId={safeZonePreset} width={doc.width} height={doc.height} visible={true} />
+            <SafeZoneOverlay presetId={safeZonePreset} width={output.width} height={output.height} visible={true} />
           )}
           {marquee && (
             <Rect
@@ -526,7 +711,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
               listening={false}
             />
           )}
-          {selectedIds.length > 0 && !isPreviewing && (
+          {selectedIds.length > 0 && (
             <Transformer
               ref={transformerRef}
               rotateEnabled={true}
@@ -547,9 +732,39 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
         </Layer>
       </Stage>
 
+      {dragOver && !uploadingFile && (
+        <div
+          className="absolute pointer-events-none z-40 w-12 h-12 -translate-x-1/2 -translate-y-1/2 border-2 border-dashed border-designerAccent rounded-lg bg-designerAccent/10"
+          style={{
+            left: dragPosition.x * zoom + viewportX,
+            top: dragPosition.y * zoom + viewportY,
+          }}
+        />
+      )}
+
+      {uploadingFile && (
+        <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e5e7eb]/60">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e1e2e] text-[13px] text-white">
+            <svg className={`w-4 h-4 ${reduceMotion ? '' : 'animate-spin'}`} viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" opacity="0.3" />
+              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+            Uploading...
+          </div>
+        </div>
+      )}
+
+      <Rulers
+        zoom={zoom}
+        viewportX={viewportX}
+        viewportY={viewportY}
+        width={stageSize.width}
+        height={stageSize.height}
+      />
+
       {hud && (
         <div
-          className="absolute pointer-events-none z-10 px-2 py-1 rounded bg-[#2B5CD3] text-white text-[11px] font-medium"
+          className="absolute pointer-events-none z-10 px-2 py-1 rounded bg-designerAccent text-white text-[11px] font-medium"
           style={{ left: viewportX + hud.x * zoom, top: viewportY + hud.y * zoom }}
         >
           {hud.text}
@@ -557,7 +772,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
       )}
 
       {editingTextId && (() => {
-        const el = page?.children.find((c) => c.id === editingTextId);
+        const el = ((output as any)?.children || []).find((c: any) => c.id === editingTextId);
         if (!el || el.type !== 'text') return null;
         return (
           <TextEditingOverlay
@@ -593,6 +808,18 @@ export const DesignerCanvas: FC<CanvasProps> = ({ store, showSafeZones, safeZone
           ⊞
         </button>
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          targetType={contextMenu.targetType}
+          elementId={contextMenu.elementId}
+          store={store}
+          onClose={() => setContextMenu(null)}
+          onAddImage={onAddImage}
+        />
+      )}
     </div>
   );
 };

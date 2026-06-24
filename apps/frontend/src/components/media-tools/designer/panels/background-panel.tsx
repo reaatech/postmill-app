@@ -3,9 +3,13 @@
 import React, { FC, useCallback, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import type { DesignerGradient } from '../designer.store';
 import { ColorSwatch, Slider, SegmentedControl } from '../controls';
 import { PanelSkeletonGrid, PanelError } from './panel-states';
+import { useBrandColors } from './use-brand-colors';
+import { MediaSelectorModal } from '../../media-selector-modal';
 
 interface BackgroundPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
@@ -35,8 +39,16 @@ type Mode = 'color' | 'gradient' | 'image';
 
 export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
   const fetch = useFetch();
+  const user = useUser();
+  const toaster = useToaster();
+  const brandColors = useBrandColors();
+  const brandEnforcement = store((s) => s.brandEnforcement);
   const [mode, setMode] = useState<Mode>('color');
-  const currentBg = store((s) => s.doc.pages[s.currentPage]?.background || '#ffffff');
+  const currentBg = store(
+    (s) =>
+      (s.doc.outputs[s.currentOutput] as import('../designer.store').DesignerOutput)
+        ?.background || '#ffffff'
+  );
 
   // Gradient builder state.
   const [stop0, setStop0] = useState('#2B5CD3');
@@ -46,10 +58,11 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
 
   // Image-from-URL state.
   const [imageUrl, setImageUrl] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
 
   const setColor = useCallback(
     (color: string) => {
-      store.getState().setPageBackground({ type: 'color', color });
+      store.getState().setOutputBackground({ type: 'color', color });
     },
     [store]
   );
@@ -63,16 +76,29 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
         { offset: 1, color: stop1 },
       ],
     };
-    store.getState().setPageBackground({ type: 'gradient', gradient });
+    store.getState().setOutputBackground({ type: 'gradient', gradient });
   }, [store, gradientType, angle, stop0, stop1]);
 
   const setImage = useCallback(
     (src: string, fileId?: string) => {
       if (!src) return;
-      store.getState().setPageBackground({ type: 'image', src, fileId });
+      store.getState().setOutputBackground({ type: 'image', src, fileId });
     },
     [store]
   );
+
+  const handleModalSelect = useCallback((item: {
+    source: 'stock' | 'file';
+    url: string;
+    fileId?: string;
+    width: number;
+    height: number;
+    type: 'image' | 'video';
+  }) => {
+    if (item.type !== 'image') return;
+    setImage(item.url, item.fileId);
+    setModalOpen(false);
+  }, [setImage]);
 
   // CSS preview of the gradient.
   const gradientCss =
@@ -81,11 +107,11 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
       : `radial-gradient(circle, ${stop0}, ${stop1})`;
 
   const { data, error, isLoading, mutate } = useSWR(
-    mode === 'image' ? 'background-files-page-1' : null,
+    mode === 'image' ? `background-files-${user.orgId}-page-1` : null,
     async () => {
       const res = await fetch('/files?page=1&limit=20');
       if (!res.ok) throw new Error('Failed to load files');
-      return res.json() as Promise<{ data: FileItem[]; total: number }>;
+      return res.json() as Promise<{ pages: number; results: FileItem[] }>;
     },
     { keepPreviousData: true }
   );
@@ -112,8 +138,8 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
                 title={preset.label}
                 className={`w-full aspect-square rounded-lg border-2 transition-all ${
                   currentBg === preset.color
-                    ? 'border-[#2B5CD3] ring-1 ring-[#2B5CD3]'
-                    : 'border-newBorder hover:border-[#2B5CD3]'
+                    ? 'border-designerAccent ring-1 ring-designerAccent'
+                    : 'border-newBorder hover:border-designerAccent'
                 }`}
               >
                 <div
@@ -128,6 +154,8 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
             label="Custom color"
             value={/^#[0-9a-fA-F]{6}$/.test(currentBg) ? currentBg : '#ffffff'}
             onChange={setColor}
+            brandColors={brandColors}
+            brandEnforcement={brandEnforcement}
           />
         </>
       )}
@@ -149,8 +177,8 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
           />
 
           <div className="grid grid-cols-2 gap-3">
-            <ColorSwatch label="Start" value={stop0} onChange={setStop0} />
-            <ColorSwatch label="End" value={stop1} onChange={setStop1} />
+            <ColorSwatch label="Start" value={stop0} onChange={setStop0} brandColors={brandColors} brandEnforcement={brandEnforcement} />
+            <ColorSwatch label="End" value={stop1} onChange={setStop1} brandColors={brandColors} brandEnforcement={brandEnforcement} />
           </div>
 
           {gradientType === 'linear' && (
@@ -166,7 +194,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
 
           <button
             onClick={applyGradient}
-            className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-[#2B5CD3] text-white hover:bg-[#2B5CD3]/80"
+            className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
           >
             Apply gradient
           </button>
@@ -181,37 +209,51 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="Image URL…"
-              className="flex-1 h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-[#2B5CD3] text-textColor"
+              className="flex-1 h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
             />
             <button
               onClick={() => setImage(imageUrl.trim())}
               disabled={!imageUrl.trim()}
-              className="px-[12px] h-[36px] rounded-lg bg-[#2B5CD3] text-white text-[13px] font-medium hover:bg-[#2B5CD3]/80 disabled:opacity-50 shrink-0"
+              className="px-[12px] h-[36px] rounded-lg bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 disabled:opacity-50 shrink-0"
             >
               Use
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            className="w-full px-3 py-2 rounded-lg text-[12px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80"
+          >
+            Choose from media library…
+          </button>
+
+          <MediaSelectorModal
+            open={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onSelect={handleModalSelect}
+          />
 
           <div className="text-[11px] text-newTextColor/40">From your files</div>
 
           {isLoading && !data ? (
             <PanelSkeletonGrid count={4} />
           ) : error && !data ? (
-            <PanelError
-              message="Couldn't load files"
+            (toaster.show('Couldn\'t load files', 'warning'), <PanelError
+              message="Couldn\'t load files"
               onRetry={() => mutate()}
-            />
-          ) : !data?.data?.length ? (
+            />)
+          ) : !data?.results?.length ? (
             <div className="text-[12px] text-newTextColor/40 text-center py-4">
               No files found
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              {data.data.map((file) => (
+              {data.results.map((file) => (
                 <button
                   key={file.id}
                   onClick={() => setImage(file.path, file.id)}
-                  className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-[#2B5CD3] transition-all"
+                  className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all"
                 >
                   <div className="aspect-[4/3] relative overflow-hidden bg-newColColor/10">
                     <img

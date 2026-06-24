@@ -20,6 +20,7 @@ const SHORTCUTS: { keys: string; label: string }[] = [
   { keys: 'Space + drag', label: 'Pan canvas' },
   { keys: 'Scroll', label: 'Zoom' },
   { keys: 'Shift / ⌘ + click', label: 'Add to selection' },
+  { keys: '⌘/Ctrl + K', label: 'Command palette' },
 ];
 
 export const ShortcutsOverlay: FC<{ onClose: () => void }> = ({ onClose }) => (

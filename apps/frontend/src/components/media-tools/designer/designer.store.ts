@@ -1,504 +1,684 @@
 import { create } from 'zustand';
+import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
+import { smartReflow, estimateFocalPoint, detectFocalPoint } from './reflow';
 
-export interface DesignerTextShadow {
-  color: string;
-  blur: number;
-  offsetX: number;
-  offsetY: number;
-}
-
-export interface DesignerElement {
-  id: string;
-  type: 'text' | 'image' | 'shape';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  rotation: number;
-  opacity: number;
-  locked: boolean;
-  hidden: boolean;
-  name?: string;
-  // grouping (C5): elements sharing a groupId move/select together
-  groupId?: string;
-  // flip (A5): negative scale on each axis
-  flipX?: boolean;
-  flipY?: boolean;
-  text?: string;
+export interface TextRun {
+  text: string;
   fontFamily?: string;
   fontSize?: number;
   fontWeight?: number;
   fontStyle?: 'normal' | 'italic';
   fill?: string;
-  align?: 'left' | 'center' | 'right';
-  lineHeight?: number;
-  letterSpacing?: number;
-  // text effects (C2)
-  textShadow?: DesignerTextShadow;
-  textStroke?: { color: string; width: number };
-  curve?: number; // arc amount in degrees; 0 = straight
-  src?: string;
-  fileId?: string;
-  crop?: { x: number; y: number; width: number; height: number };
-  filters?: string[];
-  borderRadius?: number;
-  shape?: 'rect' | 'ellipse' | 'line' | 'star';
-  fillGradient?: DesignerGradient;
-  stroke?: string;
-  strokeWidth?: number;
-  // entrance animation (H3)
-  animation?: DesignerAnimation;
+  underline?: boolean;
 }
 
-export type DesignerAnimationType =
-  | 'none'
-  | 'fadeIn'
-  | 'slideLeft'
-  | 'slideRight'
-  | 'slideUp'
-  | 'slideDown'
-  | 'zoomIn';
+export interface DesignerTextShadow { color: string; blur: number; offsetX: number; offsetY: number; }
 
-export interface DesignerAnimation {
-  type: DesignerAnimationType;
-  delay: number; // ms before the entrance starts
-  duration: number; // ms the entrance takes
+export interface DesignerMask {
+  type: 'shape' | 'text';
+  shape?: 'ellipse' | 'rounded-rect' | 'triangle' | 'star' | 'hexagon' | 'heart';
+  cornerRadius?: number;
+  text?: string;
+  fontFamily?: string;
+  fontWeight?: number;
+}
+
+export interface DesignerElement {
+  id: string;
+  type: 'text' | 'image' | 'shape' | 'icon';
+  x: number; y: number; width: number; height: number;
+  rotation: number; opacity: number; locked: boolean; hidden: boolean;
+  name?: string;
+  groupId?: string;
+  flipX?: boolean; flipY?: boolean;
+  // text
+  text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number;
+  fontStyle?: 'normal' | 'italic'; fill?: string; align?: 'left' | 'center' | 'right';
+  richText?: TextRun[];
+  lineHeight?: number; letterSpacing?: number;
+  textShadow?: DesignerTextShadow; textStroke?: { color: string; width: number };
+  curve?: number;
+  textPath?: string;
+  // image
+  src?: string; fileId?: string; crop?: { x: number; y: number; width: number; height: number };
+  filters?: string[]; borderRadius?: number;
+  fitMode?: 'contain' | 'cover' | 'fill';
+  focalPoint?: { x: number; y: number };
+  mask?: DesignerMask;
+  alt?: string;
+  naturalWidth?: number; naturalHeight?: number;
+  boxShadow?: DesignerTextShadow;
+  // shape
+  shape?: 'rect' | 'ellipse' | 'line' | 'star';
+  fillGradient?: DesignerGradient; stroke?: string; strokeWidth?: number;
+  // reflow / seeding
+  originId?: string;
+  anchor?:
+    | 'top-left' | 'top-center' | 'top-right'
+    | 'center-left' | 'center' | 'center-right'
+    | 'bottom-left' | 'bottom-center' | 'bottom-right';
 }
 
 export interface DesignerGradient {
-  type: 'linear' | 'radial';
-  angle?: number; // for linear, degrees
-  stops: { offset: number; color: string }[];
+  type: 'linear' | 'radial'; angle?: number; stops: { offset: number; color: string }[];
 }
 
-// A page background is a solid color, a gradient, or an image fill (C4).
 export interface DesignerBackground {
   type: 'color' | 'gradient' | 'image';
-  color?: string;
-  gradient?: DesignerGradient;
-  src?: string;
-  fileId?: string;
+  color?: string; gradient?: DesignerGradient; src?: string; fileId?: string;
 }
 
-export interface DesignerPage {
+export interface DesignerOutput {
   id: string;
-  // `background` stays a string (solid color) for back-compat; `bg` is the
-  // richer optional form (gradient/image). Renderers prefer `bg` when present.
+  formatId: string;
+  name: string;
+  width: number;
+  height: number;
   background: string;
   bg?: DesignerBackground;
   children: DesignerElement[];
 }
 
+export interface StickerFrame {
+  url: string;
+  durationMs: number;
+}
+
+export interface CaptionWord {
+  word: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface VideoClip {
+  id: string;
+  startMs: number;
+  endMs: number;
+  trimInMs?: number;
+  trimOutMs?: number;
+  src?: string;
+  fileId?: string;
+  x?: number; y?: number; width?: number; height?: number;
+  rotation?: number; opacity?: number;
+  text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number; fill?: string;
+  volume?: number; fadeInMs?: number; fadeOutMs?: number;
+  keyframes?: { tMs: number; props: Record<string, number>; ease?: 'linear' | 'easeInOut' | 'easeIn' | 'easeOut' }[];
+  naturalWidth?: number; naturalHeight?: number;
+  transitionIn?: { type: 'cut' | 'fade' | 'dissolve' | 'slide'; durationMs: number; direction?: 'left' | 'right' | 'up' | 'down' };
+  transitionOut?: { type: 'cut' | 'fade' | 'dissolve' | 'slide'; durationMs: number; direction?: 'left' | 'right' | 'up' | 'down' };
+  speed?: number;
+  reverse?: boolean;
+  freezeAtMs?: number;
+  filters?: string[];
+  /** Decoded sticker frames (GIF/WebP) so preview + render advance by frame index. */
+  frames?: StickerFrame[];
+  /** Per-word timing for caption clips ( karaoke highlight). */
+  words?: CaptionWord[];
+}
+
+export interface VideoTrack {
+  id: string;
+  type: 'video' | 'image' | 'text' | 'audio' | 'sticker' | 'caption';
+  clips: VideoClip[];
+  gain?: number;
+  autoDuck?: boolean;
+}
+
+export interface VideoOutput {
+  id: string;
+  formatId: string;
+  name: string;
+  width: number;
+  height: number;
+  fps: number;
+  durationMs: number;
+  tracks: VideoTrack[];
+}
+
 export interface DesignerAttribution {
-  source?: string;
-  url?: string;
-  downloadLocation?: string;
-  author?: string;
-  authorUrl?: string;
+  source?: string; url?: string; downloadLocation?: string; author?: string; authorUrl?: string;
 }
 
 export interface DesignerDoc {
   version: number;
-  width: number;
-  height: number;
-  pages: DesignerPage[];
+  mode: 'image' | 'video';
+  outputs: (DesignerOutput | VideoOutput)[];
   attribution?: DesignerAttribution;
-  durationMs?: number; // total animation length (H3)
 }
 
 export interface DesignerState {
   doc: DesignerDoc;
   selectedIds: string[];
-  currentPage: number;
-  zoom: number;
-  viewportX: number;
-  viewportY: number;
-  history: DesignerDoc[];
-  historyIndex: number;
+  currentOutput: number;
+  zoom: number; viewportX: number; viewportY: number;
+  history: DesignerDoc[]; historyIndex: number;
   designId: string | null;
+  designTemplateId: string | null;
+  templateId: string | null;
   designName: string;
-  isDirty: boolean;
-  isSaving: boolean;
-  lastSaved: Date | null;
+  isDirty: boolean; isSaving: boolean; lastSaved: Date | null;
   clipboard: DesignerElement[];
-  previewTime: number | null; // ms into the animation timeline; null = not previewing (H3)
+  editFormatOnly: boolean;
+  brandEnforcement: boolean;
+  brandAdminOverride: boolean;
+  playheadMs: number;
+  selectedClip: { outputIndex: number; trackId: string; clipId: string } | null;
+  linkedUpdateFlash: Record<number, number>;
 }
 
 export interface DesignerActions {
   setDoc: (doc: DesignerDoc) => void;
   setDesignName: (name: string) => void;
   setDesignId: (id: string | null) => void;
-  addElement: (element: DesignerElement) => void;
+  setTemplateId: (id: string | null) => void;
+  addElement: (element: DesignerElement, beforeId?: string) => void;
   updateElement: (id: string, updates: Partial<DesignerElement>) => void;
   updateElements: (ids: string[], updates: Partial<DesignerElement>) => void;
   removeElement: (id: string) => void;
   duplicateElement: (id: string) => void;
   setSelectedIds: (ids: string[]) => void;
-  setPageBackground: (bg: DesignerBackground) => void;
-  // clipboard (B2)
-  copySelection: () => void;
-  cutSelection: () => void;
-  paste: () => void;
-  // grouping (C5)
-  groupSelection: () => void;
-  ungroupSelection: () => void;
-  // z-order
+  setOutputBackground: (bg: DesignerBackground) => void;
+  copySelection: () => void; cutSelection: () => void; paste: () => void;
+  groupSelection: () => void; ungroupSelection: () => void;
   reorder: (ids: string[], dir: 'front' | 'back' | 'forward' | 'backward') => void;
-  // animation (H3)
-  setElementAnimation: (id: string, animation: DesignerAnimation) => void;
-  setDuration: (ms: number) => void;
-  setPreviewTime: (t: number | null) => void;
-  // multi-page (D1/D2)
-  setCurrentPage: (index: number) => void;
-  addPage: () => void;
-  removePage: (index: number) => void;
-  duplicatePage: (index: number) => void;
-  movePage: (from: number, to: number) => void;
-  moveElementsToPage: (ids: string[], targetPage: number) => void;
+  // outputs (replaces multi-page)
+  setCurrentOutput: (index: number) => void;
+  addOutput: (preset: { formatId: string; name: string; width: number; height: number }) => void;
+  removeOutput: (index: number) => void;
+  resizeOutput: (index: number, width: number, height: number, formatId?: string, name?: string) => void;
+  // linked-by-default
+  setEditFormatOnly: (v: boolean) => void;
+  setBrandEnforcement: (v: boolean) => void;
+  setBrandAdminOverride: (v: boolean) => void;
+  unlinkElement: (id: string) => void;
+  relinkElement: (id: string, originId: string) => void;
   setZoom: (zoom: number) => void;
   setViewport: (x: number, y: number) => void;
-  undo: () => void;
-  redo: () => void;
-  pushHistory: () => void;
-  markSaved: () => void;
-  setSaving: (saving: boolean) => void;
+  undo: () => void; redo: () => void; pushHistory: () => void;
+  markSaved: () => void; setSaving: (saving: boolean) => void;
   reset: (width?: number, height?: number) => void;
-  loadDesign: (doc: DesignerDoc, id: string, name: string) => void;
+  loadDesign: (doc: any, id: string, name: string, templateId?: string | null) => void;
+  // video mode
+  addTrack: (outputIndex: number, type: VideoTrack['type']) => void;
+  removeTrack: (outputIndex: number, trackId: string) => void;
+  addClip: (outputIndex: number, trackId: string, clip: VideoClip) => void;
+  removeClip: (outputIndex: number, trackId: string, clipId: string) => void;
+  updateClip: (outputIndex: number, trackId: string, clipId: string, updates: Partial<VideoClip>) => void;
+  setVideoDuration: (outputIndex: number, durationMs: number) => void;
+  splitClip: (outputIndex: number, trackId: string, clipId: string, atMs: number) => void;
+  setMode: (mode: 'image' | 'video') => void;
+  setPlayhead: (ms: number) => void;
+  setSelectedClip: (clip: { outputIndex: number; trackId: string; clipId: string } | null) => void;
+  setTrackGain: (outputIndex: number, trackId: string, gain: number) => void;
+  setTrackAutoDuck: (outputIndex: number, trackId: string, autoDuck: boolean) => void;
 }
 
 export type DesignerStore = DesignerState & DesignerActions;
 
-const createEmptyDoc = (width = 1080, height = 1080, attribution?: DesignerAttribution): DesignerDoc => ({
-  version: 1,
-  width,
-  height,
-  pages: [{
-    id: 'page-1',
-    background: '#ffffff',
-    children: [],
-  }],
-  attribution,
-});
-
 let elementCounter = 0;
 const genId = () => `el-${Date.now()}-${++elementCounter}`;
 
-export const createDesignerStore = (width?: number, height?: number, attribution?: DesignerAttribution) =>
+const matchPreset = (w: number, h: number) => {
+  const exact = CHANNEL_PRESETS.find((p) => p.width === w && p.height === h);
+  if (exact) return { formatId: exact.id, name: exact.name };
+  // Fuzzy match by nearest aspect ratio
+  const targetRatio = w / h;
+  let best: { formatId: string; name: string } | null = null;
+  let bestDiff = Infinity;
+  for (const p of CHANNEL_PRESETS) {
+    if (p.id === 'custom') continue;
+    const diff = Math.abs(p.width / p.height - targetRatio);
+    if (diff < bestDiff) { bestDiff = diff; best = { formatId: p.id, name: p.name }; }
+  }
+  return best || { formatId: 'custom', name: `${w}×${h}` };
+};
+
+const createEmptyDoc = (width = 1080, height = 1080, attribution?: DesignerAttribution, mode: 'image' | 'video' = 'image'): DesignerDoc => {
+  const m = matchPreset(width, height);
+  if (mode === 'video') {
+    const trackId = genId();
+    const preset = CHANNEL_PRESETS.find((p) => p.id === m.formatId);
+    return {
+      version: 2,
+      mode: 'video',
+      outputs: [{
+        id: genId(),
+        formatId: m.formatId,
+        name: m.name,
+        width,
+        height,
+        fps: preset?.fps ?? 30,
+        durationMs: preset?.maxDurationMs ?? 10000,
+        tracks: [{ id: trackId, type: 'video', clips: [] }],
+      }],
+      attribution,
+    };
+  }
+  return {
+    version: 2,
+    mode: 'image',
+    outputs: [{ id: genId(), formatId: m.formatId, name: m.name, width, height, background: '#ffffff', children: [] }],
+    attribution,
+  };
+};
+
+// Load-time migration: legacy { width, height, pages[] } → { mode, outputs[] }
+export const migrateDoc = (raw: any): DesignerDoc => {
+  if (raw && Array.isArray(raw.outputs)) {
+    return { version: raw.version || 2, mode: raw.mode || 'image', outputs: raw.outputs, attribution: raw.attribution };
+  }
+  const w = raw?.width || 1080;
+  const h = raw?.height || 1080;
+  const m = matchPreset(w, h);
+  if (raw?.mode === 'video') {
+    const preset = CHANNEL_PRESETS.find((p) => p.id === m.formatId);
+    // Preserve any existing video tracks/clips from the legacy shape.
+    const existingTracks: VideoTrack[] = Array.isArray(raw?.tracks)
+      ? raw.tracks.map((t: any) => ({
+          id: t.id || genId(),
+          type: t.type || 'video',
+          clips: Array.isArray(t.clips) ? t.clips : [],
+        }))
+      : [];
+    const tracks = existingTracks.length > 0
+      ? existingTracks
+      : [{ id: genId(), type: 'video' as const, clips: [] }];
+    return {
+      version: 2, mode: 'video',
+      outputs: [{
+        id: genId(), formatId: m.formatId, name: m.name, width: w, height: h,
+        fps: preset?.fps ?? 30,
+        durationMs: preset?.maxDurationMs ?? 10000,
+        tracks,
+      }],
+      attribution: raw?.attribution,
+    };
+  }
+  const outputs: DesignerOutput[] = (raw?.pages || [{ id: genId(), background: '#ffffff', children: [] }]).map(
+    (p: any, i: number) => ({
+      id: p.id || genId(),
+      formatId: m.formatId,
+      name: (raw?.pages?.length || 1) > 1 ? `${m.name} ${i + 1}` : m.name,
+      width: w, height: h,
+      background: p.background || '#ffffff', bg: p.bg, children: p.children || [],
+    })
+  );
+  return { version: 2, mode: 'image', outputs, attribution: raw?.attribution };
+};
+
+// Seed an element (positioned for the active output) into a target output, scaled + centered.
+// Uses smartReflow for sizing then adds id/originId/centering wrapping.
+const seedCopy = (
+  el: DesignerElement,
+  source: { width: number; height: number },
+  target: DesignerOutput,
+  originId: string,
+): DesignerElement => {
+  const smart = smartReflow(el, source, target);
+  const newW = smart.width ?? el.width;
+  const newH = smart.height ?? el.height;
+  const base: DesignerElement = JSON.parse(JSON.stringify(el));
+  const copy: DesignerElement = {
+    ...base,
+    id: genId(),
+    originId,
+  };
+  Object.assign(copy, smart);
+  if (copy.x === undefined) copy.x = (target.width - newW) / 2;
+  if (copy.y === undefined) copy.y = (target.height - newH) / 2;
+  if (copy.type === 'image' && (copy.fitMode === 'cover') && !copy.focalPoint && copy.naturalWidth && copy.naturalHeight) {
+    copy.focalPoint = estimateFocalPoint(copy.naturalWidth, copy.naturalHeight);
+  }
+  return copy;
+};
+
+// LINKED-BY-DEFAULT: Geometry is per-format and never propagates; everything
+// else (style/content) syncs to same-originId copies in the other outputs.
+const GEOMETRY_KEYS = new Set(['x', 'y', 'width', 'height', 'rotation', 'fitMode', 'focalPoint', 'crop', 'anchor']);
+const sharedUpdates = (updates: Partial<DesignerElement>): Partial<DesignerElement> => {
+  const out: any = {};
+  for (const k of Object.keys(updates)) if (!GEOMETRY_KEYS.has(k)) out[k] = (updates as any)[k];
+  return out;
+};
+
+const applyLinked = (
+  doc: DesignerDoc, currentOutput: number, ids: Set<string>, full: Partial<DesignerElement>, editFormatOnly: boolean,
+): { outputs: (DesignerOutput | VideoOutput)[]; affected: number[] } => {
+  const children = (doc.outputs[currentOutput] as DesignerOutput).children;
+  const origins = new Set(
+    children.filter((el) => ids.has(el.id) && el.originId).map((el) => el.originId as string),
+  );
+  const shared = sharedUpdates(full);
+  const propagate = !editFormatOnly && origins.size > 0 && Object.keys(shared).length > 0;
+  const affected: number[] = [];
+  const outputs = doc.outputs.map((out, i) => {
+    if (i === currentOutput) return { ...out, children: (out as DesignerOutput).children.map((el) => (ids.has(el.id) ? { ...el, ...full } : el)) };
+    if (!propagate) return out;
+    let changed = false;
+    const newChildren = (out as DesignerOutput).children.map((el) => {
+      if (el.originId && origins.has(el.originId)) {
+        changed = true;
+        return { ...el, ...shared };
+      }
+      return el;
+    });
+    if (changed) affected.push(i);
+    return { ...out, children: newChildren };
+  });
+  return { outputs, affected };
+};
+
+type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
+
+export const createDesignerStore = (
+  width?: number,
+  height?: number,
+  attribution?: DesignerAttribution,
+  fetch?: FetchLike,
+) =>
   create<DesignerStore>((set, get) => {
     const initialDoc = createEmptyDoc(width, height, attribution);
+    const active = () => get().doc.outputs[get().currentOutput] as DesignerOutput | VideoOutput;
+    const activeImage = () => get().doc.outputs[get().currentOutput] as DesignerOutput;
+    const isVideoMode = () => get().doc.mode === 'video';
+    const withActiveChildren = (children: DesignerElement[]) => {
+      const { doc, currentOutput } = get();
+      const outs = [...doc.outputs];
+      const out = outs[currentOutput] as DesignerOutput;
+      outs[currentOutput] = { ...out, children };
+      return outs;
+    };
     return {
       doc: initialDoc,
       selectedIds: [],
-      currentPage: 0,
-      zoom: 1,
-      viewportX: 0,
-      viewportY: 0,
-      history: [JSON.parse(JSON.stringify(initialDoc))],
-      historyIndex: 0,
-      designId: null,
+      currentOutput: 0,
+      zoom: 1, viewportX: 0, viewportY: 0,
+      history: [JSON.parse(JSON.stringify(initialDoc))], historyIndex: 0,
+      designId: null, designTemplateId: null, templateId: null,
       designName: 'Untitled Design',
-      isDirty: false,
-      isSaving: false,
-      lastSaved: null,
+      isDirty: false, isSaving: false, lastSaved: null,
+      editFormatOnly: false,
+      brandEnforcement: false,
+      brandAdminOverride: false,
+      playheadMs: 0,
+      selectedClip: null,
+      linkedUpdateFlash: {},
       clipboard: [],
-      previewTime: null,
-
-      setDoc: (doc) => set({ doc, isDirty: true }),
-
-      setElementAnimation: (id, animation) => get().updateElement(id, { animation }),
-
-      setDuration: (ms) => {
-        const { doc } = get();
-        set({ doc: { ...doc, durationMs: Math.max(500, ms) }, isDirty: true });
-      },
-
-      setPreviewTime: (t) => set({ previewTime: t }),
-
+      setDoc: (doc) => set({ doc: migrateDoc(doc), isDirty: true }),
       setDesignName: (name) => set({ designName: name, isDirty: true }),
-
       setDesignId: (id) => set({ designId: id }),
+      setTemplateId: (id) => set({ templateId: id }),
 
-      addElement: (element) => {
-        const { doc, currentPage } = get();
-        const newEl = { ...element, id: element.id || genId() };
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: [...newPages[currentPage].children, newEl],
+      addElement: (element, beforeId) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput } = get();
+        const originId = element.originId || genId();
+        const baseEl = { ...element, id: element.id || genId(), originId };
+        const sourceOutput = doc.outputs[currentOutput] as DesignerOutput;
+        const beforeOriginId = beforeId
+          ? sourceOutput.children.find((c) => c.id === beforeId)?.originId
+          : undefined;
+        const insert = (children: DesignerElement[], el: DesignerElement) => {
+          if (!beforeId) return [...children, el];
+          const idx = children.findIndex(
+            (c) => c.id === beforeId || (beforeOriginId && c.originId === beforeOriginId)
+          );
+          if (idx === -1) return [...children, el];
+          const next = [...children];
+          next.splice(idx, 0, el);
+          return next;
         };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true, selectedIds: [newEl.id] });
+        const copyIds = new Map<number, string>();
+        const outs = doc.outputs.map((out, i) =>
+          i === currentOutput
+            ? { ...out, children: insert((out as DesignerOutput).children, baseEl) }
+            : (() => {
+                const copy = seedCopy(baseEl, sourceOutput, out as DesignerOutput, originId);
+                copyIds.set(i, copy.id);
+                return { ...out, children: insert((out as DesignerOutput).children, copy) };
+              })()
+        );
+        set({ doc: { ...doc, outputs: outs }, isDirty: true, selectedIds: [baseEl.id] });
         get().pushHistory();
+
+        if (baseEl.type === 'image' && baseEl.src) {
+          const addedId = baseEl.id;
+          const addedSrc = baseEl.src;
+          detectFocalPoint(addedSrc, fetch).then((fp) => {
+            const state = get();
+            const source = state.doc.outputs[state.currentOutput] as DesignerOutput | undefined;
+            const sourceEl = source?.children.find((c) => c.id === addedId);
+            if (!sourceEl || sourceEl.src !== addedSrc) return;
+            const nextOutputs = state.doc.outputs.map((out, i) => {
+              const target = out as DesignerOutput;
+              const targetId = i === state.currentOutput ? addedId : copyIds.get(i);
+              if (!targetId) return out;
+              return {
+                ...out,
+                children: target.children.map((c) =>
+                  c.id === targetId ? { ...c, focalPoint: fp } : c
+                ),
+              };
+            });
+            set({ doc: { ...state.doc, outputs: nextOutputs }, isDirty: true });
+          }).catch(() => {
+            // Non-fatal: center fallback is already in place.
+          });
+        }
       },
 
       updateElement: (id, updates) => {
-        const { doc, currentPage } = get();
-        const newPages = [...doc.pages];
-        const children = newPages[currentPage].children.map((el) =>
-          el.id === id ? { ...el, ...updates } : el
-        );
-        newPages[currentPage] = { ...newPages[currentPage], children };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true });
+        if (isVideoMode()) return;
+        const { doc, currentOutput, editFormatOnly, linkedUpdateFlash } = get();
+        const { outputs, affected } = applyLinked(doc, currentOutput, new Set([id]), updates, editFormatOnly);
+        const now = Date.now();
+        const nextFlash: Record<number, number> = { ...linkedUpdateFlash };
+        affected.forEach((i) => (nextFlash[i] = now));
+        set({ doc: { ...doc, outputs }, isDirty: true, linkedUpdateFlash: nextFlash });
+      },
+
+      updateElements: (ids, updates) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput, editFormatOnly, linkedUpdateFlash } = get();
+        const { outputs, affected } = applyLinked(doc, currentOutput, new Set(ids), updates, editFormatOnly);
+        const now = Date.now();
+        const nextFlash: Record<number, number> = { ...linkedUpdateFlash };
+        affected.forEach((i) => (nextFlash[i] = now));
+        set({ doc: { ...doc, outputs }, isDirty: true, linkedUpdateFlash: nextFlash });
+        get().pushHistory();
       },
 
       removeElement: (id) => {
-        const { doc, currentPage, selectedIds } = get();
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: newPages[currentPage].children.filter((el) => el.id !== id),
-        };
+        if (isVideoMode()) return;
+        const { selectedIds } = get();
         set({
-          doc: { ...doc, pages: newPages },
-          isDirty: true,
-          selectedIds: selectedIds.filter((s) => s !== id),
+          doc: { ...get().doc, outputs: withActiveChildren(activeImage().children.filter((el) => el.id !== id)) },
+          isDirty: true, selectedIds: selectedIds.filter((s) => s !== id),
         });
         get().pushHistory();
       },
 
       duplicateElement: (id) => {
-        const { doc, currentPage } = get();
-        const el = doc.pages[currentPage].children.find((e) => e.id === id);
+        if (isVideoMode()) return;
+        const el = activeImage().children.find((e) => e.id === id);
         if (!el) return;
-        const newEl = { ...el, id: genId(), x: el.x + 20, y: el.y + 20 };
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: [...newPages[currentPage].children, newEl],
-        };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true, selectedIds: [newEl.id] });
-        get().pushHistory();
-      },
-
-      updateElements: (ids, updates) => {
-        const { doc, currentPage } = get();
-        const idSet = new Set(ids);
-        const newPages = [...doc.pages];
-        const children = newPages[currentPage].children.map((el) =>
-          idSet.has(el.id) ? { ...el, ...updates } : el
-        );
-        newPages[currentPage] = { ...newPages[currentPage], children };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true });
+        const newEl = { ...JSON.parse(JSON.stringify(el)), id: genId(), originId: genId(), x: el.x + 20, y: el.y + 20 };
+        set({ doc: { ...get().doc, outputs: withActiveChildren([...activeImage().children, newEl]) }, isDirty: true, selectedIds: [newEl.id] });
         get().pushHistory();
       },
 
       setSelectedIds: (ids) => set({ selectedIds: ids }),
 
-      setPageBackground: (bg) => {
-        const { doc, currentPage } = get();
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          background: bg.type === 'color' && bg.color ? bg.color : newPages[currentPage].background,
+      setOutputBackground: (bg) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput } = get();
+        const outs = [...doc.outputs];
+        const out = outs[currentOutput] as DesignerOutput;
+        outs[currentOutput] = {
+          ...out,
+          background: bg.type === 'color' && bg.color ? bg.color : out.background,
           bg,
         };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true });
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
         get().pushHistory();
       },
 
       copySelection: () => {
-        const { doc, currentPage, selectedIds } = get();
-        const picked = doc.pages[currentPage].children.filter((el) =>
-          selectedIds.includes(el.id)
-        );
-        set({ clipboard: JSON.parse(JSON.stringify(picked)) });
+        if (isVideoMode()) return;
+        const { selectedIds } = get();
+        set({ clipboard: JSON.parse(JSON.stringify(activeImage().children.filter((el) => selectedIds.includes(el.id)))) });
       },
 
       cutSelection: () => {
-        const { doc, currentPage, selectedIds } = get();
-        const picked = doc.pages[currentPage].children.filter((el) =>
-          selectedIds.includes(el.id)
-        );
+        if (isVideoMode()) return;
+        const { selectedIds } = get();
+        const picked = activeImage().children.filter((el) => selectedIds.includes(el.id));
         if (!picked.length) return;
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: newPages[currentPage].children.filter(
-            (el) => !selectedIds.includes(el.id)
-          ),
-        };
         set({
           clipboard: JSON.parse(JSON.stringify(picked)),
-          doc: { ...doc, pages: newPages },
-          selectedIds: [],
-          isDirty: true,
+          doc: { ...get().doc, outputs: withActiveChildren(activeImage().children.filter((el) => !selectedIds.includes(el.id))) },
+          selectedIds: [], isDirty: true,
         });
         get().pushHistory();
       },
 
       paste: () => {
-        const { doc, currentPage, clipboard } = get();
+        if (isVideoMode()) return;
+        const { clipboard } = get();
         if (!clipboard.length) return;
-        // Preserve relative grouping by remapping group ids per paste.
         const groupRemap: Record<string, string> = {};
         const pasted = clipboard.map((el) => {
           let groupId = el.groupId;
-          if (groupId) {
-            groupRemap[groupId] = groupRemap[groupId] || genId();
-            groupId = groupRemap[groupId];
-          }
-          return { ...el, id: genId(), x: el.x + 20, y: el.y + 20, groupId };
+          if (groupId) { groupRemap[groupId] = groupRemap[groupId] || genId(); groupId = groupRemap[groupId]; }
+          return { ...el, id: genId(), originId: genId(), x: el.x + 20, y: el.y + 20, groupId };
         });
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: [...newPages[currentPage].children, ...pasted],
-        };
-        set({
-          doc: { ...doc, pages: newPages },
-          selectedIds: pasted.map((el) => el.id),
-          isDirty: true,
-        });
+        set({ doc: { ...get().doc, outputs: withActiveChildren([...activeImage().children, ...pasted]) }, selectedIds: pasted.map((el) => el.id), isDirty: true });
         get().pushHistory();
       },
 
       groupSelection: () => {
+        if (isVideoMode()) return;
         const { selectedIds } = get();
         if (selectedIds.length < 2) return;
-        get().updateElements(selectedIds, { groupId: genId() });
+        const gid = genId();
+        set({ doc: { ...get().doc, outputs: withActiveChildren(
+          activeImage().children.map((el) => (selectedIds.includes(el.id) ? { ...el, groupId: gid } : el))
+        ) }, isDirty: true });
+        get().pushHistory();
       },
 
       ungroupSelection: () => {
-        const { doc, currentPage, selectedIds } = get();
-        const groupIds = new Set(
-          doc.pages[currentPage].children
-            .filter((el) => selectedIds.includes(el.id) && el.groupId)
-            .map((el) => el.groupId as string)
-        );
+        if (isVideoMode()) return;
+        const { selectedIds } = get();
+        const groupIds = new Set(activeImage().children.filter((el) => selectedIds.includes(el.id) && el.groupId).map((el) => el.groupId as string));
         if (!groupIds.size) return;
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: newPages[currentPage].children.map((el) =>
-            el.groupId && groupIds.has(el.groupId) ? { ...el, groupId: undefined } : el
-          ),
-        };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true });
+        set({ doc: { ...get().doc, outputs: withActiveChildren(
+          activeImage().children.map((el) => (el.groupId && groupIds.has(el.groupId) ? { ...el, groupId: undefined } : el))
+        ) }, isDirty: true });
         get().pushHistory();
       },
 
       reorder: (ids, dir) => {
-        const { doc, currentPage } = get();
-        const children = [...doc.pages[currentPage].children];
+        if (isVideoMode()) return;
+        const children = [...activeImage().children];
         const picked = children.filter((el) => ids.includes(el.id));
         if (!picked.length) return;
         const rest = children.filter((el) => !ids.includes(el.id));
-        let next: typeof children;
-        if (dir === 'front') {
-          next = [...rest, ...picked];
-        } else if (dir === 'back') {
-          next = [...picked, ...rest];
-        } else {
-          // forward/backward: shift each picked index by ±1 within the array
+        let next: DesignerElement[];
+        if (dir === 'front') next = [...rest, ...picked];
+        else if (dir === 'back') next = [...picked, ...rest];
+        else {
           next = [...children];
-          const indices = ids
-            .map((id) => next.findIndex((el) => el.id === id))
-            .filter((i) => i >= 0)
-            .sort((a, b) => (dir === 'forward' ? b - a : a - b));
-          indices.forEach((i) => {
-            const swap = dir === 'forward' ? i + 1 : i - 1;
-            if (swap < 0 || swap >= next.length) return;
-            [next[i], next[swap]] = [next[swap], next[i]];
-          });
+          const indices = ids.map((id) => next.findIndex((el) => el.id === id)).filter((i) => i >= 0).sort((a, b) => (dir === 'forward' ? b - a : a - b));
+          indices.forEach((i) => { const swap = dir === 'forward' ? i + 1 : i - 1; if (swap < 0 || swap >= next.length) return; [next[i], next[swap]] = [next[swap], next[i]]; });
         }
-        const newPages = [...doc.pages];
-        newPages[currentPage] = { ...newPages[currentPage], children: next };
-        set({ doc: { ...doc, pages: newPages }, isDirty: true });
+        set({ doc: { ...get().doc, outputs: withActiveChildren(next) }, isDirty: true });
         get().pushHistory();
       },
 
-      setCurrentPage: (index) => {
+      setCurrentOutput: (index) => {
         const { doc } = get();
-        if (index < 0 || index >= doc.pages.length) return;
-        set({ currentPage: index, selectedIds: [] });
+        if (index < 0 || index >= doc.outputs.length) return;
+        set({ currentOutput: index, selectedIds: [] });
       },
 
-      addPage: () => {
-        const { doc } = get();
-        const newPage: DesignerPage = { id: genId(), background: '#ffffff', children: [] };
-        const newPages = [...doc.pages, newPage];
-        set({
-          doc: { ...doc, pages: newPages },
-          currentPage: newPages.length - 1,
-          selectedIds: [],
-          isDirty: true,
-        });
-        get().pushHistory();
-      },
-
-      removePage: (index) => {
-        const { doc, currentPage } = get();
-        if (doc.pages.length <= 1) return;
-        const newPages = doc.pages.filter((_, i) => i !== index);
-        const nextCurrent = Math.max(0, Math.min(currentPage, newPages.length - 1));
-        set({
-          doc: { ...doc, pages: newPages },
-          currentPage: nextCurrent,
-          selectedIds: [],
-          isDirty: true,
-        });
-        get().pushHistory();
-      },
-
-      duplicatePage: (index) => {
-        const { doc } = get();
-        const src = doc.pages[index];
-        if (!src) return;
-        const groupRemap: Record<string, string> = {};
-        const clone: DesignerPage = {
-          id: genId(),
-          background: src.background,
-          bg: src.bg ? JSON.parse(JSON.stringify(src.bg)) : undefined,
-          children: src.children.map((el) => {
-            let groupId = el.groupId;
-            if (groupId) {
-              groupRemap[groupId] = groupRemap[groupId] || genId();
-              groupId = groupRemap[groupId];
-            }
-            return { ...JSON.parse(JSON.stringify(el)), id: genId(), groupId };
-          }),
+      addOutput: (preset) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput } = get();
+        const source = doc.outputs[currentOutput] as DesignerOutput;
+        const sourceChildren = source.children.map((el) => (el.originId ? el : { ...el, originId: genId() }));
+        const children = sourceChildren.map((el) =>
+          seedCopy(el, source, { ...preset, id: '', background: '#fff', children: [] } as DesignerOutput, el.originId as string),
+        );
+        const newOutput: DesignerOutput = {
+          id: genId(), formatId: preset.formatId, name: preset.name,
+          width: preset.width, height: preset.height,
+          background: source.background, bg: source.bg, children,
         };
-        const newPages = [...doc.pages];
-        newPages.splice(index + 1, 0, clone);
-        set({
-          doc: { ...doc, pages: newPages },
-          currentPage: index + 1,
-          selectedIds: [],
-          isDirty: true,
-        });
+        const outs = doc.outputs.map((o, i) => (i === currentOutput ? { ...o, children: sourceChildren } : o)) as DesignerOutput[];
+        outs.push(newOutput);
+        set({ doc: { ...doc, outputs: outs }, currentOutput: outs.length - 1, selectedIds: [], isDirty: true });
         get().pushHistory();
       },
 
-      movePage: (from, to) => {
+      removeOutput: (index) => {
+        const { doc, currentOutput } = get();
+        if (doc.outputs.length <= 1) return;
+        const outs = doc.outputs.filter((_, i) => i !== index);
+        set({ doc: { ...doc, outputs: outs }, currentOutput: Math.max(0, Math.min(currentOutput, outs.length - 1)), selectedIds: [], isDirty: true });
+        get().pushHistory();
+      },
+
+      resizeOutput: (index, width, height, formatId, name) => {
+        if (isVideoMode()) return;
         const { doc } = get();
-        if (from === to || from < 0 || to < 0 || from >= doc.pages.length || to >= doc.pages.length)
-          return;
-        const newPages = [...doc.pages];
-        const [moved] = newPages.splice(from, 1);
-        newPages.splice(to, 0, moved);
-        set({ doc: { ...doc, pages: newPages }, currentPage: to, isDirty: true });
+        const out = doc.outputs[index] as DesignerOutput;
+        if (!out) return;
+        const resized: DesignerOutput = { ...out, width, height, formatId: formatId ?? out.formatId, name: name ?? out.name };
+        resized.children = out.children.map((el) => seedCopy(el, out, resized, el.originId || el.id));
+        const outs = [...doc.outputs]; outs[index] = resized;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
         get().pushHistory();
       },
 
-      moveElementsToPage: (ids, targetPage) => {
-        const { doc, currentPage } = get();
-        if (targetPage === currentPage || targetPage < 0 || targetPage >= doc.pages.length) return;
-        const moving = doc.pages[currentPage].children.filter((el) => ids.includes(el.id));
-        if (!moving.length) return;
-        const newPages = [...doc.pages];
-        newPages[currentPage] = {
-          ...newPages[currentPage],
-          children: newPages[currentPage].children.filter((el) => !ids.includes(el.id)),
-        };
-        newPages[targetPage] = {
-          ...newPages[targetPage],
-          children: [...newPages[targetPage].children, ...moving],
-        };
-        set({ doc: { ...doc, pages: newPages }, selectedIds: [], isDirty: true });
+      setEditFormatOnly: (v) => set({ editFormatOnly: v }),
+
+      setBrandEnforcement: (v) => set({ brandEnforcement: v }),
+
+      setBrandAdminOverride: (v) => set({ brandAdminOverride: v }),
+
+      unlinkElement: (id) => {
+        if (isVideoMode()) return;
+        set({ doc: { ...get().doc, outputs: withActiveChildren(
+          activeImage().children.map((el) => (el.id === id ? { ...el, originId: undefined } : el))
+        ) }, isDirty: true });
+        get().pushHistory();
+      },
+
+      relinkElement: (id, originId) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput } = get();
+        const el = (doc.outputs[currentOutput] as DesignerOutput).children.find((e) => e.id === id);
+        if (!el) return;
+        const style = sharedUpdates(el);
+        delete (style as any).id;
+        delete (style as any).originId;
+        delete (style as any).groupId;
+        const outs = doc.outputs.map((out, i) => ({
+          ...out,
+          children: (out as DesignerOutput).children.map((c) =>
+            i === currentOutput && c.id === id
+              ? { ...c, originId }
+              : c.originId === originId
+              ? { ...c, ...style }
+              : c
+          ),
+        }));
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
         get().pushHistory();
       },
 
       setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)) }),
-
       setViewport: (x, y) => set({ viewportX: x, viewportY: y }),
 
       pushHistory: () => {
@@ -514,61 +694,247 @@ export const createDesignerStore = (width?: number, height?: number, attribution
         const { historyIndex, history } = get();
         if (historyIndex <= 0) return;
         const newIndex = historyIndex - 1;
-        set({
-          doc: JSON.parse(JSON.stringify(history[newIndex])),
-          historyIndex: newIndex,
-          selectedIds: [],
-          isDirty: true,
-        });
+        set({ doc: JSON.parse(JSON.stringify(history[newIndex])), historyIndex: newIndex, selectedIds: [], isDirty: true, currentOutput: 0 });
       },
 
       redo: () => {
         const { historyIndex, history } = get();
         if (historyIndex >= history.length - 1) return;
         const newIndex = historyIndex + 1;
-        set({
-          doc: JSON.parse(JSON.stringify(history[newIndex])),
-          historyIndex: newIndex,
-          selectedIds: [],
-          isDirty: true,
-        });
+        set({ doc: JSON.parse(JSON.stringify(history[newIndex])), historyIndex: newIndex, selectedIds: [], isDirty: true, currentOutput: 0 });
       },
 
       markSaved: () => set({ isDirty: false, isSaving: false, lastSaved: new Date() }),
-
       setSaving: (saving) => set({ isSaving: saving }),
 
-      reset: (width, height) => {
-        const newDoc = createEmptyDoc(width, height);
+      reset: (w, h) => {
+        const newDoc = createEmptyDoc(w, h);
         set({
-          doc: newDoc,
-          selectedIds: [],
-          currentPage: 0,
-          zoom: 1,
-          viewportX: 0,
-          viewportY: 0,
-          history: [JSON.parse(JSON.stringify(newDoc))],
-          historyIndex: 0,
-          designId: null,
-          designName: 'Untitled Design',
-          isDirty: false,
-          isSaving: false,
-          lastSaved: null,
+          doc: newDoc, selectedIds: [], currentOutput: 0, zoom: 1, viewportX: 0, viewportY: 0,
+          history: [JSON.parse(JSON.stringify(newDoc))], historyIndex: 0,
+          designId: null, designTemplateId: null, templateId: null,
+          designName: 'Untitled Design', isDirty: false, isSaving: false, lastSaved: null,
+          editFormatOnly: false,
+          brandEnforcement: false,
+          brandAdminOverride: false,
+          playheadMs: 0,
+          selectedClip: null,
+          linkedUpdateFlash: {},
         });
       },
 
-      loadDesign: (doc, id, name) => {
+      loadDesign: (doc, id, name, templateId = null) => {
+        const migrated = migrateDoc(doc);
         set({
-          doc: JSON.parse(JSON.stringify(doc)),
-          designId: id,
-          designName: name,
-          selectedIds: [],
-          currentPage: 0,
-          zoom: 1,
-          history: [JSON.parse(JSON.stringify(doc))],
-          historyIndex: 0,
-          isDirty: false,
+          doc: migrated, designId: id, designName: name,
+          templateId, designTemplateId: templateId,
+          selectedIds: [], currentOutput: 0, zoom: 1,
+          history: [JSON.parse(JSON.stringify(migrated))], historyIndex: 0, isDirty: false,
+          playheadMs: 0,
+          selectedClip: null,
+          linkedUpdateFlash: {},
+          brandAdminOverride: false,
         });
       },
+
+      // --- Video mode actions ---
+
+      addTrack: (outputIndex, type) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: [...vo.tracks, { id: genId(), type, clips: [] }],
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      removeTrack: (outputIndex, trackId) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.filter((t) => t.id !== trackId),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      addClip: (outputIndex, trackId, clip) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        // Explicit 60 s cap: reject clips that would exceed the output duration.
+        const startMs = Math.max(0, clip.startMs ?? 0);
+        const endMs = Math.max(startMs + 100, clip.endMs ?? startMs + 1000);
+        if (endMs > vo.durationMs || startMs >= vo.durationMs) {
+          return;
+        }
+        const newClip = { ...clip, id: clip.id || genId(), startMs, endMs };
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) =>
+            t.id === trackId ? { ...t, clips: [...t.clips, newClip] } : t
+          ),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      removeClip: (outputIndex, trackId, clipId) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) =>
+            t.id === trackId ? { ...t, clips: t.clips.filter((c) => c.id !== clipId) } : t
+          ),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      updateClip: (outputIndex, trackId, clipId, updates) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const track = vo.tracks.find((t) => t.id === trackId);
+        const clip = track?.clips.find((c) => c.id === clipId);
+        if (!clip) return;
+        const nextStart = updates.startMs ?? clip.startMs;
+        const nextEnd = updates.endMs ?? clip.endMs;
+        // Explicit 60 s cap: reject updates that would push the clip beyond the output duration.
+        if (nextEnd > vo.durationMs || nextStart >= vo.durationMs || nextEnd <= nextStart) {
+          return;
+        }
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) =>
+            t.id === trackId
+              ? { ...t, clips: t.clips.map((c) => (c.id === clipId ? { ...c, ...updates } : c)) }
+              : t
+          ),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+      },
+
+      setVideoDuration: (outputIndex, durationMs) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const clamped = Math.max(1000, Math.min(60000, durationMs));
+        const updated: VideoOutput = { ...vo, durationMs: clamped };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      splitClip: (outputIndex, trackId, clipId, atMs) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) => {
+            if (t.id !== trackId) return t;
+            const idx = t.clips.findIndex((c) => c.id === clipId);
+            if (idx < 0) return t;
+            const original = t.clips[idx];
+            const splitPoint = Math.max(original.startMs + 100, Math.min(original.endMs - 100, atMs));
+            if (splitPoint <= original.startMs || splitPoint >= original.endMs) return t;
+            const first: VideoClip = { ...original, id: genId(), endMs: splitPoint };
+            const second: VideoClip = { ...original, id: genId(), startMs: splitPoint, trimInMs: original.trimInMs ? original.trimInMs + (splitPoint - original.startMs) : undefined };
+            const clips = [...t.clips];
+            clips.splice(idx, 1, first, second);
+            return { ...t, clips };
+          }),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+        get().pushHistory();
+      },
+
+      setMode: (mode) => {
+        const { doc } = get();
+        if (doc.mode === mode) return;
+        if (mode === 'video') {
+          const source = doc.outputs[0] as DesignerOutput;
+          const trackId = genId();
+          const preset = CHANNEL_PRESETS.find((p) => p.id === source.formatId);
+          const vo: VideoOutput = {
+            id: genId(),
+            formatId: source.formatId,
+            name: source.name,
+            width: source.width,
+            height: source.height,
+            fps: preset?.fps ?? 30,
+            durationMs: preset?.maxDurationMs ?? 10000,
+            tracks: [{ id: trackId, type: 'video', clips: [] }],
+          };
+          set({ doc: { ...doc, mode: 'video', outputs: [vo] }, selectedIds: [], selectedClip: null, currentOutput: 0, isDirty: true });
+        } else {
+          const source = doc.outputs[0] as VideoOutput;
+          const imgOut: DesignerOutput = {
+            id: genId(),
+            formatId: source.formatId,
+            name: source.name,
+            width: source.width,
+            height: source.height,
+            background: '#ffffff',
+            children: [],
+          };
+          set({ doc: { ...doc, mode: 'image', outputs: [imgOut] }, selectedIds: [], selectedClip: null, currentOutput: 0, isDirty: true });
+        }
+        get().pushHistory();
+      },
+
+      setPlayhead: (ms) => set({ playheadMs: ms }),
+
+      setSelectedClip: (clip) => {
+        set({ selectedClip: clip, selectedIds: clip ? [] : undefined } as any);
+      },
+
+      setTrackGain: (outputIndex, trackId, gain) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) => t.id === trackId ? { ...t, gain: Math.max(0, Math.min(2, gain)) } : t),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+      },
+
+      setTrackAutoDuck: (outputIndex, trackId, autoDuck) => {
+        const { doc } = get();
+        const vo = doc.outputs[outputIndex] as VideoOutput | undefined;
+        if (!vo || doc.mode !== 'video') return;
+        const updated: VideoOutput = {
+          ...vo,
+          tracks: vo.tracks.map((t) => t.id === trackId ? { ...t, autoDuck } : t),
+        };
+        const outs = [...doc.outputs];
+        outs[outputIndex] = updated;
+        set({ doc: { ...doc, outputs: outs }, isDirty: true });
+      },
+
     };
   });

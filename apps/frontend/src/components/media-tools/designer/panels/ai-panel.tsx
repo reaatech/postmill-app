@@ -75,15 +75,15 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
   const handleAddToCanvas = useCallback(
     (dataUrl: string) => {
       const state = store.getState();
-      const doc = state.doc;
+      const out = state.doc.outputs[state.currentOutput];
       state.addElement({
         id: '',
         type: 'image',
         src: dataUrl,
         x: 0,
         y: 0,
-        width: Math.min(300, doc.width),
-        height: Math.min(300, doc.height),
+        width: Math.min(300, out.width),
+        height: Math.min(300, out.height),
         rotation: 0,
         opacity: 1,
         locked: false,
@@ -113,7 +113,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Describe the image..."
-          className="flex-1 h-[36px] px-[10px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+          className="flex-1 h-[36px] px-[10px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         />
         {inFlight ? (
           <button
@@ -126,7 +126,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           <button
             onClick={handleGenerate}
             disabled={!prompt.trim()}
-            className="px-[12px] h-[36px] rounded-[6px] bg-[#2B5CD3] text-white text-[13px] font-medium hover:bg-[#2B5CD3]/80 disabled:opacity-50 shrink-0"
+            className="px-[12px] h-[36px] rounded-[6px] bg-designerAccent text-white text-[13px] font-medium hover:bg-designerAccent/80 disabled:opacity-50 shrink-0"
           >
             Generate
           </button>
@@ -146,7 +146,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
       {status === 'generating' && (
         <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/50 text-[13px]">
           <span
-            className="w-[14px] h-[14px] rounded-full border-2 border-newBorder border-t-[#2B5CD3] motion-safe:animate-spin"
+            className="w-[14px] h-[14px] rounded-full border-2 border-newBorder border-t-designerAccent motion-safe:animate-spin"
             aria-hidden="true"
           />
           Generating…
@@ -168,7 +168,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             type="button"
             onClick={handleGenerate}
             disabled={!prompt.trim()}
-            className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-[#2B5CD3] hover:bg-boxHover transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors disabled:opacity-50"
           >
             Try again
           </button>
@@ -181,7 +181,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             <button
               key={i}
               onClick={() => handleAddToCanvas(dataUrl)}
-              className="relative group rounded-[6px] overflow-hidden border border-newBorder hover:border-[#2B5CD3] transition-all"
+              className="relative group rounded-[6px] overflow-hidden border border-newBorder hover:border-designerAccent transition-all"
               title="Click to add to canvas"
             >
               <img

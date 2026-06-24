@@ -17,46 +17,57 @@ export const SafeZoneOverlay: FC<SafeZoneOverlayProps> = ({
   height,
   visible,
 }) => {
-  const safeZones = useMemo(() => {
-    if (!presetId) return [];
-    const preset = CHANNEL_PRESETS.find((p) => p.id === presetId);
-    return preset?.safeZones || [];
-  }, [presetId]);
+  const zones = useMemo(
+    () => {
+      if (!presetId) return null;
+      const preset = CHANNEL_PRESETS.find((p) => p.id === presetId);
+      if (!preset) return null;
 
-  if (!visible || safeZones.length === 0) return null;
+      if (preset.safeZones && preset.safeZones.length > 0) {
+        return preset.safeZones;
+      }
+
+      return [
+        {
+          label: 'Title Safe (5%)',
+          x: width * 0.05,
+          y: height * 0.05,
+          width: width * 0.9,
+          height: height * 0.9,
+          description: 'Generic title-safe area',
+        },
+      ];
+    },
+    [presetId, width, height],
+  );
+
+  if (!visible || !zones) return null;
 
   return (
     <>
-      {safeZones.map((zone, i) => {
-        const x = (zone.x / width) * width;
-        const y = (zone.y / height) * height;
-        const zWidth = (zone.width / width) * width;
-        const zHeight = (zone.height / height) * height;
-
-        return (
-          <Group key={i} listening={false}>
-            <Rect
-              x={x}
-              y={y}
-              width={zWidth}
-              height={zHeight}
-              fill="rgba(255, 0, 0, 0.08)"
-              stroke="rgba(255, 0, 0, 0.4)"
-              strokeWidth={1}
-              dash={[4, 4]}
-            />
-            <Text
-              x={x + 4}
-              y={y + 2}
-              text={zone.label}
-              fontSize={10}
-              fill="rgba(255, 0, 0, 0.6)"
-              fontFamily="Arial"
-              listening={false}
-            />
-          </Group>
-        );
-      })}
+      {zones.map((zone, i) => (
+        <Group key={i} listening={false}>
+          <Rect
+            x={zone.x}
+            y={zone.y}
+            width={zone.width}
+            height={zone.height}
+            fill="rgba(255, 0, 0, 0.08)"
+            stroke="rgba(255, 0, 0, 0.4)"
+            strokeWidth={1}
+            dash={[4, 4]}
+          />
+          <Text
+            x={zone.x + 4}
+            y={zone.y + 2}
+            text={zone.label}
+            fontSize={10}
+            fill="rgba(255, 0, 0, 0.6)"
+            fontFamily="Arial"
+            listening={false}
+          />
+        </Group>
+      ))}
     </>
   );
 };
