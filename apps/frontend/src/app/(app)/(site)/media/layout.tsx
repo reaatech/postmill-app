@@ -30,7 +30,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex flex-1 h-full gap-[15px] p-[20px] bg-newBgColorInner">
+    <div className="flex flex-1 h-full min-w-0 gap-[15px] p-[20px] bg-newBgColorInner">
       <button
         className="lg:hidden fixed top-[16px] left-[16px] z-50 px-[10px] py-[8px] rounded-[6px] bg-designerAccent text-white text-[13px]"
         onClick={() => setSidebarOpen(!sidebarOpen)}
