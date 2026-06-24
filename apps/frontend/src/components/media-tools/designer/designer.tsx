@@ -99,7 +99,11 @@ export const Designer: FC<DesignerProps> = ({
   const [activePanel, setActivePanel] = useState<string | null>(null);
   const [showSafeZones, setShowSafeZones] = useState(false);
   const [showRulers, setShowRulers] = useState(true);
-  const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  // Default the inspector collapsed on mobile so it doesn't cover the canvas
+  // (≤1025px = the repo `mobile` breakpoint). Desktop stays expanded.
+  const [inspectorCollapsed, setInspectorCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.innerWidth <= 1025
+  );
   // Required startup picker on a fresh editor (no deep-linked asset/design and
   // no caller-supplied size) — forces an explicit format choice instead of the
   // silent 1080² "Instagram Post" default.
