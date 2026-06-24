@@ -18,6 +18,7 @@ vi.mock('next/font/google', () => ({
 
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
+  usePathname: () => '/dashboard',
 }));
 
 vi.mock('@gitroom/helpers/utils/custom.fetch', () => ({
@@ -68,6 +69,7 @@ vi.mock('../layout/title', () => ({
 
 vi.mock('../layout/top.menu', () => ({
   TopMenu: () => <div>Top Menu</div>,
+  useMenuItem: () => ({ all: [], firstMenu: [], secondMenu: [] }),
 }));
 
 vi.mock('../layout/language.component', () => ({
