@@ -449,26 +449,5 @@ export class PostActivity {
     }
   }
 
-  private getPostWorkflowName(post: Pick<Post, 'settings'>): string {
-    if (!post.settings) {
-      return 'postWorkflowV105';
-    }
 
-    try {
-      const settings = JSON.parse(
-        typeof post.settings === 'string'
-          ? post.settings
-          : JSON.stringify(post.settings)
-      );
-      if (
-        settings?.firstComment &&
-        !settings?.firstCommentPostedAt &&
-        !settings?.firstCommentId
-      ) {
-        return 'postWorkflowV106';
-      }
-    } catch (err) {}
-
-    return 'postWorkflowV105';
-  }
 }

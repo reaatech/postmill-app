@@ -105,7 +105,7 @@ describe('IntegrationService — plug credential cache warming (v3.7.1 §4.6)', 
       integrationManager as any,
       {} as any, // NotificationService (unused here)
       {} as any, // RefreshIntegrationService (unused here)
-      {} as any, // TemporalService (unused here)
+      {} as any, // (placeholder — unused in spec)
     );
   });
 
