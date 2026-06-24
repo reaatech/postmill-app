@@ -22,17 +22,27 @@ export interface StockPhotoItem {
 }
 
 const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
-  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(135deg, #000 0 50%, #fff 50% 100%)' },
-  { value: 'black', label: 'Black', swatch: '#111111' },
-  { value: 'white', label: 'White', swatch: '#ffffff' },
-  { value: 'blue', label: 'Blue', swatch: '#2563eb' },
-  { value: 'green', label: 'Green', swatch: '#16a34a' },
-  { value: 'red', label: 'Red', swatch: '#dc2626' },
+  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
+  { value: 'black', label: 'Black', swatch: '#000000' },
+  { value: 'white', label: 'White', swatch: '#FFFFFF' },
+  { value: 'gray', label: 'Gray', swatch: '#9E9E9E' },
+  { value: 'red', label: 'Red', swatch: '#F44336' },
+  { value: 'orange', label: 'Orange', swatch: '#FF5722' },
+  { value: 'yellow', label: 'Yellow', swatch: '#FFEB3B' },
+  { value: 'green', label: 'Green', swatch: '#8BC34A' },
+  { value: 'blue', label: 'Blue', swatch: '#2196F3' },
+  { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
+  { value: 'brown', label: 'Brown', swatch: '#795548' },
 ];
 
 const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'People', 'Abstract'];
 
-export const StockPhotos: FC = () => {
+interface StockPhotosProps {
+  mode?: 'browse' | 'select';
+  onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' }) => void;
+}
+
+export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect }) => {
   const fetch = useFetch();
   const modal = useModals();
   const [query, setQuery] = useState('');
@@ -275,7 +285,19 @@ export const StockPhotos: FC = () => {
               <button
                 key={photo.id}
                 type="button"
-                onClick={() => openPhoto(photo)}
+                onClick={() => {
+                  if (mode === 'select' && onSelect) {
+                    onSelect({
+                      url: photo.url,
+                      width: photo.width,
+                      height: photo.height,
+                      thumbnail: photo.thumbUrl,
+                      type: 'image',
+                    });
+                  } else {
+                    openPhoto(photo);
+                  }
+                }}
                 className="group block w-full mb-[12px] break-inside-avoid text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
                 <div

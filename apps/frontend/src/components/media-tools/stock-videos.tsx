@@ -20,9 +20,28 @@ export interface StockVideoItem {
   duration: number;
 }
 
+const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
+  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
+  { value: 'black', label: 'Black', swatch: '#000000' },
+  { value: 'white', label: 'White', swatch: '#FFFFFF' },
+  { value: 'gray', label: 'Gray', swatch: '#9E9E9E' },
+  { value: 'red', label: 'Red', swatch: '#F44336' },
+  { value: 'orange', label: 'Orange', swatch: '#FF5722' },
+  { value: 'yellow', label: 'Yellow', swatch: '#FFEB3B' },
+  { value: 'green', label: 'Green', swatch: '#8BC34A' },
+  { value: 'blue', label: 'Blue', swatch: '#2196F3' },
+  { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
+  { value: 'brown', label: 'Brown', swatch: '#795548' },
+];
+
 const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'Ocean', 'Abstract'];
 
-export const StockVideos: FC = () => {
+interface StockVideosProps {
+  mode?: 'browse' | 'select';
+  onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'video' }) => void;
+}
+
+export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect }) => {
   const fetch = useFetch();
   const modal = useModals();
   const [query, setQuery] = useState('');
@@ -30,22 +49,24 @@ export const StockVideos: FC = () => {
   const [page, setPage] = useState(1);
   const [orientation, setOrientation] = useState('');
   const [size, setSize] = useState('');
+  const [color, setColor] = useState('');
   const [accumulated, setAccumulated] = useState<StockVideoItem[]>([]);
 
   // Reset the accumulated list whenever a filter/search changes.
   useEffect(() => {
     setPage(1);
     setAccumulated([]);
-  }, [debouncedQuery, orientation, size]);
+  }, [debouncedQuery, orientation, size, color]);
 
   const params = new URLSearchParams();
   if (debouncedQuery) params.set('query', debouncedQuery);
   params.set('page', String(page));
   if (orientation) params.set('orientation', orientation);
   if (size) params.set('size', size);
+  if (color) params.set('color', color);
 
   const { data, error, isLoading, isValidating, mutate } = useSWR(
-    `stock-videos-${debouncedQuery}-${page}-${orientation}-${size}`,
+    `stock-videos-${debouncedQuery}-${page}-${orientation}-${size}-${color}`,
     async () => {
       const res = await fetch(`/media/stock/videos?${params}`);
       if (!res.ok) {
@@ -176,6 +197,39 @@ export const StockVideos: FC = () => {
         </div>
       </div>
 
+      <div className="flex items-center flex-wrap gap-[8px]">
+        <button
+          type="button"
+          onClick={() => setColor('')}
+          aria-pressed={color === ''}
+          className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
+            color === ''
+              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3] font-[500]'
+              : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
+          }`}
+        >
+          All
+        </button>
+        {COLOR_SWATCHES.map((c) => (
+          <button
+            key={c.value}
+            type="button"
+            onClick={() => setColor((cur) => (cur === c.value ? '' : c.value))}
+            aria-pressed={color === c.value}
+            aria-label={`Color: ${c.label}`}
+            title={c.label}
+            className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] hover:scale-110 ${
+              color === c.value ? 'border-[#2B5CD3] ring-2 ring-[#2B5CD3]/40' : 'border-newColColor'
+            }`}
+          >
+            <span
+              className="absolute inset-[3px] rounded-full"
+              style={{ background: c.swatch }}
+            />
+          </button>
+        ))}
+      </div>
+
       {/* Content states */}
       {error && items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[320px] gap-[10px] text-center px-[20px]">
@@ -243,7 +297,19 @@ export const StockVideos: FC = () => {
               <button
                 key={video.id}
                 type="button"
-                onClick={() => openVideo(video)}
+                onClick={() => {
+                  if (mode === 'select' && onSelect) {
+                    onSelect({
+                      url: video.url,
+                      width: video.width,
+                      height: video.height,
+                      thumbnail: video.thumbUrl,
+                      type: 'video',
+                    });
+                  } else {
+                    openVideo(video);
+                  }
+                }}
                 className="group text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
                 <div className="aspect-video relative overflow-hidden bg-black">

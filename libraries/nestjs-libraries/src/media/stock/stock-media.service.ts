@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
-import { StockPhotoItem, StockVideoItem, StockSearchResponse } from './stock.types';
+import { StockAudioItem, StockPhotoItem, StockVideoItem, StockSearchResponse } from './stock.types';
 
 @Injectable()
 export class StockMediaService {
@@ -86,6 +86,53 @@ export class StockMediaService {
     if (!video || !video.id) return [];
 
     return this.searchVideos(video.url?.split('/').pop() || '', 1).then(r => r.results);
+  }
+
+  private get jamendoClientId(): string | undefined {
+    return process.env.JAMENDO_CLIENT_ID;
+  }
+
+  async searchAudio(query: string, page: number = 1): Promise<StockSearchResponse<StockAudioItem>> {
+    const clientId = this.jamendoClientId;
+    if (!clientId) {
+      return { results: [], page, totalPages: 0, configured: false };
+    }
+
+    const limit = 20;
+    const offset = (page - 1) * limit;
+    const params = new URLSearchParams({
+      client_id: clientId,
+      format: 'json',
+      limit: String(limit),
+      offset: String(offset),
+      include: 'musicinfo',
+      audioformat: 'mp32',
+    });
+    if (query) params.set('search', query);
+    else params.set('order', 'popularity_total');
+
+    try {
+      const res = await safeFetch(`https://api.jamendo.com/v3.0/tracks?${params}`);
+      const data = await res.json() as any;
+      const hits = Array.isArray(data?.results) ? data.results : [];
+      const total = typeof data?.headers?.results_fullcount === 'number'
+        ? data.headers.results_fullcount
+        : hits.length;
+      return {
+        results: hits.map((h: any) => ({
+          id: String(h.id),
+          url: h.audio || h.audiodownload || '',
+          name: h.name || 'Untitled',
+          duration: typeof h.duration === 'number' ? h.duration : 0,
+          author: h.artist_name || 'Unknown',
+        })),
+        page,
+        totalPages: Math.max(1, Math.ceil(total / limit)),
+        configured: true,
+      };
+    } catch {
+      return { results: [], page, totalPages: 0, configured: false };
+    }
   }
 
   async triggerDownload(downloadLocation: string): Promise<void> {

@@ -57,4 +57,15 @@ export class StockMediaController {
   ) {
     return this._stockMediaService.getRelatedVideos(id);
   }
+
+  @Get('/audio')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async searchAudio(
+    @GetOrgFromRequest() org: Organization,
+    @Query('query') query: string,
+    @Query('page') page: string
+  ) {
+    return this._stockMediaService.searchAudio(query || '', parseInt(page || '1', 10));
+  }
 }

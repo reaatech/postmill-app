@@ -25,6 +25,14 @@ export interface StockVideoItem {
   duration: number;
 }
 
+export interface StockAudioItem {
+  id: string;
+  url: string;
+  name: string;
+  duration: number;
+  author: string;
+}
+
 export interface StockSearchResponse<T> {
   results: T[];
   page: number;
