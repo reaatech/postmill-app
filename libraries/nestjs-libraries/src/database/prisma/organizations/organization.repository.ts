@@ -89,6 +89,11 @@ export class OrganizationRepository {
                 disabled: true,
                 roleId: true,
                 userId: true,
+                roleRef: {
+                  select: {
+                    key: true,
+                  },
+                },
               },
             },
             subscription: {
@@ -177,6 +182,11 @@ export class OrganizationRepository {
           select: {
             disabled: true,
             roleId: true,
+            roleRef: {
+              select: {
+                key: true,
+              },
+            },
           },
         },
         subscription: {

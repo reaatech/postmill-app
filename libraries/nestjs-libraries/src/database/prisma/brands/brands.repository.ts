@@ -52,6 +52,7 @@ export class BrandsRepository {
       logoFileIds?: string[];
       palette?: string[];
       fontFamilies?: string[];
+      enforcement?: Record<string, any>;
     },
   ) {
     return this._aiBrandProfile.model.aIBrandProfile.create({
@@ -67,6 +68,7 @@ export class BrandsRepository {
         logoFileIds: data.logoFileIds ?? [],
         palette: data.palette ?? [],
         fontFamilies: data.fontFamilies ?? [],
+        enforcement: data.enforcement ?? {},
       },
     });
   }
@@ -83,6 +85,9 @@ export class BrandsRepository {
       logoFileIds?: string[];
       palette?: string[];
       fontFamilies?: string[];
+      introFileId?: string | null;
+      outroFileId?: string | null;
+      enforcement?: Record<string, any>;
     },
   ) {
     const brand = await this._aiBrandProfile.model.aIBrandProfile.findFirst({
@@ -121,5 +126,39 @@ export class BrandsRepository {
       where: { id: brandId },
       data: { isDefault: true },
     });
+  }
+
+  async getCustomFonts(organizationId: string) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const fonts = brand.customFonts as any[] | null;
+    return Array.isArray(fonts) ? fonts : [];
+  }
+
+  async addCustomFont(
+    organizationId: string,
+    font: { family: string; fileId: string; path: string; weights: number[] }
+  ) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const existing = (brand.customFonts as any[]) || [];
+    existing.push(font);
+    await this._aiBrandProfile.model.aIBrandProfile.update({
+      where: { id: brand.id },
+      data: { customFonts: existing },
+    });
+    return existing;
+  }
+
+  async removeCustomFont(organizationId: string, fileId: string) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const existing = (brand.customFonts as any[]) || [];
+    const next = existing.filter((f: any) => f.fileId !== fileId);
+    await this._aiBrandProfile.model.aIBrandProfile.update({
+      where: { id: brand.id },
+      data: { customFonts: next },
+    });
+    return next;
   }
 }

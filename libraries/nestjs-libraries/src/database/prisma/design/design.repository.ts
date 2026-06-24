@@ -38,12 +38,13 @@ export class DesignRepository {
     height: number;
     createdById: string;
     previewDataUrl?: string;
+    previewFileId?: string;
     campaignId?: string;
   }) {
     return this._design.model.design.create({ data });
   }
 
-  update(id: string, orgId: string, data: { name?: string; doc?: any; width?: number; height?: number; previewDataUrl?: string }) {
+  update(id: string, orgId: string, data: { name?: string; doc?: any; width?: number; height?: number; previewDataUrl?: string; previewFileId?: string }) {
     return this._design.model.design.update({
       where: { id, organizationId: orgId },
       data,
@@ -82,6 +83,13 @@ export class DesignRepository {
     isSystem?: boolean;
   }) {
     return this._designTemplate.model.designTemplate.create({ data });
+  }
+
+  updateTemplate(id: string, orgId: string, data: { name?: string; category?: string; doc?: any; thumbnailFileId?: string }) {
+    return this._designTemplate.model.designTemplate.update({
+      where: { id, organizationId: orgId },
+      data,
+    });
   }
 
   deleteTemplate(id: string, orgId: string) {

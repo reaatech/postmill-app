@@ -1222,6 +1222,10 @@ model AIBrandProfile {
   logoFileIds       Json?        @default("[]")
   palette           Json?        @default("[]")
   fontFamilies      Json?        @default("[]")
+  customFonts       Json?        @default("[]")
+  introFileId       String?
+  outroFileId       String?
+  enforcement       Json?        @default("{}")
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

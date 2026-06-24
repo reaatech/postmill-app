@@ -29,6 +29,10 @@ export class FileService {
     return this._fileRepository.getFileById(id);
   }
 
+  getFileByPath(org: string, filePath: string) {
+    return this._fileRepository.getFileByPath(org, filePath);
+  }
+
   saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
     return this._fileRepository.saveFile(org, fileName, filePath, originalName, folderId);
   }

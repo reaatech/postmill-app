@@ -156,6 +156,28 @@ export class FileRepository {
     });
   }
 
+  getFileByPath(org: string, filePath: string) {
+    return this._file.model.file.findFirst({
+      where: {
+        organizationId: org,
+        path: filePath,
+        deletedAt: null as null,
+      },
+      select: {
+        id: true,
+        name: true,
+        originalName: true,
+        path: true,
+        thumbnail: true,
+        alt: true,
+        thumbnailTimestamp: true,
+        fileSize: true,
+        type: true,
+        folderId: true,
+      },
+    });
+  }
+
   deleteFile(org: string, id: string) {
     return this._file.model.file.update({
       where: {

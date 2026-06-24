@@ -23,6 +23,7 @@ export class DesignService {
     width: number;
     height: number;
     previewDataUrl?: string;
+    previewFileId?: string;
     campaignId?: string;
   }) {
     return this._designRepository.create({
@@ -38,6 +39,7 @@ export class DesignService {
     width?: number;
     height?: number;
     previewDataUrl?: string;
+    previewFileId?: string;
   }) {
     return this._designRepository.update(id, orgId, data);
   }
@@ -62,6 +64,15 @@ export class DesignService {
     isSystem?: boolean;
   }) {
     return this._designRepository.createTemplate(data);
+  }
+
+  async updateTemplate(orgId: string, id: string, data: {
+    name?: string;
+    category?: string;
+    doc?: any;
+    thumbnailFileId?: string;
+  }) {
+    return this._designRepository.updateTemplate(id, orgId, data);
   }
 
   async deleteTemplate(orgId: string, id: string) {
