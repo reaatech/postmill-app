@@ -25,7 +25,7 @@ Every environment variable Postmill recognises, sourced from `.env.example` and
 |----------|---------|---------|
 | `UPLOAD_DIRECTORY` | — | Local path for file uploads (e.g. `/uploads`). Avatars and app-internal images always use LOCAL. Since v3.8.10, local files are partitioned per tenant under `<UPLOAD_DIRECTORY>/<tenantId>/`. |
 | `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | — | Public URL path serving uploads (e.g. `/uploads`) |
-| `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/media/upload-server` (default 1 GB) |
+| `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/files/upload-server` (default 1 GB) |
 | `LOCAL_STORAGE_QUOTA_GB` | `5` | **(v3.8.10)** Default soft quota for each org's local storage, in GB. Per-org override via the org's `localStorageQuotaBytes`. |
 
 ## Email (v3.8.1+)
@@ -187,6 +187,7 @@ fallback (login only — channel credentials are configured in Settings → Chan
 |----------|---------|---------|
 | `UNSPLASH_ACCESS_KEY` | — | Unsplash API access key for stock photo browsing and download |
 | `PEXELS_API_KEY` | — | Pexels API key for stock video browsing and download |
+| `JAMENDO_CLIENT_ID` | — | Jamendo API client ID for stock audio browsing in the video editor |
 
 ## Variables no longer read (v3.7.1+)
 

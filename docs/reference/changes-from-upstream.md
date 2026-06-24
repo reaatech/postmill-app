@@ -122,7 +122,7 @@ writes through the per-org LOCAL storage adapter.
 - **`UploadFactory`, `cloudflare.storage.ts`, and `r2.uploader.ts` deleted** — these files read
   `STORAGE_PROVIDER`/`CLOUDFLARE_*` env vars at module-load time and are no longer used.
 - **Multipart catch-all removed** — `POST /media/:endpoint` (presigned multipart for Cloudflare R2)
-  is gone. Large files upload through `/media/upload-server` with a raised configurable limit
+  is gone. Large files upload through `/files/upload-server` (v3.8+: `/media/upload-server` was renamed)
   (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB).
 - **Frontend de-cloudflared** — `uppy.upload.ts` has no `cloudflare` case; layouts hard-pin
   `storageProvider` to `'local'`; `cloudflareUrl` removed from context; `/uploads` rewrites in
