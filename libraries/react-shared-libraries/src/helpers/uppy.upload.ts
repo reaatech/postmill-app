@@ -44,6 +44,8 @@ export const getUppyUploadPlugin = (
         options: {
           endpoint: `${backendUrl}/media/upload-server`,
           withCredentials: true,
+          formData: true,
+          allowedMetaFields: ['folderId'],
         },
       };
 

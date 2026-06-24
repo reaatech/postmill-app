@@ -42,12 +42,13 @@ export function useUppyUploader(props: {
   onStart: () => void;
   onEnd: () => void;
   allowedFileTypes: string;
+  folderId?: string | null;
 }) {
   const setLocked = useLaunchStore((state) => state.setLocked);
   const toast = useToaster();
   const { backendUrl, disableImageCompression, transloadit } =
     useVariables();
-  const { onUploadSuccess, allowedFileTypes } = props;
+  const { onUploadSuccess, allowedFileTypes, folderId } = props;
   const fetch = useFetch();
   return useMemo(() => {
     // Track file order to maintain original sequence after upload
@@ -189,7 +190,7 @@ export function useUppyUploader(props: {
       setLocked(true);
       uppy2.setFileMeta(file.id, {
         addedOrder: fileOrderIndex++, // Track original order for sorting after upload
-        // Add more fields as needed
+        folderId: folderId ?? undefined,
       });
     });
     uppy2.on('error', (result) => {
@@ -275,5 +276,5 @@ export function useUppyUploader(props: {
       });
     });
     return uppy2;
-  }, []);
+  }, [folderId]);
 }

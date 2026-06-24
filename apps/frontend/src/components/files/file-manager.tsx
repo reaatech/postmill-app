@@ -51,9 +51,16 @@ export type FileItem = {
   folder?: { id: string; name: string } | null;
 };
 
-export const FileManager: FC<{ standalone?: boolean; onSelect?: (items: FileItem[]) => void }> = ({
+export const FileManager: FC<{
+  standalone?: boolean;
+  onSelect?: (items: FileItem[]) => void;
+  onFolderChange?: (folderId: string | null) => void;
+  refreshKey?: number | string;
+}> = ({
   standalone,
   onSelect,
+  onFolderChange,
+  refreshKey,
 }) => {
   const fetch = useFetch();
   const [page, setPage] = useState(0);
@@ -71,6 +78,10 @@ export const FileManager: FC<{ standalone?: boolean; onSelect?: (items: FileItem
 
   useEffect(() => { setPage(0); }, [debouncedSearch, selectedFolderId, filterType, filterTag]);
 
+  useEffect(() => {
+    onFolderChange?.(selectedFolderId);
+  }, [selectedFolderId, onFolderChange]);
+
   const params = new URLSearchParams({ page: String(page + 1) });
   if (debouncedSearch.trim()) params.set('search', debouncedSearch.trim());
   if (selectedFolderId) params.set('folderId', selectedFolderId);
@@ -82,7 +93,7 @@ export const FileManager: FC<{ standalone?: boolean; onSelect?: (items: FileItem
   params.set('limit', '24');
 
   const { data, mutate, isLoading } = useSWR(
-    `files-${page}-${debouncedSearch}-${selectedFolderId || 'root'}-${filterType}-${filterTag}-${sortField}-${sortOrder}`,
+    `files-${page}-${debouncedSearch}-${selectedFolderId || 'root'}-${filterType}-${filterTag}-${sortField}-${sortOrder}-${refreshKey ?? 0}`,
     async () => (await fetch(`/files?${params.toString()}`)).json()
   );
 

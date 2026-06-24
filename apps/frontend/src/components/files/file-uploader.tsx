@@ -14,6 +14,7 @@ export const FileUploader: FC<{
   const [loading, setLoading] = useState(false);
 
   const uppy = useUppyUploader({
+    folderId,
     allowedFileTypes: 'image/*,video/mp4,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip',
     onUploadSuccess: async () => {
       onUploadComplete();

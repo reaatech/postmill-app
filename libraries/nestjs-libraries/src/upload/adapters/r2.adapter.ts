@@ -32,6 +32,9 @@ const ALLOWED_MIME_TYPES = new Set<string>([
   'audio/mp4',
   'audio/wav',
   'audio/ogg',
+  'font/ttf',
+  'font/otf',
+  'font/woff2',
 ]);
 
 const ALLOWED_EXT_TO_MIME: Record<string, string> = {

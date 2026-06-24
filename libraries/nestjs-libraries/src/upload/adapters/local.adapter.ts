@@ -29,6 +29,9 @@ const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
   'audio/mp4',
   'audio/wav',
   'audio/ogg',
+  'font/ttf',
+  'font/otf',
+  'font/woff2',
 ]);
 
 export class LocalAdapter implements IStorageAdapter {

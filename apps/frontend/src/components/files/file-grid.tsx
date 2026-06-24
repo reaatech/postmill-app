@@ -13,7 +13,7 @@ export const FileGrid: FC<{
   onFileClick: (file: FileItem) => void;
   standalone?: boolean;
   onSelect?: (items: FileItem[]) => void;
-}> = ({ files, selectedFiles, onToggleSelect, onFileClick }) => {
+}> = ({ files, selectedFiles, onToggleSelect, onFileClick, onSelect }) => {
   const mediaDirectory = useMediaDirectory();
 
   const handleDragStart = useCallback((e: React.DragEvent, fileId: string) => {
@@ -39,8 +39,14 @@ export const FileGrid: FC<{
               'group relative w-[calc(12.5%-3px)] min-w-[120px] aspect-square rounded-[8px] overflow-hidden cursor-grab active:cursor-grabbing border-[3px] transition-all',
               isSelected ? 'border-[#2B5CD3]' : 'border-transparent hover:border-[#2B5CD3]/40'
             )}
-            onClick={() => onToggleSelect(file)}
-            onDoubleClick={() => onFileClick(file)}
+            onClick={() => {
+              if (onSelect) {
+                onSelect([file]);
+              } else {
+                onToggleSelect(file);
+              }
+            }}
+            onDoubleClick={() => !onSelect && onFileClick(file)}
           >
             <div className="w-full h-full bg-newBgColorInner relative">
               {isVideo ? (
