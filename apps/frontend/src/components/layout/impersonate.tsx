@@ -430,8 +430,8 @@ export const Impersonate = () => {
   }, [data]);
   return (
     <div>
-      <div className="bg-btnPrimary h-[52px] flex justify-center items-center border-input border rounded-[8px] text-white">
-        <div className="relative flex flex-col w-[600px]">
+      <div className="bg-btnPrimary h-[52px] flex justify-center items-center border-input border rounded-[8px] text-white min-w-0 overflow-x-auto">
+        <div className="relative flex flex-col w-full max-w-[600px] min-w-0 px-[12px]">
           <div className="relative z-[1]">
             {user?.impersonate ? (
               <div className="text-center flex justify-center items-center gap-[20px]">
