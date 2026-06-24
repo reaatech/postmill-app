@@ -15,6 +15,7 @@ import { sharedStageRef } from './stage-ref';
 interface CanvasProps {
   store: ReturnType<typeof import('./designer.store').createDesignerStore>;
   showSafeZones?: boolean;
+  showRulers?: boolean;
   safeZonePreset?: string;
   onAddImage?: () => void;
   sendImageAwareness?: (
@@ -30,6 +31,7 @@ const SNAP = 6;
 export const DesignerCanvas: FC<CanvasProps> = ({
   store,
   showSafeZones,
+  showRulers = true,
   safeZonePreset,
   onAddImage,
   sendImageAwareness,
@@ -77,6 +79,8 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   const addElement = store((s) => s.addElement);
   const setZoom = store((s) => s.setZoom);
   const setViewport = store((s) => s.setViewport);
+  const snapEnabled = store((s) => s.snapEnabled);
+  const fitNonce = store((s) => s.fitNonce);
 
   const output: any = doc.outputs[currentOutput];
   const isVideo = doc.mode === 'video';
@@ -244,6 +248,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   const computeSnap = useCallback(
     (node: Konva.Node) => {
       if (!output || isVideo) return;
+      if (!snapEnabled) { setGuides([]); return; }
       const others = ((output as DesignerOutput | undefined)?.children || []).filter((el) => !selectedIds.includes(el.id) && !el.hidden);
       const w = node.width() * node.scaleX();
       const h = node.height() * node.scaleY();
@@ -279,7 +284,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
       setGuides(lines);
       setHud({ x: node.x(), y: node.y() - 22, text: `${Math.round(node.x())}, ${Math.round(node.y())}` });
     },
-    [output, selectedIds, output.width, output.height]
+    [output, selectedIds, output.width, output.height, snapEnabled]
   );
 
   const handleDragMove = useCallback(
@@ -414,6 +419,33 @@ export const DesignerCanvas: FC<CanvasProps> = ({
     lastFitKey.current = key;
     fitToScreen();
   }, [stageSize.width, stageSize.height, output.width, output.height, fitToScreen]);
+
+  // Explicit Fit-to-Screen requests from the View menu (D-12). The store bumps
+  // fitNonce; skip the very first value so this doesn't double-fit on mount.
+  const lastFitNonce = useRef(fitNonce);
+  useEffect(() => {
+    if (lastFitNonce.current === fitNonce) return;
+    lastFitNonce.current = fitNonce;
+    fitToScreen();
+  }, [fitNonce, fitToScreen]);
+
+  // Refit the canvas when the viewport changes (window/browser resize, device
+  // tilt/orientation) — rescales to fit and re-centers in the gray area, which
+  // reads better than a same-zoom recenter on big aspect changes. Only fires on
+  // a genuine stage-size change (side panels are absolute overlays, so toggling
+  // them doesn't trigger this). The first measurement is owned by the
+  // fit-on-doc-size effect above, so skip it here.
+  const lastStageSize = useRef({ width: 0, height: 0 });
+  useEffect(() => {
+    const width = stageSize.width;
+    const height = stageSize.height;
+    const prev = lastStageSize.current;
+    lastStageSize.current = { width, height };
+    if (!width || !height) return;
+    if (!prev.width || !prev.height) return; // first real measurement → initial fit owns it
+    if (prev.width === width && prev.height === height) return;
+    fitToScreen();
+  }, [stageSize.width, stageSize.height, fitToScreen]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
@@ -754,13 +786,15 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         </div>
       )}
 
-      <Rulers
-        zoom={zoom}
-        viewportX={viewportX}
-        viewportY={viewportY}
-        width={stageSize.width}
-        height={stageSize.height}
-      />
+      {showRulers && (
+        <Rulers
+          zoom={zoom}
+          viewportX={viewportX}
+          viewportY={viewportY}
+          width={stageSize.width}
+          height={stageSize.height}
+        />
+      )}
 
       {hud && (
         <div

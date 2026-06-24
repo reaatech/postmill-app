@@ -20,9 +20,11 @@ interface DesignTemplate {
 interface TemplatesPanelProps {
   store: ReturnType<typeof import('../designer.store').createDesignerStore>;
   onClose?: () => void;
+  /** Returns false to abort applying (unsaved-changes guard). */
+  guard?: () => boolean;
 }
 
-export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
+export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard }) => {
   const fetch = useFetch();
   const user = useUser();
   const toaster = useToaster();
@@ -38,6 +40,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
   );
 
   const applyTemplate = useCallback(async (template: DesignTemplate) => {
+    if (guard && !guard()) return;
     const res = await fetch('/media/designs', {
       method: 'POST',
       body: JSON.stringify({
@@ -52,7 +55,7 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose }) => {
     const data = await res.json();
     store.getState().loadDesign(template.doc, data.id, template.name, template.id);
     onClose?.();
-  }, [store, onClose, fetch, toaster]);
+  }, [store, onClose, fetch, toaster, guard]);
 
   const saveAsTemplate = useCallback(async () => {
     const state = store.getState();

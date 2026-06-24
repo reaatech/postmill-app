@@ -164,6 +164,9 @@ export interface DesignerState {
   playheadMs: number;
   selectedClip: { outputIndex: number; trackId: string; clipId: string } | null;
   linkedUpdateFlash: Record<number, number>;
+  // View prefs / canvas requests (menu-driven)
+  snapEnabled: boolean;
+  fitNonce: number;
 }
 
 export interface DesignerActions {
@@ -194,6 +197,8 @@ export interface DesignerActions {
   relinkElement: (id: string, originId: string) => void;
   setZoom: (zoom: number) => void;
   setViewport: (x: number, y: number) => void;
+  setSnapEnabled: (v: boolean) => void;
+  requestFit: () => void;
   undo: () => void; redo: () => void; pushHistory: () => void;
   markSaved: () => void; setSaving: (saving: boolean) => void;
   reset: (width?: number, height?: number) => void;
@@ -403,6 +408,8 @@ export const createDesignerStore = (
       playheadMs: 0,
       selectedClip: null,
       linkedUpdateFlash: {},
+      snapEnabled: true,
+      fitNonce: 0,
       clipboard: [],
       setDoc: (doc) => set({ doc: migrateDoc(doc), isDirty: true }),
       setDesignName: (name) => set({ designName: name, isDirty: true }),
@@ -680,6 +687,8 @@ export const createDesignerStore = (
 
       setZoom: (zoom) => set({ zoom: Math.max(0.1, Math.min(5, zoom)) }),
       setViewport: (x, y) => set({ viewportX: x, viewportY: y }),
+      setSnapEnabled: (v) => set({ snapEnabled: v }),
+      requestFit: () => set({ fitNonce: get().fitNonce + 1 }),
 
       pushHistory: () => {
         const { doc, history, historyIndex } = get();

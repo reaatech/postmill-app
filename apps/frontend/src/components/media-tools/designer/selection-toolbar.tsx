@@ -4,8 +4,11 @@ import React, { FC } from 'react';
 import type { DesignerElement } from './designer.store';
 
 interface ToolbarProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   store: any;
+  aiActive?: boolean;
+  onAiRemoveBg?: () => void;
+  onAiUpscale?: (scale: number) => void;
+  onAiInpaint?: () => void;
 }
 
 const Btn: FC<{ onClick: () => void; title: string; children: React.ReactNode }> = ({
@@ -25,7 +28,13 @@ const Btn: FC<{ onClick: () => void; title: string; children: React.ReactNode }>
 
 // Contextual selection toolbar (A2): high-frequency actions surfaced at the top
 // of the canvas when one or more elements are selected.
-export const SelectionToolbar: FC<ToolbarProps> = ({ store }) => {
+export const SelectionToolbar: FC<ToolbarProps> = ({
+  store,
+  aiActive,
+  onAiRemoveBg,
+  onAiUpscale,
+  onAiInpaint,
+}) => {
   const doc = store((s: any) => s.doc);
   const currentOutput = store((s: any) => s.currentOutput);
   const selectedIds: string[] = store((s: any) => s.selectedIds);
@@ -44,6 +53,8 @@ export const SelectionToolbar: FC<ToolbarProps> = ({ store }) => {
   const allLocked = selected.every((s) => s.locked);
   const canGroup = selectedIds.length >= 2;
   const canUngroup = selected.some((s) => s.groupId);
+  const singleImage = selected.length === 1 && selected[0].type === 'image';
+  const showAi = !!aiActive && singleImage;
 
   return (
     <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1 px-2 py-1 rounded-lg bg-[#1e1e2e] border border-newBorder shadow-lg">
@@ -63,6 +74,20 @@ export const SelectionToolbar: FC<ToolbarProps> = ({ store }) => {
       {canUngroup && <Btn onClick={() => ungroupSelection()} title="Ungroup">▢</Btn>}
       <div className="w-px h-5 bg-newBorder mx-1" />
       <Btn onClick={() => selectedIds.forEach((id) => removeElement(id))} title="Delete">🗑</Btn>
+      {showAi && (
+        <>
+          <div className="w-px h-5 bg-newBorder mx-1" />
+          {onAiRemoveBg && (
+            <Btn onClick={onAiRemoveBg} title="AI: Remove background">✦</Btn>
+          )}
+          {onAiUpscale && (
+            <Btn onClick={() => onAiUpscale(2)} title="AI: Upscale 2×">⤢</Btn>
+          )}
+          {onAiInpaint && (
+            <Btn onClick={onAiInpaint} title="AI: Inpaint">▦</Btn>
+          )}
+        </>
+      )}
     </div>
   );
 };

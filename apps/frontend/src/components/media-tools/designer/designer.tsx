@@ -12,7 +12,6 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDebounce } from 'use-debounce';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
-import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 import { TemplatesPanel } from './panels/templates-panel';
 import { MyDesignsPanel } from './panels/my-designs-panel';
 import { TextPanel } from './panels/text-panel';
@@ -32,6 +31,14 @@ import { CommandPalette } from './command-palette';
 import { ExportDialog } from './export-dialog';
 import { VideoTimeline } from './video-timeline';
 import { fitWithin } from './panels/fit-within';
+import { MenuBar } from './menu-bar';
+import { useDesignerActions, type DesignerActionCtx } from './actions';
+import { NewDesignDialog } from './new-design-dialog';
+import { CanvasInspector } from './panels/canvas-inspector';
+import { MediaSelectorModal } from '../media-selector-modal';
+import { StartDialog } from './start-dialog';
+import { aiRemoveBackground, aiUpscale, aiDetectSubject } from './ai-image-actions';
+import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { getBrandViolations } from './brand-compliance';
 import { useBrandColors } from './panels/use-brand-colors';
 import { useBrandFonts } from './panels/use-brand-fonts';
@@ -78,199 +85,6 @@ export const getThumbnailDataUrl = (canvas: HTMLCanvasElement | null, maxDim = 4
   return c.toDataURL('image/jpeg', 0.85);
 };
 
-const StartScreen: FC<{
-  store: ReturnType<typeof createDesignerStore>;
-  onStart: () => void;
-  fetchFn: ReturnType<typeof useFetch>;
-}> = ({ store, onStart, fetchFn }) => {
-  const [tab, setTab] = useState<'my-designs' | 'templates'>('my-designs');
-  const [showFormatPicker, setShowFormatPicker] = useState(false);
-  const [selectedPresets, setSelectedPresets] = useState<string[]>([]);
-  const [mode, setMode] = useState<'image' | 'video'>('image');
-
-  const allPresets = useMemo(
-    () => CHANNEL_PRESETS.filter((p) => p.category !== 'custom' && p.category === (mode === 'video' ? 'video' : mode === 'image' ? 'social' : mode)),
-    [mode],
-  );
-
-  const handleStartBlank = useCallback(() => {
-    store.getState().reset(1080, 1080);
-    if (mode === 'video') {
-      store.getState().setMode('video');
-    }
-    onStart();
-  }, [store, onStart, mode]);
-
-  const handleStartFromFormats = useCallback(() => {
-    if (selectedPresets.length === 0) return;
-    store.getState().reset();
-    if (mode === 'video') {
-      store.getState().setMode('video');
-    }
-    const found = allPresets.filter((p) => selectedPresets.includes(p.id));
-    found.forEach((p) => store.getState().addOutput({ formatId: p.id, name: p.name, width: p.width, height: p.height }));
-    store.getState().setCurrentOutput(0);
-    onStart();
-  }, [store, onStart, selectedPresets, allPresets, mode]);
-
-  const handleOpenDesign = useCallback(async (design: { id: string }) => {
-    const res = await fetchFn(`/media/designs/${design.id}`);
-    if (!res.ok) return;
-    const full = await res.json();
-    store.getState().loadDesign(full.doc, full.id, full.name, null);
-    onStart();
-  }, [store, onStart, fetchFn]);
-
-  const togglePreset = useCallback((id: string) => {
-    setSelectedPresets((prev) =>
-      prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]
-    );
-  }, []);
-
-  if (showFormatPicker) {
-    return (
-      <div className="flex items-center justify-center h-full bg-newBgColorInner">
-        <div className="max-w-3xl w-full p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-bold text-textColor">Select Formats</h2>
-            <button
-              onClick={() => setShowFormatPicker(false)}
-              className="text-[13px] text-textColor/60 hover:text-textColor transition-colors"
-            >
-              ← Back
-            </button>
-          </div>
-          <p className="text-[13px] text-newTextColor/60 mb-4 text-center">
-            Pick one or more formats — each becomes a linked output tab in the design.
-          </p>
-          <div className="grid grid-cols-3 gap-4">
-            {allPresets.map((preset) => {
-              const isSelected = selectedPresets.includes(preset.id);
-              return (
-                <button
-                  key={preset.id}
-                  onClick={() => togglePreset(preset.id)}
-                  className={`flex flex-col items-center gap-3 p-6 rounded-xl border transition-all group ${
-                    isSelected
-                      ? 'border-designerAccent bg-designerAccent/10'
-                      : 'border-newBorder bg-newBgColorInner hover:border-designerAccent hover:bg-newColColor/10'
-                  }`}
-                >
-                  <div
-                    className="rounded-lg border border-newBorder overflow-hidden flex items-center justify-center bg-white relative"
-                    style={{
-                      width: Math.min(preset.width / 10, 120),
-                      height: Math.min(preset.height / 10, 120),
-                    }}
-                  >
-                    <div className="text-[10px] text-gray-400 text-center px-1 leading-tight">
-                      {preset.width}×{preset.height}
-                    </div>
-                    {isSelected && (
-                      <div className="absolute inset-0 bg-designerAccent/20 flex items-center justify-center">
-                        <span className="text-white text-[16px]">✓</span>
-                      </div>
-                    )}
-                  </div>
-                  <span className="text-[13px] font-medium text-textColor">{preset.name}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-6 flex justify-center">
-            <button
-              onClick={handleStartFromFormats}
-              disabled={selectedPresets.length === 0}
-              className="px-6 py-2.5 rounded-lg text-[14px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-            >
-              Create Design ({selectedPresets.length} format{selectedPresets.length !== 1 ? 's' : ''})
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full bg-newBgColorInner">
-      <div className="p-6 border-b border-newBorder">
-        <h2 className="text-xl font-bold text-textColor mb-4">Start a new design</h2>
-        <div className="flex gap-3 mb-4">
-          <button
-            onClick={() => setMode('image')}
-            className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-              mode === 'image'
-                ? 'bg-designerAccent text-white'
-                : 'border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover'
-            }`}
-          >
-            Image
-          </button>
-          <button
-            onClick={() => setMode('video')}
-            className={`px-4 py-2 rounded-lg text-[13px] font-medium transition-colors ${
-              mode === 'video'
-                ? 'bg-designerAccent text-white'
-                : 'border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover'
-            }`}
-          >
-            Video
-          </button>
-        </div>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowFormatPicker(true)}
-            className="px-4 py-2 rounded-lg text-[13px] font-medium bg-designerAccent text-white hover:bg-designerAccent/80 transition-colors"
-          >
-            Start from a Format
-          </button>
-          <button
-            onClick={handleStartBlank}
-            className="px-4 py-2 rounded-lg text-[13px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            aria-label="Start blank design"
-          >
-            Start Blank
-          </button>
-          <button
-            onClick={() => setTab('templates')}
-            className="px-4 py-2 rounded-lg text-[13px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors"
-          >
-            Start from a Template
-          </button>
-        </div>
-      </div>
-
-      <div className="flex border-b border-newBorder">
-        <button
-          onClick={() => setTab('my-designs')}
-          className={`flex-1 py-3 text-[13px] font-medium transition-colors ${
-            tab === 'my-designs'
-              ? 'text-designerAccent border-b-2 border-designerAccent'
-              : 'text-textColor/50 hover:text-textColor/80'
-          }`}
-        >
-          My Designs
-        </button>
-        <button
-          onClick={() => setTab('templates')}
-          className={`flex-1 py-3 text-[13px] font-medium transition-colors ${
-            tab === 'templates'
-              ? 'text-designerAccent border-b-2 border-designerAccent'
-              : 'text-textColor/50 hover:text-textColor/80'
-          }`}
-        >
-          Templates
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto">
-        {tab === 'my-designs' && <MyDesignsPanel onOpen={handleOpenDesign} />}
-        {tab === 'templates' && <TemplatesPanel store={store as any} onClose={onStart} />}
-      </div>
-    </div>
-  );
-};
-
 export const Designer: FC<DesignerProps> = ({
   setMedia,
   closeModal,
@@ -283,9 +97,15 @@ export const Designer: FC<DesignerProps> = ({
   const toaster = useToaster();
   const modals = useModals();
   const [activePanel, setActivePanel] = useState<string | null>(null);
-  const [showPresetPicker, setShowPresetPicker] = useState(!initialAsset && !designId);
   const [showSafeZones, setShowSafeZones] = useState(false);
+  const [showRulers, setShowRulers] = useState(true);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
+  // Required startup picker on a fresh editor (no deep-linked asset/design and
+  // no caller-supplied size) — forces an explicit format choice instead of the
+  // silent 1080² "Instagram Post" default.
+  const [showStart, setShowStart] = useState(
+    () => !initialAsset && !designId && !(width && height)
+  );
   const aiActive = useAiActive();
   const user = useUser();
   const brandColors = useBrandColors();
@@ -321,7 +141,6 @@ export const Designer: FC<DesignerProps> = ({
   const currentOutput = store((s) => s.currentOutput);
   const selectedIds = store((s) => s.selectedIds);
   const selectedClip = store((s) => s.selectedClip);
-  const editFormatOnly = store((s) => s.editFormatOnly);
   const brandEnforcement = store((s) => s.brandEnforcement);
   const brandAdminOverride = store((s) => s.brandAdminOverride);
   const undo = store((s) => s.undo);
@@ -599,8 +418,224 @@ export const Designer: FC<DesignerProps> = ({
     }
   }, []);
 
+  // --- Unsaved-changes guard shared by New / Open / Templates (D-7b) ---
+  const confirmDiscardIfDirty = useCallback(() => {
+    if (store.getState().isDirty) {
+      return window.confirm('Discard unsaved changes? Your current design will be replaced.');
+    }
+    return true;
+  }, [store]);
+
+  // Reusable image-from-media placement (centered + aspect-correct) — shared by
+  // the Insert/Import media modal and the canvas "Add Image" (D-8).
+  const addImageFromMedia = useCallback(
+    (item: { url: string; fileId?: string; width?: number; height?: number }) => {
+      const state = store.getState();
+      const active = state.doc.outputs[state.currentOutput];
+      const { width: w, height: h } = fitWithin(
+        item.width || active.width,
+        item.height || active.height,
+        active.width,
+        active.height
+      );
+      state.addElement({
+        id: '',
+        type: 'image',
+        x: (active.width - w) / 2,
+        y: (active.height - h) / 2,
+        width: w,
+        height: h,
+        rotation: 0,
+        opacity: 1,
+        locked: false,
+        hidden: false,
+        src: item.url,
+        fileId: item.fileId,
+        naturalWidth: item.width || undefined,
+        naturalHeight: item.height || undefined,
+      });
+    },
+    [store]
+  );
+
+  const onOpenMedia = useCallback(() => {
+    modals.openModal({
+      title: 'Add media',
+      children: (close: () => void) => (
+        <MediaSelectorModal
+          open
+          onClose={close}
+          onSelect={(item) => {
+            addImageFromMedia(item as any);
+            close();
+          }}
+        />
+      ),
+    });
+  }, [modals, addImageFromMedia]);
+
+  const selectedImageId = useCallback(() => {
+    const st = store.getState();
+    const out = st.doc.outputs[st.currentOutput] as any;
+    const els = (out?.children || []).filter((c: any) => st.selectedIds.includes(c.id));
+    return els.length === 1 && els[0].type === 'image' ? (els[0].id as string) : null;
+  }, [store]);
+
+  const runAi = useCallback(
+    async (fn: (id: string) => Promise<void>, failMsg: string) => {
+      const id = selectedImageId();
+      if (!id) return;
+      try {
+        await fn(id);
+      } catch {
+        toaster.show(failMsg, 'warning');
+      }
+    },
+    [selectedImageId, toaster]
+  );
+
+  const ctx: DesignerActionCtx = useMemo(
+    () => ({
+      showSafeZones,
+      showRulers,
+      aiActive,
+      canShare: !!currentDesignId,
+      collabEnabled,
+      inModal: !!(setMedia || closeModal),
+      onNew: (mode) => {
+        if (!confirmDiscardIfDirty()) return;
+        const st = store.getState();
+        st.reset(1080, 1080);
+        if (mode === 'video') st.setMode('video');
+      },
+      onNewCustom: () =>
+        modals.openModal({
+          title: 'New design',
+          children: (close: () => void) => (
+            <NewDesignDialog store={store} onClose={close} guard={confirmDiscardIfDirty} />
+          ),
+        }),
+      onOpenDesigns: () =>
+        modals.openModal({
+          title: 'Open design',
+          children: (close: () => void) => (
+            <MyDesignsPanel
+              onOpen={async (d) => {
+                if (!confirmDiscardIfDirty()) return;
+                const res = await fetch(`/media/designs/${d.id}`);
+                if (!res.ok) return;
+                const full = await res.json();
+                store.getState().loadDesign(full.doc, full.id, full.name, null);
+                close();
+              }}
+            />
+          ),
+        }),
+      onBrowseTemplates: () =>
+        modals.openModal({
+          title: 'Browse templates',
+          children: (close: () => void) => (
+            <TemplatesPanel store={store as any} onClose={close} guard={confirmDiscardIfDirty} />
+          ),
+        }),
+      onSave: handleSave,
+      onSaveAsTemplate: handleSaveAsTemplate,
+      onOpenMedia,
+      onExport: handleExport,
+      onUseInPost: setMedia ? handleExport : undefined,
+      onClose: closeModal,
+      onCanvasProperties: () => {
+        store.getState().setSelectedIds([]);
+        setInspectorCollapsed(false);
+      },
+      onTogglePanel: (id) => setActivePanel((p) => (p === id ? null : id)),
+      onToggleInspector: () => setInspectorCollapsed((c) => !c),
+      onToggleSafeZones: () => setShowSafeZones((v) => !v),
+      onToggleRulers: () => setShowRulers((v) => !v),
+      onToggleSnap: () => {
+        const st = store.getState();
+        st.setSnapEnabled(!st.snapEnabled);
+      },
+      onFitToScreen: () => store.getState().requestFit(),
+      onActualSize: () => store.getState().setZoom(1),
+      onShortcuts: () =>
+        modals.openModal({
+          children: (close: () => void) => <ShortcutsOverlay onClose={close} />,
+        }),
+      onConvertMode: () => {
+        const st = store.getState();
+        const cur = st.doc.mode;
+        const target = cur === 'image' ? 'video' : 'image';
+        const msg =
+          cur === 'image'
+            ? 'Convert to video mode? All image elements will be lost.'
+            : 'Convert to image mode? All video tracks and clips will be lost.';
+        if (window.confirm(msg)) st.setMode(target);
+      },
+      onToggleShare: () => setCollabEnabled((v) => !v),
+      onAiGenerate: () => setActivePanel('ai'),
+      onAiRemoveBg: () =>
+        runAi((id) => aiRemoveBackground({ fetch, store, elementId: id }), 'Background removal failed'),
+      onAiUpscale: (scale) =>
+        runAi((id) => aiUpscale({ fetch, store, elementId: id }, scale), 'Upscale failed'),
+      onAiInpaint: () => {
+        const id = selectedImageId();
+        if (!id) return;
+        setActivePanel(null);
+        setInspectorCollapsed(false);
+        toaster.show('Draw a mask in the inspector’s AI Tools, then Inpaint', 'success');
+      },
+      onAiDetectSubject: () =>
+        runAi((id) => aiDetectSubject({ fetch, store, elementId: id }), 'Subject detection failed'),
+    }),
+    [
+      showSafeZones,
+      showRulers,
+      aiActive,
+      currentDesignId,
+      collabEnabled,
+      setMedia,
+      closeModal,
+      store,
+      modals,
+      fetch,
+      toaster,
+      handleSave,
+      handleSaveAsTemplate,
+      handleExport,
+      onOpenMedia,
+      confirmDiscardIfDirty,
+      selectedImageId,
+      runAi,
+    ]
+  );
+
+  const actions = useDesignerActions(store, ctx);
+
+  const hasInspectorTarget =
+    selectedIds.length >= 1 || (doc.mode === 'video' && !!selectedClip);
+
+  const onSetBackgroundImage = useCallback(() => {
+    modals.openModal({
+      title: 'Background image',
+      children: (close: () => void) => (
+        <MediaSelectorModal
+          open
+          onClose={close}
+          onSelect={(item) => {
+            store.getState().setOutputBackground({
+              type: 'image',
+              src: (item as any).url,
+              fileId: (item as any).fileId,
+            });
+            close();
+          }}
+        />
+      ),
+    });
+  }, [modals, store]);
+
   const panels = [
-    { id: 'templates', icon: '◧', label: 'Templates' },
     { id: 'text', icon: 'T', label: 'Text' },
     { id: 'elements', icon: '◇', label: 'Elements' },
     { id: 'icons', icon: '★', label: 'Icons' },
@@ -613,46 +648,51 @@ export const Designer: FC<DesignerProps> = ({
     { id: 'brand', icon: '♥', label: 'Brand' },
   ];
 
-  if (showPresetPicker) {
-    return <StartScreen store={store} onStart={() => setShowPresetPicker(false)} fetchFn={fetch} />;
-  }
+  // Global ⌘E → Export (⌘S/⌘K already handled elsewhere; the rest of the
+  // shortcut map is canvas-focus-scoped). Ignore while typing in a field.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'e') {
+        const t = e.target as HTMLElement | null;
+        const tag = t?.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
+        e.preventDefault();
+        handleExport();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [handleExport]);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden bg-newBgColorInner">
-      <div className="flex items-center justify-between px-4 py-2 border-b border-newBorder bg-newBgColorInner shrink-0">
-        <div className="flex items-center gap-3">
+    <div className="relative flex flex-col h-full w-full overflow-hidden bg-newBgColorInner">
+      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-newBorder bg-newBgColorInner shrink-0">
+        <div className="flex items-center gap-2 shrink-0">
+          <Logo size={26} className="" />
           <input
             value={designName}
             onChange={(e) => store.getState().setDesignName(e.target.value)}
-            className="bg-transparent border-none text-textColor text-[14px] font-medium outline-none focus:border-b focus:border-designerAccent px-1 py-0.5"
+            aria-label="Design name"
+            className="mobile:hidden bg-transparent border-none text-textColor text-[14px] font-medium outline-none focus:border-b focus:border-designerAccent px-1 py-0.5 w-[150px]"
           />
-          {isSaving && (
-            <span className="text-[11px] text-newTextColor/40">Saving…</span>
-          )}
-          {!isSaving && !isDirty && currentDesignId && (
-            <span className="text-[11px] text-green-500">All changes saved</span>
-          )}
-          {!isSaving && isDirty && (
-            <span className="text-[11px] text-amber-400">Unsaved changes</span>
-          )}
         </div>
-         <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const currentMode = store.getState().doc.mode;
-              const targetMode = currentMode === 'image' ? 'video' : 'image';
-              const confirmMsg = currentMode === 'image'
-                ? 'Convert to video mode? All image elements will be lost.'
-                : 'Convert to image mode? All video tracks and clips will be lost.';
-              if (window.confirm(confirmMsg)) {
-                store.getState().setMode(targetMode);
-              }
-            }}
-            className="px-2 py-1 rounded text-[10px] text-textColor/40 hover:text-amber-400 hover:bg-amber-400/10 border border-transparent hover:border-amber-400/20 transition-colors"
-            title={`Convert to ${doc.mode === 'image' ? 'video' : 'image'} mode`}
-          >
-            {doc.mode === 'image' ? '→ Video' : '→ Image'}
-          </button>
+
+        <MenuBar actions={actions} />
+
+        <div className="mobile:hidden flex items-center text-[11px] min-w-0 shrink-0">
+          {isSaving && <span className="text-newTextColor/40">Saving…</span>}
+          {!isSaving && !isDirty && currentDesignId && (
+            <span className="text-green-500">Saved</span>
+          )}
+          {!isSaving && isDirty && <span className="text-amber-400">Unsaved</span>}
+        </div>
+
+        <div className="flex-1" />
+
+        <div className="flex items-center gap-1 shrink-0 min-w-0">
+          {/* Secondary quick actions collapse on mobile (all reachable via the
+              menus / ⌘ shortcuts); only Export + contextual actions stay. */}
+          <div className="contents mobile:hidden">
           <button
             onClick={() => undo()}
             className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
@@ -669,45 +709,12 @@ export const Designer: FC<DesignerProps> = ({
           >
             ↪
           </button>
-          <button
-            onClick={() => setShowSafeZones((v) => !v)}
-            className={`w-8 h-8 flex items-center justify-center rounded text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
-              showSafeZones ? 'bg-designerAccent/20 text-designerAccent' : 'text-textColor hover:bg-newColColor/30'
-            }`}
-            title="Toggle safe zones"
-            aria-label="Toggle safe zones"
-          >
-            ⊡
-          </button>
-          <button
-            onClick={() => store.getState().setEditFormatOnly(!editFormatOnly)}
-            className={`px-3 py-1.5 text-xs rounded border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
-              editFormatOnly
-                ? 'bg-orange-500/20 border-orange-500/30 text-orange-400'
-                : 'border-[#2a2a4a] text-gray-400 hover:text-white'
-            }`}
-            title={editFormatOnly ? 'Edits stay in this format only' : 'Edits apply to all formats (default)'}
-            aria-label={editFormatOnly ? 'Format-only editing (edits stay in this format only)' : 'All formats editing (edits apply to all formats)'}
-          >
-            {editFormatOnly ? 'Format-only' : 'All Formats'}
-          </button>
-          <button
-            onClick={() => store.getState().setBrandEnforcement(!brandEnforcement)}
-            className={`px-3 py-1.5 text-xs rounded border transition-colors ${
-              brandEnforcement
-                ? 'bg-purple-500/20 border-purple-500/30 text-purple-400'
-                : 'border-[#2a2a4a] text-gray-400 hover:text-white'
-            }`}
-            title={brandEnforcement ? 'Brand restrictions active' : 'Free editing'}
-          >
-            {brandEnforcement ? '🔒 Brand' : 'Brand'}
-          </button>
           {currentDesignId && (
             <button
               className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                 collabEnabled
                   ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                  : 'border-[#2a2a4a] text-gray-400 hover:text-white'
+                  : 'border-newBorder text-textColor/70 hover:text-textColor'
               }`}
               onClick={() => setCollabEnabled(!collabEnabled)}
               title={collabEnabled ? `${connectedCount} connected` : 'Enable real-time collaboration'}
@@ -715,16 +722,6 @@ export const Designer: FC<DesignerProps> = ({
               {collabEnabled ? `👥 ${connectedCount}` : 'Share'}
             </button>
           )}
-          <button
-            onClick={() =>
-              modals.openModal({ children: <ShortcutsOverlay onClose={() => modals.closeAll()} /> })
-            }
-            className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            title="Keyboard shortcuts"
-            aria-label="Keyboard shortcuts"
-          >
-            ?
-          </button>
           <div className="w-px h-6 bg-newBorder mx-1" />
           <button
             onClick={handleSave}
@@ -734,15 +731,7 @@ export const Designer: FC<DesignerProps> = ({
           >
             Save
           </button>
-          <button
-            onClick={handleSaveAsTemplate}
-            disabled={isSaving}
-            className="px-3 py-1.5 rounded-md text-[12px] border border-dashed border-newBorder text-textColor/60 hover:bg-boxHover hover:text-textColor disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-            title="Promote this design to a reusable template"
-            aria-label="Save as template"
-          >
-            Save as template
-          </button>
+          </div>
           <button
             onClick={handleExport}
             disabled={isSaving}
@@ -807,7 +796,6 @@ export const Designer: FC<DesignerProps> = ({
             <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider mb-3">
               {panels.find((p) => p.id === activePanel)?.label}
             </div>
-            {activePanel === 'templates' && <TemplatesPanel store={store as any} />}
             {activePanel === 'text' && <TextPanel store={store as any} />}
             {activePanel === 'elements' && <ElementsPanel store={store as any} />}
             {activePanel === 'icons' && <IconsPanel store={store as any} />}
@@ -825,11 +813,18 @@ export const Designer: FC<DesignerProps> = ({
             <DesignerCanvas
               store={store}
               showSafeZones={showSafeZones}
+              showRulers={showRulers}
               safeZonePreset={safeZonePreset}
-              onAddImage={() => setActivePanel('photos')}
+              onAddImage={onOpenMedia}
               sendImageAwareness={collabEnabled ? collabData.sendImageAwareness : undefined}
             />
-            <SelectionToolbar store={store} />
+            <SelectionToolbar
+              store={store}
+              aiActive={aiActive}
+              onAiRemoveBg={ctx.onAiRemoveBg}
+              onAiUpscale={ctx.onAiUpscale}
+              onAiInpaint={ctx.onAiInpaint}
+            />
             <CollaborationCursors
               connectedCount={connectedCount}
               peers={doc.mode === 'video' ? peerTimelines : undefined}
@@ -838,50 +833,56 @@ export const Designer: FC<DesignerProps> = ({
               durationMs={doc.mode === 'video' ? (doc.outputs[currentOutput] as any)?.durationMs : undefined}
               store={store}
             />
+
+            {/* Inspector overlays the canvas area ONLY (bounded by this
+                relative parent), so it never covers the timeline/format tabs
+                that sit below the canvas. */}
+            {!inspectorCollapsed && (
+              <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-newBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
+                    {hasInspectorTarget ? 'Inspector' : 'Canvas'}
+                  </div>
+                  <button
+                    onClick={() => setInspectorCollapsed(true)}
+                    className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+                    title="Collapse panel"
+                    aria-label="Collapse properties panel"
+                  >
+                    ›
+                  </button>
+                </div>
+                {hasInspectorTarget ? (
+                  <InspectorPanel store={store} />
+                ) : (
+                  <CanvasInspector
+                    key={`canvas-${currentOutput}-${(doc.outputs[currentOutput] as any)?.width}x${(doc.outputs[currentOutput] as any)?.height}`}
+                    store={store}
+                    onSetBackgroundImage={onSetBackgroundImage}
+                  />
+                )}
+              </div>
+            )}
+
+            {inspectorCollapsed && (
+              <button
+                onClick={() => setInspectorCollapsed(false)}
+                className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-newBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
+                title="Show properties"
+                aria-label="Expand properties panel"
+              >
+                ‹
+              </button>
+            )}
           </div>
           {doc.mode === 'video' && <VideoTimeline store={store} sendTimelineAwareness={collabData.sendTimelineAwareness} />}
           <OutputTabs store={store} />
         </div>
-
-        {(selectedIds.length >= 1 || (doc.mode === 'video' && selectedClip)) && !inspectorCollapsed && (
-          <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-newBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
-                Inspector
-              </div>
-              <button
-                onClick={() => setInspectorCollapsed(true)}
-                className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
-                title="Collapse inspector"
-                aria-label="Collapse inspector panel"
-              >
-                ›
-              </button>
-            </div>
-            <InspectorPanel store={store} />
-          </div>
-        )}
-
-        {(selectedIds.length >= 1 || (doc.mode === 'video' && selectedClip)) && inspectorCollapsed && (
-          <button
-            onClick={() => setInspectorCollapsed(false)}
-            className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-newBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
-            title="Show inspector"
-            aria-label="Expand inspector panel"
-          >
-            ‹
-          </button>
-        )}
       </div>
-      <CommandPalette
-        store={store}
-        onExport={handleExport}
-        onSave={handleSave}
-        onSaveAsTemplate={handleSaveAsTemplate}
-        showSafeZones={showSafeZones}
-        onToggleSafeZones={() => setShowSafeZones((v) => !v)}
-        onAddImage={() => setActivePanel('photos')}
-      />
+      <CommandPalette actions={actions} />
+      {showStart && (
+        <StartDialog store={store} fetchFn={fetch} onDone={() => setShowStart(false)} />
+      )}
     </div>
   );
 };
