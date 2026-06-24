@@ -11,7 +11,10 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 interface DeepgramListenResponse {
   results?: {
     channels?: {
-      alternatives?: { transcript?: string }[];
+      alternatives?: {
+        transcript?: string;
+        words?: { word: string; start: number; end: number }[];
+      }[];
     }[];
   };
 }
@@ -65,5 +68,25 @@ export class DeepgramAdapter implements MediaProviderAdapter {
     const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
     if (!transcript) throw new Error('Deepgram returned no transcript');
     return transcript;
+  }
+
+  async speechToTextWords(audio: Buffer, options?: MediaGenerateOptions): Promise<{ text: string; words: { word: string; start: number; end: number }[] }> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) throw new Error('Deepgram API key is required');
+
+    const res = await safeFetch(`https://api.deepgram.com/v1/listen?model=${options?.model || 'whisper'}&word_timestamps=true`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': options?.mimeType || 'audio/wav',
+      },
+      body: new Uint8Array(audio),
+    });
+
+    if (!res.ok) throw new Error(`Deepgram STT failed: ${await res.text()}`);
+    const data = (await res.json()) as DeepgramListenResponse;
+    const alt = data.results?.channels?.[0]?.alternatives?.[0];
+    if (!alt?.transcript) throw new Error('Deepgram returned no transcript');
+    return { text: alt.transcript, words: alt.words || [] };
   }
 }

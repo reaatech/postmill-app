@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DesignRenderService } from './design-render.service';
-import { DesignerDoc, DesignerElement, RenderOptions } from './design-render.types';
+import { DesignerDoc, DesignerElement, DesignerOutput, RenderOptions } from './design-render.types';
 
 export const MAX_BULK_ROWS = 200;
 
@@ -47,8 +47,8 @@ export class DesignBulkService {
         ? structuredClone(templateDoc)
         : JSON.parse(JSON.stringify(templateDoc));
 
-    for (const page of doc.pages ?? []) {
-      for (const el of page.children ?? []) {
+    for (const page of (doc.outputs ?? []).filter(o => 'children' in o) as DesignerOutput[]) {
+      for (const el of (page.children ?? [])) {
         this.substituteElement(el, row);
       }
     }
@@ -61,6 +61,13 @@ export class DesignBulkService {
   ): void {
     if (typeof el.text === 'string') {
       el.text = this.substitute(el.text, row);
+    }
+    if (el.richText?.length) {
+      for (const run of el.richText) {
+        if (typeof run.text === 'string') {
+          run.text = this.substitute(run.text, row);
+        }
+      }
     }
     if (typeof el.src === 'string') {
       el.src = this.substitute(el.src, row);

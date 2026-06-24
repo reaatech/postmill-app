@@ -13,10 +13,9 @@ import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
-import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
@@ -116,10 +115,13 @@ import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/desi
 import { DesignService } from '@gitroom/nestjs-libraries/database/prisma/design/design.service';
 import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
 import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
+import { FontLoaderService } from '@gitroom/nestjs-libraries/media/design-render/font-loader.service';
+import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render/video-render.module';
 
 @Global()
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, VideoRenderModule],
   controllers: [],
   providers: [
     PrismaService,
@@ -144,10 +146,9 @@ import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render
     AutopostRepository,
     AutopostService,
     SignatureService,
-    MediaService,
-    MediaRepository,
     FileService,
     FileRepository,
+    AiMediaGenerationService,
     IntegrationManager,
     RefreshIntegrationService,
     ExtractContentService,
@@ -244,6 +245,7 @@ import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render
     DesignService,
     DesignRenderService,
     DesignBulkService,
+    FontLoaderService,
     {
       provide: 'RBAC_SEED_ON_INIT',
       useFactory: (seeder: RbacSeeder, backfill: BackfillService) => {
@@ -276,8 +278,10 @@ import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render
   ],
   get exports() {
     // Re-export MediaModule so the populated MediaProviderRegistry (adapters are
-    // registered in MediaModule.onModuleInit) is globally injectable.
-    return [...this.providers, MediaModule];
+    // registered in MediaModule.onModuleInit) is globally injectable. VideoRenderModule
+    // is likewise re-exported so VideoRenderService is globally injectable (MediaJobsActivity
+    // in InngestModule, design.controller in ApiModule) without each module re-importing it.
+    return [...this.providers, MediaModule, VideoRenderModule];
   },
 })
 export class DatabaseModule {}

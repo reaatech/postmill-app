@@ -164,6 +164,98 @@ export class AiMediaService {
     this._provenanceSigner = null;
   }
 
+  // Detect a normalized focal point for an image using the org's vision-capable AI
+  // provider when available. Falls back to center (0.5, 0.5) non-fatally when AI is
+  // off, the model lacks vision, or the call fails.
+  async detectFocalPoint(
+    imageUrl: string,
+    options?: { orgId?: string },
+  ): Promise<{ x: number; y: number; source: 'provider' | 'fallback' }> {
+    const fallback = { x: 0.5, y: 0.5, source: 'fallback' as const };
+    if (!options?.orgId) {
+      return fallback;
+    }
+
+    try {
+      const config = await this._aiModelProvider.resolveConfigForScope(
+        'utility',
+        options.orgId,
+      );
+      if (!config) {
+        return fallback;
+      }
+
+      const hasVision = await this._aiModelProvider.modelHasCapability(
+        config.providerId,
+        config.modelId,
+        'vision',
+        config.creds,
+      );
+      if (!hasVision) {
+        return fallback;
+      }
+
+      const model = await this._aiModelProvider.languageModel(
+        'utility',
+        options.orgId,
+      );
+      const result = await (model as any).doGenerate({
+        prompt: [
+          {
+            role: 'system',
+            content: [
+              {
+                type: 'text',
+                text:
+                  'You are an image-composition assistant. Given an image, identify the main subject or area of interest and return its normalized center coordinates as JSON: {"x": number, "y": number} where each value is between 0 and 1. Return only the JSON object, no markdown or explanation.',
+              },
+            ],
+          },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: 'Return the focal point for this image.' },
+              { type: 'image', image: imageUrl },
+            ],
+          },
+        ],
+      });
+
+      const extractText = (r: any): string =>
+        typeof r?.text === 'string'
+          ? r.text
+          : (Array.isArray(r?.content) ? r.content : [])
+              .filter(
+                (p: any) => p?.type === 'text' && typeof p.text === 'string',
+              )
+              .map((p: any) => p.text)
+              .join('');
+
+      const text = extractText(result).trim();
+      const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+
+      if (
+        typeof parsed?.x === 'number' &&
+        typeof parsed?.y === 'number' &&
+        !Number.isNaN(parsed.x) &&
+        !Number.isNaN(parsed.y)
+      ) {
+        return {
+          x: Math.min(1, Math.max(0, parsed.x)),
+          y: Math.min(1, Math.max(0, parsed.y)),
+          source: 'provider',
+        };
+      }
+    } catch (err) {
+      this._logger.warn(
+        `detectFocalPoint failed: ${(err as Error).message}`,
+      );
+    }
+
+    return fallback;
+  }
+
   // 4F — read-only summary of configured media providers for the user-facing Brand & AI
   // settings panel. Returns one entry per media operation listing the org-enabled
   // providers (by id) whose adapter declares the capability. Never returns credentials.
@@ -649,6 +741,42 @@ export class AiMediaService {
       'Speech-to-text is not available. Configure an STT-capable media provider (Deepgram or OpenAI) in Settings > Media.',
       'speech',
     );
+  }
+
+  async speechToTextWords(
+    audio: Buffer,
+    options?: { orgId?: string; userId?: string },
+  ): Promise<{ text: string; words: { word: string; start: number; end: number }[] }> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'stt');
+
+    for (const candidate of candidates) {
+      if (!candidate.adapter.speechToTextWords) continue;
+      try {
+        const result = await candidate.adapter.speechToTextWords(audio, {
+          credentials: candidate.credentials,
+        });
+        await this._persistJob({
+          operation: 'stt',
+          provider: candidate.adapter.identifier,
+          orgId: options?.orgId,
+          userId: options?.userId,
+        });
+        return result;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} word-level STT failed: ${(err as Error).message} — trying next`,
+        );
+      }
+    }
+
+    // Fallback: use plain STT and split heuristically by duration if word timestamps unavailable.
+    const text = await this.speechToText(audio, options);
+    const words = text.split(/\s+/).filter(Boolean).map((word, i, arr) => ({
+      word,
+      start: i / arr.length,
+      end: (i + 1) / arr.length,
+    }));
+    return { text, words };
   }
 
   // ── Image edits (synchronous) ──

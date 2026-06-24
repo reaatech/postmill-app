@@ -22,6 +22,7 @@ export interface MediaArtifactMetadata {
   width?: number;
   height?: number;
   durationSeconds?: number;
+  fps?: number;
   seed?: number;
   costUsd?: number;
   provenance?: string;
@@ -108,6 +109,7 @@ export interface MediaProviderAdapter {
 
   textToSpeech?(text: string, options?: MediaGenerateOptions): Promise<Buffer | string>;
   speechToText?(audio: Buffer, options?: MediaGenerateOptions): Promise<string>;
+  speechToTextWords?(audio: Buffer, options?: MediaGenerateOptions): Promise<{ text: string; words: { word: string; start: number; end: number }[] }>;
   upscaleImage?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   removeBackground?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   inpaintImage?(imageUrl: string, maskUrl: string, prompt: string, options?: MediaGenerateOptions): Promise<string>;
