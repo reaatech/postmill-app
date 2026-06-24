@@ -1,27 +1,60 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import clsx from 'clsx';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
+import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
 
 const tabs = [
-  { href: '/media/stock-photos', label: 'Stock Photos' },
-  { href: '/media/stock-videos', label: 'Stock Videos' },
-  { href: '/media/designer', label: 'Designer' },
+  {
+    href: '/media/stock-photos',
+    label: 'Stock Photos',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/stock-videos',
+    label: 'Stock Videos',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="4" width="14" height="16" rx="2" />
+        <path d="M16 9l6-3v12l-6-3" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/designer',
+    label: 'Designer',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 19l7-7 3 3-7 7-3-3z" />
+        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+        <path d="M2 2l7.586 7.586" />
+        <circle cx="11" cy="11" r="2" />
+      </svg>
+    ),
+  },
 ];
 
 export default function MediaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const permissions = usePermissions();
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { collapsed, toggle } = useSidebarCollapse('media:sidebar-collapsed');
 
   if (permissions.isLoaded && !permissions.hasPermission('media', 'read')) {
     return (
       <div className="flex flex-1 items-center justify-center h-full p-[20px] bg-newBgColorInner text-textColor">
         <div className="text-center">
           <div className="text-[16px] font-semibold mb-2">Media access required</div>
-          <div className="text-[13px] text-newTextColor/60">
+          <div className="text-[13px] text-newTableText/60">
             You don&apos;t have permission to access media tools.
           </div>
         </div>
@@ -30,50 +63,83 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="flex flex-1 h-full min-w-0 gap-[15px] p-[20px] bg-newBgColorInner">
-      <button
-        className="lg:hidden fixed top-[16px] left-[16px] z-50 px-[10px] py-[8px] rounded-[6px] bg-designerAccent text-white text-[13px]"
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        aria-label="Toggle media sidebar"
-      >
-        {sidebarOpen ? 'Close' : 'Menu'}
-      </button>
-
+    <div className="flex flex-1 h-full min-w-0 gap-[15px] p-[20px] mobile:p-0 mobile:gap-0 bg-newBgColorInner">
+      {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip. */}
       <div
-        className={`w-[220px] shrink-0 flex flex-col gap-[4px] lg:flex
-          ${sidebarOpen ? 'fixed inset-0 z-40 bg-newBgColorInner p-[20px] pt-[60px]' : 'hidden'}
-          lg:relative lg:inset-auto lg:z-auto lg:bg-transparent lg:p-0 lg:pt-0`}
+        className={clsx(
+          'mobile:hidden shrink-0 flex flex-col gap-[4px] transition-all',
+          collapsed ? 'w-[56px]' : 'w-[220px]'
+        )}
       >
-        <div className="text-[13px] font-[600] text-textColor mb-[8px] px-[12px]">
-          Media Tools
+        <div
+          className={clsx(
+            'flex items-center mb-[8px] px-[8px] h-[24px]',
+            collapsed ? 'justify-center px-0' : 'justify-between'
+          )}
+        >
+          {!collapsed && (
+            <span className="text-[13px] font-[600] text-textColor">Media Tools</span>
+          )}
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            className="flex w-[24px] h-[24px] items-center justify-center rounded-[6px] text-textColor/60 hover:text-textColor hover:bg-newColColor/50 transition-colors"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={clsx('transition-transform', collapsed && 'rotate-180')}
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
         </div>
+
         {tabs.map((t) => {
           const active = pathname.startsWith(t.href);
           return (
             <Link
               key={t.href}
               href={t.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`text-left px-[12px] py-[8px] rounded-[6px] text-[13px] transition-all ${
+              title={t.label}
+              className={clsx(
+                'flex items-center gap-[10px] rounded-[6px] text-[13px] transition-all',
+                collapsed ? 'justify-center px-0 py-[10px]' : 'px-[12px] py-[8px]',
                 active
                   ? 'bg-designerAccent/20 text-white'
                   : 'text-textColor hover:bg-newColColor/50'
-              }`}
+              )}
             >
-              {t.label}
+              <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
+                {t.icon}
+              </span>
+              {!collapsed && <span className="truncate">{t.label}</span>}
             </Link>
           );
         })}
       </div>
 
-      {sidebarOpen && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/40"
-          onClick={() => setSidebarOpen(false)}
+      {/* Page area: mobile gets a horizontal sub-menu strip above the content. */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <SubmenuStrip
+          ariaLabel="Media tools"
+          items={tabs.map((t) => ({
+            href: t.href,
+            label: t.label,
+            icon: t.icon,
+            active: pathname.startsWith(t.href),
+          }))}
         />
-      )}
-
-      <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0">{children}</div>
+      </div>
     </div>
   );
 }

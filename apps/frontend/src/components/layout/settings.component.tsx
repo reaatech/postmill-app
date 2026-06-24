@@ -39,6 +39,8 @@ import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/chan
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { RolesTab } from '@gitroom/frontend/components/settings/roles/roles.tab';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
+import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
 export const SettingsPopup: FC<{
   getRef?: Ref<any>;
 }> = (props) => {
@@ -90,6 +92,7 @@ export const SettingsPopup: FC<{
     close();
   }, [close, fetch, getRef, t, toast]);
 
+  const { collapsed, toggle } = useSidebarCollapse('settings:sidebar-collapsed');
   const tabParam = url.get('tab');
   const [tab, setTab] = useState(tabParam || 'channels');
   // Sync the active tab when the URL's ?tab= changes (derived state during
@@ -192,9 +195,51 @@ export const SettingsPopup: FC<{
     );
   }
 
+  const stripItems = list.map((item) => ({
+    label: item.label,
+    icon: item.icon,
+    section: item.section,
+    active: item.tab === tab,
+    onClick: () => setTab(item.tab),
+  }));
+
   return (
     <>
-      <div className="bg-newBgColorInner p-[20px] flex flex-col transition-all w-[260px]">
+      {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip. */}
+      <div
+        className={clsx(
+          'mobile:hidden bg-newBgColorInner flex flex-col transition-all p-[20px]',
+          collapsed ? 'w-[76px]' : 'w-[260px]'
+        )}
+      >
+        <div
+          className={clsx(
+            'flex items-center mb-[12px] h-[24px]',
+            collapsed ? 'justify-center' : 'justify-end'
+          )}
+        >
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? 'Expand menu' : 'Collapse menu'}
+            title={collapsed ? 'Expand menu' : 'Collapse menu'}
+            className="w-[24px] h-[24px] flex items-center justify-center rounded-[6px] text-newTableText hover:text-textColor hover:bg-boxHover transition-colors"
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={clsx('transition-transform', collapsed && 'rotate-180')}
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+        </div>
         <div className="flex flex-1 flex-col gap-[15px]">
           {(() => {
             const elements: React.ReactNode[] = [];
@@ -203,7 +248,7 @@ export const SettingsPopup: FC<{
               if (item.section && item.section !== currentSection) {
                 currentSection = item.section;
                 elements.push(
-                  <div key={`section-${item.section}`} className="text-[10px] font-semibold text-newTableText uppercase tracking-wider px-[4px] mt-[12px] mb-[4px]">
+                  <div key={`section-${item.section}`} className={clsx('text-[10px] font-semibold text-newTableText uppercase tracking-wider px-[4px] mt-[12px] mb-[4px]', collapsed && 'hidden')}>
                     {item.section}
                   </div>
                 );
@@ -212,9 +257,11 @@ export const SettingsPopup: FC<{
                 <button
                   type="button"
                   key={item.tab}
+                  title={item.label}
                   aria-current={item.tab === tab ? 'page' : undefined}
                   className={clsx(
                     'cursor-pointer flex items-center gap-[12px] group/profile hover:bg-boxHover rounded-e-[8px] text-start w-full',
+                    collapsed && 'justify-center',
                     item.tab === tab && 'bg-boxHover'
                   )}
                   onClick={() => setTab(item.tab)}
@@ -222,14 +269,15 @@ export const SettingsPopup: FC<{
                   <div
                     className={clsx(
                       'h-full w-[4px] rounded-s-[3px] opacity-0 group-hover/profile:opacity-100 transition-opacity',
-                      item.tab === tab && 'opacity-100'
+                      item.tab === tab && 'opacity-100',
+                      collapsed && 'hidden'
                     )}
                   >
                     <SVGLine />
                   </div>
-                  <span className="flex items-center gap-[8px]">
+                  <span className={clsx('flex items-center gap-[8px]', collapsed && 'py-[8px]')}>
                     {item.icon}
-                    {item.label}
+                    <span className={clsx(collapsed && 'hidden')}>{item.label}</span>
                   </span>
                 </button>
               );
@@ -239,13 +287,16 @@ export const SettingsPopup: FC<{
         </div>
         <div>
           {showLogout && (
-            <div className="mt-4">
-              <LogoutComponent />
+            <div className={clsx('mt-4 flex', collapsed && 'justify-center')}>
+              <LogoutComponent isIcon={collapsed} />
             </div>
           )}
         </div>
       </div>
-      <div className="bg-newBgColorInner flex-1 flex-col flex p-[20px] gap-[12px]">
+
+      <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px]">
+        <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
+        <div className="flex flex-col gap-[12px] mobile:p-[16px]">
         <PageHeader title="Settings" />
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)}>
@@ -347,6 +398,7 @@ export const SettingsPopup: FC<{
             </div>
           </form>
         </FormProvider>
+        </div>
       </div>
     </>
   );
