@@ -2,14 +2,16 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 
 @Injectable()
 export class GenerateImageTool implements AgentToolInterface {
   constructor(
-    private _mediaService: MediaService,
+    private _aiGeneration: AiMediaGenerationService,
+    private _fileService: FileService,
     private _storageService: StorageService,
   ) {}
   name = 'generateImageTool';
@@ -40,7 +42,7 @@ export class GenerateImageTool implements AgentToolInterface {
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
-        const image = await this._mediaService.generateImage(
+        const image = await this._aiGeneration.generateImage(
           inputData.prompt,
           org
         );
@@ -50,7 +52,7 @@ export class GenerateImageTool implements AgentToolInterface {
           'data:image/png;base64,' + image
         );
 
-        return this._mediaService.saveFile(org.id, file.split('/').pop(), file);
+        return this._fileService.saveFile(org.id, file.split('/').pop(), file);
       },
     });
   }

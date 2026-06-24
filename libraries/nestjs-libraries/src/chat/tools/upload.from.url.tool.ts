@@ -2,17 +2,14 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
-// undici's own fetch — global fetch (Node built-in undici v6) rejects the npm undici v8
-// Agent dispatcher with `invalid onRequestStart method`.
 import { fetch as undiciFetch } from 'undici';
 import { Readable } from 'stream';
 import { fromBuffer } from 'file-type';
 
-// Same allow-list as the public API /upload-from-url route.
 const ALLOWED_MIME = new Set<string>([
   'image/jpeg',
   'image/png',
@@ -27,7 +24,7 @@ const ALLOWED_MIME = new Set<string>([
 @Injectable()
 export class UploadFromUrlTool implements AgentToolInterface {
   constructor(
-    private _mediaService: MediaService,
+    private _fileService: FileService,
     private _storageService: StorageService,
   ) {}
   name = 'uploadFromUrlTool';
@@ -91,7 +88,7 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
           encoding: '',
         });
 
-        return this._mediaService.saveFile(
+        return this._fileService.saveFile(
           org.id,
           getFile.originalname,
           getFile.path
