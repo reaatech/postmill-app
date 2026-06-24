@@ -96,7 +96,9 @@
     "bcrypt": "^6.0.0",
     "canvas": "^3.2.3",
     "facebook-nodejs-business-sdk": "^21.0.5",
+    "ffmpeg-static": "^5.2.0",
     "file-type": "^16.5.4",
+    "fluent-ffmpeg": "^2.1.2",
     "google-auth-library": "^9.11.0",
     "googleapis": "^137.1.0",
     "image-to-pdf": "^3.0.2",
@@ -119,6 +121,7 @@
     "p-limit": "^3.1.0",
     "postmark": "4.0.7",
     "prisma": "6.5.0",
+    "puppeteer": "^22.0.0",
     "resend": "^6.12.4",
     "rss-parser": "^3.13.0",
     "sharp": "^0.33.4",
@@ -137,6 +140,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.24",
+    "@types/fluent-ffmpeg": "^2.1.24",
     "@vitest/coverage-v8": "^4.1.0"
   }
 }

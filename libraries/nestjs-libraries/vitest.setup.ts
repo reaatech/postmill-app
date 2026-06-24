@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { vi } from 'vitest';
 
 // Set encryption key for tests
