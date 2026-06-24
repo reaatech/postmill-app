@@ -11,7 +11,7 @@ import { IStorageAdapter, StorageFileEntry } from '../upload.interface';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-import { fromBuffer } from 'file-type';
+import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
 const ALLOWED_MIME_TYPES = new Set<string>([
   'image/jpeg',

@@ -3,7 +3,7 @@ import {
   Injectable,
   PipeTransform,
 } from '@nestjs/common';
-import { fromBuffer, fromFile } from 'file-type';
+import { fromBuffer, fromFile } from './file-type.compat';
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
 

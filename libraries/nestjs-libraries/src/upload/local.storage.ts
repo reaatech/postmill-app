@@ -3,7 +3,7 @@ import { mkdirSync, unlink, writeFileSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-import { fromBuffer } from 'file-type';
+import { fromBuffer } from './file-type.compat';
 
 const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
   'image/jpeg',

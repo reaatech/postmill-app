@@ -8,7 +8,7 @@ import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
 import { fetch as undiciFetch } from 'undici';
 import { Readable } from 'stream';
-import { fromBuffer } from 'file-type';
+import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
 const ALLOWED_MIME = new Set<string>([
   'image/jpeg',
