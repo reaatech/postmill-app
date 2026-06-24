@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -24,10 +25,17 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
 import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
-import { RenderDesignDto } from '@gitroom/nestjs-libraries/dtos/media/render.design.dto';
-import { BulkGenerateDesignDto } from '@gitroom/nestjs-libraries/dtos/media/bulk.generate.design.dto';
+import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { FRAME_RENDERER_SCRIPT } from '@gitroom/nestjs-libraries/media/design-render/frame-renderer-script';
+import { RenderDesignDto } from '@gitroom/nestjs-libraries/dtos/design/render.design.dto';
+import { BulkGenerateDesignDto } from '@gitroom/nestjs-libraries/dtos/design/bulk.generate.design.dto';
 import type { DesignerDoc } from '@gitroom/nestjs-libraries/media/design-render/design-render.types';
 import type { Response } from 'express';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import {
+  mediaJobWebhookToken,
+  verifyMediaJobWebhookToken,
+} from '@gitroom/nestjs-libraries/media/media-job-token';
 
 @ApiTags('Design')
 @Controller('/media/designs')
@@ -36,7 +44,8 @@ export class DesignController {
     private _designService: DesignService,
     private _fileService: FileService,
     private _designRenderService: DesignRenderService,
-    private _designBulkService: DesignBulkService
+    private _designBulkService: DesignBulkService,
+    private _videoRenderService: VideoRenderService,
   ) {}
 
   @Get('/')
@@ -72,6 +81,7 @@ export class DesignController {
       width: number;
       height: number;
       previewDataUrl?: string;
+      previewFileId?: string;
       campaignId?: string;
     },
   ) {
@@ -90,6 +100,7 @@ export class DesignController {
       width?: number;
       height?: number;
       previewDataUrl?: string;
+      previewFileId?: string;
     },
   ) {
     return this._designService.updateDesign(org.id, id, body);
@@ -110,11 +121,12 @@ export class DesignController {
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
   async render(
+    @GetOrgFromRequest() org: Organization,
     @Body() body: RenderDesignDto,
     @Res() res: Response,
   ): Promise<void> {
     const doc = body.doc as unknown as DesignerDoc;
-    const opts = { pixelRatio: body.pixelRatio, transparent: body.transparent };
+    const opts = { pixelRatio: body.pixelRatio, transparent: body.transparent, orgId: org.id };
 
     if (body.format === 'pdf') {
       const pdf = await this._designRenderService.renderPdf(doc, opts);
@@ -126,7 +138,7 @@ export class DesignController {
 
     const png = await this._designRenderService.renderPage(
       doc,
-      body.pageIndex ?? 0,
+      body.outputIndex ?? body.pageIndex ?? 0,
       opts,
     );
     res.setHeader('Content-Type', 'image/png');
@@ -152,6 +164,48 @@ export class DesignController {
       totalRows,
     };
   }
+
+  @Post('/render-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async renderVideo(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: {
+      composition: any;
+      outputIndex?: number;
+      format?: string;
+      quality?: number;
+      bitrateKbps?: number;
+      posterUrl?: string;
+      folderId?: string;
+    },
+  ) {
+    return this._videoRenderService.enqueueRender(org.id, body);
+  }
+
+  @Get('/render-video/:jobId')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async getVideoRenderStatus(
+    @GetOrgFromRequest() org: Organization,
+    @Param('jobId') jobId: string,
+  ) {
+    const job = await this._videoRenderService.getJob(org.id, jobId);
+    if (!job) throw new NotFoundException();
+    let thumbnailUrl: string | undefined;
+    if (job.status === 'completed' && job.artifactUrl) {
+      const file = await this._fileService.getFileByPath(org.id, job.artifactUrl);
+      thumbnailUrl = file?.thumbnail || undefined;
+    }
+    return {
+      id: job.id,
+      status: job.status,
+      artifactUrl: job.artifactUrl,
+      thumbnailUrl,
+      errorMessage: job.status === 'failed' ? job.error : undefined,
+      progress: job.status === 'completed' ? 100 : job.status === 'processing' ? 50 : 0,
+    };
+  }
 }
 
 @ApiTags('Design Templates')
@@ -171,6 +225,17 @@ export class DesignTemplateController {
   @RequirePermission('media', 'read')
   async get(@Param('id') id: string) {
     return this._designService.getTemplate(id);
+  }
+
+  @Put('/:id')
+  @CheckPolicies([AuthorizationActions.Update, Sections.MEDIA])
+  @RequirePermission('media', 'update')
+  async update(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Body() body: { name?: string; category?: string; doc?: any; thumbnailFileId?: string },
+  ) {
+    return this._designService.updateTemplate(org.id, id, body);
   }
 
   @Post('/')
@@ -280,5 +345,78 @@ export class DesignerProxyController {
       if (!res) return;
       res.status(502).json({ error: 'Proxy fetch failed' });
     }
+  }
+}
+
+@ApiTags('Design Render')
+@Controller('/media/designs')
+export class DesignRenderFrameController {
+  @Get('/render-frame/:jobId')
+  async renderFrame(
+    @Param('jobId') jobId: string,
+    @Query('token') token: string,
+    @Query('frame') frame?: string,
+    @Res() res?: Response,
+  ): Promise<void> {
+    if (!res) {
+      return;
+    }
+
+    if (!token) {
+      res.status(403).send('Missing render token');
+      return;
+    }
+
+    const raw = await ioRedis.get(`video-render:payload:${jobId}`);
+    if (!raw) {
+      res.status(404).send('Render job not found');
+      return;
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      res.status(500).send('Invalid render payload');
+      return;
+    }
+
+    const orgId = payload?.organizationId;
+    if (!orgId || !verifyMediaJobWebhookToken(jobId, orgId, token)) {
+      res.status(403).send('Invalid render token');
+      return;
+    }
+
+    const output = payload.composition || {};
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      process.env.FRONTEND_URL ||
+      'http://localhost:3000';
+    const initialFrame = frame ? Number(frame) : undefined;
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <base href="${baseUrl}">
+  <style>body{margin:0;background:#000}</style>
+</head>
+<body>
+  <canvas id="frame-canvas"></canvas>
+  <script>
+    window.__DATA = {
+      output: ${JSON.stringify(output)},
+      baseUrl: ${JSON.stringify(baseUrl)}
+    };
+    ${FRAME_RENDERER_SCRIPT}
+    window.__FRAME_API.preload().then(function () {
+      ${initialFrame != null ? `window.__FRAME_API.renderFrame(${initialFrame});` : ''}
+    });
+  </script>
+</body>
+</html>`;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
   }
 }

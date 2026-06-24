@@ -18,6 +18,10 @@ import { HttpExceptionFilter } from '@gitroom/nestjs-libraries/services/exceptio
 import { ConfigurationChecker } from '@gitroom/helpers/configuration/configuration.checker';
 import { startMcp } from '@gitroom/nestjs-libraries/chat/start.mcp';
 import { isDev } from '@gitroom/helpers/utils/is.dev';
+import { CollaborationGateway } from './services/collaboration/collaboration.gateway';
+import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 
 // v3.6.0 added BigInt columns (e.g. Organization.localStorageQuotaBytes,
 // StorageProviderConfig.quotaBytes). Express serializes responses with
@@ -129,6 +133,24 @@ async function start() {
     console.log('Backend started successfully on port ' + port);
 
     checkConfiguration(); // Do this last, so that users will see obvious issues at the end of the startup log without having to scroll up.
+
+    const server = app.getHttpServer();
+    const collabGateway = app.get(CollaborationGateway);
+    const usersService = app.get(UsersService);
+    const organizationService = app.get(OrganizationService);
+    collabGateway.initialize(server, async (token: string) => {
+      try {
+        const payload = AuthService.verifyJWT(token) as { id: string } | null;
+        if (!payload?.id) return null;
+        const user = await usersService.getUserById(payload.id);
+        if (!user) return null;
+        const orgs = await organizationService.getOrgsByUserId(user.id);
+        if (!orgs?.length) return null;
+        return { userId: user.id, orgId: orgs[0].id };
+      } catch {
+        return null;
+      }
+    });
 
     Logger.log(`🚀 Backend is running on: http://localhost:${port}`);
   } catch (e) {

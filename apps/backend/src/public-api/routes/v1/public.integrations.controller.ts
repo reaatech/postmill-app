@@ -23,7 +23,7 @@ import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
 import { ChangePostStatusDto } from '@gitroom/nestjs-libraries/dtos/posts/change.post.status.dto';
 import {
@@ -32,7 +32,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
-import { UploadDto } from '@gitroom/nestjs-libraries/dtos/media/upload.dto';
+import { UploadDto } from '@gitroom/nestjs-libraries/dtos/file/upload.dto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
 import { Readable } from 'stream';
@@ -60,6 +60,7 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 
 @ApiTags('Public API')
 @Controller('/public/v1')
@@ -67,12 +68,13 @@ export class PublicIntegrationsController {
   constructor(
     private _integrationService: IntegrationService,
     private _postsService: PostsService,
-    private _mediaService: MediaService,
+    private _fileService: FileService,
     private _notificationService: NotificationService,
     private _integrationManager: IntegrationManager,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _analyticsService: AnalyticsService,
-    private _storageService: StorageService
+    private _storageService: StorageService,
+    private _aiGeneration: AiMediaGenerationService
   ) {}
 
   @Post('/upload')
@@ -89,7 +91,7 @@ export class PublicIntegrationsController {
 
     const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
     const getFile = await adapter.uploadFile(file);
-    return this._mediaService.saveFile(
+    return this._fileService.saveFile(
       org.id,
       getFile.originalname,
       getFile.path
@@ -128,7 +130,7 @@ export class PublicIntegrationsController {
       encoding: '',
     });
 
-    return this._mediaService.saveFile(
+    return this._fileService.saveFile(
       org.id,
       getFile.originalname,
       getFile.path
@@ -306,13 +308,13 @@ export class PublicIntegrationsController {
     @Body() body: VideoDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._mediaService.generateVideo(org, body);
+    return this._aiGeneration.generateVideo(org, body);
   }
 
   @Post('/video/function')
   videoFunction(@Body() body: VideoFunctionDto) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._mediaService.videoFunction(
+    return this._aiGeneration.videoFunction(
       body.identifier,
       body.functionName,
       body.params

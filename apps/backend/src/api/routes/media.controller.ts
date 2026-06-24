@@ -1,15 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Post,
   Req,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
 import { Request } from 'express';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ApiTags } from '@nestjs/swagger';
@@ -19,18 +22,25 @@ import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
 import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
-import { RemoveBackgroundDto } from '@gitroom/nestjs-libraries/dtos/media/remove.background.dto';
-import { UpscaleImageDto } from '@gitroom/nestjs-libraries/dtos/media/upscale.image.dto';
-import { InpaintImageDto } from '@gitroom/nestjs-libraries/dtos/media/inpaint.image.dto';
+import { RemoveBackgroundDto } from '@gitroom/nestjs-libraries/dtos/ai/remove.background.dto';
+import { DetectFocalPointDto } from '@gitroom/nestjs-libraries/dtos/ai/detect-focal-point.dto';
+import { UpscaleImageDto } from '@gitroom/nestjs-libraries/dtos/ai/upscale.image.dto';
+import { InpaintImageDto } from '@gitroom/nestjs-libraries/dtos/ai/inpaint.image.dto';
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
+import { BadRequestException } from '@nestjs/common';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 
 @ApiTags('Media')
 @Controller('/media')
 export class MediaController {
   constructor(
-    private _mediaService: MediaService,
+    private _aiGeneration: AiMediaGenerationService,
+    private _fileService: FileService,
     private _subscriptionService: SubscriptionService,
     private _storageService: StorageService,
-    private _stockMediaService: StockMediaService
+    private _stockMediaService: StockMediaService,
+    private _brandsService: BrandsService
   ) {}
 
   @Post('/generate-video')
@@ -39,7 +49,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
   ) {
-    return this._mediaService.generateVideo(org, body);
+    return this._aiGeneration.generateVideo(org, body);
   }
 
   @Post('/generate-image')
@@ -58,7 +68,7 @@ export class MediaController {
     return {
       output:
         'data:image/png;base64,' +
-        (await this._mediaService.generateImage(prompt, org, isPicturePrompt)),
+        (await this._aiGeneration.generateImage(prompt, org, isPicturePrompt)),
     };
   }
 
@@ -77,13 +87,13 @@ export class MediaController {
     const adapter = await this._storageService.getLocalAdapterForOrg(org.id);
     const file = await adapter.uploadSimple(image.output);
 
-    return this._mediaService.saveFile(org.id, file.split('/').pop(), file);
+    return this._fileService.saveFile(org.id, file.split('/').pop(), file);
   }
 
   @Get('/video-options')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   getVideos() {
-    return this._mediaService.getVideoOptions();
+    return this._aiGeneration.getVideoOptions();
   }
 
   @Post('/video/function')
@@ -91,7 +101,7 @@ export class MediaController {
   videoFunction(
     @Body() body: VideoFunctionDto
   ) {
-    return this._mediaService.videoFunction(body.identifier, body.functionName, body.params);
+    return this._aiGeneration.videoFunction(body.identifier, body.functionName, body.params);
   }
 
   @Get('/generate-video/:type/allowed')
@@ -100,7 +110,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Param('type') type: string
   ) {
-    return this._mediaService.generateVideoAllowed(org, type);
+    return this._aiGeneration.generateVideoAllowed(org, type);
   }
 
   @Post('/remove-background')
@@ -111,7 +121,7 @@ export class MediaController {
     @Body() body: RemoveBackgroundDto
   ) {
     await this._subscriptionService.checkCredits(org);
-    return { url: await this._mediaService.removeBackground(org, body.imageUrl) };
+    return { url: await this._aiGeneration.removeBackground(org, body.imageUrl) };
   }
 
   @Post('/inpaint')
@@ -123,7 +133,7 @@ export class MediaController {
   ) {
     await this._subscriptionService.checkCredits(org);
     return {
-      url: await this._mediaService.inpaintImage(
+      url: await this._aiGeneration.inpaintImage(
         org,
         body.imageUrl,
         body.maskUrl,
@@ -140,7 +150,7 @@ export class MediaController {
     @Body() body: UpscaleImageDto
   ) {
     await this._subscriptionService.checkCredits(org);
-    return { url: await this._mediaService.upscaleImage(org, body.imageUrl, body.scale) };
+    return { url: await this._aiGeneration.upscaleImage(org, body.imageUrl, body.scale) };
   }
 
   @Post('/stock/download')
@@ -152,5 +162,101 @@ export class MediaController {
   ) {
     await this._stockMediaService.triggerDownload(downloadLocation);
     return { success: true };
+  }
+
+  @Get('/fonts')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  async listFonts(@GetOrgFromRequest() org: Organization) {
+    return this._brandsService.getCustomFonts(org.id);
+  }
+
+  @Post('/fonts/upload')
+  @CheckPolicies([AuthorizationActions.Update, Sections.MEDIA])
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  async uploadFont(
+    @GetOrgFromRequest() org: Organization,
+    @UploadedFile() file: Express.Multer.File
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    const allowedExts = new Set(['ttf', 'otf', 'woff2']);
+    if (!ext || !allowedExts.has(ext)) {
+      throw new BadRequestException('Invalid font file. Accepted: .ttf, .otf, .woff2');
+    }
+
+    const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
+    const uploaded = await adapter.uploadFile(file);
+
+    const fontEntry = {
+      family: file.originalname.replace(/\.[^./\\]*$/, ''),
+      fileId: uploaded.filename || uploaded.originalname,
+      path: uploaded.path,
+      weights: [400],
+    };
+
+    const fonts = await this._brandsService.addCustomFont(org.id, fontEntry);
+    return { fonts, uploaded: fontEntry };
+  }
+
+  @Delete('/fonts/:fileId')
+  @CheckPolicies([AuthorizationActions.Update, Sections.MEDIA])
+  async deleteFont(
+    @GetOrgFromRequest() org: Organization,
+    @Param('fileId') fileId: string
+  ) {
+    return this._brandsService.removeCustomFont(org.id, fileId);
+  }
+
+  @Post('/text-to-speech')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async textToSpeech(
+    @GetOrgFromRequest() org: Organization,
+    @Body('text') text: string,
+    @Body('voice') voice?: string,
+  ) {
+    if (!text?.trim()) {
+      throw new BadRequestException('Text is required');
+    }
+    return this._aiGeneration.textToSpeech(org, text, voice);
+  }
+
+  @Post('/speech-to-text')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async speechToText(
+    @GetOrgFromRequest() org: Organization,
+    @Body('audioUrl') audioUrl: string,
+  ) {
+    if (!audioUrl?.trim()) {
+      throw new BadRequestException('audioUrl is required');
+    }
+    return this._aiGeneration.speechToText(org, audioUrl);
+  }
+
+  @Post('/speech-to-text-words')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async speechToTextWords(
+    @GetOrgFromRequest() org: Organization,
+    @Body('audioUrl') audioUrl: string,
+  ) {
+    if (!audioUrl?.trim()) {
+      throw new BadRequestException('audioUrl is required');
+    }
+    return this._aiGeneration.speechToTextWords(org, audioUrl);
+  }
+
+  @Post('/detect-focal-point')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async detectFocalPoint(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: DetectFocalPointDto,
+  ) {
+    return this._aiGeneration.detectFocalPoint(org, body.imageUrl);
   }
 }

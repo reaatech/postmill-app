@@ -15,7 +15,7 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ImportMediaDto } from '@gitroom/nestjs-libraries/dtos/third-party/import-media.dto';
 import { ThirdPartySubmitDto } from '@gitroom/nestjs-libraries/dtos/third-party/third-party-submit.dto';
 
@@ -24,7 +24,7 @@ import { ThirdPartySubmitDto } from '@gitroom/nestjs-libraries/dtos/third-party/
 export class ThirdPartyController {
   constructor(
     private _thirdPartyManager: ThirdPartyManager,
-    private _mediaService: MediaService,
+    private _fileService: FileService,
     private _storageService: StorageService,
   ) {}
 
@@ -93,7 +93,7 @@ export class ThirdPartyController {
 
     const adapter = await this._storageService.getLocalAdapterForOrg(organization.id);
     const file = await adapter.uploadSimple(loadedData);
-    return this._mediaService.saveFile(organization.id, file.split('/').pop(), file);
+    return this._fileService.saveFile(organization.id, file.split('/').pop(), file);
   }
 
   @Post('/function/:id/:functionName')
@@ -163,7 +163,7 @@ export class ThirdPartyController {
     for (const item of downloadUrls) {
       const adapter = await this._storageService.getLocalAdapterForOrg(organization.id);
       const file = await adapter.uploadSimple(item.url);
-      const saved = await this._mediaService.saveFile(
+      const saved = await this._fileService.saveFile(
         organization.id,
         item.name || file.split('/').pop(),
         file

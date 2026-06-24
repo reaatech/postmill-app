@@ -58,7 +58,7 @@ import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controll
 import { RolesController } from '@gitroom/backend/api/routes/roles.controller';
 import { StockMediaController } from '@gitroom/backend/api/routes/stock-media.controller';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
-import { DesignController, DesignTemplateController, DesignerProxyController } from '@gitroom/backend/api/routes/design.controller';
+import { DesignController, DesignRenderFrameController, DesignTemplateController, DesignerProxyController } from '@gitroom/backend/api/routes/design.controller';
 import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
 import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jobs-webhook.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
@@ -132,6 +132,7 @@ const authenticatedController = [
     OAuthController,
     EmailWebhooksController,
     MediaJobsWebhookController,
+    DesignRenderFrameController,
     ...authenticatedController,
   ],
   providers: [

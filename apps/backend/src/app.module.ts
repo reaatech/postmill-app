@@ -22,6 +22,7 @@ import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
 import { InngestController } from '@gitroom/backend/api/controllers/inngest.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FeatureFlagsModule, FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
+import { CollaborationModule } from '@gitroom/backend/services/collaboration/collaboration.module';
 
 // Module-level feature flags are read at bootstrap time. Defaults keep all
 // features enabled for production/CI; local developers opt-out via env vars.
@@ -45,6 +46,7 @@ const scheduleModule = featureFlags.isEnabled('cron')
     ChatModule,
     InngestModule,
     AiModule,
+    CollaborationModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
