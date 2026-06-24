@@ -12,7 +12,7 @@ import {
   ValidationOptions,
   ValidatorConstraint,
   ValidatorConstraintInterface, Allow } from 'class-validator';
-import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
+import { MediaDto } from '@gitroom/nestjs-libraries/dtos/file/media.dto';
 import { Type } from 'class-transformer';
 
 // YouTube caps the combined length of all tags at 500 characters.

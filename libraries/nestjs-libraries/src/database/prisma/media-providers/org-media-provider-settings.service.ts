@@ -2,7 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
-import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 
 const STANDARD_FOLDERS = ['documents', 'audio', 'images', 'video', 'other'];
@@ -27,7 +27,7 @@ export class OrgMediaProviderSettingsService {
     private _repository: OrgMediaProviderSettingsRepository,
     private _encryption: EncryptionService,
     private _registry: MediaProviderRegistry,
-    private _mediaRepository: MediaRepository,
+    private _fileRepository: FileRepository,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
   ) {}
 
@@ -176,13 +176,13 @@ export class OrgMediaProviderSettingsService {
   // Ensure the provider root's typed 5-folder tree (§11.5). Public so the async-job
   // completion path can lazily (re)create it before landing an artifact.
   async ensureStandardFolders(orgId: string, rootFolderId: string) {
-    const existing = await this._mediaRepository.findFoldersByParent(orgId, rootFolderId);
+    const existing = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
     const existingNames = new Set(existing.map((f) => f.name.toLowerCase()));
 
     for (const folderName of STANDARD_FOLDERS) {
       if (!existingNames.has(folderName)) {
         try {
-          await this._mediaRepository.createFolder(orgId, {
+          await this._fileRepository.createFolder(orgId, {
             name: folderName,
             parentId: rootFolderId,
           });
@@ -197,7 +197,7 @@ export class OrgMediaProviderSettingsService {
   async getStandardFolderId(orgId: string, rootFolderId: string, folderName: string): Promise<string | null> {
     if (!STANDARD_FOLDERS.includes(folderName)) return null;
     await this.ensureStandardFolders(orgId, rootFolderId);
-    const folders = await this._mediaRepository.findFoldersByParent(orgId, rootFolderId);
+    const folders = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
     const match = folders.find((f) => f.name.toLowerCase() === folderName);
     return match?.id ?? null;
   }

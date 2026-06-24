@@ -28,7 +28,7 @@ import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generato
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import utc from 'dayjs/plugin/utc';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
 import {
@@ -69,7 +69,7 @@ export class PostsService {
     private _analyticsRepository: AnalyticsRepository,
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
-    private _mediaService: MediaService,
+    private _fileService: FileService,
     private _shortLinkService: ShortLinkService,
     private _openaiService: OpenaiService,
     private _refreshIntegrationService: RefreshIntegrationService,
@@ -470,7 +470,7 @@ export class PostsService {
             (imagesList || []).map(async (p: any) => {
               if (!p.path && p.id) {
                 imageUpdateNeeded = true;
-                return this._mediaService.getMediaById(p.id);
+                return this._fileService.getFileById(p.id);
               }
 
               return p;
