@@ -128,11 +128,20 @@ export const smartReflow = (
       if (y < safe.top) y = safe.top;
       if (y + newH > safe.bottom) y = Math.max(safe.top, safe.bottom - newH);
     } else {
-      // Images / shapes: nudge only the edge that crosses a safe boundary.
-      if (x < safe.left) x = safe.left;
-      if (x + newW > safe.right) x = Math.max(safe.left, safe.right - newW);
-      if (y < safe.top) y = safe.top;
-      if (y + newH > safe.bottom) y = Math.max(safe.top, safe.bottom - newH);
+      // Images / shapes: nudge only the edge that crosses a safe boundary, and
+      // only when the element actually fits inside the safe area. A full-bleed
+      // element (wider/taller than the safe zone, e.g. a cover photo) is an
+      // intentional edge-to-edge placement and must be preserved.
+      const safeW = safe.right - safe.left;
+      const safeH = safe.bottom - safe.top;
+      if (newW <= safeW) {
+        if (x < safe.left) x = safe.left;
+        if (x + newW > safe.right) x = Math.max(safe.left, safe.right - newW);
+      }
+      if (newH <= safeH) {
+        if (y < safe.top) y = safe.top;
+        if (y + newH > safe.bottom) y = Math.max(safe.top, safe.bottom - newH);
+      }
     }
   }
 
@@ -221,7 +230,7 @@ export const detectFocalPointClient = (imageUrl: string): Promise<{ x: number; y
 
         if (weightSum === 0) return fallback();
 
-        let x = weightedX / weightSum / canvas.width;
+        const x = weightedX / weightSum / canvas.width;
         let y = weightedY / weightSum / canvas.height;
 
         // For portrait photos, bias slightly toward the upper-center where faces
