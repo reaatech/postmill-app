@@ -11,6 +11,19 @@
 ## Unreleased
 
 ### Added
+- **Replicate Studio** (`/media/replicate`) — Native generative media workspace powered by Replicate.
+  - 18 categories: text-to-image, image-to-image, inpaint, upscale, background removal, text-to-video,
+    image-to-video, video-to-video, caption, text-to-speech, speech-to-text, voice clone, music
+    generation, music-to-music, meme generator, and video merge.
+  - Warm official models by default with instant cost badges; optional community-model toggle with
+    usage-based pricing.
+  - Dynamic input forms per model, live cost estimation, and folder-aware async delivery for
+    video/audio jobs.
+  - Native mask painter for inpainting, ffmpeg-based merge editor for up to 6 clips, and a canvas
+    meme generator with draggable text layers.
+  - Audio enablement: upload, preview, and select audio files in Files; audio inputs for voice clone
+    and music-to-music.
+  - Per-org Replicate token configuration in Settings → Media Providers; no env-var fallback.
 - **Designer** — Native open-source design editor replacing the proprietary Polotno SDK.
   - Built on react-konva (MIT), no license key required.
   - Full canvas editor with text, image, and shape elements; drag/resize/rotate via Konva Transformer.

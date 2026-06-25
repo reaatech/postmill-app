@@ -25,6 +25,7 @@ export default defineConfig({
             { text: 'Social Comments', link: '/user-guide/social-comments' },
             { text: 'Campaigns', link: '/user-guide/campaigns' },
             { text: 'Media Library', link: '/user-guide/media-library' },
+            { text: 'Replicate Studio', link: '/user-guide/media/replicate-studio' },
             { text: 'AI Tools', link: '/user-guide/ai-tools' },
             { text: 'Settings', link: '/user-guide/settings' },
             { text: 'Billing', link: '/user-guide/billing' },

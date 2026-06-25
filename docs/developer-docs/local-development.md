@@ -15,6 +15,7 @@ commands so you only pay for what you use.
 | Node.js | `>=22.12.0 <23.0.0` | See `engines` in root `package.json` |
 | pnpm | `10.6.1` | Specified in `packageManager`; other versions may silently break |
 | Docker / Docker Compose | Recent stable | For Postgres + Redis + optional services |
+| ffmpeg | Recent stable | Required for the **video merge** feature in `/media/replicate`. Install with `brew install ffmpeg` (macOS) or `apt-get install ffmpeg` / `dnf install ffmpeg` (Linux). |
 
 ---
 
@@ -206,6 +207,8 @@ There is no per-package `lint` script.
 | `/p/[id]` fails under webpack | Legacy CSS import | Use Turbopack (`pnpm run dev:frontend`) |
 | Redis connection error | No Redis running | Start `docker compose -f ./docker-compose.dev.yaml up -d` |
 | Inngest functions not running | Inngest dev server not started | Start with `--profile jobs` and set `USE_INNGEST=true` / `INNGEST_DEV=1` |
+| Replicate async jobs never complete locally | Inngest poll sweep not running or unreachable webhook | Async Replicate jobs complete via the Inngest poll sweep (`media-job-polling` function). Start jobs with `--profile jobs`, set `USE_INNGEST=true` and `INNGEST_DEV=1`. Webhook completion requires a public `NEXT_PUBLIC_BACKEND_URL` (tunnel such as ngrok/cloudflared) reachable from Replicate's servers. |
+| Replicate image-to-image/video/upscale fails with URL errors | Input file is not publicly reachable | Categories that feed a Files asset into the model (image-to-image, image-to-video, video-to-video, caption, inpaint, voice-clone, music-to-music, upscale) require a **public `https` input URL**. Local/private storage (`http://localhost…`, private IPs) will fail Replicate-side in local dev / private-storage self-hosts. |
 
 ---
 

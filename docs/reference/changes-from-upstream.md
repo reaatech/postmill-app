@@ -27,6 +27,17 @@ server) instead of a separate Temporal orchestrator:
 
 See [Inngest & Cron](../operations-guide/inngest-and-cron.md) for operation details.
 
+The v3.9.0 release also adds the **Replicate Studio** (`/media/replicate`), a native generative media
+workspace backed by [Replicate](https://replicate.com). It supports 18 categories covering image
+generation/editing (text-to-image, image-to-image, inpaint, upscale, background removal), video
+(text-to-video, image-to-video, video-to-video, caption, merge), audio (text-to-speech, voice clone,
+music generation, music-to-music), speech-to-text transcription, and utility surfaces (meme
+generator). Warm official models are shown by default with fixed-cost badges; community models are
+available via a per-category toggle with usage-based pricing. Async video/audio jobs require a target
+Files folder and complete through the Inngest poll sweep. The studio is intentionally a standalone
+surface in v1: it does **not** participate in C2PA provenance signing or the shared media-pipeline
+cost ledger; accounting is tracked per job through `AIMediaJob.costUsd`/`creditType`.
+
 ### v3.8.10 (June 2026)
 
 Identity, tenancy, RBAC & provider-surface redesign:
