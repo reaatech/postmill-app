@@ -16,9 +16,11 @@ interface SaveToFilesModalProps {
   type?: string;
   downloadLocation?: string;
   attribution?: Record<string, unknown>;
+  // Bare audio can't be a standalone social post — hide "Save & Post" for it.
+  allowPost?: boolean;
 }
 
-export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution }) => {
+export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution, allowPost = true }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -228,13 +230,15 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
         >
           {saving ? 'Saving...' : 'Save File'}
         </button>
-        <button
-          disabled={saving || !fileName.trim()}
-          onClick={() => handleSave(true)}
-          className="px-[16px] h-[40px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 disabled:opacity-50 transition-all"
-        >
-          {saving ? 'Saving...' : 'Save & Post'}
-        </button>
+        {allowPost && (
+          <button
+            disabled={saving || !fileName.trim()}
+            onClick={() => handleSave(true)}
+            className="px-[16px] h-[40px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 disabled:opacity-50 transition-all"
+          >
+            {saving ? 'Saving...' : 'Save & Post'}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -4,7 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore } from './replicate.store';
-import { AudioPlayer } from './players/audio-player';
+import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
 import { VideoPlayer } from './players/video-player';
 import { ElapsedTimer } from './elapsed-timer';
 import { useGenerate } from './use-generate';

@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
 import type { FileItem } from './file-manager';
 
 const formatDate = (dateStr: string) => {
@@ -128,7 +129,7 @@ export const FileDetailsPanel: FC<{
       <div className="p-[16px]">
         <div className="rounded-[8px] overflow-hidden bg-black/20 mb-[16px]">
           {isAudio ? (
-            <audio controls className="max-w-full" src={mediaDirectory.set(file.path)} />
+            <div className="p-[12px]"><AudioPlayer src={mediaDirectory.set(file.path)} /></div>
           ) : isVideo ? (
             <video src={mediaDirectory.set(file.path)} className="w-full aspect-video object-cover" controls />
           ) : (

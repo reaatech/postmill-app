@@ -44,6 +44,8 @@ export interface StockIconItem extends StockItemBase {
 export interface StockAudioItem {
   id: string;
   url: string;
+  /** Stable download URL for saving (the streaming `url` carries an expiring token). */
+  downloadUrl?: string;
   name: string;
   duration: number;
   author: string;
