@@ -388,6 +388,9 @@ export class StockMediaService {
         offset: String(offset),
         include: 'musicinfo',
         audioformat: 'mp32',
+        // Only return tracks whose stable download URL is usable (the streaming
+        // `audio` URL carries an expiring token and 404s on a later save).
+        audiodownload_allowed: 'true',
       });
       if (query) params.set('search', query);
       else params.set('order', 'popularity_total');
@@ -403,7 +406,11 @@ export class StockMediaService {
         return {
           results: hits.map((h: any) => ({
             id: String(h.id),
+            // `url` is the streaming URL (fresh token → plays immediately in <audio>).
+            // `downloadUrl` is the stable /download/ URL used for saving — it has no
+            // expiring token (Jamendo mislabels it text/html; the importer sniffs it).
             url: h.audio || h.audiodownload || '',
+            downloadUrl: h.audiodownload || h.audio || '',
             name: h.name || 'Untitled',
             duration: typeof h.duration === 'number' ? h.duration : 0,
             author: h.artist_name || 'Unknown',

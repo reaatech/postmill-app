@@ -5,6 +5,7 @@ import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/sav
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
+import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
@@ -224,6 +225,12 @@ export class FileService {
     const adapter = await this._storageService.resolveAdapterForFolder(data.folderId, orgId);
 
     const response = await safeFetch(data.url);
+    if (!response.ok) {
+      throw new HttpException(
+        `Could not download the file (source returned ${response.status})`,
+        422
+      );
+    }
 
     const contentLength = response.headers.get('content-length');
     if (contentLength) {
@@ -240,7 +247,17 @@ export class FileService {
 
     await this._storageService.assertWithinProviderQuota(adapter, orgId, buffer.length);
 
-    const contentType = data.type || response.headers.get('content-type') || 'application/octet-stream';
+    // Validate the ACTUAL downloaded MIME, not the caller's category hint
+    // (`data.type` is 'photo'/'audio'/… — not a MIME — and would never match).
+    let contentType =
+      (response.headers.get('content-type') || '').split(';')[0].trim() ||
+      'application/octet-stream';
+    if (!ALLOWED_MIME_TYPES.has(contentType)) {
+      // Some sources mislabel the type (e.g. Jamendo serves an MP3 as text/html).
+      // Sniff the real type from the bytes before rejecting.
+      const sniffed = await fromBuffer(buffer);
+      if (sniffed?.mime) contentType = sniffed.mime;
+    }
     if (!ALLOWED_MIME_TYPES.has(contentType)) {
       throw new HttpException(`File type not allowed: ${contentType}`, 415);
     }
