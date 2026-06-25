@@ -21,7 +21,7 @@ const JOB_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 // Defensive cap when downloading provider artifacts.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
-type AsyncOperation = 'video' | 'audio' | 'avatar';
+type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image';
 
 const OPERATION_FOLDER: Record<string, string> = {
   image: 'images',
@@ -83,6 +83,10 @@ export class MediaJobLifecycleService {
     operation: AsyncOperation;
     costUsd?: number;
     creditType?: string;
+    folderId?: string | null;
+    model?: string | null;
+    versionId?: string | null;
+    inputJson?: string | null;
   }): Promise<AIMediaJob> {
     return this._aiSettings.createMediaJob({
       organizationId: params.organizationId,
@@ -92,6 +96,10 @@ export class MediaJobLifecycleService {
       status: 'pending',
       costUsd: params.costUsd,
       creditType: params.creditType,
+      folderId: params.folderId,
+      model: params.model,
+      versionId: params.versionId,
+      inputJson: params.inputJson,
     });
   }
 
@@ -172,7 +180,7 @@ export class MediaJobLifecycleService {
       return 'failed';
     }
     if (poll.status === 'completed' && poll.artifactUrl) {
-      const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata);
+      const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
       return ok ? 'completed' : 'failed';
     }
 
@@ -265,6 +273,7 @@ export class MediaJobLifecycleService {
     job: AIMediaJob,
     artifactUrl: string,
     metadata?: MediaArtifactMetadata,
+    folderId?: string | null,
   ): Promise<boolean> {
     try {
       const stored = await this.storeArtifact({
@@ -274,6 +283,7 @@ export class MediaJobLifecycleService {
         jobId: job.id,
         artifactUrl,
         metadata,
+        folderId,
       });
 
       await this._aiSettings.updateMediaJob(job.id, {
@@ -319,6 +329,7 @@ export class MediaJobLifecycleService {
     jobId: string;
     artifactUrl: string;
     metadata?: MediaArtifactMetadata;
+    folderId?: string | null;
   }): Promise<StoredArtifact> {
     const { buffer, mime } = await this._download(params.artifactUrl, params.metadata?.mime);
     const metadata: Record<string, unknown> = {
@@ -334,6 +345,7 @@ export class MediaJobLifecycleService {
       baseName: `${params.operation}-${params.jobId}`,
       buffer,
       mime,
+      folderId: params.folderId,
       metadata,
     });
   }

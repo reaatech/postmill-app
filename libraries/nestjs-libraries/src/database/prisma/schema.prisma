@@ -1280,6 +1280,10 @@ model AIMediaJob {
   costUsd        Float        @default(0)
   creditType     String?
   error          String?
+  folderId    String?
+  model       String?
+  versionId   String?
+  inputJson   String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 

@@ -629,6 +629,26 @@ describe('AiSettingsRepository', () => {
       expect(mockMediaJob.create).toHaveBeenCalledWith({ data });
       expect(result).toEqual(created);
     });
+
+    it('persists new Replicate columns (folderId, model, versionId, inputJson, operation image)', async () => {
+      const data = {
+        organizationId: 'org1',
+        provider: 'replicate',
+        operation: 'image',
+        status: 'pending',
+        folderId: 'folder-1',
+        model: 'black-forest-labs/flux-schnell',
+        versionId: 'v1',
+        inputJson: JSON.stringify({ prompt: 'cat' }),
+      };
+      const created = { id: 'mj2', ...data };
+      mockMediaJob.create.mockResolvedValue(created);
+
+      const result = await repository.createMediaJob(data);
+
+      expect(mockMediaJob.create).toHaveBeenCalledWith({ data });
+      expect(result).toEqual(created);
+    });
   });
 
   describe('updateMediaJob', () => {
