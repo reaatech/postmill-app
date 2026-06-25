@@ -1,25 +1,12 @@
 'use client';
 
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useDebounce } from 'use-debounce';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPreviewModal } from './stock-preview-modal';
-
-export interface StockPhotoItem {
-  id: string;
-  url: string;
-  thumbUrl: string;
-  description: string | null;
-  author: string;
-  authorUrl: string;
-  sourceUrl: string;
-  downloadLocation: string | null;
-  width: number;
-  height: number;
-  color: string | null;
-}
+import { StockPhotoItem, stockSourceLabel } from './stock.types';
+import { useStockSearch } from './use-stock-search';
 
 const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
@@ -43,54 +30,30 @@ interface StockPhotosProps {
 }
 
 export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect }) => {
-  const fetch = useFetch();
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
-  const [page, setPage] = useState(1);
   const [orientation, setOrientation] = useState('');
   const [color, setColor] = useState('');
-  const [accumulated, setAccumulated] = useState<StockPhotoItem[]>([]);
 
-  // Reset the accumulated list whenever a filter/search changes.
-  useEffect(() => {
-    setPage(1);
-    setAccumulated([]);
-  }, [debouncedQuery, orientation, color]);
-
-  const params = new URLSearchParams();
-  if (debouncedQuery) params.set('query', debouncedQuery);
-  params.set('page', String(page));
-  if (orientation) params.set('orientation', orientation);
-  if (color) params.set('color', color);
-
-  const { data, error, isLoading, isValidating, mutate } = useSWR(
-    `stock-photos-${debouncedQuery}-${page}-${orientation}-${color}`,
-    async () => {
-      const res = await fetch(`/media/stock/photos?${params}`);
-      if (!res.ok) {
-        const err: any = new Error(`Request failed (HTTP ${res.status})`);
-        err.status = res.status;
-        throw err;
-      }
-      return res.json();
-    },
-    { keepPreviousData: true }
+  const filters = useMemo(
+    () => ({ orientation, color }),
+    [orientation, color]
   );
 
-  // Accumulate fetched pages into a single list.
-  useEffect(() => {
-    if (!data?.results) return;
-    setAccumulated((prev) => {
-      if (page === 1) return data.results;
-      const seen = new Set(prev.map((p) => p.id));
-      const next = (data.results as StockPhotoItem[]).filter((p) => !seen.has(p.id));
-      return next.length ? [...prev, ...next] : prev;
-    });
-  }, [data, page]);
+  const {
+    items,
+    lastPage,
+    error,
+    isLoading,
+    isValidating,
+    size,
+    setSize,
+    mutate,
+  } = useStockSearch<StockPhotoItem>('/media/stock/photos', debouncedQuery, filters);
 
-  const totalPages = data?.totalPages || 1;
-  const hasMore = page < totalPages;
+  const totalPages = lastPage?.totalPages || 1;
+  const hasMore = size < totalPages;
 
   // Infinite-scroll sentinel.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
@@ -99,17 +62,13 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect })
     if (!node || !hasMore || isLoading || isValidating) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) setPage((p) => p + 1);
+        if (entries[0]?.isIntersecting) setSize((s) => s + 1);
       },
       { rootMargin: '400px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
-    // `accumulated.length` is required: data arrives (isLoading flips false)
-    // one render BEFORE the accumulate effect mounts the grid + sentinel, so
-    // without it this effect runs while sentinelRef is still null and never
-    // re-runs to attach once the sentinel appears.
-  }, [hasMore, isLoading, isValidating, accumulated.length]);
+  }, [hasMore, isLoading, isValidating, setSize, items.length]);
 
   const openPhoto = useCallback(
     (photo: StockPhotoItem) =>
@@ -125,15 +84,14 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect })
     [modal]
   );
 
-  const items = useMemo(() => accumulated, [accumulated]);
   const initialLoading = isLoading && items.length === 0 && !error;
   const showEmpty = !initialLoading && !error && items.length === 0;
-  const isFirstFetch = page === 1;
+  const isFirstFetch = size === 1;
 
-  if (data && !data.configured) {
+  if (lastPage && !lastPage.configured) {
     return (
       <div className="flex items-center justify-center h-full text-newTextColor/60">
-        Stock browsing isn't configured
+        Stock browsing isn&apos;t configured
       </div>
     );
   }
@@ -331,6 +289,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect })
                     >
                       {photo.author}
                     </a>
+                    <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(photo.source)}</span>
                   </div>
                 </div>
               </button>

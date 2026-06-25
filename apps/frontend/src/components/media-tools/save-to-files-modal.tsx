@@ -13,11 +13,12 @@ interface SaveToFilesModalProps {
   url: string;
   name: string;
   source?: string;
+  type?: string;
   downloadLocation?: string;
   attribution?: Record<string, unknown>;
 }
 
-export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, downloadLocation, attribution }) => {
+export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -68,6 +69,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           name: fileName,
           folderId: selectedFolderId,
           source,
+          type,
           downloadLocation,
           attribution,
         }),
@@ -105,7 +107,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
     } finally {
       setSaving(false);
     }
-  }, [url, fileName, selectedFolderId, source, downloadLocation, attribution, fetch, toaster, modal]);
+  }, [url, fileName, selectedFolderId, source, type, downloadLocation, attribution, fetch, toaster, modal]);
 
   const renderFolderTree = (items: any[], depth: number = 0): React.ReactNode => {
     return (items || []).map((folder: any) => {
@@ -149,6 +151,31 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
           onChange={e => setFileName(e.target.value)}
           className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
         />
+        {source && (
+          <div className="mt-[8px] text-[12px] text-newTextColor/60">
+            {source === 'pixabay' && (
+              <span>
+                Powered by{' '}
+                <a
+                  href="https://pixabay.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#2B5CD3] hover:underline"
+                >
+                  Pixabay
+                </a>
+              </span>
+            )}
+            {source === 'giphy' && <span>Powered by GIPHY</span>}
+            {source === 'iconify' && (
+              <span>
+                {(attribution as any)?.set || (attribution as any)?.prefix || 'Iconify'} · License:{' '}
+                {(attribution as any)?.license || 'Unknown'}
+                {/cc-by/i.test(String((attribution as any)?.license || '')) && ' · Attribution required'}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       <div>

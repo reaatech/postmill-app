@@ -35,6 +35,7 @@ import { AITab } from '@gitroom/frontend/components/settings/ai/ai.tab';
 import { ShortlinksTab } from '@gitroom/frontend/components/settings/shortlinks/shortlinks.tab';
 import { MediaProvidersTab } from '@gitroom/frontend/components/settings/media-providers/media-providers.tab';
 import { StorageTab } from '@gitroom/frontend/components/settings/storage/storage.tab';
+import { ContentPacksTab } from '@gitroom/frontend/components/settings/content-packs/content-packs.tab';
 import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/channels.tab';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { RolesTab } from '@gitroom/frontend/components/settings/roles/roles.tab';
@@ -142,6 +143,9 @@ export const SettingsPopup: FC<{
     arr.push({ tab: 'shortlinks', label: t('shortlinks', 'Shortlinks'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> });
     arr.push({ tab: 'media_providers', label: t('media_providers', 'AI Media'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 20 21" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7.50008 3L6.66675 7.16667M13.3334 3L12.5001 7.16667M18.3334 7.16667H1.66675M5.66675 18H14.3334C15.7335 18 16.4336 18 16.9684 17.7275C17.4388 17.4878 17.8212 17.1054 18.0609 16.635C18.3334 16.1002 18.3334 15.4001 18.3334 14V7C18.3334 5.59987 18.3334 4.8998 18.0609 4.36502C17.8212 3.89462 17.4388 3.51217 16.9684 3.27248C16.4336 3 15.7335 3 14.3334 3H5.66675C4.26662 3 3.56655 3 3.03177 3.27248C2.56137 3.51217 2.17892 3.89462 1.93923 4.36502C1.66675 4.8998 1.66675 5.59987 1.66675 7V14C1.66675 15.4001 1.66675 16.1002 1.93923 16.635C2.17892 17.1054 2.56137 17.4878 3.03177 17.7275C3.56655 18 4.26662 18 5.66675 18Z"/></svg> });
     arr.push({ tab: 'storage', label: t('storage', 'Storage'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> });
+    if (permissions.hasPermission('media-config', 'manage')) {
+      arr.push({ tab: 'content_packs', label: t('content_packs', 'Content Packs'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 2l1.5 5.5L19 9l-5.5 2L12 22l-1.5-11L5 9l5.5-1.5L12 2Z"/></svg> });
+    }
     if (user?.tier?.webhooks) {
       arr.push({ tab: 'webhooks', label: t('webhooks_1', 'Webhooks'), section: 'Automation', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M18 16.98h-5.99c-1.1 0-1.95.94-2.48 1.9A4 4 0 0 1 2 17c.01-.7.2-1.4.57-2"/><path d="M6 17L3 2l3.05 2.66"/><path d="M16.54 6.76a3 3 0 0 1 3.05 3.64"/><path d="M6 17.01l-2.5 4.99"/></svg> });
     }
@@ -161,7 +165,7 @@ export const SettingsPopup: FC<{
       return a.label.localeCompare(b.label);
     });
     return arr;
-  }, [user, isGeneral, showLogout, t, canManageRoles]);
+  }, [user, isGeneral, showLogout, t, canManageRoles, permissions]);
 
   // If the current tab isn't available for this user/tier, fall back to the
   // first available tab (guarded so it converges in a single re-render).
@@ -354,6 +358,12 @@ export const SettingsPopup: FC<{
               {tab === 'storage' && (
                 <div>
                   <StorageTab />
+                </div>
+              )}
+
+              {tab === 'content_packs' && permissions.hasPermission('media-config', 'manage') && (
+                <div>
+                  <ContentPacksTab />
                 </div>
               )}
 

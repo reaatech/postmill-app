@@ -51,6 +51,42 @@ const tabs = [
       </svg>
     ),
   },
+  {
+    href: '/media/stock-vectors',
+    label: 'Vectors',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 17c5-10 13-10 18 0" />
+        <circle cx="3" cy="17" r="1.5" />
+        <circle cx="12" cy="12" r="1.5" />
+        <circle cx="21" cy="17" r="1.5" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/stock-stickers',
+    label: 'Stickers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9 9h.01" />
+        <path d="M15 9h.01" />
+        <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/stock-icons',
+    label: 'Icons',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1" />
+        <rect x="14" y="3" width="7" height="7" rx="1" />
+        <rect x="3" y="14" width="7" height="7" rx="1" />
+        <rect x="14" y="14" width="7" height="7" rx="1" />
+      </svg>
+    ),
+  },
 ];
 
 export default function MediaLayout({ children }: { children: React.ReactNode }) {

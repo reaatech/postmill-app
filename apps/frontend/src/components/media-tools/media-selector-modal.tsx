@@ -3,12 +3,22 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StockPhotos } from './stock-photos';
 import { StockVideos } from './stock-videos';
+import { StockVectors } from './stock-vectors';
+import { StockStickers } from './stock-stickers';
+import { StockIcons } from './stock-icons';
 import { FileManager } from '@gitroom/frontend/components/files/file-manager';
 import type { FileItem } from '@gitroom/frontend/components/files/file-manager';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 
-const TABS = ['Stock Photos', 'Stock Videos', 'My Files'] as const;
+const TABS = [
+  'Stock Photos',
+  'Stock Videos',
+  'Stock Vectors',
+  'Stock Stickers',
+  'Stock Icons',
+  'My Files',
+] as const;
 
 const useFocusTrap = (
   containerRef: React.RefObject<HTMLElement | null>,
@@ -222,6 +232,15 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
           )}
           {activeTab === 'Stock Videos' && (
             <StockVideos mode="select" onSelect={handleStockSelect} />
+          )}
+          {activeTab === 'Stock Vectors' && (
+            <StockVectors mode="select" onSelect={handleStockSelect} />
+          )}
+          {activeTab === 'Stock Stickers' && (
+            <StockStickers mode="select" onSelect={handleStockSelect} />
+          )}
+          {activeTab === 'Stock Icons' && (
+            <StockIcons mode="select" onSelect={handleStockSelect} />
           )}
           {activeTab === 'My Files' && (
             <div className="flex flex-col gap-3">

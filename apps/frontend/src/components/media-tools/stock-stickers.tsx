@@ -4,42 +4,22 @@ import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 're
 import { useDebounce } from 'use-debounce';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { StockPreviewModal } from './stock-preview-modal';
-import { StockVideoItem, stockSourceLabel } from './stock.types';
+import { StockStickerItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 
-const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
-  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
-  { value: 'black', label: 'Black', swatch: '#000000' },
-  { value: 'white', label: 'White', swatch: '#FFFFFF' },
-  { value: 'gray', label: 'Gray', swatch: '#9E9E9E' },
-  { value: 'red', label: 'Red', swatch: '#F44336' },
-  { value: 'orange', label: 'Orange', swatch: '#FF5722' },
-  { value: 'yellow', label: 'Yellow', swatch: '#FFEB3B' },
-  { value: 'green', label: 'Green', swatch: '#8BC34A' },
-  { value: 'blue', label: 'Blue', swatch: '#2196F3' },
-  { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
-  { value: 'brown', label: 'Brown', swatch: '#795548' },
-];
+const SUGGESTED_SEARCHES = ['Happy', 'Cat', 'Reaction', 'Celebration', 'Meme'];
 
-const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'Ocean', 'Abstract'];
-
-interface StockVideosProps {
+interface StockStickersProps {
   mode?: 'browse' | 'select';
-  onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'video' }) => void;
+  onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' | 'video' }) => void;
 }
 
-export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect }) => {
+export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelect }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
-  const [orientation, setOrientation] = useState('');
-  const [size, setSize] = useState('');
-  const [color, setColor] = useState('');
 
-  const filters = useMemo(
-    () => ({ orientation, size, color }),
-    [orientation, size, color]
-  );
+  const filters = useMemo(() => ({}), []);
 
   const {
     items,
@@ -47,38 +27,37 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
     error,
     isLoading,
     isValidating,
-    size: pageCount,
-    setSize: setPageCount,
+    size,
+    setSize,
     mutate,
-  } = useStockSearch<StockVideoItem>('/media/stock/videos', debouncedQuery, filters);
+  } = useStockSearch<StockStickerItem>('/media/stock/stickers', debouncedQuery, filters);
 
   const totalPages = lastPage?.totalPages || 1;
-  const hasMore = pageCount < totalPages;
+  const hasMore = size < totalPages;
 
-  // Infinite-scroll sentinel.
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const node = sentinelRef.current;
     if (!node || !hasMore || isLoading || isValidating) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0]?.isIntersecting) setPageCount((s) => s + 1);
+        if (entries[0]?.isIntersecting) setSize((s) => s + 1);
       },
       { rootMargin: '400px' }
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [hasMore, isLoading, isValidating, setPageCount, items.length]);
+  }, [hasMore, isLoading, isValidating, setSize, items.length]);
 
-  const openVideo = useCallback(
-    (video: StockVideoItem) =>
+  const openSticker = useCallback(
+    (sticker: StockStickerItem) =>
       modal.openModal({
         title: '',
         closeOnClickOutside: true,
         closeOnEscape: true,
         withCloseButton: true,
         classNames: { modal: 'w-[100%] max-w-[1100px] text-textColor' },
-        children: <StockPreviewModal item={video} type="video" />,
+        children: <StockPreviewModal item={sticker} type="sticker" />,
         size: '80%',
       }),
     [modal]
@@ -86,7 +65,7 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
 
   const initialLoading = isLoading && items.length === 0 && !error;
   const showEmpty = !initialLoading && !error && items.length === 0;
-  const isFirstFetch = pageCount === 1;
+  const isFirstFetch = size === 1;
 
   if (lastPage && !lastPage.configured) {
     return (
@@ -98,7 +77,6 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
 
   return (
     <div className="flex flex-col gap-[15px]">
-      {/* Toolbar — always mounted in every state */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-[12px]">
         <div className="relative flex-1">
           <svg className="absolute left-[14px] top-1/2 -translate-y-1/2 w-[16px] h-[16px] text-newTextColor/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -107,8 +85,8 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
           <input
             type="text"
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search videos..."
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search stickers..."
             className="w-full h-[44px] pl-[38px] pr-[34px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
           />
           {query && (
@@ -122,72 +100,8 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
             </button>
           )}
         </div>
-        <div className="relative">
-          <select
-            value={orientation}
-            onChange={e => setOrientation(e.target.value)}
-            className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
-          >
-            <option value="">All orientations</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-            <option value="square">Square</option>
-          </select>
-          <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-        <div className="relative">
-          <select
-            value={size}
-            onChange={e => setSize(e.target.value)}
-            className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
-          >
-            <option value="">All sizes</option>
-            <option value="small">Small</option>
-            <option value="medium">Medium</option>
-            <option value="large">Large</option>
-          </select>
-          <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
       </div>
 
-      <div className="flex items-center flex-wrap gap-[8px]">
-        <button
-          type="button"
-          onClick={() => setColor('')}
-          aria-pressed={color === ''}
-          className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
-            color === ''
-              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3] font-[500]'
-              : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
-          }`}
-        >
-          All
-        </button>
-        {COLOR_SWATCHES.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onClick={() => setColor((cur) => (cur === c.value ? '' : c.value))}
-            aria-pressed={color === c.value}
-            aria-label={`Color: ${c.label}`}
-            title={c.label}
-            className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] hover:scale-110 ${
-              color === c.value ? 'border-[#2B5CD3] ring-2 ring-[#2B5CD3]/40' : 'border-newColColor'
-            }`}
-          >
-            <span
-              className="absolute inset-[3px] rounded-full"
-              style={{ background: c.swatch }}
-            />
-          </button>
-        ))}
-      </div>
-
-      {/* Content states */}
       {error && items.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-[320px] gap-[10px] text-center px-[20px]">
           <svg className="w-[44px] h-[44px] text-newTextColor/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
@@ -199,7 +113,7 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
           <div className="text-[13px] text-newTextColor/50 max-w-[320px]">
             {error.status === 401 || error.status === 403
               ? 'Your session may have expired — try signing in again.'
-              : "We couldn't reach the video library. Give it another go in a moment."}
+              : "We couldn't reach the sticker library. Give it another go in a moment."}
           </div>
           <button
             type="button"
@@ -210,10 +124,10 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
           </button>
         </div>
       ) : initialLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px]">
-          {Array.from({ length: 8 }).map((_, i) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-[12px]">
+          {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner">
-              <div className="aspect-video bg-newColColor/20 animate-pulse rounded-[8px]" />
+              <div className="aspect-square bg-newColColor/20 animate-pulse rounded-[8px]" />
               <div className="p-[8px]">
                 <div className="h-[11px] bg-newColColor/20 animate-pulse rounded-[4px] w-[60%]" />
               </div>
@@ -223,15 +137,15 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
       ) : showEmpty ? (
         <div className="flex flex-col items-center justify-center h-[320px] gap-[10px] text-center px-[20px]">
           <svg className="w-[44px] h-[44px] text-newTextColor/30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5l4.72-4.72a.75.75 0 011.28.53v11.38a.75.75 0 01-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25h-9A2.25 2.25 0 002.25 7.5v9a2.25 2.25 0 002.25 2.25z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.182 15.182a4.5 4.5 0 01-6.364 0M21 12a9 9 0 11-18 0 9 9 0 0118 0zM7.5 9.75c0 .414.168.75.375.75S8.25 10.164 8.25 9.75 8.082 9 7.875 9s-.375.336-.375.75zm7.5 0c0 .414.168.75.375.75s.375-.336.375-.75-.168-.75-.375-.75-.375.336-.375.75z" />
           </svg>
           <div className="text-[15px] font-[600] text-textColor">
-            {debouncedQuery ? `No videos for "${debouncedQuery}"` : 'Find the perfect clip'}
+            {debouncedQuery ? `No stickers for "${debouncedQuery}"` : 'Find the perfect sticker'}
           </div>
           <div className="text-[13px] text-newTextColor/50 max-w-[340px]">
             {debouncedQuery
               ? 'Try a different keyword or one of these popular searches.'
-              : 'Search thousands of free, high-quality stock videos from Pexels to get started.'}
+              : 'Search thousands of free stickers from GIPHY to get started.'}
           </div>
           <div className="flex items-center flex-wrap justify-center gap-[8px] mt-[4px]">
             {SUGGESTED_SEARCHES.map((s) => (
@@ -248,37 +162,39 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
         </div>
       ) : (
         <>
-          {/* Responsive aspect-video grid (F6) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px]">
-            {items.map((video) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-[12px]">
+            {items.map((sticker) => (
               <button
-                key={video.id}
+                key={sticker.id}
                 type="button"
                 onClick={() => {
                   if (mode === 'select' && onSelect) {
+                    const isVideo = !!sticker.mp4Url;
                     onSelect({
-                      url: video.url,
-                      width: video.width,
-                      height: video.height,
-                      thumbnail: video.thumbUrl,
-                      type: 'video',
+                      url: isVideo ? sticker.mp4Url! : sticker.url,
+                      width: sticker.width,
+                      height: sticker.height,
+                      thumbnail: sticker.thumbUrl,
+                      type: isVideo ? 'video' : 'image',
                     });
                   } else {
-                    openVideo(video);
+                    openSticker(sticker);
                   }
                 }}
                 className="group text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
-                <div className="aspect-video relative overflow-hidden bg-black">
+                <div className="aspect-square relative overflow-hidden bg-transparent">
                   <img
-                    src={video.thumbUrl}
-                    alt=""
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                    src={sticker.thumbUrl}
+                    alt={sticker.description || ''}
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform"
                     loading="lazy"
                   />
-                  <div className="absolute bottom-[8px] right-[8px] px-[6px] py-[2px] rounded-[4px] bg-black/70 text-[11px] text-white pointer-events-none z-10">
-                    {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                  </div>
+                  {sticker.mp4Url && (
+                    <div className="absolute bottom-[8px] right-[8px] px-[6px] py-[2px] rounded-[4px] bg-black/70 text-[11px] text-white pointer-events-none z-10">
+                      GIF
+                    </div>
+                  )}
                   <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute bottom-0 left-0 right-0 h-[70px] bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     <div className="absolute bottom-[8px] right-[8px] opacity-0 group-hover:opacity-100 transition-opacity">
@@ -292,35 +208,44 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
                   <div className="text-[11px] text-newTextColor/60 truncate">
                     by{' '}
                     <a
-                      href={video.authorUrl}
+                      href={sticker.authorUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
+                      onClick={(e) => e.stopPropagation()}
                       className="text-[#2B5CD3] hover:underline"
                     >
-                      {video.author}
+                      {sticker.author}
                     </a>
-                    <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(video.source)}</span>
+                    <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(sticker.source)}</span>
                   </div>
                 </div>
               </button>
             ))}
           </div>
 
-          {/* Infinite-scroll sentinel + skeleton tail (F2) */}
           {hasMore && (
             <div ref={sentinelRef}>
               {!isFirstFetch && isValidating && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] mt-[12px]">
-                  {Array.from({ length: 4 }).map((_, i) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-[12px] mt-[12px]">
+                  {Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner">
-                      <div className="aspect-video bg-newColColor/20 animate-pulse rounded-[8px]" />
+                      <div className="aspect-square bg-newColColor/20 animate-pulse rounded-[8px]" />
                     </div>
                   ))}
                 </div>
               )}
             </div>
           )}
+
+          {/* GIPHY API ToS requires the "Powered By GIPHY" attribution mark wherever results are shown. */}
+          <a
+            href="https://giphy.com"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-[4px] self-center text-[11px] text-newTextColor/40 hover:text-newTextColor/70 transition-colors"
+          >
+            Powered By GIPHY
+          </a>
         </>
       )}
     </div>

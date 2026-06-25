@@ -56,6 +56,9 @@ const ICONS: Record<string, Entry> = {
   IDRIVE_E2: { viewBox: '0 0 24 24', color: '#0066CC', node: (<path d="M6 6h12v4l-6 4-6-4V6Zm0 8l6-4 6 4v4l-6 4-6-4v-4Z" />) },
   LOCAL: { viewBox: '0 0 24 24', color: '#888888', node: (<path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm0 2v12h14V6H5Zm4 2h6v2H9V8Z" />) },
 
+  // ── Content Pack Providers ────────────────────────────────
+  magnific: { viewBox: '0 0 24 24', color: '#D946EF', node: (<path d="M12 2l1.5 5.5L19 9l-5.5 2L12 22l-1.5-11L5 9l5.5-1.5L12 2Z" />) },
+
   // ── Shortlink Providers ───────────────────────────────────
   bitly: { viewBox: '0 0 24 24', color: '#EE6123', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm3 8h-3v-2h3v2Z" />) },
   tinyurl: { viewBox: '0 0 24 24', color: '#0284C7', node: (<path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 4a2 2 0 1 1 0 4 2 2 0 0 1 0-4Z" />) },
