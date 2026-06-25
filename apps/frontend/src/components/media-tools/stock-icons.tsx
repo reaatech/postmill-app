@@ -7,20 +7,6 @@ import { StockPreviewModal } from './stock-preview-modal';
 import { StockIconItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 
-const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
-  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
-  { value: 'black', label: 'Black', swatch: '#000000' },
-  { value: 'white', label: 'White', swatch: '#FFFFFF' },
-  { value: 'gray', label: 'Gray', swatch: '#9E9E9E' },
-  { value: 'red', label: 'Red', swatch: '#F44336' },
-  { value: 'orange', label: 'Orange', swatch: '#FF5722' },
-  { value: 'yellow', label: 'Yellow', swatch: '#FFEB3B' },
-  { value: 'green', label: 'Green', swatch: '#8BC34A' },
-  { value: 'blue', label: 'Blue', swatch: '#2196F3' },
-  { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
-  { value: 'brown', label: 'Brown', swatch: '#795548' },
-];
-
 const SUGGESTED_SEARCHES = ['Home', 'User', 'Heart', 'Arrow', 'Social'];
 
 interface StockIconsProps {
@@ -32,13 +18,9 @@ export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect }) =
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
-  const [orientation, setOrientation] = useState('');
-  const [color, setColor] = useState('');
 
-  const filters = useMemo(
-    () => ({ orientation, color }),
-    [orientation, color]
-  );
+  // Iconify search supports only a query — no orientation/colour filters.
+  const filters = useMemo(() => ({}), []);
 
   const {
     items,
@@ -119,51 +101,6 @@ export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect }) =
             </button>
           )}
         </div>
-        <div className="relative">
-          <select
-            value={orientation}
-            onChange={(e) => setOrientation(e.target.value)}
-            className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
-          >
-            <option value="">All orientations</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-            <option value="square">Square</option>
-          </select>
-          <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </div>
-
-      <div className="flex items-center flex-wrap gap-[8px]">
-        <button
-          type="button"
-          onClick={() => setColor('')}
-          aria-pressed={color === ''}
-          className={`h-[30px] px-[12px] rounded-full border text-[12px] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] ${
-            color === ''
-              ? 'border-[#2B5CD3] bg-[#2B5CD3]/15 text-[#2B5CD3] font-[500]'
-              : 'border-newColColor text-newTextColor/70 hover:text-textColor hover:border-newTextColor/40'
-          }`}
-        >
-          All
-        </button>
-        {COLOR_SWATCHES.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            onClick={() => setColor((cur) => (cur === c.value ? '' : c.value))}
-            aria-pressed={color === c.value}
-            aria-label={`Color: ${c.label}`}
-            title={c.label}
-            className={`relative w-[30px] h-[30px] rounded-full border transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3] hover:scale-110 ${
-              color === c.value ? 'border-[#2B5CD3] ring-2 ring-[#2B5CD3]/40' : 'border-newColColor'
-            }`}
-          >
-            <span className="absolute inset-[3px] rounded-full" style={{ background: c.swatch }} />
-          </button>
-        ))}
       </div>
 
       {error && items.length === 0 ? (
@@ -249,15 +186,25 @@ export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect }) =
                 }}
                 className="group block w-full mb-[12px] break-inside-avoid text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
               >
-                <div
-                  className="relative overflow-hidden p-[16px] flex items-center justify-center"
-                  style={{ aspectRatio: icon.width && icon.height ? `${icon.width} / ${icon.height}` : '1 / 1' }}
-                >
-                  <img
-                    src={icon.url}
-                    alt={icon.description || ''}
-                    className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform"
-                    loading="lazy"
+                <div className="relative overflow-hidden p-[16px] flex items-center justify-center aspect-square">
+                  {/* Iconify icons are monochrome `currentColor` SVGs — rendered via <img>
+                      they'd come out black (invisible in dark mode) and at their tiny 24px
+                      intrinsic size. Paint them as a mask filled with the theme text color so
+                      they're visible in both themes and scale up cleanly. */}
+                  <span
+                    role="img"
+                    aria-label={icon.description || ''}
+                    className="w-[48px] h-[48px] bg-textColor group-hover:scale-110 transition-transform"
+                    style={{
+                      maskImage: `url("${icon.url}")`,
+                      WebkitMaskImage: `url("${icon.url}")`,
+                      maskRepeat: 'no-repeat',
+                      WebkitMaskRepeat: 'no-repeat',
+                      maskPosition: 'center',
+                      WebkitMaskPosition: 'center',
+                      maskSize: 'contain',
+                      WebkitMaskSize: 'contain',
+                    }}
                   />
                   <div className="absolute inset-0 pointer-events-none">
                     <div className="absolute bottom-0 left-0 right-0 h-[70px] bg-gradient-to-t from-black/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

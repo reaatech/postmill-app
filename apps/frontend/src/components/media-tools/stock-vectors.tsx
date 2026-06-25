@@ -7,8 +7,11 @@ import { StockPreviewModal } from './stock-preview-modal';
 import { StockVectorItem, stockSourceLabel } from './stock.types';
 import { useStockSearch } from './use-stock-search';
 
+// Values must match Pixabay's `colors` parameter exactly
+// (https://pixabay.com/api/docs/) — e.g. `grayscale`/`lilac`, not `black_and_white`/`purple`.
 const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
-  { value: 'black_and_white', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
+  { value: 'grayscale', label: 'B&W', swatch: 'linear-gradient(90deg, #000000 50%, #FFFFFF 50%)' },
+  { value: 'transparent', label: 'Transparent', swatch: 'repeating-conic-gradient(#bbb 0% 25%, #fff 0% 50%) 50% / 10px 10px' },
   { value: 'black', label: 'Black', swatch: '#000000' },
   { value: 'white', label: 'White', swatch: '#FFFFFF' },
   { value: 'gray', label: 'Gray', swatch: '#9E9E9E' },
@@ -16,8 +19,10 @@ const COLOR_SWATCHES: { value: string; label: string; swatch: string }[] = [
   { value: 'orange', label: 'Orange', swatch: '#FF5722' },
   { value: 'yellow', label: 'Yellow', swatch: '#FFEB3B' },
   { value: 'green', label: 'Green', swatch: '#8BC34A' },
+  { value: 'turquoise', label: 'Turquoise', swatch: '#1ABC9C' },
   { value: 'blue', label: 'Blue', swatch: '#2196F3' },
-  { value: 'purple', label: 'Purple', swatch: '#9C27B0' },
+  { value: 'lilac', label: 'Lilac', swatch: '#9C27B0' },
+  { value: 'pink', label: 'Pink', swatch: '#EC407A' },
   { value: 'brown', label: 'Brown', swatch: '#795548' },
 ];
 
@@ -126,9 +131,8 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect 
             className="appearance-none h-[44px] w-full sm:w-auto pl-[12px] pr-[32px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none cursor-pointer"
           >
             <option value="">All orientations</option>
-            <option value="landscape">Landscape</option>
-            <option value="portrait">Portrait</option>
-            <option value="square">Square</option>
+            <option value="horizontal">Horizontal</option>
+            <option value="vertical">Vertical</option>
           </select>
           <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

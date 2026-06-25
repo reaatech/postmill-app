@@ -145,6 +145,29 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
         />
       );
     }
+    if (type === 'icon') {
+      // Monochrome currentColor SVG — paint it as a theme-coloured mask so it's
+      // visible in dark mode (an <img> would render it black).
+      return (
+        <div className="w-full rounded-[8px] flex items-center justify-center p-[48px] bg-newBgColorInner">
+          <span
+            role="img"
+            aria-label={item.description || ''}
+            className="w-[160px] h-[160px] bg-textColor"
+            style={{
+              maskImage: `url("${item.url}")`,
+              WebkitMaskImage: `url("${item.url}")`,
+              maskRepeat: 'no-repeat',
+              WebkitMaskRepeat: 'no-repeat',
+              maskPosition: 'center',
+              WebkitMaskPosition: 'center',
+              maskSize: 'contain',
+              WebkitMaskSize: 'contain',
+            }}
+          />
+        </div>
+      );
+    }
     return (
       <img
         src={item.url}

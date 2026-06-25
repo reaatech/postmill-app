@@ -131,7 +131,7 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect })
             <option value="">All orientations</option>
             <option value="landscape">Landscape</option>
             <option value="portrait">Portrait</option>
-            <option value="square">Square</option>
+            <option value="squarish">Square</option>
           </select>
           <svg className="absolute right-[10px] top-1/2 -translate-y-1/2 w-[14px] h-[14px] text-newTextColor/40 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
