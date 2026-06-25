@@ -105,9 +105,20 @@ export class MediaJobLifecycleService {
 
   // Webhook completion URL (§11.2) — unguessable (HMAC token) and org-bound.
   // Returns undefined when no backend base URL is configured (polling still covers it).
+  // Only a public HTTPS base produces a webhook: providers (e.g. Replicate) reject
+  // non-HTTPS webhook URLs with a 422, and a webhook pointed at http/localhost can
+  // never be delivered anyway. For those bases we omit the webhook and let the
+  // polling sweep / per-request poll complete the job.
   webhookUrlFor(jobId: string, organizationId: string): string | undefined {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!base) return undefined;
+    let parsed: URL;
+    try {
+      parsed = new URL(base);
+    } catch {
+      return undefined;
+    }
+    if (parsed.protocol !== 'https:') return undefined;
     try {
       const token = mediaJobWebhookToken(jobId, organizationId);
       return `${base.replace(/\/+$/, '')}/media-jobs/webhook/${jobId}/${token}`;

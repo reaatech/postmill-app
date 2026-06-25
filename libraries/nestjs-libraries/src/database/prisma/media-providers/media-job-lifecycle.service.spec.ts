@@ -148,6 +148,14 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       delete process.env.NEXT_PUBLIC_BACKEND_URL;
       expect(service.webhookUrlFor('job-1', 'org-1')).toBeUndefined();
     });
+
+    it('omits the webhook for a non-HTTPS base (providers reject http/localhost)', () => {
+      const { service } = makeService();
+      const prev = process.env.NEXT_PUBLIC_BACKEND_URL;
+      process.env.NEXT_PUBLIC_BACKEND_URL = 'http://localhost:3000';
+      expect(service.webhookUrlFor('job-1', 'org-1')).toBeUndefined();
+      process.env.NEXT_PUBLIC_BACKEND_URL = prev;
+    });
   });
 
   describe('processJob', () => {

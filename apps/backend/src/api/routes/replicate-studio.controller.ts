@@ -11,12 +11,14 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections, SubscriptionException } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
-import { Organization } from '@prisma/client';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
+import { Organization, User } from '@prisma/client';
 import { ReplicateRunnerService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-runner.service';
 import { ReplicateCatalogService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-catalog.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { EstimateDto, RunSyncDto, RunAsyncDto, SaveUrlDto, MergeDto } from '@gitroom/nestjs-libraries/dtos/replicate';
+import { estimate } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-cost';
 
 @ApiTags('Replicate Studio')
 @Controller('/media/replicate')
@@ -75,7 +77,6 @@ export class ReplicateStudioController {
   async estimate(
     @Body() body: EstimateDto,
   ) {
-    const { estimate } = await import('@gitroom/nestjs-libraries/media/replicate-studio/replicate-cost');
     return estimate(body.modelId, body.input);
   }
 
@@ -86,6 +87,7 @@ export class ReplicateStudioController {
   async runSync(
     @Body() body: RunSyncDto,
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
   ) {
     // Image ops: read-only credit gate; actual consumption happens in the runner.
     if (body.operation === 'image') {
@@ -100,7 +102,7 @@ export class ReplicateStudioController {
       }
       return this._runner.runSync(
         org.id,
-        '',
+        user.id,
         {
           modelId: body.modelId,
           input: body.input,
@@ -111,7 +113,7 @@ export class ReplicateStudioController {
     }
 
     // STT: no credit gate, no credit consumption
-    return this._runner.runSync(org.id, '', {
+    return this._runner.runSync(org.id, user.id, {
       modelId: body.modelId,
       input: body.input,
       operation: body.operation,
@@ -125,6 +127,7 @@ export class ReplicateStudioController {
   async runAsync(
     @Body() body: RunAsyncDto,
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
   ) {
     // Video/image ops: read-only credit gate; actual consumption happens in the runner.
     if (body.operation === 'video') {
@@ -139,7 +142,7 @@ export class ReplicateStudioController {
       }
       return this._runner.runAsync(
         org.id,
-        '',
+        user.id,
         {
           modelId: body.modelId,
           versionId: body.versionId,
@@ -163,7 +166,7 @@ export class ReplicateStudioController {
       }
       return this._runner.runAsync(
         org.id,
-        '',
+        user.id,
         {
           modelId: body.modelId,
           versionId: body.versionId,
@@ -176,7 +179,7 @@ export class ReplicateStudioController {
     }
 
     // Audio: no gate, no credit consumption
-    return this._runner.runAsync(org.id, '', {
+    return this._runner.runAsync(org.id, user.id, {
       modelId: body.modelId,
       versionId: body.versionId,
       input: body.input,
@@ -216,8 +219,9 @@ export class ReplicateStudioController {
   async merge(
     @Body() body: MergeDto,
     @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
   ) {
-    return this._runner.runMerge(org.id, '', {
+    return this._runner.runMerge(org.id, user.id, {
       clips: body.clips,
       transitions: body.transitions,
       folderId: body.folderId,

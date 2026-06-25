@@ -288,7 +288,8 @@ export class ReplicateRunnerService {
 
       const job = await this._aiSettings.createMediaJob({
         organizationId: orgId,
-        userId,
+        // userId is an optional FK — an empty string would violate it, so coerce to undefined.
+        userId: userId || undefined,
         provider: 'replicate',
         operation: 'image',
         status: 'pending',
@@ -321,7 +322,8 @@ export class ReplicateRunnerService {
 
       const job = await this._lifecycle.createPendingJob({
         organizationId: orgId,
-        userId,
+        // userId is an optional FK — an empty string would violate it, so coerce to undefined.
+        userId: userId || undefined,
         provider: 'replicate',
         operation: params.operation,
         model: params.modelId,
@@ -353,8 +355,25 @@ export class ReplicateRunnerService {
   }
 
   async getJob(orgId: string, jobId: string): Promise<GetJobResult> {
-    const job = await this._aiSettings.getMediaJobById(jobId);
+    const existing = await this._aiSettings.getMediaJobById(jobId);
 
+    if (!existing || existing.organizationId !== orgId) {
+      throw new ForbiddenException('Job not found');
+    }
+
+    // Drive completion by polling the provider so async jobs finish even when no
+    // public webhook can reach this instance (local dev, private deploys). A
+    // public-HTTPS deploy still completes faster via the webhook; processJob is a
+    // no-op ('skipped') once the job is terminal, so the two paths don't conflict.
+    if (existing.status === 'pending' || existing.status === 'processing') {
+      try {
+        await this._lifecycle.processJob(jobId);
+      } catch {
+        // Transient poll failure — leave the job pending for the next poll/sweep.
+      }
+    }
+
+    const job = await this._aiSettings.getMediaJobById(jobId);
     if (!job || job.organizationId !== orgId) {
       throw new ForbiddenException('Job not found');
     }
