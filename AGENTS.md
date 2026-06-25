@@ -208,6 +208,27 @@ at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
 
 # Architecture notes
 
+## Background jobs (Inngest)
+
+All scheduled/async work runs on **Inngest** (the Temporal orchestrator was removed — commit #39).
+The backend serves the Inngest handler at **`/api/inngest`**; functions live in
+`apps/backend/src/inngest/functions/`, with the heavier domain logic in
+`libraries/nestjs-libraries/src/inngest/activities/`. **There is no `while(true)` poll loop and no
+`continueAsNew`** — jobs are either cron-triggered or event-triggered, and durable steps
+(`step.run`, `step.sleepUntil`) provide retries/idempotency.
+
+- **Toggle**: events are only sent when `USE_INNGEST=true` (`isInngestEnabled()` gates every
+  `inngest.send(...)`). Locally, run the Inngest dev server (`--profile jobs`) with `INNGEST_DEV=1`;
+  in Cloud, set `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`. See `.env.example` for the full set.
+- **Event-triggered**: `post/publish` (`post-publish.ts` — sleeps until the publish date, posts,
+  posts thread items as comments, then first comment / webhooks / plugins; per-`taskQueue`
+  concurrency cap), `autopost/process`, `integration/refresh-token`, `email/send` (global 1/sec),
+  `email/digest`, `analytics/backfill`, `streak/start`.
+- **Cron-triggered**: `comments-collection.ts` (every minute — sync comments, dispatch webhooks,
+  prune, notify), `analytics-collection.ts` (daily 02:00 UTC — the snapshot sweep below),
+  `media-jobs-poll.ts` (every minute — poll pending media jobs + FFmpeg video renders),
+  `missing-post-finder.ts` (hourly — recover posts that should have published).
+
 ## Analytics
 
 Refactored from single-channel live-fetch to a persisted multi-channel dashboard.
@@ -249,8 +270,8 @@ Two feature tracks added to `/launches`.
 - **`ISocialMediaComments`** interface in `social.integrations.interface.ts` with optional
   `fetchComments` / `replyToComment` / `likeComment`.
 - Social comments **Controller → Service → Repository** layer.
-- Inngest **`CommentsActivity` + `commentsCollection`** for periodic sync (gated by background jobs
-  configured).
+- Inngest **`comments-collection.ts` cron** (backed by `CommentsActivity`) for periodic sync — gated
+  on `USE_INNGEST`. See **Background jobs (Inngest)** above.
 
 ## AI Providers (v3.4.0)
 
@@ -358,12 +379,13 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
   sentiment/priority badges (from 2E), bulk mark-read, quick replies. Additive to the post-detail
   comments view.
 
-### First comment (2F, workflow v1.0.6)
-- New `post.workflow.v1.0.6.ts` auto-posts a first comment after a successful `post()` when
+### First comment (2F)
+- The `post-publish.ts` Inngest function auto-posts a first comment after a successful `post()` when
   `settings.firstComment` is set. **Three invariants:** capability-gated on
-  `providerCapabilities.firstComment`; **idempotent** (records the posted comment id /
-  `firstCommentPostedAt` so a retry or `continueAsNew` can't double-post); **non-fatal** (a failed
-  first comment warns + notifies, but the post stays published — never fail/roll back the post).
+  `providerCapabilities.firstComment`; **idempotent** (records `firstCommentId` /
+  `firstCommentPostedAt` back into the post's `settings` JSON so a retry can't double-post);
+  **non-fatal** (a failed first comment warns + notifies, but the post stays published — never
+  fail/roll back the post).
 
 ### Poll posts (3F)
 - Polls are part of the post payload (not a follow-up step), wired through `post()` for X and
@@ -500,14 +522,62 @@ AI, Media, Storage, and Shortlinks settings surfaces share:
 
 Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `MessagesGroup`, `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`, `Messages` + associated enums (`OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`) and their relations on `User`, `Post`, `Organization`, `Media`, `Integration`. Code-only removal in step 6, schema drops in step 7. The legacy `Role` enum and its `UserOrganization.role` column were also dropped — superseded by `AppRole`-based RBAC (`UserOrganization.roleId`).
 
-## Stock media & Content Packs (v3.8.10+)
+## Media surface, Stock & Content Packs (v3.8.10+)
 
-- Free stock sources: Unsplash (photos), Pexels (videos), Pixabay (vectors/illustrations), GIPHY
-  (stickers), Iconify (SVG icons), and Jamendo (audio). Results carry `source`, `license`, and
-  `attribution` metadata through preview, Designer open, and `/files/import`.
-- Redis caches free stock search results globally for 60s (including negative-cache for empty/missing
-  key configurations).
-- Premium Content Packs are per-organization BYOK packs configured at **Settings → Content Packs**.
-  Magnific is the first supported pack (photos, vectors, icons, videos). When a pack is active it
-  takes precedence over the matching free catalog for that capability. Pack credentials are encrypted
-  at rest and never returned to the client.
+### `/media` vs `/files`
+- **`/files` is the asset library** — uploads plus anything a tool saved out. It is both the input
+  source and the output destination for the tools.
+- **`/media` is tools only** (no library inside it). Each tool: pick/produce media → **save to
+  `/files`** (or send straight to the composer). The nav lives in
+  `apps/frontend/src/app/(app)/(site)/media/layout.tsx`, grouped + alphabetised into two sections:
+  - **Tools** — Designer, Replicate.
+  - **Content Pack** — Stock Photos, Stock Videos, Vectors, Stickers, Stock Audio, Icons.
+
+### Designer (Konva)
+- The Designer (`apps/frontend/src/components/media-tools/designer/`) is **Konva/react-konva**, not
+  Polotno (fully removed). Two modes: a **static canvas** (images/text/shapes) and a **video
+  timeline** (`video-timeline.tsx` — video/image/text/caption/audio/sticker tracks, canvas-decoded
+  audio waveforms; renders via headless Chromium + FFmpeg).
+- Opens from a single asset (`?url=&type=&w=&h=…`) or a bulk handoff (Files → bulk **Open all in
+  Designer**, which stashes the selection in `sessionStorage` and navigates to `?bulk=1`). Animated
+  GIF/WebP export only exists in **video** mode — static mode never offers it (Konva flattens to
+  frame 1).
+
+### Stock providers (free)
+`StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via
+`GET /media/stock/{photos|videos|vectors|stickers|icons|audio}`. Each capability is backed by one
+free provider, keyed by env (results carry `source`/`license`/`attribution` through preview, Designer
+open, and `/files/import`):
+
+| Capability | Provider | Env key |
+|---|---|---|
+| Photos | Unsplash | `UNSPLASH_ACCESS_KEY` |
+| Videos | Pexels | `PEXELS_API_KEY` |
+| Vectors / illustrations | Pixabay | `PIXABAY_API_KEY` |
+| Stickers | GIPHY | `GIPHY_API_KEY` |
+| Audio | Jamendo | `JAMENDO_CLIENT_ID` |
+| Icons | Iconify | *(public API — no key)* |
+
+Redis caches free stock search results globally for 60s (incl. negative-cache for missing-key /
+empty configs).
+
+### Content Packs (premium, BYOK)
+- Per-org packs configured at **Settings → Content Packs**, resolved per-org-per-capability by
+  `OrgContentPackSettingsService` (`database/prisma/content-packs/`). Backed by `ContentPackConfig`
+  (encrypted credentials + provider `extraConfig`) and a pointer `Organization.activeContentPackIdentifier`.
+- **Magnific** is the first pack (photos, vectors, icons, videos). When a pack is active it takes
+  precedence over the matching free catalog for that capability; saving uses a **mint-then-ingest**
+  step (`resolveMagnificDownload` resolves a licensed URL before `/files/import`). Credentials are
+  encrypted at rest and never returned to the client.
+
+### Saving into `/files`
+- All saves go through **`POST /files/import`** → `FileService.importFromUrl`
+  (`database/prisma/file/file.service.ts`): `safeFetch` the URL, enforce a 512 MB cap, validate the
+  **real** content-type against an allowlist (image/* + `video/mp4` + audio mp3/mp4/wav/ogg),
+  sniffing bytes via the `file-type.compat` shim when a source mislabels the MIME (e.g. Jamendo
+  serves an MP3 as `text/html`). Stores `source`/`attribution` in file metadata.
+- Shared frontend pieces under `apps/frontend/src/components/`: a native canvas **audio player**
+  (`media-tools/audio-player.tsx`, lazy waveform decode, one-at-a-time playback — used in stock
+  audio, Files grid/details, and the file preview modal), the **Save to Files** modal
+  (`media-tools/save-to-files-modal.tsx`, with an `allowPost` flag), the stock **preview modal**, and
+  the Files **preview modal** (`files/file-preview-modal.tsx`).
