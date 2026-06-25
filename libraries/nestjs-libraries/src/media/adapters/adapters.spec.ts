@@ -356,6 +356,37 @@ describe('ReplicateMediaAdapter', () => {
     mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'failed', error: 'oom' }));
     expect(await adapter.pollJob('pred-1', CREDS)).toMatchObject({ status: 'failed', error: 'oom' });
   });
+
+  it('runOfficial posts to /models/{id}/predictions with no version', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'pred-official', status: 'succeeded', output: ['https://rep/out.png'] }));
+    const result = await adapter.runOfficial('black-forest-labs/flux-schnell', { prompt: 'cat' }, { ...CREDS, wait: true, webhookUrl: 'https://cb' });
+
+    const url = mockSafeFetch.mock.calls[0][0];
+    expect(url).toBe('https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions');
+
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string);
+    expect(body).not.toHaveProperty('version');
+    expect(body.input).toMatchObject({ prompt: 'cat' });
+    expect(body.webhook).toBe('https://cb');
+    expect((init.headers as Record<string, string>)['Prefer']).toBe('wait=60');
+    expect(result).toMatchObject({ id: 'pred-official', status: 'succeeded' });
+  });
+
+  it('runCommunity posts to /predictions with the supplied version', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'pred-community', status: 'starting' }));
+    const result = await adapter.runCommunity('v-community', { prompt: 'cat' }, { ...CREDS, webhookUrl: 'https://cb' });
+
+    const url = mockSafeFetch.mock.calls[0][0];
+    expect(url).toBe('https://api.replicate.com/v1/predictions');
+
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(init.body as string);
+    expect(body.version).toBe('v-community');
+    expect(body.input).toMatchObject({ prompt: 'cat' });
+    expect(body.webhook).toBe('https://cb');
+    expect(result).toMatchObject({ id: 'pred-community', status: 'starting' });
+  });
 });
 
 describe('LumaAdapter', () => {
@@ -422,7 +453,7 @@ describe('ReplicateMediaAdapter image + edits', () => {
     mockSafeFetch.mockResolvedValue(jsonResponse({ output: ['https://rep/1.png', 'https://rep/2.png'] }));
     const result = await adapter.generateImage('two cats', CREDS);
     const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
-    expect((init.headers as Record<string, string>)['Prefer']).toBe('wait');
+    expect((init.headers as Record<string, string>)['Prefer']).toBe('wait=60');
     expect(result).toMatchObject({ multi: true, image: 'https://rep/1.png' });
   });
 
