@@ -1,11 +1,15 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore } from './replicate.store';
 import { AudioPlayer } from './players/audio-player';
 import { VideoPlayer } from './players/video-player';
+import { ElapsedTimer } from './elapsed-timer';
+import { useGenerate } from './use-generate';
+
+type Medium = 'image' | 'video' | 'audio';
 
 function useJobPoll(jobId: string | null) {
   const fetch = useFetch();
@@ -13,7 +17,10 @@ function useJobPoll(jobId: string | null) {
     jobId ? `replicate-job-${jobId}` : null,
     async () => {
       const res = await fetch(`/media/replicate/jobs/${jobId}`);
-      return (await res.json()) as { status: string; result: { kind: string; urls: string[] } | null };
+      return (await res.json()) as {
+        status: string;
+        result: { kind: string; urls: string[] } | null;
+      };
     },
     { refreshInterval: 6000 }
   );
@@ -36,39 +43,124 @@ function generateSrt(segments: Array<{ text: string; start?: number; end?: numbe
     .map((seg, i) => {
       const start = seg.start ?? 0;
       const end = seg.end ?? start + 1;
-      const format = (s: number) => {
+      const fmt = (s: number) => {
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
         const sec = Math.floor(s % 60);
         const ms = Math.floor((s % 1) * 1000);
         return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
       };
-      return `${i + 1}\n${format(start)} --> ${format(end)}\n${seg.text}\n`;
+      return `${i + 1}\n${fmt(start)} --> ${fmt(end)}\n${seg.text}\n`;
     })
     .join('\n');
 }
 
-export function ResultPanel() {
-  const store = useReplicateStore();
-  // Stable action/value selectors for the polling effect below. Depending on the
-  // whole `store` object (which changes identity on every state update) made this
-  // effect re-run forever after a job completed (Maximum update depth exceeded).
+const MEDIUM_ICON: Record<Medium, string> = {
+  image: '🖼️',
+  video: '🎬',
+  audio: '🎵',
+};
+
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-full w-full flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl">{children}</div>
+    </div>
+  );
+}
+
+// ── Hover action overlay (oc-platform: Download / Regenerate / New) ───────────
+function ActionOverlay({
+  onDownload,
+  onRegenerate,
+  onNew,
+}: {
+  onDownload?: () => void;
+  onRegenerate: () => void;
+  onNew: () => void;
+}) {
+  const btn =
+    'flex items-center justify-center w-9 h-9 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors';
+  return (
+    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {onDownload && (
+        <button type="button" onClick={onDownload} className={btn} title="Download">
+          ⤓
+        </button>
+      )}
+      <button type="button" onClick={onRegenerate} className={btn} title="Regenerate">
+        ⟳
+      </button>
+      <button type="button" onClick={onNew} className={btn} title="New">
+        ＋
+      </button>
+    </div>
+  );
+}
+
+function DetailsCard() {
+  const meta = useReplicateStore((s) => s.resultMeta);
+  const estimate = useReplicateStore((s) => s.estimate);
+  if (!meta) return null;
+  const entries = Object.entries(meta.input).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ''
+  );
+  return (
+    <div className="mt-4 rounded-xl border border-newBorder bg-newBgColorInner p-3">
+      <div className="flex gap-6 mb-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Model</div>
+          <div className="text-sm text-white">{meta.modelName}</div>
+        </div>
+        {estimate && !estimate.approximate && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">Est. cost</div>
+            <div className="text-sm text-green-400">${estimate.usd.toFixed(4)}</div>
+          </div>
+        )}
+      </div>
+      {entries.length > 0 && (
+        <div className="border-t border-newBorder pt-2 space-y-1">
+          {entries.map(([k, v]) => {
+            const display =
+              typeof v === 'object' ? (v as any).url || (v as any).fileId || JSON.stringify(v) : String(v);
+            return (
+              <div key={k} className="text-[11px] text-gray-400">
+                <span className="text-gray-500">{k.replace(/_/g, ' ')}: </span>
+                <span className={k === 'prompt' ? 'text-gray-300' : 'text-gray-300'}>{display}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ResultPanel({ medium }: { medium: Medium }) {
+  const runState = useReplicateStore((s) => s.runState);
+  const result = useReplicateStore((s) => s.result);
+  const error = useReplicateStore((s) => s.error);
+  const selectedModel = useReplicateStore((s) => s.selectedModel);
+  const selectedCategory = useReplicateStore((s) => s.selectedCategory);
+  const saveFolderId = useReplicateStore((s) => s.saveFolderId);
   const setResult = useReplicateStore((s) => s.setResult);
   const setRunState = useReplicateStore((s) => s.setRunState);
   const setError = useReplicateStore((s) => s.setError);
   const resultJobId = useReplicateStore((s) => s.result?.jobId);
+
   const fetch = useFetch();
+  const generate = useGenerate();
   const [saving, setSaving] = useState(false);
-  const [savedFileId, setSavedFileId] = useState<string | null>(null);
   const [savedPaths, setSavedPaths] = useState<Record<string, string>>({});
 
-  const isPolling = store.runState === 'running' && store.result?.jobId;
-  const { data: jobData } = useJobPoll(isPolling ? store.result!.jobId! : null);
+  const isPolling = runState === 'running' && !!result?.jobId;
+  const { data: jobData } = useJobPoll(isPolling ? result!.jobId! : null);
 
   useEffect(() => {
     if (jobData?.status === 'completed' && jobData.result) {
       setResult({
-        kind: jobData.result.kind as 'image' | 'video' | 'audio' | 'text',
+        kind: jobData.result.kind as Medium | 'text',
         urls: jobData.result.urls,
         jobId: resultJobId,
       });
@@ -80,335 +172,240 @@ export function ResultPanel() {
     }
   }, [jobData, setResult, setRunState, setError, resultJobId]);
 
-  const handleSaveToFiles = useCallback(async (url: string) => {
-    setSaving(true);
-    try {
-      const res = await fetch('/media/replicate/save-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url,
-          name: `replicate-${Date.now()}`,
-          folderId: store.saveFolderId,
-        }),
-      });
-      const data = await res.json();
-      setSavedFileId(data.id);
-      if (data.path) {
-        setSavedPaths((prev) => ({ ...prev, [url]: data.path }));
+  const handleNew = useCallback(() => {
+    setResult(null);
+    setError(null);
+    setRunState('idle');
+  }, [setResult, setError, setRunState]);
+
+  const handleSaveToFiles = useCallback(
+    async (url: string) => {
+      setSaving(true);
+      try {
+        const res = await fetch('/media/replicate/save-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, name: `replicate-${Date.now()}`, folderId: saveFolderId }),
+        });
+        const data = await res.json();
+        if (data.path) setSavedPaths((prev) => ({ ...prev, [url]: data.path }));
+      } catch {
+        setError('Failed to save to Files');
+      } finally {
+        setSaving(false);
       }
-    } catch (err) {
-      store.setError('Failed to save to Files');
-    } finally {
-      setSaving(false);
-    }
-  }, [fetch, store]);
+    },
+    [fetch, saveFolderId, setError]
+  );
 
-  const handleOpenDesigner = useCallback((url: string) => {
-    const storedUrl = savedPaths[url] || url;
-    const params = new URLSearchParams({ url: storedUrl, type: 'photo', w: '', h: '' });
-    window.open(`/media/designer?${params.toString()}`, '_blank');
-  }, [savedPaths]);
+  const handleDownload = useCallback((url: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, []);
 
-  const handleOpenInFiles = useCallback((url: string) => {
-    const folderId = store.saveFolderId;
-    const target = folderId ? `/files?folderId=${encodeURIComponent(folderId)}` : '/files';
+  const openInFiles = useCallback(() => {
+    const target = saveFolderId ? `/files?folderId=${encodeURIComponent(saveFolderId)}` : '/files';
     window.open(target, '_blank');
-  }, [store.saveFolderId]);
+  }, [saveFolderId]);
 
-  const handleCopyTranscript = useCallback((text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      // Could add a toast here
-    });
-  }, []);
+  const openInDesigner = useCallback(
+    (url: string) => {
+      const storedUrl = savedPaths[url] || url;
+      const params = new URLSearchParams({ url: storedUrl, type: 'photo', w: '', h: '' });
+      window.open(`/media/designer?${params.toString()}`, '_blank');
+    },
+    [savedPaths]
+  );
 
-  const handleDownloadTxt = useCallback((text: string) => {
-    downloadBlob(text, 'transcript.txt', 'text/plain');
-  }, []);
+  // ── State 1: placeholder ───────────────────────────────────────────────────
+  if (!selectedModel) {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-newBorder py-20 text-center">
+          <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
+          <p className="text-gray-400">Nothing generated yet</p>
+          <p className="text-xs text-gray-600">Pick a model and configure it to get started.</p>
+        </div>
+      </Frame>
+    );
+  }
 
-  const handleDownloadSrt = useCallback((segments?: Array<{ text: string; start?: number; end?: number }>, text?: string) => {
-    if (segments && segments.length > 0) {
-      downloadBlob(generateSrt(segments), 'transcript.srt', 'text/plain');
-    } else if (text) {
-      downloadBlob(text, 'transcript.txt', 'text/plain');
-    }
-  }, []);
-
-  const handleGenerate = useCallback(async () => {
-    const model = store.selectedModel;
-    if (!model) return;
-
-    const category = store.selectedCategory;
-    if (!category) return;
-
-    // Required field validation
-    const inputSchema = store.selectedModel?.inputSchema as { required?: string[]; properties?: Record<string, unknown> } | undefined;
-    const requiredFields = inputSchema?.required || [];
-    const missing = requiredFields.filter((field) => {
-      const value = store.formInput[field];
-      if (value === undefined || value === null || value === '') return true;
-      if (typeof value === 'object' && !Array.isArray(value)) {
-        const obj = value as Record<string, unknown>;
-        return !obj.fileId && !obj.url;
-      }
-      return false;
-    });
-    if (missing.length > 0) {
-      store.setError(`Missing required fields: ${missing.join(', ')}`);
-      store.setRunState('error');
-      return;
-    }
-
-    // Map category to endpoint (see plan §3 mapping table)
-    const syncCategories = ['text-to-image', 'image-to-image', 'background-remove', 'upscale', 'inpaint', 'stt'];
-    const asyncCategories = ['restore', 'text-to-video', 'image-to-video', 'video-to-video', 'video-upscale', 'caption', 'tts', 'text-to-music', 'music-to-music', 'voice-clone'];
-    const localCategories = ['meme', 'merge'];
-
-    store.setRunState('running');
-    store.setError(null);
-    store.setResult(null);
-
-    try {
-      if (localCategories.includes(category)) {
-        // Meme and merge are handled by their own editors
-        return;
-      }
-
-      let endpoint: string;
-      let operation: string;
-
-      if (syncCategories.includes(category)) {
-        endpoint = '/run/sync';
-        operation = category === 'stt' ? 'stt' : 'image';
-      } else if (asyncCategories.includes(category)) {
-        endpoint = '/run/async';
-        operation = category === 'restore' ? 'image'
-          : ['text-to-video', 'image-to-video', 'video-to-video', 'video-upscale', 'caption'].includes(category) ? 'video'
-          : 'audio';
-      } else {
-        throw new Error('Unknown category');
-      }
-
-      const res = await fetch(`/media/replicate${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          modelId: model.id,
-          versionId: model.versionId || undefined,
-          input: store.formInput,
-          operation,
-          folderId: store.saveFolderId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.status === 'succeeded') {
-        store.setResult(data);
-        store.setRunState('success');
-        store.addToHistory({ jobId: data.jobId || '', modelId: model.id });
-      } else if (data.jobId) {
-        store.setResult({ kind: 'image', urls: [], jobId: data.jobId });
-        // Stay in 'running' — poll will update
-        store.addToHistory({ jobId: data.jobId, modelId: model.id });
-      } else {
-        throw new Error(data.error || 'Generation failed');
-      }
-    } catch (err: any) {
-      store.setError(err.message || 'Generation failed');
-      store.setRunState('error');
-    }
-  }, [store, fetch]);
-
-  const isFormReady = store.selectedModel && store.selectedCategory;
-  const needsFolder = store.selectedCategory && ['text-to-video', 'image-to-video', 'video-to-video', 'video-upscale', 'caption', 'tts', 'text-to-music', 'music-to-music', 'voice-clone', 'restore'].includes(store.selectedCategory);
-
-  return (
-    <div className="w-full">
-      {/* State: idle */}
-      {store.runState === 'idle' && (
-        <div className="flex flex-col items-center gap-3">
-          {store.selectedModel?.coverImageUrl && (
+  // ── State 2: example media (model picked, idle) ────────────────────────────
+  if (runState === 'idle' && !result) {
+    return (
+      <Frame>
+        <div className="flex flex-col gap-2">
+          <div className="text-xs text-gray-500">
+            Example of <span className="text-designerAccent">{selectedModel.id}</span>
+          </div>
+          {selectedModel.coverImageUrl ? (
             <img
-              src={store.selectedModel.coverImageUrl}
-              alt="Example output"
-              className="w-full max-w-xs rounded-xl opacity-50"
+              src={selectedModel.coverImageUrl}
+              alt="Model example"
+              className="w-full rounded-2xl border border-newBorder object-contain max-h-[60vh]"
             />
-          )}
-          {isFormReady && (
-            <>
-              {needsFolder && !store.saveFolderId && (
-                <p className="text-xs text-yellow-400">Select a save folder before generating</p>
-              )}
-              <button
-                onClick={handleGenerate}
-                disabled={needsFolder && !store.saveFolderId}
-                className="px-6 py-2.5 rounded-xl bg-designerAccent text-white font-medium hover:bg-designerAccent/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                Generate
-              </button>
-            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-newBorder py-20">
+              <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
+              <p className="text-xs text-gray-600">No example available — generate to see output.</p>
+            </div>
           )}
         </div>
-      )}
+      </Frame>
+    );
+  }
 
-      {/* State: running */}
-      {store.runState === 'running' && (
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-designerAccent" />
-          <p className="text-sm text-gray-400">
-            {store.result?.jobId ? 'Processing...' : 'Generating...'}
+  // ── State 3: loading ───────────────────────────────────────────────────────
+  if (runState === 'running') {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-newBorder py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-designerAccent" />
+          <p className="text-gray-300">Generating your {medium}…</p>
+          <p className="text-xs text-gray-500">
+            {medium === 'image' ? 'This usually takes 10–30 seconds.' : 'This can take a few minutes.'}
           </p>
+          <ElapsedTimer />
         </div>
-      )}
+      </Frame>
+    );
+  }
 
-      {/* State: success */}
-      {store.runState === 'success' && store.result && (
-        <div className="flex flex-col gap-3">
-          {store.selectedCategory === 'caption' && (
-            <p className="text-xs text-gray-400">
-              Burns captions into your video — the output is an MP4, not a subtitle file.
-            </p>
-          )}
-
-          {/* Image result */}
-          {store.result.kind === 'image' && store.result.urls && store.result.urls.length > 0 && (
-            <div className="flex flex-col gap-2">
-              {store.result.urls.length > 1 ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {store.result.urls.map((url, i) => (
-                    <div key={i} className="flex flex-col gap-2">
-                      <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-xl" />
-                      <div className="flex gap-2">
-                        {!store.result?.jobId ? (
-                          <button
-                            onClick={() => handleSaveToFiles(url)}
-                            disabled={saving}
-                            className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                          >
-                            {saving ? 'Saving...' : 'Save to Files'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleOpenInFiles(url)}
-                            className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                          >
-                            Open in Files
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleOpenDesigner(url)}
-                          className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
-                        >
-                          Open in Designer
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <img src={store.result.urls[0]} alt="Result" className="w-full max-w-md rounded-xl" />
-                  <div className="flex gap-2">
-                    {!store.result.jobId ? (
-                      // Inline-sync: raw Replicate URL, not yet in Files → Save to Files
-                      <button
-                        onClick={() => handleSaveToFiles(store.result!.urls![0])}
-                        disabled={saving}
-                        className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                      >
-                        {savedFileId ? 'Saved!' : saving ? 'Saving...' : 'Save to Files'}
-                      </button>
-                    ) : (
-                      // Job-completed: already in Files → Open in Files
-                      <button
-                        onClick={() => handleOpenInFiles(store.result!.urls![0])}
-                        className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                      >
-                        Open in Files
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleOpenDesigner(store.result!.urls![0])}
-                      className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
-                    >
-                      Open in Designer
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Video result */}
-          {store.result.kind === 'video' && store.result.urls && store.result.urls.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <VideoPlayer src={store.result.urls[0]} />
-              <button
-                onClick={() => handleOpenInFiles(store.result!.urls![0])}
-                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors self-start"
-              >
-                Open in Files
-              </button>
-            </div>
-          )}
-
-          {/* Audio result */}
-          {store.result.kind === 'audio' && store.result.urls && store.result.urls.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <AudioPlayer src={store.result.urls[0]} />
-              <button
-                onClick={() => handleOpenInFiles(store.result!.urls![0])}
-                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors self-start"
-              >
-                Open in Files
-              </button>
-            </div>
-          )}
-
-          {/* Text result (STT) */}
-          {store.result.kind === 'text' && store.result.text && (
-            <div className="flex flex-col gap-2">
-              <div className="p-3 rounded-lg bg-newBgColorInner border border-newBorder max-h-40 overflow-y-auto">
-                <p className="text-sm text-white whitespace-pre-wrap">{store.result.text}</p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleCopyTranscript(store.result!.text!)}
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                >
-                  Copy
-                </button>
-                <button
-                  onClick={() => handleDownloadTxt(store.result!.text!)}
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                >
-                  Download .txt
-                </button>
-                <button
-                  onClick={() => handleDownloadSrt(store.result!.segments, store.result!.text)}
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
-                >
-                  Download .srt
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* State: error */}
-      {store.runState === 'error' && (
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-sm text-red-400">{store.error || 'An error occurred'}</p>
+  // ── State 4: error ─────────────────────────────────────────────────────────
+  if (runState === 'error') {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-20">
+          <p className="text-red-400 text-center px-6">{error || 'Generation failed'}</p>
           <button
-            onClick={handleGenerate}
-            className="px-4 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+            onClick={() => generate()}
+            className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-700 transition-colors"
           >
             Retry
           </button>
         </div>
-      )}
-    </div>
-  );
+      </Frame>
+    );
+  }
+
+  // ── State 5: result ────────────────────────────────────────────────────────
+  if (runState === 'success' && result) {
+    const urls = result.urls || [];
+    const single = urls.length <= 1;
+
+    return (
+      <Frame>
+        <div className="flex flex-col gap-3">
+          {selectedCategory === 'caption' && (
+            <p className="text-xs text-gray-400">
+              Captions are burned into the video — the output is an MP4, not a subtitle file.
+            </p>
+          )}
+
+          {result.kind === 'image' && urls.length > 0 && (
+            <div className={single ? '' : 'grid grid-cols-2 gap-3'}>
+              {urls.map((url, i) => (
+                <div key={i} className="group relative">
+                  <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-newBorder" />
+                  <ActionOverlay
+                    onDownload={() => handleDownload(url)}
+                    onRegenerate={() => generate()}
+                    onNew={handleNew}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.kind === 'video' && urls.length > 0 && (
+            <div className="group relative">
+              <VideoPlayer src={urls[0]} />
+              <ActionOverlay onDownload={() => handleDownload(urls[0])} onRegenerate={() => generate()} onNew={handleNew} />
+            </div>
+          )}
+
+          {result.kind === 'audio' && urls.length > 0 && (
+            <div className="group relative rounded-2xl border border-newBorder p-3">
+              <AudioPlayer src={urls[0]} />
+              <ActionOverlay onDownload={() => handleDownload(urls[0])} onRegenerate={() => generate()} onNew={handleNew} />
+            </div>
+          )}
+
+          {result.kind === 'text' && result.text && (
+            <div className="rounded-2xl border border-newBorder bg-newBgColorInner p-4 max-h-[50vh] overflow-y-auto">
+              <p className="text-sm text-white whitespace-pre-wrap">{result.text}</p>
+            </div>
+          )}
+
+          {/* Persist / open actions */}
+          {urls.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {!result.jobId ? (
+                <button
+                  onClick={() => handleSaveToFiles(urls[0])}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save to Files'}
+                </button>
+              ) : (
+                <button
+                  onClick={openInFiles}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                >
+                  Open in Files
+                </button>
+              )}
+              {result.kind === 'image' && (
+                <button
+                  onClick={() => openInDesigner(urls[0])}
+                  className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
+                >
+                  Open in Designer
+                </button>
+              )}
+            </div>
+          )}
+
+          {result.kind === 'text' && result.text && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => navigator.clipboard.writeText(result.text!)}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+              >
+                Copy
+              </button>
+              <button
+                onClick={() => downloadBlob(result.text!, 'transcript.txt', 'text/plain')}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+              >
+                Download .txt
+              </button>
+              {result.segments && result.segments.length > 0 && (
+                <button
+                  onClick={() => downloadBlob(generateSrt(result.segments!), 'transcript.srt', 'text/plain')}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                >
+                  Download .srt
+                </button>
+              )}
+              <button onClick={handleNew} className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors">
+                New
+              </button>
+            </div>
+          )}
+
+          <DetailsCard />
+        </div>
+      </Frame>
+    );
+  }
+
+  return null;
 }

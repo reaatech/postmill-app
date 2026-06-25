@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore, EstimateResult } from './replicate.store';
+
+const ENHANCE_SURCHARGE = 0.1; // oc-platform: $0.10 per enabled prompt enhancement
 
 function useEstimate(modelId: string | undefined, input: Record<string, unknown>) {
   const fetch = useFetch();
@@ -22,12 +24,12 @@ function useEstimate(modelId: string | undefined, input: Record<string, unknown>
 }
 
 export function CostBar() {
-  // Select individual slices — subscribing to the whole store returns a new object
-  // identity on every state change, which made the setEstimate effect loop forever.
+  // Individual slice selectors — whole-store subscription loops the setEstimate effect.
   const formInput = useReplicateStore((s) => s.formInput);
   const selectedModel = useReplicateStore((s) => s.selectedModel);
   const setEstimate = useReplicateStore((s) => s.setEstimate);
   const storedEstimate = useReplicateStore((s) => s.estimate);
+  const enhanceFlags = useReplicateStore((s) => s.enhanceFlags);
   const debounceRef = useRef<NodeJS.Timeout>(undefined);
   const inputRef = useRef(formInput);
   const [debouncedInput, setDebouncedInput] = React.useState(formInput);
@@ -35,9 +37,7 @@ export function CostBar() {
   useEffect(() => {
     inputRef.current = formInput;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => {
-      setDebouncedInput(inputRef.current);
-    }, 500);
+    debounceRef.current = setTimeout(() => setDebouncedInput(inputRef.current), 500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
@@ -46,29 +46,40 @@ export function CostBar() {
   const { data: estimate } = useEstimate(selectedModel?.id, debouncedInput);
 
   useEffect(() => {
-    if (estimate) {
-      setEstimate(estimate);
-    }
+    if (estimate) setEstimate(estimate);
   }, [estimate, setEstimate]);
 
   if (!selectedModel) return null;
 
+  const enhanceCount = Object.values(enhanceFlags).filter(Boolean).length;
+  const surcharge = enhanceCount * ENHANCE_SURCHARGE;
+
+  let body: React.ReactNode;
+  if (!storedEstimate) {
+    body = <span className="text-xs text-gray-600">Estimating…</span>;
+  } else if (storedEstimate.approximate) {
+    body = (
+      <span className="text-xs text-gray-400">
+        Billed by usage
+        {surcharge > 0 && <> · + ${surcharge.toFixed(2)} enhance</>}
+      </span>
+    );
+  } else {
+    const total = storedEstimate.usd + surcharge;
+    body = (
+      <span className="text-sm text-gray-300">
+        Estimated cost{' '}
+        <span className="text-white font-semibold">${total.toFixed(4)}</span>
+        {surcharge > 0 && (
+          <span className="text-[10px] text-gray-500"> (incl. ${surcharge.toFixed(2)} enhance)</span>
+        )}
+      </span>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-3 mt-4 pt-3 border-t border-newBorder">
-      {storedEstimate ? (
-        storedEstimate.approximate ? (
-          <span className="text-xs text-gray-500">
-            Billed by usage — exact cost is usage-dependent
-          </span>
-        ) : (
-          <span className="text-xs text-gray-400">
-            Est. cost: <span className="text-white font-medium">${storedEstimate.usd.toFixed(4)}</span>
-            {' '}per run
-          </span>
-        )
-      ) : (
-        <span className="text-xs text-gray-600">Estimating cost...</span>
-      )}
+    <div className="flex items-center justify-between rounded-lg border border-newBorder bg-newBgColorInner px-3 py-2.5">
+      {body}
     </div>
   );
 }

@@ -1,131 +1,249 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore } from './replicate.store';
 import { FileInput, type FileValue } from './fields/file';
+import {
+  classifySchema,
+  type ClassifiedField,
+  type InputSchema,
+  type SchemaField,
+} from './field-classification';
 
-interface SchemaField {
-  type: string;
-  title?: string;
-  description?: string;
-  default?: unknown;
-  enum?: unknown[];
-  minimum?: number;
-  maximum?: number;
-  'x-order'?: number;
-  format?: string;
-  anyOf?: Array<{ type: string; format?: string }>;
+function RequiredMark({ required }: { required?: boolean }) {
+  return required ? <span className="text-red-400 ml-1">*</span> : null;
 }
 
-interface InputSchema {
-  type: string;
-  required?: string[];
-  properties?: Record<string, SchemaField>;
-}
+const inputClass =
+  'w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm focus:outline-none focus:border-designerAccent';
 
-function inferAcceptType(name: string, title?: string): 'image' | 'video' | 'audio' {
-  const haystack = `${name} ${title || ''}`.toLowerCase();
-  if (haystack.includes('video')) return 'video';
-  if (haystack.includes('audio') || haystack.includes('sound')) return 'audio';
-  return 'image';
-}
-
-const SIZE_PRESETS = ['1:1', '16:9', '9:16', '4:3'];
-
-function isSizeField(name: string, title?: string): boolean {
-  return name === 'size' || title?.toLowerCase() === 'size';
-}
-
-function SizeField({ label, value, onChange, required, description }: {
-  label: string;
+// ── Prompt (with inline AI enhancement) ──────────────────────────────────────
+function PromptField({
+  name,
+  schema,
+  value,
+  required,
+  mode,
+  onChange,
+}: {
+  name: string;
+  schema: SchemaField;
   value: unknown;
-  onChange: (value: unknown) => void;
   required?: boolean;
-  description?: string;
+  mode: 'positive' | 'negative';
+  onChange: (v: unknown) => void;
 }) {
-  const current = typeof value === 'string' ? value : '';
+  const fetch = useFetch();
+  const enhanceFlags = useReplicateStore((s) => s.enhanceFlags);
+  const setEnhanceFlag = useReplicateStore((s) => s.setEnhanceFlag);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const enabled = enhanceFlags[name] ?? false;
+  const text = typeof value === 'string' ? value : '';
+
+  const enhance = useCallback(async () => {
+    if (!text.trim()) {
+      setNote('Write a prompt first.');
+      return;
+    }
+    setBusy(true);
+    setNote(null);
+    try {
+      const res = await fetch('/media/replicate/enhance-prompt', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: text, mode }),
+      });
+      const data = (await res.json()) as { text: string; enhanced: boolean; reason?: string };
+      if (data.enhanced) {
+        onChange(data.text);
+        setEnhanceFlag(name, true);
+      } else if (data.reason === 'ai-not-configured') {
+        setNote('AI is not configured for this workspace — enable a provider in Settings → AI.');
+      } else {
+        setNote('Could not enhance the prompt. Try again.');
+      }
+    } catch {
+      setNote('Could not enhance the prompt. Try again.');
+    } finally {
+      setBusy(false);
+    }
+  }, [fetch, text, mode, onChange, setEnhanceFlag, name]);
+
   return (
-    <div className="mb-3">
-      <label className="block text-xs text-gray-400 mb-1">
-        {label}
-        {required && <span className="text-red-400 ml-1">*</span>}
-      </label>
-      <div className="flex flex-wrap gap-2 mb-2">
-        {SIZE_PRESETS.map((preset) => (
-          <button
-            key={preset}
-            type="button"
-            onClick={() => onChange(preset)}
-            className={`px-2 py-1 rounded-lg border text-xs transition-colors ${
-              current === preset
-                ? 'bg-blue-900/50 border-blue-500 text-blue-300'
-                : 'border-newBorder bg-newBgColorInner text-white hover:bg-boxHover'
-            }`}
-          >
-            {preset}
-          </button>
-        ))}
+    <div className="mb-4">
+      <div className="flex items-center justify-between mb-1.5">
+        <label className="text-xs text-gray-400">
+          {schema.title || name}
+          <RequiredMark required={required} />
+        </label>
+        <button
+          type="button"
+          onClick={enhance}
+          disabled={busy}
+          className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-md bg-designerAccent/15 text-designerAccent hover:bg-designerAccent/25 disabled:opacity-50 transition-colors"
+        >
+          <span>✨</span>
+          {busy ? 'Enhancing…' : mode === 'negative' ? 'Build negatives' : 'Enhance'}
+        </button>
       </div>
-      <input
-        type="text"
-        value={current}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="Custom size (e.g. 1024x1024)"
-        className="w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm"
+      <textarea
+        value={text}
+        onChange={(e) => {
+          onChange(e.target.value);
+          if (enabled) setEnhanceFlag(name, false);
+        }}
+        placeholder={schema.description || `Enter ${name}…`}
+        rows={mode === 'negative' ? 2 : 4}
+        className={`${inputClass} resize-none`}
       />
-      {description && (
-        <p className="text-[10px] text-gray-600 mt-1">{description}</p>
+      {note && <p className="text-[10px] text-yellow-400 mt-1">{note}</p>}
+      {!note && schema.description && (
+        <p className="text-[10px] text-gray-600 mt-1">{schema.description}</p>
       )}
     </div>
   );
 }
 
-function FieldRenderer({ name, schema, value, onChange, required }: {
+// ── Size (aspect-ratio visual grid) ──────────────────────────────────────────
+function aspectStyle(ratio: string): React.CSSProperties {
+  const m = ratio.match(/^(\d+)\s*[:x]\s*(\d+)$/);
+  let w = 1;
+  let h = 1;
+  if (m) {
+    w = Number(m[1]) || 1;
+    h = Number(m[2]) || 1;
+  }
+  const max = 22;
+  const scale = max / Math.max(w, h);
+  return { width: Math.round(w * scale), height: Math.round(h * scale) };
+}
+
+function SizeField({
+  name,
+  schema,
+  value,
+  required,
+  onChange,
+}: {
   name: string;
   schema: SchemaField;
   value: unknown;
-  onChange: (value: unknown) => void;
   required?: boolean;
+  onChange: (v: unknown) => void;
 }) {
-  const isUri = schema.format === 'uri' || schema.anyOf?.some((a) => a.format === 'uri');
+  const options = (schema.enum as string[]) || [];
+  const current = typeof value === 'string' ? value : '';
+  return (
+    <div className="mb-4">
+      <label className="block text-xs text-gray-400 mb-1.5">
+        {schema.title || name}
+        <RequiredMark required={required} />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const active = current === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`flex flex-col items-center justify-center gap-1.5 w-[68px] h-[64px] rounded-lg border transition-colors ${
+                active
+                  ? 'border-designerAccent bg-designerAccent/15 text-white'
+                  : 'border-newBorder bg-newBgColorInner text-gray-400 hover:bg-boxHover'
+              }`}
+            >
+              <span
+                className={`block rounded-sm border ${active ? 'border-designerAccent bg-designerAccent/30' : 'border-gray-500'}`}
+                style={aspectStyle(opt)}
+              />
+              <span className="text-[10px]">{opt}</span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-  if (isUri) {
-    return (
-      <FileInput
-        label={schema.title || name}
-        required={required}
-        acceptType={inferAcceptType(name, schema.title)}
-        value={(value as FileValue | string | undefined) || undefined}
-        onChange={(fileValue) => onChange(fileValue as unknown)}
-      />
-    );
-  }
+// ── Format (toggle button group) ─────────────────────────────────────────────
+function FormatField({
+  name,
+  schema,
+  value,
+  required,
+  onChange,
+}: {
+  name: string;
+  schema: SchemaField;
+  value: unknown;
+  required?: boolean;
+  onChange: (v: unknown) => void;
+}) {
+  const options = (schema.enum as string[]) || [];
+  const current = typeof value === 'string' ? value : '';
+  return (
+    <div className="mb-4">
+      <label className="block text-xs text-gray-400 mb-1.5">
+        {schema.title || name}
+        <RequiredMark required={required} />
+      </label>
+      <div className="inline-flex rounded-lg border border-newBorder overflow-hidden">
+        {options.map((opt, i) => {
+          const active = current === opt;
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => onChange(opt)}
+              className={`px-3 py-1.5 text-xs transition-colors ${i > 0 ? 'border-l border-newBorder' : ''} ${
+                active
+                  ? 'bg-designerAccent/20 text-white'
+                  : 'bg-newBgColorInner text-gray-400 hover:bg-boxHover'
+              }`}
+            >
+              {opt.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
-  if (isSizeField(name, schema.title) && !schema.enum) {
-    return (
-      <SizeField
-        label={schema.title || name}
-        value={value}
-        onChange={onChange}
-        required={required}
-        description={schema.description}
-      />
-    );
-  }
+// ── Advanced scalar fields ───────────────────────────────────────────────────
+function AdvancedField({
+  name,
+  schema,
+  value,
+  required,
+  onChange,
+}: {
+  name: string;
+  schema: SchemaField;
+  value: unknown;
+  required?: boolean;
+  onChange: (v: unknown) => void;
+}) {
+  const label = (
+    <label className="block text-xs text-gray-400 mb-1">
+      {schema.title || name}
+      <RequiredMark required={required} />
+    </label>
+  );
 
   if (schema.enum) {
     return (
       <div className="mb-3">
-        <label className="block text-xs text-gray-400 mb-1">
-          {schema.title || name}
-          {required && <span className="text-red-400 ml-1">*</span>}
-        </label>
+        {label}
         <select
           value={String(value ?? '')}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm"
+          className={inputClass}
         >
-          <option value="">Select...</option>
+          <option value="">Select…</option>
           {schema.enum.map((opt) => (
             <option key={String(opt)} value={String(opt)}>
               {String(opt)}
@@ -138,65 +256,67 @@ function FieldRenderer({ name, schema, value, onChange, required }: {
 
   if (schema.type === 'boolean') {
     return (
-      <div className="mb-3 flex items-center gap-2">
+      <label className="mb-3 flex items-center gap-2 cursor-pointer">
         <input
           type="checkbox"
           checked={!!value}
           onChange={(e) => onChange(e.target.checked)}
           className="rounded bg-gray-800 border-gray-600"
         />
-        <label className="text-xs text-gray-400">
+        <span className="text-xs text-gray-400">
           {schema.title || name}
-          {required && <span className="text-red-400 ml-1">*</span>}
-        </label>
-      </div>
+          <RequiredMark required={required} />
+        </span>
+      </label>
     );
   }
 
   if (schema.type === 'integer' || schema.type === 'number') {
+    const hasRange = schema.minimum !== undefined && schema.maximum !== undefined;
+    const step = schema.type === 'integer' ? 1 : 'any';
     return (
       <div className="mb-3">
-        <label className="block text-xs text-gray-400 mb-1">
-          {schema.title || name}
-          {required && <span className="text-red-400 ml-1">*</span>}
-        </label>
-        <input
-          type="number"
-          value={value !== undefined ? String(value) : ''}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
-          min={schema.minimum}
-          max={schema.maximum}
-          placeholder={schema.default !== undefined ? String(schema.default) : ''}
-          className="w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm"
-        />
+        <div className="flex items-center justify-between mb-1">
+          {label}
+          <span className="text-[10px] text-gray-500 tabular-nums">
+            {value !== undefined ? String(value) : ''}
+          </span>
+        </div>
+        {hasRange ? (
+          <input
+            type="range"
+            value={value !== undefined ? Number(value) : (schema.default as number) ?? schema.minimum}
+            onChange={(e) => onChange(Number(e.target.value))}
+            min={schema.minimum}
+            max={schema.maximum}
+            step={step}
+            className="w-full accent-designerAccent"
+          />
+        ) : (
+          <input
+            type="number"
+            value={value !== undefined ? String(value) : ''}
+            onChange={(e) => onChange(e.target.value ? Number(e.target.value) : undefined)}
+            min={schema.minimum}
+            max={schema.maximum}
+            placeholder={schema.default !== undefined ? String(schema.default) : ''}
+            className={inputClass}
+          />
+        )}
       </div>
     );
   }
 
-  // Default: string / text input
   return (
     <div className="mb-3">
-      <label className="block text-xs text-gray-400 mb-1">
-        {schema.title || name}
-        {required && <span className="text-red-400 ml-1">*</span>}
-      </label>
-      {name === 'prompt' || name === 'text' ? (
-        <textarea
-          value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={schema.description || `Enter ${name}...`}
-          rows={3}
-          className="w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm resize-none"
-        />
-      ) : (
-        <input
-          type="text"
-          value={typeof value === 'string' ? value : ''}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={schema.default !== undefined ? String(schema.default) : ''}
-          className="w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm"
-        />
-      )}
+      {label}
+      <input
+        type="text"
+        value={typeof value === 'string' ? value : value !== undefined ? String(value) : ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={schema.default !== undefined ? String(schema.default) : ''}
+        className={inputClass}
+      />
       {schema.description && (
         <p className="text-[10px] text-gray-600 mt-1">{schema.description}</p>
       )}
@@ -204,31 +324,76 @@ function FieldRenderer({ name, schema, value, onChange, required }: {
   );
 }
 
+function PrimaryField({ entry }: { entry: ClassifiedField }) {
+  const value = useReplicateStore((s) => (s.formInput as Record<string, unknown>)[entry.name]);
+  const updateFormField = useReplicateStore((s) => s.updateFormField);
+  const onChange = useCallback(
+    (v: unknown) => updateFormField(entry.name, v),
+    [updateFormField, entry.name]
+  );
+
+  switch (entry.role) {
+    case 'prompt':
+      return (
+        <PromptField name={entry.name} schema={entry.field} value={value} required={entry.required} mode="positive" onChange={onChange} />
+      );
+    case 'negative':
+      return (
+        <PromptField name={entry.name} schema={entry.field} value={value} required={entry.required} mode="negative" onChange={onChange} />
+      );
+    case 'file':
+      return (
+        <div className="mb-4">
+          <FileInput
+            label={entry.field.title || entry.name}
+            required={entry.required}
+            acceptType={entry.acceptType}
+            value={(value as FileValue | string | undefined) || undefined}
+            onChange={(v) => onChange(v as unknown)}
+          />
+        </div>
+      );
+    case 'size':
+      return <SizeField name={entry.name} schema={entry.field} value={value} required={entry.required} onChange={onChange} />;
+    case 'format':
+      return <FormatField name={entry.name} schema={entry.field} value={value} required={entry.required} onChange={onChange} />;
+    default:
+      return null;
+  }
+}
+
+function AdvancedFieldRow({ entry }: { entry: ClassifiedField }) {
+  const value = useReplicateStore((s) => (s.formInput as Record<string, unknown>)[entry.name]);
+  const updateFormField = useReplicateStore((s) => s.updateFormField);
+  const onChange = useCallback(
+    (v: unknown) => updateFormField(entry.name, v),
+    [updateFormField, entry.name]
+  );
+  return <AdvancedField name={entry.name} schema={entry.field} value={value} required={entry.required} onChange={onChange} />;
+}
+
 const ALWAYS_EXCLUDED = ['mask'];
 
 export function DynamicForm() {
-  const store = useReplicateStore();
-  const schema = store.selectedModel?.inputSchema as unknown as InputSchema | null;
+  const selectedModel = useReplicateStore((s) => s.selectedModel);
+  const selectedCategory = useReplicateStore((s) => s.selectedCategory);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  const excludedFields = useMemo(() => {
+  const excluded = useMemo(() => {
     const set = new Set<string>(ALWAYS_EXCLUDED);
-    // Inpaint uses a dedicated mask painter + source picker in the studio.
-    if (store.selectedCategory === 'inpaint') {
-      set.add('image');
-    }
+    // Inpaint drives image + mask via the dedicated mask editor.
+    if (selectedCategory === 'inpaint') set.add('image');
     return set;
-  }, [store.selectedCategory]);
+  }, [selectedCategory]);
 
-  const sortedFields = useMemo(() => {
-    if (!schema?.properties) return [];
-    const required = new Set(schema.required || []);
-    return Object.entries(schema.properties)
-      .filter(([name]) => !excludedFields.has(name))
-      .map(([name, field]) => ({ name, field, required: required.has(name) }))
-      .sort((a, b) => (a.field['x-order'] ?? 99) - (b.field['x-order'] ?? 99));
-  }, [schema, excludedFields]);
+  const { primary, advanced } = useMemo(
+    () => classifySchema(selectedModel?.inputSchema as unknown as InputSchema | null, excluded),
+    [selectedModel, excluded]
+  );
 
-  if (!schema?.properties) {
+  if (!selectedModel) return null;
+
+  if (primary.length === 0 && advanced.length === 0) {
     return (
       <div className="text-sm text-gray-500 text-center py-4">
         No configurable parameters for this model.
@@ -237,17 +402,31 @@ export function DynamicForm() {
   }
 
   return (
-    <div className="max-w-md">
-      {sortedFields.map(({ name, field, required }) => (
-        <FieldRenderer
-          key={name}
-          name={name}
-          schema={field}
-          value={(store.formInput as Record<string, unknown>)[name]}
-          onChange={(value) => store.updateFormField(name, value)}
-          required={required}
-        />
+    <div>
+      {primary.map((entry) => (
+        <PrimaryField key={entry.name} entry={entry} />
       ))}
+
+      {advanced.length > 0 && (
+        <div className="mt-2 border-t border-newBorder pt-3">
+          <button
+            type="button"
+            onClick={() => setAdvancedOpen((o) => !o)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+          >
+            <span className={`transition-transform ${advancedOpen ? 'rotate-90' : ''}`}>▸</span>
+            Advanced settings
+            <span className="text-gray-600">({advanced.length})</span>
+          </button>
+          {advancedOpen && (
+            <div className="mt-3">
+              {advanced.map((entry) => (
+                <AdvancedFieldRow key={entry.name} entry={entry} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useReplicateStore, ModelSummary } from './replicate.store';
@@ -11,132 +11,93 @@ interface ModelPickerProps {
 
 function useModels(categoryKey: string) {
   const fetch = useFetch();
-  return useSWR(
-    categoryKey ? `replicate-models-${categoryKey}` : null,
-    async () => {
-      const res = await fetch(`/media/replicate/categories/${categoryKey}/models`);
-      return (await res.json()) as ModelSummary[];
-    }
-  );
+  return useSWR(categoryKey ? `replicate-models-${categoryKey}` : null, async () => {
+    const res = await fetch(`/media/replicate/categories/${categoryKey}/models`);
+    return (await res.json()) as ModelSummary[];
+  });
 }
 
-function ModelCard({ model, onClick }: { model: ModelSummary; onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex-shrink-0 w-36 rounded-xl border border-newBorder bg-newBgColorInner hover:bg-boxHover transition-colors overflow-hidden text-left"
-    >
-      {model.coverImageUrl ? (
-        <img
-          src={model.coverImageUrl}
-          alt={model.name}
-          className="w-full h-24 object-cover"
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-24 bg-gray-800 flex items-center justify-center text-gray-600 text-2xl">
-          ✨
-        </div>
-      )}
-      <div className="p-2">
-        <p className="text-xs font-medium text-white truncate">{model.name}</p>
-        <div className="flex items-center gap-1 mt-1">
-          {model.warm ? (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-900/50 text-green-400">
-              Instant
-            </span>
-          ) : (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-yellow-900/50 text-yellow-400">
-              Community · may cold-start · usage-billed
-            </span>
-          )}
-          <span className="text-[10px] text-gray-500">
-            {model.pricing === 'output' ? (
-              model.price ? `$${model.price.usd}` : '$'
-            ) : (
-              'Billed by usage'
-            )}
-          </span>
-        </div>
-      </div>
-    </button>
-  );
+function priceLabel(m: ModelSummary): string {
+  if (m.pricing === 'output' && m.price) return `$${m.price.usd}`;
+  return 'usage-billed';
 }
 
+// oc-platform-style model dropdown: name + warm/community grouping + price. The
+// selected model's cover art is shown in the hero output "Example" pane, not here.
 export function ModelPicker({ categoryKey }: ModelPickerProps) {
   const { data: models } = useModels(categoryKey);
-  // Select individual slices — subscribing to the whole store (`useReplicateStore()`)
-  // returns a new object identity on every state change, which made the setModels
-  // effect below re-run forever (Maximum update depth exceeded). Store actions are
-  // stable references, so depending on them is safe.
+  // Individual slice selectors — subscribing to the whole store re-runs effects on
+  // every state change (the Maximum-update-depth loop we hit before). Actions are stable.
   const setModels = useReplicateStore((s) => s.setModels);
   const setSelectedModel = useReplicateStore((s) => s.setSelectedModel);
-  const showCommunity = useReplicateStore((s) => s.showCommunity);
-  const setShowCommunity = useReplicateStore((s) => s.setShowCommunity);
+  const selectedModel = useReplicateStore((s) => s.selectedModel);
+  const setError = useReplicateStore((s) => s.setError);
   const fetch = useFetch();
 
-  // Determine if this category has any community models
-  const hasCommunity = models?.some((m) => !m.warm) ?? false;
-  const hasOfficial = models?.some((m) => m.warm) ?? false;
-
-  const loadModel = useCallback(async (modelId: string) => {
-    const [owner, name] = modelId.split('/');
-    const res = await fetch(`/media/replicate/models/${owner}/${name}`);
-    const detail = await res.json();
-    setSelectedModel(detail);
-  }, [fetch, setSelectedModel]);
-
-  useEffect(() => {
-    if (models) {
-      setModels(models);
-    }
+  React.useEffect(() => {
+    if (models) setModels(models);
   }, [models, setModels]);
 
-  // Show community models when the user opts in OR when the category has no
-  // warm/official models at all — otherwise an all-community category (e.g.
-  // Restore, Caption, Text to Music, STT) would render an empty picker by default.
-  const filteredModels = showCommunity || !hasOfficial
-    ? models || []
-    : (models || []).filter((m) => m.warm);
+  const { warm, community } = useMemo(() => {
+    const list = models || [];
+    return {
+      warm: list.filter((m) => m.warm),
+      community: list.filter((m) => !m.warm),
+    };
+  }, [models]);
+
+  const loadModel = useCallback(
+    async (modelId: string) => {
+      if (!modelId) {
+        setSelectedModel(null);
+        return;
+      }
+      const [owner, name] = modelId.split('/');
+      try {
+        const res = await fetch(`/media/replicate/models/${owner}/${name}`);
+        const detail = await res.json();
+        setSelectedModel(detail);
+      } catch {
+        setError('Failed to load model');
+      }
+    },
+    [fetch, setSelectedModel, setError]
+  );
 
   if (!models) {
-    return (
-      <div className="flex gap-3">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="w-36 h-40 rounded-xl bg-gray-800 animate-pulse" />
-        ))}
-      </div>
-    );
+    return <div className="h-10 rounded-lg bg-gray-800 animate-pulse" />;
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-sm font-medium text-white">Models</h4>
-        {hasCommunity && !hasOfficial && (
-          <p className="text-xs text-yellow-400">Community models only — may cold-start</p>
+      <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1.5">
+        Model
+      </label>
+      <select
+        value={selectedModel?.id || ''}
+        onChange={(e) => loadModel(e.target.value)}
+        className="w-full px-3 py-2.5 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm focus:outline-none focus:border-designerAccent"
+      >
+        <option value="">Select a model…</option>
+        {warm.length > 0 && (
+          <optgroup label="Instant (official)">
+            {warm.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {priceLabel(m)}
+              </option>
+            ))}
+          </optgroup>
         )}
-        {hasCommunity && hasOfficial && (
-          <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showCommunity}
-              onChange={(e) => setShowCommunity(e.target.checked)}
-              className="rounded bg-gray-800 border-gray-600"
-            />
-            Show community models
-          </label>
+        {community.length > 0 && (
+          <optgroup label="Community (may cold-start)">
+            {community.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name} · {priceLabel(m)}
+              </option>
+            ))}
+          </optgroup>
         )}
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {filteredModels.map((model) => (
-          <ModelCard
-            key={model.id}
-            model={model}
-            onClick={() => loadModel(model.id)}
-          />
-        ))}
-      </div>
+      </select>
     </div>
   );
 }

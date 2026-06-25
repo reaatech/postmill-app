@@ -7,6 +7,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { useReplicateStore } from './replicate.store';
 import { VideoPlayer } from './players/video-player';
+import { EditorShell, toolbarBtn, toolbarPrimary } from './editor-shell';
 
 interface MergeClip {
   url?: string;
@@ -29,6 +30,10 @@ const TRANSITION_OPTIONS = [
   { value: 'fadegrayscale', label: 'Fade Grayscale' },
 ];
 
+const fieldLabel = 'text-[10px] uppercase tracking-wider text-gray-500';
+const fieldInput =
+  'w-full px-2 py-1 rounded border border-newBorder bg-newBgColor text-white text-xs focus:outline-none focus:border-designerAccent';
+
 function useJobPoll(jobId: string | null) {
   const fetch = useFetch();
   return useSWR(
@@ -44,14 +49,16 @@ function useJobPoll(jobId: string | null) {
 export function MergeEditor() {
   const fetch = useFetch();
   const modals = useModals();
-  const store = useReplicateStore();
+  const saveFolderId = useReplicateStore((s) => s.saveFolderId);
   const [clips, setClips] = useState<MergeClip[]>([]);
   const [transitions, setTransitions] = useState<MergeTransition[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
   const [running, setRunning] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const { data: jobData } = useJobPoll(jobId);
+  const isComplete = jobData?.status === 'completed';
 
   const addFileClip = useCallback(() => {
     if (clips.length >= 6) return;
@@ -63,15 +70,11 @@ export function MergeEditor() {
           open
           onClose={close}
           onSelect={(item) => {
-            if (clips.length < 6) {
-              setClips((prev) => {
-                const next = [...prev, { fileId: item.fileId }];
-                if (prev.length > 0) {
-                  setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
-                }
-                return next;
-              });
-            }
+            setClips((prev) => {
+              if (prev.length >= 6) return prev;
+              if (prev.length > 0) setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
+              return [...prev, { fileId: item.fileId }];
+            });
             close();
           }}
         />
@@ -88,192 +91,196 @@ export function MergeEditor() {
       return;
     }
     setClips((prev) => {
-      const next = [...prev, { url }];
-      if (prev.length > 0) {
-        setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
-      }
-      return next;
+      if (prev.length > 0) setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
+      return [...prev, { url }];
     });
   }, [clips.length]);
 
   const removeClip = useCallback((index: number) => {
     setClips((prev) => prev.filter((_, i) => i !== index));
     setTransitions((prev) => prev.filter((_, i) => i !== index));
+    setSelected((cur) => (cur === index ? null : cur));
+  }, []);
+
+  const updateClip = useCallback((index: number, patch: Partial<MergeClip>) => {
+    setClips((prev) => prev.map((c, i) => (i === index ? { ...c, ...patch } : c)));
   }, []);
 
   const updateTransition = useCallback((index: number, field: string, value: unknown) => {
-    setTransitions((prev) =>
-      prev.map((t, i) => (i === index ? { ...t, [field]: value } : t))
-    );
+    setTransitions((prev) => prev.map((t, i) => (i === index ? { ...t, [field]: value } : t)));
   }, []);
 
   const handleMerge = useCallback(async () => {
-    if (clips.length === 0) return;
-    if (!store.saveFolderId) return;
+    if (clips.length === 0 || !saveFolderId) return;
     setRunning(true);
     setError(null);
-
     try {
       const res = await fetch('/media/replicate/merge', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clips, transitions, folderId: store.saveFolderId }),
+        body: JSON.stringify({ clips, transitions, folderId: saveFolderId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || data.error || 'Merge failed');
-      }
+      if (!res.ok) throw new Error(data.message || data.error || 'Merge failed');
       setJobId(data.jobId);
     } catch (err: any) {
       setError(err.message);
       setRunning(false);
     }
-  }, [clips, transitions, fetch, store.saveFolderId]);
+  }, [clips, transitions, fetch, saveFolderId]);
 
-  const isComplete = jobData?.status === 'completed';
-
-  const handleOpenInFiles = useCallback(() => {
-    const folderId = store.saveFolderId;
-    const target = folderId ? `/files?folderId=${encodeURIComponent(folderId)}` : '/files';
+  const openInFiles = useCallback(() => {
+    const target = saveFolderId ? `/files?folderId=${encodeURIComponent(saveFolderId)}` : '/files';
     window.open(target, '_blank');
-  }, [store.saveFolderId]);
+  }, [saveFolderId]);
 
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-sm font-medium text-white">Merge Clips</h4>
-        <div className="flex gap-2">
-          <button
-            onClick={addFileClip}
-            disabled={clips.length >= 6}
-            className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 disabled:opacity-50"
-          >
-            Add from Files ({clips.length}/6)
-          </button>
-          <button
-            onClick={addUrlClip}
-            disabled={clips.length >= 6}
-            className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 disabled:opacity-50"
-          >
-            Add URL ({clips.length}/6)
-          </button>
-        </div>
-      </div>
+  const selectedClip = selected !== null ? clips[selected] : null;
 
-      {!store.saveFolderId && (
-        <p className="text-xs text-yellow-400">
-          Select a save folder before merging.
-        </p>
-      )}
+  const toolbar = (
+    <>
+      <button onClick={addFileClip} disabled={clips.length >= 6} className={toolbarBtn}>
+        + Files ({clips.length}/6)
+      </button>
+      <button onClick={addUrlClip} disabled={clips.length >= 6} className={toolbarBtn}>
+        + URL
+      </button>
+      <button
+        onClick={handleMerge}
+        disabled={clips.length === 0 || running || !saveFolderId}
+        className={toolbarPrimary}
+      >
+        {running && !isComplete ? 'Merging…' : 'Merge'}
+      </button>
+    </>
+  );
 
-      {/* Clip list */}
-      {clips.map((clip, idx) => (
-        <div key={idx} className="p-3 rounded-lg border border-newBorder bg-newBgColorInner">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs text-gray-400">Clip {idx + 1}</span>
-            <button onClick={() => removeClip(idx)} className="text-xs text-red-400 hover:text-red-300">Remove</button>
-          </div>
-          <p className="text-xs text-gray-500 truncate">{clip.url || clip.fileId}</p>
-          <div className="flex gap-3 mt-2">
+  const inspector = (
+    <div className="p-4 space-y-4">
+      {!saveFolderId && <p className="text-xs text-yellow-400">Pick a save folder (header) before merging.</p>}
+      {selectedClip ? (
+        <div className="space-y-3">
+          <div className={fieldLabel}>Clip {selected! + 1}</div>
+          <p className="text-[11px] text-gray-500 truncate">{selectedClip.url || selectedClip.fileId}</p>
+          <div className="grid grid-cols-2 gap-2">
             <div>
-              <label className="text-[10px] text-gray-600">Trim Start (s)</label>
+              <div className={fieldLabel}>Trim start (s)</div>
               <input
                 type="number"
-                value={clip.trimStart ?? ''}
-                onChange={(e) => {
-                  const newClips = [...clips];
-                  newClips[idx] = { ...clip, trimStart: e.target.value ? Number(e.target.value) : undefined };
-                  setClips(newClips);
-                }}
+                value={selectedClip.trimStart ?? ''}
+                onChange={(e) =>
+                  updateClip(selected!, { trimStart: e.target.value ? Number(e.target.value) : undefined })
+                }
                 placeholder="0"
-                className="w-20 px-2 py-1 rounded border border-newBorder bg-gray-800 text-white text-xs"
+                className={fieldInput}
               />
             </div>
             <div>
-              <label className="text-[10px] text-gray-600">Trim End (s)</label>
+              <div className={fieldLabel}>Trim end (s)</div>
               <input
                 type="number"
-                value={clip.trimEnd ?? ''}
-                onChange={(e) => {
-                  const newClips = [...clips];
-                  newClips[idx] = { ...clip, trimEnd: e.target.value ? Number(e.target.value) : undefined };
-                  setClips(newClips);
-                }}
+                value={selectedClip.trimEnd ?? ''}
+                onChange={(e) =>
+                  updateClip(selected!, { trimEnd: e.target.value ? Number(e.target.value) : undefined })
+                }
                 placeholder="end"
-                className="w-20 px-2 py-1 rounded border border-newBorder bg-gray-800 text-white text-xs"
+                className={fieldInput}
               />
             </div>
           </div>
-          {/* Transition (between this clip and next) */}
-          {idx < clips.length - 1 && transitions[idx] && (
-            <div className="flex gap-3 mt-2 pt-2 border-t border-newBorder">
+          {selected! < clips.length - 1 && transitions[selected!] && (
+            <div className="border-t border-newBorder pt-3 space-y-2">
+              <div className={fieldLabel}>Transition → next clip</div>
+              <select
+                value={transitions[selected!].type}
+                onChange={(e) => updateTransition(selected!, 'type', e.target.value)}
+                className={fieldInput}
+              >
+                {TRANSITION_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
               <div>
-                <label className="text-[10px] text-gray-600">Transition</label>
-                <select
-                  value={transitions[idx].type}
-                  onChange={(e) => updateTransition(idx, 'type', e.target.value)}
-                  className="w-32 px-2 py-1 rounded border border-newBorder bg-gray-800 text-white text-xs"
-                >
-                  {TRANSITION_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-600">Duration (s)</label>
+                <div className={fieldLabel}>Duration (s)</div>
                 <input
                   type="number"
                   min={0.1}
                   max={5}
                   step={0.1}
-                  value={transitions[idx].duration}
-                  onChange={(e) => updateTransition(idx, 'duration', Number(e.target.value))}
-                  className="w-20 px-2 py-1 rounded border border-newBorder bg-gray-800 text-white text-xs"
+                  value={transitions[selected!].duration}
+                  onChange={(e) => updateTransition(selected!, 'duration', Number(e.target.value))}
+                  className={fieldInput}
                 />
               </div>
             </div>
           )}
-        </div>
-      ))}
-
-      {clips.length === 0 && (
-        <div className="text-center py-8 text-gray-500 text-sm">
-          Add video clips to merge them together with transitions
-        </div>
-      )}
-
-      {/* Actions */}
-      <button
-        onClick={handleMerge}
-        disabled={clips.length === 0 || running || !store.saveFolderId}
-        className="px-6 py-2.5 rounded-xl bg-designerAccent text-white font-medium hover:bg-designerAccent/80 disabled:opacity-50"
-      >
-        {running ? 'Merging...' : 'Merge Videos'}
-      </button>
-
-      {/* Result */}
-      {running && !isComplete && (
-        <div className="flex items-center gap-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-designerAccent" />
-          <span className="text-sm text-gray-400">Processing merge...</span>
-        </div>
-      )}
-
-      {isComplete && jobData?.result?.urls && (
-        <div className="flex flex-col gap-2">
-          <VideoPlayer src={jobData.result.urls[0]} />
-          <button
-            onClick={handleOpenInFiles}
-            className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors self-start"
-          >
-            Open in Files
+          <button onClick={() => removeClip(selected!)} className="text-xs text-red-400 hover:text-red-300">
+            Remove clip
           </button>
         </div>
+      ) : (
+        <p className="text-xs text-gray-600">Select a clip in the strip to trim it or set its transition.</p>
       )}
-
-      {error && (
-        <p className="text-sm text-red-400">{error}</p>
-      )}
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
+  );
+
+  return (
+    <EditorShell title="Merge Videos" toolbar={toolbar} inspector={inspector} stageClassName="!items-stretch !justify-start flex-col">
+      {clips.length === 0 ? (
+        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+          Add up to 6 video clips to merge them with transitions.
+        </div>
+      ) : (
+        <div className="w-full">
+          {/* Filmstrip */}
+          <div className="flex items-stretch gap-1 overflow-x-auto pb-4">
+            {clips.map((clip, idx) => (
+              <React.Fragment key={idx}>
+                <button
+                  onClick={() => setSelected(idx)}
+                  className={`flex-shrink-0 w-40 h-24 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
+                    selected === idx
+                      ? 'border-designerAccent bg-designerAccent/15 text-white'
+                      : 'border-newBorder bg-newBgColorInner text-gray-400 hover:bg-boxHover'
+                  }`}
+                >
+                  <span className="text-2xl">🎬</span>
+                  <span className="text-xs">Clip {idx + 1}</span>
+                  {(clip.trimStart != null || clip.trimEnd != null) && (
+                    <span className="text-[10px] text-gray-500">
+                      {clip.trimStart ?? 0}s–{clip.trimEnd ?? '∞'}s
+                    </span>
+                  )}
+                </button>
+                {idx < clips.length - 1 && (
+                  <div className="flex-shrink-0 flex flex-col items-center justify-center w-16 text-center">
+                    <span className="text-gray-600 text-lg">⟶</span>
+                    <span className="text-[9px] text-gray-500">{transitions[idx]?.type || 'fade'}</span>
+                  </div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          {/* Preview / status */}
+          {running && !isComplete && (
+            <div className="flex items-center gap-2 mt-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-designerAccent" />
+              <span className="text-sm text-gray-400">Processing merge…</span>
+            </div>
+          )}
+          {isComplete && jobData?.result?.urls && (
+            <div className="flex flex-col gap-2 mt-2 max-w-xl">
+              <VideoPlayer src={jobData.result.urls[0]} />
+              <button onClick={openInFiles} className={`${toolbarBtn} self-start`}>
+                Open in Files
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </EditorShell>
   );
 }

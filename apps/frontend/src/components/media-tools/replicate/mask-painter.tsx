@@ -120,11 +120,11 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
   }, [sourceImage]);
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative border border-newBorder rounded-xl overflow-hidden bg-gray-900">
+    <div className="flex flex-col gap-3 w-full items-center">
+      <div className="relative border border-newBorder rounded-xl overflow-hidden bg-gray-900 shadow-2xl">
         <canvas
           ref={canvasRef}
-          className="max-w-full cursor-crosshair"
+          className="max-w-full max-h-[calc(100vh-280px)] object-contain cursor-crosshair"
           onMouseDown={() => setIsDrawing(true)}
           onMouseUp={() => setIsDrawing(false)}
           onMouseLeave={() => setIsDrawing(false)}

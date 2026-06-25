@@ -50,9 +50,13 @@ interface ReplicateState {
   models: ModelSummary[];
   selectedModel: ModelDetail | null;
   formInput: Record<string, unknown>;
+  // Per-prompt-field "enhance with AI" toggle state (field name -> enabled).
+  enhanceFlags: Record<string, boolean>;
   estimate: EstimateResult | null;
   runState: RunState;
   result: RunResult | null;
+  // Settings snapshot captured at generate time, shown in the result details card.
+  resultMeta: { modelName: string; input: Record<string, unknown> } | null;
   error: string | null;
   saveFolderId: string | null;
   history: Array<{ jobId: string; modelId: string; createdAt: Date }>;
@@ -62,24 +66,61 @@ interface ReplicateState {
   setSelectedModel: (model: ModelDetail | null) => void;
   setFormInput: (input: Record<string, unknown>) => void;
   updateFormField: (key: string, value: unknown) => void;
+  setEnhanceFlag: (key: string, enabled: boolean) => void;
   setEstimate: (estimate: EstimateResult | null) => void;
   setRunState: (state: RunState) => void;
   setResult: (result: RunResult | null) => void;
+  setResultMeta: (meta: { modelName: string; input: Record<string, unknown> } | null) => void;
   setError: (error: string | null) => void;
   setSaveFolderId: (id: string | null) => void;
   addToHistory: (entry: { jobId: string; modelId: string }) => void;
   reset: () => void;
 }
 
-const initialState: Pick<ReplicateState, 'selectedCategory' | 'showCommunity' | 'models' | 'selectedModel' | 'formInput' | 'estimate' | 'runState' | 'result' | 'error' | 'saveFolderId' | 'history'> = {
+// Seed the form with each schema property's `default` (oc-platform's onModelChange
+// behaviour) so a freshly-selected model arrives pre-filled rather than empty.
+function defaultsFromSchema(model: ModelDetail | null): Record<string, unknown> {
+  const schema = model?.inputSchema as
+    | { properties?: Record<string, { default?: unknown }> }
+    | null
+    | undefined;
+  const props = schema?.properties;
+  if (!props) return {};
+  const out: Record<string, unknown> = {};
+  for (const [name, field] of Object.entries(props)) {
+    if (field && field.default !== undefined) {
+      out[name] = field.default;
+    }
+  }
+  return out;
+}
+
+const initialState: Pick<
+  ReplicateState,
+  | 'selectedCategory'
+  | 'showCommunity'
+  | 'models'
+  | 'selectedModel'
+  | 'formInput'
+  | 'enhanceFlags'
+  | 'estimate'
+  | 'runState'
+  | 'result'
+  | 'resultMeta'
+  | 'error'
+  | 'saveFolderId'
+  | 'history'
+> = {
   selectedCategory: null,
   showCommunity: false,
   models: [],
   selectedModel: null,
   formInput: {},
+  enhanceFlags: {},
   estimate: null,
   runState: 'idle' as RunState,
   result: null,
+  resultMeta: null,
   error: null,
   saveFolderId: null,
   history: [],
@@ -94,7 +135,12 @@ export const useReplicateStore = create<ReplicateState>((set, get) => ({
       models: [],
       selectedModel: null,
       formInput: {},
+      enhanceFlags: {},
       estimate: null,
+      runState: 'idle',
+      result: null,
+      resultMeta: null,
+      error: null,
     });
   },
 
@@ -102,12 +148,23 @@ export const useReplicateStore = create<ReplicateState>((set, get) => ({
 
   setModels: (models) => set({ models }),
 
-  setSelectedModel: (model) => set({ selectedModel: model, formInput: {} }),
+  setSelectedModel: (model) =>
+    set({
+      selectedModel: model,
+      // Repopulate the form with the new model's defaults and clear stale enhance flags.
+      formInput: defaultsFromSchema(model),
+      enhanceFlags: {},
+      estimate: null,
+    }),
 
   setFormInput: (input) => set({ formInput: input }),
 
   updateFormField: (key, value) => {
     set({ formInput: { ...get().formInput, [key]: value } });
+  },
+
+  setEnhanceFlag: (key, enabled) => {
+    set({ enhanceFlags: { ...get().enhanceFlags, [key]: enabled } });
   },
 
   setEstimate: (estimate) => set({ estimate }),
@@ -116,16 +173,15 @@ export const useReplicateStore = create<ReplicateState>((set, get) => ({
 
   setResult: (result) => set({ result }),
 
+  setResultMeta: (meta) => set({ resultMeta: meta }),
+
   setError: (error) => set({ error }),
 
   setSaveFolderId: (id) => set({ saveFolderId: id }),
 
   addToHistory: (entry) => {
     set({
-      history: [
-        { ...entry, createdAt: new Date() },
-        ...get().history,
-      ].slice(0, 50),
+      history: [{ ...entry, createdAt: new Date() }, ...get().history].slice(0, 50),
     });
   },
 
