@@ -50,6 +50,13 @@ function generateSrt(segments: Array<{ text: string; start?: number; end?: numbe
 
 export function ResultPanel() {
   const store = useReplicateStore();
+  // Stable action/value selectors for the polling effect below. Depending on the
+  // whole `store` object (which changes identity on every state update) made this
+  // effect re-run forever after a job completed (Maximum update depth exceeded).
+  const setResult = useReplicateStore((s) => s.setResult);
+  const setRunState = useReplicateStore((s) => s.setRunState);
+  const setError = useReplicateStore((s) => s.setError);
+  const resultJobId = useReplicateStore((s) => s.result?.jobId);
   const fetch = useFetch();
   const [saving, setSaving] = useState(false);
   const [savedFileId, setSavedFileId] = useState<string | null>(null);
@@ -60,18 +67,18 @@ export function ResultPanel() {
 
   useEffect(() => {
     if (jobData?.status === 'completed' && jobData.result) {
-      store.setResult({
+      setResult({
         kind: jobData.result.kind as 'image' | 'video' | 'audio' | 'text',
         urls: jobData.result.urls,
-        jobId: store.result?.jobId,
+        jobId: resultJobId,
       });
-      store.setRunState('success');
+      setRunState('success');
     }
     if (jobData?.status === 'failed') {
-      store.setError('Generation failed');
-      store.setRunState('error');
+      setError('Generation failed');
+      setRunState('error');
     }
-  }, [jobData, store]);
+  }, [jobData, setResult, setRunState, setError, resultJobId]);
 
   const handleSaveToFiles = useCallback(async (url: string) => {
     setSaving(true);

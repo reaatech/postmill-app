@@ -22,13 +22,18 @@ function useEstimate(modelId: string | undefined, input: Record<string, unknown>
 }
 
 export function CostBar() {
-  const store = useReplicateStore();
+  // Select individual slices — subscribing to the whole store returns a new object
+  // identity on every state change, which made the setEstimate effect loop forever.
+  const formInput = useReplicateStore((s) => s.formInput);
+  const selectedModel = useReplicateStore((s) => s.selectedModel);
+  const setEstimate = useReplicateStore((s) => s.setEstimate);
+  const storedEstimate = useReplicateStore((s) => s.estimate);
   const debounceRef = useRef<NodeJS.Timeout>(undefined);
-  const inputRef = useRef(store.formInput);
-  const [debouncedInput, setDebouncedInput] = React.useState(store.formInput);
+  const inputRef = useRef(formInput);
+  const [debouncedInput, setDebouncedInput] = React.useState(formInput);
 
   useEffect(() => {
-    inputRef.current = store.formInput;
+    inputRef.current = formInput;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setDebouncedInput(inputRef.current);
@@ -36,28 +41,28 @@ export function CostBar() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [store.formInput]);
+  }, [formInput]);
 
-  const { data: estimate } = useEstimate(store.selectedModel?.id, debouncedInput);
+  const { data: estimate } = useEstimate(selectedModel?.id, debouncedInput);
 
   useEffect(() => {
     if (estimate) {
-      store.setEstimate(estimate);
+      setEstimate(estimate);
     }
-  }, [estimate, store]);
+  }, [estimate, setEstimate]);
 
-  if (!store.selectedModel) return null;
+  if (!selectedModel) return null;
 
   return (
     <div className="flex items-center gap-3 mt-4 pt-3 border-t border-newBorder">
-      {store.estimate ? (
-        store.estimate.approximate ? (
+      {storedEstimate ? (
+        storedEstimate.approximate ? (
           <span className="text-xs text-gray-500">
             Billed by usage — exact cost is usage-dependent
           </span>
         ) : (
           <span className="text-xs text-gray-400">
-            Est. cost: <span className="text-white font-medium">${store.estimate.usd.toFixed(4)}</span>
+            Est. cost: <span className="text-white font-medium">${storedEstimate.usd.toFixed(4)}</span>
             {' '}per run
           </span>
         )
