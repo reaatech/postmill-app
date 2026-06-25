@@ -12,6 +12,7 @@ const tabs = [
   {
     href: '/media/stock-photos',
     label: 'Stock Photos',
+    section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -23,6 +24,7 @@ const tabs = [
   {
     href: '/media/stock-videos',
     label: 'Stock Videos',
+    section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="2" y="4" width="14" height="16" rx="2" />
@@ -33,6 +35,7 @@ const tabs = [
   {
     href: '/media/designer',
     label: 'Designer',
+    section: 'Tools',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 19l7-7 3 3-7 7-3-3z" />
@@ -45,6 +48,7 @@ const tabs = [
   {
     href: '/media/replicate',
     label: 'Replicate',
+    section: 'Tools',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -54,6 +58,7 @@ const tabs = [
   {
     href: '/media/stock-vectors',
     label: 'Vectors',
+    section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M3 17c5-10 13-10 18 0" />
@@ -66,6 +71,7 @@ const tabs = [
   {
     href: '/media/stock-stickers',
     label: 'Stickers',
+    section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
@@ -78,6 +84,7 @@ const tabs = [
   {
     href: '/media/stock-icons',
     label: 'Icons',
+    section: 'Content Pack',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <rect x="3" y="3" width="7" height="7" rx="1" />
@@ -88,6 +95,15 @@ const tabs = [
     ),
   },
 ];
+
+// Keep the section order, but sort entries alphabetically within each section.
+const sectionOrder = ['Tools', 'Content Pack'];
+const sortedTabs = [...tabs].sort((a, b) => {
+  const sectionDiff =
+    sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section);
+  if (sectionDiff !== 0) return sectionDiff;
+  return a.label.localeCompare(b.label);
+});
 
 export default function MediaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -148,35 +164,47 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {tabs.map((t) => {
-          const active = pathname.startsWith(t.href);
-          return (
-            <Link
-              key={t.href}
-              href={t.href}
-              title={t.label}
-              className={clsx(
-                'flex items-center gap-[10px] rounded-[6px] text-[13px] transition-all',
-                collapsed ? 'justify-center px-0 py-[10px]' : 'px-[12px] py-[8px]',
-                active
-                  ? 'bg-designerAccent/20 text-white'
-                  : 'text-textColor hover:bg-newColColor/50'
-              )}
-            >
-              <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
-                {t.icon}
-              </span>
-              {!collapsed && <span className="truncate">{t.label}</span>}
-            </Link>
-          );
-        })}
+        {sortedTabs.map((t, i) => {
+            const active = pathname.startsWith(t.href);
+            const showHeader = i === 0 || sortedTabs[i - 1].section !== t.section;
+            return (
+              <React.Fragment key={t.href}>
+                {showHeader && (
+                  <div
+                    className={clsx(
+                      'text-[10px] font-semibold text-newTableText uppercase tracking-wider px-[4px] mt-[12px] mb-[4px]',
+                      collapsed && 'hidden'
+                    )}
+                  >
+                    {t.section}
+                  </div>
+                )}
+                <Link
+                  href={t.href}
+                  title={t.label}
+                  className={clsx(
+                    'flex items-center gap-[10px] rounded-[6px] text-[13px] transition-all',
+                    collapsed ? 'justify-center px-0 py-[10px]' : 'px-[12px] py-[8px]',
+                    active
+                      ? 'bg-designerAccent/20 text-white'
+                      : 'text-textColor hover:bg-newColColor/50'
+                  )}
+                >
+                  <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
+                    {t.icon}
+                  </span>
+                  {!collapsed && <span className="truncate">{t.label}</span>}
+                </Link>
+              </React.Fragment>
+            );
+          })}
       </div>
 
       {/* Page area: mobile gets a horizontal sub-menu strip above the content. */}
       <div className="flex-1 min-w-0 flex flex-col">
         <SubmenuStrip
           ariaLabel="Media tools"
-          items={tabs.map((t) => ({
+          items={sortedTabs.map((t) => ({
             href: t.href,
             label: t.label,
             icon: t.icon,
