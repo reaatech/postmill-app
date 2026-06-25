@@ -158,7 +158,8 @@ export class ReplicateCatalogService {
 
     const data = await this._fetchModel(owner, name, apiKey);
 
-    const inputSchema = data.latest_version?.openapi_schema?.components?.schemas?.Input || null;
+    const schemas = data.latest_version?.openapi_schema?.components?.schemas;
+    const inputSchema = this._inlineEnumRefs(schemas?.Input || null, schemas);
 
     return {
       id: modelId,
@@ -168,5 +169,63 @@ export class ReplicateCatalogService {
       versionId: data.latest_version?.id || '',
       inputSchema,
     };
+  }
+
+  // Replicate expresses every enum/constrained field as a separate component
+  // schema referenced from the property — via `allOf`, `anyOf` or `oneOf`
+  // (`{ $ref: '#/components/schemas/<name>' }`), e.g. aspect_ratio,
+  // output_format, megapixels, scheduler, voice, style, … The Input schema alone
+  // carries no `enum`/`type` for ANY of these, so the UI can't render a select.
+  // Resolve the refs for EVERY property here and inline enum/type/min/max,
+  // keeping the property's own default/description/x-order.
+  private _inlineEnumRefs(
+    input: any,
+    schemas: Record<string, any> | undefined,
+  ): any {
+    if (!input?.properties || !schemas) return input;
+
+    const resolveRef = (ref: unknown): any | undefined => {
+      if (typeof ref !== 'string') return undefined;
+      const m = /#\/components\/schemas\/(.+)$/.exec(ref);
+      return m ? schemas[m[1]] : undefined;
+    };
+
+    // Find the first $ref anywhere a property can reference a component schema.
+    const findRefSchema = (prop: any): any | undefined => {
+      if (prop.$ref) {
+        const r = resolveRef(prop.$ref);
+        if (r) return r;
+      }
+      for (const key of ['allOf', 'anyOf', 'oneOf'] as const) {
+        if (Array.isArray(prop[key])) {
+          for (const entry of prop[key]) {
+            const r = resolveRef(entry?.$ref);
+            if (r) return r;
+          }
+        }
+      }
+      return undefined;
+    };
+
+    const properties: Record<string, any> = {};
+    for (const [key, raw] of Object.entries<any>(input.properties)) {
+      const prop = { ...raw };
+      const ref = findRefSchema(prop);
+      if (ref) {
+        // Inline the referenced constraints, never overwriting the property's own.
+        for (const f of ['enum', 'type', 'minimum', 'maximum', 'title'] as const) {
+          if (prop[f] == null && ref[f] != null) prop[f] = ref[f];
+        }
+        // Drop the now-resolved ref wrappers so the field renders directly.
+        delete prop.allOf;
+        delete prop.$ref;
+        if (prop.enum != null) {
+          delete prop.anyOf;
+          delete prop.oneOf;
+        }
+      }
+      properties[key] = prop;
+    }
+    return { ...input, properties };
   }
 }

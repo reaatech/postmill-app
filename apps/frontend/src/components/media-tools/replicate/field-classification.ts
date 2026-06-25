@@ -22,7 +22,7 @@ export interface InputSchema {
   properties?: Record<string, SchemaField>;
 }
 
-export type FieldRole = 'prompt' | 'negative' | 'file' | 'size' | 'format';
+export type FieldRole = 'prompt' | 'negative' | 'file';
 
 export interface ClassifiedField {
   name: string;
@@ -41,8 +41,6 @@ const PRIMARY_ORDER: Record<FieldRole, number> = {
   prompt: 1,
   negative: 1,
   file: 2,
-  size: 3,
-  format: 4,
 };
 
 const FILE_NAME_HINTS = [
@@ -83,11 +81,8 @@ function roleFor(name: string, field: SchemaField): FieldRole | null {
 
   if (isUriField(name, field)) return 'file';
 
-  if ((lname === 'aspect_ratio' || lname === 'size' || lname === 'ratio') && field.enum)
-    return 'size';
-
-  if (lname === 'output_format' && field.enum) return 'format';
-
+  // Everything else (including enum fields like aspect_ratio / output_format)
+  // stays in Advanced and renders by its type — enums become selects there.
   return null;
 }
 

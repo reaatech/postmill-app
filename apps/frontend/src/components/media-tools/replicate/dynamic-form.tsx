@@ -106,113 +106,6 @@ function PromptField({
   );
 }
 
-// ── Size (aspect-ratio visual grid) ──────────────────────────────────────────
-function aspectStyle(ratio: string): React.CSSProperties {
-  const m = ratio.match(/^(\d+)\s*[:x]\s*(\d+)$/);
-  let w = 1;
-  let h = 1;
-  if (m) {
-    w = Number(m[1]) || 1;
-    h = Number(m[2]) || 1;
-  }
-  const max = 22;
-  const scale = max / Math.max(w, h);
-  return { width: Math.round(w * scale), height: Math.round(h * scale) };
-}
-
-function SizeField({
-  name,
-  schema,
-  value,
-  required,
-  onChange,
-}: {
-  name: string;
-  schema: SchemaField;
-  value: unknown;
-  required?: boolean;
-  onChange: (v: unknown) => void;
-}) {
-  const options = (schema.enum as string[]) || [];
-  const current = typeof value === 'string' ? value : '';
-  return (
-    <div className="mb-4">
-      <label className="block text-xs text-gray-400 mb-1.5">
-        {schema.title || name}
-        <RequiredMark required={required} />
-      </label>
-      <div className="flex flex-wrap gap-2">
-        {options.map((opt) => {
-          const active = current === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={`flex flex-col items-center justify-center gap-1.5 w-[68px] h-[64px] rounded-lg border transition-colors ${
-                active
-                  ? 'border-designerAccent bg-designerAccent/15 text-white'
-                  : 'border-newBorder bg-newBgColorInner text-gray-400 hover:bg-boxHover'
-              }`}
-            >
-              <span
-                className={`block rounded-sm border ${active ? 'border-designerAccent bg-designerAccent/30' : 'border-gray-500'}`}
-                style={aspectStyle(opt)}
-              />
-              <span className="text-[10px]">{opt}</span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ── Format (toggle button group) ─────────────────────────────────────────────
-function FormatField({
-  name,
-  schema,
-  value,
-  required,
-  onChange,
-}: {
-  name: string;
-  schema: SchemaField;
-  value: unknown;
-  required?: boolean;
-  onChange: (v: unknown) => void;
-}) {
-  const options = (schema.enum as string[]) || [];
-  const current = typeof value === 'string' ? value : '';
-  return (
-    <div className="mb-4">
-      <label className="block text-xs text-gray-400 mb-1.5">
-        {schema.title || name}
-        <RequiredMark required={required} />
-      </label>
-      <div className="inline-flex rounded-lg border border-newBorder overflow-hidden">
-        {options.map((opt, i) => {
-          const active = current === opt;
-          return (
-            <button
-              key={opt}
-              type="button"
-              onClick={() => onChange(opt)}
-              className={`px-3 py-1.5 text-xs transition-colors ${i > 0 ? 'border-l border-newBorder' : ''} ${
-                active
-                  ? 'bg-designerAccent/20 text-white'
-                  : 'bg-newBgColorInner text-gray-400 hover:bg-boxHover'
-              }`}
-            >
-              {opt.toUpperCase()}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── Advanced scalar fields ───────────────────────────────────────────────────
 function AdvancedField({
   name,
@@ -235,6 +128,7 @@ function AdvancedField({
   );
 
   if (schema.enum) {
+    const hasValue = value !== undefined && value !== null && value !== '';
     return (
       <div className="mb-3">
         {label}
@@ -243,7 +137,7 @@ function AdvancedField({
           onChange={(e) => onChange(e.target.value)}
           className={inputClass}
         >
-          <option value="">Select…</option>
+          {!hasValue && <option value="">Select…</option>}
           {schema.enum.map((opt) => (
             <option key={String(opt)} value={String(opt)}>
               {String(opt)}
@@ -353,10 +247,6 @@ function PrimaryField({ entry }: { entry: ClassifiedField }) {
           />
         </div>
       );
-    case 'size':
-      return <SizeField name={entry.name} schema={entry.field} value={value} required={entry.required} onChange={onChange} />;
-    case 'format':
-      return <FormatField name={entry.name} schema={entry.field} value={value} required={entry.required} onChange={onChange} />;
     default:
       return null;
   }
