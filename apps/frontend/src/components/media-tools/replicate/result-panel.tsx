@@ -279,10 +279,28 @@ export function ResultPanel({ medium }: { medium: Medium }) {
 
   // ── State 4: error ─────────────────────────────────────────────────────────
   if (runState === 'error') {
+    // A missing-field error is self-explanatory; any other failure may be an
+    // out-of-credit / rate-limit on Replicate (which has no balance API), so
+    // point the user at their Replicate billing.
+    const isInputError = /missing required/i.test(error || '');
     return (
       <Frame>
-        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-20">
-          <p className="text-red-400 text-center px-6">{error || 'Generation failed'}</p>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
+          <p className="text-red-400 text-center">{error || 'Generation failed'}</p>
+          {!isInputError && (
+            <p className="text-xs text-gray-500 text-center max-w-sm">
+              If a generation fails for no clear reason, check your{' '}
+              <a
+                href="https://replicate.com/account/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-designerAccent underline"
+              >
+                Replicate balance
+              </a>{' '}
+              — low or empty credit causes rate-limiting and failed runs.
+            </p>
+          )}
           <button
             onClick={() => generate()}
             className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-700 transition-colors"

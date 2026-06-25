@@ -90,14 +90,46 @@ export class ReplicateCatalogService {
     return (await res.json()) as ReplicateModelApi;
   }
 
+  // Max models shown per category (curated allowlist is always kept; the
+  // Replicate collection fills the rest up to this cap, by popularity).
+  private static readonly CATEGORY_MODEL_CAP = 30;
+
+  private _summaryFrom(modelId: string, data: ReplicateModelApi): ModelSummary {
+    const [, name] = modelId.split('/');
+    return {
+      id: modelId,
+      name: data.name || name,
+      description: data.description || '',
+      coverImageUrl: data.cover_image_url || null,
+      runCount: data.run_count || 0,
+      warm: isWarm(modelId),
+      pricing: pricingCategory(modelId),
+      price: this._cost.getPrice(modelId),
+    };
+  }
+
+  // Fetch the models featured in a Replicate collection (best-effort). The model
+  // objects already carry owner/name/description/cover/run_count, so no per-model
+  // fetch is needed to build a summary.
+  private async _fetchCollection(slug: string, apiKey: string): Promise<ReplicateModelApi[]> {
+    const res = await safeFetch(`${BASE}/collections/${slug}`, {
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      throw new Error(`Replicate collection fetch failed for ${slug}: ${res.status}`);
+    }
+    const data = (await res.json()) as { models?: ReplicateModelApi[] };
+    return Array.isArray(data?.models) ? data.models : [];
+  }
+
   async listModels(categoryKey: string, orgId: string): Promise<ModelSummary[]> {
-    const allowlist = MODEL_ALLOWLIST[categoryKey];
+    const allowlist = MODEL_ALLOWLIST[categoryKey] || [];
     const category = CATEGORIES.find((c) => c.key === categoryKey);
 
-    // Return empty for local categories or unknown/all categories with no allowlist
-    if (!allowlist || allowlist.length === 0 || category?.execution === 'local') {
-      return [];
-    }
+    // Local categories have no models; a category needs either a curated
+    // allowlist or a Replicate collection to surface anything.
+    if (category?.execution === 'local') return [];
+    if (allowlist.length === 0 && !category?.collectionSlug) return [];
 
     const categoryCacheKey = `replicate:category:${categoryKey}`;
     const cachedCategory = await this._redis.get(categoryCacheKey);
@@ -107,48 +139,52 @@ export class ReplicateCatalogService {
 
     const apiKey = await this.getReplicateKey(orgId);
 
-    const results: ModelSummary[] = [];
+    // Keep insertion order: curated allowlist first, then collection extras.
+    const byId = new Map<string, ModelSummary>();
+
+    // 1) Curated allowlist — always included, in curated order.
     for (const modelId of allowlist) {
       const cacheKey = `replicate:model:${modelId}`;
       try {
         const cached = await this._redis.get(cacheKey);
         if (cached) {
-          results.push(JSON.parse(cached));
+          byId.set(modelId, JSON.parse(cached));
           continue;
         }
-
         const [owner, name] = modelId.split('/');
         const data = await this._fetchModel(owner, name, apiKey);
-
-        const summary: ModelSummary = {
-          id: modelId,
-          name: data.name || name,
-          description: data.description || '',
-          coverImageUrl: data.cover_image_url || null,
-          runCount: data.run_count || 0,
-          warm: isWarm(modelId),
-          pricing: pricingCategory(modelId),
-          price: this._cost.getPrice(modelId),
-        };
-
-        // Only cache on successful fetch — never poison cache with failed response
+        const summary = this._summaryFrom(modelId, data);
         await this._redis.set(cacheKey, JSON.stringify(summary), CACHE_TTL);
-        results.push(summary);
+        byId.set(modelId, summary);
       } catch {
-        // Skip failed models — try the cached version if available
         const cached = await this._redis.get(cacheKey);
-        if (cached) {
-          results.push(JSON.parse(cached));
-        }
+        if (cached) byId.set(modelId, JSON.parse(cached));
       }
     }
 
-    // Cache the full category index only when every allowlisted model resolved
-    // (whether from API or from per-model cache). Failed models are skipped.
-    if (results.length === allowlist.length) {
-      await this._redis.set(categoryCacheKey, JSON.stringify(results), CACHE_TTL);
+    // 2) Replicate collection (what Replicate features) — merged in, badged by
+    //    warmth. Best-effort: a failed fetch still returns the allowlist.
+    if (category?.collectionSlug) {
+      try {
+        const models = await this._fetchCollection(category.collectionSlug, apiKey);
+        const extras = models
+          .filter((m) => m?.owner && m?.name)
+          .map((m) => ({ id: `${m.owner}/${m.name}`, m }))
+          .filter(({ id }) => !byId.has(id))
+          .sort((a, b) => (b.m.run_count || 0) - (a.m.run_count || 0));
+        for (const { id, m } of extras) {
+          if (byId.size >= ReplicateCatalogService.CATEGORY_MODEL_CAP) break;
+          byId.set(id, this._summaryFrom(id, m));
+        }
+      } catch {
+        // Collection is supplementary — ignore failures.
+      }
     }
 
+    const results = Array.from(byId.values());
+    if (results.length > 0) {
+      await this._redis.set(categoryCacheKey, JSON.stringify(results), CACHE_TTL);
+    }
     return results;
   }
 

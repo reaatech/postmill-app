@@ -12,25 +12,25 @@ export interface CategoryDefinition {
 export const CATEGORIES: CategoryDefinition[] = [
   // IMAGE
   { key: 'text-to-image', medium: 'image', label: 'Text to Image', collectionSlug: 'text-to-image', execution: 'sync' },
-  { key: 'image-to-image', medium: 'image', label: 'Image to Image', collectionSlug: 'image-to-image', execution: 'sync' },
+  { key: 'image-to-image', medium: 'image', label: 'Image to Image', collectionSlug: 'image-editing', execution: 'sync' },
   { key: 'background-remove', medium: 'image', label: 'Remove Background', collectionSlug: 'remove-backgrounds', execution: 'sync' },
   { key: 'upscale', medium: 'image', label: 'Upscale', collectionSlug: 'super-resolution', execution: 'sync' },
-  { key: 'restore', medium: 'image', label: 'Restore', collectionSlug: 'image-restoration', execution: 'async' },
+  { key: 'restore', medium: 'image', label: 'Restore', collectionSlug: 'ai-image-restoration', execution: 'async' },
   { key: 'inpaint', medium: 'image', label: 'Inpaint', execution: 'sync' },
   { key: 'meme', medium: 'image', label: 'Meme Generator', execution: 'local' },
   // VIDEO
   { key: 'text-to-video', medium: 'video', label: 'Text to Video', collectionSlug: 'text-to-video', execution: 'async' },
   { key: 'image-to-video', medium: 'video', label: 'Image to Video', collectionSlug: 'image-to-video', execution: 'async' },
   { key: 'video-to-video', medium: 'video', label: 'Video to Video', execution: 'async' },
-  { key: 'video-upscale', medium: 'video', label: 'Video Upscale', execution: 'async' },
+  { key: 'video-upscale', medium: 'video', label: 'Video Upscale', collectionSlug: 'ai-enhance-videos', execution: 'async' },
   { key: 'caption', medium: 'video', label: 'Caption Video', execution: 'async' },
   { key: 'merge', medium: 'video', label: 'Merge Videos', execution: 'local' },
   // AUDIO
   { key: 'tts', medium: 'audio', label: 'Text to Speech', collectionSlug: 'text-to-speech', execution: 'async' },
-  { key: 'text-to-music', medium: 'audio', label: 'Text to Music', collectionSlug: 'music-generation', execution: 'async' },
+  { key: 'text-to-music', medium: 'audio', label: 'Text to Music', collectionSlug: 'ai-music-generation', execution: 'async' },
   { key: 'music-to-music', medium: 'audio', label: 'Music to Music', execution: 'async' },
-  { key: 'voice-clone', medium: 'audio', label: 'Voice Clone', execution: 'async' },
-  { key: 'stt', medium: 'audio', label: 'Speech to Text', execution: 'sync' },
+  { key: 'voice-clone', medium: 'audio', label: 'Voice Clone', collectionSlug: 'sing-with-voices', execution: 'async' },
+  { key: 'stt', medium: 'audio', label: 'Speech to Text', collectionSlug: 'speech-to-text', execution: 'sync' },
 ];
 
 // MODEL_ALLOWLIST: category key → array of "owner/name" model IDs
