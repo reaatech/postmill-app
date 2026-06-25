@@ -223,6 +223,9 @@ export class StockMediaService {
       if (color) params.set('colors', color);
 
       const res = await safeFetch(`https://pixabay.com/api/?${params}`);
+      if (!res.ok) {
+        return { results: [], page, totalPages: 0, configured: true, source: 'pixabay' };
+      }
       const data = (await res.json()) as any;
       const hits = Array.isArray(data?.hits) ? data.hits : [];
       const totalHits = typeof data?.totalHits === 'number' ? data.totalHits : hits.length;
@@ -266,16 +269,24 @@ export class StockMediaService {
     return this.withCache(cacheKey, async () => {
       const limit = 20;
       const offset = (page - 1) * limit;
+      // GIPHY search requires a query; fall back to trending so the tab has
+      // content on load (matching the photos/videos behaviour).
+      const endpoint = query
+        ? 'https://api.giphy.com/v1/stickers/search'
+        : 'https://api.giphy.com/v1/stickers/trending';
       const params = new URLSearchParams({
         api_key: this.giphyKey!,
-        q: query || '',
         limit: String(limit),
         offset: String(offset),
         rating: 'g',
         lang: 'en',
       });
+      if (query) params.set('q', query);
 
-      const res = await safeFetch(`https://api.giphy.com/v1/stickers/search?${params}`);
+      const res = await safeFetch(`${endpoint}?${params}`);
+      if (!res.ok) {
+        return { results: [], page, totalPages: 0, configured: true, source: 'giphy' };
+      }
       const data = (await res.json()) as any;
       const items = Array.isArray(data?.data) ? data.data : [];
       const total = typeof data?.pagination?.total_count === 'number' ? data.pagination.total_count : items.length;
@@ -308,17 +319,26 @@ export class StockMediaService {
   }
 
   private async searchIconsFree(query: string, page: number = 1): Promise<StockSearchResponse<StockIconItem>> {
+    // Iconify's search endpoint requires a non-empty query (an empty one returns
+    // a plain-text "Bad request"). Show the empty state instead of erroring.
+    if (!query.trim()) {
+      return { results: [], page, totalPages: 0, configured: true, source: 'iconify' };
+    }
+
     const cacheKey = this.buildCacheKey('iconify', 'icons', query, page);
     return this.withCache(cacheKey, async () => {
       const limit = 32;
       const start = (page - 1) * limit;
       const params = new URLSearchParams({
-        query: query || '',
+        query,
         limit: String(limit),
         start: String(start),
       });
 
       const res = await safeFetch(`https://api.iconify.design/search?${params}`);
+      if (!res.ok) {
+        return { results: [], page, totalPages: 0, configured: true, source: 'iconify' };
+      }
       const data = (await res.json()) as any;
       const icons: string[] = Array.isArray(data?.icons) ? data.icons : [];
       const total = typeof data?.total === 'number' ? data.total : icons.length;
