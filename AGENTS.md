@@ -499,3 +499,15 @@ AI, Media, Storage, and Shortlinks settings surfaces share:
 ## Dropped Gitroom subsystems (v3.8.10)
 
 Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `MessagesGroup`, `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`, `Messages` + associated enums (`OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`) and their relations on `User`, `Post`, `Organization`, `Media`, `Integration`. Code-only removal in step 6, schema drops in step 7. The legacy `Role` enum and its `UserOrganization.role` column were also dropped — superseded by `AppRole`-based RBAC (`UserOrganization.roleId`).
+
+## Stock media & Content Packs (v3.8.10+)
+
+- Free stock sources: Unsplash (photos), Pexels (videos), Pixabay (vectors/illustrations), GIPHY
+  (stickers), Iconify (SVG icons), and Jamendo (audio). Results carry `source`, `license`, and
+  `attribution` metadata through preview, Designer open, and `/files/import`.
+- Redis caches free stock search results globally for 60s (including negative-cache for empty/missing
+  key configurations).
+- Premium Content Packs are per-organization BYOK packs configured at **Settings → Content Packs**.
+  Magnific is the first supported pack (photos, vectors, icons, videos). When a pack is active it
+  takes precedence over the matching free catalog for that capability. Pack credentials are encrypted
+  at rest and never returned to the client.

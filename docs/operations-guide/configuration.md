@@ -187,7 +187,21 @@ fallback (login only — channel credentials are configured in Settings → Chan
 |----------|---------|---------|
 | `UNSPLASH_ACCESS_KEY` | — | Unsplash API access key for stock photo browsing and download |
 | `PEXELS_API_KEY` | — | Pexels API key for stock video browsing and download |
+| `PIXABAY_API_KEY` | — | Pixabay API key for free vector/illustration browsing |
+| `GIPHY_API_KEY` | — | GIPHY API key for free sticker browsing |
 | `JAMENDO_CLIENT_ID` | — | Jamendo API client ID for stock audio browsing in the video editor |
+
+Iconify (SVG icons) does not require an API key.
+
+### Content Packs (v3.8.10+)
+
+Premium stock sources are configured **per-organization** in-app via **Settings → Content Packs**.
+Bring-your-own-key (BYOK) packs take precedence over the free catalogs above for the capabilities
+they support.
+
+| Provider | Setup location | Notes |
+|----------|----------------|-------|
+| **Magnific** | Settings → Content Packs | Add your Magnific API key; it is encrypted at rest and never returned to the client. Supports photos, vectors, icons, and videos. |
 
 ## Variables no longer read (v3.7.1+)
 

@@ -38,6 +38,13 @@ Files folder and complete through the Inngest poll sweep. The studio is intentio
 surface in v1: it does **not** participate in C2PA provenance signing or the shared media-pipeline
 cost ledger; accounting is tracked per job through `AIMediaJob.costUsd`/`creditType`.
 
+Stock browsing was expanded with free vectors (Pixabay), stickers (GIPHY), and icons (Iconify),
+joining existing photos (Unsplash) and videos (Pexels). Results carry `source`, `license`, and
+`attribution` metadata through preview, Designer open, and `/files/import`. Premium Content Packs
+(BYOK) were added under **Settings → Content Packs**, with Magnific as the first supported pack
+(photos, vectors, icons, videos). An active pack takes precedence over the matching free catalog;
+credentials are encrypted at rest and never returned to the client.
+
 ### v3.8.10 (June 2026)
 
 Identity, tenancy, RBAC & provider-surface redesign:

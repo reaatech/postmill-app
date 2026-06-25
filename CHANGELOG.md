@@ -62,6 +62,14 @@
   - **Not included:** real-time multi-user collaboration (O5) — requires adding a WebSocket platform
     + CRDT (Yjs); tracked in `dev/MEDIA_PHASE_2.md` as the one deferred item.
 - **Stock surface UX hardening** — Grid tiles are now keyboard-accessible buttons; error states don't wipe toolbar; skeleton grid loading; search magnifier + clear button; custom select styling; hover affordances.
+- **Stock content expansion** — Free stock browsing now covers vectors (Pixabay), stickers (GIPHY),
+  and icons (Iconify) alongside existing photos (Unsplash) and videos (Pexels). Each source carries
+  `source`, `license`, and `attribution` metadata through preview, Designer open, and the
+  `/files/import` save path.
+- **Content Packs (premium BYOK)** — Per-organization premium stock packs via **Settings → Content
+  Packs**. Magnific is the first supported pack: add a Magnific API key, set it active, and search
+  results for photos/vectors/icons/videos are served from your own Magnific plan before falling back
+  to free catalogs. Keys are encrypted at rest; minted download URLs are used for import.
 
 ### Changed
 - **Polotno removal** — Removed all `polotno`, `polonto`, `plontoKey` references across the codebase.
