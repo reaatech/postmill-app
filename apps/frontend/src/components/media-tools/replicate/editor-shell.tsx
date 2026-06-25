@@ -24,14 +24,14 @@ export function EditorShell({
         <h2 className="text-sm font-medium text-white">{title}</h2>
         {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
       </div>
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex mobile:flex-col flex-1 overflow-hidden">
         <div
-          className={`flex-1 flex items-center justify-center overflow-auto bg-[#0d0d12] p-6 ${stageClassName}`}
+          className={`flex-1 flex items-center justify-center overflow-auto bg-[#0d0d12] p-6 mobile:p-3 ${stageClassName}`}
         >
           {children}
         </div>
         {inspector && (
-          <div className="w-72 flex-shrink-0 border-l border-newBorder overflow-y-auto bg-newBgColorInner">
+          <div className="w-72 flex-shrink-0 border-l border-newBorder overflow-y-auto bg-newBgColorInner mobile:w-full mobile:border-l-0 mobile:border-t mobile:max-h-[45%]">
             {inspector}
           </div>
         )}
