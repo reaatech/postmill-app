@@ -30,6 +30,8 @@ import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/databa
 import { MediaModule } from '@gitroom/nestjs-libraries/media/media.module';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
+import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
+import { OrgContentPackSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.repository';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { BitlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/bitly.adapter';
@@ -207,6 +209,8 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     // never receives the adapter registrations from MediaModule.onModuleInit.
     OrgMediaProviderSettingsService,
     OrgMediaProviderSettingsRepository,
+    OrgContentPackSettingsService,
+    OrgContentPackSettingsRepository,
     ProviderCredentialLinkService,
     MediaJobLifecycleService,
     {

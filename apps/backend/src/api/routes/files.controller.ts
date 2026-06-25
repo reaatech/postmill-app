@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
   Param,
   Post,
   Put,
@@ -21,6 +22,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
+import { MagnificDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/magnific.content-pack';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { CreateFolderDto } from '@gitroom/nestjs-libraries/dtos/file/create.folder.dto';
@@ -358,8 +360,24 @@ export class FilesController {
   @RequirePermission('media', 'create')
   async importFromUrl(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { url: string; name: string; folderId?: string; source?: string; downloadLocation?: string; attribution?: Record<string, unknown> }
+    @Body() body: { url: string; name: string; folderId?: string; source?: string; downloadLocation?: string; attribution?: Record<string, unknown>; type?: string }
   ) {
+    if (body.source === 'magnific' && body.downloadLocation) {
+      try {
+        const licensedUrl = await this._stockMediaService.resolveMagnificDownload(
+          org.id,
+          body.downloadLocation,
+          (body.type as any) || 'photos'
+        );
+        return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
+      } catch (err) {
+        if (err instanceof MagnificDailyCapError) {
+          throw new HttpException(err.message, 402);
+        }
+        throw new HttpException((err as Error).message, 500);
+      }
+    }
+
     const result = await this._fileService.importFromUrl(org.id, body);
     if (body.source === 'unsplash' && body.downloadLocation) {
       await this._stockMediaService.triggerDownload(body.downloadLocation);

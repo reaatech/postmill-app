@@ -22,7 +22,7 @@ export class StockMediaController {
     @Query('orientation') orientation: string,
     @Query('color') color: string
   ) {
-    return this._stockMediaService.searchPhotos(query || '', parseInt(page || '1', 10), orientation || undefined, color || undefined);
+    return this._stockMediaService.searchPhotos(org.id, query || '', parseInt(page || '1', 10), orientation || undefined, color || undefined);
   }
 
   @Get('/photos/:id/related')
@@ -45,7 +45,7 @@ export class StockMediaController {
     @Query('orientation') orientation: string,
     @Query('size') size: string
   ) {
-    return this._stockMediaService.searchVideos(query || '', parseInt(page || '1', 10), orientation || undefined, size || undefined);
+    return this._stockMediaService.searchVideos(org.id, query || '', parseInt(page || '1', 10), orientation || undefined, size || undefined);
   }
 
   @Get('/videos/:id/related')
@@ -66,6 +66,47 @@ export class StockMediaController {
     @Query('query') query: string,
     @Query('page') page: string
   ) {
-    return this._stockMediaService.searchAudio(query || '', parseInt(page || '1', 10));
+    return this._stockMediaService.searchAudio(org.id, query || '', parseInt(page || '1', 10));
+  }
+
+  @Get('/vectors')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async searchVectors(
+    @GetOrgFromRequest() org: Organization,
+    @Query('query') query: string,
+    @Query('page') page: string,
+    @Query('orientation') orientation: string,
+    @Query('color') color: string
+  ) {
+    return this._stockMediaService.searchVectors(
+      org.id,
+      query || '',
+      parseInt(page || '1', 10),
+      orientation || undefined,
+      color || undefined
+    );
+  }
+
+  @Get('/stickers')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async searchStickers(
+    @GetOrgFromRequest() org: Organization,
+    @Query('query') query: string,
+    @Query('page') page: string
+  ) {
+    return this._stockMediaService.searchStickers(org.id, query || '', parseInt(page || '1', 10));
+  }
+
+  @Get('/icons')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async searchIcons(
+    @GetOrgFromRequest() org: Organization,
+    @Query('query') query: string,
+    @Query('page') page: string
+  ) {
+    return this._stockMediaService.searchIcons(org.id, query || '', parseInt(page || '1', 10));
   }
 }
