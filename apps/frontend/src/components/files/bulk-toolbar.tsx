@@ -1,10 +1,23 @@
 'use client';
 
 import React, { FC, useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
+import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import type { FileItem } from './file-manager';
+
+const loadDims = (src: string) =>
+  new Promise<{ width?: number; height?: number }>((resolve) => {
+    if (!src) return resolve({});
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = () => resolve({});
+    img.src = src;
+  });
 
 type FolderItem = {
   id: string;
@@ -22,9 +35,59 @@ export const BulkToolbar: FC<{
   foldersData: FolderItem[];
 }> = ({ selectedFiles, onClearSelection, onRefresh, foldersData }) => {
   const fetch = useFetch();
+  const router = useRouter();
+  const mediaDirectory = useMediaDirectory();
   const toaster = useToaster();
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [targetFolderId, setTargetFolderId] = useState<string | null>(null);
+  const [opening, setOpening] = useState(false);
+
+  // Open all selected images/videos together on one Designer canvas as elements.
+  // The list is too long for the query string, so hand it off via sessionStorage.
+  const handleOpenAllInDesigner = useCallback(async () => {
+    const designable = selectedFiles.filter((f) => {
+      const isVideo = hasExtension(f.path, 'mp4', 'mov', 'webm');
+      const isImage = hasExtension(
+        f.path, 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'bmp'
+      );
+      // A video needs a poster image to place on the canvas (Konva can't draw a raw video).
+      if (isVideo) return !!f.thumbnail;
+      return isImage;
+    });
+    if (designable.length === 0) {
+      toaster.show('Select images or videos to open in the Designer', 'warning');
+      return;
+    }
+    if (designable.length < selectedFiles.length) {
+      toaster.show(
+        `Opening ${designable.length} of ${selectedFiles.length} (skipped audio/documents)`,
+        'success'
+      );
+    }
+    setOpening(true);
+    try {
+      const assets = await Promise.all(
+        designable.map(async (f) => {
+          const isVideo = hasExtension(f.path, 'mp4', 'mov', 'webm');
+          const thumb = f.thumbnail ? mediaDirectory.set(f.thumbnail) : undefined;
+          const displaySrc = isVideo ? thumb || '' : mediaDirectory.set(f.path);
+          const dims = await loadDims(displaySrc);
+          return {
+            url: mediaDirectory.set(f.path),
+            type: isVideo ? ('video' as const) : ('photo' as const),
+            thumbUrl: isVideo ? thumb : undefined,
+            naturalWidth: dims.width,
+            naturalHeight: dims.height,
+            source: 'files',
+          };
+        })
+      );
+      window.sessionStorage.setItem('designer:bulk-assets', JSON.stringify(assets));
+      router.push('/media/designer?bulk=1');
+    } finally {
+      setOpening(false);
+    }
+  }, [selectedFiles, mediaDirectory, router, toaster]);
 
   const handleBulkDelete = useCallback(async () => {
     if (selectedFiles.length === 0) return;
@@ -69,6 +132,17 @@ export const BulkToolbar: FC<{
         {selectedFiles.length} selected
       </div>
       <div className="flex-1" />
+      <button
+        onClick={handleOpenAllInDesigner}
+        disabled={opening}
+        className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 transition-all flex items-center gap-[6px]"
+      >
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+        </svg>
+        {opening ? 'Opening…' : 'Open all in Designer'}
+      </button>
       <button
         onClick={() => setShowMoveDialog(true)}
         className="px-[12px] py-[6px] rounded-[6px] text-[12px] text-textColor border border-newColColor hover:bg-boxHover transition-all"

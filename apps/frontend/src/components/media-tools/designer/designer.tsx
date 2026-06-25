@@ -66,6 +66,16 @@ interface DesignerProps {
     naturalWidth?: number;
     naturalHeight?: number;
   };
+  // Multiple assets opened together as elements (e.g. "Open all in Designer"
+  // from the Files library). Each is placed as a cascaded image element.
+  initialAssets?: Array<{
+    url: string;
+    type?: 'photo' | 'video';
+    thumbUrl?: string;
+    naturalWidth?: number;
+    naturalHeight?: number;
+    source?: string;
+  }>;
   designId?: string;
 }
 
@@ -91,6 +101,7 @@ export const Designer: FC<DesignerProps> = ({
   width,
   height,
   initialAsset,
+  initialAssets,
   designId,
 }) => {
   const fetch = useFetch();
@@ -108,7 +119,7 @@ export const Designer: FC<DesignerProps> = ({
   // no caller-supplied size) — forces an explicit format choice instead of the
   // silent 1080² "Instagram Post" default.
   const [showStart, setShowStart] = useState(
-    () => !initialAsset && !designId && !(width && height)
+    () => !initialAsset && !initialAssets?.length && !designId && !(width && height)
   );
   const aiActive = useAiActive();
   const user = useUser();
@@ -391,6 +402,36 @@ export const Designer: FC<DesignerProps> = ({
   }, [handleSave]);
 
   useEffect(() => {
+    if (initialAssets && initialAssets.length) {
+      const state = store.getState();
+      const active = state.doc.outputs[state.currentOutput];
+      initialAssets.forEach((asset, i) => {
+        if (!asset.url) return;
+        const imgUrl = asset.type === 'video' ? (asset.thumbUrl || asset.url) : asset.url;
+        const { width: w, height: h } = fitWithin(
+          asset.naturalWidth || active.width * 0.5,
+          asset.naturalHeight || active.height * 0.5,
+          active.width,
+          active.height
+        );
+        // Cascade each element from the top-left so they don't fully overlap.
+        const off = i * 32;
+        store.getState().addElement({
+          id: '',
+          type: 'image',
+          x: Math.min(40 + off, Math.max(0, active.width - w)),
+          y: Math.min(40 + off, Math.max(0, active.height - h)),
+          width: w,
+          height: h,
+          rotation: 0,
+          opacity: 1,
+          locked: false,
+          hidden: false,
+          src: imgUrl,
+        });
+      });
+      return;
+    }
     if (initialAsset && initialAsset.url) {
       const imgUrl = initialAsset.type === 'video'
         ? (initialAsset.thumbUrl || initialAsset.url)

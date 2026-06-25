@@ -8,7 +8,9 @@ import { FolderTree } from '@gitroom/frontend/components/files/folder-tree';
 import { FileGrid } from '@gitroom/frontend/components/files/file-grid';
 import { FileList } from '@gitroom/frontend/components/files/file-list';
 import { FileDetailsPanel } from '@gitroom/frontend/components/files/file-details-panel';
+import { FilePreviewModal } from '@gitroom/frontend/components/files/file-preview-modal';
 import { BulkToolbar } from '@gitroom/frontend/components/files/bulk-toolbar';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { FileUploader } from '@gitroom/frontend/components/files/file-uploader';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { TrashComponent } from '@gitroom/frontend/components/files/trash.component';
@@ -63,6 +65,7 @@ export const FileManager: FC<{
   refreshKey,
 }) => {
   const fetch = useFetch();
+  const modals = useModals();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [debouncedSearch] = useDebounce(search, 300);
@@ -111,6 +114,23 @@ export const FileManager: FC<{
   }, []);
 
   const clearSelection = useCallback(() => setSelectedFiles([]), []);
+
+  // Open a file in a preview modal (with "Open in Designer"); the modal's
+  // Details button reopens the side panel for renaming/tagging/deleting.
+  const handleFileClick = useCallback(
+    (file: FileItem) => {
+      modals.openModal({
+        title: '',
+        closeOnClickOutside: true,
+        closeOnEscape: true,
+        withCloseButton: true,
+        classNames: { modal: 'w-[100%] max-w-[820px] text-textColor' },
+        children: <FilePreviewModal file={file} onDetails={setDetailsFile} />,
+        size: '80%',
+      });
+    },
+    [modals]
+  );
 
   const handleFolderSelect = useCallback((folderId: string | null) => {
     setSelectedFolderId(folderId);
@@ -226,7 +246,7 @@ export const FileManager: FC<{
               files={data.results}
               selectedFiles={selectedFiles}
               onToggleSelect={toggleFileSelection}
-              onFileClick={setDetailsFile}
+              onFileClick={handleFileClick}
               standalone={standalone}
               onSelect={onSelect}
             />
@@ -235,7 +255,7 @@ export const FileManager: FC<{
               files={data.results}
               selectedFiles={selectedFiles}
               onToggleSelect={toggleFileSelection}
-              onFileClick={setDetailsFile}
+              onFileClick={handleFileClick}
               sortField={sortField}
               sortOrder={sortOrder}
               onSort={(field) => {

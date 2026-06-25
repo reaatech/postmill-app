@@ -36,9 +36,37 @@ function DesignerWithParams() {
       }
     : undefined;
 
+  // Bulk handoff: "Open all in Designer" from the Files library stashes the
+  // selected assets in sessionStorage (too many/too long for the query string)
+  // and navigates here with ?bulk=1. Each is placed as a cascaded element.
+  let initialAssets:
+    | Array<{
+        url: string;
+        type?: 'photo' | 'video';
+        thumbUrl?: string;
+        naturalWidth?: number;
+        naturalHeight?: number;
+        source?: string;
+      }>
+    | undefined;
+  if (sp.get('bulk') && typeof window !== 'undefined') {
+    try {
+      const raw = window.sessionStorage.getItem('designer:bulk-assets');
+      if (raw) initialAssets = JSON.parse(raw);
+    } catch {
+      // ignore malformed handoff
+    }
+  }
+
   // The Designer initialises its store once from initialAsset, so remount it
   // when the asset changes (navigating straight from one asset to another).
-  return <DesignerPage key={url || 'blank'} initialAsset={initialAsset} />;
+  return (
+    <DesignerPage
+      key={url || (initialAssets ? 'bulk' : 'blank')}
+      initialAsset={initialAsset}
+      initialAssets={initialAssets}
+    />
+  );
 }
 
 export default function DesignerRoute() {
