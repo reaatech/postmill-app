@@ -93,7 +93,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
     fileId?: string;
     width: number;
     height: number;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => {
     if (item.type !== 'image') return;
     setImage(item.url, item.fileId);

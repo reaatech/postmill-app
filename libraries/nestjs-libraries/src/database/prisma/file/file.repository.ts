@@ -57,6 +57,7 @@ export class FileRepository {
 
   async saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
     const mimeType = mimeFromName(fileName);
+    const fileType = mimeType.startsWith('audio/') ? 'audio' : mimeType.startsWith('video/') ? 'video' : 'image';
     const meta: Record<string, unknown> = {
       mimeType,
       originalName: originalName || fileName,
@@ -85,6 +86,7 @@ export class FileRepository {
         },
       },
       name: fileName,
+      type: fileType,
       path: filePath,
       originalName: originalName || null,
       fileSize: (meta.fileSize as number) || 0,

@@ -28,6 +28,7 @@ export const FileGrid: FC<{
       {files.map((file) => {
         const isSelected = !!selectedFiles.find(f => f.id === file.id);
         const isVideo = hasExtension(file.path, 'mp4');
+        const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
         const tags = file.tags ? JSON.parse(file.tags) : [];
 
         return (
@@ -49,7 +50,15 @@ export const FileGrid: FC<{
             onDoubleClick={() => !onSelect && onFileClick(file)}
           >
             <div className="w-full h-full bg-newBgColorInner relative">
-              {isVideo ? (
+              {isAudio ? (
+                <div className="flex items-center justify-center w-full h-full bg-gray-800">
+                  <audio
+                    src={mediaDirectory.set(file.path)}
+                    className="w-full"
+                    controls
+                  />
+                </div>
+              ) : isVideo ? (
                 <video
                   src={mediaDirectory.set(file.path)}
                   className="w-full h-full object-cover"

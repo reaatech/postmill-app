@@ -64,7 +64,7 @@ interface MediaSelectorModalProps {
     fileId?: string;
     width: number;
     height: number;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => void;
 }
 
@@ -90,7 +90,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
     width: number;
     height: number;
     thumbnail?: string;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => {
     onSelect({
       source: 'stock',
@@ -111,7 +111,10 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
       fileId: item.id,
       width: 0,
       height: 0,
-      type: item.type?.startsWith('video') ? 'video' : 'image',
+      type: item.type?.startsWith('audio') ? 'audio' 
+        : item.type?.startsWith('video') ? 'video' 
+        : /\.(mp3|wav|ogg|m4a)$/i.test(item.name || '') ? 'audio'
+        : 'image',
     });
     onClose();
   };

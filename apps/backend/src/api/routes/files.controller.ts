@@ -113,7 +113,7 @@ export class FilesController {
   @Post('/upload-simple')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
   @UsePipes(new CustomFileValidationPipe())
   async uploadSimple(
     @GetOrgFromRequest() org: Organization,

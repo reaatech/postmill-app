@@ -214,7 +214,7 @@ const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
 export const FileBox: FC<{
   setMedia: (params: { id: string; path: string }[]) => void;
   standalone?: boolean;
-  type?: 'image' | 'video';
+  type?: 'image' | 'video' | 'audio';
   closeModal: () => void;
 }> = ({ type, standalone, setMedia }) => {
   const [page, setPage] = useState(0);
@@ -363,20 +363,26 @@ export const FileBox: FC<{
         top: 10,
         children: (
           <div className="w-full h-full p-[50px]">
-            {hasExtension(media.path, 'mp4') ? (
-              <VideoFrame
-                autoplay={true}
-                url={mediaDirectory.set(media.path)}
-              />
-            ) : (
-              <img
-                width="100%"
-                height="100%"
-                className="w-full h-full max-h-[100%] max-w-[100%] object-cover"
-                src={mediaDirectory.set(media.path)}
-                alt="media"
-              />
-            )}
+          {hasExtension(media.path, 'mp4') ? (
+            <VideoFrame
+              autoplay={true}
+              url={mediaDirectory.set(media.path)}
+            />
+          ) : hasExtension(media.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+            <audio
+              controls
+              className="w-full"
+              src={mediaDirectory.set(media.path)}
+            />
+          ) : (
+            <img
+              width="100%"
+              height="100%"
+              className="w-full h-full max-h-[100%] max-w-[100%] object-cover"
+              src={mediaDirectory.set(media.path)}
+              alt="media"
+            />
+          )}
           </div>
         ),
       });
@@ -539,7 +545,9 @@ export const FileBox: FC<{
                 if (type === 'video') {
                   return hasExtension(f.path, 'mp4');
                 } else if (type === 'image') {
-                  return !hasExtension(f.path, 'mp4');
+                  return !hasExtension(f.path, 'mp4') && !hasExtension(f.path, 'mp3', 'wav', 'ogg', 'm4a');
+                } else if (type === 'audio') {
+                  return hasExtension(f.path, 'mp3', 'wav', 'ogg', 'm4a');
                 }
                 return true;
               })
@@ -593,6 +601,14 @@ export const FileBox: FC<{
                       </div>
                       {hasExtension(media.path, 'mp4') ? (
                         <VideoFrame url={mediaDirectory.set(media.path)} />
+                      ) : hasExtension(media.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+                        <div className="flex items-center justify-center w-full h-full bg-gray-800">
+                          <audio
+                            controls
+                            className="w-full"
+                            src={mediaDirectory.set(media.path)}
+                          />
+                        </div>
                       ) : (
                         <img
                           width="100%"
@@ -691,13 +707,13 @@ export const MultiFileComponent: FC<{
   const permissions = usePermissions();
   const modals = useModals();
   const t = useT();
+  const [currentMedia, setCurrentMedia] = useState(value);
   useEffect(() => {
     if (value) {
       setCurrentMedia(value);
     }
   }, [value]);
 
-  const [currentMedia, setCurrentMedia] = useState(value);
   const mediaDirectory = useMediaDirectory();
   const changeMedia = useCallback(
     (
@@ -818,6 +834,14 @@ export const MultiFileComponent: FC<{
                       </div>
                       {hasExtension(media?.path, 'mp4') ? (
                         <VideoFrame url={mediaDirectory.set(media?.path)} />
+                      ) : hasExtension(media?.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+                        <div className="flex items-center justify-center w-full h-full">
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" className="text-textColor/60">
+                            <path d="M2 10V14C2 15.1046 2.89543 16 4 16H6L11.2929 20.2929C11.7458 20.7458 12.5 20.4243 12.5 19.8047V4.19534C12.5 3.57571 11.7458 3.25419 11.2929 3.70711L6 8H4C2.89543 8 2 8.89543 2 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M15.5355 8.46448C16.4684 9.39734 16.9948 10.6611 17 11.9927C17.0052 13.3243 16.4888 14.5921 15.564 15.5355" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M19.6569 5.17157C21.1494 6.66412 21.9952 8.69168 22 10.8487C22.0048 13.0058 21.1692 15.0372 19.6845 16.5372" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </div>
                       ) : (
                         <img
                           className="w-full h-full object-cover rounded-[4px]"
@@ -920,7 +944,7 @@ export const FileComponent: FC<{
       };
     };
   }) => void;
-  type?: 'image' | 'video';
+  type?: 'image' | 'video' | 'audio';
   width?: number;
   height?: number;
 }> = (props) => {
@@ -931,13 +955,13 @@ export const FileComponent: FC<{
   const { getValues } = useSettings();
   const user = useUser();
   const permissions = usePermissions();
+  const [currentMedia, setCurrentMedia] = useState(value);
   useEffect(() => {
     const settings = getValues()[props.name];
     if (settings) {
       setCurrentMedia(settings);
     }
   }, []);
-  const [currentMedia, setCurrentMedia] = useState(value);
   const modals = useModals();
   const mediaDirectory = useMediaDirectory();
 
@@ -996,12 +1020,27 @@ export const FileComponent: FC<{
       <div className="text-[14px]">{label}</div>
       <div className="text-[12px]">{description}</div>
       {!!currentMedia && (
-        <div className="my-[20px] cursor-pointer w-[200px] h-[200px] border-2 border-newTableBorder">
-          <img
-            className="w-full h-full object-cover"
-            src={currentMedia.path}
-            onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
-          />
+        <div className="my-[20px] w-[200px] h-[200px] border-2 border-newTableBorder">
+          {type === 'audio' ||
+          hasExtension(currentMedia.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+            <audio
+              controls
+              className="w-full h-full"
+              src={mediaDirectory.set(currentMedia.path)}
+            />
+          ) : type === 'video' || hasExtension(currentMedia.path, 'mp4') ? (
+            <video
+              controls
+              className="w-full h-full object-cover"
+              src={mediaDirectory.set(currentMedia.path)}
+            />
+          ) : (
+            <img
+              className="w-full h-full object-cover cursor-pointer"
+              src={currentMedia.path}
+              onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
+            />
+          )}
         </div>
       )}
       <div className="flex gap-[5px]">

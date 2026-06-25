@@ -221,7 +221,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
     fileId?: string;
     width: number;
     height: number;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => {
     if (item.type !== 'image') return;
     addLogoToCanvas({ id: item.fileId || '', path: item.url, name: 'Logo' });

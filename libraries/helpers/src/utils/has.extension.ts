@@ -1,10 +1,15 @@
 export const hasExtension = (
   path: string | undefined | null,
-  extension: string
+  ...extensions: string[]
 ): boolean => {
-  if (!path) {
+  if (!path || extensions.length === 0) {
     return false;
   }
-  const ext = extension.startsWith('.') ? extension : `.${extension}`;
-  return path.toLowerCase().indexOf(ext.toLowerCase()) > -1;
+  const lowerPath = path.toLowerCase();
+  return extensions.some((extension) => {
+    const ext = extension.startsWith('.')
+      ? extension.toLowerCase()
+      : `.${extension.toLowerCase()}`;
+    return lowerPath.endsWith(ext);
+  });
 };

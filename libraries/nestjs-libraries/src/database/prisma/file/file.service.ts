@@ -252,7 +252,7 @@ export class FileService {
     return this._fileRepository.saveGeneratedMedia(orgId, {
       name: data.name,
       path,
-      type: contentType.startsWith('video/') ? 'video' : 'image',
+      type: contentType.startsWith('audio/') ? 'audio' : contentType.startsWith('video/') ? 'video' : 'image',
       folderId: data.folderId,
       fileSize,
       metadata: {

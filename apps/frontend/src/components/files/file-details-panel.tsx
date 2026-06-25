@@ -30,6 +30,7 @@ export const FileDetailsPanel: FC<{
   const toaster = useToaster();
   const mediaDirectory = useMediaDirectory();
   const isVideo = hasExtension(file.path, 'mp4');
+  const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
 
   const [editingName, setEditingName] = useState(false);
   const [name, setName] = useState(file.name);
@@ -126,7 +127,9 @@ export const FileDetailsPanel: FC<{
 
       <div className="p-[16px]">
         <div className="rounded-[8px] overflow-hidden bg-black/20 mb-[16px]">
-          {isVideo ? (
+          {isAudio ? (
+            <audio controls className="max-w-full" src={mediaDirectory.set(file.path)} />
+          ) : isVideo ? (
             <video src={mediaDirectory.set(file.path)} className="w-full aspect-video object-cover" controls />
           ) : (
             <img src={mediaDirectory.set(file.path)} alt="" className="w-full aspect-square object-cover" />

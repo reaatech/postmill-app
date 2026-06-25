@@ -297,7 +297,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
     fileId?: string;
     width: number;
     height: number;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => {
     const state = store.getState();
     const out = state.doc.outputs[state.currentOutput];

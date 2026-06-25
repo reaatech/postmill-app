@@ -137,7 +137,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
     fileId?: string;
     width: number;
     height: number;
-    type: 'image' | 'video';
+    type: 'image' | 'video' | 'audio';
   }) => {
     const state = store.getState();
     const out = state.doc.outputs[state.currentOutput];

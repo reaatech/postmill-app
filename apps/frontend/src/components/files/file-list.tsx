@@ -50,9 +50,18 @@ export const FileList: FC<{
       width: '40px',
       render: (file: FileItem) => {
         const isVideo = hasExtension(file.path, 'mp4');
+        const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
         return (
           <div className="w-[36px] h-[36px] rounded-[6px] overflow-hidden bg-newBgColorInner">
-            {isVideo ? (
+            {isAudio ? (
+              <div className="flex items-center justify-center w-full h-full">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-textColor/60">
+                  <path d="M2 10V14C2 15.1046 2.89543 16 4 16H6L11.2929 20.2929C11.7458 20.7458 12.5 20.4243 12.5 19.8047V4.19534C12.5 3.57571 11.7458 3.25419 11.2929 3.70711L6 8H4C2.89543 8 2 8.89543 2 10Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M15.5355 8.46448C16.4684 9.39734 16.9948 10.6611 17 11.9927C17.0052 13.3243 16.4888 14.5921 15.564 15.5355" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M19.6569 5.17157C21.1494 6.66412 21.9952 8.69168 22 10.8487C22.0048 13.0058 21.1692 15.0372 19.6845 16.5372" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+            ) : isVideo ? (
               <video src={mediaDirectory.set(file.path)} className="w-full h-full object-cover" muted preload="metadata" />
             ) : (
               <img src={mediaDirectory.set(file.path)} alt="" className="w-full h-full object-cover" loading="lazy" />
