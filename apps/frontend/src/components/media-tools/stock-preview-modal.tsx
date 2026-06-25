@@ -24,6 +24,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
   const modal = useModals();
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
+  const [posting, setPosting] = useState(false);
 
   // "Open in Designer" navigates to the full /media/designer page with the
   // asset in the query string — there is no Designer modal. `w/h` are the chosen
@@ -133,6 +134,54 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       size: 'lg',
     });
   }, [modal, item, type]);
+
+  // Stickers' real home is a post, not the Designer (which flattens the
+  // animation to frame 1). Save the original animated file, then open the
+  // composer with it pre-attached — animation survives all the way to publish.
+  const handleSaveAndPost = useCallback(async () => {
+    if (posting) return;
+    setPosting(true);
+    try {
+      const name = `${item.source}-${item.id}.gif`;
+      const res = await fetch('/files/import', {
+        method: 'POST',
+        body: JSON.stringify({
+          url: item.url,
+          name,
+          source: item.source,
+          type,
+          attribution: item.attribution,
+        }),
+      });
+      if (!res.ok) return;
+      const savedFile = await res.json();
+      const integrationsRes = await fetch('/integrations');
+      const integrations = integrationsRes.ok ? await integrationsRes.json() : [];
+      const { AddEditModal } = await import(
+        '@gitroom/frontend/components/new-launch/add.edit.modal'
+      );
+      const dayjs = (await import('dayjs')).default;
+      modal.closeAll();
+      modal.openModal({
+        fullScreen: true,
+        removeLayout: true,
+        children: (
+          <AddEditModal
+            date={dayjs()}
+            integrations={integrations}
+            allIntegrations={integrations}
+            onlyValues={[
+              { content: '', id: 'new', image: [{ id: savedFile.id, path: savedFile.path }] },
+            ]}
+            mutate={() => {}}
+            reopenModal={() => {}}
+          />
+        ),
+      });
+    } finally {
+      setPosting(false);
+    }
+  }, [posting, fetch, modal, item, type]);
 
   const renderPreview = () => {
     if (type === 'video') {
@@ -259,15 +308,28 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           </div>
           {renderAttributionLine()}
           <div className="text-[12px] text-newTextColor/60">{item.description}</div>
-          <button
-            onClick={handleOpenInDesigner}
-            className="px-[16px] py-[10px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 transition-all flex items-center gap-[6px]"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-            </svg>
-            Open in Designer
-          </button>
+          {type === 'sticker' ? (
+            <button
+              onClick={handleSaveAndPost}
+              disabled={posting}
+              className="px-[16px] py-[10px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 disabled:opacity-50 transition-all flex items-center gap-[6px]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+              {posting ? 'Saving…' : 'Save & Post'}
+            </button>
+          ) : (
+            <button
+              onClick={handleOpenInDesigner}
+              className="px-[16px] py-[10px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 transition-all flex items-center gap-[6px]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
+              </svg>
+              Open in Designer
+            </button>
+          )}
           <button
             onClick={handleSaveToFiles}
             className="px-[16px] py-[10px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[500] hover:bg-[#2B5CD3]/80 transition-all flex items-center gap-[6px]"

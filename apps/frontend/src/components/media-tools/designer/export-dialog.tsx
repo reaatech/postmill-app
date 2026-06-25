@@ -64,14 +64,15 @@ interface FormatDef {
   showScale: boolean;
 }
 
+// Static image exports only. `gif`/`webp-animated` are intentionally NOT here:
+// a single-frame Konva snapshot can't produce animation, so they only ever
+// yielded a misleadingly-named static file. Animated output lives in VIDEO_FORMATS.
 const FORMATS: FormatDef[] = [
   { value: 'png', label: 'PNG', showQuality: false, showScale: true },
   { value: 'jpeg', label: 'JPEG', showQuality: true, showScale: true },
   { value: 'transparent', label: 'Transparent PNG', showQuality: false, showScale: true },
   { value: 'webp', label: 'WebP', showQuality: true, showScale: true },
   { value: 'pdf', label: 'PDF', showQuality: false, showScale: false },
-  { value: 'gif', label: 'GIF', showQuality: false, showScale: true },
-  { value: 'webp-animated', label: 'Animated WebP', showQuality: true, showScale: true },
 ];
 
 const VIDEO_FORMATS: FormatDef[] = [
