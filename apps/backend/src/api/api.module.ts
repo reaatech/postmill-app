@@ -74,6 +74,8 @@ import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
 import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
+import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-studio.module';
+import { ReplicateStudioController } from './routes/replicate-studio.controller';
 
 const authenticatedController = [
   UsersController,
@@ -117,9 +119,10 @@ const authenticatedController = [
   DesignTemplateController,
   DesignerProxyController,
   AdminController,
+  ReplicateStudioController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule],
   controllers: [
     RootController,
     HealthController,
