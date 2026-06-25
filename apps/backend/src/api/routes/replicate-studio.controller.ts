@@ -15,9 +15,10 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { Organization, User } from '@prisma/client';
 import { ReplicateRunnerService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-runner.service';
 import { ReplicateCatalogService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-catalog.service';
+import { ReplicateEnhanceService } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-enhance.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
-import { EstimateDto, RunSyncDto, RunAsyncDto, SaveUrlDto, MergeDto } from '@gitroom/nestjs-libraries/dtos/replicate';
+import { EstimateDto, RunSyncDto, RunAsyncDto, SaveUrlDto, MergeDto, EnhancePromptDto } from '@gitroom/nestjs-libraries/dtos/replicate';
 import { estimate } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-cost';
 
 @ApiTags('Replicate Studio')
@@ -26,6 +27,7 @@ export class ReplicateStudioController {
   constructor(
     private readonly _runner: ReplicateRunnerService,
     private readonly _catalog: ReplicateCatalogService,
+    private readonly _enhance: ReplicateEnhanceService,
     private readonly _fileService: FileService,
     private readonly _subscription: SubscriptionService,
   ) {}
@@ -196,6 +198,18 @@ export class ReplicateStudioController {
     @GetOrgFromRequest() org: Organization,
   ) {
     return this._runner.getJob(org.id, id);
+  }
+
+  @Post('/enhance-prompt')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async enhancePrompt(
+    @Body() body: EnhancePromptDto,
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+  ) {
+    return this._enhance.enhance(org.id, user.id, body.prompt, body.mode || 'positive');
   }
 
   @Post('/save-url')
