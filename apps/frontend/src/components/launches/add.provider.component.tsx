@@ -3,6 +3,7 @@
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import React, { FC, useCallback, useMemo } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import useSWR from 'swr';
 import { Input } from '@gitroom/react/form/input';
 import { FieldValues, FormProvider, useForm } from 'react-hook-form';
 import { Button } from '@gitroom/react/form/button';
@@ -146,8 +147,9 @@ export const CustomVariables: FC<{
   identifier: string;
   gotoUrl(url: string): void;
   onboarding?: boolean;
+  config?: string;
 }> = (props) => {
-  const { close, gotoUrl, identifier, variables, onboarding } = props;
+  const { close, gotoUrl, identifier, variables, onboarding, config } = props;
   const fetch = useFetch();
   const modals = useModals();
   const toaster = useToaster();
@@ -186,11 +188,15 @@ export const CustomVariables: FC<{
   const submit = useCallback(
     async (data: FieldValues) => {
       try {
+        const query = [
+          onboarding ? 'onboarding=true' : '',
+          config ? `config=${config}` : '',
+        ]
+          .filter(Boolean)
+          .join('&');
         const { url } = await (
           await fetch(
-            `/integrations/social/${identifier}${
-              onboarding ? '?onboarding=true' : ''
-            }`
+            `/integrations/social/${identifier}${query ? `?${query}` : ''}`
           )
         ).json();
         modals.closeAll();
@@ -203,7 +209,7 @@ export const CustomVariables: FC<{
         toaster.show('Failed to connect to provider', 'warning');
       }
     },
-    [variables, onboarding, gotoUrl, identifier, fetch, modals, toaster]
+    [variables, onboarding, config, gotoUrl, identifier, fetch, modals, toaster]
   );
 
   const t = useT();
@@ -336,6 +342,51 @@ const ChromeExtensionWarning: FC<{
   );
 };
 
+// When a provider has more than one configured credential set, let the user choose
+// which one to connect through (each set has its own OAuth app credentials).
+const ConfigPicker: FC<{
+  sets: Array<{ id: string; name: string }>;
+  onResolve: (id?: string) => void;
+}> = ({ sets, onResolve }) => {
+  const modals = useModals();
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-[10px] pt-[8px]">
+      <p className="text-[14px] text-textColor/80">
+        {t(
+          'choose_config_desc',
+          'This provider has multiple credential sets. Choose which one to connect with:'
+        )}
+      </p>
+      <div className="flex flex-col gap-[6px]">
+        {sets.map((s) => (
+          <button
+            key={s.id}
+            type="button"
+            onClick={() => {
+              modals.closeCurrent();
+              onResolve(s.id);
+            }}
+            className="text-start p-[10px] rounded-[8px] border border-newTableBorder hover:bg-boxHover text-[14px] text-textColor"
+          >
+            {s.name}
+          </button>
+        ))}
+      </div>
+      <Button
+        type="button"
+        className="!bg-transparent border border-newTableBorder text-textColor"
+        onClick={() => {
+          modals.closeCurrent();
+          onResolve(undefined);
+        }}
+      >
+        {t('cancel', 'Cancel')}
+      </Button>
+    </div>
+  );
+};
+
 export const AddProviderComponent: FC<{
   social: Array<{
     identifier: string;
@@ -372,6 +423,27 @@ export const AddProviderComponent: FC<{
   const router = useRouter();
   const fetch = useFetch();
   const modal = useModals();
+
+  // The org's configured credential sets, grouped by provider. Used to bind a new
+  // connection to a specific named set when a provider has more than one. Requires
+  // channel-admin rights; non-admins get an empty map and the legacy (primary) flow.
+  const { data: channelConfigs } = useSWR<
+    Array<{ id: string; identifier: string; name: string; enabled: boolean; isConfigured: boolean }>
+  >('/channels/config', (url: string) =>
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : []))
+      .catch(() => [])
+  );
+  const configsByIdentifier = useMemo(() => {
+    const map: Record<string, Array<{ id: string; name: string }>> = {};
+    for (const c of channelConfigs || []) {
+      if (c.enabled && c.isConfigured) {
+        (map[c.identifier] ||= []).push({ id: c.id, name: c.name });
+      }
+    }
+    return map;
+  }, [channelConfigs]);
+
   const getSocialLink = useCallback(
     (
         invite: boolean,
@@ -388,6 +460,37 @@ export const AddProviderComponent: FC<{
         }>
       ) =>
       async () => {
+        // Resolve which named credential set to connect through. >1 set ⇒ prompt;
+        // exactly one ⇒ bind it automatically; none ⇒ legacy primary-config flow.
+        const sets = configsByIdentifier[identifier] || [];
+        let configId: string | undefined;
+        if (!invite && sets.length > 1) {
+          configId = await new Promise<string | undefined>((resolve) => {
+            let settled = false;
+            const done = (id?: string) => {
+              if (!settled) {
+                settled = true;
+                resolve(id);
+              }
+            };
+            modal.openModal({
+              title: t('choose_channel_config', 'Choose a configuration'),
+              withCloseButton: true,
+              onClose: () => done(undefined),
+              children: <ConfigPicker sets={sets} onResolve={done} />,
+            });
+          });
+          if (!configId) return;
+        } else if (sets.length === 1) {
+          configId = sets[0].id;
+        }
+        const configParam = configId ? `config=${configId}` : '';
+        const socialUrl = () => {
+          const q = [onboarding ? 'onboarding=true' : '', configParam]
+            .filter(Boolean)
+            .join('&');
+          return `/integrations/social/${identifier}${q ? `?${q}` : ''}`;
+        };
         const onboardingParam = onboarding ? 'onboarding=true' : '';
         const openWeb3 = async () => {
           const found = web3List.find(
@@ -400,11 +503,7 @@ export const AddProviderComponent: FC<{
           const { component: Web3Providers } = found;
           let url: string;
           try {
-            const response = await fetch(
-              `/integrations/social/${identifier}${
-                onboarding ? '?onboarding=true' : ''
-              }`
-            );
+            const response = await fetch(socialUrl());
             const data = await response.json();
             url = data.url;
           } catch {
@@ -443,6 +542,7 @@ export const AddProviderComponent: FC<{
           const params = [
             ...(externalUrl ? [`externalUrl=${encodeURIComponent(externalUrl)}`] : []),
             onboardingParam,
+            configParam,
             isMobile
               ? `redirectUrl=${encodeURIComponent('postmill://integrations')}`
               : '',
@@ -592,11 +692,7 @@ export const AddProviderComponent: FC<{
             }
             let url: string;
             try {
-              const response = await fetch(
-                `/integrations/social/${identifier}${
-                  onboarding ? '?onboarding=true' : ''
-                }`
-              );
+              const response = await fetch(socialUrl());
               const data = await response.json();
               url = data.url;
             } catch {
@@ -647,6 +743,7 @@ export const AddProviderComponent: FC<{
                   gotoUrl={(url: string) => router.push(url)}
                   variables={customFields}
                   onboarding={onboarding}
+                  config={configId}
                 />
               </div>
             ),
@@ -655,7 +752,7 @@ export const AddProviderComponent: FC<{
         }
         await gotoIntegration();
       },
-    [onboarding, t, isMobile, fetch, toaster, modal, router, extensionId]
+    [onboarding, t, isMobile, fetch, toaster, modal, router, extensionId, configsByIdentifier]
   );
 
   const showSetupInstructions = useCallback(

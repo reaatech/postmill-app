@@ -86,6 +86,9 @@ const CAPABILITY_COLORS: Record<string, string> = {
   watchlist: 'bg-orange-500/20 text-orange-400',
 };
 
+const capabilityLabel = (cap: CapabilityKey) =>
+  CAPABILITY_FILTERS.find((f) => f.key === cap)?.label || cap;
+
 const useConfigs = () => {
   const fetch = useFetch();
   return useSWR<ChannelConfigItem[]>('/channels/config', (url: string) =>
@@ -122,6 +125,25 @@ const ChannelProviderIcon: FC<{ identifier: string; name: string; size?: number 
   );
 };
 
+const CapabilityBadges: FC<{ capabilities: ProviderCapability | null }> = ({ capabilities }) => {
+  const caps = CAPABILITY_KEYS.filter((c) => capabilities?.[c]);
+  if (!caps.length) return null;
+  return (
+    <div className="flex gap-[4px] mt-[4px] flex-wrap">
+      {caps.map((cap) => (
+        <span
+          key={cap}
+          className={`text-[10px] rounded-[4px] px-[6px] py-[2px] ${
+            CAPABILITY_COLORS[cap] || 'bg-newTableHeader text-newTableText'
+          }`}
+        >
+          {capabilityLabel(cap)}
+        </span>
+      ))}
+    </div>
+  );
+};
+
 // Single dropdown of capability checkboxes (replaces the row of filter buttons).
 const CapabilityFilter: FC<{
   selected: CapabilityKey[];
@@ -149,7 +171,7 @@ const CapabilityFilter: FC<{
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="flex items-center gap-[8px] text-[13px] px-[12px] py-[8px] rounded-[8px] border border-newTableBorder bg-newBgColor text-newTableText hover:bg-boxHover transition-colors"
+        className="flex items-center gap-[8px] text-[13px] px-[12px] py-[8px] rounded-[8px] border border-newTableBorder bg-newBgColor text-newTableText hover:bg-boxHover transition-colors whitespace-nowrap"
       >
         {t('capabilities', 'Capabilities')}
         {selected.length > 0 && (
@@ -197,43 +219,73 @@ const CapabilityFilter: FC<{
   );
 };
 
-// Provider picker used by "Add channel" — choose a provider, then configure it.
+// Provider picker used by "Add channel" — browse providers with their capability
+// tags and a capability filter, then configure the chosen one.
 const ProviderPicker: FC<{
   providers: ProviderCatalogItem[];
   onPick: (provider: ProviderCatalogItem) => void;
 }> = ({ providers, onPick }) => {
   const t = useT();
   const [search, setSearch] = useState('');
+  const [selectedCaps, setSelectedCaps] = useState<CapabilityKey[]>([]);
+
+  const toggleCap = useCallback((cap: CapabilityKey) => {
+    setSelectedCaps((prev) =>
+      prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]
+    );
+  }, []);
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return providers;
-    return providers.filter(
-      (p) => p.name.toLowerCase().includes(q) || p.identifier.toLowerCase().includes(q)
-    );
-  }, [providers, search]);
+    return providers.filter((p) => {
+      if (q && !p.name.toLowerCase().includes(q) && !p.identifier.toLowerCase().includes(q)) {
+        return false;
+      }
+      if (selectedCaps.length && !selectedCaps.some((c) => p.capabilities?.[c])) {
+        return false;
+      }
+      return true;
+    });
+  }, [providers, search, selectedCaps]);
 
   return (
-    <div className="flex flex-col gap-[12px] min-w-[420px] mobile:min-w-0">
-      <input
-        type="search"
-        autoFocus
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        placeholder={t('search_providers', 'Search providers...')}
-        className="w-full px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
-      />
-      <div className="flex flex-col gap-[4px] max-h-[420px] overflow-y-auto">
-        {filtered.map((p) => (
-          <button
-            key={p.identifier}
-            type="button"
-            onClick={() => onPick(p)}
-            className="flex items-center gap-[12px] p-[10px] rounded-[8px] border border-newTableBorder hover:bg-boxHover text-start"
-          >
-            <ChannelProviderIcon identifier={p.identifier} name={p.name} size={32} />
-            <span className="text-[14px] font-[500] text-textColor">{p.name}</span>
-          </button>
-        ))}
+    <div className="flex flex-col gap-[12px] w-[520px] max-w-full">
+      <div className="flex items-center gap-[8px] mobile:flex-col mobile:items-stretch">
+        <input
+          type="search"
+          autoFocus
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={t('search_providers', 'Search providers...')}
+          className="flex-1 px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
+        />
+        <CapabilityFilter
+          selected={selectedCaps}
+          onToggle={toggleCap}
+          onClear={() => setSelectedCaps([])}
+        />
+      </div>
+      <div className="flex flex-col gap-[6px] max-h-[440px] overflow-y-auto">
+        {filtered.length === 0 ? (
+          <div className="text-[13px] text-newTableText text-center py-[24px]">
+            {t('no_providers_match', 'No providers match your filters.')}
+          </div>
+        ) : (
+          filtered.map((p) => (
+            <button
+              key={p.identifier}
+              type="button"
+              onClick={() => onPick(p)}
+              className="flex items-start gap-[12px] p-[10px] rounded-[8px] border border-newTableBorder hover:bg-boxHover text-start"
+            >
+              <ChannelProviderIcon identifier={p.identifier} name={p.name} size={32} />
+              <div className="flex flex-col min-w-0">
+                <span className="text-[14px] font-[500] text-textColor">{p.name}</span>
+                <CapabilityBadges capabilities={p.capabilities} />
+              </div>
+            </button>
+          ))
+        )}
       </div>
     </div>
   );
@@ -248,7 +300,6 @@ export const ChannelsTab: FC = () => {
   const toaster = useToaster();
 
   const [search, setSearch] = useState('');
-  const [selectedCaps, setSelectedCaps] = useState<CapabilityKey[]>([]);
 
   const providerName = useCallback(
     (identifier: string) =>
@@ -311,31 +362,19 @@ export const ChannelsTab: FC = () => {
     });
   }, [providers, modals, t, toaster, openConfig]);
 
-  const toggleCap = useCallback((cap: CapabilityKey) => {
-    setSelectedCaps((prev) =>
-      prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]
-    );
-  }, []);
-
   const filteredConfigs = useMemo(() => {
     const q = search.trim().toLowerCase();
     return [...(configs || [])]
       .filter((c) => {
-        if (
-          q &&
-          !c.name.toLowerCase().includes(q) &&
-          !c.identifier.toLowerCase().includes(q) &&
-          !providerName(c.identifier).toLowerCase().includes(q)
-        ) {
-          return false;
-        }
-        if (selectedCaps.length && !selectedCaps.some((cap) => c.capabilities?.[cap])) {
-          return false;
-        }
-        return true;
+        if (!q) return true;
+        return (
+          c.name.toLowerCase().includes(q) ||
+          c.identifier.toLowerCase().includes(q) ||
+          providerName(c.identifier).toLowerCase().includes(q)
+        );
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [configs, search, selectedCaps, providerName]);
+  }, [configs, search, providerName]);
 
   const shellProviders = useMemo(
     () =>
@@ -346,7 +385,6 @@ export const ChannelsTab: FC = () => {
         enabled: c.enabled && c.isConfigured,
         isActive: c.enabled && c.isConfigured,
         isConfigured: c.isConfigured,
-        capabilities: CAPABILITY_KEYS.filter((cap) => c.capabilities?.[cap]),
       })),
     [filteredConfigs]
   );
@@ -399,11 +437,6 @@ export const ChannelsTab: FC = () => {
               </button>
             )}
           </div>
-          <CapabilityFilter
-            selected={selectedCaps}
-            onToggle={toggleCap}
-            onClear={() => setSelectedCaps([])}
-          />
           <button
             type="button"
             onClick={openPicker}
@@ -413,28 +446,13 @@ export const ChannelsTab: FC = () => {
           </button>
         </div>
       }
-      renderBadges={(provider) => {
-        const caps = (provider.capabilities || []).filter((cap): cap is CapabilityKey =>
-          CAPABILITY_KEYS.includes(cap as CapabilityKey)
-        );
-        return (
-          <div className="flex gap-[4px] mt-[4px] flex-wrap items-center">
-            <span className="text-[11px] text-newTableText">
-              {providerName(provider.identifier)}
-            </span>
-            {caps.map((cap) => (
-              <span
-                key={cap}
-                className={`text-[10px] rounded-[4px] px-[6px] py-[2px] ${
-                  CAPABILITY_COLORS[cap] || 'bg-newTableHeader text-newTableText'
-                }`}
-              >
-                {CAPABILITY_FILTERS.find((f) => f.key === cap)?.label || cap}
-              </span>
-            ))}
-          </div>
-        );
-      }}
+      renderBadges={(provider) => (
+        <div className="flex gap-[6px] mt-[4px] items-center">
+          <span className="text-[11px] text-newTableText">
+            {providerName(provider.identifier)}
+          </span>
+        </div>
+      )}
       renderActions={(provider) => {
         const config = filteredConfigs.find((c) => c.id === provider.id);
         if (!config) return null;

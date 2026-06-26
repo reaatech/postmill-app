@@ -14,14 +14,16 @@
 - **Channels settings: many named credential sets per provider.** Settings → Channels now manages
   *named* OAuth-app credential sets — an org can add **multiple sets for the same provider**, each
   with a required **name** and its **own auth** (client id/secret/scopes/redirect). Configuration
-  opens in a **modal**; the long row of capability filter buttons is collapsed into a single
-  **Capabilities** checkbox dropdown; the page heading was removed. Backed by an additive,
-  db-push-safe schema change: `OrgProviderConfiguration` drops its `(organizationId, identifier)`
-  unique in favour of `(organizationId, identifier, name)` and is resolved by row `id`, and
-  `Integration` gains a nullable `providerConfigId` FK (`onDelete: SetNull`) binding each connected
-  account to the credential set it used. Credential resolution falls back to the org's primary set
-  for unbound/legacy connections. (A connect-time picker to choose the set when linking a new account
-  is a follow-up; the OAuth endpoint already accepts `?config=<id>`.)
+  opens in a **modal**; the **Add channel** picker browses providers with their capability tags and a
+  single **Capabilities** checkbox-dropdown filter (replacing the old row of filter buttons); the page
+  heading was removed. Backed by an additive, db-push-safe schema change: `OrgProviderConfiguration`
+  drops its `(organizationId, identifier)` unique in favour of `(organizationId, identifier, name)`
+  and is resolved by row `id`, and `Integration` gains a nullable `providerConfigId` FK
+  (`onDelete: SetNull`) binding each connected account to the credential set it used. Credential
+  resolution falls back to the org's primary set for unbound/legacy connections. When linking a new
+  account, if a provider has more than one credential set the connect flow **prompts which set to
+  use** (one set ⇒ bound automatically; none ⇒ legacy primary-config flow); the choice rides through
+  the OAuth `?config=<id>` binding.
 
 ### Changed
 - **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
@@ -31,6 +33,13 @@
   behind an "Advanced settings (most people can skip these)" toggle so the default view stays simple.
 
 ### Added
+- **VPN provider settings surface.** Settings → VPN is a new credential-only provider page that
+  mirrors AI/Shortlinks: provider cards with brand icons, configured/enabled badges, search, and
+  per-provider configuration. Adapters are included for the top-5 consumer VPN providers: **NordVPN**,
+  **ExpressVPN**, **Surfshark**, **Proton VPN**, and **Mullvad**. Credentials are encrypted at rest in
+  the new `OrgVpnConfig` table and never returned to the browser. Endpoints: `GET /settings/vpn/config`,
+  `GET /settings/vpn/providers`, `PUT/DELETE /settings/vpn/config/:identifier`,
+  `POST /settings/vpn/config/:identifier/test`.
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
   scopes the dataset: each language has its own instructions **and** its own optional per-channel
   overrides; switching the language shows a fresh dataset. Backed by a new additive

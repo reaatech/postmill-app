@@ -73,8 +73,9 @@ then fill in the configuration dialog:
 You can add **many credential sets for the same provider**, each with a different name — useful when
 an org juggles several OAuth apps for one platform. Each named set has its **own auth**: a social
 account connected through a set uses that set's credentials for the OAuth handshake, token refresh,
-and API calls. Sets are listed by name; use the **search** box and the **Capabilities** filter
-dropdown (checkboxes) to narrow the list.
+and API calls. The **Add channel** picker shows each provider's capability tags and offers a
+**search** box and a **Capabilities** filter dropdown (checkboxes) to find the right provider; the
+configured-channel list itself is searchable by name.
 
 ### Channel configuration
 
@@ -99,10 +100,10 @@ Below the provider list, a **Connection Status** table shows every connected cha
 
 ### Provider capabilities
 
-Each channel row shows capability badges for its provider — analytics, comments, first comment,
-polls, video, carousel, alt text, link preview, refresh token, and watchlist support. The
-**Capabilities** filter dropdown narrows the list to providers that support the selected features,
-so you can see feature availability per channel before composing posts.
+The **Add channel** picker shows capability badges on each provider — analytics, comments, first
+comment, polls, video, carousel, alt text, link preview, refresh token, and watchlist support — and
+its **Capabilities** filter dropdown narrows the provider list to those supporting the selected
+features, so you can judge feature availability before configuring a provider.
 
 ## Shortlinks tab
 
@@ -332,6 +333,30 @@ media provider (and vice versa) — the key is shared, you don't re-enter it.
 When enabled, generated media files are signed with C2PA Content Authenticity Initiative
 metadata, embedding cryptographically verifiable provenance into output files.
 
+## VPN tab
+
+Configure VPN provider credentials for your organisation. This is a credential-only settings
+surface in v3.9.0 — it stores the credentials needed to connect to a provider but does not yet
+drive live VPN connections.
+
+- **Provider list** — mirrors the AI/Shortlinks pages: provider cards with real brand icons,
+  configured/enabled badges, and a **Configure / Remove** action per row. Supported providers:
+  **NordVPN**, **ExpressVPN**, **Surfshark**, **Proton VPN**, and **Mullvad**.
+- **Credential fields** — each provider exposes its required manual-setup credentials (for example,
+  service credentials, activation code, or account number) and an optional config-file URL.
+- **Enable toggle** — a configured provider can be enabled or disabled.
+- **Test connection** — validates the stored configuration (currently a no-op placeholder; future
+  releases may probe provider status).
+- **Credentials** — encrypted at rest in `OrgVpnConfig` and never returned to the browser.
+
+| Provider | Required credential | Optional field |
+|----------|---------------------|----------------|
+| NordVPN | Service credentials (`username:password`) | OpenVPN config URL |
+| ExpressVPN | Activation code | OpenVPN config URL |
+| Surfshark | Service credentials (`username:password`) | OpenVPN config URL |
+| Proton VPN | OpenVPN / IKEv2 credentials (`username:password`) | Config file URL |
+| Mullvad | 16-digit account number | WireGuard config URL |
+
 ## Storage tab
 
 Configure where uploaded media files are stored. See [Storage Setup](../operations-guide/storage.md)
@@ -487,8 +512,8 @@ Endpoints: `GET /user/approved-apps` lists apps; `DELETE /user/approved-apps/:id
 
 Settings access is permission-gated (v3.8.10): reading and changing the org-level settings tabs
 requires the `settings` permission, which the seeded **Owner** and **Admin** roles carry. The
-four provider surfaces (AI, Media, Storage, Shortlinks) and brand management are likewise gated
+five provider surfaces (AI, Media, Storage, Shortlinks, VPN) and brand management are likewise gated
 on their own permissions. A member whose role lacks the grant receives **HTTP 403**; an org can
 grant these permissions to a custom role.
 
-> Verified against v3.8.10
+> Verified against v3.9.0
