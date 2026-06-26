@@ -1,34 +1,40 @@
 'use client';
 
 import React, { useState } from 'react';
-import { S3Icon } from '@gitroom/frontend/components/settings/storage/icons/s3-icon';
-import { R2Icon } from '@gitroom/frontend/components/settings/storage/icons/r2-icon';
-import { B2Icon } from '@gitroom/frontend/components/settings/storage/icons/b2-icon';
-import { IdriveIcon } from '@gitroom/frontend/components/settings/storage/icons/idrive-icon';
-import { LocalIcon } from '@gitroom/frontend/components/settings/storage/icons/local-icon';
+import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 
 const allProviderTypes = [
-  { value: 'LOCAL', label: 'Local Storage', Icon: LocalIcon },
-  { value: 'S3', label: 'AWS S3', Icon: S3Icon },
-  { value: 'CLOUDFLARE_R2', label: 'Cloudflare R2', Icon: R2Icon },
-  { value: 'BACKBLAZE_B2', label: 'Backblaze B2', Icon: B2Icon },
-  { value: 'IDRIVE_E2', label: 'IDrive e2', Icon: IdriveIcon },
+  { value: 'LOCAL', label: 'Local Storage' },
+  { value: 'S3', label: 'AWS S3' },
+  { value: 'CLOUDFLARE_R2', label: 'Cloudflare R2' },
+  { value: 'BACKBLAZE_B2', label: 'Backblaze B2' },
+  { value: 'IDRIVE_E2', label: 'IDrive e2' },
+  { value: 'WASABI', label: 'Wasabi' },
+  { value: 'DIGITALOCEAN_SPACES', label: 'DigitalOcean Spaces' },
+  { value: 'HETZNER', label: 'Hetzner Object Storage' },
+  { value: 'STORJ', label: 'Storj' },
+  { value: 'SCALEWAY', label: 'Scaleway' },
+  { value: 'VULTR', label: 'Vultr Object Storage' },
+  { value: 'LINODE', label: 'Linode / Akamai' },
+  { value: 'S3_COMPATIBLE', label: 'S3-Compatible' },
 ];
 
 interface ProviderFormModalProps {
   onClose: () => void;
   onSaved: () => void;
   editProvider?: any;
+  presetType?: string;
 }
 
 export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
   onClose,
   onSaved,
   editProvider,
+  presetType,
 }) => {
   const fetch = useFetch();
-  const [type, setType] = useState(editProvider?.type || 'S3');
+  const [type, setType] = useState(editProvider?.type || presetType || 'S3');
   const [name, setName] = useState(editProvider?.name || '');
   const [accessKeyId, setAccessKeyId] = useState('');
   const [secretAccessKey, setSecretAccessKey] = useState('');
@@ -130,8 +136,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
             <div className="grid grid-cols-3 gap-[8px]">
               {(editProvider
                 ? allProviderTypes.filter((t) => t.value === editProvider.type)
-                : allProviderTypes.filter((t) => t.value !== 'LOCAL')
-              ).map(({ value, label, Icon }) => (
+                : allProviderTypes
+                    .filter((t) => t.value !== 'LOCAL')
+                    .sort((a, b) => a.label.localeCompare(b.label))
+              ).map(({ value, label }) => (
                 <button
                   key={value}
                   onClick={() => {
@@ -147,7 +155,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                       : 'border-newTableBorder bg-transparent hover:bg-boxHover'
                   }`}
                 >
-                  <Icon />
+                  <ProviderIcon identifier={value} name={label} size={28} />
                   <span className="text-[10px] text-newTableText text-center">
                     {label}
                   </span>

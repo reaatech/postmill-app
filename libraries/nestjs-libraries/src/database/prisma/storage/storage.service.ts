@@ -160,17 +160,17 @@ export class StorageService {
     credentials?: Record<string, string>
   ): string | undefined {
     if (!credentials) return undefined;
-    if (type === 'S3' || type === 'CLOUDFLARE_R2' || type === 'IDRIVE_E2') {
-      return credentials.accessKeyId
-        ? accountFingerprint(type, credentials.accessKeyId)
-        : undefined;
-    }
+    // Backblaze B2 keys its credentials on keyId; every other S3-compatible
+    // provider (S3, R2, IDrive, Wasabi, DO Spaces, Hetzner, Storj, Scaleway,
+    // Vultr, Linode, generic) keys on accessKeyId.
     if (type === 'BACKBLAZE_B2') {
       return credentials.keyId
         ? accountFingerprint(type, credentials.keyId)
         : undefined;
     }
-    return undefined;
+    return credentials.accessKeyId
+      ? accountFingerprint(type, credentials.accessKeyId)
+      : undefined;
   }
 
   async updateConfig(

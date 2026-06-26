@@ -639,6 +639,14 @@ enum StorageProviderType {
   CLOUDFLARE_R2
   BACKBLAZE_B2
   IDRIVE_E2
+  WASABI
+  DIGITALOCEAN_SPACES
+  HETZNER
+  STORJ
+  SCALEWAY
+  VULTR
+  LINODE
+  S3_COMPATIBLE
 }
 
 model StorageProviderConfig {
