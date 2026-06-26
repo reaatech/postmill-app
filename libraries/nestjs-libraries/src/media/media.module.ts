@@ -1,6 +1,8 @@
-import { Logger, Module, OnModuleInit } from '@nestjs/common';
+import { Logger, Module, OnModuleInit, Optional } from '@nestjs/common';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
+import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
 import { MediaProviderRegistry } from './media-provider.registry';
+import { setAiRegistry } from './adapters/ai-sdk-media.helper';
 import { FalAdapter } from './adapters/fal.adapter';
 import { OpenaiMediaAdapter } from './adapters/openai-media.adapter';
 import { ElevenLabsAdapter } from './adapters/elevenlabs.adapter';
@@ -17,6 +19,14 @@ import { MiniMaxMediaAdapter } from './adapters/minimax-media.adapter';
 import { DeepgramAdapter } from './adapters/deepgram.adapter';
 import { LumaAdapter } from './adapters/luma.adapter';
 import { QwenMediaAdapter } from './adapters/qwen-media.adapter';
+import { TogetherAiMediaAdapter } from './adapters/togetherai-media.adapter';
+import { SiliconFlowMediaAdapter } from './adapters/siliconflow-media.adapter';
+import { GroqMediaAdapter } from './adapters/groq-media.adapter';
+import { OpenRouterMediaAdapter } from './adapters/openrouter-media.adapter';
+import { FireworksMediaAdapter } from './adapters/fireworks-media.adapter';
+import { DeepInfraMediaAdapter } from './adapters/deepinfra-media.adapter';
+import { GatewayMediaAdapter } from './adapters/gateway-media.adapter';
+import { BedrockMediaAdapter, AzureMediaAdapter } from './adapters/ai-sdk-media.adapter';
 
 const ALL_ADAPTERS = [
   FalAdapter,
@@ -35,6 +45,15 @@ const ALL_ADAPTERS = [
   DeepgramAdapter,
   LumaAdapter,
   QwenMediaAdapter,
+  TogetherAiMediaAdapter,
+  SiliconFlowMediaAdapter,
+  GroqMediaAdapter,
+  OpenRouterMediaAdapter,
+  FireworksMediaAdapter,
+  DeepInfraMediaAdapter,
+  GatewayMediaAdapter,
+  BedrockMediaAdapter,
+  AzureMediaAdapter,
 ];
 
 @Module({
@@ -47,6 +66,9 @@ export class MediaModule implements OnModuleInit {
   constructor(
     private readonly _registry: MediaProviderRegistry,
     private readonly _flags: FeatureFlagsService,
+    // AI hub media adapters (Bedrock/Azure/Gateway) delegate image generation to the
+    // existing AI-SDK provider adapters; share the AI registry with them via the helper.
+    @Optional() private readonly _aiRegistry?: AIProviderRegistry,
   ) {}
 
   onModuleInit() {
@@ -54,6 +76,8 @@ export class MediaModule implements OnModuleInit {
       this._logger.log('Media module is disabled via DEV_DISABLE_MEDIA; skipping adapter registration');
       return;
     }
+
+    if (this._aiRegistry) setAiRegistry(this._aiRegistry);
 
     for (const AdapterClass of ALL_ADAPTERS) {
       const adapter = new AdapterClass();

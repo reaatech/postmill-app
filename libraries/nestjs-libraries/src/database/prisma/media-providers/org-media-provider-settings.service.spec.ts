@@ -173,6 +173,26 @@ describe('OrgMediaProviderSettingsService', () => {
       expect(await service.getConfigForProvider('org-1', 'runway')).toBeNull();
       expect(orgAiRepository.getByIdentifier).not.toHaveBeenCalled();
     });
+
+    it('reuses the org AI key for the new hub providers (single + multi-field)', async () => {
+      const { service, orgAiRepository } = makeService();
+      orgAiRepository.getByIdentifier.mockImplementation(async (_org: string, id: string) => {
+        if (id === 'togetherai') return { credentials: `enc(${JSON.stringify({ apiKey: 'tg-key' })})` };
+        // Bedrock reuses its multi-field AWS credentials verbatim.
+        if (id === 'bedrock')
+          return {
+            credentials: `enc(${JSON.stringify({ region: 'us-east-1', accessKeyId: 'AK', secretAccessKey: 'SK' })})`,
+          };
+        return null;
+      });
+
+      expect((await service.getConfigForProvider('org-1', 'togetherai'))?.credentials).toEqual({ apiKey: 'tg-key' });
+      expect((await service.getConfigForProvider('org-1', 'bedrock'))?.credentials).toEqual({
+        region: 'us-east-1',
+        accessKeyId: 'AK',
+        secretAccessKey: 'SK',
+      });
+    });
   });
 
   describe('getProviders universal-credential fallback', () => {

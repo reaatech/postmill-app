@@ -679,6 +679,46 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   Qwen has no media-side settings flow, so a read-fallback is the lighter path — extend
   `UNIVERSAL_AI_CREDENTIAL` to add more such providers.)
 
+### AI-hub media studios (image/video/audio, credential-reuse)
+
+The AI **hub/aggregator** LLM providers also serve large media catalogs, exposed as kit studios that
+**reuse the org's existing Settings → AI key** (the Qwen `UNIVERSAL_AI_CREDENTIAL` pattern, now a
+10-entry set: `qwen`, `togetherai`, `siliconflow`, `groq`, `openrouter`, `fireworks`, `deepinfra`,
+`gateway`, `bedrock`, `azure`). Each is a `<hub>-media.adapter.ts` + `media-tools/<hub>/descriptor.ts`
++ a 3-line studio + route page + nav entry — no Settings → Media config needed (registering the
+adapter auto-surfaces it, marked configured/enabled when the AI key exists).
+
+- **Mechanism per (hub, modality):** native REST dominates; AI-SDK delegation is the narrow exception
+  for hard auth and experimental video.
+  - **Native REST** (Qwen pattern, `safeFetch`, native-param passthrough via `options.input`):
+    Together (image `/v1/images/generations`, video `/v1/videos` async+poll, TTS `/v1/audio/speech`),
+    SiliconFlow (image + Wan2.x video `/v1/video/submit`+`/video/status` + TTS), Groq (TTS only,
+    `/openai/v1/audio/speech`), OpenRouter (image only, dedicated `/api/v1/images` → `b64_json`),
+    Fireworks (image only, `…/{model}/text_to_image`, `Accept: application/json` → `base64[]`),
+    DeepInfra (image/video/TTS via native `/v1/inference/{model}`). Together + SiliconFlow share the
+    OpenAI-compatible image+audio shape via `openai-compatible-media.adapter.ts` (abstract base —
+    subclasses add their own async video).
+  - **AI-SDK delegation** (`ai-sdk-media.adapter.ts` + `ai-sdk-media.helper.ts`): Bedrock + Azure
+    image generation runs through the matching **AI** adapter's `createImageModel` (so SigV4 / Azure
+    deployment auth is handled by `@ai-sdk/amazon-bedrock` / `@ai-sdk/azure`, never hand-rolled). The
+    media adapters are dependency-free `new`'d objects, so `MediaModule.onModuleInit` static-injects
+    the `AIProviderRegistry` into the helper (`setAiRegistry`) — `MediaStudioService` stays provider-
+    agnostic. Image-only this batch (Bedrock Nova Reel video / Azure Speech deferred).
+  - **Gateway** (`gateway-media.adapter.ts`): image via AI-SDK delegation; **video via AI SDK v6
+    `experimental_generateVideo`** (`createGateway({apiKey}).video(modelId)`), which is inherently
+    synchronous (one long await) — we extend the Undici dispatcher timeout to 15 min and complete the
+    job inline (no poll/webhook). Audio is omitted (no gateway speech model in the AI adapter).
+- **Dynamic model discovery (the "many models" surface):** a new optional
+  `listModels(operation, options)` on `MediaProviderAdapter` hits the hub's `/v1/models` (filtered by
+  modality) or reuses the AI adapter's catalog; served by `GET /media/studio/:provider/models?operation=`
+  (`MediaStudioService.listModels`, Redis-cached ~60s). The Studio Kit `select` field gains
+  `source: 'models'` → a **searchable combobox** (`studio-kit/model-select.tsx`) populated live, with
+  the descriptor's static `options` as fallback. The combobox **accepts a typed model id** too, so an
+  incomplete catalog (hubs don't tag every modality) never blocks a render.
+- **Risk:** these were built source-grounded but **without live keys** — per-hub request/response
+  bodies (esp. DeepInfra's native `/inference` keys, Together/SiliconFlow video model ids) may need
+  adjustment against a real key; structure keeps each (hub, modality) independently verifiable.
+
 ### Deepgram Studio (transcription / captions)
 - A bespoke tool at **`/media/deepgram`** — every media adapter now has a studio. It reuses the
   Studio Kit's `StudioShell` (header/tabs/fullscreen/render-queue chrome) via a single `custom` tab

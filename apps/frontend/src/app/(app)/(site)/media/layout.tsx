@@ -115,12 +115,115 @@ const tabs = [
     ),
   },
   {
+    href: '/media/togetherai',
+    label: 'Together AI',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="6" cy="6" r="3" />
+        <circle cx="18" cy="6" r="3" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="18" cy="18" r="3" />
+        <path d="M9 6h6M6 9v6M18 9v6M9 18h6" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/runway',
     label: 'Runway',
     section: 'Providers',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 3l14 9-14 9V3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/siliconflow',
+    label: 'SiliconFlow',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 8h5a3 3 0 0 1 0 6H9l5 4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/groq',
+    label: 'Groq',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M9 12a3 3 0 1 1 3 3v3" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/openrouter',
+    label: 'OpenRouter',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12h6l3-4 3 8 3-4h0" />
+        <circle cx="3" cy="12" r="1" />
+        <circle cx="21" cy="12" r="1" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/fireworks',
+    label: 'Fireworks AI',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l4 4M15 15l4 4M19 5l-4 4M9 15l-4 4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/deepinfra',
+    label: 'DeepInfra',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 7l9-4 9 4-9 4-9-4z" />
+        <path d="M3 12l9 4 9-4" />
+        <path d="M3 17l9 4 9-4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/gateway',
+    label: 'AI Gateway',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9l9-6 9 6v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z" />
+        <path d="M9 21V12h6v9" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/bedrock',
+    label: 'Amazon Bedrock',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 7l8-4 8 4-8 4-8-4z" />
+        <path d="M4 12l8 4 8-4" />
+        <path d="M4 17l8 4 8-4" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/azure',
+    label: 'Azure OpenAI',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 4L3 18h4l3-7 5 9 6-2L13 4H9z" />
       </svg>
     ),
   },

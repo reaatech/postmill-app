@@ -22,8 +22,13 @@ export interface PromptField extends StudioFieldBase {
 }
 export interface SelectField extends StudioFieldBase {
   type: 'select';
-  options: { value: string; label: string }[];
+  options?: { value: string; label: string }[];
   default?: string;
+  // When 'models', the dropdown is populated at runtime from
+  // GET /media/studio/:provider/models?operation=<tab operation> and rendered as a
+  // searchable combobox. Any static `options` act as a fallback when the catalog is
+  // empty/unavailable. Used for the hub studios' large, changing model catalogs.
+  source?: 'models';
 }
 export interface NumberField extends StudioFieldBase {
   type: 'number';

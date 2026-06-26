@@ -6,7 +6,8 @@ import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
-import { MediaGenerateOptions } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
+import { MediaGenerateOptions, MediaModelOption, MediaOperation } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
+import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 export interface StudioGenerateParams {
   operation: 'video' | 'image' | 'audio';
@@ -31,7 +32,40 @@ export class MediaStudioService {
     private readonly _registry: MediaProviderRegistry,
     private readonly _storage: StorageService,
     private readonly _fileService: FileService,
+    private readonly _redis: RedisService,
   ) {}
+
+  // Runtime model catalog for a modality, feeding the studio's dynamic model dropdown.
+  // Cached ~60s per (provider, operation, org) — catalogs are large but change rarely, and
+  // every render's status poll must not re-hit the provider's /models endpoint. Returns []
+  // when the adapter exposes no catalog (the descriptor's static options then apply).
+  async listModels(orgId: string, provider: string, operation: MediaOperation): Promise<MediaModelOption[]> {
+    const adapter = this._registry.get(provider);
+    if (!adapter?.listModels) return [];
+
+    const cacheKey = `studio:models:${provider}:${operation}:${orgId}`;
+    const cached = await this._redis.get(cacheKey).catch(() => null);
+    if (cached) {
+      try {
+        return JSON.parse(cached) as MediaModelOption[];
+      } catch {
+        /* fall through to refetch */
+      }
+    }
+
+    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider);
+    if (!config?.credentials || Object.keys(config.credentials).length === 0) return [];
+
+    let models: MediaModelOption[] = [];
+    try {
+      models = await adapter.listModels(operation, { credentials: config.credentials });
+    } catch (err) {
+      this._logger.warn(`listModels failed for ${provider}/${operation}: ${(err as Error).message}`);
+      return [];
+    }
+    await this._redis.set(cacheKey, JSON.stringify(models), 60).catch(() => {});
+    return models;
+  }
 
   async getStatus(orgId: string, provider: string): Promise<{ configured: boolean; enabled: boolean }> {
     const providers = await this._orgMediaProviderSettings.getProviders(orgId);

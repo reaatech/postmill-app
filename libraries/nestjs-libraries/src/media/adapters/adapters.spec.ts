@@ -21,6 +21,12 @@ import { HeyGenAdapter } from './heygen.adapter';
 import { ElevenLabsAdapter } from './elevenlabs.adapter';
 import { DeepgramAdapter } from './deepgram.adapter';
 import { QwenMediaAdapter } from './qwen-media.adapter';
+import { TogetherAiMediaAdapter } from './togetherai-media.adapter';
+import { SiliconFlowMediaAdapter } from './siliconflow-media.adapter';
+import { GroqMediaAdapter } from './groq-media.adapter';
+import { OpenRouterMediaAdapter } from './openrouter-media.adapter';
+import { FireworksMediaAdapter } from './fireworks-media.adapter';
+import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -731,5 +737,150 @@ describe('Capability stubs reject unsupported operations', () => {
     expect(await new LumaAdapter().pollJob('t', CREDS)).toMatchObject({ status: 'failed' });
     expect(await new HeyGenAdapter().pollJob('t', CREDS)).toMatchObject({ status: 'failed' });
     expect(await new ReplicateMediaAdapter().pollJob('t', CREDS)).toMatchObject({ status: 'failed' });
+  });
+});
+
+// ── AI hub media adapters (image/video/audio, universal-credential reuse) ──
+
+describe('TogetherAiMediaAdapter', () => {
+  const adapter = new TogetherAiMediaAdapter();
+
+  it('generates images via the OpenAI-compatible endpoint', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ url: 'https://together/out.png' }] }));
+    const result = await adapter.generateImage('a fox', { ...CREDS, model: 'black-forest-labs/FLUX.1-schnell', input: { width: 1024 } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.together.ai/v1/images/generations');
+    expect(JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string)).toMatchObject({
+      model: 'black-forest-labs/FLUX.1-schnell',
+      prompt: 'a fox',
+      width: 1024,
+    });
+    expect(result).toMatchObject({ image: 'https://together/out.png' });
+  });
+
+  it('returns TTS audio inline as a data URL', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({}));
+    const sub = await adapter.generateAudio('hello there', { ...CREDS, model: 'cartesia/sonic-2', input: { voice: 'helpful woman', response_format: 'mp3' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.together.ai/v1/audio/speech');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toMatchObject({ model: 'cartesia/sonic-2', input: 'hello there', voice: 'helpful woman', response_format: 'mp3' });
+    expect(sub.artifactUrl).toMatch(/^data:audio\/mpeg;base64,/);
+  });
+
+  it('submits video as an async job and maps i2v frame to media.frame_images', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'vid-1', status: 'in_progress' }));
+    const sub = await adapter.generateVideo('a wave', { ...CREDS, model: 'together/veo', input: { frame_image: 'https://img/a.png', ratio: '16:9' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.together.ai/v1/videos');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toMatchObject({ model: 'together/veo', prompt: 'a wave', ratio: '16:9', media: { frame_images: ['https://img/a.png'] } });
+    expect(body.frame_image).toBeUndefined();
+    expect(sub.jobId).toBe('vid-1');
+  });
+
+  it('polls video status to completion', async () => {
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'in_progress' }));
+    expect((await adapter.pollJob('vid-1', CREDS)).status).toBe('pending');
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'completed', outputs: { video_url: 'https://together/out.mp4' } }));
+    expect(await adapter.pollJob('vid-1', CREDS)).toMatchObject({ status: 'completed', artifactUrl: 'https://together/out.mp4' });
+  });
+
+  it('lists only image models from the catalog', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [
+      { id: 'black-forest-labs/FLUX.1-schnell', type: 'image' },
+      { id: 'meta-llama/Llama-3', type: 'chat' },
+    ] }));
+    const models = await adapter.listModels('image', CREDS);
+    expect(models).toEqual([{ id: 'black-forest-labs/FLUX.1-schnell', label: 'black-forest-labs/FLUX.1-schnell' }]);
+    expect(await adapter.listModels('video', CREDS)).toEqual([]);
+  });
+});
+
+describe('SiliconFlowMediaAdapter', () => {
+  const adapter = new SiliconFlowMediaAdapter();
+
+  it('submits video to /video/submit and returns the requestId', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ requestId: 'req-9' }));
+    const sub = await adapter.generateVideo('a dragon', { ...CREDS, model: 'Wan-AI/Wan2.2-T2V-A14B', input: { image_size: '1280x720' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.siliconflow.com/v1/video/submit');
+    expect(sub.jobId).toBe('req-9');
+  });
+
+  it('polls /video/status to completion', async () => {
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'InProgress' }));
+    expect((await adapter.pollJob('req-9', CREDS)).status).toBe('pending');
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'Succeed', results: { videos: [{ url: 'https://sf/out.mp4' }] } }));
+    expect(await adapter.pollJob('req-9', CREDS)).toMatchObject({ status: 'completed', artifactUrl: 'https://sf/out.mp4' });
+  });
+});
+
+describe('GroqMediaAdapter', () => {
+  const adapter = new GroqMediaAdapter();
+
+  it('generates TTS audio inline', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({}));
+    const sub = await adapter.generateAudio('fast speech', { ...CREDS, model: 'playai-tts', input: { voice: 'Fritz-PlayAI', response_format: 'wav' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.groq.com/openai/v1/audio/speech');
+    expect(sub.artifactUrl).toMatch(/^data:audio\/wav;base64,/);
+  });
+
+  it('exposes audio-only capabilities and no models', async () => {
+    expect(adapter.capabilities).toMatchObject({ image: false, video: false, audio: true });
+    expect(await adapter.listModels('audio', CREDS)).toEqual([]);
+  });
+});
+
+describe('OpenRouterMediaAdapter', () => {
+  const adapter = new OpenRouterMediaAdapter();
+
+  it('generates images via /api/v1/images and decodes b64_json', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: 'AAAA' }] }));
+    const result = await adapter.generateImage('a robot', { ...CREDS, model: 'openai/gpt-image-1', input: { n: 1, aspect_ratio: '1:1' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://openrouter.ai/api/v1/images');
+    expect(result.image).toBe('data:image/png;base64,AAAA');
+  });
+
+  it('lists models with image output modality', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [
+      { id: 'openai/gpt-image-1', name: 'gpt-image-1', architecture: { output_modalities: ['image'] } },
+      { id: 'anthropic/claude', architecture: { output_modalities: ['text'] } },
+    ] }));
+    expect(await adapter.listModels('image', CREDS)).toEqual([{ id: 'openai/gpt-image-1', label: 'gpt-image-1' }]);
+  });
+
+  it('rejects video/audio', async () => {
+    await expect(adapter.generateVideo('x', CREDS)).rejects.toThrow('video');
+    await expect(adapter.generateAudio('x', CREDS)).rejects.toThrow('audio');
+  });
+});
+
+describe('FireworksMediaAdapter', () => {
+  const adapter = new FireworksMediaAdapter();
+
+  it('generates images via the workflow endpoint and wraps base64', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ base64: ['BBBB'], finishReason: 'SUCCESS' }));
+    const result = await adapter.generateImage('a city', { ...CREDS, model: 'flux-1-schnell-fp8', input: { aspect_ratio: '16:9' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe(
+      'https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models/flux-1-schnell-fp8/text_to_image',
+    );
+    expect((mockSafeFetch.mock.calls[0][1] as RequestInit).headers).toMatchObject({ Accept: 'application/json' });
+    expect(result.image).toBe('data:image/png;base64,BBBB');
+  });
+});
+
+describe('DeepInfraMediaAdapter', () => {
+  const adapter = new DeepInfraMediaAdapter();
+
+  it('generates images from the native inference endpoint', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ images: ['https://di/out.png'] }));
+    const result = await adapter.generateImage('a tree', { ...CREDS, model: 'black-forest-labs/FLUX-1-schnell' });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.deepinfra.com/v1/inference/black-forest-labs/FLUX-1-schnell');
+    expect(result.image).toBe('https://di/out.png');
+  });
+
+  it('generates TTS audio and sends text', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ audio: 'data:audio/wav;base64,CCCC' }));
+    const sub = await adapter.generateAudio('speak this', { ...CREDS, model: 'hexgrad/Kokoro-82M' });
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.text).toBe('speak this');
+    expect(sub.artifactUrl).toBe('data:audio/wav;base64,CCCC');
   });
 });

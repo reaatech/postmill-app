@@ -28,7 +28,7 @@ describe('MediaProviderRegistry', () => {
 });
 
 describe('MediaModule', () => {
-  it('registers all 15 adapters on init', () => {
+  it('registers all adapters on init', () => {
     const registry = new MediaProviderRegistry();
     const flags = new FeatureFlagsService();
     const mediaModule = new MediaModule(registry, flags);
@@ -36,20 +36,30 @@ describe('MediaModule', () => {
 
     const ids = registry.getAll().map((a) => a.identifier).sort();
     expect(ids).toEqual([
+      'azure',
+      'bedrock',
       'black-forest-labs',
       'deepgram',
+      'deepinfra',
       'did',
       'elevenlabs',
       'fal',
+      'fireworks',
+      'gateway',
+      'groq',
       'hedra',
       'heygen',
       'luma',
       'minimax',
       'openai',
+      'openrouter',
+      'qwen',
       'replicate',
       'runway',
+      'siliconflow',
       'stability-ai',
       'tavus',
+      'togetherai',
       'vertex',
     ]);
   });

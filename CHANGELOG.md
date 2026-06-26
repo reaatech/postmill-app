@@ -11,6 +11,22 @@
 ## Unreleased
 
 ### Added
+- **AI-hub media studios** (`/media/{togetherai,siliconflow,groq,openrouter,fireworks,deepinfra,gateway,bedrock,azure}`)
+  — The AI hub/aggregator providers from Settings → AI now also expose their **media** catalogs as
+  full Studio Kit studios, each **reusing the org's existing AI key** (the Qwen
+  `UNIVERSAL_AI_CREDENTIAL` pattern, now 10 providers). Coverage per hub: Together (image + async
+  video + TTS), SiliconFlow (image + Wan2.x video + TTS), DeepInfra (image + video + TTS), Groq (TTS),
+  OpenRouter (image), Fireworks (image), Vercel AI Gateway (image + video via AI SDK v6
+  `experimental_generateVideo`), Amazon Bedrock + Azure OpenAI (image, via AI-SDK delegation so SigV4 /
+  Azure-deployment auth is handled by the provider packages — no hand-rolled signing).
+  - **Dynamic model discovery** — because these catalogs are large and change often, the studio model
+    dropdown is populated **live** from each hub's `/v1/models` (filtered by modality) via a new
+    `GET /media/studio/:provider/models?operation=` route (Redis-cached) and a `source: 'models'`
+    searchable combobox in the Studio Kit; it also accepts a typed model id so an incomplete catalog
+    never blocks a render.
+  - Native-REST adapters share an `openai-compatible-media.adapter.ts` base (Together/SiliconFlow);
+    Bedrock/Azure/Gateway delegate image to the AI registry via a static-injected helper, keeping
+    `MediaStudioService` provider-agnostic. No schema migration; no env fallback.
 - **Studio Kit + AI Video studios** (`/media/{runway,luma,minimax,kling}`) — A reusable scaffold so a
   new media-provider studio is mostly a descriptor, not a from-scratch build. Shared shell, render
   queue, and the three handoffs (Save-to-Files / Edit-in-Designer / Post-to-Composer) are write-once;

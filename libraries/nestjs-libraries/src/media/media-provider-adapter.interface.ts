@@ -97,6 +97,14 @@ export interface MediaPollResult {
   metadata?: MediaArtifactMetadata;
 }
 
+export type MediaOperation = 'image' | 'video' | 'audio';
+
+// A single entry in a provider's runtime model catalog for one modality.
+export interface MediaModelOption {
+  id: string;
+  label: string;
+}
+
 export function resolveApiKey(options?: MediaCredentialOptions): string | undefined {
   return (
     options?.apiKey ||
@@ -123,6 +131,13 @@ export interface MediaProviderAdapter {
   generateAvatar(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
 
   pollJob?(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult>;
+
+  // Optional runtime model catalog for a modality — powers the studio's dynamic model
+  // dropdown (`select` field with `source: 'models'`). Hubs with large/changing catalogs
+  // implement this (hitting their `/models` endpoint, or reusing the AI adapter's
+  // `listModels`); providers with a small fixed set omit it and rely on the descriptor's
+  // static options. Returns [] when the modality has no models.
+  listModels?(operation: MediaOperation, options?: MediaCredentialOptions): Promise<MediaModelOption[]>;
 
   // Lightweight credential/auth check for the Settings → Media "Test connection" action.
   // Image-only providers can rely on the generateImage fallback; providers without image

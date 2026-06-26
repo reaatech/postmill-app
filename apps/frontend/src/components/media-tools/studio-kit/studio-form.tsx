@@ -3,12 +3,15 @@
 import React, { FC } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { ModelSelect } from './model-select';
 import type { FileFieldValue, StudioField, StudioFieldValue } from './types';
 
 interface StudioFormProps {
   fields: StudioField[];
   values: Record<string, StudioFieldValue>;
   onChange: (name: string, value: StudioFieldValue) => void;
+  provider: string;
+  operation: string;
 }
 
 const Label: FC<{ field: StudioField }> = ({ field }) => {
@@ -72,7 +75,7 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
   );
 };
 
-export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange }) => {
+export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, provider, operation }) => {
   return (
     <div className="flex flex-col gap-[16px]">
       {fields.map((field) => {
@@ -100,19 +103,28 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange }) =>
                 />
               ))}
 
-            {field.type === 'select' && (
-              <select
-                value={(value as string) ?? field.default ?? ''}
-                onChange={(e) => onChange(field.name, e.target.value)}
-                className={inputClass}
-              >
-                {field.options.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            )}
+            {field.type === 'select' &&
+              (field.source === 'models' ? (
+                <ModelSelect
+                  provider={provider}
+                  operation={operation}
+                  value={(value as string) ?? field.default}
+                  staticOptions={field.options}
+                  onChange={(v) => onChange(field.name, v)}
+                />
+              ) : (
+                <select
+                  value={(value as string) ?? field.default ?? ''}
+                  onChange={(e) => onChange(field.name, e.target.value)}
+                  className={inputClass}
+                >
+                  {(field.options ?? []).map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ))}
 
             {field.type === 'number' &&
               (field.min !== undefined && field.max !== undefined ? (

@@ -31,6 +31,19 @@ export function useStudioJobs(provider: string, enabled: boolean) {
   );
 }
 
+export function useStudioModels(provider: string, operation: string, enabled: boolean) {
+  const fetch = useFetch();
+  return useSWR(
+    enabled ? `studio-models:${provider}:${operation}` : null,
+    async () => {
+      const res = await fetch(`/media/studio/${provider}/models?operation=${operation}`);
+      if (!res.ok) return [] as { id: string; label: string }[];
+      return (await res.json()) as { id: string; label: string }[];
+    },
+    { revalidateOnFocus: false, dedupingInterval: 60000 }
+  );
+}
+
 export function useStudioGenerate(provider: string) {
   const fetch = useFetch();
   return useCallback(

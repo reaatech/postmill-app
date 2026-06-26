@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
@@ -30,6 +30,19 @@ export class MediaStudioController {
   @RequirePermission('media', 'read')
   getJobs(@Param('provider') provider: string, @GetOrgFromRequest() org: Organization) {
     return this._studio.listJobs(org.id, provider);
+  }
+
+  // Runtime model catalog for the studio's dynamic model dropdown.
+  @Get('/:provider/models')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  getModels(
+    @Param('provider') provider: string,
+    @Query('operation') operation: string,
+    @GetOrgFromRequest() org: Organization,
+  ) {
+    const op = operation === 'video' || operation === 'audio' ? operation : 'image';
+    return this._studio.listModels(org.id, provider, op);
   }
 
   @Post('/:provider/generate')

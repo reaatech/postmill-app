@@ -157,7 +157,13 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
           ) : (
             <div className="max-w-[640px] mx-auto flex flex-col gap-[18px]">
               {tab.description && <p className="text-[13px] text-newTextColor/55">{tab.description}</p>}
-              <StudioForm fields={tab.fields} values={values} onChange={setValue} />
+              <StudioForm
+                fields={tab.fields}
+                values={values}
+                onChange={setValue}
+                provider={provider}
+                operation={tab.operation}
+              />
               <button
                 type="button"
                 onClick={onGenerate}

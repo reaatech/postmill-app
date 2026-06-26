@@ -13,7 +13,18 @@ const STANDARD_FOLDERS = ['documents', 'audio', 'images', 'video', 'other'];
 // provider key — configure once, works for both surfaces. (openai/minimax instead
 // write-mirror both ways via ProviderCredentialLinkService; Qwen has no media-side
 // settings flow yet, so a read-fallback is the lighter, immediate path.)
-const UNIVERSAL_AI_CREDENTIAL = new Set(['qwen']);
+const UNIVERSAL_AI_CREDENTIAL = new Set([
+  'qwen',
+  'togetherai',
+  'siliconflow',
+  'groq',
+  'openrouter',
+  'fireworks',
+  'deepinfra',
+  'gateway',
+  'bedrock',
+  'azure',
+]);
 
 export interface MediaProviderExtraConfig {
   operations?: string[];
