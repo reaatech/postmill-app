@@ -17,6 +17,35 @@ import dayjs from 'dayjs';
 
 const PAGE_SIZE = 25;
 
+interface SetMedia {
+  id: string;
+  path: string;
+  thumbnail?: string;
+}
+
+// A Set's `content` is the serialized composer payload: { ..., posts: [{
+// integration: { id }, value: [{ image: [...] }] }] }. (Older sets may have
+// stored the bare posts array — handle both.) Derive the channels, post count
+// and media so the list can show a real preview.
+const parseSetContent = (
+  raw?: string
+): { postCount: number; integrationIds: string[]; media: SetMedia[] } => {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    const posts = Array.isArray(parsed) ? parsed : parsed?.posts || [];
+    const integrationIds = posts
+      .map((p: any) => p?.integration?.id)
+      .filter(Boolean);
+    const media: SetMedia[] = posts
+      .flatMap((p: any) => (p?.value || []).flatMap((v: any) => v?.image || []))
+      .filter((m: any) => m?.path)
+      .map((m: any) => ({ id: m.id, path: m.path, thumbnail: m.thumbnail }));
+    return { postCount: posts.length, integrationIds, media };
+  } catch {
+    return { postCount: 0, integrationIds: [], media: [] };
+  }
+};
+
 const SaveSetModal: FC<{
   postData: any;
   initialValue?: string;
@@ -70,7 +99,7 @@ export const Sets: FC = () => {
 
   const load = useCallback(async (path: string) => {
     return (await (await fetch(path)).json()).integrations;
-  }, []);
+  }, [fetch]);
 
   const { data: integrations } = useSWR('/integrations/list', load, {
     revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false,
@@ -78,7 +107,7 @@ export const Sets: FC = () => {
     fallbackData: [],
   });
 
-  const listSets = useCallback(async () => (await fetch('/sets')).json(), []);
+  const listSets = useCallback(async () => (await fetch('/sets')).json(), [fetch]);
   const { data, mutate, isLoading, error } = useSWR('sets', listSets, {
     revalidateOnFocus: false, revalidateOnReconnect: false, revalidateIfStale: false,
     revalidateOnMount: true, refreshWhenHidden: false, refreshWhenOffline: false,
@@ -96,6 +125,12 @@ export const Sets: FC = () => {
   }, [data, search, page]);
 
   const totalPages = data ? Math.ceil((data.length || 0) / PAGE_SIZE) : 0;
+
+  const channelById = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const c of integrations || []) map.set(c.id, c);
+    return map;
+  }, [integrations]);
 
   const addSet = useCallback((params?: { id?: string; name?: string; content?: string }) => () => {
     modal.openModal({
@@ -180,109 +215,129 @@ export const Sets: FC = () => {
         <Button onClick={addSet()}>{t('add_set', 'Add Set')}</Button>
       </div>
 
-      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] overflow-x-auto">
-        {isLoading && (
-          <div className="flex flex-col gap-[8px] py-[16px]">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-[12px] animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i === 0 ? 2 : 1.5 }} />
-                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: 1 }} />
-                <div className="h-[16px] bg-newTableHeader rounded-[4px]" style={{ flex: i < 3 ? 1 : 0.5 }} />
-              </div>
-            ))}
-          </div>
-        )}
+      {isLoading && (
+        <div className="flex flex-col gap-[8px]">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[84px] bg-newBgColorInner border border-newTableBorder rounded-[12px] animate-pulse"
+            />
+          ))}
+        </div>
+      )}
 
-        {!isLoading && error && !data && (
-          <div className="flex flex-col items-center py-[40px] gap-[8px]">
-            <div className="text-red-400 text-[14px]">{t('failed_loading_sets', 'Failed to load sets')}</div>
-            <button onClick={() => window.location.reload()} className="text-[12px] text-textColor hover:underline">{t('try_again', 'Try again')}</button>
-          </div>
-        )}
+      {!isLoading && error && !data && (
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
+          <span className="text-[14px] text-red-400">{t('failed_loading_sets', 'Failed to load sets')}</span>
+          <button onClick={() => mutate()} className="text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors">{t('try_again', 'Try again')}</button>
+        </div>
+      )}
 
-        {!isLoading && !error && (!data || data.length === 0) && (
-          <div className="flex flex-col items-center py-[40px] gap-[16px]">
-            <div className="text-textColor/50 text-[14px]">{t('no_sets', 'No sets created yet')}</div>
-            <p className="text-[12px] text-newTableText max-w-[400px] text-center">
-              {t('sets_empty_hint', 'Sets let you save groups of social accounts and content together so you can quickly reuse them when creating new posts.')}
-            </p>
-            <Button onClick={addSet()}>{t('create_first_set', 'Create your first set')}</Button>
-          </div>
-        )}
+      {!isLoading && !error && (!data || data.length === 0) && (
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] flex flex-col items-center py-[40px] gap-[16px]">
+          <div className="text-textColor/50 text-[14px]">{t('no_sets', 'No sets created yet')}</div>
+          <p className="text-[12px] text-newTableText max-w-[400px] text-center">
+            {t('sets_empty_hint', 'Sets let you save groups of channels, content and media together so you can quickly reuse them when creating new posts.')}
+          </p>
+          <Button onClick={addSet()}>{t('create_first_set', 'Create your first set')}</Button>
+        </div>
+      )}
 
-        {!isLoading && data && data.length > 0 && (
-          <>
-            <div className="min-w-[700px]">
-            <div className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] text-[12px] text-newTableText uppercase font-medium pb-[12px] border-b border-newTableBorder items-center">
-              <div>{t('name', 'Name')}</div>
-              <div>{t('channels', 'Channels')}</div>
-              <div>{t('post_count', 'Posts')}</div>
-              <div>{t('created', 'Created')}</div>
-              <div className="text-end">{t('actions', 'Actions')}</div>
-            </div>
-
-            <div className="flex flex-col">
-              {filtered.map((s: any) => (
-                <div key={s.id} className="grid grid-cols-[2fr,2fr,1fr,1fr,1fr] gap-[12px] py-[12px] border-b border-newTableBorder/50 items-center text-[14px]">
-                  <div className="truncate">{s.name}</div>
-                  <div>
-                    {(() => {
-                      try {
-                        const content = JSON.parse(s.content || '[]');
-                        if (Array.isArray(content)) {
-                          const channels = content.filter((c: any) => c?.integration?.picture);
-                          return (
-                            <div className="flex items-center gap-[4px]">
-                              {channels.slice(0, 5).map((c: any, i: number) => (
-                                <img
-                                  key={i}
-                                  src={c.integration.picture}
-                                  alt=""
-                                  className="w-[20px] h-[20px] rounded-full border border-newTableBorder"
-                                />
-                              ))}
-                              {channels.length > 5 && (
-                                <span className="text-[11px] text-newTableText">+{channels.length - 5}</span>
-                              )}
-                            </div>
-                          );
-                        }
-                      } catch {}
-                      return <span className="text-[12px] text-newTableText">—</span>;
-                    })()}
+      {!isLoading && data && data.length > 0 && (
+        <div className="flex flex-col gap-[8px]">
+          {filtered.map((s: any) => {
+            const { postCount, integrationIds, media } = parseSetContent(s.content);
+            const channels = integrationIds
+              .map((id) => channelById.get(id))
+              .filter(Boolean);
+            return (
+              <div
+                key={s.id}
+                className="flex items-center gap-[14px] bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[14px]"
+              >
+                {/* Media preview stack */}
+                {media.length > 0 ? (
+                  <div className="flex items-center -space-x-[10px] shrink-0">
+                    {media.slice(0, 3).map((m, i) => (
+                      <img
+                        key={m.id || i}
+                        src={m.thumbnail || m.path}
+                        alt=""
+                        className="w-[44px] h-[44px] rounded-[8px] object-cover border border-newTableBorder bg-newTableHeader"
+                      />
+                    ))}
+                    {media.length > 3 && (
+                      <div className="w-[44px] h-[44px] rounded-[8px] border border-newTableBorder bg-newTableHeader flex items-center justify-center text-[12px] text-newTableText ps-[10px]">
+                        +{media.length - 3}
+                      </div>
+                    )}
                   </div>
-                  <div className="text-newTableText text-[12px]">
-                    {(() => {
-                      try {
-                        const content = JSON.parse(s.content || '[]');
-                        return Array.isArray(content) ? content.length : 0;
-                      } catch { return 0; }
-                    })()}
+                ) : (
+                  <div className="w-[44px] h-[44px] rounded-[8px] bg-newTableHeader flex items-center justify-center shrink-0 text-newTableText">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1" />
+                      <rect x="14" y="3" width="7" height="7" rx="1" />
+                      <rect x="3" y="14" width="7" height="7" rx="1" />
+                      <rect x="14" y="14" width="7" height="7" rx="1" />
+                    </svg>
                   </div>
-                  <div className="text-newTableText text-[12px]">{dayjs(s.createdAt).format('MMM D, YYYY')}</div>
-                  <div className="flex justify-end gap-[8px]">
-                    <button onClick={addSet(s)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
-                    <button onClick={deleteSet(s)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
+                )}
+
+                {/* Name + meta */}
+                <div className="flex-1 min-w-0">
+                  <div className="text-[14px] text-textColor truncate">{s.name}</div>
+                  <div className="flex items-center gap-[10px] mt-[6px]">
+                    {channels.length > 0 ? (
+                      <div className="flex items-center -space-x-[6px]">
+                        {channels.slice(0, 6).map((c: any, i: number) => (
+                          c?.picture ? (
+                            <img
+                              key={c.id || i}
+                              src={c.picture}
+                              alt={c.name}
+                              title={c.name}
+                              className="w-[20px] h-[20px] rounded-full border border-newTableBorder object-cover"
+                            />
+                          ) : (
+                            <div key={c?.id || i} className="w-[20px] h-[20px] rounded-full border border-newTableBorder bg-newTableHeader" title={c?.name} />
+                          )
+                        ))}
+                        {channels.length > 6 && (
+                          <span className="text-[11px] text-newTableText ps-[10px]">+{channels.length - 6}</span>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-newTableText">{t('no_channels', 'No channels')}</span>
+                    )}
+                    <span className="text-[11px] text-newTableText">
+                      · {postCount} {postCount === 1 ? t('post', 'post') : t('posts_lower', 'posts')}
+                    </span>
+                    <span className="text-[11px] text-newTableText">
+                      · {dayjs(s.createdAt).format('MMM D, YYYY')}
+                    </span>
                   </div>
                 </div>
-              ))}
-            </div>
 
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between mt-[16px] pt-[12px] border-t border-newTableBorder">
-                <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
-                <div className="flex gap-[8px]">
-                  <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40">{t('previous', 'Previous')}</button>
-                  <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[4px] disabled:opacity-40">{t('next', 'Next')}</button>
+                {/* Actions */}
+                <div className="flex items-center gap-[10px] shrink-0">
+                  <button onClick={addSet(s)} className="text-[12px] text-textColor hover:underline">{t('edit', 'Edit')}</button>
+                  <button onClick={deleteSet(s)} className="text-[12px] text-red-400 hover:underline">{t('delete', 'Delete')}</button>
                 </div>
               </div>
-            )}
-          </>
-        )}
-      </div>
+            );
+          })}
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-[8px] pt-[12px] border-t border-newTableBorder">
+              <div className="text-[12px] text-newTableText">{t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}</div>
+              <div className="flex gap-[8px]">
+                <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('previous', 'Previous')}</button>
+                <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-[12px] py-[6px] text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] disabled:opacity-40">{t('next', 'Next')}</button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
