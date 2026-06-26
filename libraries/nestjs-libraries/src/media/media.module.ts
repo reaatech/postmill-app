@@ -31,6 +31,9 @@ import { FireworksMediaAdapter } from './adapters/fireworks-media.adapter';
 import { DeepInfraMediaAdapter } from './adapters/deepinfra-media.adapter';
 import { GatewayMediaAdapter } from './adapters/gateway-media.adapter';
 import { BedrockMediaAdapter, AzureMediaAdapter } from './adapters/ai-sdk-media.adapter';
+import { RecraftMediaAdapter } from './adapters/recraft-media.adapter';
+import { IdeogramMediaAdapter } from './adapters/ideogram-media.adapter';
+import { LeonardoMediaAdapter } from './adapters/leonardo-media.adapter';
 
 const ALL_ADAPTERS = [
   FalAdapter,
@@ -62,6 +65,9 @@ const ALL_ADAPTERS = [
   GatewayMediaAdapter,
   BedrockMediaAdapter,
   AzureMediaAdapter,
+  RecraftMediaAdapter,
+  IdeogramMediaAdapter,
+  LeonardoMediaAdapter,
 ];
 
 @Module({

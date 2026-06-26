@@ -51,6 +51,9 @@ const ICONS: Record<string, Entry> = {
   higgsfield: { viewBox: '0 0 24 24', color: '#111111', full: true, node: (<path d="M5 3h3v7h8V3h3v18h-3v-8H8v8H5V3Z" />) },
   wan: { viewBox: '0 0 24 24', color: '#6E3AF2', node: (<path d="M2 4l3.5 16L9 9l3 11 3-11 3.5 11L22 4h-3l-1.8 9L14 4h-2l-3.2 9L7 4H2Z" />) },
   ltx: { viewBox: '0 0 24 24', color: '#111111', node: (<path d="M4 4v16h6v-2H6V4H4Zm16 0h-2.4l-2.1 3-2.1-3H11l3.2 4.5L10.7 13H13l2.5-3.5L18 13h2.3l-3.5-4.5L20 4Z" />) },
+  recraft: { viewBox: '0 0 24 24', color: '#E5484D', node: (<path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />) },
+  ideogram: { viewBox: '0 0 24 24', color: '#111111', node: (<path d="M6 4h12v3h-4.25v10H18v3H6v-3h4.25V7H6V4z" />) },
+  leonardo: { viewBox: '0 0 24 24', color: '#0EA5E9', node: (<path d="M12 2 3 9l9 13 9-13-9-7zm0 2.54L18.6 9 12 18.2 5.4 9 12 4.54z" />) },
 
   // ── Storage Providers ─────────────────────────────────────
   S3: { viewBox: '0 0 24 24', color: '#FF9900', node: (<path d="M12 2 4 7v10l8 5 8-5V7Zm0 3 4 2.5v3L12 11l-4 2.5v-3Z" />) },

@@ -759,6 +759,21 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `:predictLongRunning`); image `aspectRatio`/`sampleCount` shaping and the Veo file-download header may
   need a live smoke test. (Note: Imagen `:predict` is slated for shutdown 2026-08-17 in favour of Nano
   Banana — both remain selectable model options.)
+- **Recraft** (`/media/recraft`), **Ideogram** (`/media/ideogram`), and **Leonardo.ai**
+  (`/media/leonardo`) are three **own-key image** kit studios configured at Settings → Media. Each is a
+  `<hub>-media.adapter.ts` (image-only capability) + descriptor + 3-line studio + route + nav entry.
+  **Recraft** (`external.api.recraft.ai`, Bearer) — raster + vector/SVG + icons; one synchronous POST
+  → hosted URL; native params (style/substyle/size/n) ride via `options.input`. **Ideogram**
+  (`api.ideogram.ai/v1/ideogram-v3/generate`) — accurate in-image text; the key rides as the **`Api-Key`
+  header** (not Bearer) and the body is **multipart/form-data** (the adapter builds a `FormData`, no
+  Content-Type so fetch sets the boundary), single endpoint with **no model param**; synchronous.
+  **Leonardo.ai** (`cloud.leonardo.ai/api/rest/v1`, Bearer) — its API is async (create → `generationId`
+  → poll `GET /generations/{id}` until `COMPLETE`), but image must be synchronous, so the adapter
+  **polls internally** (the BFL/Qwen bounded-poll pattern) to keep the contract; the `model` select
+  carries a Leonardo model **UUID** (→ `modelId`), width/height/num_images ride via `options.input`. All
+  three return hosted public URLs (re-downloaded by the lifecycle via `safeFetch`). **Built without a
+  live key** — endpoints grounded in the official Recraft / Ideogram / Leonardo API references; param
+  names and Leonardo model UUIDs may need a live smoke test.
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

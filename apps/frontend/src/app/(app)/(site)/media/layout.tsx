@@ -315,6 +315,40 @@ const tabs = [
     ),
   },
   {
+    href: '/media/recraft',
+    label: 'Recraft',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 20h9" />
+        <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/ideogram',
+    label: 'Ideogram',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M8 16l4-9 4 9" />
+        <path d="M9.5 13h5" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/leonardo',
+    label: 'Leonardo.ai',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2 3 9l9 13 9-13-9-7z" />
+        <path d="M3 9h18" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/openai',
     label: 'OpenAI',
     section: 'Providers',

@@ -11,6 +11,13 @@
 ## Unreleased
 
 ### Added
+- **Recraft, Ideogram, and Leonardo.ai media studios** (`/media/recraft`, `/media/ideogram`,
+  `/media/leonardo`) — three own-key image-generation Studio Kit studios configured at Settings → Media.
+  **Recraft** (Bearer) for raster + vector/SVG + icons; **Ideogram** for accurate in-image text (key as
+  `Api-Key` header, multipart/form-data body, single v3 endpoint); **Leonardo.ai** (Bearer) across its
+  fine-tuned model family — its API is async (create → poll), so the adapter polls internally to keep
+  the synchronous image contract (the BFL/Qwen pattern). All three return hosted URLs and land artifacts
+  in `/files`. Built source-grounded against each official API reference (no live key).
 - **Google AI Studio media studio** (`/media/google-ai`, registry id `google`) — a full Studio Kit
   studio for the **Gemini Developer API**. Image tab covers **Nano Banana** (`gemini-2.5-flash-image`
   via `:generateContent`) and **Imagen** (`imagen-*` via `:predict`), routed by the chosen model; Video

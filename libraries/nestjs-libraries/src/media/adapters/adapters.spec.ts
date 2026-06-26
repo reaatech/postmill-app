@@ -31,6 +31,9 @@ import { WanAdapter } from './wan.adapter';
 import { HiggsfieldAdapter } from './higgsfield.adapter';
 import { LtxAdapter } from './ltx.adapter';
 import { GoogleAiMediaAdapter } from './google-ai-media.adapter';
+import { RecraftMediaAdapter } from './recraft-media.adapter';
+import { IdeogramMediaAdapter } from './ideogram-media.adapter';
+import { LeonardoMediaAdapter } from './leonardo-media.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -1281,5 +1284,76 @@ describe('GoogleAiMediaAdapter', () => {
     mockSafeFetch.mockResolvedValue(jsonResponse({ models: [] }));
     expect(await adapter.testConnection(CREDS)).toEqual({ ok: true, message: 'Connection successful' });
     expect(mockSafeFetch.mock.calls[0][0]).toBe('https://generativelanguage.googleapis.com/v1beta/models');
+  });
+});
+
+describe('RecraftMediaAdapter', () => {
+  const adapter = new RecraftMediaAdapter();
+
+  it('generates an image via a single POST with Bearer auth', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ url: 'https://rc/1.png', image_id: 'i1' }] }));
+    const result = await adapter.generateImage('a logo', { ...CREDS, input: { style: 'vector_illustration' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://external.api.recraft.ai/v1/images/generations');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ prompt: 'a logo', model: 'recraftv3', style: 'vector_illustration' });
+    expect(result.image).toBe('https://rc/1.png');
+  });
+
+  it('requires a key and rejects unsupported operations', async () => {
+    await expect(adapter.generateImage('x')).rejects.toThrow('Recraft API key');
+    await expect(adapter.generateVideo('x', CREDS)).rejects.toThrow('video');
+    await expect(adapter.generateAudio('x', CREDS)).rejects.toThrow('audio');
+  });
+});
+
+describe('IdeogramMediaAdapter', () => {
+  const adapter = new IdeogramMediaAdapter();
+
+  it('posts multipart form-data with the Api-Key header', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ url: 'https://id/1.png' }] }));
+    const result = await adapter.generateImage('hello text', { ...CREDS, input: { aspect_ratio: '16x9', rendering_speed: 'TURBO' } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.ideogram.ai/v1/ideogram-v3/generate');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>)['Api-Key']).toBe('test-key');
+    expect(init.body instanceof FormData).toBe(true);
+    const form = init.body as FormData;
+    expect(form.get('prompt')).toBe('hello text');
+    expect(form.get('aspect_ratio')).toBe('16x9');
+    expect(result.image).toBe('https://id/1.png');
+  });
+
+  it('requires a key', async () => {
+    await expect(adapter.generateImage('x')).rejects.toThrow('Ideogram API key');
+  });
+});
+
+describe('LeonardoMediaAdapter', () => {
+  const adapter = new LeonardoMediaAdapter();
+
+  it('creates a generation and internally polls until COMPLETE (sync image contract)', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ sdGenerationJob: { generationId: 'g-1' } }))
+      .mockResolvedValueOnce(
+        jsonResponse({ generations_by_pk: { status: 'COMPLETE', generated_images: [{ url: 'https://leo/1.png', id: 'x' }] } }),
+      );
+    const result = await adapter.generateImage('a fox', { ...CREDS, model: 'model-uuid', input: { width: 768, height: 1024 } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://cloud.leonardo.ai/api/rest/v1/generations');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toMatchObject({ prompt: 'a fox', modelId: 'model-uuid', width: 768, height: 1024 });
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://cloud.leonardo.ai/api/rest/v1/generations/g-1');
+    expect(result.image).toBe('https://leo/1.png');
+  }, 15000);
+
+  it('throws on a FAILED generation', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ sdGenerationJob: { generationId: 'g-2' } }))
+      .mockResolvedValueOnce(jsonResponse({ generations_by_pk: { status: 'FAILED' } }));
+    await expect(adapter.generateImage('a fox', CREDS)).rejects.toThrow('failed');
+  }, 15000);
+
+  it('requires a key', async () => {
+    await expect(adapter.generateImage('x')).rejects.toThrow('Leonardo.ai API key');
   });
 });
