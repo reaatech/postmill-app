@@ -301,7 +301,7 @@ export const SettingsPopup: FC<{
       <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px]">
         <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
         <div className="flex flex-col gap-[12px] mobile:p-[16px]">
-        {tab !== 'media_providers' && <PageHeader title="Settings" />}
+        {tab !== 'media_providers' && tab !== 'content_packs' && <PageHeader title="Settings" />}
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)}>
             {!!getRef && (

@@ -9,11 +9,16 @@ import ProviderListShell from '@gitroom/frontend/components/settings/shared/prov
 import { useContentPacksConfig } from './hooks/useContentPacksConfig';
 import { ContentPackForm } from './content-pack-form';
 
+// Postmill's built-in free stock pack — the default that is enabled whenever no
+// premium pack is active. It covers every capability via the free providers.
+const POSTMILL_IDENTIFIER = 'postmill';
+const POSTMILL_CAPABILITIES = ['photos', 'videos', 'vectors', 'stickers', 'audio', 'icons'];
+
 export const ContentPacksTab: React.FC = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const { data: config, isLoading, error, mutate } = useContentPacksConfig();
+  const { data: config, error, mutate } = useContentPacksConfig();
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -86,7 +91,15 @@ export const ContentPacksTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <h3 className="text-[20px]">{t('content_packs', 'Content Packs')}</h3>
+      <div className="flex flex-col gap-[4px]">
+        <h3 className="text-[20px]">{t('content_packs', 'Content Packs')}</h3>
+        <p className="text-[13px] text-newTableText max-w-[640px]">
+          {t(
+            'content_packs_description',
+            'A content pack is the stock media library that powers searches for photos, videos, vectors, stickers, icons and audio across the app. Postmill ships with a free default pack; connect a premium provider for higher-quality, licensed content. You can configure several, but only one pack is enabled at a time — anything it doesn’t cover falls back to the free default.'
+          )}
+        </p>
+      </div>
 
       {error && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
@@ -112,117 +125,83 @@ export const ContentPacksTab: React.FC = () => {
           }}
         />
       ) : (
-        <>
-          <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
-            <div className="mt-[4px]">{t('active_provider', 'Active Provider')}</div>
-            {isLoading ? (
-              <div className="animate-pulse">{t('loading', 'Loading...')}</div>
-            ) : config?.active ? (
-              <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center gap-[12px]">
-                <ProviderIcon
-                  identifier={config.active.identifier}
-                  name={config.active.identifier}
-                  size={32}
-                />
-                <div className="flex flex-col gap-[4px] flex-1">
-                  <span className="text-[14px] font-semibold">
-                    {config.active.name ||
-                      config.active.identifier.charAt(0).toUpperCase() +
-                        config.active.identifier.slice(1)}
-                  </span>
-                  {config.active.capabilities.length > 0 && (
-                    <div className="flex gap-[4px] flex-wrap">
-                      {capabilityChips(config.active.capabilities).map((chip) => (
-                        <span
-                          key={chip}
-                          className="text-[10px] bg-newTableText/20 text-newTableText rounded-[2px] px-[4px] py-[1px]"
-                        >
-                          {chip}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <span className="text-[11px] bg-green-900/20 text-green-400 rounded-[4px] px-[8px] py-[2px]">
-                  {t('active', 'Active')}
-                </span>
+        <ProviderListShell
+          title=""
+          providers={[
+            // Postmill's built-in free pack — always available, enabled by
+            // default. A null backend `active` means free providers are in use,
+            // which is exactly the Postmill default. Pinned to the top; the
+            // configurable premium packs sort alphabetically below it.
+            {
+              id: POSTMILL_IDENTIFIER,
+              identifier: POSTMILL_IDENTIFIER,
+              name: t('postmill_default', 'Postmill (Default)'),
+              enabled: !config?.active,
+              isActive: !config?.active,
+              isConfigured: true,
+              capabilities: capabilityChips(POSTMILL_CAPABILITIES),
+            },
+            ...(config?.providers || [])
+              .slice()
+              .sort((a, b) => a.name.localeCompare(b.name))
+              .map((p) => ({
+                id: p.identifier,
+                identifier: p.identifier,
+                name: p.name,
+                enabled: true,
+                isActive: p.isActive,
+                isConfigured: p.isConfigured,
+                capabilities: capabilityChips(p.capabilities),
+              })),
+          ]}
+          onConfigure={(id) => setConfiguringProvider(id)}
+          onSetActive={(id) => handleSetActive(id)}
+          onRemove={(id) => handleDelete(id)}
+          ProviderIconComponent={ProviderIcon}
+          renderActions={(provider) => {
+            // Postmill default: only one pack can be enabled, so enabling it
+            // just deactivates any premium pack (back to free providers).
+            if (provider.identifier === POSTMILL_IDENTIFIER) {
+              if (provider.isActive) return null;
+              return (
                 <button
-                  className="text-[12px] text-red-500 hover:underline"
+                  className="text-[12px] text-btnPrimary hover:underline"
                   onClick={handleDeactivate}
                 >
-                  {t('deactivate', 'Deactivate')}
+                  {t('enable', 'Enable')}
                 </button>
-              </div>
-            ) : (
-              <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
-                <span className="text-[13px] text-newTableText">
-                  {t(
-                    'no_active_content_pack',
-                    'No content pack configured. Premium stock results will fall back to free providers.'
-                  )}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <ProviderListShell
-            title={t('all_providers', 'All Providers')}
-            providers={(config?.providers || []).map((p) => ({
-              id: p.identifier,
-              identifier: p.identifier,
-              name: p.name,
-              enabled: true,
-              isActive: p.isActive,
-              isConfigured: p.isConfigured,
-              capabilities: capabilityChips(p.capabilities),
-            }))}
-            onConfigure={(id) => setConfiguringProvider(id)}
-            onSetActive={(id) => handleSetActive(id)}
-            onRemove={(id) => handleDelete(id)}
-            ProviderIconComponent={ProviderIcon}
-            addProviderButton={
-              <button
-                onClick={() => {
-                  const first = config?.providers?.[0];
-                  if (first) setConfiguringProvider(first.identifier);
-                }}
-                className="px-[12px] py-[6px] rounded-[6px] bg-btnPrimary text-white text-[12px] font-medium hover:bg-btnPrimary/80 transition-colors"
-              >
-                {t('add_provider', 'Add Provider')}
-              </button>
+              );
             }
-            renderActions={(provider) => {
-              const p = config?.providers?.find((pr) => pr.identifier === provider.identifier);
-              if (!p) return null;
-              return (
-                <>
+            const p = config?.providers?.find((pr) => pr.identifier === provider.identifier);
+            if (!p) return null;
+            return (
+              <>
+                <button
+                  className="text-[12px] text-btnPrimary hover:underline"
+                  onClick={() => setConfiguringProvider(p.identifier)}
+                >
+                  {p.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
+                </button>
+                {!p.isActive && p.isConfigured && (
                   <button
                     className="text-[12px] text-btnPrimary hover:underline"
-                    onClick={() => setConfiguringProvider(p.identifier)}
+                    onClick={() => handleSetActive(p.identifier)}
                   >
-                    {p.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
+                    {t('enable', 'Enable')}
                   </button>
-                  {!p.isActive && p.isConfigured && (
-                    <button
-                      className="text-[12px] text-btnPrimary hover:underline"
-                      onClick={() => handleSetActive(p.identifier)}
-                    >
-                      {t('set_active', 'Set Active')}
-                    </button>
-                  )}
-                  {p.isConfigured && (
-                    <button
-                      className="text-[12px] text-red-500 hover:underline"
-                      onClick={() => handleDelete(p.identifier)}
-                    >
-                      {t('remove', 'Remove')}
-                    </button>
-                  )}
-                </>
-              );
-            }}
-          />
-        </>
+                )}
+                {p.isConfigured && (
+                  <button
+                    className="text-[12px] text-red-500 hover:underline"
+                    onClick={() => handleDelete(p.identifier)}
+                  >
+                    {t('remove', 'Remove')}
+                  </button>
+                )}
+              </>
+            );
+          }}
+        />
       )}
     </div>
   );

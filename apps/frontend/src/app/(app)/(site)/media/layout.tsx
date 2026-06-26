@@ -46,6 +46,29 @@ const tabs = [
     ),
   },
   {
+    href: '/media/reelfarm',
+    label: 'Reel.Farm',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="6" width="14" height="12" rx="2" />
+        <path d="M17 10l4-2v8l-4-2" />
+        <path d="M8 10l3 2-3 2z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/genviral',
+    label: 'Genviral',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M10 8l5 4-5 4V8z" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/replicate',
     label: 'Replicate',
     section: 'Providers',

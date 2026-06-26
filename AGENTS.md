@@ -724,6 +724,22 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
   live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
   vs. named-preset formatting may need a live smoke test.
+- **Reel.Farm** (`reel.farm`) and **Genviral** (`genviral.io`) are two **own-key** faceless/short-form
+  **video** kit studios configured at Settings → Media — each a `<provider>.adapter.ts` + descriptor +
+  3-line studio + route + nav entry (`/media/reelfarm`, `/media/genviral`), `operation: 'video'`, single
+  Bearer key. Both are **async submit-and-poll**, no webhook → poll-cron (like Runway/LTX). **Reel.Farm**
+  renders an AI TikTok slideshow from a prompt: `POST /api/v1/slideshows/generate` → `{ slideshow_id }`,
+  poll `GET /slideshows/{id}/status`; the status response carries **no mp4 URL**, so `pollJob` fetches
+  `GET /videos/{video_id}` once a `video_id` exists and reads `video_url`. The prompt is sent as
+  `additional_context`; optional `image_N` media fields are collected into the `images[]` background array.
+  **Genviral** Studio AI: `POST /studio/videos` (required `model_id` from a **live `/studio/models`** catalog
+  → the descriptor's dynamic `source: 'models'` field) → poll `GET /studio/videos/{id}` until
+  `data.status: succeeded` (`data.output_url`); the adapter routes `resolution`/`duration_seconds`/`fps`/
+  `aspect_ratio`/`generate_audio` into the nested `params` object and everything else (incl. resolved
+  `image_url`/`audio_url`) flat. These are the resolved survivors of a 6-provider ask — Superscale AI,
+  NullFace AI, SendShort, and Vireel were **dropped: no public API exists** (don't re-add without one).
+  **Built without a live key** — Reel.Farm's slideshow `video_url` field and Genviral's `/studio/models`
+  shape (mapped defensively) need a live smoke test.
 - **Sora** (OpenAI) is a branded kit studio (`/media/sora`) that **reuses the `openai` provider/key** —
   `descriptor.provider: 'openai'`, like Pika rides `fal` — so no separate credential: the org's existing
   Settings → AI / Media OpenAI key drives it. Video-only, two tabs (Text→Video, Image→Video). Sora lives

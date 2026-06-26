@@ -35,6 +35,8 @@ import { GoogleAiMediaAdapter } from './google-ai-media.adapter';
 import { RecraftMediaAdapter } from './recraft-media.adapter';
 import { IdeogramMediaAdapter } from './ideogram-media.adapter';
 import { LeonardoMediaAdapter } from './leonardo-media.adapter';
+import { ReelFarmAdapter } from './reelfarm.adapter';
+import { GenviralAdapter } from './genviral.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -1383,5 +1385,116 @@ describe('LeonardoMediaAdapter', () => {
 
   it('requires a key', async () => {
     await expect(adapter.generateImage('x')).rejects.toThrow('Leonardo.ai API key');
+  });
+});
+
+describe('ReelFarmAdapter', () => {
+  const adapter = new ReelFarmAdapter();
+
+  it('submits a slideshow prompt with Bearer auth, collecting background images', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ slideshow_id: 12345, status: 'processing' }));
+    const submission = await adapter.generateVideo('a 6-slide motivational slideshow', {
+      ...CREDS,
+      input: { image_1: 'https://img/a.jpg', image_3: 'https://img/c.jpg' },
+    });
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://reel.farm/api/v1/slideshows/generate');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      additional_context: 'a 6-slide motivational slideshow',
+      images: ['https://img/a.jpg', 'https://img/c.jpg'],
+    });
+    // jobId is the slideshow id, stringified.
+    expect(submission.jobId).toBe('12345');
+  });
+
+  it('polls status then fetches the rendered video_url from /videos/{id}', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ slideshow_id: 12345, status: 'completed', video_id: 'v-9' }))
+      .mockResolvedValueOnce(jsonResponse({ video_id: 'v-9', video_url: 'https://reel/out.mp4', finished: true }));
+    const result = await adapter.pollJob('12345', CREDS);
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://reel.farm/api/v1/slideshows/12345/status');
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://reel.farm/api/v1/videos/v-9');
+    expect(result).toMatchObject({ status: 'completed', artifactUrl: 'https://reel/out.mp4' });
+  });
+
+  it('stays pending until a video export exists, and surfaces failure', async () => {
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ slideshow_id: 1, status: 'rendering' }));
+    expect((await adapter.pollJob('1', CREDS)).status).toBe('pending');
+
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ slideshow_id: 1, status: 'failed' }));
+    expect((await adapter.pollJob('1', CREDS)).status).toBe('failed');
+  });
+
+  it('requires a key', async () => {
+    await expect(adapter.generateVideo('x')).rejects.toThrow('Reel.Farm API key');
+  });
+});
+
+describe('GenviralAdapter', () => {
+  const adapter = new GenviralAdapter();
+
+  it('submits a video, routing param fields into params and media/top-level fields flat', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ ok: true, code: 202, data: { video_id: 'gv-1', status: 'processing' } }));
+    const submission = await adapter.generateVideo('a product reveal', {
+      ...CREDS,
+      model: 'openai/sora-2',
+      input: {
+        image_url: 'https://img/p.jpg',
+        negative_prompt: 'blurry',
+        aspect_ratio: '9:16',
+        duration_seconds: 5,
+        generate_audio: true,
+      },
+    });
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://www.genviral.io/api/partner/v1/studio/videos');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      model_id: 'openai/sora-2',
+      prompt: 'a product reveal',
+      image_url: 'https://img/p.jpg',
+      negative_prompt: 'blurry',
+      params: { aspect_ratio: '9:16', duration_seconds: 5, generate_audio: true },
+    });
+    expect(submission.jobId).toBe('gv-1');
+  });
+
+  it('polls the envelope and completes on succeeded', async () => {
+    mockSafeFetch.mockResolvedValueOnce(
+      jsonResponse({ ok: true, data: { status: 'succeeded', output_url: 'https://gv/out.mp4' } }),
+    );
+    expect(await adapter.pollJob('gv-1', CREDS)).toMatchObject({
+      status: 'completed',
+      artifactUrl: 'https://gv/out.mp4',
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://www.genviral.io/api/partner/v1/studio/videos/gv-1');
+
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ ok: true, data: { status: 'processing' } }));
+    expect((await adapter.pollJob('gv-1', CREDS)).status).toBe('pending');
+
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ ok: true, data: { status: 'failed' } }));
+    expect((await adapter.pollJob('gv-1', CREDS)).status).toBe('failed');
+  });
+
+  it('lists video models defensively from /studio/models (array or {data})', async () => {
+    mockSafeFetch.mockResolvedValueOnce(
+      jsonResponse({ data: [{ id: 'openai/sora-2', name: 'Sora 2' }, 'bytedance/seedance-2.0'] }),
+    );
+    const models = await adapter.listModels('video', CREDS);
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://www.genviral.io/api/partner/v1/studio/models');
+    expect(models).toEqual([
+      { id: 'openai/sora-2', label: 'Sora 2' },
+      { id: 'bytedance/seedance-2.0', label: 'bytedance/seedance-2.0' },
+    ]);
+    // non-video operations have no catalog
+    expect(await adapter.listModels('image', CREDS)).toEqual([]);
+  });
+
+  it('requires a model and a key', async () => {
+    await expect(adapter.generateVideo('x')).rejects.toThrow('Genviral API key');
+    await expect(adapter.generateVideo('x', CREDS)).rejects.toThrow('Genviral requires a model');
   });
 });

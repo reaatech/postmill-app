@@ -35,6 +35,8 @@ import { RecraftMediaAdapter } from './adapters/recraft-media.adapter';
 import { IdeogramMediaAdapter } from './adapters/ideogram-media.adapter';
 import { LeonardoMediaAdapter } from './adapters/leonardo-media.adapter';
 import { XaiMediaAdapter } from './adapters/xai-media.adapter';
+import { ReelFarmAdapter } from './adapters/reelfarm.adapter';
+import { GenviralAdapter } from './adapters/genviral.adapter';
 
 const ALL_ADAPTERS = [
   FalAdapter,
@@ -70,6 +72,8 @@ const ALL_ADAPTERS = [
   IdeogramMediaAdapter,
   LeonardoMediaAdapter,
   XaiMediaAdapter,
+  ReelFarmAdapter,
+  GenviralAdapter,
 ];
 
 @Module({
