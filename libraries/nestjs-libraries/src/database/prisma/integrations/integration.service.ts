@@ -148,10 +148,6 @@ export class IntegrationService {
     return this._integrationRepository.getIntegrationsList(org);
   }
 
-  getIntegrationsForHealth(orgId: string) {
-    return this._integrationRepository.getIntegrationsForHealth(orgId);
-  }
-
   updateNameAndUrl(id: string, name: string, url: string) {
     return this._integrationRepository.updateNameAndUrl(id, name, url);
   }

@@ -44,7 +44,6 @@ import { SocialCommentsController } from '@gitroom/backend/api/routes/social-com
 import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
 import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
 import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
-import { ProviderCapabilitiesController } from '@gitroom/backend/api/routes/provider-capabilities.controller';
 import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
 import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
@@ -107,7 +106,6 @@ const authenticatedController = [
   AiSettingsController,
   AiModerateController,
   AiUserController,
-  ProviderCapabilitiesController,
   StorageController,
   ChannelConfigPerTenantController,
   OrgAiSettingsController,

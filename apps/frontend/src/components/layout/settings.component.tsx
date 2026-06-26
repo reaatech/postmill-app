@@ -303,7 +303,15 @@ export const SettingsPopup: FC<{
         <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
         <div className="flex flex-col gap-[12px] mobile:p-[16px]">
         {!isContentTab && tab !== 'storage' && (
-          <PageHeader title={tab === 'ai' ? 'AI' : 'Settings'} />
+          <PageHeader
+            title={
+              tab === 'channels'
+                ? 'Channels'
+                : tab === 'ai'
+                  ? 'AI'
+                  : 'Settings'
+            }
+          />
         )}
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)}>

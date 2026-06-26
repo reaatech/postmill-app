@@ -3,25 +3,27 @@
 import React, { FC, useCallback, useMemo, useState } from 'react';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ChannelEditModal } from './channel-edit.modal';
-import { ProviderCapabilitiesPanel } from './provider-capabilities.panel';
-import { DataTable, StatusPill } from '@gitroom/frontend/components/ui/data-table';
-import type { Column } from '@gitroom/frontend/components/ui/data-table';
+import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 import SafeImage from '@gitroom/react/helpers/safe.image';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
-interface ChannelHealthItem {
-  id: string;
-  name: string;
-  provider: string;
-  picture: string | null;
-  disabled: boolean;
-  configured: boolean;
-  providerEnabled: boolean;
-  tokenExpired: boolean;
-  refreshNeeded: boolean;
+interface ProviderCapability {
+  analytics: boolean;
+  comments: boolean;
+  firstComment: boolean;
+  poll: boolean;
+  video: boolean;
+  carousel: boolean;
+  altText: boolean;
+  maxMedia: number;
+  linkPreview: boolean;
+  refreshToken: boolean;
+  watchlist: boolean;
 }
+
+type CapabilityKey = keyof ProviderCapability;
 
 interface ProviderConfigItem {
   identifier: string;
@@ -37,7 +39,47 @@ interface ProviderConfigItem {
   scopes: string;
   redirectUri: string;
   updatedAt: string | null;
+  capabilities: ProviderCapability | null;
 }
+
+const CAPABILITY_KEYS: CapabilityKey[] = [
+  'analytics',
+  'comments',
+  'firstComment',
+  'poll',
+  'video',
+  'carousel',
+  'altText',
+  'linkPreview',
+  'refreshToken',
+  'watchlist',
+];
+
+const CAPABILITY_FILTERS: { key: CapabilityKey; label: string; active: string }[] = [
+  { key: 'analytics', label: 'Analytics', active: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+  { key: 'comments', label: 'Comments', active: 'bg-purple-500/20 text-purple-400 border-purple-500/40' },
+  { key: 'firstComment', label: 'First Comment', active: 'bg-amber-500/20 text-amber-400 border-amber-500/40' },
+  { key: 'poll', label: 'Polls', active: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40' },
+  { key: 'video', label: 'Video', active: 'bg-red-500/20 text-red-400 border-red-500/40' },
+  { key: 'carousel', label: 'Carousel', active: 'bg-pink-500/20 text-pink-400 border-pink-500/40' },
+  { key: 'altText', label: 'Alt Text', active: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40' },
+  { key: 'linkPreview', label: 'Link Preview', active: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40' },
+  { key: 'refreshToken', label: 'Refresh Token', active: 'bg-teal-500/20 text-teal-400 border-teal-500/40' },
+  { key: 'watchlist', label: 'Watchlist', active: 'bg-orange-500/20 text-orange-400 border-orange-500/40' },
+];
+
+const CAPABILITY_COLORS: Record<string, string> = {
+  analytics: 'bg-blue-500/20 text-blue-400',
+  comments: 'bg-purple-500/20 text-purple-400',
+  firstComment: 'bg-amber-500/20 text-amber-400',
+  poll: 'bg-emerald-500/20 text-emerald-400',
+  video: 'bg-red-500/20 text-red-400',
+  carousel: 'bg-pink-500/20 text-pink-400',
+  altText: 'bg-cyan-500/20 text-cyan-400',
+  linkPreview: 'bg-indigo-500/20 text-indigo-400',
+  refreshToken: 'bg-teal-500/20 text-teal-400',
+  watchlist: 'bg-orange-500/20 text-orange-400',
+};
 
 const useConfigs = () => {
   const fetch = useFetch();
@@ -46,21 +88,19 @@ const useConfigs = () => {
   );
 };
 
-const useHealth = () => {
-  const fetch = useFetch();
-  return useSWR<ChannelHealthItem[]>('/channels/config/health', (url: string) =>
-    fetch(url).then((r) => { if (!r.ok) throw new Error(r.statusText); return r.json(); })
-  );
-};
-
-const ProviderIcon: FC<{ identifier: string; name: string }> = ({ identifier, name }) => {
+const ChannelProviderIcon: FC<{ identifier: string; name: string; size?: number }> = ({
+  identifier,
+  name,
+  size = 40,
+}) => {
   const src = identifier === 'youtube'
     ? '/icons/platforms/youtube.svg'
     : `/icons/platforms/${identifier}.png`;
 
   return (
     <SafeImage
-      className="w-[28px] h-[28px] rounded-full"
+      className="rounded-full"
+      style={{ width: size, height: size }}
       src={src}
       alt={name}
       onError={(e) => {
@@ -70,25 +110,15 @@ const ProviderIcon: FC<{ identifier: string; name: string }> = ({ identifier, na
   );
 };
 
-const StatusBadge: FC<{ enabled: boolean; isConfigured: boolean }> = ({ enabled, isConfigured }) => {
-  const label = enabled && isConfigured ? 'Active' : enabled ? 'No Credentials' : 'Disabled';
-  const colorClass = enabled && isConfigured
-    ? 'bg-green-500/10 text-green-500'
-    : enabled
-    ? 'bg-yellow-500/10 text-yellow-500'
-    : 'bg-red-500/10 text-red-500';
-
-  return <span className={`text-[12px] px-[8px] py-[2px] rounded-full ${colorClass}`}>{label}</span>;
-};
-
 export const ChannelsTab: FC = () => {
-  const user = useUser();
+  const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const { mutate: globalMutate } = useSWRConfig();
   const { data: configs, isLoading, error, mutate } = useConfigs();
-  const { data: health } = useHealth();
   const [editingIdentifier, setEditingIdentifier] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [selectedCaps, setSelectedCaps] = useState<CapabilityKey[]>([]);
 
   const handleDelete = useCallback(async (identifier: string) => {
     try {
@@ -141,6 +171,53 @@ export const ChannelsTab: FC = () => {
     }
   }, [fetch, toaster]);
 
+  const toggleCap = useCallback((cap: CapabilityKey) => {
+    setSelectedCaps((prev) =>
+      prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap]
+    );
+  }, []);
+
+  const sortedProviders = useMemo(() => {
+    return [...(configs || [])].sort((a, b) => {
+      if (a.isConfigured !== b.isConfigured) return a.isConfigured ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [configs]);
+
+  const filteredProviders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return sortedProviders.filter((p) => {
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !p.identifier.toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+      if (
+        selectedCaps.length &&
+        !selectedCaps.some((c) => p.capabilities?.[c])
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [sortedProviders, search, selectedCaps]);
+
+  const shellProviders = useMemo(
+    () =>
+      filteredProviders.map((p) => ({
+        id: p.identifier,
+        identifier: p.identifier,
+        name: p.name,
+        enabled: p.enabled && p.isConfigured,
+        isActive: p.enabled && p.isConfigured,
+        isConfigured: p.isConfigured,
+        capabilities: CAPABILITY_KEYS.filter((c) => p.capabilities?.[c]),
+      })),
+    [filteredProviders]
+  );
+
   if (error) {
     return (
       <div className="flex flex-col items-center gap-[12px] py-[40px]">
@@ -159,134 +236,109 @@ export const ChannelsTab: FC = () => {
     );
   }
 
-  const configsList = configs || [];
-
   return (
     <div className="flex flex-col gap-[16px]">
-      <div>
-        <h2 className="text-[18px] font-[600]">Channel Credentials</h2>
-        <p className="text-[13px] text-textColor/60 mt-[4px]">
-          Configure your own OAuth app credentials for each social channel. These credentials are
-          used when connecting channels to your organization.
-        </p>
-      </div>
+      {editingIdentifier && (
+        <ChannelEditModal
+          identifier={editingIdentifier}
+          name={filteredProviders.find((p) => p.identifier === editingIdentifier)?.name || editingIdentifier}
+          enabled={filteredProviders.find((p) => p.identifier === editingIdentifier)?.enabled || false}
+          scopes={filteredProviders.find((p) => p.identifier === editingIdentifier)?.scopes || ''}
+          redirectUri={filteredProviders.find((p) => p.identifier === editingIdentifier)?.redirectUri || ''}
+          setupNotes={filteredProviders.find((p) => p.identifier === editingIdentifier)?.setupNotes || ''}
+          isConfigured={filteredProviders.find((p) => p.identifier === editingIdentifier)?.isConfigured || false}
+          onSave={handleSave}
+          onDelete={handleDelete}
+          onTest={handleTestConnection}
+          onClose={() => setEditingIdentifier(null)}
+        />
+      )}
 
-      {configsList.length === 0 ? (
-        <div className="text-textColor/50 text-[14px] py-[40px] text-center">
-          No channel configurations found.
-        </div>
-      ) : (
-        <div className="flex flex-col gap-[8px]">
-          {configsList.filter((c) => !c.isExternal && !c.isWeb3 && !c.isChromeExtension).map((config) => (
-            <div
-              key={config.identifier}
-              className="flex flex-col bg-newTableHeader rounded-[8px]"
-            >
-              <div
-                className="w-full flex items-center gap-[12px] p-[12px] cursor-pointer hover:bg-newTableHeader/80"
-                onClick={() => setEditingIdentifier(
-                  editingIdentifier === config.identifier ? null : config.identifier
-                )}
-              >
-                <ProviderIcon identifier={config.identifier} name={config.name} />
-                <div className="flex-1 min-w-0">
-                  <div className="text-[14px] font-[500] text-textColor">{config.name}</div>
-                  <div className="text-[12px] text-textColor/60 truncate">{config.description}</div>
-                </div>
-                <div className="flex items-center gap-[8px] shrink-0">
-                  <StatusBadge enabled={config.enabled} isConfigured={config.isConfigured} />
-                  <span className="text-[12px] text-textColor font-[500]">
-                    {editingIdentifier === config.identifier ? 'Close' : 'Edit'}
-                  </span>
-                </div>
-              </div>
-
-              {editingIdentifier === config.identifier && (
-                <div className="px-[12px] pb-[12px]">
-                  <ChannelEditModal
-                    identifier={config.identifier}
-                    name={config.name}
-                    enabled={config.enabled}
-                    scopes={config.scopes}
-                    redirectUri={config.redirectUri}
-                    setupNotes={config.setupNotes}
-                    isConfigured={config.isConfigured}
-                    onSave={handleSave}
-                    onDelete={handleDelete}
-                    onTest={handleTestConnection}
-                    onClose={() => setEditingIdentifier(null)}
-                  />
-                </div>
+      <ProviderListShell
+        title={t('channels', 'Channels')}
+        toolbar={
+          <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
+            <div className="flex-1 relative">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('search_providers', 'Search providers...')}
+                className="w-full px-[12px] py-[8px] pr-[36px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label={t('clear_search', 'Clear search')}
+                  className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center rounded-full text-newTableText hover:text-textColor hover:bg-boxHover transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
               )}
             </div>
-          ))}
-        </div>
-      )}
-
-      <ProviderCapabilitiesPanel />
-
-      {health && health.length > 0 && (
-        <div className="flex flex-col gap-[12px] mt-[8px]">
-          <div className="border-t border-newTableBorder pt-[16px]">
-            <h3 className="text-[15px] font-[600] text-textColor mb-[4px]">
-              Connection Status
-            </h3>
-            <p className="text-[13px] text-textColor/60 mb-[12px]">
-              Overview of your connected channels and their authentication status.
-            </p>
-            <DataTable
-              columns={[
-                {
-                  key: 'channel',
-                  header: 'Channel',
-                  render: (item: ChannelHealthItem) => (
-                    <div className="flex items-center gap-[8px]">
-                      {item.picture && (
-                        <SafeImage className="w-[22px] h-[22px] rounded-full" src={item.picture} alt={item.name} />
-                      )}
-                      <span className="font-[500] text-textColor">{item.name}</span>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  render: (item: ChannelHealthItem) => {
-                    const map = item.disabled ? 'red' : item.tokenExpired ? 'red' : item.refreshNeeded ? 'amber' : 'green' as const;
-                    const label = item.disabled ? 'Disabled' : item.tokenExpired ? 'Token Expired' : item.refreshNeeded ? 'Refresh Needed' : 'Connected';
-                    return <StatusPill status={map} label={label} />;
-                  },
-                },
-                {
-                  key: 'details',
-                  header: 'Details',
-                  render: (item: ChannelHealthItem) => {
-                    let text = '';
-                    if (!item.configured) text = 'Provider not configured';
-                    else if (!item.providerEnabled) text = 'Provider disabled in settings';
-                    else if (item.tokenExpired) text = 'Token expired, reconnect needed';
-                    else if (item.refreshNeeded) text = 'Token refresh required';
-                    else text = 'Healthy';
-                    return <span className="text-textColor/60 text-[12px]">{text}</span>;
-                  },
-                },
-                {
-                  key: 'action',
-                  header: 'Action',
-                  render: (item: ChannelHealthItem) =>
-                    (item.tokenExpired || item.refreshNeeded) ? (
-                      <a href={`/integrations/social/${item.provider}?refresh=${item.id}`} className="text-[12px] text-textColor font-[500] hover:underline">
-                        Reconnect
-                      </a>
-                    ) : null,
-                },
-              ]}
-              data={health}
-              keyExtractor={(item: ChannelHealthItem) => item.id}
-            />
+            <div className="flex items-center gap-[8px]">
+              {CAPABILITY_FILTERS.map((f) => {
+                const active = selectedCaps.includes(f.key);
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => toggleCap(f.key)}
+                    aria-pressed={active}
+                    className={`text-[13px] px-[12px] py-[8px] rounded-[8px] border transition-colors ${
+                      active
+                        ? f.active
+                        : 'bg-newBgColor border-newTableBorder text-newTableText hover:bg-boxHover'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
+        }
+        providers={shellProviders}
+        onConfigure={(id) => setEditingIdentifier(id)}
+        onRemove={(id) => handleDelete(id)}
+        ProviderIconComponent={ChannelProviderIcon}
+        renderBadges={(provider) => {
+          const caps = (provider.capabilities || []).filter((cap): cap is CapabilityKey =>
+            CAPABILITY_KEYS.includes(cap as CapabilityKey)
+          );
+          if (caps.length === 0) return null;
+          return (
+            <div className="flex gap-[4px] mt-[4px] flex-wrap">
+              {caps.map((cap) => (
+                <span
+                  key={cap}
+                  className={`text-[10px] rounded-[4px] px-[6px] py-[2px] ${
+                    CAPABILITY_COLORS[cap] || 'bg-newTableHeader text-newTableText'
+                  }`}
+                >
+                  {CAPABILITY_FILTERS.find((f) => f.key === cap)?.label || cap}
+                </span>
+              ))}
+            </div>
+          );
+        }}
+        renderActions={(provider) => {
+          const p = filteredProviders.find((pr) => pr.identifier === provider.identifier);
+          return (
+            <>
+              <button
+                className="text-[12px] text-textColor hover:underline"
+                onClick={() => setEditingIdentifier(provider.identifier)}
+              >
+                {p?.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
+              </button>
+            </>
+          );
+        }}
+      />
     </div>
   );
 };

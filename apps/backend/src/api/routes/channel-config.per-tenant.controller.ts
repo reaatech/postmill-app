@@ -15,7 +15,7 @@ import { ApiTags } from '@nestjs/swagger';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
+import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
@@ -25,7 +25,6 @@ export class ChannelConfigPerTenantController {
   constructor(
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
-    private _integrationService: IntegrationService
   ) {}
 
   @Get('/')
@@ -50,37 +49,7 @@ export class ChannelConfigPerTenantController {
         scopes: p.scopes?.join(', ') || '',
         redirectUri: dbConfig?.redirectUri || '',
         updatedAt: dbConfig?.updatedAt || null,
-      };
-    });
-  }
-
-  @Get('/health')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  async getHealth(@GetOrgFromRequest() org: Organization) {
-    const [integrations, configs] = await Promise.all([
-      this._integrationService.getIntegrationsForHealth(org.id),
-      this._orgProviderConfigService.getConfigs(org.id),
-    ]);
-
-    const configMap = new Map(configs.map((c) => [c.identifier, c]));
-    const now = new Date();
-
-    return integrations.map((integration) => {
-      const config = configMap.get(integration.providerIdentifier);
-      const tokenExpired = integration.tokenExpiration
-        ? new Date(integration.tokenExpiration) < now
-        : false;
-
-      return {
-        id: integration.id,
-        name: integration.name,
-        provider: integration.providerIdentifier,
-        picture: integration.picture,
-        disabled: integration.disabled,
-        configured: config?.isConfigured || false,
-        providerEnabled: config?.enabled || false,
-        tokenExpired,
-        refreshNeeded: integration.refreshNeeded,
+        capabilities: PROVIDER_CAPABILITIES[p.identifier] || null,
       };
     });
   }
@@ -108,6 +77,7 @@ export class ChannelConfigPerTenantController {
       isChromeExtension: !!provider?.isChromeExtension,
       customFields: !!provider?.customFields,
       updatedAt: config?.updatedAt || null,
+      capabilities: PROVIDER_CAPABILITIES[identifier] || null,
     };
   }
 
