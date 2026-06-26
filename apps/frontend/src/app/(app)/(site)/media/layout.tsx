@@ -476,7 +476,8 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
           </button>
         </div>
 
-        {sortedTabs.map((t, i) => {
+        <div className="flex flex-1 min-h-0 flex-col gap-[4px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
+          {sortedTabs.map((t, i) => {
             const active = pathname.startsWith(t.href);
             // 'Platform' (Designer) is the lone built-in tool — no section header.
             const showHeader =
@@ -513,6 +514,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
               </React.Fragment>
             );
           })}
+        </div>
       </div>
 
       {/* Page area: mobile gets a horizontal sub-menu strip above the content. */}

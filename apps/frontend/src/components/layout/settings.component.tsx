@@ -244,7 +244,7 @@ export const SettingsPopup: FC<{
             </svg>
           </button>
         </div>
-        <div className="flex flex-1 flex-col gap-[15px]">
+        <div className="flex flex-1 min-h-0 flex-col gap-[15px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
           {(() => {
             const elements: React.ReactNode[] = [];
             let currentSection = '';
