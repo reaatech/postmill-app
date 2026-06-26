@@ -11,6 +11,21 @@
 ## Unreleased
 
 ### Added
+- **Signatures — channel scope, logo/sticker, usage tracking & auto-add wiring.** Signatures gained
+  a `name`, a `channels[]` scope (integration ids; empty = all channels), a `usageCount`, and an
+  optional `pictureId → File` logo/sticker. New endpoints: `GET /signatures/auto` (all auto-add
+  signatures) and `POST /signatures/:id/track-usage`. The Settings → Signatures tab was rebuilt
+  (channel-scope avatar chips, logo picker via `MediaSelectorModal`, usage, modern card list) and the
+  broken auto-add toggle was fixed. New posts are now **seeded with each auto-add signature's text and
+  logo**, gated by channel scope — baked into the composer's initial value (the only path the TipTap
+  editor honours); applying a signature (auto or manual) tracks usage. The single-auto-add restriction
+  was removed so several channel-scoped auto-add signatures can coexist. *(Schema: additive columns
+  on `Signatures` + a `File.signatures` back-relation, db-push-safe.)*
+- **Sets — media-rich list + RBAC gating.** The Sets list (which previously showed blank channels and
+  a `0` post count because it parsed the composer payload as an array) now reads `content.posts`:
+  real post count, channel avatars (joined against `/integrations/list`), and a media-thumbnail stack,
+  in a modern card layout. `SetsController` is now gated on the `posts` RBAC resource
+  (`OrgRbacGuard` + `@RequirePermission`) — it was previously ungated.
 - **Recraft, Ideogram, and Leonardo.ai media studios** (`/media/recraft`, `/media/ideogram`,
   `/media/leonardo`) — three own-key image-generation Studio Kit studios configured at Settings → Media.
   **Recraft** (Bearer) for raster + vector/SVG + icons; **Ideogram** for accurate in-image text (key as

@@ -329,7 +329,10 @@ const AddOrEditSignature: FC<{
 };
 
 export const SignaturesComponent: FC<{
-  appendSignature?: (value: string) => void;
+  appendSignature?: (sig: {
+    content: string;
+    picture?: SignaturePicture | null;
+  }) => void;
 }> = ({ appendSignature }) => {
   const fetch = useFetch();
   const modal = useModals();
@@ -397,7 +400,7 @@ export const SignaturesComponent: FC<{
 
   const applySignature = useCallback(
     (sig: SignatureItem) => () => {
-      appendSignature?.(sig.content);
+      appendSignature?.({ content: sig.content, picture: sig.picture });
       // Best-effort usage tracking; never block the insert on it.
       fetch(`/signatures/${sig.id}/track-usage`, { method: 'POST' })
         .then(() => mutate())

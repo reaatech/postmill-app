@@ -763,7 +763,10 @@ export const Editor: FC<{
                   }
                   toolBar={
                     <div className="flex gap-[5px]">
-                      <SignatureBox editor={editorRef?.current?.editor} />
+                      <SignatureBox
+                        editor={editorRef?.current?.editor}
+                        appendImages={appendImages}
+                      />
                       {editorType !== 'none' && (
                         <>
                           <UText

@@ -32,8 +32,8 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `Tags` | Per-org color-coded tags for posts | FK → `Organization`; has many `TagsPosts` |
 | `TagsPosts` | Many-to-many join between posts and tags | FK → `Post`, `Tags` |
-| `Sets` | Named content blocks (reusable text/JSON) | FK → `Organization` |
-| `Signatures` | Per-org post signatures with auto-add flag | FK → `Organization` |
+| `Sets` | Named, reusable post templates (serialized composer payload) | FK → `Organization` |
+| `Signatures` | Per-org post signatures — content, channel scope (`channels[]`), auto-add, usage count, optional logo/sticker | FK → `Organization`, FK → `File` (`pictureId`) |
 | `Notifications` | Per-org notification feed entries | FK → `Organization` |
 | `Errors` | Post-publish errors with platform and message | FK → `Organization`, `Post` |
 | `Announcement` | System-wide announcements (info/warning/error) | Standalone |

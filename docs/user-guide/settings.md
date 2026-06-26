@@ -369,20 +369,35 @@ Available when your subscription tier includes auto-posting. Configure scheduled
 
 ## Sets tab
 
-Available on paid tiers (not FREE). Create named collections of post content templates:
+Available on paid tiers (not FREE). Create named, reusable post templates:
 
-- Create sets with multiple pre-written posts.
-- Quickly load a set into the composer when preparing a campaign.
+- A **Set** captures a full composer payload — the selected channels, per-channel settings, post
+  content, and any attached media — so you can reload it into the composer in one click.
+- The Sets list shows a rich preview of each set: the channels it targets (as avatars), how many
+  posts it contains, and thumbnails of its media.
 - Edit and delete existing sets.
+
+Managing sets requires the `posts` permission (RBAC). Endpoints: `GET/POST/PUT /sets`,
+`DELETE /sets/:id`.
 
 ## Signatures tab
 
-Available on paid tiers (not FREE). Manage reusable auto-append text blocks:
+Available on paid tiers (not FREE). Manage reusable, channel-aware signatures:
 
-- Create signatures — short text that appends to the end of every post (e.g. hashtag blocks,
-  legal disclosures, "Follow us" CTAs).
-- Assign signatures per channel.
-- Signatures are configurable per post type.
+- **Content** — a reusable text block appended to a post (hashtag blocks, legal disclosures,
+  "Follow us" CTAs).
+- **Logo / sticker** — optionally attach an image (from your Files or the stock library) to a
+  signature. When the signature is applied, the image is added to the post's media.
+- **Channel scope** — apply a signature to all channels, or restrict it to specific channels.
+- **Auto-add** — mark one or more signatures to be appended automatically to new posts (text **and**
+  logo), respecting each signature's channel scope. Several scoped auto-add signatures can coexist.
+- **Usage** — each signature tracks how many times it has been applied.
+- Insert a signature manually from the composer's signature toolbar button (its logo is attached
+  too).
+
+Endpoints: `GET /signatures`, `GET /signatures/auto` (auto-add signatures), `GET /signatures/default`,
+`POST /signatures`, `PUT /signatures/:id`, `POST /signatures/:id/track-usage`,
+`DELETE /signatures/:id`.
 
 ## Developers tab
 
