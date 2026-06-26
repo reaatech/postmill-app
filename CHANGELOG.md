@@ -11,6 +11,14 @@
 ## Unreleased
 
 ### Added
+- **Wan media studio** (`/media/wan`) — a dedicated, Wan-branded Studio Kit studio for Alibaba Wan
+  (Tongyi Wanxiang) on **Alibaba Cloud Model Studio** with three tabs: Text→Image (`wan2.2-t2i*` /
+  `wanx2.1-t2i*`), Text→Video and Image→Video (`wan2.x-t2v*` / `wan2.x-i2v*`). Same DashScope
+  async-task protocol as the Qwen studio (`X-DashScope-Async` → poll `GET /tasks/{id}`; image
+  bounded-poll-synchronous, video poll-cron) pointed at the **international** host
+  `dashscope-intl.aliyuncs.com`. **Own-key** provider configured at Settings → AI Media (not a
+  credential-reuse hub). Built source-grounded against Alibaba's public Model Studio API reference —
+  the exact intl host/region may need a live smoke test.
 - **AI-hub media studios** (`/media/{togetherai,siliconflow,groq,openrouter,fireworks,deepinfra,gateway,bedrock,azure}`)
   — The AI hub/aggregator providers from Settings → AI now also expose their **media** catalogs as
   full Studio Kit studios, each **reusing the org's existing AI key** (the Qwen

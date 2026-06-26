@@ -61,6 +61,7 @@ describe('MediaModule', () => {
       'tavus',
       'togetherai',
       'vertex',
+      'wan',
     ]);
   });
 });

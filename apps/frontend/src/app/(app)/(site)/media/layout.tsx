@@ -139,6 +139,16 @@ const tabs = [
     ),
   },
   {
+    href: '/media/wan',
+    label: 'Wan',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 5l3 14 4-10 4 10 3-14" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/siliconflow',
     label: 'SiliconFlow',
     section: 'Providers',

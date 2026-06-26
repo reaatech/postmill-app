@@ -678,6 +678,20 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   Media and both work. (openai/minimax instead write-mirror both ways via `ProviderCredentialLinkService`;
   Qwen has no media-side settings flow, so a read-fallback is the lighter path — extend
   `UNIVERSAL_AI_CREDENTIAL` to add more such providers.)
+- **Wan (Alibaba Model Studio)** is a dedicated, Wan-branded kit studio (`/media/wan`) with three tabs
+  — Text→Image (`wan2.2-t2i*` / `wanx2.1-t2i*` via `…/text2image/image-synthesis`), Text→Video and
+  Image→Video (`wan2.x-t2v*` / `wan2.x-i2v*` via `…/video-generation/video-synthesis`). It is the **same
+  DashScope async-task protocol as Qwen** (`X-DashScope-Async` → `task_id`, poll `GET /tasks/{id}`,
+  `output.video_url`/`output.results[].url`; image bounded-poll-synchronous, video poll-cron with no
+  webhook) but pointed at the **international host** `dashscope-intl.aliyuncs.com` (clicking "API" on
+  wan.video lands on `modelstudio.alibabacloud.com` — wan.video IS Model Studio, with Wan as the model
+  family). Unlike Qwen, Wan is an **own-key** provider configured at Settings → Media — it is
+  intentionally **NOT** in `UNIVERSAL_AI_CREDENTIAL` (a Wan key need not be the Qwen LLM key), so it
+  surfaces purely by adapter registration. `wan.adapter.ts` reuses Qwen's `INPUT_KEYS` routing
+  (`negative_prompt`/`img_url`/`audio_url` → `input`, all else → `parameters`). Model lists are curated
+  in the descriptor (DashScope has no clean per-modality catalog for the task API). **Built without a
+  live key** — endpoints/model ids are grounded in Alibaba's public Model Studio API reference; the
+  exact intl host/region may need a live smoke test.
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

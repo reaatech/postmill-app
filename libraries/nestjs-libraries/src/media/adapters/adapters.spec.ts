@@ -27,6 +27,7 @@ import { GroqMediaAdapter } from './groq-media.adapter';
 import { OpenRouterMediaAdapter } from './openrouter-media.adapter';
 import { FireworksMediaAdapter } from './fireworks-media.adapter';
 import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
+import { WanAdapter } from './wan.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -566,6 +567,85 @@ describe('QwenMediaAdapter', () => {
     mockSafeFetch.mockResolvedValue(jsonResponse({ data: [] }));
     const ok = await adapter.testConnection(CREDS);
     expect(mockSafeFetch.mock.calls[0][0]).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/models');
+    expect(ok).toMatchObject({ ok: true });
+    expect(await adapter.testConnection({})).toMatchObject({ ok: false });
+  });
+});
+
+describe('WanAdapter', () => {
+  const adapter = new WanAdapter();
+
+  it('submits Wan2.2 text-to-image as an intl DashScope async task and routes params', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ output: { task_id: 'task-img', task_status: 'PENDING' } }))
+      .mockResolvedValueOnce(jsonResponse({ output: { task_status: 'RUNNING' } }))
+      .mockResolvedValueOnce(
+        jsonResponse({ output: { task_status: 'SUCCEEDED', results: [{ url: 'https://wan/out.png' }] } }),
+      );
+    const result = await adapter.generateImage('a cat', {
+      ...CREDS,
+      input: { negative_prompt: 'blurry', size: '1280*1280', n: 1 },
+    });
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>)['X-DashScope-Async']).toBe('enable');
+    // negative_prompt → input, size/n → parameters; default model applied.
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      model: 'wan2.2-t2i-flash',
+      input: { prompt: 'a cat', negative_prompt: 'blurry' },
+      parameters: { size: '1280*1280', n: 1 },
+    });
+    expect(result.image).toBe('https://wan/out.png');
+  }, 15000);
+
+  it('submits Wan2.x text-to-video (no webhook) and returns the task id', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ output: { task_id: 'task-vid', task_status: 'PENDING' } }));
+    const submission = await adapter.generateVideo('a sunset', { ...CREDS, model: 'wan2.2-t2v-plus' });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe(
+      'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+    );
+    expect(submission.jobId).toBe('task-vid');
+  });
+
+  it('routes img_url into input for image-to-video', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ output: { task_id: 'task-i2v' } }));
+    await adapter.generateVideo('pan', {
+      ...CREDS,
+      model: 'wan2.2-i2v-plus',
+      input: { img_url: 'https://img/src.png', resolution: '720P' },
+    });
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body.input).toMatchObject({ prompt: 'pan', img_url: 'https://img/src.png' });
+    expect(body.parameters).toMatchObject({ resolution: '720P' });
+  });
+
+  it('polls task status (video url, pending, failed)', async () => {
+    mockSafeFetch.mockResolvedValueOnce(
+      jsonResponse({ output: { task_status: 'SUCCEEDED', video_url: 'https://wan/out.mp4' } }),
+    );
+    expect(await adapter.pollJob('task-vid', CREDS)).toMatchObject({
+      status: 'completed',
+      artifactUrl: 'https://wan/out.mp4',
+    });
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ output: { task_status: 'RUNNING' } }));
+    expect((await adapter.pollJob('task-vid', CREDS)).status).toBe('pending');
+    mockSafeFetch.mockResolvedValueOnce(
+      jsonResponse({ output: { task_status: 'FAILED', message: 'content moderated' } }),
+    );
+    expect(await adapter.pollJob('task-vid', CREDS)).toMatchObject({ status: 'failed', error: 'content moderated' });
+  });
+
+  it('rejects unsupported operations and requires a key', async () => {
+    await expect(adapter.generateAudio('x', CREDS)).rejects.toThrow('audio');
+    await expect(adapter.generateAvatar('x', CREDS)).rejects.toThrow('avatar');
+    await expect(adapter.generateVideo('x', {})).rejects.toThrow('API key');
+  });
+
+  it('tests the connection via the intl OpenAI-compatible models list', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    const ok = await adapter.testConnection(CREDS);
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models');
     expect(ok).toMatchObject({ ok: true });
     expect(await adapter.testConnection({})).toMatchObject({ ok: false });
   });
