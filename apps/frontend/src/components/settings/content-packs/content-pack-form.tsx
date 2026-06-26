@@ -110,7 +110,7 @@ export const ContentPackForm: React.FC<ContentPackFormProps> = ({
           <input
             className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] w-full"
             type={showKey ? 'text' : 'password'}
-            placeholder={t('api_key_placeholder', 'Paste your Magnific API key')}
+            placeholder={`Paste your ${provider.name} API key`}
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
           />

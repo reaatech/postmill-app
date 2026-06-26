@@ -3,7 +3,8 @@ import { createHash } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
-import { MagnificContentPack, type ContentPackCapability } from './content-packs/magnific.content-pack';
+import { createContentPack } from './content-packs/content-pack.registry';
+import type { ContentPackCapability } from './content-packs/content-pack.interface';
 import {
   StockAudioItem,
   StockIconItem,
@@ -429,17 +430,20 @@ export class StockMediaService {
 
   // ── Premium mint-then-ingest ─────────────────────────────────
 
-  async resolveMagnificDownload(
+  async resolveContentPackDownload(
     orgId: string,
     id: string,
     capability: ContentPackCapability = 'photos'
   ) {
-    // Caller is responsible for having an active Magnific pack; this is used by /files/import.
+    // Caller is responsible for having an active pack; this is used by /files/import.
     const active = await this._contentPacks.getActiveForCapability(orgId, capability);
     if (!active) {
-      throw new Error('No active Magnific content pack');
+      throw new Error('No active content pack');
     }
-    const pack = new MagnificContentPack(active.credentials.apiKey);
+    const pack = createContentPack(active.identifier, active.credentials);
+    if (!pack) {
+      throw new Error(`Unknown content pack provider "${active.identifier}"`);
+    }
     return pack.resolveDownload(id, capability);
   }
 
@@ -460,19 +464,21 @@ export class StockMediaService {
 
   private async resolveSearch<T>(
     orgId: string,
-    capability: ContentPackCapability | 'stickers' | 'audio',
+    capability: ContentPackCapability,
     query: string,
     page: number,
     filters: Record<string, string | undefined>,
     freeSearch: () => Promise<StockSearchResponse<T>>
   ): Promise<StockSearchResponse<T>> {
-    const premiumCapabilities: ContentPackCapability[] = ['photos', 'vectors', 'icons', 'videos'];
-    if (premiumCapabilities.includes(capability as ContentPackCapability)) {
-      const active = await this._contentPacks.getActiveForCapability(orgId, capability as ContentPackCapability);
-      if (active) {
-        const pack = new MagnificContentPack(active.credentials.apiKey);
+    // If the org's active content pack covers this capability, use it; otherwise
+    // (pack absent, or it doesn't declare this capability) fall back to the free
+    // provider. This is the per-capability "default to free" behaviour.
+    const active = await this._contentPacks.getActiveForCapability(orgId, capability);
+    if (active) {
+      const pack = createContentPack(active.identifier, active.credentials);
+      if (pack) {
         return pack.search(
-          capability as ContentPackCapability,
+          capability,
           query,
           page,
           Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined)) as Record<string, string>

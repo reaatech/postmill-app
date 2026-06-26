@@ -872,10 +872,27 @@ empty configs).
 - Per-org packs configured at **Settings → Content Packs**, resolved per-org-per-capability by
   `OrgContentPackSettingsService` (`database/prisma/content-packs/`). Backed by `ContentPackConfig`
   (encrypted credentials + provider `extraConfig`) and a pointer `Organization.activeContentPackIdentifier`.
-- **Magnific** is the first pack (photos, vectors, icons, videos). When a pack is active it takes
-  precedence over the matching free catalog for that capability; saving uses a **mint-then-ingest**
-  step (`resolveMagnificDownload` resolves a licensed URL before `/files/import`). Credentials are
-  encrypted at rest and never returned to the client.
+- **A `ContentPack` registry is the single source of truth** (`media/stock/content-packs/
+  content-pack.registry.ts`): each entry declares `{ name, capabilities, credentialFields, factory }`.
+  Adding a pack there surfaces it in the settings list, the credential form, and per-capability
+  resolution — no other wiring. Every pack implements the shared `ContentPack` interface
+  (`content-pack.interface.ts`: `search(capability, …)` + `resolveDownload(id, capability)`); all
+  outbound HTTP goes through `safeFetch`; a provider 429 throws `ContentPackDailyCapError` → the import
+  controller maps it to a 402.
+- **Four packs**: **Magnific** (photos/vectors/icons/videos), **Vecteezy** (photos/vectors/videos),
+  **Adobe Stock** (photos/vectors/videos — the user's "Adobe Firefly" ask resolved to the licensable
+  Adobe *Stock* library, not Firefly generative), **Envato Elements** (photos/vectors/videos/audio).
+  Only ONE pack is active per org. When the active pack covers a capability it takes precedence over
+  the matching free catalog; **anything it does NOT declare falls back to the free provider** for that
+  capability (`StockMediaService.resolveSearch` → `getActiveForCapability` returns null → free). Saving
+  uses a **mint-then-ingest** step (`resolveContentPackDownload` → the pack's `resolveDownload` mints a
+  licensed URL before `/files/import`; the import gate fires for any `source` in the registry).
+  Credentials are encrypted at rest and never returned to the client.
+- **Risk**: Vecteezy and Envato were built source-grounded but **without live keys** (Vecteezy's
+  content API is partner-gated; Envato's download entitlement differs between Market and Elements), and
+  Adobe Stock's full *licensed* download needs an OAuth entitlement (search + comp URL work with a key
+  alone). Per-pack request/response shapes may need a live smoke test; each pack is independently
+  verifiable behind its own adapter.
 
 ### Saving into `/files`
 - All saves go through **`POST /files/import`** → `FileService.importFromUrl`

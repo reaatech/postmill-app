@@ -14,6 +14,16 @@ import {
 } from './stock.types';
 import { SaveToFilesModal } from './save-to-files-modal';
 
+// Premium BYOK content packs mint a licensed download URL from the item id at
+// import time (mint-then-ingest). Keep in sync with the backend registry.
+const CONTENT_PACK_SOURCES = new Set(['magnific', 'vecteezy', 'adobe-stock', 'envato']);
+const CONTENT_PACK_LABELS: Record<string, string> = {
+  magnific: 'Magnific',
+  vecteezy: 'Vecteezy',
+  'adobe-stock': 'Adobe Stock',
+  envato: 'Envato Elements',
+};
+
 interface StockPreviewModalProps {
   item: StockPhotoItem | StockVideoItem | StockVectorItem | StockStickerItem | StockIconItem;
   type: 'photo' | 'video' | 'vector' | 'sticker' | 'icon';
@@ -110,7 +120,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
     }
 
     // Premium content packs mint a licensed download URL from the item id.
-    if (source === 'magnific') {
+    if (CONTENT_PACK_SOURCES.has(source)) {
       downloadLocation = item.id;
     }
 
@@ -232,8 +242,8 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       pexels: 'Pexels',
       pixabay: 'Pixabay',
       giphy: 'GIPHY',
-      magnific: 'Magnific',
       iconify: 'Iconify',
+      ...CONTENT_PACK_LABELS,
     }[item.source] || item.source;
 
   const renderAttributionLine = () => {
@@ -268,10 +278,11 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       return <div className="text-[12px] text-newTextColor/60">Powered by GIPHY</div>;
     }
 
-    if (item.source === 'magnific') {
+    if (CONTENT_PACK_SOURCES.has(item.source)) {
       return (
         <div className="text-[12px] text-newTextColor/60">
-          Magnific (BYOK) · {item.license || 'Premium content pack'}
+          {CONTENT_PACK_LABELS[item.source] || item.source} (BYOK) ·{' '}
+          {item.license || 'Premium content pack'}
         </div>
       );
     }

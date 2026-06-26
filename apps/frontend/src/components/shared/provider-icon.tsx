@@ -69,6 +69,9 @@ const ICONS: Record<string, Entry> = {
 
   // ── Content Pack Providers ────────────────────────────────
   magnific: { viewBox: '0 0 24 24', color: '#D946EF', node: (<path d="M12 2l1.5 5.5L19 9l-5.5 2L12 22l-1.5-11L5 9l5.5-1.5L12 2Z" />) },
+  vecteezy: { viewBox: '0 0 24 24', color: '#FB5541', node: (<path d="M3 4l9 16 9-16h-4l-5 9-5-9H3z" />) },
+  'adobe-stock': { viewBox: '0 0 24 24', color: '#EB1000', node: (<><rect x="2" y="2" width="20" height="20" rx="3" fill="#EB1000" /><path d="M12 6l4 12h-2.6l-.9-3h-3l1-2.6h1.2L12 9.6 9.2 18H6.6L11 6h1z" fill="#fff" /></>) },
+  envato: { viewBox: '0 0 24 24', color: '#81B441', node: (<path d="M15.6 3c-3.5.4-6.4 3-7.4 6.3-.3-1.2-.3-2.5 0-3.8C5.5 7.2 4 10.3 4 13.6 4 17.7 7.3 21 11.4 21c4.6 0 8.3-3.7 8.3-8.3 0-3.6-1.5-7-3.9-9.5l-.2-.2z" />) },
 
   // ── Shortlink Providers ───────────────────────────────────
   bitly: { viewBox: '0 0 24 24', color: '#EE6123', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm3 8h-3v-2h3v2Z" />) },

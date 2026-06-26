@@ -22,7 +22,8 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
-import { MagnificDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/magnific.content-pack';
+import { ContentPackDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
+import { CONTENT_PACK_IDENTIFIERS } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { CreateFolderDto } from '@gitroom/nestjs-libraries/dtos/file/create.folder.dto';
@@ -362,16 +363,16 @@ export class FilesController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: { url: string; name: string; folderId?: string; source?: string; downloadLocation?: string; attribution?: Record<string, unknown>; type?: string }
   ) {
-    if (body.source === 'magnific' && body.downloadLocation) {
+    if (body.source && CONTENT_PACK_IDENTIFIERS.includes(body.source) && body.downloadLocation) {
       try {
-        const licensedUrl = await this._stockMediaService.resolveMagnificDownload(
+        const licensedUrl = await this._stockMediaService.resolveContentPackDownload(
           org.id,
           body.downloadLocation,
           (body.type as any) || 'photos'
         );
         return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
       } catch (err) {
-        if (err instanceof MagnificDailyCapError) {
+        if (err instanceof ContentPackDailyCapError) {
           throw new HttpException(err.message, 402);
         }
         throw new HttpException((err as Error).message, 500);

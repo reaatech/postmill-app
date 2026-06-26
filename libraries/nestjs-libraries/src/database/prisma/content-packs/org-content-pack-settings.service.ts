@@ -1,17 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OrgContentPackSettingsRepository } from './org-content-pack-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { MagnificContentPack } from '@gitroom/nestjs-libraries/media/stock/content-packs/magnific.content-pack';
-
-const PACK_IDENTIFIERS = ['magnific'] as const;
-type PackIdentifier = (typeof PACK_IDENTIFIERS)[number];
-
-const PACK_META: Record<PackIdentifier, { name: string; capabilities: string[] }> = {
-  magnific: {
-    name: 'Magnific',
-    capabilities: ['photos', 'vectors', 'icons', 'videos'],
-  },
-};
+import {
+  CONTENT_PACK_IDENTIFIERS,
+  CONTENT_PACK_REGISTRY,
+  contentPackMeta,
+  createContentPack,
+} from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 
 @Injectable()
 export class OrgContentPackSettingsService {
@@ -27,9 +22,9 @@ export class OrgContentPackSettingsService {
     const pointer = await this._repository.getActivePointer(orgId);
     const activeIdentifier = pointer?.activeContentPackIdentifier || null;
 
-    return PACK_IDENTIFIERS.map((identifier) => {
+    return CONTENT_PACK_IDENTIFIERS.map((identifier) => {
       const config = configs.find((c) => c.identifier === identifier);
-      const meta = PACK_META[identifier];
+      const meta = CONTENT_PACK_REGISTRY[identifier];
       return {
         identifier,
         name: meta.name,
@@ -61,8 +56,8 @@ export class OrgContentPackSettingsService {
   async getActiveForCapability(orgId: string, capability: string) {
     const active = await this.getActive(orgId);
     if (!active) return null;
-    const meta = PACK_META[active.identifier as PackIdentifier];
-    if (!meta?.capabilities.includes(capability)) return null;
+    const meta = contentPackMeta(active.identifier);
+    if (!meta?.capabilities.includes(capability as any)) return null;
     return active;
   }
 
@@ -117,9 +112,13 @@ export class OrgContentPackSettingsService {
       throw new Error(`Content pack "${identifier}" is missing credentials`);
     }
 
-    const pack = new MagnificContentPack(credentials.apiKey);
+    const pack = createContentPack(identifier, credentials);
+    if (!pack) {
+      throw new Error(`Unknown content pack provider "${identifier}"`);
+    }
+    const capability = contentPackMeta(identifier)?.capabilities[0] || 'photos';
     try {
-      const result = await pack.search('photos', 'test', 1);
+      const result = await pack.search(capability, 'test', 1);
       return { ok: true, message: 'Connection successful', result };
     } catch (err) {
       return { ok: false, message: (err as Error).message };

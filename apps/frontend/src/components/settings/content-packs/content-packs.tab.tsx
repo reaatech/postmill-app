@@ -75,6 +75,10 @@ export const ContentPacksTab: React.FC = () => {
           return t('vectors', 'Vectors');
         case 'icons':
           return t('icons', 'Icons');
+        case 'audio':
+          return t('audio', 'Audio');
+        case 'stickers':
+          return t('stickers', 'Stickers');
         default:
           return cap;
       }
@@ -122,8 +126,9 @@ export const ContentPacksTab: React.FC = () => {
                 />
                 <div className="flex flex-col gap-[4px] flex-1">
                   <span className="text-[14px] font-semibold">
-                    {config.active.identifier.charAt(0).toUpperCase() +
-                      config.active.identifier.slice(1)}
+                    {config.active.name ||
+                      config.active.identifier.charAt(0).toUpperCase() +
+                        config.active.identifier.slice(1)}
                   </span>
                   {config.active.capabilities.length > 0 && (
                     <div className="flex gap-[4px] flex-wrap">

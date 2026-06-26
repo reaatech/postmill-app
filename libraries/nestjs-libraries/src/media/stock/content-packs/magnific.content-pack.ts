@@ -7,12 +7,15 @@ import {
   StockVectorItem,
   StockVideoItem,
 } from '../stock.types';
-
-export type ContentPackCapability = 'photos' | 'vectors' | 'icons' | 'videos';
+import {
+  ContentPack,
+  ContentPackCapability,
+  ContentPackDailyCapError,
+} from './content-pack.interface';
 
 const BASE_URL = 'https://api.magnific.com';
 
-export class MagnificContentPack {
+export class MagnificContentPack implements ContentPack {
   constructor(private readonly _apiKey: string) {}
 
   async search(
@@ -40,7 +43,7 @@ export class MagnificContentPack {
     });
 
     if (res.status === 429) {
-      throw new MagnificDailyCapError('Daily Magnific limit reached. Check your Magnific plan.');
+      throw new ContentPackDailyCapError('Daily Magnific limit reached. Check your Magnific plan.');
     }
     if (!res.ok) {
       const text = await res.text().catch(() => 'Unknown error');
@@ -71,7 +74,7 @@ export class MagnificContentPack {
     });
 
     if (res.status === 429) {
-      throw new MagnificDailyCapError('Daily Magnific limit reached. Check your Magnific plan.');
+      throw new ContentPackDailyCapError('Daily Magnific limit reached. Check your Magnific plan.');
     }
     if (!res.ok) {
       const text = await res.text().catch(() => 'Unknown error');
@@ -220,12 +223,5 @@ export class MagnificContentPack {
       source: 'magnific',
       license: 'magnific-byok',
     };
-  }
-}
-
-export class MagnificDailyCapError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MagnificDailyCapError';
   }
 }

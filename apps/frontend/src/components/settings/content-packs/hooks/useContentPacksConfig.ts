@@ -17,6 +17,7 @@ export interface ContentPackProviderInfo {
 export interface ContentPackConfigResponse {
   active: {
     identifier: string;
+    name: string;
     capabilities: string[];
   } | null;
   providers: ContentPackProviderInfo[];

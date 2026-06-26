@@ -16,7 +16,12 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
-import { MagnificContentPack } from '@gitroom/nestjs-libraries/media/stock/content-packs/magnific.content-pack';
+import {
+  CONTENT_PACK_IDENTIFIERS,
+  CONTENT_PACK_REGISTRY,
+  contentPackMeta,
+  createContentPack,
+} from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -32,14 +37,15 @@ export class ContentPackController {
   @RequirePermission('media-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
-    return [
-      {
-        identifier: 'magnific',
-        name: 'Magnific',
-        capabilities: ['photos', 'vectors', 'icons', 'videos'],
-        credentialFields: [{ key: 'apiKey', label: 'API Key', required: true }],
-      },
-    ];
+    return CONTENT_PACK_IDENTIFIERS.map((identifier) => {
+      const meta = CONTENT_PACK_REGISTRY[identifier];
+      return {
+        identifier: meta.identifier,
+        name: meta.name,
+        capabilities: meta.capabilities,
+        credentialFields: meta.credentialFields,
+      };
+    });
   }
 
   @Get('/config')
@@ -50,7 +56,11 @@ export class ContentPackController {
     const active = await this._orgContentPackSettings.getActive(org.id);
     // Never return decrypted credentials to the client.
     const safeActive = active
-      ? { identifier: active.identifier, capabilities: ['photos', 'vectors', 'icons', 'videos'] }
+      ? {
+          identifier: active.identifier,
+          name: contentPackMeta(active.identifier)?.name || active.identifier,
+          capabilities: contentPackMeta(active.identifier)?.capabilities || [],
+        }
       : null;
     return {
       active: safeActive,
@@ -66,7 +76,7 @@ export class ContentPackController {
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string>; extraConfig?: Record<string, any> }
   ) {
-    if (identifier !== 'magnific') {
+    if (!contentPackMeta(identifier)) {
       throw new BadRequestException('Unknown content pack provider');
     }
 
@@ -110,17 +120,20 @@ export class ContentPackController {
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string> }
   ) {
-    if (identifier !== 'magnific') {
+    const meta = contentPackMeta(identifier);
+    if (!meta) {
       throw new BadRequestException('Unknown content pack provider');
     }
 
     if (body.credentials?.apiKey) {
-      const pack = new MagnificContentPack(body.credentials.apiKey);
-      try {
-        const result = await pack.search('photos', 'test', 1);
-        return { ok: true, message: 'Connection successful', result };
-      } catch (err) {
-        return { ok: false, message: (err as Error).message };
+      const pack = createContentPack(identifier, body.credentials);
+      if (pack) {
+        try {
+          const result = await pack.search(meta.capabilities[0], 'test', 1);
+          return { ok: true, message: 'Connection successful', result };
+        } catch (err) {
+          return { ok: false, message: (err as Error).message };
+        }
       }
     }
 
