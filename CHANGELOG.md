@@ -11,6 +11,14 @@
 ## Unreleased
 
 ### Added
+- **Brand assets in Settings → Brands.** The brand editor now surfaces a brand kit that previously
+  only the Designer could edit: a **colour palette**, **attached assets** (logos / reference imagery
+  picked via `MediaSelectorModal` — stock picks are imported to Files so they persist — each with an
+  optional caption), and the **brand-enforcement** toggle, all saved through the existing
+  `PUT /brands/:id`. New additive `AIBrandProfile.assets Json[]` column (`{fileId,url,caption}`,
+  db-push-safe) backs the attachments; `CreateBrandDto`/`UpdateBrandDto` + service/repo carry it. The
+  brand list shows a colour-swatch + asset-count preview, the delete uses the shared confirm dialog,
+  and a dead `useT()` local was removed.
 - **Unified "Content" settings page.** Settings now has a single **Content** tab with sub-tabs for
   **AI Media**, **Content Packs**, **Sets** and **Signatures** (replacing the standalone AI Media,
   Content Packs, Sets and Signatures entries). Sub-tabs respect their existing gates (Content Packs on

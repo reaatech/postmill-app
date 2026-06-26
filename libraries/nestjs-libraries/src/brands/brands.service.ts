@@ -30,6 +30,7 @@ export class BrandsService {
       fontFamilies?: string[];
       introFileId?: string | null;
       outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
       enforcement?: Record<string, any>;
     },
   ) {
@@ -61,6 +62,7 @@ export class BrandsService {
       fontFamilies?: string[];
       introFileId?: string | null;
       outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
       enforcement?: Record<string, any>;
     },
   ) {

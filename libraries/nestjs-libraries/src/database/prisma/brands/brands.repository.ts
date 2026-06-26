@@ -52,6 +52,7 @@ export class BrandsRepository {
       logoFileIds?: string[];
       palette?: string[];
       fontFamilies?: string[];
+      assets?: { fileId?: string; url: string; caption?: string }[];
       enforcement?: Record<string, any>;
     },
   ) {
@@ -68,6 +69,7 @@ export class BrandsRepository {
         logoFileIds: data.logoFileIds ?? [],
         palette: data.palette ?? [],
         fontFamilies: data.fontFamilies ?? [],
+        assets: data.assets ?? [],
         enforcement: data.enforcement ?? {},
       },
     });
@@ -87,6 +89,7 @@ export class BrandsRepository {
       fontFamilies?: string[];
       introFileId?: string | null;
       outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
       enforcement?: Record<string, any>;
     },
   ) {

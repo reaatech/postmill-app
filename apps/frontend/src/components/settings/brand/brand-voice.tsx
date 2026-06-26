@@ -236,7 +236,5 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
 };
 
 export const BrandVoice = ({ brandId, initial, onSaved }: { brandId?: string; initial?: BrandProfile; onSaved?: () => void }) => {
-  const translate = useT();
-
   return <BrandVoiceForm key={brandId || 'default'} initial={initial} brandId={brandId} onMutate={onSaved} />;
 };

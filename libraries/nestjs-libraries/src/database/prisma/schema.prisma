@@ -1240,6 +1240,8 @@ model AIBrandProfile {
   introFileId       String?
   outroFileId       String?
   enforcement       Json?        @default("{}")
+  // Attached brand assets — [{ fileId, url, caption }] (logos, reference imagery, etc.).
+  assets            Json?        @default("[]")
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 

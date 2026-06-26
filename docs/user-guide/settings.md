@@ -237,6 +237,20 @@ The tab shows a brand list with create, edit, and delete, plus a **Default** bad
   tone for LinkedIn (professional) versus X (witty).
 - **Enable/disable** — toggle whether the brand profile is applied to AI generations.
 
+### Brand Assets (per brand)
+
+Each brand carries a brand kit, surfaced both in Settings → Brands and in the Designer:
+
+- **Colour palette** — define the brand's colours; the Designer uses these and (when enforcement is
+  on) warns on off-palette exports.
+- **Attached assets** — attach logos and reference imagery (picked from your Files or the stock
+  library; stock picks are imported into Files so they persist), each with an optional caption.
+- **Brand enforcement** — toggle whether the Designer warns when an export uses off-palette colours
+  or non-brand fonts.
+
+Assets are saved via `PUT /brands/:id` (fields `palette`, `assets`, `enforcement`). The brand list
+shows a colour-swatch + asset-count preview per brand.
+
 ### Knowledge Base
 
 - **Index content** — trigger indexing of your top-performing posts into the RAG vector store.

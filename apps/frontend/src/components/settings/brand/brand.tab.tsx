@@ -6,8 +6,15 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { BrandVoice } from '@gitroom/frontend/components/settings/brand/brand-voice';
+import { BrandAssets } from '@gitroom/frontend/components/settings/brand/brand-assets';
 import { KnowledgeBase } from '@gitroom/frontend/components/settings/brand/knowledge-base';
-import clsx from 'clsx';
+import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+
+interface BrandAsset {
+  fileId?: string;
+  url: string;
+  caption?: string;
+}
 
 interface Brand {
   id: string;
@@ -18,6 +25,9 @@ interface Brand {
   enabled: boolean;
   isDefault: boolean;
   createdAt: string;
+  palette?: string[];
+  assets?: BrandAsset[];
+  enforcement?: { enabled?: boolean } & Record<string, any>;
 }
 
 const useBrands = () => {
@@ -65,7 +75,7 @@ export const BrandTab = () => {
   }, [newName, fetch, toaster, t, refetchBrands]);
 
   const handleDelete = useCallback(async (brand: Brand) => {
-    if (!confirm(t('confirm_delete_brand', `Delete "${brand.name}"?`))) return;
+    if (!(await deleteDialog(t('confirm_delete_brand', `Delete "${brand.name}"?`)))) return;
     const res = await fetch(`/brands/${brand.id}`, { method: 'DELETE' });
     if (!res.ok) {
       toaster.show(t('delete_failed', 'Failed to delete brand'), 'warning');
@@ -107,6 +117,12 @@ export const BrandTab = () => {
         </div>
         <BrandVoice
           key={editingBrand.id}
+          brandId={editingBrand.id}
+          initial={editingBrand}
+          onSaved={() => refetchBrands()}
+        />
+        <BrandAssets
+          key={`assets-${editingBrand.id}`}
           brandId={editingBrand.id}
           initial={editingBrand}
           onSaved={() => refetchBrands()}
@@ -160,7 +176,7 @@ export const BrandTab = () => {
             key={brand.id}
             className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex items-center gap-[16px]"
           >
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <div className="flex items-center gap-[8px]">
                 <div className="text-[14px] font-[500]">{brand.name}</div>
                 {brand.isDefault && (
@@ -174,6 +190,27 @@ export const BrandTab = () => {
                   </div>
                 )}
               </div>
+              {(brand.palette?.length || brand.assets?.length) ? (
+                <div className="flex items-center gap-[10px] mt-[6px]">
+                  {!!brand.palette?.length && (
+                    <div className="flex items-center -space-x-[4px]">
+                      {brand.palette.slice(0, 6).map((c, i) => (
+                        <div
+                          key={`${c}-${i}`}
+                          className="w-[14px] h-[14px] rounded-full border border-newTableBorder"
+                          style={{ backgroundColor: c }}
+                          title={c}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {!!brand.assets?.length && (
+                    <span className="text-[11px] text-newTableText">
+                      {brand.assets.length} {brand.assets.length === 1 ? t('asset', 'asset') : t('assets_lower', 'assets')}
+                    </span>
+                  )}
+                </div>
+              ) : null}
             </div>
             <div className="flex items-center gap-[8px]">
               {!brand.isDefault && (

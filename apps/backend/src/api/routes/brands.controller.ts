@@ -57,6 +57,11 @@ class CreateBrandDto {
   @IsString({ each: true })
   fontFamilies?: string[];
 
+  // Attached brand assets — [{ fileId?, url, caption? }].
+  @IsOptional()
+  @IsArray()
+  assets?: { fileId?: string; url: string; caption?: string }[];
+
   @IsOptional()
   @IsObject()
   enforcement?: Record<string, any>;
@@ -104,6 +109,11 @@ class UpdateBrandDto {
   @IsOptional()
   @IsString()
   outroFileId?: string;
+
+  // Attached brand assets — [{ fileId?, url, caption? }].
+  @IsOptional()
+  @IsArray()
+  assets?: { fileId?: string; url: string; caption?: string }[];
 
   @IsOptional()
   @IsObject()

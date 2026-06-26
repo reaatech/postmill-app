@@ -109,7 +109,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `AIOrgProviderConfig` | Per-org AI provider + encrypted credentials + `defaultModel` (standard) and `reasoningModel` (v3.8.10). `imageModel` was dropped in v3.8.10 — image generation lives in the Media provider system. | FK → `Organization` |
 | `AISpendLog` | Cost ledger — input/output tokens, cost, provider, model, scope | FK → `Organization` (nullable), `User` (nullable) |
-| `AIBrandProfile` | Brand voice instructions + language. **Many per org** since v3.8.10 (`name`, `isDefault`, `slug`); one default per org, selectable per-post via `Post.brandId`. | FK → `Organization`; has many `Post` |
+| `AIBrandProfile` | Brand voice instructions + language **and a brand kit** — `palette`, `fontFamilies`/`customFonts`, `logoFileIds`, `enforcement`, and attached `assets[]` (`{fileId,url,caption}`). **Many per org** since v3.8.10 (`name`, `isDefault`, `slug`); one default per org, selectable per-post via `Post.brandId`. | FK → `Organization`; has many `Post` |
 | `AIPromptTemplate` | Editable prompt templates (org-scoped or global, with key) | FK → `Organization` (nullable) |
 | `AISettingsAudit` | Append-only audit of AI-settings changes | FK → `User` (nullable) |
 | `AIMediaJob` | Media pipeline job — operation, status, artifact URL, provenance, cost. Tracks async media generation (video/audio/avatar) in the v3.8.10 media-provider system. | FK → `Organization`, `User` (nullable) |
