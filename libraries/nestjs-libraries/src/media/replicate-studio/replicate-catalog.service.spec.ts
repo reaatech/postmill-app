@@ -108,7 +108,12 @@ describe('ReplicateCatalogService', () => {
 
       const result = await service.listModels('text-to-image', 'org1');
 
-      expect(mockSafeFetch).not.toHaveBeenCalled();
+      // The 6 curated models came from the per-model cache — none were fetched.
+      // (The category collection is fetched separately, best-effort, for extras.)
+      const modelFetches = mockSafeFetch.mock.calls.filter((c: any[]) =>
+        String(c[0]).includes('/models/')
+      );
+      expect(modelFetches).toHaveLength(0);
       expect(result).toHaveLength(6);
       expect(result[0]).toMatchObject({ name: 'cached' });
     });

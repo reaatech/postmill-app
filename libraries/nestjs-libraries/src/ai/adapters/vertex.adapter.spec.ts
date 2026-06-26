@@ -31,8 +31,8 @@ describe('VertexAdapter', () => {
       expect(adapter.identifier).toBe('vertex');
     });
 
-    it('has name "Google Vertex AI"', () => {
-      expect(adapter.name).toBe('Google Vertex AI');
+    it('has name "Google Vertex"', () => {
+      expect(adapter.name).toBe('Google Vertex');
     });
 
     it('has type "hub"', () => {
