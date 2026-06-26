@@ -35,7 +35,7 @@ const tabs = [
   {
     href: '/media/designer',
     label: 'Designer',
-    section: 'Tools',
+    section: 'Platform',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 19l7-7 3 3-7 7-3-3z" />
@@ -48,7 +48,7 @@ const tabs = [
   {
     href: '/media/replicate',
     label: 'Replicate',
-    section: 'Tools',
+    section: 'Providers',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -58,7 +58,7 @@ const tabs = [
   {
     href: '/media/heygen',
     label: 'HeyGen',
-    section: 'Tools',
+    section: 'Providers',
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
@@ -120,7 +120,9 @@ const tabs = [
 ];
 
 // Keep the section order, but sort entries alphabetically within each section.
-const sectionOrder = ['Tools', 'Content Pack'];
+// 'Platform' (Designer) renders header-less at the top; 'Providers' and
+// 'Content Pack' get section headers.
+const sectionOrder = ['Platform', 'Providers', 'Content Pack'];
 const sortedTabs = [...tabs].sort((a, b) => {
   const sectionDiff =
     sectionOrder.indexOf(a.section) - sectionOrder.indexOf(b.section);
@@ -189,7 +191,10 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
 
         {sortedTabs.map((t, i) => {
             const active = pathname.startsWith(t.href);
-            const showHeader = i === 0 || sortedTabs[i - 1].section !== t.section;
+            // 'Platform' (Designer) is the lone built-in tool — no section header.
+            const showHeader =
+              t.section !== 'Platform' &&
+              (i === 0 || sortedTabs[i - 1].section !== t.section);
             return (
               <React.Fragment key={t.href}>
                 {showHeader && (
@@ -209,7 +214,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                     'flex items-center gap-[10px] rounded-[6px] text-[13px] transition-all',
                     collapsed ? 'justify-center px-0 py-[10px]' : 'px-[12px] py-[8px]',
                     active
-                      ? 'bg-designerAccent/20 text-white'
+                      ? 'bg-designerAccent/20 text-textColor'
                       : 'text-textColor hover:bg-newColColor/50'
                   )}
                 >

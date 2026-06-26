@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function MediaPage() {
-  redirect('/media/stock-photos');
+  redirect('/media/designer');
 }
