@@ -120,5 +120,10 @@
   "jest-junit": {
     "outputDirectory": "./reports",
     "outputName": "junit.xml"
+  },
+  "pnpm": {
+    "overrides": {
+      "happy-dom": ">=20.0.0"
+    }
   }
 }

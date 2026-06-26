@@ -15,7 +15,9 @@ const redVideo = (durationMs = 1000): VideoOutput => ({
   background: '#ff0000',
 });
 
-describe('Chromium + ffmpeg video render integration', () => {
+// Opt-in: this spec launches a real headless Chrome + FFmpeg, which CI runners
+// don't provide. Run locally with RUN_RENDER_INTEGRATION=1.
+describe.skipIf(process.env.RUN_RENDER_INTEGRATION !== '1')('Chromium + ffmpeg video render integration', () => {
   it('renders a 1-second red MP4 with a thumbnail', async () => {
     const capture = new ChromiumFrameCaptureService();
     const encoder = new FfmpegVideoEncoderService(capture);

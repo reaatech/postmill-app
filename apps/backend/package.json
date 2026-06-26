@@ -20,7 +20,8 @@
     "compression": "^1.8.1",
     "cookie-parser": "^1.4.7",
     "bs58": "^6.0.0",
-    "tweetnacl": "^1.0.3"
+    "tweetnacl": "^1.0.3",
+    "yjs": "^13.6.31"
   },
   "devDependencies": {
     "@nestjs/testing": "^11.1.24",
