@@ -692,6 +692,21 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   in the descriptor (DashScope has no clean per-modality catalog for the task API). **Built without a
   live key** — endpoints/model ids are grounded in Alibaba's public Model Studio API reference; the
   exact intl host/region may need a live smoke test.
+- **Higgsfield** (`platform.higgsfield.ai`) is an **own-key** kit studio (`/media/higgsfield`) with a
+  **two-part credential** — `keyId` + `keySecret` (declared via `credentialFields`, rendered as the
+  multi-field Settings → Media modal like Vertex), sent as the single header
+  `Authorization: Key <id>:<secret>` (the official `higgsfield-js` V2 scheme). Every generation is
+  **submit-and-poll**: POST the input fields **directly** (not wrapped) to the model endpoint →
+  `{ request_id, status }`, then poll `GET /requests/{id}/status` until `completed` (or `nsfw`/`failed`)
+  — image bounded-poll-synchronous, video poll-cron (no webhook). Three model surfaces, routed by
+  operation + the `model` value: **Soul** text→image (`/v1/text2image/soul`, optional `image_reference`
+  for image-to-image), **DoP** image→video (`/v1/image2video/dop`, `model=dop-lite|dop-turbo|dop-standard`),
+  and **Speak** audio→talking-video (`/v1/speak/higgsfield`, `model='speak'` as a routing marker only).
+  `higgsfield.adapter.ts` wraps the flat media-field URLs into Higgsfield's nested input objects
+  (`input_images[]` / `input_image` / `input_audio` / `image_reference`); `result.video.url` or
+  `result.images[].url` (Soul `batch_size: 4` returns multiple). **Built without a live key** —
+  endpoints/shapes are grounded in the official higgsfield-js SDK source; Soul `width_and_height`
+  presets may need a live smoke test.
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

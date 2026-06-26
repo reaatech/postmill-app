@@ -15,6 +15,7 @@ import { StabilityAdapter } from './adapters/stability.adapter';
 import { TavusAdapter } from './adapters/tavus.adapter';
 import { DIDAdapter } from './adapters/did.adapter';
 import { HedraAdapter } from './adapters/hedra.adapter';
+import { HiggsfieldAdapter } from './adapters/higgsfield.adapter';
 import { MiniMaxMediaAdapter } from './adapters/minimax-media.adapter';
 import { DeepgramAdapter } from './adapters/deepgram.adapter';
 import { LumaAdapter } from './adapters/luma.adapter';
@@ -42,6 +43,7 @@ const ALL_ADAPTERS = [
   TavusAdapter,
   DIDAdapter,
   HedraAdapter,
+  HiggsfieldAdapter,
   MiniMaxMediaAdapter,
   DeepgramAdapter,
   LumaAdapter,

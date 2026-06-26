@@ -11,6 +11,13 @@
 ## Unreleased
 
 ### Added
+- **Higgsfield media studio** (`/media/higgsfield`) — an own-key Studio Kit studio for Higgsfield
+  (`platform.higgsfield.ai`) with three tabs: **Soul** Text→Image (+ optional reference image), **DoP**
+  Image→Video (`dop-lite/turbo/standard`), and **Speak** (portrait + audio → talking video). Two-part
+  credential (`keyId` + `keySecret`, `Authorization: Key <id>:<secret>`) configured at Settings → AI
+  Media via the multi-field modal. Submit-and-poll (`POST {endpoint}` → poll `/requests/{id}/status`):
+  image bounded-poll-synchronous, video poll-cron. Built source-grounded against the official
+  higgsfield-js SDK — no live key, so Soul size presets may need a smoke test.
 - **Wan media studio** (`/media/wan`) — a dedicated, Wan-branded Studio Kit studio for Alibaba Wan
   (Tongyi Wanxiang) on **Alibaba Cloud Model Studio** with three tabs: Text→Image (`wan2.2-t2i*` /
   `wanx2.1-t2i*`), Text→Video and Image→Video (`wan2.x-t2v*` / `wan2.x-i2v*`). Same DashScope

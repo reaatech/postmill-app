@@ -48,6 +48,7 @@ const ICONS: Record<string, Entry> = {
   tavus: { viewBox: '0 0 24 24', color: '#0066FF', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm0 4c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4Z" />) },
   did: { viewBox: '0 0 24 24', color: '#00A3FF', node: (<path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10ZM4 22c0-4.42 3.58-8 8-8s8 3.58 8 8H4Z" />) },
   hedra: { viewBox: '0 0 24 24', color: '#FF6B6B', node: (<path d="M21 16v-2l-9-5-9 5v2l9-5 9 5Zm0-6V8l-9-5-9 5v2l9-5 9 5Z" />) },
+  higgsfield: { viewBox: '0 0 24 24', color: '#111111', full: true, node: (<path d="M5 3h3v7h8V3h3v18h-3v-8H8v8H5V3Z" />) },
   wan: { viewBox: '0 0 24 24', color: '#6E3AF2', node: (<path d="M2 4l3.5 16L9 9l3 11 3-11 3.5 11L22 4h-3l-1.8 9L14 4h-2l-3.2 9L7 4H2Z" />) },
 
   // ── Storage Providers ─────────────────────────────────────
@@ -127,7 +128,7 @@ const LABEL_MAP: Record<string, string> = {
   IDRIVE_E2: 'E2', LOCAL: 'Lo',
   fal: 'Fa', elevenlabs: 'EL', heygen: 'HY', runway: 'RW',
   'black-forest-labs': 'BF', replicate: 'Rp', 'stability-ai': 'SA',
-  tavus: 'Ta', did: 'DI', hedra: 'He', wan: 'Wa',
+  tavus: 'Ta', did: 'DI', hedra: 'He', higgsfield: 'Hi', wan: 'Wa',
 };
 
 const ProviderIcon: FC<{

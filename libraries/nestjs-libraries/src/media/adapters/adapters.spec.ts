@@ -28,6 +28,7 @@ import { OpenRouterMediaAdapter } from './openrouter-media.adapter';
 import { FireworksMediaAdapter } from './fireworks-media.adapter';
 import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
 import { WanAdapter } from './wan.adapter';
+import { HiggsfieldAdapter } from './higgsfield.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -648,6 +649,105 @@ describe('WanAdapter', () => {
     expect(mockSafeFetch.mock.calls[0][0]).toBe('https://dashscope-intl.aliyuncs.com/compatible-mode/v1/models');
     expect(ok).toMatchObject({ ok: true });
     expect(await adapter.testConnection({})).toMatchObject({ ok: false });
+  });
+});
+
+describe('HiggsfieldAdapter', () => {
+  const adapter = new HiggsfieldAdapter();
+  const HF = { credentials: { keyId: 'kid', keySecret: 'ksecret' } };
+
+  it('submits Soul text-to-image with Key auth and polls to completion', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ request_id: 'req-img', status: 'queued' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'in_progress' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'completed', images: [{ url: 'https://hf/out.png' }] }));
+    const result = await adapter.generateImage('a cat', {
+      ...HF,
+      input: { width_and_height: '2048x2048', quality: '1080p', batch_size: 1 },
+    });
+    const submitUrl = mockSafeFetch.mock.calls[0][0] as string;
+    expect(submitUrl).toBe('https://platform.higgsfield.ai/v1/text2image/soul');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Key kid:ksecret');
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      prompt: 'a cat',
+      width_and_height: '2048x2048',
+      quality: '1080p',
+    });
+    // poll url
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://platform.higgsfield.ai/requests/req-img/status');
+    expect(result.image).toBe('https://hf/out.png');
+  }, 15000);
+
+  it('returns multiple images from a Soul batch', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ request_id: 'req-batch', status: 'queued' }))
+      .mockResolvedValueOnce(
+        jsonResponse({ status: 'completed', images: [{ url: 'https://hf/1.png' }, { url: 'https://hf/2.png' }] }),
+      );
+    const result = await adapter.generateImage('cats', { ...HF, input: { batch_size: 4 } });
+    expect(result).toMatchObject({ multi: true, image: 'https://hf/1.png' });
+    expect(result.images).toEqual(['https://hf/1.png', 'https://hf/2.png']);
+  }, 15000);
+
+  it('submits DoP image-to-video wrapping the source image and returns the request id', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ request_id: 'req-vid', status: 'queued' }));
+    const submission = await adapter.generateVideo('pan in', {
+      ...HF,
+      model: 'dop-turbo',
+      input: { image_url: 'https://img/src.png', enhance_prompt: true },
+    });
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://platform.higgsfield.ai/v1/image2video/dop');
+    expect(body).toMatchObject({
+      model: 'dop-turbo',
+      prompt: 'pan in',
+      input_images: [{ type: 'image_url', image_url: 'https://img/src.png' }],
+      enhance_prompt: true,
+    });
+    expect(submission.jobId).toBe('req-vid');
+  });
+
+  it('routes Speak to its endpoint with nested image + audio inputs', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ request_id: 'req-speak', status: 'queued' }));
+    await adapter.generateVideo('hello', {
+      ...HF,
+      model: 'speak',
+      input: { image_url: 'https://img/face.png', audio_url: 'https://au/voice.mp3', quality: 'high', duration: 10 },
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://platform.higgsfield.ai/v1/speak/higgsfield');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toMatchObject({
+      input_image: { type: 'image_url', image_url: 'https://img/face.png' },
+      input_audio: { type: 'audio_url', audio_url: 'https://au/voice.mp3' },
+      quality: 'high',
+      duration: 10,
+    });
+  });
+
+  it('polls video status (completed, pending, nsfw → failed)', async () => {
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'completed', video: { url: 'https://hf/out.mp4' } }));
+    expect(await adapter.pollJob('req-vid', HF)).toMatchObject({
+      status: 'completed',
+      artifactUrl: 'https://hf/out.mp4',
+    });
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'in_progress' }));
+    expect((await adapter.pollJob('req-vid', HF)).status).toBe('pending');
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'nsfw' }));
+    expect(await adapter.pollJob('req-vid', HF)).toMatchObject({ status: 'failed', error: 'Blocked by NSFW filter' });
+  });
+
+  it('requires both credential parts and rejects unsupported ops', async () => {
+    await expect(adapter.generateVideo('x', { credentials: { keyId: 'only-id' } })).rejects.toThrow('Key Secret');
+    await expect(adapter.generateAudio('x', HF)).rejects.toThrow('audio');
+    await expect(adapter.generateVideo('x', { ...HF, model: 'speak', input: {} })).rejects.toThrow('source image');
+  });
+
+  it('accepts a combined "id:secret" apiKey fallback', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ request_id: 'req-c', status: 'queued' }));
+    await adapter.generateVideo('x', { apiKey: 'kid:ksecret', input: { image_url: 'https://i/s.png' } });
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Key kid:ksecret');
   });
 });
 

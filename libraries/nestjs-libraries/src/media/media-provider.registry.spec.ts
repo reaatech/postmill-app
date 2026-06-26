@@ -49,6 +49,7 @@ describe('MediaModule', () => {
       'groq',
       'hedra',
       'heygen',
+      'higgsfield',
       'luma',
       'minimax',
       'openai',
