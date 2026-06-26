@@ -39,6 +39,8 @@ import { MediaSelectorModal } from '../media-selector-modal';
 import { StartDialog } from './start-dialog';
 import { aiRemoveBackground, aiUpscale, aiDetectSubject } from './ai-image-actions';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
+import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
+import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
 import { getBrandViolations } from './brand-compliance';
 import { useBrandColors } from './panels/use-brand-colors';
 import { useBrandFonts } from './panels/use-brand-fonts';
@@ -709,8 +711,13 @@ export const Designer: FC<DesignerProps> = ({
     return () => window.removeEventListener('keydown', handler);
   }, [handleExport]);
 
+  // Full-screen fills the canvas app, not the page: the document goes fullscreen and the
+  // Designer root goes immersive (fixed inset-0) to cover the app chrome. Modals/dialogs
+  // mount at the app root (z 200+) and stay above this z-[100] layer.
+  const { isFullscreen } = useFullscreen();
+
   return (
-    <div className="relative flex flex-col h-full w-full overflow-hidden bg-newBgColorInner">
+    <div className={`flex flex-col h-full w-full overflow-hidden bg-newBgColorInner ${isFullscreen ? 'fixed inset-0 z-[100]' : 'relative'}`}>
       <div className="flex items-center gap-3 px-3 py-1.5 border-b border-newBorder bg-newBgColorInner shrink-0">
         <div className="flex items-center gap-2 shrink-0">
           <Logo size={26} className="" />
@@ -777,6 +784,7 @@ export const Designer: FC<DesignerProps> = ({
             Save
           </button>
           </div>
+          <FullscreenButton className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent shrink-0" />
           <button
             onClick={handleExport}
             disabled={isSaving}

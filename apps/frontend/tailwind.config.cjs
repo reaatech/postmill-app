@@ -85,6 +85,8 @@ module.exports = {
         newSep: 'var(--new-sep)',
         newBorder: 'var(--new-border)',
         newBgColorInner: 'var(--new-bgColorInner)',
+        studioBg: 'var(--studio-bg)',
+        studioBorder: 'var(--studio-border)',
         newBgLineColor: 'var(--new-bgLineColor)',
         textItemFocused: 'var(--new-textItemFocused)',
         textItemBlur: 'var(--new-textItemBlur)',

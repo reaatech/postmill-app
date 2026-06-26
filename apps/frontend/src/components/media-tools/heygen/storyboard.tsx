@@ -142,12 +142,12 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Video title (optional)"
-          className="flex-1 min-w-[180px] h-[38px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+          className="flex-1 min-w-[180px] h-[38px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
         />
         <select
           value={dimensionKey}
           onChange={(e) => setDimensionKey(e.target.value)}
-          className="h-[38px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+          className="h-[38px] px-[10px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
         >
           {DIMENSIONS.map((d) => (
             <option key={d.key} value={d.key}>{d.label}</option>
@@ -160,9 +160,9 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         {scenes.map((scene, index) => (
           <div
             key={scene.key}
-            className="shrink-0 w-[260px] rounded-[12px] border border-newBorder bg-newBgColorInner flex flex-col"
+            className="shrink-0 w-[260px] rounded-[12px] border border-studioBorder bg-newBgColorInner flex flex-col"
           >
-            <div className="flex items-center justify-between px-[10px] py-[8px] border-b border-newBorder">
+            <div className="flex items-center justify-between px-[10px] py-[8px] border-b border-studioBorder">
               <span className="text-[12px] font-[600] text-textColor">Scene {index + 1}</span>
               <div className="flex items-center gap-[2px]">
                 <button type="button" aria-label="Move left" disabled={index === 0} onClick={() => moveScene(index, -1)} className="w-[24px] h-[24px] flex items-center justify-center rounded-[5px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover disabled:opacity-30">‹</button>
@@ -175,7 +175,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <button
                 type="button"
                 onClick={() => openAvatarPicker(scene)}
-                className="flex items-center gap-[10px] p-[8px] rounded-[8px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+                className="flex items-center gap-[10px] p-[8px] rounded-[8px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
               >
                 <div className="w-[40px] h-[40px] rounded-[6px] bg-newBgColor overflow-hidden flex items-center justify-center shrink-0">
                   {scene.avatar?.previewImageUrl ? (
@@ -193,7 +193,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
               <button
                 type="button"
                 onClick={() => openVoicePicker(scene)}
-                className="flex items-center justify-between gap-[8px] px-[10px] py-[8px] rounded-[8px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+                className="flex items-center justify-between gap-[8px] px-[10px] py-[8px] rounded-[8px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
               >
                 <div className="min-w-0">
                   <div className="text-[12px] text-textColor truncate">{scene.voice?.name || 'Pick voice'}</div>
@@ -207,7 +207,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                 onChange={(e) => patchScene(scene.key, { inputText: e.target.value })}
                 placeholder="What should the avatar say?"
                 rows={4}
-                className="w-full px-[10px] py-[8px] rounded-[8px] bg-newBgColor border border-newColColor text-[12px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
+                className="w-full px-[10px] py-[8px] rounded-[8px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
               />
 
               {/* Background */}
@@ -217,12 +217,12 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
                   aria-label="Background color"
                   value={scene.background?.type === 'color' ? scene.background.color || '#000000' : '#000000'}
                   onChange={(e) => patchScene(scene.key, { background: { type: 'color', color: e.target.value } })}
-                  className="w-[32px] h-[32px] rounded-[6px] border border-newColColor bg-transparent cursor-pointer"
+                  className="w-[32px] h-[32px] rounded-[6px] border border-studioBorder bg-transparent cursor-pointer"
                 />
                 <button
                   type="button"
                   onClick={() => setBgPickerScene(scene.key)}
-                  className="flex-1 px-[10px] h-[32px] rounded-[8px] border border-newColColor text-[11px] text-newTextColor/70 hover:border-[#2B5CD3] hover:text-textColor transition-all truncate"
+                  className="flex-1 px-[10px] h-[32px] rounded-[8px] border border-studioBorder text-[11px] text-newTextColor/70 hover:border-[#2B5CD3] hover:text-textColor transition-all truncate"
                 >
                   {scene.background && scene.background.type !== 'color' ? 'Image/Video bg ✓' : 'Image/Video bg'}
                 </button>
@@ -248,7 +248,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         <button
           type="button"
           onClick={() => setScenes((prev) => [...prev, newScene()])}
-          className="shrink-0 w-[88px] rounded-[12px] border-[2px] border-dashed border-newColColor hover:border-[#2B5CD3] text-newTextColor/50 hover:text-[#2B5CD3] flex flex-col items-center justify-center gap-[6px] transition-all"
+          className="shrink-0 w-[88px] rounded-[12px] border-[2px] border-dashed border-studioBorder hover:border-[#2B5CD3] text-newTextColor/50 hover:text-[#2B5CD3] flex flex-col items-center justify-center gap-[6px] transition-all"
         >
           <span className="text-[26px] leading-none">＋</span>
           <span className="text-[11px]">Scene</span>
@@ -264,7 +264,7 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
         >
           {generating ? 'Starting…' : `Generate video → Files`}
         </button>
-        {validation && <span className="text-[12px] text-yellow-400">{validation}</span>}
+        {validation && <span className="text-[12px] text-amber-600">{validation}</span>}
       </div>
 
       <MediaSelectorModal

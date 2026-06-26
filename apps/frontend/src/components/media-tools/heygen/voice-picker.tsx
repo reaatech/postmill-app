@@ -33,7 +33,7 @@ export const VoicePicker: FC<VoicePickerProps> = ({ voices, selectedId, onSelect
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search by name or language..."
-        className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
+        className="w-full h-[40px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[14px] text-textColor outline-none focus:border-[#2B5CD3]"
       />
       {filtered.length === 0 ? (
         <div className="h-[200px] flex items-center justify-center text-[13px] text-newTextColor/50">
@@ -45,7 +45,7 @@ export const VoicePicker: FC<VoicePickerProps> = ({ voices, selectedId, onSelect
             <div
               key={v.voiceId}
               className={`flex items-center gap-[12px] p-[10px] rounded-[8px] border transition-all ${
-                selectedId === v.voiceId ? 'border-[#2B5CD3] bg-[#2B5CD3]/10' : 'border-newBorder bg-newBgColorInner'
+                selectedId === v.voiceId ? 'border-[#2B5CD3] bg-[#2B5CD3]/10' : 'border-studioBorder bg-newBgColorInner'
               }`}
             >
               <div className="flex-1 min-w-0">

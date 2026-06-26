@@ -63,7 +63,7 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
       <button
         type="button"
         onClick={() => setPicking(true)}
-        className="flex items-center gap-[12px] p-[12px] rounded-[10px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+        className="flex items-center gap-[12px] p-[12px] rounded-[10px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
       >
         <div className="w-[96px] h-[54px] rounded-[8px] bg-black overflow-hidden flex items-center justify-center shrink-0">
           {source ? (
@@ -88,7 +88,7 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search languages…"
-          className="w-full h-[36px] px-[12px] mb-[8px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+          className="w-full h-[36px] px-[12px] mb-[8px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
         />
         {langsLoading ? (
           <div className="text-[12px] text-newTextColor/40 py-[10px]">Loading languages…</div>
@@ -104,7 +104,7 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
                 className={`px-[12px] h-[30px] rounded-full text-[12px] border transition-all ${
                   selected.includes(lang)
                     ? 'bg-[#2B5CD3] border-[#2B5CD3] text-white'
-                    : 'border-newColColor text-newTextColor/70 hover:border-[#2B5CD3] hover:text-textColor'
+                    : 'border-studioBorder text-newTextColor/70 hover:border-[#2B5CD3] hover:text-textColor'
                 }`}
               >
                 {lang}

@@ -80,7 +80,7 @@ export const RenderQueue: FC<{ jobs: HeyGenJob[] | undefined; isLoading: boolean
         const isAudio = job.operation === 'audio';
         const previewUrl = job.artifactUrl ? mediaDirectory.set(job.artifactUrl) : null;
         return (
-          <div key={job.id} className="rounded-[10px] border border-newBorder bg-newBgColorInner overflow-hidden">
+          <div key={job.id} className="rounded-[10px] border border-studioBorder bg-newBgColorInner overflow-hidden">
             {job.status === 'completed' && previewUrl && !isAudio && (
               <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" />
             )}

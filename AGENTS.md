@@ -548,6 +548,42 @@ the modern **HeyGen Studio** (above).
   GIF/WebP export only exists in **video** mode — static mode never offers it (Konva flattens to
   frame 1).
 
+### Canvas-app (studio) UI conventions
+A **studio** is a full-height `/media/*` canvas tool (Designer, Replicate, HeyGen — more coming).
+They share a deliberate visual language; **follow it when building a new one** rather than inventing
+per-tool styling. Reference implementation: `apps/frontend/src/components/media-tools/heygen/heygen-studio.tsx`.
+
+- **Shell:** a full-height flex column. Header bar (`h-[52px]`, `border-b border-studioBorder`) with —
+  left: the Postmill **`Logo`** (`components/new-layout/logo.tsx`, `size={20–22}`) + the studio title;
+  right: tool tabs + a **`FullscreenButton`**. Body below fills the rest.
+- **Theme tokens (light + dark, defined in `app/colors.scss`, mapped in `tailwind.config.cjs`):**
+  - `bg-studioBg` — the studio backdrop. Light `#d4e0f0` (soft blue-gray), dark `#0a0f1f` (near-black navy).
+  - `border-studioBorder` — **use this for every studio border** (cards, inputs, tabs, dividers). Light
+    `#aebdd4`, dark `#2a3450`. It is tuned to contrast with `studioBg` in both modes.
+  - **Do not** use `newBorder`/`newColColor` for studio borders — they are near-white in light mode
+    (`#eaecee`/`#eff1f3`) and vanish on `studioBg` ("whitewashed"). `newSep` is also too close to the bg.
+  - Accent is `#2B5CD3` (a.k.a. `designerAccent`); active item = `bg-[#2B5CD3]/20 text-textColor`.
+- **Light-mode contrast rules (this codebase is dark-mode-first — these break in light otherwise):**
+  - Never hard-code `text-white` for active/selected state or titles; use **`text-textColor`** (adapts).
+    `text-white` is only for text on a solid accent fill (e.g. a `bg-[#2B5CD3]` button).
+  - Warning/validation text uses **`text-amber-600`**, not `text-yellow-400` (pale and unreadable on light).
+- **Rounded corners:** when **not** full-screen, the studio root is `rounded-[12px] overflow-hidden`
+  (matches the app layout/menu card radius). Full-screen drops the radius (full-bleed).
+- **Full-screen = the canvas, not the page.** Use the shared `useFullscreen()` hook
+  (`media-tools/use-fullscreen.ts`) + `FullscreenButton`. It requests fullscreen on
+  `document.documentElement` (hides browser chrome **and** keeps modals, which mount at the app root,
+  visible) and the studio root goes immersive — `fixed inset-0 z-[100]` — to cover the app nav/sidebar
+  so the canvas fills the screen. **`z-[100]` is deliberate: above app chrome, below modals (`z 200+`).**
+  Never element-scope the Fullscreen API to the studio root — modals would be hidden by the top-layer.
+- **Input + output:** pick source assets from `/files` via **`MediaSelectorModal`** (returns
+  `{source,url,fileId,type,…}`). Long-running generation goes through the **media-job pipeline**
+  (`MediaJobLifecycleService.createPendingJob` → poll/webhook → land in `/files`); a live **render
+  queue** polls the jobs endpoint. Finished artifacts offer **Edit in Designer** (`/media/designer?url=&type=`)
+  and **Post** (composer `AddEditModal` with `onlyValues:[{image:[{id,path}]}]`). Reuse
+  **`SaveToFilesModal`** and the **`AudioPlayer`** (`media-tools/audio-player.tsx`) rather than rebuilding.
+- **SWR:** one hook per resource via `useFetch` (e.g. `use-heygen.ts`); the render queue uses a
+  `refreshInterval` that polls only while a job is pending.
+
 ### HeyGen Studio (AI avatar video)
 - A bespoke tool at **`/media/heygen`** built on the **AI Media provider** stack (`HeyGenAdapter`,
   per-org `MediaProviderConfig` `'heygen'`, `AIMediaJob` async spine) — **not** the legacy

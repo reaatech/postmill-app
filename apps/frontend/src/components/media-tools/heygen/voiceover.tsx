@@ -56,7 +56,7 @@ export const Voiceover: FC<VoiceoverProps> = ({ voices, onGenerated }) => {
             children: <VoicePicker voices={voices} selectedId={voice?.voiceId} onSelect={(v) => setVoice({ voiceId: v.voiceId, name: v.name })} />,
           })
         }
-        className="flex items-center justify-between gap-[8px] px-[12px] py-[10px] rounded-[10px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+        className="flex items-center justify-between gap-[8px] px-[12px] py-[10px] rounded-[10px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
       >
         <div>
           <div className="text-[13px] text-textColor">{voice?.name || 'Pick a voice'}</div>
@@ -70,7 +70,7 @@ export const Voiceover: FC<VoiceoverProps> = ({ voices, onGenerated }) => {
         onChange={(e) => setText(e.target.value)}
         placeholder="Type the script to read aloud…"
         rows={7}
-        className="w-full px-[12px] py-[10px] rounded-[10px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
+        className="w-full px-[12px] py-[10px] rounded-[10px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
       />
 
       <button

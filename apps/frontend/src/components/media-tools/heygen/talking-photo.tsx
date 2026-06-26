@@ -69,7 +69,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
       <button
         type="button"
         onClick={() => setPicking(true)}
-        className="flex items-center gap-[12px] p-[12px] rounded-[10px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+        className="flex items-center gap-[12px] p-[12px] rounded-[10px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
       >
         <div className="w-[64px] h-[64px] rounded-[8px] bg-newBgColorInner overflow-hidden flex items-center justify-center shrink-0">
           {photo ? (
@@ -92,7 +92,7 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
             children: <VoicePicker voices={voices} selectedId={voice?.voiceId} onSelect={(v) => setVoice({ voiceId: v.voiceId, name: v.name })} />,
           })
         }
-        className="flex items-center justify-between gap-[8px] px-[12px] py-[10px] rounded-[10px] border border-newColColor hover:border-[#2B5CD3] transition-all text-left"
+        className="flex items-center justify-between gap-[8px] px-[12px] py-[10px] rounded-[10px] border border-studioBorder hover:border-[#2B5CD3] transition-all text-left"
       >
         <div>
           <div className="text-[13px] text-textColor">{voice?.name || 'Pick a voice'}</div>
@@ -106,13 +106,13 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
         onChange={(e) => setText(e.target.value)}
         placeholder="What should the photo say?"
         rows={5}
-        className="w-full px-[12px] py-[10px] rounded-[10px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
+        className="w-full px-[12px] py-[10px] rounded-[10px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3] resize-none"
       />
 
       <select
         value={dimensionKey}
         onChange={(e) => setDimensionKey(e.target.value)}
-        className="h-[38px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] w-fit"
+        className="h-[38px] px-[10px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3] w-fit"
       >
         {DIMENSIONS.map((d) => (
           <option key={d.key} value={d.key}>{d.label}</option>
