@@ -48,8 +48,16 @@
     is resolved server-side to a provider-reachable URL.
   - The `elevenlabs`, `openai-media`, `did`, `hedra`, and `tavus` adapters gained the same
     native-param `options.input` passthrough (back-compatible — legacy `AiMediaService` defaults apply
-    when `input` is absent); no schema migration. **Deepgram** (STT → text) and **Veo/Vertex** (OAuth
-    creds) are intentionally not kit studios.
+    when `input` is absent); no schema migration. **Deepgram** (STT → text) is intentionally not a kit
+    studio.
+- **Vertex AI studio** (`/media/vertex`) — Google **Veo** (Text → Video) and **Imagen** (Text →
+  Image) as a two-tab kit studio. Unlike every other media provider, Vertex uses GCP credentials, not
+  a single API key: the adapter declares a `credentialFields` schema (project + location +
+  service-account JSON, matching the AI Vertex adapter) and the Settings → Media modal renders those
+  fields dynamically (single `apiKey` remains the default for all other providers). A short-lived
+  access token is **minted per request** from the service-account key via `google-auth-library` — a
+  stored static token would expire in ~1h. Veo has no completion webhook, so it completes via the
+  `media-jobs-poll` cron (like Runway); Imagen completes synchronously inline. No schema migration.
 - **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
   provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
   env-var fallback).

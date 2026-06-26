@@ -40,6 +40,19 @@ export interface MediaGenerationResult {
 
 export type MediaInputValue = string | number | boolean;
 
+// Per-provider credential schema for the Settings → Media modal. Most providers need a
+// single API key (the modal's default) and omit this; multi-field providers (e.g. Google
+// Vertex: project + location + service-account JSON) declare their fields here so the modal
+// renders them dynamically. Mirrors the AI provider's `CredentialField`.
+export interface MediaCredentialField {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea';
+  required: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
 export interface MediaCredentialOptions {
   apiKey?: string;
   credentials?: Record<string, string>;
@@ -98,6 +111,10 @@ export interface MediaProviderAdapter {
   readonly identifier: string;
   readonly name: string;
   readonly capabilities: MediaProviderCapabilities;
+
+  // Optional multi-field credential schema. When absent, the Settings → Media modal
+  // collects a single `apiKey`.
+  readonly credentialFields?: MediaCredentialField[];
 
   generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult>;
 

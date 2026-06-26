@@ -1,13 +1,16 @@
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
+  MediaCredentialField,
   MediaGenerationResult,
   MediaGenerateOptions,
   MediaCredentialOptions,
+  MediaInputValue,
   MediaJobSubmission,
   MediaPollResult,
 } from '../media-provider-adapter.interface';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { GoogleAuth } from 'google-auth-library';
 
 interface VertexPredictResponse {
   predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
@@ -30,6 +33,7 @@ interface VertexCredentials {
 
 const DEFAULT_IMAGE_MODEL = 'imagen-3.0-generate-002';
 const DEFAULT_VIDEO_MODEL = 'veo-2.0-generate-001';
+const VERTEX_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
 export class VertexMediaAdapter implements MediaProviderAdapter {
   readonly identifier = 'vertex';
@@ -46,12 +50,47 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
     inpaint: false,
   };
 
-  private _credentials(options?: MediaCredentialOptions): VertexCredentials {
-    const accessToken = options?.credentials?.accessToken || options?.apiKey;
-    const projectId = options?.credentials?.projectId;
-    const region = options?.credentials?.region || 'us-central1';
-    if (!accessToken || !projectId) {
-      throw new Error('Vertex AI requires accessToken and projectId credentials');
+  // Vertex uses GCP credentials, not a single API key. The service-account JSON is the
+  // durable credential — short-lived access tokens are minted from it per call (a raw
+  // `accessToken` may still be passed for advanced use, but expires in ~1h). Field keys
+  // match the AI Vertex adapter so an org configures the same three values for both.
+  readonly credentialFields: MediaCredentialField[] = [
+    { key: 'project', label: 'GCP Project ID', type: 'string', required: true, placeholder: 'my-gcp-project' },
+    { key: 'location', label: 'GCP Location', type: 'string', required: true, placeholder: 'us-central1' },
+    {
+      key: 'googleCredentials',
+      label: 'GCP Service Account JSON',
+      type: 'textarea',
+      required: true,
+      placeholder: 'Paste your service account key JSON',
+      help: 'A short-lived access token is minted from this key on each request.',
+    },
+  ];
+
+  // Mint a short-lived OAuth token from the service-account JSON (preferred), falling back
+  // to a raw access token / apiKey for advanced callers. Returns the project + region too.
+  private async _credentials(options?: MediaCredentialOptions): Promise<VertexCredentials> {
+    const creds = options?.credentials || {};
+    const projectId = creds.project || creds.projectId;
+    const region = creds.location || creds.region || 'us-central1';
+    if (!projectId) {
+      throw new Error('Vertex AI requires a GCP project ID');
+    }
+
+    let accessToken = creds.accessToken || options?.apiKey;
+    if (!accessToken && creds.googleCredentials) {
+      let parsed: object;
+      try {
+        parsed = JSON.parse(creds.googleCredentials);
+      } catch {
+        throw new Error('Vertex AI service account JSON is not valid JSON');
+      }
+      const auth = new GoogleAuth({ credentials: parsed, scopes: [VERTEX_SCOPE] });
+      const client = await auth.getClient();
+      accessToken = (await client.getAccessToken()).token || undefined;
+    }
+    if (!accessToken) {
+      throw new Error('Vertex AI requires a service account JSON (or an access token)');
     }
     return { accessToken, projectId, region };
   }
@@ -71,14 +110,19 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
   }
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
-    const creds = this._credentials(options);
+    const creds = await this._credentials(options);
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
     const model = options?.model || DEFAULT_IMAGE_MODEL;
+    const sampleCount = input.sampleCount !== undefined ? Number(input.sampleCount) : options?.n || 1;
+    const parameters: Record<string, MediaInputValue> = { sampleCount };
+    if (typeof input.aspectRatio === 'string' && input.aspectRatio) parameters.aspectRatio = input.aspectRatio;
+    if (typeof input.negativePrompt === 'string' && input.negativePrompt) parameters.negativePrompt = input.negativePrompt;
     const res = await safeFetch(this._modelUrl(creds, model, 'predict'), {
       method: 'POST',
       headers: this._headers(creds),
       body: JSON.stringify({
         instances: [{ prompt }],
-        parameters: { sampleCount: options?.n || 1 },
+        parameters,
       }),
     });
     if (!res.ok) throw new Error(`Vertex AI image generation failed: ${await res.text()}`);
@@ -96,16 +140,25 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    const creds = this._credentials(options);
+    const creds = await this._credentials(options);
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
     const model = options?.model || DEFAULT_VIDEO_MODEL;
+    const aspectRatio =
+      options?.aspectRatio || (typeof input.aspectRatio === 'string' ? input.aspectRatio : undefined);
+    const durationSeconds =
+      options?.durationSeconds ?? (input.durationSeconds !== undefined ? Number(input.durationSeconds) : undefined);
+    const sampleCount = input.sampleCount !== undefined ? Number(input.sampleCount) : undefined;
+    const negativePrompt = typeof input.negativePrompt === 'string' ? input.negativePrompt : undefined;
     const res = await safeFetch(this._modelUrl(creds, model, 'predictLongRunning'), {
       method: 'POST',
       headers: this._headers(creds),
       body: JSON.stringify({
         instances: [{ prompt }],
         parameters: {
-          ...(options?.aspectRatio ? { aspectRatio: options.aspectRatio } : {}),
-          ...(options?.durationSeconds ? { durationSeconds: options.durationSeconds } : {}),
+          ...(aspectRatio ? { aspectRatio } : {}),
+          ...(durationSeconds ? { durationSeconds } : {}),
+          ...(sampleCount ? { sampleCount } : {}),
+          ...(negativePrompt ? { negativePrompt } : {}),
         },
       }),
     });
@@ -124,8 +177,20 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
     throw new Error('Vertex AI does not support avatar generation');
   }
 
+  // Validate credentials without spending an image generation: minting a token exercises
+  // the service-account JSON, project, and scope. (capabilities.image would otherwise make
+  // the generic test path call Imagen.)
+  async testConnection(options?: MediaCredentialOptions): Promise<{ ok: boolean; message: string }> {
+    try {
+      await this._credentials(options);
+      return { ok: true, message: 'Credentials valid (access token minted)' };
+    } catch (err) {
+      return { ok: false, message: (err as Error).message };
+    }
+  }
+
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const creds = this._credentials(options);
+    const creds = await this._credentials(options);
     // Operation names look like:
     // projects/{p}/locations/{r}/publishers/google/models/{model}/operations/{id}
     const modelMatch = jobId.match(/models\/([^/]+)\//);

@@ -626,9 +626,10 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
   descriptor.**
 - **Current studios on the kit:**
-  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter).
+  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter), Vertex (Google **Veo**).
   - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), OpenAI
-    (gpt-image-1 + DALL·E 3 as two fixed-model tabs). `operation: 'image'` completes **synchronously**
+    (gpt-image-1 + DALL·E 3 as two fixed-model tabs), Vertex (Google **Imagen**, a second tab on the
+    Vertex studio). `operation: 'image'` completes **synchronously**
     inside `MediaStudioService.generate` (the adapter returns the artifact inline / via its own
     bounded poll — no webhook), and base64 `data:` URLs are decoded by `completeJob`.
   - **Audio (TTS)** — ElevenLabs, OpenAI (a third `Text → Speech` tab on the OpenAI studio).
@@ -645,11 +646,16 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   adapters, and the audio/avatar adapters — ElevenLabs/OpenAI TTS + D-ID/Hedra/Tavus — enriched with
   native param passthrough; `model` is lifted out by the service and selects the endpoint/variant,
   everything else in `input` rides into the body). The passthrough is back-compatible: when `input`
-  is absent the legacy `AiMediaService` defaults apply unchanged. **Veo (Vertex) deferred** — OAuth
-  credential shape (`accessToken`+`projectId`+`region`) must be confirmed first. **Deepgram is not a
-  kit studio** — its real capability is STT (text output), which doesn't fit the kit's "prompt → media
-  artifact in `/files`" model. HeyGen and Replicate are intentionally **not** retrofitted (they keep
-  their bespoke implementations).
+  is absent the legacy `AiMediaService` defaults apply unchanged. **Vertex (Veo video + Imagen
+  image)** uses GCP credentials, **not** a single API key: the `vertex-media.adapter.ts` declares a
+  `credentialFields` schema (`project` + `location` + service-account `googleCredentials` JSON, same
+  keys as the AI Vertex adapter) and mints a **short-lived access token per call** via
+  `google-auth-library` — a stored static `accessToken` would expire in ~1h. The Settings → Media
+  modal renders `adapter.credentialFields` dynamically (multi-field), falling back to the single
+  `apiKey` input for every other provider. Veo has no completion webhook → it relies on the
+  `media-jobs-poll` cron (like Runway). **Deepgram is not a kit studio** — its real capability is STT
+  (text output), which doesn't fit the kit's "prompt → media artifact in `/files`" model. HeyGen and
+  Replicate are intentionally **not** retrofitted (they keep their bespoke implementations).
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via

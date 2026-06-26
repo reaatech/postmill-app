@@ -260,8 +260,18 @@ describe('VertexMediaAdapter', () => {
   const adapter = new VertexMediaAdapter();
   const vertexCreds = { credentials: { accessToken: 'tok', projectId: 'proj', region: 'us-central1' } };
 
-  it('requires accessToken and projectId', async () => {
-    await expect(adapter.generateImage('x', CREDS)).rejects.toThrow('projectId');
+  it('requires a project id', async () => {
+    await expect(adapter.generateImage('x', CREDS)).rejects.toThrow('project');
+  });
+
+  it('requires a service account JSON or access token when project is set', async () => {
+    await expect(
+      adapter.generateImage('x', { credentials: { project: 'proj' } }),
+    ).rejects.toThrow('service account');
+  });
+
+  it('exposes the GCP credential fields for the settings modal', () => {
+    expect(adapter.credentialFields?.map((f) => f.key)).toEqual(['project', 'location', 'googleCredentials']);
   });
 
   it('generates Imagen images as data URIs', async () => {
