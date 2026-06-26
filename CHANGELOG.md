@@ -241,6 +241,9 @@
   The `ThirdParty` Prisma model + `Organization.thirdParty` relation were dropped from the schema.
 
 ### Changed
+- **Renamed "Vercel AI Gateway" / "AI Gateway" → "Vercel AI"** across the AI provider, media provider,
+  the `/media/gateway` studio title, and the media nav. Identifier unchanged (`gateway`); display-name
+  only.
 - **Renamed "Google Vertex AI" → "Google Vertex"** across the AI provider, media provider, the
   `/media/vertex` studio title, and the media nav — disambiguating the enterprise GCP path (`vertex`,
   service-account auth) from the new consumer Gemini-key path (Google AI Studio, `google`). Identifier

@@ -28,14 +28,14 @@ export class GatewayAdapter implements AIProviderAdapter {
   }
 
   readonly identifier = 'gateway';
-  readonly name = 'Vercel AI Gateway';
+  readonly name = 'Vercel AI';
   readonly type = 'hub' as const;
   readonly credentialFields: CredentialField[] = [
     { key: 'apiKey', label: 'Gateway API Key', type: 'password', required: true, placeholder: 'gw_...' },
     { key: 'baseURL', label: 'Gateway Base URL', type: 'string', required: true, placeholder: 'https://gateway.ai.cloudflare.com/v1/...' },
   ];
   readonly capabilities: AICapabilities = { text: true, image: true, vision: true, embeddings: true, speech: true, tools: true };
-  readonly privacy = { dataRetention: 'Managed by your gateway policy', trainingOnData: false, description: 'Vercel AI Gateway — unified API gateway with caching, rate limiting, and observability' };
+  readonly privacy = { dataRetention: 'Managed by your gateway policy', trainingOnData: false, description: 'Vercel AI — unified API gateway with caching, rate limiting, and observability' };
 
   async listModels(_creds: Record<string, string>): Promise<ModelInfo[]> {
     return [

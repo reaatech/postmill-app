@@ -36,7 +36,7 @@ interface GatewayModelsResponse {
 
 export class GatewayMediaAdapter extends AiSdkMediaAdapter {
   readonly identifier = 'gateway';
-  readonly name = 'Vercel AI Gateway';
+  readonly name = 'Vercel AI';
   readonly capabilities: MediaProviderCapabilities = {
     image: true,
     video: true,
@@ -56,7 +56,7 @@ export class GatewayMediaAdapter extends AiSdkMediaAdapter {
     const model = options?.model;
     if (!model) throw new Error('Gateway video generation requires a model');
     const apiKey = options?.credentials?.apiKey || resolveApiKey(options);
-    if (!apiKey) throw new Error('Vercel AI Gateway API key is required');
+    if (!apiKey) throw new Error('Vercel AI API key is required');
 
     const gw = createGateway({ apiKey, fetch: videoFetch });
     const input = options?.input || {};

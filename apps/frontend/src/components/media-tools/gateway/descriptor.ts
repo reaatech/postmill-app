@@ -11,7 +11,7 @@ const RATIOS = [
 
 export const gatewayDescriptor: StudioDescriptor = {
   provider: 'gateway',
-  title: 'Vercel AI Gateway',
+  title: 'Vercel AI',
   tabs: [
     {
       key: 'text-to-image',
