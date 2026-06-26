@@ -101,7 +101,8 @@ export class SocialCommentsService {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       post.integration.providerIdentifier,
-      post.integration.organizationId
+      post.integration.organizationId,
+      post.integration.providerConfigId
     ).catch(() => undefined);
 
     try {
@@ -172,7 +173,8 @@ export class SocialCommentsService {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       post.integration.providerIdentifier,
-      post.integration.organizationId
+      post.integration.organizationId,
+      post.integration.providerConfigId
     ).catch(() => undefined);
 
     try {
@@ -319,7 +321,8 @@ export class SocialCommentsService {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       post.integration.providerIdentifier,
-      post.integration.organizationId
+      post.integration.organizationId,
+      post.integration.providerConfigId
     ).catch(() => undefined);
 
     while (hasMore && attempts < MAX_PAGES) {
@@ -463,7 +466,8 @@ export class SocialCommentsService {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       post.integration.providerIdentifier,
-      post.integration.organizationId
+      post.integration.organizationId,
+      post.integration.providerConfigId
     ).catch(() => undefined);
 
     try {

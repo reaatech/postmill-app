@@ -19,6 +19,35 @@ import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/so
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
+interface ChannelConfigBody {
+  name?: string;
+  enabled?: boolean;
+  clientId?: string;
+  clientSecret?: string;
+  redirectUri?: string;
+  scopes?: string;
+  additionalConfig?: string;
+  setupNotes?: string;
+}
+
+function validateBody(body: ChannelConfigBody) {
+  if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
+    throw new BadRequestException('enabled must be a boolean');
+  }
+  for (const key of ['name', 'clientId', 'clientSecret', 'redirectUri', 'scopes', 'setupNotes', 'additionalConfig'] as const) {
+    if (body[key] !== undefined && typeof body[key] !== 'string') {
+      throw new BadRequestException(`${key} must be a string`);
+    }
+  }
+  if (body.additionalConfig) {
+    try {
+      JSON.parse(body.additionalConfig);
+    } catch {
+      throw new BadRequestException('additionalConfig must be valid JSON');
+    }
+  }
+}
+
 @ApiTags('Channel Config')
 @Controller('/channels/config')
 export class ChannelConfigPerTenantController {
@@ -27,166 +56,137 @@ export class ChannelConfigPerTenantController {
     private _orgProviderConfigManager: OrgProviderConfigManager,
   ) {}
 
+  // Static provider catalog — used by the "Add channel" picker. Declared before
+  // the `/:id` routes so it isn't captured as an id.
+  @Get('/providers')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async listProviders() {
+    return socialIntegrationList.map((p) => ({
+      identifier: p.identifier,
+      name: p.name,
+      description: p.toolTip || '',
+      isExternal: !!p.externalUrl,
+      isWeb3: !!p.isWeb3,
+      isChromeExtension: !!p.isChromeExtension,
+      customFields: !!p.customFields,
+      scopes: p.scopes?.join(', ') || '',
+      capabilities: PROVIDER_CAPABILITIES[p.identifier] || null,
+    }));
+  }
+
+  // The org's named credential-config instances (the list rows).
   @Get('/')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listConfigs(@GetOrgFromRequest() org: Organization) {
-    const dbConfigs = await this._orgProviderConfigService.getConfigs(org.id);
-    const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
-
-    return socialIntegrationList.map((p) => {
-      const dbConfig = dbConfigMap.get(p.identifier);
-      return {
-        identifier: p.identifier,
-        name: p.name,
-        description: p.toolTip || '',
-        enabled: dbConfig?.enabled || false,
-        isConfigured: dbConfig?.isConfigured || false,
-        setupNotes: dbConfig?.setupNotes || '',
-        isExternal: !!p.externalUrl,
-        isWeb3: !!p.isWeb3,
-        isChromeExtension: !!p.isChromeExtension,
-        customFields: !!p.customFields,
-        scopes: p.scopes?.join(', ') || '',
-        redirectUri: dbConfig?.redirectUri || '',
-        updatedAt: dbConfig?.updatedAt || null,
-        capabilities: PROVIDER_CAPABILITIES[p.identifier] || null,
-      };
-    });
+    const configs = await this._orgProviderConfigService.getConfigs(org.id);
+    return configs.map((c) => ({
+      ...c,
+      capabilities: PROVIDER_CAPABILITIES[c.identifier] || null,
+    }));
   }
 
-  @Get('/:identifier')
+  @Get('/:id')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async getConfig(
     @GetOrgFromRequest() org: Organization,
-    @Param('identifier') identifier: string
+    @Param('id') id: string
   ) {
-    const configs = await this._orgProviderConfigService.getConfigs(org.id);
-    const config = configs.find((c) => c.identifier === identifier);
-    const provider = socialIntegrationList.find((p) => p.identifier === identifier);
-
+    const config = await this._orgProviderConfigService.getConfigById(org.id, id);
+    if (!config) {
+      throw new BadRequestException('Channel config not found');
+    }
     return {
-      identifier,
-      name: provider?.name || identifier,
-      enabled: config?.enabled || false,
-      isConfigured: config?.isConfigured || false,
-      redirectUri: config?.redirectUri || '',
-      scopes: config?.scopes || provider?.scopes?.join(', ') || '',
-      setupNotes: config?.setupNotes || '',
-      isExternal: !!provider?.externalUrl,
-      isWeb3: !!provider?.isWeb3,
-      isChromeExtension: !!provider?.isChromeExtension,
-      customFields: !!provider?.customFields,
-      updatedAt: config?.updatedAt || null,
-      capabilities: PROVIDER_CAPABILITIES[identifier] || null,
+      ...config,
+      capabilities: PROVIDER_CAPABILITIES[config.identifier] || null,
     };
   }
 
-  @Put('/:identifier')
+  @Post('/')
+  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
+  async createConfig(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Body() body: ChannelConfigBody & { identifier?: string }
+  ) {
+    validateBody(body);
+    if (!body.identifier || typeof body.identifier !== 'string') {
+      throw new BadRequestException('identifier is required');
+    }
+    if (!socialIntegrationList.find((p) => p.identifier === body.identifier)) {
+      throw new BadRequestException('Unknown provider');
+    }
+    if (!body.name?.trim()) {
+      throw new BadRequestException('A channel name is required');
+    }
+
+    const result = await this._orgProviderConfigService.createConfig(
+      org.id,
+      {
+        identifier: body.identifier,
+        name: body.name,
+        enabled: body.enabled ?? false,
+        clientId: body.clientId,
+        clientSecret: body.clientSecret,
+        redirectUri: body.redirectUri,
+        scopes: body.scopes,
+        additionalConfig: body.additionalConfig,
+        setupNotes: body.setupNotes,
+      },
+      user.id
+    );
+
+    this._orgProviderConfigManager.invalidateOrg(org.id);
+    return result;
+  }
+
+  @Put('/:id')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async saveConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      enabled: boolean;
-      clientId?: string;
-      clientSecret?: string;
-      redirectUri?: string;
-      scopes?: string;
-      additionalConfig?: string;
-      setupNotes?: string;
-    }
+    @Param('id') id: string,
+    @Body() body: ChannelConfigBody
   ) {
-    if (typeof body.enabled !== 'boolean') {
-      throw new BadRequestException('enabled must be a boolean');
-    }
-    if (body.clientId !== undefined && typeof body.clientId !== 'string') {
-      throw new BadRequestException('clientId must be a string');
-    }
-    if (body.clientSecret !== undefined && typeof body.clientSecret !== 'string') {
-      throw new BadRequestException('clientSecret must be a string');
-    }
-    if (body.redirectUri !== undefined && typeof body.redirectUri !== 'string') {
-      throw new BadRequestException('redirectUri must be a string');
-    }
-    if (body.scopes !== undefined && typeof body.scopes !== 'string') {
-      throw new BadRequestException('scopes must be a string');
-    }
-    if (body.setupNotes !== undefined && typeof body.setupNotes !== 'string') {
-      throw new BadRequestException('setupNotes must be a string');
-    }
-    if (body.additionalConfig !== undefined && typeof body.additionalConfig !== 'string') {
-      throw new BadRequestException('additionalConfig must be a string');
-    }
-    if (body.additionalConfig) {
-      try {
-        JSON.parse(body.additionalConfig);
-      } catch {
-        throw new BadRequestException('additionalConfig must be valid JSON');
-      }
-    }
+    validateBody(body);
 
-    const provider = socialIntegrationList.find((p) => p.identifier === identifier);
-    if (!provider) {
-      throw new BadRequestException('Unknown provider');
-    }
-
-    if (body.enabled) {
-      const hasNewClientId =
-        body.clientId !== undefined &&
-        typeof body.clientId === 'string' &&
-        body.clientId.trim().length > 0;
-
-      if (!hasNewClientId) {
-        const existingCredentials =
-          await this._orgProviderConfigService.getCredentials(
-            org.id,
-            identifier
-          );
-
-        if (!existingCredentials?.clientId?.trim()) {
-          throw new BadRequestException(
-            'A provider must be configured with credentials before it can be enabled.'
-          );
-        }
-      }
-    }
-
-    const result = await this._orgProviderConfigService.upsert(org.id, identifier, {
-      name: provider.name,
-      enabled: body.enabled,
-      clientId: body.clientId !== undefined ? body.clientId : undefined,
-      clientSecret: body.clientSecret !== undefined ? body.clientSecret : undefined,
-      redirectUri: body.redirectUri !== undefined ? body.redirectUri : undefined,
-      scopes: body.scopes !== undefined ? body.scopes : undefined,
-      additionalConfig: body.additionalConfig !== undefined ? body.additionalConfig : undefined,
-      setupNotes: body.setupNotes !== undefined ? body.setupNotes : undefined,
-    }, user.id);
+    const result = await this._orgProviderConfigService.updateConfig(
+      org.id,
+      id,
+      {
+        name: body.name,
+        enabled: body.enabled,
+        clientId: body.clientId,
+        clientSecret: body.clientSecret,
+        redirectUri: body.redirectUri,
+        scopes: body.scopes,
+        additionalConfig: body.additionalConfig,
+        setupNotes: body.setupNotes,
+      },
+      user.id
+    );
 
     this._orgProviderConfigManager.invalidateOrg(org.id);
-
     return result;
   }
 
-  @Delete('/:identifier')
+  @Delete('/:id')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Param('identifier') identifier: string
+    @Param('id') id: string
   ) {
-    await this._orgProviderConfigService.delete(org.id, identifier, user.id);
+    await this._orgProviderConfigService.deleteConfig(org.id, id, user.id);
     this._orgProviderConfigManager.invalidateOrg(org.id);
     return { success: true };
   }
 
-  @Post('/:identifier/test')
+  @Post('/:id/test')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async testConfig(
     @GetOrgFromRequest() org: Organization,
-    @Param('identifier') identifier: string
+    @Param('id') id: string
   ) {
-    return this._orgProviderConfigService.testConnection(org.id, identifier);
+    return this._orgProviderConfigService.testConnection(org.id, id);
   }
 }

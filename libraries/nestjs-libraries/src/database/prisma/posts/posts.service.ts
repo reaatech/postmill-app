@@ -224,7 +224,8 @@ export class PostsService {
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
         getIntegration.providerIdentifier,
-        getIntegration.organizationId
+        getIntegration.organizationId,
+        getIntegration.providerConfigId
       ).catch(() => undefined);
 
       const loadAnalytics = await integrationProvider.postAnalytics(

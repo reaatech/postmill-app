@@ -10,6 +10,19 @@
 
 ## Unreleased
 
+### Added
+- **Channels settings: many named credential sets per provider.** Settings → Channels now manages
+  *named* OAuth-app credential sets — an org can add **multiple sets for the same provider**, each
+  with a required **name** and its **own auth** (client id/secret/scopes/redirect). Configuration
+  opens in a **modal**; the long row of capability filter buttons is collapsed into a single
+  **Capabilities** checkbox dropdown; the page heading was removed. Backed by an additive,
+  db-push-safe schema change: `OrgProviderConfiguration` drops its `(organizationId, identifier)`
+  unique in favour of `(organizationId, identifier, name)` and is resolved by row `id`, and
+  `Integration` gains a nullable `providerConfigId` FK (`onDelete: SetNull`) binding each connected
+  account to the credential set it used. Credential resolution falls back to the org's primary set
+  for unbound/legacy connections. (A connect-time picker to choose the set when linking a new account
+  is a follow-up; the OAuth endpoint already accepts `?config=<id>`.)
+
 ### Changed
 - **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
   Brand Kit + Knowledge Base stacked) is now split into three tabs — **Voice & Tone**, **Brand Kit**,

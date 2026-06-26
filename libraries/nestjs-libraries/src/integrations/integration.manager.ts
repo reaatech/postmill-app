@@ -246,16 +246,22 @@ export class IntegrationManager {
     return socialIntegrationList.find((i) => i.identifier === integration);
   }
 
-  // INTERNAL USE ONLY - returns decrypted client credentials
-  async getClientInformation(integration: string, orgId?: string) {
+  // INTERNAL USE ONLY - returns decrypted client credentials.
+  // When configId is provided the credentials of that specific named config are used
+  // (each named credential set has its own auth); otherwise resolution falls back to
+  // the org's primary config for the provider identifier.
+  async getClientInformation(integration: string, orgId?: string, configId?: string | null) {
     if (orgId) {
+      if (configId) {
+        return this._orgProviderConfigManager.getClientInfoById(orgId, configId);
+      }
       return this._orgProviderConfigManager.getClientInfo(orgId, integration);
     }
     return this._providerConfigManager.getClientInfo(integration);
   }
 
-  async requireClientInformation(integration: string, orgId?: string) {
-    const info = await this.getClientInformation(integration, orgId);
+  async requireClientInformation(integration: string, orgId?: string, configId?: string | null) {
+    const info = await this.getClientInformation(integration, orgId, configId);
     if (!info?.client_id && !info?.token) {
       throw new ProviderNotConfiguredError(integration, orgId);
     }

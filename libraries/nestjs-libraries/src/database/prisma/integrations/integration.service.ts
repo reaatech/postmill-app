@@ -110,7 +110,8 @@ export class IntegrationService {
     isBetweenSteps = false,
     refresh?: string,
     timezone?: number,
-    customInstanceDetails?: string
+    customInstanceDetails?: string,
+    providerConfigId?: string
   ) {
     const uploadedPicture = picture
       ? await (await this._storageService.getLocalAdapterForOrg(org, true)).uploadSimple(picture)
@@ -132,7 +133,8 @@ export class IntegrationService {
       isBetweenSteps,
       refresh,
       timezone,
-      customInstanceDetails
+      customInstanceDetails,
+      providerConfigId
     );
   }
 
@@ -404,7 +406,8 @@ export class IntegrationService {
       try {
         const clientInformation = await this._integrationManager.requireClientInformation(
           integration,
-          getIntegration.organizationId
+          getIntegration.organizationId,
+          getIntegration.providerConfigId
         ).catch(() => undefined);
 
         const loadAnalytics = await integrationProvider.analytics(

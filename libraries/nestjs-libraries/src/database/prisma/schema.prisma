@@ -263,9 +263,11 @@ model Integration {
   customerId            String?
   rootInternalId        String?
   additionalSettings    String?                @default("[]")
+  providerConfigId      String?
   exisingPlugData       ExisingPlugData[]
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
+  providerConfig        OrgProviderConfiguration? @relation(fields: [providerConfigId], references: [id], onDelete: SetNull)
   webhooks              Webhooks[]
   plugs                 Plugs[]
   posts                     Post[]
@@ -284,6 +286,7 @@ model Integration {
   @@index([inBetweenSteps])
   @@index([refreshNeeded])
   @@index([disabled])
+  @@index([providerConfigId])
 }
 
 model AnalyticsSnapshot {
@@ -698,9 +701,12 @@ model OrgProviderConfiguration {
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [organizationId], references: [id])
+  integrations     Integration[]
 
-  @@unique([organizationId, identifier])
+  // Many named credential sets per provider per org; the name disambiguates them.
+  @@unique([organizationId, identifier, name])
   @@index([organizationId])
+  @@index([organizationId, identifier])
 }
 
 // ── v3.6.0: DB-backed audit log for credential & storage mutations ──

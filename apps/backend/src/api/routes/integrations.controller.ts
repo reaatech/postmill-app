@@ -199,6 +199,7 @@ export class IntegrationsController {
     @Query('externalUrl') externalUrl: string,
     @Query('redirectUrl') redirectUrl: string,
     @Query('onboarding') onboarding: string,
+    @Query('config') config: string,
     @GetOrgFromRequest() org: Organization
   ) {
     if (
@@ -226,11 +227,18 @@ export class IntegrationsController {
 
       const clientInformation = await this._integrationManager.requireClientInformation(
         integration,
-        org.id
+        org.id,
+        config || undefined
       );
 
       const { codeVerifier, state, url } =
         await integrationProvider.generateAuthUrl(clientInformation);
+
+      // Bind the chosen named credential config to this connection so the callback
+      // (and later refresh/publish) use that config's own auth.
+      if (config) {
+        await ioRedis.set(`config:${state}`, config, 'EX', 3600);
+      }
 
       if (refresh) {
         await ioRedis.set(`refresh:${state}`, refresh, 'EX', 3600);

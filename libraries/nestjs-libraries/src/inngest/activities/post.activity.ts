@@ -169,7 +169,8 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
     return getIntegration.comment(
@@ -213,7 +214,8 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
     return getIntegration.comment(
@@ -263,7 +265,8 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
     const postNow = await getIntegration.post(

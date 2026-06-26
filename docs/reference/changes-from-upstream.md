@@ -38,6 +38,14 @@ Files folder and complete through the Inngest poll sweep. The studio is intentio
 surface in v1: it does **not** participate in C2PA provenance signing or the shared media-pipeline
 cost ledger; accounting is tracked per job through `AIMediaJob.costUsd`/`creditType`.
 
+v3.9.0 also reworks **Settings → Channels** into *named credential sets*: an org can configure
+**multiple OAuth-app credential sets for the same provider**, each with a required name and its own
+auth. Configuration moved into a modal, the capability filter buttons were collapsed into a single
+checkbox dropdown, and the page heading was dropped. Schema-wise, `OrgProviderConfiguration` is now
+unique on `(organizationId, identifier, name)` (resolved by row `id`) and `Integration` gained a
+nullable `providerConfigId` FK binding each connected account to the set it used (fallback to the
+org's primary set when unbound). Additive and db-push-safe.
+
 Stock browsing was expanded with free vectors (Pixabay), stickers (GIPHY), and icons (Iconify),
 joining existing photos (Unsplash) and videos (Pexels). Results carry `source`, `license`, and
 `attribution` metadata through preview, Designer open, and `/files/import`. Premium Content Packs

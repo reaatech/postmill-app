@@ -99,9 +99,16 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`onboarding:${body.state}`);
     }
 
+    // The named credential config this connection was initiated from (if any).
+    const providerConfigId = await ioRedis.get(`config:${body.state}`);
+    if (providerConfigId) {
+      await ioRedis.del(`config:${body.state}`);
+    }
+
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration,
-      org.id
+      org.id,
+      providerConfigId || undefined
     ).catch(() => undefined);
 
     const {
@@ -247,7 +254,8 @@ export class NoAuthIntegrationsController {
           ? AuthService.fixedEncryption(
               Buffer.from(body.code, 'base64').toString()
             )
-          : undefined
+          : undefined,
+        providerConfigId || undefined
       );
 
     this._refreshIntegrationService

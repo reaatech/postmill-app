@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
-import { setCredentials, getCredential, replaceCredentialsMap, clearOrgCredentials, type CredentialEntry } from '@gitroom/nestjs-libraries/integrations/credentials';
+import { replaceCredentialsMap, clearOrgCredentials, type CredentialEntry } from '@gitroom/nestjs-libraries/integrations/credentials';
 
 type DecryptedConfig = {
+  id: string;
   clientId?: string;
   clientSecret?: string;
   redirectUri?: string;
@@ -15,6 +16,10 @@ type DecryptedConfig = {
 };
 
 type OrgCache = {
+  // Keyed by config id — the authoritative per-instance map.
+  byId: Map<string, DecryptedConfig>;
+  // Keyed by provider identifier — the "primary" config (enabled-first) used by
+  // legacy by-identifier resolution / fallback for unbound integrations.
   configs: Map<string, DecryptedConfig>;
   enabledIdentifiers: string[];
   lastRefresh: number;
@@ -32,7 +37,7 @@ export class OrgProviderConfigManager {
   async ensureFresh(orgId: string) {
     let cache = this.orgCaches.get(orgId);
     if (!cache) {
-      cache = { configs: new Map(), enabledIdentifiers: [], lastRefresh: 0, refreshPromise: null };
+      cache = { byId: new Map(), configs: new Map(), enabledIdentifiers: [], lastRefresh: 0, refreshPromise: null };
       this.orgCaches.set(orgId, cache);
     }
 
@@ -51,15 +56,17 @@ export class OrgProviderConfigManager {
   }
 
   async #doRefresh(orgId: string, cache: OrgCache) {
-    const newConfigs = new Map<string, DecryptedConfig>();
-    const newEnabled: string[] = [];
+    const newById = new Map<string, DecryptedConfig>();
+    const newByIdentifier = new Map<string, DecryptedConfig>();
+    const newEnabled = new Set<string>();
     const newCredentials = new Map<string, CredentialEntry>();
 
     const allConfigs = await this._orgProviderConfigService['_repository'].getByOrg(orgId);
 
     for (const config of allConfigs) {
-      const decrypted = await this._orgProviderConfigService.getCredentials(orgId, config.identifier) || {};
+      const decrypted = this._orgProviderConfigService.decryptRow(config);
       const entry: DecryptedConfig = {
+        id: config.id,
         identifier: config.identifier,
         name: config.name,
         enabled: config.enabled,
@@ -70,21 +77,35 @@ export class OrgProviderConfigManager {
         additionalConfig: decrypted.additionalConfig,
         setupNotes: config.setupNotes || undefined,
       };
-      newConfigs.set(config.identifier, entry);
+      newById.set(config.id, entry);
+
+      // Primary per identifier: prefer an enabled config over a disabled one.
+      const current = newByIdentifier.get(config.identifier);
+      if (!current || (entry.enabled && !current.enabled)) {
+        newByIdentifier.set(config.identifier, entry);
+      }
 
       if (config.enabled && (decrypted.clientId || decrypted.clientSecret)) {
-        newEnabled.push(config.identifier);
-        newCredentials.set(config.identifier, {
-          clientId: decrypted.clientId,
-          clientSecret: decrypted.clientSecret,
-          redirectUri: config.redirectUri || undefined,
-          scopes: config.scopes?.split(',').map((s: string) => s.trim()),
+        newEnabled.add(config.identifier);
+      }
+    }
+
+    // Credentials map is keyed by identifier (the publish path resolves by identifier
+    // when an integration isn't bound to a specific config) — use the primary.
+    for (const [identifier, entry] of newByIdentifier) {
+      if (entry.enabled && (entry.clientId || entry.clientSecret)) {
+        newCredentials.set(identifier, {
+          clientId: entry.clientId,
+          clientSecret: entry.clientSecret,
+          redirectUri: entry.redirectUri,
+          scopes: entry.scopes?.split(',').map((s: string) => s.trim()),
         });
       }
     }
 
-    cache.configs = newConfigs;
-    cache.enabledIdentifiers = newEnabled;
+    cache.byId = newById;
+    cache.configs = newByIdentifier;
+    cache.enabledIdentifiers = [...newEnabled];
     cache.lastRefresh = Date.now();
 
     replaceCredentialsMap(orgId, newCredentials);
@@ -98,6 +119,11 @@ export class OrgProviderConfigManager {
   async getConfig(orgId: string, identifier: string): Promise<DecryptedConfig | undefined> {
     await this.ensureFresh(orgId);
     return this.orgCaches.get(orgId)?.configs.get(identifier);
+  }
+
+  async getConfigById(orgId: string, configId: string): Promise<DecryptedConfig | undefined> {
+    await this.ensureFresh(orgId);
+    return this.orgCaches.get(orgId)?.byId.get(configId);
   }
 
   async getEnabledIdentifiers(orgId: string): Promise<string[]> {
@@ -115,17 +141,10 @@ export class OrgProviderConfigManager {
     return this.orgCaches.get(orgId)?.configs.get(identifier)?.enabled === true;
   }
 
-  async getClientInfo(orgId: string, identifier: string): Promise<{
-    client_id: string;
-    client_secret: string;
-    instanceUrl: string;
-    token?: string;
-  } | undefined> {
-    await this.ensureFresh(orgId);
-    const config = this.orgCaches.get(orgId)?.configs.get(identifier);
-    if (!config?.enabled) {
-      return undefined;
-    }
+  #buildClientInfo(config: DecryptedConfig | undefined, requireEnabled: boolean) {
+    if (!config) return undefined;
+    if (requireEnabled && !config.enabled) return undefined;
+
     let token: string | undefined;
     if (config.additionalConfig) {
       try {
@@ -146,5 +165,26 @@ export class OrgProviderConfigManager {
       instanceUrl: config.redirectUri || '',
       ...(token ? { token } : {}),
     };
+  }
+
+  async getClientInfo(orgId: string, identifier: string): Promise<{
+    client_id: string;
+    client_secret: string;
+    instanceUrl: string;
+    token?: string;
+  } | undefined> {
+    await this.ensureFresh(orgId);
+    return this.#buildClientInfo(this.orgCaches.get(orgId)?.configs.get(identifier), true);
+  }
+
+  // Resolve credentials for a specific named config (each named set uses its own auth).
+  async getClientInfoById(orgId: string, configId: string): Promise<{
+    client_id: string;
+    client_secret: string;
+    instanceUrl: string;
+    token?: string;
+  } | undefined> {
+    await this.ensureFresh(orgId);
+    return this.#buildClientInfo(this.orgCaches.get(orgId)?.byId.get(configId), false);
   }
 }

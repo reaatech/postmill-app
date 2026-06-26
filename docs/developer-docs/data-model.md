@@ -68,8 +68,13 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `OrgProviderConfiguration` | Per-org channel provider OAuth credentials (encrypted); replaces `ProviderConfiguration` | FK → `Organization` |
+| `OrgProviderConfiguration` | Per-org channel provider OAuth credentials (encrypted). **Many named sets per provider** — unique on `(organizationId, identifier, name)`; resolved by row `id`. Replaces `ProviderConfiguration` | FK → `Organization`; back-ref → `Integration[]` |
 | `ProviderConfiguration` | **DEPRECATED v3.6.0** — global provider config; replaced by per-tenant `OrgProviderConfiguration` | Standalone |
+
+A connected `Integration` carries a nullable `providerConfigId` FK (`onDelete: SetNull`) binding it to
+the named credential set it was connected through, so OAuth handshake, token refresh, and API calls use
+that set's own auth. When `providerConfigId` is `NULL` (legacy / unbound connections), credential
+resolution falls back to the org's primary set for the provider identifier (enabled-first).
 
 ---
 

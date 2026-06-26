@@ -60,25 +60,31 @@ organisation:
 
 Connect and manage social media and chat channels.
 
-### Connecting providers
+### Named credential sets
 
-Each channel provider supports OAuth authentication. Click a provider row to expand its
-configuration:
+A **channel** here is a named OAuth-app credential set. Click **Add channel**, pick a provider,
+then fill in the configuration dialog:
 
-- Enter your own OAuth app credentials (Client ID, Client Secret) if using custom apps.
-- For providers that support it, use the platform's default OAuth flow to connect.
-- Each configured provider shows an **Active**, **No Credentials**, or **Disabled** status badge.
+- **Name** (required) — a label that identifies this credential set (e.g. "Marketing LinkedIn").
+- **Client ID / Client Secret** — your own OAuth app credentials.
+- **Scopes** and **Redirect URI** — optional; defaults apply when left blank.
+- **Enabled** — a set must have a Client ID before it can be enabled.
+
+You can add **many credential sets for the same provider**, each with a different name — useful when
+an org juggles several OAuth apps for one platform. Each named set has its **own auth**: a social
+account connected through a set uses that set's credentials for the OAuth handshake, token refresh,
+and API calls. Sets are listed by name; use the **search** box and the **Capabilities** filter
+dropdown (checkboxes) to narrow the list.
 
 ### Channel configuration
 
-Provider credentials are stored per-organisation in `OrgProviderConfiguration` records and
-encrypted at rest (AES-256-GCM). You can:
+Credential sets are stored per-organisation in `OrgProviderConfiguration` records and encrypted at
+rest (AES-256-GCM). From a set's dialog you can:
 
-- **Edit credentials** — update Client ID, Client Secret, scopes, and redirect URI for any
-  configured provider.
-- **Test connection** — validate that your credentials work by generating an auth URL.
-- **Clear credentials** — remove stored OAuth data for a provider, disconnecting all channels
-  of that type.
+- **Edit** — update the name, Client ID, Client Secret, scopes, and redirect URI.
+- **Test** — validate the credentials by generating an auth URL.
+- **Remove** — delete this credential set. Accounts that were connected through it fall back to the
+  org's primary set for that provider.
 
 ### Connection health status
 
@@ -91,12 +97,12 @@ Below the provider list, a **Connection Status** table shows every connected cha
 | **Refresh Needed** | Token requires a refresh cycle. Click **Reconnect**. |
 | **Disabled** | Channel has been manually disabled or the provider is turned off. |
 
-### Provider capabilities panel
+### Provider capabilities
 
-A reference matrix below the connection status shows what each provider supports. Capabilities
-include: analytics, comments, first comment, polls, video, carousel, alt text, max media count,
-link preview, and refresh token support. Use this to understand feature availability per channel
-before composing posts.
+Each channel row shows capability badges for its provider — analytics, comments, first comment,
+polls, video, carousel, alt text, link preview, refresh token, and watchlist support. The
+**Capabilities** filter dropdown narrows the list to providers that support the selected features,
+so you can see feature availability per channel before composing posts.
 
 ## Shortlinks tab
 

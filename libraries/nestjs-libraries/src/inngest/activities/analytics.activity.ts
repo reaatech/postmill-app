@@ -110,7 +110,8 @@ export class AnalyticsActivity {
       try {
         const clientInformation = await this._integrationManager.requireClientInformation(
           integration.providerIdentifier,
-          integration.organizationId
+          integration.organizationId,
+          integration.providerConfigId
         ).catch(() => undefined);
 
         const data = await provider.analytics(
@@ -205,7 +206,8 @@ export class AnalyticsActivity {
 
         const clientInformation = await this._integrationManager.requireClientInformation(
           post.integration.providerIdentifier,
-          post.integration.organizationId
+          post.integration.organizationId,
+          post.integration.providerConfigId
         ).catch(() => undefined);
 
         const data = await provider.postAnalytics(
@@ -431,7 +433,8 @@ export class AnalyticsActivity {
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
         integration.providerIdentifier,
-        integration.organizationId
+        integration.organizationId,
+        integration.providerConfigId
       ).catch(() => undefined);
 
       const data = await provider.analytics(integration.internalId, token, 90, clientInformation);
