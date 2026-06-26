@@ -45,7 +45,9 @@ function decodeJobId(jobId: string): { model: string; requestId: string } {
 
 export class FalAdapter implements MediaProviderAdapter {
   readonly identifier = 'fal';
-  readonly name = 'fal.ai';
+  // Display name shown in Settings → Media. Kept as "Kling" to match the studio
+  // (/media/kling, nav + title "Kling"); the registry/config identifier stays `fal`.
+  readonly name = 'Kling';
   readonly capabilities: MediaProviderCapabilities = {
     image: true,
     video: true,
