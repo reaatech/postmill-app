@@ -1,8 +1,9 @@
 import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/studio-kit/types';
 
-// OpenAI image generation (registry/config identifier `openai`). gpt-image-1 and DALL·E 3
-// take different param sets, so each is its own tab with a fixed model and its own correct
-// fields — field names are native OpenAI Images params. Both return synchronously.
+// OpenAI media (registry/config identifier `openai`). gpt-image-1 and DALL·E 3 take different
+// param sets, so each is its own image tab with a fixed model and its own correct fields; a
+// third tab covers TTS (operation `audio`, synchronous data-URL artifact). Field names are
+// native OpenAI params and ride straight into the request body.
 export const openaiDescriptor: StudioDescriptor = {
   provider: 'openai',
   title: 'OpenAI',
@@ -104,6 +105,55 @@ export const openaiDescriptor: StudioDescriptor = {
             { value: 'natural', label: 'Natural' },
           ],
         },
+      ],
+    },
+    {
+      key: 'text-to-speech',
+      label: 'Text → Speech',
+      operation: 'audio',
+      description: 'Generate a voiceover with OpenAI TTS. The clip lands in your audio files.',
+      fields: [
+        { type: 'prompt', name: 'prompt', label: 'Text', required: true, placeholder: 'Type the script to voice…' },
+        {
+          type: 'select',
+          name: 'model',
+          label: 'Model',
+          default: 'gpt-4o-mini-tts',
+          options: [
+            { value: 'gpt-4o-mini-tts', label: 'GPT-4o mini TTS (latest)' },
+            { value: 'tts-1', label: 'TTS-1 (fast)' },
+            { value: 'tts-1-hd', label: 'TTS-1 HD (quality)' },
+          ],
+        },
+        {
+          type: 'select',
+          name: 'voice',
+          label: 'Voice',
+          default: 'alloy',
+          options: [
+            { value: 'alloy', label: 'Alloy' },
+            { value: 'ash', label: 'Ash' },
+            { value: 'ballad', label: 'Ballad' },
+            { value: 'coral', label: 'Coral' },
+            { value: 'echo', label: 'Echo' },
+            { value: 'fable', label: 'Fable' },
+            { value: 'nova', label: 'Nova' },
+            { value: 'onyx', label: 'Onyx' },
+            { value: 'sage', label: 'Sage' },
+            { value: 'shimmer', label: 'Shimmer' },
+          ],
+        },
+        {
+          type: 'select',
+          name: 'response_format',
+          label: 'Output format',
+          default: 'mp3',
+          options: [
+            { value: 'mp3', label: 'MP3' },
+            { value: 'wav', label: 'WAV' },
+          ],
+        },
+        { type: 'number', name: 'speed', label: 'Speed', min: 0.25, max: 4, step: 0.05, default: 1 },
       ],
     },
   ],

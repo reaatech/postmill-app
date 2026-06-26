@@ -4,9 +4,19 @@ import {
   MediaGenerationResult,
   MediaGenerateOptions,
   MediaJobSubmission,
+  MediaInputValue,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+
+// Map a TTS response_format to the data-URL mime so the artifact lands with the right type.
+const TTS_MIME: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  opus: 'audio/opus',
+  aac: 'audio/aac',
+  flac: 'audio/flac',
+};
 
 interface OpenAIImageResponse {
   data?: { url?: string; b64_json?: string }[];
@@ -85,10 +95,13 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
   async generateAudio(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
     const audio = await this.textToSpeech(prompt, options);
     const base64 = Buffer.isBuffer(audio) ? audio.toString('base64') : audio;
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const fmt = String(input.response_format || options?.format || 'mp3');
+    const mime = TTS_MIME[fmt] || 'audio/mpeg';
     return {
       jobId: `openai-audio-${Date.now()}`,
-      artifactUrl: `data:audio/mpeg;base64,${base64}`,
-      metadata: { provider: this.identifier, model: options?.model || 'tts-1', mime: 'audio/mpeg' },
+      artifactUrl: `data:${mime};base64,${base64}`,
+      metadata: { provider: this.identifier, model: options?.model || 'tts-1', mime },
     };
   }
 
@@ -99,6 +112,13 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
   async textToSpeech(text: string, options?: MediaGenerateOptions): Promise<Buffer | string> {
     const apiKey = this._apiKey(options);
 
+    // Studio descriptor fields (voice, response_format, speed) arrive in `options.input`;
+    // fall back to legacy top-level options so existing callers are unchanged.
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const voice = (typeof input.voice === 'string' && input.voice) || options?.voice || 'alloy';
+    const responseFormat =
+      (typeof input.response_format === 'string' && input.response_format) || options?.format || 'mp3';
+
     const res = await safeFetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: {
@@ -108,8 +128,9 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       body: JSON.stringify({
         model: options?.model || 'tts-1',
         input: text,
-        voice: options?.voice || 'alloy',
-        response_format: options?.format || 'mp3',
+        voice,
+        response_format: responseFormat,
+        ...(input.speed !== undefined ? { speed: Number(input.speed) } : {}),
       }),
     });
 

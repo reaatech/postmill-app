@@ -36,6 +36,20 @@
   synchronously and lands in `/files`. The `black-forest-labs`, `stability-ai`, and `openai-media`
   adapters gained the same native-param `options.input` passthrough (back-compatible — legacy defaults
   apply when `input` is absent); no schema migration.
+- **AI Voiceover + Avatar-video studios** (`/media/{elevenlabs,did,hedra,tavus}` + an OpenAI TTS tab) —
+  The remaining kit-fit media providers, completing the Studio Kit's `audio` and avatar-`video` paths:
+  - **Audio (TTS)** — **ElevenLabs** (model, premade voice, stability, similarity boost, style,
+    speaker boost) and a third **Text → Speech** tab on the existing **OpenAI** studio (model, voice,
+    MP3/WAV, speed). `operation: 'audio'` completes synchronously — the clip returns inline as a
+    `data:audio/…;base64,` URL and lands in the org's audio files (no webhook).
+  - **Avatar / character video** — **D-ID** (talking-head from a portrait + voice provider/id),
+    **Hedra** (character video from a keyframe + aspect ratio), **Tavus** (replica video from a replica
+    id + script). `operation: 'video'`, completed webhook-first (poll-cron fallback); the source image
+    is resolved server-side to a provider-reachable URL.
+  - The `elevenlabs`, `openai-media`, `did`, `hedra`, and `tavus` adapters gained the same
+    native-param `options.input` passthrough (back-compatible — legacy `AiMediaService` defaults apply
+    when `input` is absent); no schema migration. **Deepgram** (STT → text) and **Veo/Vertex** (OAuth
+    creds) are intentionally not kit studios.
 - **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
   provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
   env-var fallback).

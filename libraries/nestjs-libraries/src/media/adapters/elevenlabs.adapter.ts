@@ -4,6 +4,7 @@ import {
   MediaGenerationResult,
   MediaGenerateOptions,
   MediaJobSubmission,
+  MediaInputValue,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
@@ -50,8 +51,29 @@ export class ElevenLabsAdapter implements MediaProviderAdapter {
     const apiKey = resolveApiKey(options);
     if (!apiKey) throw new Error('ElevenLabs API key is required');
 
-    const voiceId = options?.voiceId || options?.voice || '21m00Tcm4TlvDq8ikWAM';
-    const model = options?.model || 'eleven_monolingual_v1';
+    // Studio descriptor fields arrive in `options.input` (native ElevenLabs params); fall
+    // back to the legacy top-level options so existing AiMediaService callers are unchanged.
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const voiceId =
+      (typeof input.voice_id === 'string' && input.voice_id) ||
+      options?.voiceId ||
+      options?.voice ||
+      '21m00Tcm4TlvDq8ikWAM';
+    const model =
+      options?.model ||
+      (typeof input.model_id === 'string' ? input.model_id : undefined) ||
+      'eleven_monolingual_v1';
+
+    const voiceSettings: Record<string, number | boolean> = {
+      stability:
+        input.stability !== undefined ? Number(input.stability) : options?.voiceSettings?.stability ?? 0.5,
+      similarity_boost:
+        input.similarity_boost !== undefined
+          ? Number(input.similarity_boost)
+          : options?.voiceSettings?.similarityBoost ?? 0.75,
+    };
+    if (input.style !== undefined) voiceSettings.style = Number(input.style);
+    if (input.use_speaker_boost !== undefined) voiceSettings.use_speaker_boost = Boolean(input.use_speaker_boost);
 
     const res = await safeFetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
       method: 'POST',
@@ -63,10 +85,7 @@ export class ElevenLabsAdapter implements MediaProviderAdapter {
       body: JSON.stringify({
         text,
         model_id: model,
-        voice_settings: {
-          stability: options?.voiceSettings?.stability ?? 0.5,
-          similarity_boost: options?.voiceSettings?.similarityBoost ?? 0.75,
-        },
+        voice_settings: voiceSettings,
       }),
     });
 

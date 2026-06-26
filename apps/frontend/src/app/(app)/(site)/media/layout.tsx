@@ -148,6 +148,52 @@ const tabs = [
     ),
   },
   {
+    href: '/media/elevenlabs',
+    label: 'ElevenLabs',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="6" y="4" width="4" height="16" rx="1" />
+        <rect x="14" y="4" width="4" height="16" rx="1" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/did',
+    label: 'D-ID',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="9" r="4" />
+        <path d="M3 20v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1" />
+        <path d="M19 8c1 1.333 1 4.667 0 6" />
+        <path d="M21.5 6c1.5 2 1.5 8 0 10" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/hedra',
+    label: 'Hedra',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 3l2.5 5.5L20 11l-5.5 2.5L12 19l-2.5-5.5L4 11l5.5-2.5L12 3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/tavus',
+    label: 'Tavus',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="4" width="18" height="16" rx="2" />
+        <circle cx="12" cy="10" r="2.5" />
+        <path d="M7.5 17a4.5 4.5 0 0 1 9 0" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/stock-vectors',
     label: 'Vectors',
     section: 'Content Pack',

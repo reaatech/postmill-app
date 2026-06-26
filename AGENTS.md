@@ -631,14 +631,25 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
     (gpt-image-1 + DALL·E 3 as two fixed-model tabs). `operation: 'image'` completes **synchronously**
     inside `MediaStudioService.generate` (the adapter returns the artifact inline / via its own
     bounded poll — no webhook), and base64 `data:` URLs are decoded by `completeJob`.
+  - **Audio (TTS)** — ElevenLabs, OpenAI (a third `Text → Speech` tab on the OpenAI studio).
+    `operation: 'audio'` also completes **synchronously**: the adapter returns the voiced clip inline
+    as a `data:audio/…;base64,` URL (mime derived from the chosen `response_format`), decoded by
+    `completeJob` into the org's audio files — no webhook.
+  - **Avatar / character video** — D-ID (talking-head from a portrait), Hedra (character video from a
+    keyframe), Tavus (replica video). `operation: 'video'`, completed **webhook-first** (poll-cron
+    fallback). The portrait/keyframe media field is resolved server-side to a provider-reachable URL
+    (same LOCAL-storage caveat as HeyGen translate). These overlap HeyGen's avatar surface by design —
+    HeyGen keeps its bespoke studio.
   - Each is a `media-tools/<provider>/descriptor.ts` + a 3-line studio + a route page. Adapters merge
-  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax + the three image
-  adapters enriched with native param passthrough — `model` is lifted out by the service and selects
-  the endpoint/variant, everything else in `input` rides into the body). The passthrough is
-  back-compatible: when `input` is absent the legacy defaults apply unchanged. **Veo (Vertex)
-  deferred** — OAuth credential shape (`accessToken`+`projectId`+`region`) must be confirmed first.
-  HeyGen and Replicate are intentionally **not** retrofitted (they keep their bespoke
-  implementations).
+  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax, the three image
+  adapters, and the audio/avatar adapters — ElevenLabs/OpenAI TTS + D-ID/Hedra/Tavus — enriched with
+  native param passthrough; `model` is lifted out by the service and selects the endpoint/variant,
+  everything else in `input` rides into the body). The passthrough is back-compatible: when `input`
+  is absent the legacy `AiMediaService` defaults apply unchanged. **Veo (Vertex) deferred** — OAuth
+  credential shape (`accessToken`+`projectId`+`region`) must be confirmed first. **Deepgram is not a
+  kit studio** — its real capability is STT (text output), which doesn't fit the kit's "prompt → media
+  artifact in `/files`" model. HeyGen and Replicate are intentionally **not** retrofitted (they keep
+  their bespoke implementations).
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via
