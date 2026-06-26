@@ -49,6 +49,7 @@ export const BrandTab = () => {
   const { mutate } = useSWRConfig();
   const { data: brands, isLoading, mutate: refetchBrands } = useBrands();
   const [subtab, setSubtab] = useState<'list' | 'edit' | 'knowledge'>('list');
+  const [editTab, setEditTab] = useState<'voice' | 'kit' | 'knowledge'>('voice');
   const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -104,9 +105,14 @@ export const BrandTab = () => {
   }
 
   if (subtab === 'edit' && editingBrand) {
+    const editTabs: { key: 'voice' | 'kit' | 'knowledge'; label: string; hint: string }[] = [
+      { key: 'voice', label: t('tab_voice', 'Voice & Tone'), hint: t('tab_voice_hint', 'How the AI writes for you') },
+      { key: 'kit', label: t('tab_kit', 'Brand Kit'), hint: t('tab_kit_hint', 'Your logo & colours') },
+      { key: 'knowledge', label: t('tab_knowledge', 'Knowledge'), hint: t('tab_knowledge_hint', 'What the AI knows about you') },
+    ];
     return (
       <div className="flex flex-col">
-        <div className="flex items-center gap-[12px] mb-[16px]">
+        <div className="flex items-center gap-[12px] mb-[8px]">
           <button
             onClick={() => { setSubtab('list'); setEditingBrand(null); setIsCreating(false); }}
             className="text-[13px] text-newTableText hover:text-textColor"
@@ -115,21 +121,44 @@ export const BrandTab = () => {
           </button>
           <h3 className="text-[20px]">{editingBrand.name}</h3>
         </div>
-        <BrandVoice
-          key={editingBrand.id}
-          brandId={editingBrand.id}
-          initial={editingBrand}
-          onSaved={() => refetchBrands()}
-        />
-        <BrandAssets
-          key={`assets-${editingBrand.id}`}
-          brandId={editingBrand.id}
-          initial={editingBrand}
-          onSaved={() => refetchBrands()}
-        />
-        <div className="mt-[16px]">
-          <KnowledgeBase />
+        <p className="text-[13px] text-newTableText mb-[16px] max-w-[640px] leading-relaxed">
+          {t('brand_editor_intro', "A “brand” is a personality for the AI. Set up how it should write, what your brand looks like, and what it knows about your business — then it'll create on-brand posts for you. Pick a section below to get started.")}
+        </p>
+
+        <div className="flex gap-[8px] flex-wrap mb-[16px]">
+          {editTabs.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setEditTab(tab.key)}
+              className={`flex flex-col items-start text-start px-[16px] py-[10px] rounded-[10px] border transition-colors ${
+                editTab === tab.key
+                  ? 'border-btnPrimary bg-btnPrimary/10'
+                  : 'border-newTableBorder hover:bg-boxHover'
+              }`}
+            >
+              <span className="text-[14px] text-textColor">{tab.label}</span>
+              <span className="text-[11px] text-newTableText">{tab.hint}</span>
+            </button>
+          ))}
         </div>
+
+        {editTab === 'voice' && (
+          <BrandVoice
+            key={editingBrand.id}
+            brandId={editingBrand.id}
+            initial={editingBrand}
+            onSaved={() => refetchBrands()}
+          />
+        )}
+        {editTab === 'kit' && (
+          <BrandAssets
+            key={`assets-${editingBrand.id}`}
+            brandId={editingBrand.id}
+            initial={editingBrand}
+            onSaved={() => refetchBrands()}
+          />
+        )}
+        {editTab === 'knowledge' && <KnowledgeBase />}
       </div>
     );
   }
@@ -222,7 +251,7 @@ export const BrandTab = () => {
                 </button>
               )}
               <button
-                onClick={() => { setEditingBrand(brand); setSubtab('edit'); }}
+                onClick={() => { setEditingBrand(brand); setEditTab('voice'); setSubtab('edit'); }}
                 className="text-btnPrimary text-[12px] hover:underline"
               >
                 {t('edit', 'Edit')}

@@ -10,6 +10,13 @@
 
 ## Unreleased
 
+### Changed
+- **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
+  Brand Kit + Knowledge Base stacked) is now split into three tabs — **Voice & Tone**, **Brand Kit**,
+  **Knowledge** — each with a one-line "what this does" hint, and all copy rewritten in plain language
+  for non-technical users. The Knowledge tab's technical cards (Vector Database, Auto-Index) are tucked
+  behind an "Advanced settings (most people can skip these)" toggle so the default view stays simple.
+
 ### Added
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
   scopes the dataset: each language has its own instructions **and** its own optional per-channel

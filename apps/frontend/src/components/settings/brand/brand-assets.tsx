@@ -103,15 +103,18 @@ export const BrandAssets = ({
   return (
     <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex flex-col">
-        <div className="text-[14px]">{t('brand_assets', 'Brand Assets')}</div>
+        <div className="text-[14px]">{t('brand_assets', 'Brand Kit')}</div>
         <div className="text-[12px] text-newTableText">
-          {t('brand_assets_description', 'Attach logos, reference imagery and a colour palette for this brand — used by the Designer and brand-aware tools.')}
+          {t('brand_assets_description_v2', 'Your logo, colours, and reference pictures. When you make graphics in the Designer, it uses these so everything looks like you.')}
         </div>
       </div>
 
       {/* Colour palette */}
       <div className="flex flex-col gap-[10px]">
-        <div className="text-[13px]">{t('color_palette', 'Colour palette')}</div>
+        <div className="text-[13px]">{t('color_palette', 'Your brand colours')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('color_palette_hint', 'Add the colours you use. Click the swatch to pick one, or paste a colour code like #2B5CD3.')}
+        </div>
         <div className="flex flex-wrap items-center gap-[8px]">
           {palette.map((c) => (
             <div
@@ -157,7 +160,10 @@ export const BrandAssets = ({
 
       {/* Attached assets */}
       <div className="flex flex-col gap-[10px]">
-        <div className="text-[13px]">{t('attached_assets', 'Attached assets')}</div>
+        <div className="text-[13px]">{t('attached_assets', 'Logos & pictures')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('attached_assets_hint', 'Upload your logo and any images you want on hand — product photos, your mascot, screenshots. You can drop them into designs later.')}
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-[12px]">
           {assets.map((a, i) => (
             <div
@@ -202,9 +208,9 @@ export const BrandAssets = ({
       {/* Enforcement */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <div className="text-[14px]">{t('brand_enforcement', 'Brand enforcement')}</div>
+          <div className="text-[14px]">{t('brand_enforcement', 'Keep me on-brand')}</div>
           <div className="text-[12px] text-newTableText">
-            {t('brand_enforcement_description', 'Warn when Designer exports use off-palette colours or non-brand fonts.')}
+            {t('brand_enforcement_description_v2', "When on, you'll get a gentle heads-up before saving a design that uses colours or fonts outside your brand.")}
           </div>
         </div>
         <Slider

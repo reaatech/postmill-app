@@ -170,18 +170,18 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
     <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <div className="text-[14px]">{t('brand_voice', 'Brand Voice')}</div>
+          <div className="text-[14px]">{t('brand_voice', 'Voice & Tone')}</div>
           <div className="text-[12px] text-newTableText">
-            {t('brand_voice_description', 'Define your brand voice and tone for AI-generated content')}
+            {t('brand_voice_description_v2', "Tell the AI how to write for you — like briefing a new team member. It'll follow this every time it creates a post.")}
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between">
         <div className="flex flex-col">
-          <div className="text-[14px]">{t('enable_brand_profile', 'Enable Brand Profile')}</div>
+          <div className="text-[14px]">{t('enable_brand_profile', 'Use this brand voice')}</div>
           <div className="text-[12px] text-newTableText">
-            {t('enable_brand_profile_description', 'Apply brand instructions to AI-generated content')}
+            {t('enable_brand_profile_description_v2', 'When this is on, the AI follows the instructions below every time it writes for you. Turn it off to pause it.')}
           </div>
         </div>
         <Slider
@@ -196,7 +196,7 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
         <div className="flex flex-col flex-1">
           <div className="text-[14px]">{t('brand_language', 'Language')}</div>
           <div className="text-[12px] text-newTableText">
-            {t('brand_language_description_v2', 'The instructions and channel overrides below apply to this language. Switch to author another language.')}
+            {t('brand_language_description_v3', "The language the AI writes in. Everything below is for this language — switch it to set up a different language, and your other languages are kept.")}
           </div>
         </div>
         <div className="w-[200px]">
@@ -221,9 +221,9 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
       </div>
 
       <div className="flex flex-col gap-[8px]">
-        <div className="text-[14px]">{t('brand_instructions', 'Brand Instructions')}</div>
+        <div className="text-[14px]">{t('brand_instructions', 'How should it write?')}</div>
         <div className="text-[12px] text-newTableText">
-          {t('brand_instructions_description', 'Define tone, banned words, emoji policy, CTA style, and other brand guidelines for AI-generated content')}
+          {t('brand_instructions_description_v2', "Describe your style in plain words: the tone to use, words to avoid, whether to use emojis, and how to end a post. There's no wrong answer — write it like you'd explain it to a person.")}
         </div>
         <textarea
           className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
@@ -234,9 +234,9 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
       </div>
 
       <div className="flex flex-col gap-[12px]">
-        <div className="text-[14px]">{t('channel_overrides', 'Channel Overrides')}</div>
+        <div className="text-[14px]">{t('channel_overrides', 'Different style for one channel? (optional)')}</div>
         <div className="text-[12px] text-newTableText">
-          {t('channel_overrides_description', 'Optionally override the brand instructions for a specific channel. Falls back to the instructions above when not set.')}
+          {t('channel_overrides_description_v2', "Most people can skip this. If you want a different style on one channel — say, more formal on LinkedIn or more playful on TikTok — pick the channel and add special instructions just for it.")}
         </div>
 
         <div className="w-[250px]">

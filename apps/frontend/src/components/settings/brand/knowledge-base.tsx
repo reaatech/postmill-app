@@ -113,6 +113,8 @@ export const KnowledgeBase = () => {
   const [bm25K1, setBm25K1] = useState(1.2);
   const [bm25B, setBm25B] = useState(0.75);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Tucks the technical cards (Vector Database, Auto-Index) away from beginners.
+  const [kbAdvancedOpen, setKbAdvancedOpen] = useState(false);
   const [autoIndex, setAutoIndex] = useState(false);
   const [autoIndexSources, setAutoIndexSources] = useState<string[]>([]);
   const [newAutoIndexSource, setNewAutoIndexSource] = useState('');
@@ -331,17 +333,18 @@ export const KnowledgeBase = () => {
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <div className="text-[14px]">{t('knowledge_base', 'Knowledge Base')}</div>
-            <div className="text-[12px] text-newTableText">
-              {t('knowledge_base_description', 'Manage your RAG knowledge base for AI-powered content generation')}
+            <div className="text-[14px]">{t('knowledge_base', 'What the AI knows about you')}</div>
+            <div className="text-[12px] text-newTableText max-w-[560px] leading-relaxed">
+              {t('knowledge_base_description_v2', "Give the AI examples and facts about your business — your best posts, web pages, or notes. It'll use them to sound more like you and get the details right. Nothing here is required to start.")}
             </div>
           </div>
           <button
-            className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50 shrink-0"
             onClick={handleBackfill}
             disabled={backfilling}
+            title={t('backfill_tip', 'Learn from your best-performing past posts automatically')}
           >
-            {backfilling ? t('indexing', 'Indexing...') : t('backfill', 'Backfill')}
+            {backfilling ? t('indexing', 'Learning...') : t('backfill', 'Learn from my posts')}
           </button>
         </div>
 
@@ -385,10 +388,22 @@ export const KnowledgeBase = () => {
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setKbAdvancedOpen((v) => !v)}
+        className="text-[12px] text-newTableText hover:text-textColor self-start"
+      >
+        {kbAdvancedOpen
+          ? t('hide_kb_advanced', '▾ Hide advanced settings')
+          : t('show_kb_advanced', '▸ Advanced settings (most people can skip these)')}
+      </button>
+
+      {kbAdvancedOpen && (
+        <>
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="text-[14px]">{t('vector_store', 'Vector Database')}</div>
         <div className="text-[12px] text-newTableText">
-          {t('vector_store_description', 'Configure the hybrid-RAG vector store adapter.')}
+          {t('vector_store_description_v2', "Where your knowledge is stored. The default (Postmill) works for everyone — only change this if your team runs its own database.")}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
           <div className="flex flex-col gap-[4px]">
@@ -745,10 +760,12 @@ export const KnowledgeBase = () => {
           </div>
         )}
       </div>
+        </>
+      )}
 
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="flex items-center justify-between">
-          <div className="text-[14px]">{t('add_content', 'Add Content')}</div>
+          <div className="text-[14px]">{t('add_content', 'Teach the AI something')}</div>
           <button
             className="text-[13px] text-textColor hover:underline"
             onClick={() => setShowAddContent(!showAddContent)}
@@ -848,7 +865,7 @@ export const KnowledgeBase = () => {
       </div>
 
       <div className="flex flex-col gap-[16px]">
-        <div className="text-[14px]">{t('indexed_content', 'Indexed Content')}</div>
+        <div className="text-[14px]">{t('indexed_content', "What you've added")}</div>
 
         <DataTable
           columns={[
@@ -883,11 +900,14 @@ export const KnowledgeBase = () => {
       </div>
 
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
-        <div className="text-[14px]">{t('search_knowledge_base', 'Search Knowledge Base')}</div>
+        <div className="text-[14px]">{t('search_knowledge_base', 'Try a search')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('search_knowledge_base_hint', 'See what the AI finds for a topic — a quick way to check it learned the right things.')}
+        </div>
         <div className="flex gap-[8px]">
           <input
             className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-            placeholder={t('search_placeholder', 'Search your knowledge base...')}
+            placeholder={t('search_placeholder', 'Search what the AI knows…')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
