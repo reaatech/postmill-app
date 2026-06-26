@@ -366,6 +366,10 @@ export class AiSettingsService {
     return this._repository.getMediaJobs(organizationId, limit);
   }
 
+  getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {
+    return this._repository.getMediaJobsByProvider(organizationId, provider, limit);
+  }
+
   getMediaJobById(id: string) {
     return this._repository.getMediaJobById(id);
   }

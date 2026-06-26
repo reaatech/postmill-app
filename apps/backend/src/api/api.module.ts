@@ -31,7 +31,6 @@ import { WebhookController } from '@gitroom/backend/api/routes/webhooks.controll
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
 import { SetsController } from '@gitroom/backend/api/routes/sets.controller';
-import { ThirdPartyController } from '@gitroom/backend/api/routes/third-party.controller';
 import { MonitorController } from '@gitroom/backend/api/routes/monitor.controller';
 import { NoAuthIntegrationsController } from '@gitroom/backend/api/routes/no.auth.integrations.controller';
 import { EnterpriseController } from '@gitroom/backend/api/routes/enterprise.controller';
@@ -77,6 +76,8 @@ import { HealthController } from '@gitroom/backend/api/routes/health.controller'
 import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
 import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-studio.module';
 import { ReplicateStudioController } from './routes/replicate-studio.controller';
+import { HeyGenModule } from '@gitroom/nestjs-libraries/media/heygen/heygen.module';
+import { HeyGenController } from './routes/heygen.controller';
 
 const authenticatedController = [
   UsersController,
@@ -94,7 +95,6 @@ const authenticatedController = [
   SignatureController,
   AutopostController,
   SetsController,
-  ThirdPartyController,
   OAuthAppController,
   ApprovedAppsController,
   OAuthAuthorizedController,
@@ -122,9 +122,10 @@ const authenticatedController = [
   DesignerProxyController,
   AdminController,
   ReplicateStudioController,
+  HeyGenController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule, ReplicateStudioModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule],
   controllers: [
     RootController,
     HealthController,

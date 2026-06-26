@@ -56,6 +56,17 @@ const tabs = [
     ),
   },
   {
+    href: '/media/heygen',
+    label: 'HeyGen',
+    section: 'Tools',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 13a4 4 0 1 0 0-8 4 4 0 0 0 0 8z" />
+        <path d="M5 21v-1a5 5 0 0 1 5-5h4a5 5 0 0 1 5 5v1" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/stock-vectors',
     label: 'Vectors',
     section: 'Content Pack',

@@ -107,7 +107,6 @@ Available flags (all default to **enabled**):
 - `DEV_DISABLE_MEDIA` — skip media-generation adapter registration.
 - `DEV_DISABLE_SHORTLINKS` — skip short-link adapter registration.
 - `DEV_DISABLE_EMAIL` — skip email-provider adapter registration.
-- `DEV_DISABLE_THIRDPARTY` — skip third-party provider registration.
 - `DEV_DISABLE_VIDEO` — skip video-generation adapter registration.
 - `DEV_DISABLE_AGENT` — skip agent-graph services.
 - `DEV_DISABLE_CRON` — skip `ScheduleModule.forRoot()`.
@@ -522,6 +521,12 @@ AI, Media, Storage, and Shortlinks settings surfaces share:
 
 Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `MessagesGroup`, `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`, `Messages` + associated enums (`OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`) and their relations on `User`, `Post`, `Organization`, `Media`, `Integration`. Code-only removal in step 6, schema drops in step 7. The legacy `Role` enum and its `UserOrganization.role` column were also dropped — superseded by `AppRole`-based RBAC (`UserOrganization.roleId`).
 
+**Legacy `/third-party` integration platform — removed.** The Gitroom-era third-party provider
+subsystem (the `/third-party` route, `@ThirdParty` decorator + `ThirdPartyManager`, the HeyGen and
+ReelFarm providers, and the composer's "insert third-party media" path) was deleted, along with the
+`ThirdParty` Prisma model + its `Organization.thirdParty` relation. AI avatar video now lives only in
+the modern **HeyGen Studio** (above).
+
 ## Media surface, Stock & Content Packs (v3.8.10+)
 
 ### `/media` vs `/files`
@@ -530,7 +535,7 @@ Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `Mes
 - **`/media` is tools only** (no library inside it). Each tool: pick/produce media → **save to
   `/files`** (or send straight to the composer). The nav lives in
   `apps/frontend/src/app/(app)/(site)/media/layout.tsx`, grouped + alphabetised into two sections:
-  - **Tools** — Designer, Replicate.
+  - **Tools** — Designer, HeyGen, Replicate.
   - **Content Pack** — Stock Photos, Stock Videos, Vectors, Stickers, Stock Audio, Icons.
 
 ### Designer (Konva)
@@ -542,6 +547,24 @@ Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `Mes
   Designer**, which stashes the selection in `sessionStorage` and navigates to `?bulk=1`). Animated
   GIF/WebP export only exists in **video** mode — static mode never offers it (Konva flattens to
   frame 1).
+
+### HeyGen Studio (AI avatar video)
+- A bespoke tool at **`/media/heygen`** built on the **AI Media provider** stack (`HeyGenAdapter`,
+  per-org `MediaProviderConfig` `'heygen'`, `AIMediaJob` async spine) — **not** the legacy
+  `/third-party` HeyGen (that whole Gitroom-era subsystem was removed; see below). Configure the key
+  at **Settings → Media** (no env fallback). Frontend lives in
+  `apps/frontend/src/components/media-tools/heygen/`; logic in
+  `libraries/nestjs-libraries/src/media/heygen/heygen.service.ts` (controller `/media/heygen`).
+- Four tabs + a live **Render queue** (polls `GET /media/heygen/jobs`): **Storyboard** (multi-scene
+  avatar video via `video_inputs[]` — each scene = avatar + voice + script + color/file background),
+  **Talking Photo** (upload a `/files` image → `talking_photo_id`), **Voiceover** (TTS → audio
+  folder), **Translate** (one `AIMediaJob` per target language; source must be a HeyGen-reachable URL).
+- Every render lands in `/files` via the existing `MediaJobLifecycleService` → cron/webhook pipeline,
+  then offers **Edit in Designer** (`?url=&type=video`) and **Post** (composer `AddEditModal`).
+- **Operation-namespaced poll routing:** `HeyGenService` stores the provider ref as `<op>:<id>`
+  (`video:` / `tts:` / `translate:`); `HeyGenAdapter.pollJob` branches on the prefix to hit the right
+  HeyGen status endpoint. A bare id (no prefix) = avatar video — preserves the generic
+  governance/grid path, which stores the raw id.
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via

@@ -11,6 +11,21 @@
 ## Unreleased
 
 ### Added
+- **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
+  provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
+  env-var fallback).
+  - **Storyboard** canvas: multi-scene avatar video via HeyGen `video_inputs[]` — each scene is an
+    avatar + voice + script + color/file background, with add/remove/reorder and 16:9 / 9:16 / 1:1.
+  - **Talking Photo**: turn a `/files` image into a talking avatar (uploads to mint a `talking_photo_id`).
+  - **Voiceover**: text-to-speech into the Files audio folder.
+  - **Translate**: lip-synced video translation, one render per target language.
+  - Avatar/voice catalogs cached per-org (Redis); voice previews in-picker. Live **Render queue**
+    polling `GET /media/heygen/jobs`.
+  - Every render saves to `/files` via the existing media-job pipeline, then offers **Edit in
+    Designer** and **Post** to the composer.
+  - Backend `HeyGenService` + `/media/heygen` controller; reuses `MediaJobLifecycleService`. Async
+    poll routing is operation-namespaced (`video:` / `tts:` / `translate:`) in `HeyGenAdapter.pollJob`
+    (backward-compatible with the generic media-provider path). No schema migration.
 - **Replicate Studio** (`/media/replicate`) — Native generative media workspace powered by Replicate.
   - 18 categories: text-to-image, image-to-image, inpaint, upscale, background removal, text-to-video,
     image-to-video, video-to-video, caption, text-to-speech, speech-to-text, voice clone, music
@@ -70,6 +85,16 @@
   Packs**. Magnific is the first supported pack: add a Magnific API key, set it active, and search
   results for photos/vectors/icons/videos are served from your own Magnific plan before falling back
   to free catalogs. Keys are encrypted at rest; minted download URLs are used for import.
+
+### Removed
+- **Legacy `/third-party` integration platform** — Removed the Gitroom-era third-party provider
+  subsystem: the `/third-party` route + `third-parties/` UI, the `@ThirdParty` decorator,
+  `ThirdPartyManager`/`ThirdPartyService`/`ThirdPartyController`, the HeyGen and ReelFarm providers,
+  the `DEV_DISABLE_THIRDPARTY` flag, and the composer/Files "insert third-party media" path. AI
+  avatar video now lives only in the new **HeyGen Studio**. The shared `slider.component` used by the
+  TikTok/Instagram composer previews was moved to `components/ui/`. The "Integrations" nav entry was
+  removed and the miswired "Connect a Social Channel" CTAs repointed to `/settings?tab=channels`.
+  The `ThirdParty` Prisma model + `Organization.thirdParty` relation were dropped from the schema.
 
 ### Changed
 - **Polotno removal** — Removed all `polotno`, `polonto`, `plontoKey` references across the codebase.

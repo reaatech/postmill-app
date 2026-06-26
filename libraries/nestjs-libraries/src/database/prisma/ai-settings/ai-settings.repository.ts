@@ -297,6 +297,14 @@ export class AiSettingsRepository {
     });
   }
 
+  getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {
+    return this._aiMediaJob.model.aIMediaJob.findMany({
+      where: { organizationId, provider },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
   getMediaJobById(id: string) {
     return this._aiMediaJob.model.aIMediaJob.findUnique({ where: { id } });
   }
