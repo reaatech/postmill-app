@@ -16,6 +16,7 @@ import { HedraAdapter } from './adapters/hedra.adapter';
 import { MiniMaxMediaAdapter } from './adapters/minimax-media.adapter';
 import { DeepgramAdapter } from './adapters/deepgram.adapter';
 import { LumaAdapter } from './adapters/luma.adapter';
+import { QwenMediaAdapter } from './adapters/qwen-media.adapter';
 
 const ALL_ADAPTERS = [
   FalAdapter,
@@ -33,6 +34,7 @@ const ALL_ADAPTERS = [
   MiniMaxMediaAdapter,
   DeepgramAdapter,
   LumaAdapter,
+  QwenMediaAdapter,
 ];
 
 @Module({

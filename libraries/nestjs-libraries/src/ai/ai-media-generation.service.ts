@@ -107,7 +107,7 @@ export class AiMediaGenerationService {
       throw new Error(`Video with identifier ${identifier} not found`);
     }
 
-    const functionToCall = video.instance[functionName];
+    const functionToCall = (video.instance as Record<string, any>)[functionName];
     if (
       typeof functionToCall !== 'function' ||
       this._videoManager.checkAvailableVideoFunction(functionToCall)

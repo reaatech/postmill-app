@@ -631,8 +631,9 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
 - **Current studios on the kit:**
   - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter — config identifier `fal`, but the
     adapter's display name + studio are both **"Kling"** so Settings → Media and the studio match),
-    Vertex (Google **Veo**).
-  - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), OpenAI
+    Vertex (Google **Veo**), Qwen (Alibaba **Wan2.x** text→video + image→video).
+  - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), Qwen
+    (Alibaba **Qwen-Image**, a third tab on the Qwen studio), OpenAI
     (gpt-image-1 + DALL·E 3 as two fixed-model tabs), Vertex (Google **Imagen**, a second tab on the
     Vertex studio). `operation: 'image'` completes **synchronously**
     inside `MediaStudioService.generate` (the adapter returns the artifact inline / via its own
@@ -663,6 +664,20 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   model, so it uses the StudioShell chrome with a `custom` panel over a dedicated `/media/deepgram`
   backend (see **Deepgram Studio** below). HeyGen and Replicate are also intentionally **not**
   retrofitted onto the kit (they keep their bespoke implementations).
+- **Qwen (Alibaba DashScope)** is a single-key kit studio with three tabs — Text→Image (`qwen-image*`),
+  Text→Video and Image→Video (`wan2.x`). Both surfaces are DashScope **async task APIs** (POST with
+  `X-DashScope-Async: enable` → `task_id`, then poll `GET /tasks/{id}`): image keeps the synchronous
+  contract via bounded internal polling (like BFL/Runway); video has **no webhook** → poll-cron
+  completion (like Runway/Veo). The `qwen-media.adapter.ts` routes `prompt`/`negative_prompt`/`img_url`
+  into DashScope's `input` and every other native param into `parameters`. **Credential is shared with
+  the Qwen LLM provider** (`ai.module.ts`): Qwen is a *universal-credential* provider, so when no
+  dedicated media credential exists `OrgMediaProviderSettingsService.getConfigForProvider` falls back
+  to the org's **AIOrgProviderConfig** Qwen key (read via `OrgAiSettingsRepository`, decrypted with the
+  media `EncryptionService` — per-org AI configs use AES-GCM, **not** the global config's
+  `AuthService.fixedEncryption`). Configure the DashScope key once at Settings → AI **or** Settings →
+  Media and both work. (openai/minimax instead write-mirror both ways via `ProviderCredentialLinkService`;
+  Qwen has no media-side settings flow, so a read-fallback is the lighter path — extend
+  `UNIVERSAL_AI_CREDENTIAL` to add more such providers.)
 
 ### Deepgram Studio (transcription / captions)
 - A bespoke tool at **`/media/deepgram`** — every media adapter now has a studio. It reuses the

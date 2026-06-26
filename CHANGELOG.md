@@ -36,6 +36,16 @@
   synchronously and lands in `/files`. The `black-forest-labs`, `stability-ai`, and `openai-media`
   adapters gained the same native-param `options.input` passthrough (back-compatible — legacy defaults
   apply when `input` is absent); no schema migration.
+- **Qwen media studio** (`/media/qwen`) — Alibaba DashScope added as a media provider with a
+  three-tab Studio Kit studio: Text→Image (Qwen-Image), Text→Video and Image→Video (Wan2.x). Both are
+  DashScope **async task APIs** (`X-DashScope-Async` → `task_id` → poll `/tasks/{id}`): image keeps the
+  synchronous contract via bounded internal polling; video completes via the poll-cron (no webhook).
+  The adapter routes `prompt`/`negative_prompt`/`img_url` into DashScope's `input` and all other native
+  params into `parameters`. **The DashScope key is shared with the Qwen LLM provider** — Qwen is a
+  *universal-credential* provider, so the media surface falls back to the org's existing Settings → AI
+  Qwen key when no dedicated media credential exists (read from `AIOrgProviderConfig` via
+  `OrgAiSettingsRepository`, decrypted with the media `EncryptionService`). Configure the key once on
+  either surface; no schema migration, no env fallback.
 - **AI Voiceover + Avatar-video studios** (`/media/{elevenlabs,did,hedra,tavus}` + an OpenAI TTS tab) —
   The remaining kit-fit media providers, completing the Studio Kit's `audio` and avatar-`video` paths:
   - **Audio (TTS)** — **ElevenLabs** (model, premade voice, stability, similarity boost, style,

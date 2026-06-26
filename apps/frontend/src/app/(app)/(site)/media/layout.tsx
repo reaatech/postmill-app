@@ -102,6 +102,19 @@ const tabs = [
     ),
   },
   {
+    href: '/media/qwen',
+    label: 'Qwen',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M11 7v8" />
+        <path d="M7 11h8" />
+        <path d="M16 16l4 4" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/runway',
     label: 'Runway',
     section: 'Providers',
