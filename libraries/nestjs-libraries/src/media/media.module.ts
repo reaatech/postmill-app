@@ -21,6 +21,7 @@ import { DeepgramAdapter } from './adapters/deepgram.adapter';
 import { LumaAdapter } from './adapters/luma.adapter';
 import { QwenMediaAdapter } from './adapters/qwen-media.adapter';
 import { WanAdapter } from './adapters/wan.adapter';
+import { LtxAdapter } from './adapters/ltx.adapter';
 import { TogetherAiMediaAdapter } from './adapters/togetherai-media.adapter';
 import { SiliconFlowMediaAdapter } from './adapters/siliconflow-media.adapter';
 import { GroqMediaAdapter } from './adapters/groq-media.adapter';
@@ -49,6 +50,7 @@ const ALL_ADAPTERS = [
   LumaAdapter,
   QwenMediaAdapter,
   WanAdapter,
+  LtxAdapter,
   TogetherAiMediaAdapter,
   SiliconFlowMediaAdapter,
   GroqMediaAdapter,

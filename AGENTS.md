@@ -711,6 +711,19 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `result.images[].url` (Soul `batch_size: 4` returns multiple). **Built without a live key** —
   endpoints/shapes are grounded in the official higgsfield-js SDK source; Soul `width_and_height`
   presets may need a live smoke test.
+- **LTX Studio** (Lightricks, `api.ltx.video`) is an **own-key** kit studio (`/media/ltx`) configured at
+  Settings → Media — single Bearer key, **video-only** (LTX-2 / LTX-2.3 family). Three tabs, all
+  `operation: 'video'`: **Text→Video** (`POST /v2/text-to-video`), **Image→Video** (`/v2/image-to-video`,
+  `image_uri` + optional `last_frame_uri`), **Audio→Video** (`/v2/audio-to-video`, `audio_uri` + optional
+  `image_uri`; Pro models only). Every generation is **async submit-and-poll**: POST → `{ id }`, then poll
+  `GET /v2/<op>/{id}` until `status: completed`, reading `result.video_url` (no webhook → poll-cron, like
+  Runway/Wan). The sub-operation is **routed by the media inputs present** (audio → audio-to-video, else
+  image → image-to-video, else text-to-video), and because the poll path mirrors the submit path the
+  `ltx.adapter.ts` **namespaces the job id as `<op>:<id>`** (the HeyGen pattern) so `pollJob` hits the
+  right status endpoint. Native params (`model`/`resolution`/`duration`/`fps`/`generate_audio`/
+  `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
+  live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
+  vs. named-preset formatting may need a live smoke test.
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

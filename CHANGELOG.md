@@ -11,6 +11,14 @@
 ## Unreleased
 
 ### Added
+- **LTX Studio media studio** (`/media/ltx`) — an own-key Studio Kit studio for LTX Studio (Lightricks,
+  `api.ltx.video`), video-only on the LTX-2 / LTX-2.3 model family. Three tabs: **Text→Video**,
+  **Image→Video** (source + optional last-frame), and **Audio→Video** (Pro models only). Single Bearer
+  key at Settings → Media. All async submit-and-poll (`POST /v2/<op>` → `{ id }`, poll
+  `GET /v2/<op>/{id}` → `result.video_url`, no webhook → poll-cron). The sub-operation is routed by the
+  media inputs present, and the adapter namespaces the job id as `<op>:<id>` so polling hits the right
+  status endpoint. Built source-grounded against the official `docs.ltx.video` reference (no live key) —
+  resolution-string formatting may need a live smoke test.
 - **Pika media studio** (`/media/pika`) — a branded Studio Kit studio for Pika, served through the
   existing fal.ai adapter (Pika's official API is fal-hosted per pika.art/api), mirroring the Kling
   pattern: `provider: 'fal'`, the `model` field carries the fal endpoint id, reuses the org's fal key.

@@ -50,6 +50,7 @@ const ICONS: Record<string, Entry> = {
   hedra: { viewBox: '0 0 24 24', color: '#FF6B6B', node: (<path d="M21 16v-2l-9-5-9 5v2l9-5 9 5Zm0-6V8l-9-5-9 5v2l9-5 9 5Z" />) },
   higgsfield: { viewBox: '0 0 24 24', color: '#111111', full: true, node: (<path d="M5 3h3v7h8V3h3v18h-3v-8H8v8H5V3Z" />) },
   wan: { viewBox: '0 0 24 24', color: '#6E3AF2', node: (<path d="M2 4l3.5 16L9 9l3 11 3-11 3.5 11L22 4h-3l-1.8 9L14 4h-2l-3.2 9L7 4H2Z" />) },
+  ltx: { viewBox: '0 0 24 24', color: '#111111', node: (<path d="M4 4v16h6v-2H6V4H4Zm16 0h-2.4l-2.1 3-2.1-3H11l3.2 4.5L10.7 13H13l2.5-3.5L18 13h2.3l-3.5-4.5L20 4Z" />) },
 
   // ── Storage Providers ─────────────────────────────────────
   S3: { viewBox: '0 0 24 24', color: '#FF9900', node: (<path d="M12 2 4 7v10l8 5 8-5V7Zm0 3 4 2.5v3L12 11l-4 2.5v-3Z" />) },
@@ -128,7 +129,7 @@ const LABEL_MAP: Record<string, string> = {
   IDRIVE_E2: 'E2', LOCAL: 'Lo',
   fal: 'Fa', elevenlabs: 'EL', heygen: 'HY', runway: 'RW',
   'black-forest-labs': 'BF', replicate: 'Rp', 'stability-ai': 'SA',
-  tavus: 'Ta', did: 'DI', hedra: 'He', higgsfield: 'Hi', wan: 'Wa',
+  tavus: 'Ta', did: 'DI', hedra: 'He', higgsfield: 'Hi', wan: 'Wa', ltx: 'LT',
 };
 
 const ProviderIcon: FC<{

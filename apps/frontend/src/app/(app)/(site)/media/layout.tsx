@@ -89,6 +89,16 @@ const tabs = [
     ),
   },
   {
+    href: '/media/ltx',
+    label: 'LTX Studio',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4v16h6M20 4l-7 8 7 8M13 4v16" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/luma',
     label: 'Luma',
     section: 'Providers',

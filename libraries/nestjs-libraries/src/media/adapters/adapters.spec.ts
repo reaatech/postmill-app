@@ -29,6 +29,7 @@ import { FireworksMediaAdapter } from './fireworks-media.adapter';
 import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
 import { WanAdapter } from './wan.adapter';
 import { HiggsfieldAdapter } from './higgsfield.adapter';
+import { LtxAdapter } from './ltx.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -748,6 +749,94 @@ describe('HiggsfieldAdapter', () => {
     await adapter.generateVideo('x', { apiKey: 'kid:ksecret', input: { image_url: 'https://i/s.png' } });
     const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
     expect((init.headers as Record<string, string>).Authorization).toBe('Key kid:ksecret');
+  });
+});
+
+describe('LtxAdapter', () => {
+  const adapter = new LtxAdapter();
+
+  it('submits text-to-video async with Bearer auth and namespaces the job id', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'job-t2v', created_at: '2026-01-01T00:00:00Z' }));
+    const submission = await adapter.generateVideo('a sunset over the sea', {
+      ...CREDS,
+      model: 'ltx-2-pro',
+      input: { resolution: '1920x1080', duration: 8, generate_audio: true, camera_motion: 'dolly_in' },
+    });
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://api.ltx.video/v2/text-to-video');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      model: 'ltx-2-pro',
+      prompt: 'a sunset over the sea',
+      resolution: '1920x1080',
+      duration: 8,
+      generate_audio: true,
+      camera_motion: 'dolly_in',
+    });
+    // op-namespaced for poll routing; default model applied when omitted.
+    expect(submission.jobId).toBe('text-to-video:job-t2v');
+  });
+
+  it('routes an image source to image-to-video', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'job-i2v' }));
+    const submission = await adapter.generateVideo('pan across', {
+      ...CREDS,
+      input: { image_uri: 'https://img/src.png', resolution: '1080x1920', duration: 5 },
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.ltx.video/v2/image-to-video');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toMatchObject({ model: 'ltx-2-3-pro', image_uri: 'https://img/src.png' });
+    expect(submission.jobId).toBe('image-to-video:job-i2v');
+  });
+
+  it('routes an audio source to audio-to-video (audio wins over image)', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'job-a2v' }));
+    const submission = await adapter.generateVideo('', {
+      ...CREDS,
+      input: { audio_uri: 'https://aud/clip.mp3', image_uri: 'https://img/src.png' },
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.ltx.video/v2/audio-to-video');
+    const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
+    // an empty prompt is dropped from the body (optional for audio-to-video).
+    expect(body.prompt).toBeUndefined();
+    expect(body).toMatchObject({ audio_uri: 'https://aud/clip.mp3', image_uri: 'https://img/src.png' });
+    expect(submission.jobId).toBe('audio-to-video:job-a2v');
+  });
+
+  it('polls the op-specific status path (completed, pending, failed)', async () => {
+    mockSafeFetch.mockResolvedValueOnce(
+      jsonResponse({ status: 'completed', result: { video_url: 'https://ltx/out.mp4' } }),
+    );
+    expect(await adapter.pollJob('image-to-video:job-i2v', CREDS)).toMatchObject({
+      status: 'completed',
+      artifactUrl: 'https://ltx/out.mp4',
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.ltx.video/v2/image-to-video/job-i2v');
+
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'processing' }));
+    expect((await adapter.pollJob('text-to-video:job-t2v', CREDS)).status).toBe('pending');
+
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'failed', error: 'content moderated' }));
+    expect(await adapter.pollJob('text-to-video:job-t2v', CREDS)).toMatchObject({
+      status: 'failed',
+      error: 'content moderated',
+    });
+  });
+
+  it('rejects unsupported operations and requires a key', async () => {
+    await expect(adapter.generateImage('x', CREDS)).rejects.toThrow('image');
+    await expect(adapter.generateAudio('x', CREDS)).rejects.toThrow('audio');
+    await expect(adapter.generateAvatar('x', CREDS)).rejects.toThrow('avatar');
+    await expect(adapter.generateVideo('x', {})).rejects.toThrow('API key');
+  });
+
+  it('tests the connection via a status probe (401 → invalid)', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ detail: 'not found' }, 404));
+    expect(await adapter.testConnection(CREDS)).toMatchObject({ ok: true });
+    mockSafeFetch.mockResolvedValue(jsonResponse({ detail: 'unauthorized' }, 401));
+    expect(await adapter.testConnection(CREDS)).toMatchObject({ ok: false });
+    expect(await adapter.testConnection({})).toMatchObject({ ok: false });
   });
 });
 

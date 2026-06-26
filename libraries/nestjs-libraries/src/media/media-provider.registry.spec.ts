@@ -50,6 +50,7 @@ describe('MediaModule', () => {
       'hedra',
       'heygen',
       'higgsfield',
+      'ltx',
       'luma',
       'minimax',
       'openai',
