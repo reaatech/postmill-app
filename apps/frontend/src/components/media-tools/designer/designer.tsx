@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { createDesignerStore, migrateDoc, type DesignerStore, type DesignerDoc, type DesignerAttribution } from './designer.store';
+import { createDesignerStore, migrateDoc, type DesignerStore, type DesignerDoc, type DesignerAttribution, type VideoOutput, type VideoClip } from './designer.store';
 import { useCollaboration } from './collaboration';
 import type { TimelineAwareness, ImageAwareness } from './collaboration';
 import { CollaborationCursors, type PeerTimelineState } from './collaboration-cursors';
@@ -78,7 +78,65 @@ interface DesignerProps {
     naturalHeight?: number;
     source?: string;
   }>;
+  // Caption handoff (from the Deepgram studio): open a video project with this clip on
+  // the timeline and a caption track pre-built from the word timings (start/end in
+  // seconds), so the user never re-transcribes.
+  initialCaptionVideo?: {
+    url: string;
+    fileId?: string;
+    width?: number;
+    height?: number;
+    words: { word: string; start: number; end: number }[];
+  };
   designId?: string;
+}
+
+// Phrase-group word timings into caption clips — mirrors the video-timeline's
+// auto-caption grouping so a Deepgram handoff yields the same caption shape.
+function buildCaptionClips(
+  words: { word: string; start: number; end: number }[],
+  width: number,
+  height: number,
+  durationMs: number
+): VideoClip[] {
+  const phrases: { word: string; start: number; end: number }[][] = [];
+  let current: { word: string; start: number; end: number }[] = [];
+  const maxWordsPerCaption = 6;
+  for (const w of words) {
+    current.push(w);
+    if (/[.!?]$/.test(w.word) || current.length >= maxWordsPerCaption) {
+      phrases.push(current);
+      current = [];
+    }
+  }
+  if (current.length) phrases.push(current);
+
+  const clips: VideoClip[] = [];
+  for (const phrase of phrases) {
+    const startMs = Math.round(phrase[0].start * 1000);
+    const endMs = Math.min(Math.round(phrase[phrase.length - 1].end * 1000), durationMs);
+    if (startMs >= durationMs) break;
+    clips.push({
+      id: `clip-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      startMs,
+      endMs,
+      text: phrase.map((w) => w.word).join(' '),
+      words: phrase.map((w) => ({
+        word: w.word,
+        startMs: Math.round(w.start * 1000) - startMs,
+        endMs: Math.round(w.end * 1000) - startMs,
+      })),
+      fontFamily: 'Arial',
+      fontSize: 28,
+      fontWeight: 700,
+      fill: '#ffffff',
+      x: (width - 300) / 2,
+      y: height - 120,
+      width: 300,
+      height: 70,
+    });
+  }
+  return clips;
 }
 
 export const getThumbnailDataUrl = (canvas: HTMLCanvasElement | null, maxDim = 400): string | undefined => {
@@ -104,6 +162,7 @@ export const Designer: FC<DesignerProps> = ({
   height,
   initialAsset,
   initialAssets,
+  initialCaptionVideo,
   designId,
 }) => {
   const fetch = useFetch();
@@ -121,7 +180,7 @@ export const Designer: FC<DesignerProps> = ({
   // no caller-supplied size) — forces an explicit format choice instead of the
   // silent 1080² "Instagram Post" default.
   const [showStart, setShowStart] = useState(
-    () => !initialAsset && !initialAssets?.length && !designId && !(width && height)
+    () => !initialAsset && !initialAssets?.length && !initialCaptionVideo && !designId && !(width && height)
   );
   const aiActive = useAiActive();
   const user = useUser();
@@ -135,6 +194,10 @@ export const Designer: FC<DesignerProps> = ({
     if (initialAsset?.width && initialAsset?.height) {
       w = initialAsset.width;
       h = initialAsset.height;
+    }
+    if (initialCaptionVideo?.width && initialCaptionVideo?.height) {
+      w = initialCaptionVideo.width;
+      h = initialCaptionVideo.height;
     }
     const attribution: DesignerAttribution | undefined = initialAsset?.url
       ? {
@@ -464,6 +527,63 @@ export const Designer: FC<DesignerProps> = ({
       });
     }
   }, []);
+
+  // Caption handoff (Deepgram studio): open a video project — the source clip on a video
+  // track + a caption track pre-built from the word timings. Loads the video's metadata
+  // for duration/natural size; falls back to 10s if metadata can't load (e.g. CORS).
+  const captionInitRef = useRef(false);
+  useEffect(() => {
+    if (!initialCaptionVideo || captionInitRef.current) return;
+    captionInitRef.current = true;
+    const { url, fileId, words } = initialCaptionVideo;
+
+    const build = (durationMs: number) => {
+      store.getState().setMode('video');
+      let s = store.getState();
+      const out = s.currentOutput;
+      const vo = () => s.doc.outputs[out] as VideoOutput;
+      const videoTrack = vo().tracks.find((t) => t.type === 'video');
+      if (videoTrack) {
+        s.addClip(out, videoTrack.id, {
+          id: `clip-${Date.now()}-v`,
+          startMs: 0,
+          endMs: durationMs,
+          src: url,
+          fileId,
+        });
+      }
+      s.setVideoDuration(out, durationMs);
+
+      if (words?.length) {
+        store.getState().addTrack(out, 'caption');
+        s = store.getState();
+        const v = s.doc.outputs[out] as VideoOutput;
+        const captionTrack = v.tracks.find((t) => t.type === 'caption');
+        if (captionTrack) {
+          for (const clip of buildCaptionClips(words, v.width, v.height, durationMs)) {
+            store.getState().addClip(out, captionTrack.id, clip);
+          }
+        }
+      }
+      store.getState().pushHistory();
+    };
+
+    // Build once, from whichever fires first: metadata (real duration), error (10s
+    // fallback), or a timeout guard so a hanging/slow source can't block the project.
+    let built = false;
+    const finish = (durationMs: number) => {
+      if (built) return;
+      built = true;
+      build(durationMs);
+    };
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => finish(Math.max(1000, Math.round((probe.duration || 10) * 1000)));
+    probe.onerror = () => finish(10000);
+    probe.src = url;
+    const guard = window.setTimeout(() => finish(10000), 5000);
+    return () => window.clearTimeout(guard);
+  }, [initialCaptionVideo, store]);
 
   // --- Unsaved-changes guard shared by New / Open / Templates (D-7b) ---
   const confirmDiscardIfDirty = useCallback(() => {

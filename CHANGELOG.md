@@ -56,9 +56,19 @@
   over a dedicated `/media/deepgram` backend (`DeepgramController` → `DeepgramService`). Reads source
   bytes straight from storage (`readFile`, no SSRF surface), transcribes via the `deepgram` adapter,
   and returns transcript + phrase-chunked caption segments. Exports `.srt` / `.vtt` / `.txt`
-  client-side (no allowlist change), plus copy, Save-to-Files (`storeTranscript`), and a
-  Send-to-composer handoff. Adapter `speechToTextWords` gained opt-in `smart_format`/`punctuate` +
-  `language` passthrough (the Designer timeline's auto-caption call is unchanged). No schema migration.
+  client-side (no allowlist change), plus copy and a Send-to-composer handoff. Adapter
+  `speechToTextWords` gained opt-in `smart_format`/`punctuate` + `language` passthrough (the Designer
+  timeline's auto-caption call is unchanged). No schema migration.
+  - **Transcript history in the render queue** — Save-to-Files persists the transcript as a completed
+    `stt` `AIMediaJob` (via `completeJobWithBuffer`), surfaced through the existing studio jobs
+    endpoint; the shared `RenderQueue` gained an additive `stt` text card (Copy / To composer).
+  - **Edit in Designer (captions, no re-transcribe)** — for a video source, hands the clip + word
+    timings to the Designer (`?captions=1` + `sessionStorage`), which builds a video project with a
+    caption track pre-built from the words — the only path that loads a video onto the Designer
+    timeline from a URL.
+- **Kling studio name** — the `fal` media adapter's display name is now **"Kling"** (was "fal.ai") so
+  Settings → Media matches the studio (`/media/kling`, nav + title "Kling"). Config identifier stays
+  `fal` (unchanged at-rest key).
 - **Vertex AI studio** (`/media/vertex`) — Google **Veo** (Text → Video) and **Imagen** (Text →
   Image) as a two-tab kit studio. Unlike every other media provider, Vertex uses GCP credentials, not
   a single API key: the adapter declares a `credentialFields` schema (project + location +

@@ -58,13 +58,29 @@ function DesignerWithParams() {
     }
   }
 
+  // Caption handoff: the Deepgram studio stashes the source video + computed word
+  // timings in sessionStorage and navigates here with ?captions=1. The Designer opens a
+  // video project with the clip + a caption track already built (no re-transcribe).
+  let initialCaptionVideo:
+    | { url: string; fileId?: string; width?: number; height?: number; words: { word: string; start: number; end: number }[] }
+    | undefined;
+  if (sp.get('captions') && typeof window !== 'undefined') {
+    try {
+      const raw = window.sessionStorage.getItem('designer:caption-handoff');
+      if (raw) initialCaptionVideo = JSON.parse(raw);
+    } catch {
+      // ignore malformed handoff
+    }
+  }
+
   // The Designer initialises its store once from initialAsset, so remount it
   // when the asset changes (navigating straight from one asset to another).
   return (
     <DesignerPage
-      key={url || (initialAssets ? 'bulk' : 'blank')}
+      key={url || (initialCaptionVideo ? 'captions' : initialAssets ? 'bulk' : 'blank')}
       initialAsset={initialAsset}
       initialAssets={initialAssets}
+      initialCaptionVideo={initialCaptionVideo}
     />
   );
 }

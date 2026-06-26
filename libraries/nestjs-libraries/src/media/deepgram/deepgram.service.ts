@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
+import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
@@ -53,6 +54,7 @@ export class DeepgramService {
   constructor(
     private readonly _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private readonly _lifecycle: MediaJobLifecycleService,
+    private readonly _aiSettings: AiSettingsService,
     private readonly _storage: StorageService,
     private readonly _fileService: FileService,
     private readonly _registry: MediaProviderRegistry,
@@ -94,20 +96,32 @@ export class DeepgramService {
     return { text, words, segments: this._buildSegments(words, text) };
   }
 
-  // Persist a transcript as a text document under the org's media tree (best path for
-  // reuse as post copy). Bypasses the /files import content-type allowlist by writing
-  // straight to tenant storage via the lifecycle helper.
+  // Persist a transcript as a completed `stt` media job — the transcript text lands in
+  // the org's media tree (bypassing the /files import content-type allowlist) and the
+  // job row surfaces in the studio render queue via /media/studio/jobs?provider=deepgram.
+  // The job is created already-complete, so it never enters the async poll path.
   async saveTranscript(
     orgId: string,
+    userId: string | undefined,
     params: { text: string; segments?: TranscriptSegment[] },
-  ): Promise<{ path: string; fileId: string }> {
-    const stored = await this._lifecycle.storeTranscript({
+  ): Promise<{ jobId: string; path: string }> {
+    const job = await this._lifecycle.createPendingJob({
       organizationId: orgId,
+      userId,
       provider: 'deepgram',
-      text: params.text,
-      segments: params.segments,
+      operation: 'stt',
+      model: 'deepgram',
+      inputJson: JSON.stringify({ operation: 'stt', segments: params.segments?.length ?? 0 }),
     });
-    return { path: stored.path, fileId: stored.mediaId };
+    const ok = await this._lifecycle.completeJobWithBuffer(
+      job,
+      Buffer.from(params.text, 'utf-8'),
+      'text/plain',
+      { provider: 'deepgram', ...(params.segments ? { segments: params.segments } : {}) },
+    );
+    if (!ok) throw new ForbiddenException('Failed to store transcript');
+    const stored = await this._aiSettings.getMediaJobById(job.id);
+    return { jobId: job.id, path: stored?.artifactUrl ?? '' };
   }
 
   // ── internals ──

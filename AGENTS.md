@@ -545,7 +545,10 @@ the modern **HeyGen Studio** (above).
   timeline** (`video-timeline.tsx` — video/image/text/caption/audio/sticker tracks, canvas-decoded
   audio waveforms; renders via headless Chromium + FFmpeg).
 - Opens from a single asset (`?url=&type=&w=&h=…`) or a bulk handoff (Files → bulk **Open all in
-  Designer**, which stashes the selection in `sessionStorage` and navigates to `?bulk=1`). Animated
+  Designer**, which stashes the selection in `sessionStorage` and navigates to `?bulk=1`), or a
+  **caption handoff** (`?captions=1` + `sessionStorage['designer:caption-handoff']`) from the Deepgram
+  studio — the one path that loads a **video onto the timeline** (`setMode('video')` + a caption track
+  built from word timings); the single-asset `?type=video` open only drops a static thumbnail. Animated
   GIF/WebP export only exists in **video** mode — static mode never offers it (Konva flattens to
   frame 1).
 
@@ -626,7 +629,9 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
   descriptor.**
 - **Current studios on the kit:**
-  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter), Vertex (Google **Veo**).
+  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter — config identifier `fal`, but the
+    adapter's display name + studio are both **"Kling"** so Settings → Media and the studio match),
+    Vertex (Google **Veo**).
   - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), OpenAI
     (gpt-image-1 + DALL·E 3 as two fixed-model tabs), Vertex (Google **Imagen**, a second tab on the
     Vertex studio). `operation: 'image'` completes **synchronously**
@@ -671,14 +676,28 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   service. It reads the source file's **bytes directly from storage** (`IStorageAdapter.readFile` —
   works for local + cloud, no outbound HTTP/SSRF surface), calls the `deepgram` registry adapter's
   `speechToTextWords`, and returns `{ text, words, segments }` (segments are phrase-chunked for
-  captions). `POST /transcribe` (gated on the org's Deepgram key) and `POST /save-transcript`
-  (persists the transcript as a text document via `MediaJobLifecycleService.storeTranscript`, which
-  bypasses the `/files` import content-type allowlist).
+  captions). `POST /transcribe` (gated on the org's Deepgram key) and `POST /save-transcript`.
+- **Transcript history rides the render queue.** `save-transcript` persists the transcript as a
+  **completed `stt` `AIMediaJob`** via `MediaJobLifecycleService.completeJobWithBuffer` (the text lands
+  in the media tree, bypassing the `/files` import content-type allowlist), so it surfaces through the
+  existing `GET /media/studio/:provider/jobs`. `stt` is created already-complete, so it never enters
+  the async poll path (`'stt'` added to the lifecycle `AsyncOperation` union). The shared studio-kit
+  `RenderQueue` gained an **additive `stt` branch** — a text card with **Copy** / **To composer**
+  (no AV preview, no Edit-in-Designer/Post); other studios never emit `stt`, so they're unchanged.
 - The panel exports captions **client-side** — `.srt` / `.vtt` / `.txt` Blob downloads (no `/files`
-  write, so no allowlist change), plus copy, Save-to-Files, and a Send-to-composer handoff
-  (`AddEditModal` with the transcript as content). The adapter's `speechToTextWords` gained an
-  **opt-in** `input.smartFormat` (→ `smart_format`+`punctuate`) and `input.language` passthrough; the
-  Designer timeline's existing auto-caption call passes neither, so its request is unchanged.
+  write, so no allowlist change), plus copy, Save-to-Files (→ render queue), and a Send-to-composer
+  handoff. The adapter's `speechToTextWords` gained an **opt-in** `input.smartFormat`
+  (→ `smart_format`+`punctuate`) and `input.language` passthrough; the Designer timeline's existing
+  auto-caption call passes neither, so its request is unchanged.
+- **Edit in Designer (captions burned, no re-transcribe).** For a video source, the panel stashes
+  `{ url, fileId, width, height, words }` in `sessionStorage` (`designer:caption-handoff`) and opens
+  `/media/designer?captions=1`. The Designer reads it (new `initialCaptionVideo` prop on the `Designer`
+  component) and **builds a video project**: `setMode('video')`, loads the clip's duration via a
+  metadata probe (`onloadedmetadata` → real duration, `onerror`/5s-timeout → 10s fallback so a
+  hanging source can't block), adds the video clip, then a **caption track** phrase-grouped from the
+  word timings (same grouping as the timeline's auto-caption). This is the **only** path that loads a
+  video onto the Designer timeline from a URL (the `?url=&type=video` open still drops a static
+  thumbnail).
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via

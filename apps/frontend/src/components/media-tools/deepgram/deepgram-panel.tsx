@@ -21,6 +21,8 @@ interface SelectedSource {
   fileId?: string;
   url: string;
   type: 'image' | 'video' | 'audio';
+  width: number;
+  height: number;
 }
 
 const MODELS = [
@@ -58,7 +60,7 @@ const download = (filename: string, content: string, mime: string) => {
   URL.revokeObjectURL(url);
 };
 
-export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
+export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -72,7 +74,14 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
   const [transcript, setTranscript] = useState('');
 
   const onSelect = useCallback(
-    (item: { source: string; url: string; fileId?: string; type: 'image' | 'video' | 'audio' }) => {
+    (item: {
+      source: string;
+      url: string;
+      fileId?: string;
+      type: 'image' | 'video' | 'audio';
+      width: number;
+      height: number;
+    }) => {
       if (item.type !== 'audio' && item.type !== 'video') {
         toaster.show('Pick an audio or video file to transcribe', 'warning');
         return;
@@ -81,7 +90,13 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
         toaster.show('Transcription needs a file from your library', 'warning');
         return;
       }
-      setSource({ fileId: item.fileId, url: item.url, type: item.type });
+      setSource({
+        fileId: item.fileId,
+        url: item.url,
+        type: item.type,
+        width: item.width,
+        height: item.height,
+      });
       setResult(null);
       setTranscript('');
     },
@@ -127,10 +142,11 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
         return;
       }
       toaster.show('Transcript saved to Files', 'success');
+      onGenerated();
     } catch {
       toaster.show('Could not save transcript', 'warning');
     }
-  }, [result, transcript, fetch, toaster]);
+  }, [result, transcript, fetch, toaster, onGenerated]);
 
   const sendToComposer = useCallback(async () => {
     if (!transcript) return;
@@ -164,6 +180,27 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
       () => toaster.show('Copy failed', 'warning')
     );
   }, [transcript, toaster]);
+
+  // Hand the source video + computed word timings to the Designer so it opens a video
+  // project with a caption track already built — no re-transcribe. Payload rides in
+  // sessionStorage (too large/long for the query string), keyed for the Designer to read.
+  const editInDesigner = useCallback(() => {
+    if (!source || source.type !== 'video' || !result) return;
+    const payload = {
+      url: source.url,
+      fileId: source.fileId,
+      width: source.width || undefined,
+      height: source.height || undefined,
+      words: result.words,
+    };
+    try {
+      window.sessionStorage.setItem('designer:caption-handoff', JSON.stringify(payload));
+    } catch {
+      toaster.show('Could not open the Designer', 'warning');
+      return;
+    }
+    window.open('/media/designer?captions=1', '_blank');
+  }, [source, result, toaster]);
 
   const segments = useMemo(() => result?.segments ?? [], [result]);
 
@@ -258,6 +295,11 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = () => {
             <button type="button" onClick={saveToFiles} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
               Save to Files
             </button>
+            {source?.type === 'video' && (
+              <button type="button" onClick={editInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+                Edit in Designer
+              </button>
+            )}
             <button type="button" onClick={sendToComposer} className="px-[12px] py-[8px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all">
               Send to composer
             </button>

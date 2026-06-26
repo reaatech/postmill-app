@@ -21,7 +21,10 @@ const JOB_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 // Defensive cap when downloading provider artifacts.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
-type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image';
+// 'stt' jobs are created already-complete (transcript stored inline via
+// completeJobWithBuffer), so they never enter the async poll path — but the type must
+// admit them so the Deepgram studio can record transcript history as media jobs.
+type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image' | 'stt';
 
 const OPERATION_FOLDER: Record<string, string> = {
   image: 'images',

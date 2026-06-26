@@ -5,7 +5,8 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
-import { Organization } from '@prisma/client';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
+import { Organization, User } from '@prisma/client';
 import { DeepgramService } from '@gitroom/nestjs-libraries/media/deepgram/deepgram.service';
 import { SaveTranscriptDto, TranscribeDto } from '@gitroom/nestjs-libraries/dtos/deepgram';
 
@@ -37,8 +38,12 @@ export class DeepgramController {
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
   @Throttle({ default: { limit: 20, ttl: 60000 } })
-  saveTranscript(@Body() body: SaveTranscriptDto, @GetOrgFromRequest() org: Organization) {
-    return this._deepgram.saveTranscript(org.id, {
+  saveTranscript(
+    @Body() body: SaveTranscriptDto,
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+  ) {
+    return this._deepgram.saveTranscript(org.id, user?.id, {
       text: body.text,
       segments: body.segments,
     });

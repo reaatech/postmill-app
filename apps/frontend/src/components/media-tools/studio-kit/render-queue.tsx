@@ -19,6 +19,7 @@ const OPERATION_LABEL: Record<string, string> = {
   avatar: 'Video',
   image: 'Image',
   audio: 'Audio',
+  stt: 'Transcript',
 };
 
 // Shared render-queue used by every studio. The three handoffs are baked in:
@@ -36,12 +37,8 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
     window.open(`/media/designer?${params.toString()}`, '_blank');
   }, []);
 
-  const post = useCallback(
-    async (job: StudioJob) => {
-      if (!job.artifactUrl || !job.fileId) {
-        toaster.show('This render is not ready to post yet', 'warning');
-        return;
-      }
+  const openComposer = useCallback(
+    async (content: string, image: { id: string; path: string }[]) => {
       const integrationsRes = await fetch('/integrations');
       if (!integrationsRes.ok) {
         toaster.show('Could not load channels', 'warning');
@@ -58,7 +55,7 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
             date={dayjs()}
             integrations={integrations}
             allIntegrations={integrations}
-            onlyValues={[{ content: '', id: 'new', image: [{ id: job.fileId, path: job.artifactUrl }] }]}
+            onlyValues={[{ content, id: 'new', image }]}
             mutate={() => {}}
             reopenModal={() => {}}
           />
@@ -66,6 +63,60 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
       });
     },
     [fetch, modal, toaster]
+  );
+
+  const post = useCallback(
+    (job: StudioJob) => {
+      if (!job.artifactUrl || !job.fileId) {
+        toaster.show('This render is not ready to post yet', 'warning');
+        return;
+      }
+      return openComposer('', [{ id: job.fileId, path: job.artifactUrl }]);
+    },
+    [openComposer, toaster]
+  );
+
+  // Transcript (stt) jobs carry text, not a previewable artifact — fetch the stored
+  // text on demand for copy / insert-to-composer.
+  const fetchTranscript = useCallback(
+    async (job: StudioJob): Promise<string | null> => {
+      if (!job.artifactUrl) return null;
+      try {
+        const res = await window.fetch(mediaDirectory.set(job.artifactUrl));
+        if (!res.ok) return null;
+        return await res.text();
+      } catch {
+        return null;
+      }
+    },
+    [mediaDirectory]
+  );
+
+  const copyTranscript = useCallback(
+    async (job: StudioJob) => {
+      const text = await fetchTranscript(job);
+      if (text == null) {
+        toaster.show('Could not load transcript', 'warning');
+        return;
+      }
+      navigator.clipboard.writeText(text).then(
+        () => toaster.show('Transcript copied', 'success'),
+        () => toaster.show('Copy failed', 'warning')
+      );
+    },
+    [fetchTranscript, toaster]
+  );
+
+  const insertTranscript = useCallback(
+    async (job: StudioJob) => {
+      const text = await fetchTranscript(job);
+      if (text == null) {
+        toaster.show('Could not load transcript', 'warning');
+        return;
+      }
+      await openComposer(text, []);
+    },
+    [fetchTranscript, openComposer, toaster]
   );
 
   if (!isLoading && (!jobs || jobs.length === 0)) {
@@ -80,6 +131,7 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
     <div className="flex flex-col gap-[8px]">
       {(jobs || []).map((job) => {
         const meta = STATUS_META[job.status];
+        const isStt = job.operation === 'stt';
         const isAudio = job.operation === 'audio';
         const isImage = job.operation === 'image';
         const previewUrl = job.artifactUrl ? mediaDirectory.set(job.artifactUrl) : null;
@@ -88,7 +140,7 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
             {job.status === 'completed' && previewUrl && isImage && (
               <img src={previewUrl} alt="" className="w-full aspect-video object-cover bg-black" />
             )}
-            {job.status === 'completed' && previewUrl && !isAudio && !isImage && (
+            {job.status === 'completed' && previewUrl && !isStt && !isAudio && !isImage && (
               <video src={previewUrl} className="w-full aspect-video object-cover bg-black" controls preload="metadata" />
             )}
             {job.status === 'completed' && previewUrl && isAudio && (
@@ -110,7 +162,25 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
                 {meta.label}
               </span>
             </div>
-            {job.status === 'completed' && (
+            {job.status === 'completed' && isStt && (
+              <div className="flex gap-[6px] px-[10px] pb-[10px]">
+                <button
+                  type="button"
+                  onClick={() => copyTranscript(job)}
+                  className="flex-1 px-[10px] py-[7px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all"
+                >
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertTranscript(job)}
+                  className="flex-1 px-[10px] py-[7px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all"
+                >
+                  To composer
+                </button>
+              </div>
+            )}
+            {job.status === 'completed' && !isStt && (
               <div className="flex gap-[6px] px-[10px] pb-[10px]">
                 <button
                   type="button"
