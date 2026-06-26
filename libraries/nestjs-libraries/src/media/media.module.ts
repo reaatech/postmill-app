@@ -10,6 +10,7 @@ import { HeyGenAdapter } from './adapters/heygen.adapter';
 import { RunwayAdapter } from './adapters/runway.adapter';
 import { BlackForestLabsAdapter } from './adapters/black-forest-labs.adapter';
 import { VertexMediaAdapter } from './adapters/vertex-media.adapter';
+import { GoogleAiMediaAdapter } from './adapters/google-ai-media.adapter';
 import { ReplicateMediaAdapter } from './adapters/replicate.adapter';
 import { StabilityAdapter } from './adapters/stability.adapter';
 import { TavusAdapter } from './adapters/tavus.adapter';
@@ -39,6 +40,7 @@ const ALL_ADAPTERS = [
   RunwayAdapter,
   BlackForestLabsAdapter,
   VertexMediaAdapter,
+  GoogleAiMediaAdapter,
   ReplicateMediaAdapter,
   StabilityAdapter,
   TavusAdapter,

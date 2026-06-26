@@ -28,13 +28,13 @@ const IMAGE_ASPECT = [
 
 export const vertexDescriptor: StudioDescriptor = {
   provider: 'vertex',
-  title: 'Vertex AI',
+  title: 'Google Vertex',
   tabs: [
     {
       key: 'text-to-video',
       label: 'Text → Video',
       operation: 'video',
-      description: 'Generate a video clip from a text prompt with Google Veo on Vertex AI.',
+      description: 'Generate a video clip from a text prompt with Google Veo on Vertex.',
       fields: [
         { type: 'select', name: 'model', label: 'Model', default: 'veo-2.0-generate-001', options: VEO_MODELS },
         { type: 'prompt', name: 'prompt', label: 'Prompt', required: true, placeholder: 'Describe the scene…' },
@@ -47,7 +47,7 @@ export const vertexDescriptor: StudioDescriptor = {
       key: 'text-to-image',
       label: 'Text → Image',
       operation: 'image',
-      description: 'Generate a still image from a text prompt with Google Imagen on Vertex AI.',
+      description: 'Generate a still image from a text prompt with Google Imagen on Vertex.',
       fields: [
         { type: 'select', name: 'model', label: 'Model', default: 'imagen-3.0-generate-002', options: IMAGEN_MODELS },
         { type: 'prompt', name: 'prompt', label: 'Prompt', required: true, placeholder: 'Describe the image…' },

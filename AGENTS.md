@@ -738,6 +738,27 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   existing OpenAI image/TTS studio is unchanged (separate descriptor, no video tab). **Built without a
   live key** — grounded in the official OpenAI Videos API reference. (Note: OpenAI lists the Sora-2 Videos
   API as deprecated with a 2026-09-24 shutdown.)
+- **Google AI Studio** (`/media/google-ai`, registry id `google`) is the **Gemini Developer API**
+  (`generativelanguage.googleapis.com`) — keyed by a single Gemini API key (`AIza…`), the **same key**
+  the org sets at Settings → AI → "Google Gemini". So `google` is a **universal-credential** media
+  provider (added to `UNIVERSAL_AI_CREDENTIAL` alongside Qwen): configure the Gemini key once and it
+  drives both the LLM and the media studio; no Settings → Media config needed (registering the adapter
+  auto-surfaces it, marked configured when the AI key exists). This is **distinct from `vertex`**, which
+  is the enterprise GCP path (service-account `project`/`location`/`googleCredentials`, short-lived
+  minted token) — the media adapter `name` was renamed `Google Vertex AI` → **Google Vertex** (AI +
+  media surfaces, studio title, nav) to disambiguate the two Google surfaces. `google-ai-media.adapter.ts`
+  serves **image** (synchronous): **Nano Banana** (`gemini-2.5-flash-image` via `:generateContent` →
+  inline `candidates[].content.parts[].inlineData` base64) and **Imagen** (`imagen-*` via `:predict` →
+  `predictions[].bytesBase64Encoded`), routed by the chosen model id; and **video**: **Veo**
+  (`veo-*` via `:predictLongRunning` → operation name as `jobId`, polled at `GET /v1beta/{name}`; no
+  webhook → media-jobs poll-cron, like Vertex Veo). Veo's finished MP4 is **auth-only bytes** at the
+  returned file `uri`, so `pollJob` downloads it **with the key** and returns a `data:video/mp4;base64,…`
+  URL (the Sora pattern — the lifecycle's unauthenticated re-download would 401). The key rides as the
+  `x-goog-api-key` header. **Built without a live key** — endpoints grounded in the official
+  `ai.google.dev` Gemini API reference (Imagen `:predict`, Gemini-image `:generateContent`, Veo
+  `:predictLongRunning`); image `aspectRatio`/`sampleCount` shaping and the Veo file-download header may
+  need a live smoke test. (Note: Imagen `:predict` is slated for shutdown 2026-08-17 in favour of Nano
+  Banana — both remain selectable model options.)
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

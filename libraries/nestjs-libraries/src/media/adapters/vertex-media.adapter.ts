@@ -37,7 +37,7 @@ const VERTEX_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
 export class VertexMediaAdapter implements MediaProviderAdapter {
   readonly identifier = 'vertex';
-  readonly name = 'Google Vertex AI';
+  readonly name = 'Google Vertex';
   readonly capabilities: MediaProviderCapabilities = {
     image: true,
     video: true,

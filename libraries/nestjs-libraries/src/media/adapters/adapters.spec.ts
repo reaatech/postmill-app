@@ -30,6 +30,7 @@ import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
 import { WanAdapter } from './wan.adapter';
 import { HiggsfieldAdapter } from './higgsfield.adapter';
 import { LtxAdapter } from './ltx.adapter';
+import { GoogleAiMediaAdapter } from './google-ai-media.adapter';
 import { resolveApiKey } from '../media-provider-adapter.interface';
 
 function jsonResponse(body: unknown, status = 200) {
@@ -1213,5 +1214,72 @@ describe('DeepInfraMediaAdapter', () => {
     const body = JSON.parse((mockSafeFetch.mock.calls[0][1] as RequestInit).body as string);
     expect(body.text).toBe('speak this');
     expect(sub.artifactUrl).toBe('data:audio/wav;base64,CCCC');
+  });
+});
+
+describe('GoogleAiMediaAdapter', () => {
+  const adapter = new GoogleAiMediaAdapter();
+
+  it('generates a Nano Banana image via generateContent (inline base64, key header)', async () => {
+    mockSafeFetch.mockResolvedValue(
+      jsonResponse({ candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: 'QUJD' } }] } }] }),
+    );
+    const result = await adapter.generateImage('a cat', CREDS);
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>)['x-goog-api-key']).toBe('test-key');
+    expect(result.image).toBe('data:image/png;base64,QUJD');
+  });
+
+  it('routes an imagen model to the predict endpoint (predictions[].bytesBase64Encoded)', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ predictions: [{ bytesBase64Encoded: 'QUJD', mimeType: 'image/png' }] }));
+    const result = await adapter.generateImage('a dog', { ...CREDS, model: 'imagen-4.0-generate-001' });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict',
+    );
+    expect(result.image).toBe('data:image/png;base64,QUJD');
+  });
+
+  it('submits a Veo job and returns the operation name as jobId', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ name: 'models/veo-3.0-generate-001/operations/abc' }));
+    const sub = await adapter.generateVideo('a sunset', { ...CREDS, model: 'veo-3.0-generate-001' });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001:predictLongRunning',
+    );
+    expect(sub.jobId).toBe('models/veo-3.0-generate-001/operations/abc');
+  });
+
+  it('polls a Veo operation and downloads the video URI with the key', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(
+        jsonResponse({
+          done: true,
+          response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://g/file:download' } }] } },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({}));
+    const poll = await adapter.pollJob('models/veo-3.0-generate-001/operations/abc', CREDS);
+    // poll path, then an authenticated download of the file URI
+    expect(mockSafeFetch.mock.calls[0][0]).toBe(
+      'https://generativelanguage.googleapis.com/v1beta/models/veo-3.0-generate-001/operations/abc',
+    );
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://g/file:download');
+    expect(poll.status).toBe('completed');
+    expect(poll.artifactUrl).toBe('data:video/mp4;base64,AQID');
+  });
+
+  it('reports a pending Veo operation', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ done: false }));
+    const poll = await adapter.pollJob('models/veo-3.0-generate-001/operations/abc', CREDS);
+    expect(poll.status).toBe('pending');
+  });
+
+  it('requires a key and tests the connection by listing models', async () => {
+    await expect(adapter.generateImage('x')).rejects.toThrow('Gemini API key');
+    expect(await adapter.testConnection({})).toEqual({ ok: false, message: expect.stringContaining('Gemini API key') });
+    mockSafeFetch.mockResolvedValue(jsonResponse({ models: [] }));
+    expect(await adapter.testConnection(CREDS)).toEqual({ ok: true, message: 'Connection successful' });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://generativelanguage.googleapis.com/v1beta/models');
   });
 });

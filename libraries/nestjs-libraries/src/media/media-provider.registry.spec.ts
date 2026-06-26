@@ -46,6 +46,7 @@ describe('MediaModule', () => {
       'fal',
       'fireworks',
       'gateway',
+      'google',
       'groq',
       'hedra',
       'heygen',

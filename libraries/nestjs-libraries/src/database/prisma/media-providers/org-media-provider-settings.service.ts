@@ -15,6 +15,7 @@ const STANDARD_FOLDERS = ['documents', 'audio', 'images', 'video', 'other'];
 // settings flow yet, so a read-fallback is the lighter, immediate path.)
 const UNIVERSAL_AI_CREDENTIAL = new Set([
   'qwen',
+  'google',
   'togetherai',
   'siliconflow',
   'groq',

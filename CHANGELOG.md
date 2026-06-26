@@ -11,6 +11,15 @@
 ## Unreleased
 
 ### Added
+- **Google AI Studio media studio** (`/media/google-ai`, registry id `google`) — a full Studio Kit
+  studio for the **Gemini Developer API**. Image tab covers **Nano Banana** (`gemini-2.5-flash-image`
+  via `:generateContent`) and **Imagen** (`imagen-*` via `:predict`), routed by the chosen model; Video
+  tab runs **Veo** (`veo-*` via `:predictLongRunning`, polled to completion — no webhook → poll-cron).
+  It is a **universal-credential** provider: it reuses the org's existing Settings → AI "Google Gemini"
+  key (added to `UNIVERSAL_AI_CREDENTIAL`, the Qwen pattern) — configure once, works for both LLM and
+  media. Veo's finished MP4 is auth-only bytes at the returned file URI, so `pollJob` downloads it with
+  the key and returns it inline as a `data:video/mp4` URL (the Sora pattern). Built source-grounded
+  against the official `ai.google.dev` reference (no live key).
 - **Sora media studio** (`/media/sora`) — a branded Studio Kit studio for OpenAI Sora that reuses the
   org's existing OpenAI key (`descriptor.provider: 'openai'`, the Pika-rides-fal pattern). Video-only
   with Text→Video and Image→Video tabs (`sora-2` / `sora-2-pro`). `generateVideo` + `pollJob` were added
@@ -225,6 +234,10 @@
   The `ThirdParty` Prisma model + `Organization.thirdParty` relation were dropped from the schema.
 
 ### Changed
+- **Renamed "Google Vertex AI" → "Google Vertex"** across the AI provider, media provider, the
+  `/media/vertex` studio title, and the media nav — disambiguating the enterprise GCP path (`vertex`,
+  service-account auth) from the new consumer Gemini-key path (Google AI Studio, `google`). Identifier
+  unchanged (`vertex`); display-name only.
 - **Polotno removal** — Removed all `polotno`, `polonto`, `plontoKey` references across the codebase.
   - Deleted: `polonto.tsx`, `polonto/` directory, `polonto.css`, global.scss imports/rules.
   - Removed: `NEXT_PUBLIC_POLOTNO` from `.env.example`, `docker-compose.yaml`, and docs.
