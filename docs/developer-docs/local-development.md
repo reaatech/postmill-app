@@ -119,7 +119,6 @@ default to **enabled**; set `=true` to skip that subsystem.
 | `DEV_DISABLE_MEDIA` | Media-generation adapter registration |
 | `DEV_DISABLE_SHORTLINKS` | Short-link adapter registration |
 | `DEV_DISABLE_EMAIL` | Email-provider adapter registration |
-| `DEV_DISABLE_THIRDPARTY` | Third-party provider registration |
 | `DEV_DISABLE_VIDEO` | Video-generation adapter registration |
 | `DEV_DISABLE_AGENT` | Agent-graph services |
 | `DEV_DISABLE_CRON` | `ScheduleModule.forRoot()` (used by session cleanup) |

@@ -36,7 +36,6 @@ This page lists every model grouped by domain with a one-line purpose and key re
 | `Signatures` | Per-org post signatures with auto-add flag | FK → `Organization` |
 | `Notifications` | Per-org notification feed entries | FK → `Organization` |
 | `Errors` | Post-publish errors with platform and message | FK → `Organization`, `Post` |
-| `ThirdParty` | Per-org third-party API keys (n8n, Zapier, etc.) | FK → `Organization` |
 | `Announcement` | System-wide announcements (info/warning/error) | Standalone |
 
 ---

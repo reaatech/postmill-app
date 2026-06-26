@@ -14,7 +14,6 @@ echo "   30 - Analytics page"
 echo "   31 - Composer flows"
 echo "   32 - Settings pages"
 echo "   33 - Media library"
-echo "   34 - Integrations"
 echo "   35 - Error states"
 echo "   36 - Post detail"
 echo ""
@@ -33,7 +32,6 @@ docker run --rm \
       31-ui-composer-flows.spec.ts \
       32-ui-settings.spec.ts \
       33-ui-media-library.spec.ts \
-      34-ui-integrations.spec.ts \
       35-ui-error-states.spec.ts \
       36-ui-post-detail.spec.ts \
       2>&1
@@ -57,9 +55,6 @@ if [ -f "results-settings.json" ]; then
 fi
 if [ -f "results-media.json" ]; then
   echo "✓ Media library test completed"
-fi
-if [ -f "results-integrations.json" ]; then
-  echo "✓ Integrations test completed"
 fi
 if [ -f "results-errors.json" ]; then
   echo "✓ Error states test completed"

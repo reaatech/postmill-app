@@ -215,7 +215,6 @@ database/prisma/
 ├── social-comments/   → social.comments.repository.ts
 ├── storage/           → storage.repository.ts
 ├── subscriptions/     → subscription.repository.ts
-├── third-party/       → third-party.repository.ts
 ├── users/             → users.repository.ts
 ├── watchlist/         → watchlist.repository.ts
 └── webhooks/          → webhooks.repository.ts

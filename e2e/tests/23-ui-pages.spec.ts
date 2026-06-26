@@ -5,7 +5,7 @@ import * as path from 'path';
 const ROUTES: [string, string][] = [
   ['Calendar', '/launches'], ['Analytics', '/analytics'], ['Media', '/media'],
   ['Campaigns', '/campaigns'], ['Comments', '/comments'], ['Plugs', '/plugs'],
-  ['Third-party', '/third-party'], ['Settings', '/settings'], ['Billing', '/billing'],
+  ['Settings', '/settings'], ['Billing', '/billing'],
   ['Agents', '/agents'],
 ];
 

@@ -167,7 +167,7 @@ describe('DashboardSetup (Part G)', () => {
     render(<DashboardSetup />);
 
     fireEvent.click(screen.getByText(stepLabel('channel')));
-    expect(mockPush).toHaveBeenCalledWith('/third-party');
+    expect(mockPush).toHaveBeenCalledWith('/settings?tab=channels');
   });
 
   it('does not navigate when a completed step is clicked', () => {

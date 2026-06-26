@@ -11,7 +11,7 @@ Source: `apps/frontend/src/app/`
 
 | Route group | Path | Purpose |
 |---|---|---|
-| `(app)/(site)/` | `/schedule`, `/agents`, `/comments`, `/analytics`, `/media`, `/plugs`, `/campaigns`, `/billing`, `/settings`, `/third-party` | Main application pages |
+| `(app)/(site)/` | `/schedule`, `/agents`, `/comments`, `/analytics`, `/media`, `/plugs`, `/campaigns`, `/billing`, `/settings` | Main application pages |
 | `(app)/(site)/analytics/v2/` | `/analytics/v2` | Multi-channel analytics dashboard |
 | `(app)/(site)/agents/[id]/` | `/agents/[id]` | Individual agent detail |
 | `(app)/auth/` | `/auth/login`, `/auth/forgot`, `/auth/activate` | Authentication flows |

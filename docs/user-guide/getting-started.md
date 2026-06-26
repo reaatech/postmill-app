@@ -95,7 +95,6 @@ Postmill is organized into these sections, accessible from the left sidebar:
 | Media           | `/media`        | Media library (upload, organize, search)               |
 | Plugs           | `/plugs`        | Provider-specific automations and integrations         |
 | Campaigns       | `/campaigns`    | Campaign folders for grouping posts and analytics      |
-| Integrations    | `/third-party`   | Third-party integrations and webhook configuration     |
 | Settings        | `/settings`     | Org settings: profile, channels, team, AI, billing     |
 
 ## 5. Next Steps

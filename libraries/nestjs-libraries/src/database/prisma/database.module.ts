@@ -61,8 +61,6 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { SetsService } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.service';
 import { SetsRepository } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.repository';
-import { ThirdPartyRepository } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.repository';
-import { ThirdPartyService } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.service';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -161,8 +159,6 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     ShortLinkService,
     SetsService,
     SetsRepository,
-    ThirdPartyRepository,
-    ThirdPartyService,
     OAuthRepository,
     OAuthService,
     VideoManager,

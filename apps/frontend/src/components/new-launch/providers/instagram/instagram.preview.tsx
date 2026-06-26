@@ -5,7 +5,7 @@ import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validatio
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { FC } from 'react';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
-import { SliderComponent } from '@gitroom/frontend/components/third-parties/slider.component';
+import { SliderComponent } from '@gitroom/frontend/components/ui/slider.component';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 
 export const InstagramPreview: FC<{

@@ -14,7 +14,6 @@ export type DevFeatureFlag =
   | 'media'
   | 'shortlinks'
   | 'email'
-  | 'thirdparty'
   | 'video'
   | 'agent'
   | 'sentry'
@@ -27,7 +26,6 @@ const ENV_MAP: Record<DevFeatureFlag, string> = {
   media: 'DEV_DISABLE_MEDIA',
   shortlinks: 'DEV_DISABLE_SHORTLINKS',
   email: 'DEV_DISABLE_EMAIL',
-  thirdparty: 'DEV_DISABLE_THIRDPARTY',
   video: 'DEV_DISABLE_VIDEO',
   agent: 'DEV_DISABLE_AGENT',
   sentry: 'DEV_DISABLE_SENTRY',

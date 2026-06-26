@@ -95,14 +95,6 @@ export const FEATURE_EXPECTATIONS: FeatureExpectation[] = [
       { what: 'Create Post button', name: /create post|create a post/i, mustBeEnabled: true },
     ],
   },
-  // ---- Channels / Integrations ----
-  {
-    area: 'Integrations',
-    route: '/third-party',
-    controls: [
-      { what: 'Add channel / connect', name: /add|connect|channel|integration/i, mustBeEnabled: true, soft: true },
-    ],
-  },
   // ---- Comments inbox ----
   {
     area: 'Comments inbox',
