@@ -15,6 +15,7 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import { SettingsController } from '@gitroom/backend/api/routes/settings.controller';
 import { PostsController } from '@gitroom/backend/api/routes/posts.controller';
 import { MediaController } from '@gitroom/backend/api/routes/media.controller';
+import { FilesController } from '@gitroom/backend/api/routes/files.controller';
 import { UploadModule } from '@gitroom/nestjs-libraries/upload/upload.module';
 import { BillingController } from '@gitroom/backend/api/routes/billing.controller';
 import { NotificationsController } from '@gitroom/backend/api/routes/notifications.controller';
@@ -30,7 +31,6 @@ import { WebhookController } from '@gitroom/backend/api/routes/webhooks.controll
 import { SignatureController } from '@gitroom/backend/api/routes/signature.controller';
 import { AutopostController } from '@gitroom/backend/api/routes/autopost.controller';
 import { SetsController } from '@gitroom/backend/api/routes/sets.controller';
-import { ThirdPartyController } from '@gitroom/backend/api/routes/third-party.controller';
 import { MonitorController } from '@gitroom/backend/api/routes/monitor.controller';
 import { NoAuthIntegrationsController } from '@gitroom/backend/api/routes/no.auth.integrations.controller';
 import { EnterpriseController } from '@gitroom/backend/api/routes/enterprise.controller';
@@ -50,11 +50,15 @@ import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { ContentPackController } from '@gitroom/backend/api/routes/content-pack.controller';
 import { MediaProviderController } from '@gitroom/backend/api/routes/media-provider.controller';
 import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
 import { RolesController } from '@gitroom/backend/api/routes/roles.controller';
+import { StockMediaController } from '@gitroom/backend/api/routes/stock-media.controller';
+import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
+import { DesignController, DesignRenderFrameController, DesignTemplateController, DesignerProxyController } from '@gitroom/backend/api/routes/design.controller';
 import { EmailWebhooksController } from '@gitroom/backend/api/routes/email-webhooks.controller';
 import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jobs-webhook.controller';
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
@@ -70,6 +74,14 @@ import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
 import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
+import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-studio.module';
+import { ReplicateStudioController } from './routes/replicate-studio.controller';
+import { HeyGenModule } from '@gitroom/nestjs-libraries/media/heygen/heygen.module';
+import { HeyGenController } from './routes/heygen.controller';
+import { MediaStudioModule } from '@gitroom/nestjs-libraries/media/studio/studio.module';
+import { MediaStudioController } from './routes/media-studio.controller';
+import { DeepgramModule } from '@gitroom/nestjs-libraries/media/deepgram/deepgram.module';
+import { DeepgramController } from './routes/deepgram.controller';
 
 const authenticatedController = [
   UsersController,
@@ -79,6 +91,7 @@ const authenticatedController = [
   CampaignsController,
   PostsController,
   MediaController,
+  FilesController,
   BillingController,
   NotificationsController,
   CopilotController,
@@ -86,7 +99,6 @@ const authenticatedController = [
   SignatureController,
   AutopostController,
   SetsController,
-  ThirdPartyController,
   OAuthAppController,
   ApprovedAppsController,
   OAuthAuthorizedController,
@@ -102,15 +114,24 @@ const authenticatedController = [
   OrgAiSettingsController,
   RagController,
   OrgShortLinkSettingsController,
+  ContentPackController,
   MediaProviderController,
   ApiKeysController,
   DashboardController,
   BrandsController,
   RolesController,
+  StockMediaController,
+  DesignController,
+  DesignTemplateController,
+  DesignerProxyController,
   AdminController,
+  ReplicateStudioController,
+  HeyGenController,
+  MediaStudioController,
+  DeepgramController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule],
   controllers: [
     RootController,
     HealthController,
@@ -123,6 +144,7 @@ const authenticatedController = [
     OAuthController,
     EmailWebhooksController,
     MediaJobsWebhookController,
+    DesignRenderFrameController,
     ...authenticatedController,
   ],
   providers: [
@@ -145,6 +167,7 @@ const authenticatedController = [
     WalletProvider,
     OauthProvider,
     AnalyticsService,
+    StockMediaService,
     AiGuardMiddleware,
     SessionCleanupService,
   ],

@@ -11,7 +11,10 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 interface DeepgramListenResponse {
   results?: {
     channels?: {
-      alternatives?: { transcript?: string }[];
+      alternatives?: {
+        transcript?: string;
+        words?: { word: string; start: number; end: number }[];
+      }[];
     }[];
   };
 }
@@ -65,5 +68,35 @@ export class DeepgramAdapter implements MediaProviderAdapter {
     const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
     if (!transcript) throw new Error('Deepgram returned no transcript');
     return transcript;
+  }
+
+  async speechToTextWords(audio: Buffer, options?: MediaGenerateOptions): Promise<{ text: string; words: { word: string; start: number; end: number }[] }> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) throw new Error('Deepgram API key is required');
+
+    const params = new URLSearchParams({ model: options?.model || 'whisper' });
+    // Opt-in caption niceties — callers (the Deepgram studio) pass these via input;
+    // the existing timeline path passes none, so its request is unchanged.
+    if (options?.input?.smartFormat) {
+      params.set('smart_format', 'true');
+      params.set('punctuate', 'true');
+    }
+    const language = options?.input?.language;
+    if (typeof language === 'string' && language) params.set('language', language);
+
+    const res = await safeFetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${apiKey}`,
+        'Content-Type': options?.mimeType || 'audio/wav',
+      },
+      body: new Uint8Array(audio),
+    });
+
+    if (!res.ok) throw new Error(`Deepgram STT failed: ${await res.text()}`);
+    const data = (await res.json()) as DeepgramListenResponse;
+    const alt = data.results?.channels?.[0]?.alternatives?.[0];
+    if (!alt?.transcript) throw new Error('Deepgram returned no transcript');
+    return { text: alt.transcript, words: alt.words || [] };
   }
 }

@@ -34,8 +34,8 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => (
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/database/prisma/media/media.service', () => ({
-  MediaService: class {
+vi.mock('@gitroom/nestjs-libraries/database/prisma/file/file.service', () => ({
+  FileService: class {
     saveFile = vi.fn().mockResolvedValue('uploaded-file-id-123');
   },
 }));
@@ -126,7 +126,7 @@ vi.mock('dayjs', () => {
 
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AgentGraphService } from './agent.graph.service';
 import type { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -135,14 +135,14 @@ describe('AgentGraphService', () => {
   let service: AgentGraphService;
   let aiModelProvider: AIModelProvider;
   let postsService: PostsService;
-  let mediaService: MediaService;
+  let fileService: FileService;
   let storageService: StorageService;
   let aiMediaService: { generateImage: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
     postsService = new (PostsService as any)();
-    mediaService = new (MediaService as any)();
+    fileService = new (FileService as any)();
     aiModelProvider = new (AIModelProvider as any)();
     storageService = new (StorageService as any)();
     aiMediaService = {
@@ -150,7 +150,7 @@ describe('AgentGraphService', () => {
     };
     service = new AgentGraphService(
       postsService,
-      mediaService,
+      fileService,
       aiModelProvider,
       storageService,
       aiMediaService as unknown as AiMediaService,
@@ -158,10 +158,10 @@ describe('AgentGraphService', () => {
   });
 
   describe('constructor', () => {
-    it('injects AIModelProvider, PostsService, and MediaService', () => {
+    it('injects AIModelProvider, PostsService, and FileService', () => {
       expect((service as any)._aiModelProvider).toBe(aiModelProvider);
       expect((service as any)._postsService).toBe(postsService);
-      expect((service as any)._mediaService).toBe(mediaService);
+      expect((service as any)._fileService).toBe(fileService);
     });
 
     it('injects StorageService', () => {
@@ -219,7 +219,7 @@ describe('AgentGraphService', () => {
       };
       const svc = new AgentGraphService(
         postsService,
-        mediaService,
+      fileService,
         aiModelProvider,
         storageService,
         failingMedia as unknown as AiMediaService,
@@ -293,7 +293,7 @@ describe('AgentGraphService', () => {
   });
 
   describe('uploadPictures', () => {
-    it('uploads images and calls mediaService.saveFile', async () => {
+    it('uploads images and calls fileService.saveFile', async () => {
       const state = {
         orgId: 'org-1',
         content: [{ image: 'https://cdn.example.com/img.png' }],
@@ -302,7 +302,7 @@ describe('AgentGraphService', () => {
       const result = await service.uploadPictures(state);
 
       expect(mockUploadAdapter.uploadSimple).toHaveBeenCalledWith('https://cdn.example.com/img.png');
-      expect(mediaService.saveFile).toHaveBeenCalledWith(
+      expect(fileService.saveFile).toHaveBeenCalledWith(
         'org-1',
         'uploaded.png',
         'https://storage.example.com/uploaded.png',

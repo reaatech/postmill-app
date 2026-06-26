@@ -233,8 +233,11 @@ export const MainBillingComponent: FC<{
     sub
   );
   const [loading, setLoading] = useState<boolean>(false);
+  const normalizePeriod = (p?: string): 'MONTHLY' | 'YEARLY' =>
+    p === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
+
   const [period, setPeriod] = useState<'MONTHLY' | 'YEARLY'>(
-    subscription?.period || 'MONTHLY'
+    normalizePeriod(subscription?.period)
   );
   const [monthlyOrYearly, setMonthlyOrYearly] = useState<'on' | 'off'>(
     period === 'MONTHLY' ? 'off' : 'on'
@@ -246,11 +249,10 @@ export const MainBillingComponent: FC<{
     if (initialChannels !== sub?.totalChannels) {
       setInitialChannels(sub?.totalChannels || 1);
     }
-    if (period !== sub?.period) {
-      setPeriod(sub?.period || 'MONTHLY');
-      setMonthlyOrYearly(
-        (sub?.period || 'MONTHLY') === 'MONTHLY' ? 'off' : 'on'
-      );
+    const subPeriod = normalizePeriod(sub?.period);
+    if (period !== subPeriod) {
+      setPeriod(subPeriod);
+      setMonthlyOrYearly(subPeriod === 'MONTHLY' ? 'off' : 'on');
     }
     setSubscription(sub);
   }, [sub]);

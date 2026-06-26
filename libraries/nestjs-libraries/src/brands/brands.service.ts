@@ -24,7 +24,15 @@ export class BrandsService {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
+      introFileId?: string | null;
+      outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
+      enforcement?: Record<string, any>;
     },
   ) {
     const count = await this._repository.countBrands(orgId);
@@ -49,7 +57,15 @@ export class BrandsService {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
+      introFileId?: string | null;
+      outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
+      enforcement?: Record<string, any>;
     },
   ) {
     return this._repository.updateBrand(orgId, brandId, data);
@@ -79,5 +95,17 @@ export class BrandsService {
     const brand = await this._repository.getBrand(orgId, brandId);
     if (!brand) return null;
     return this._repository.setBrandAsDefault(orgId, brandId);
+  }
+
+  getCustomFonts(orgId: string) {
+    return this._repository.getCustomFonts(orgId);
+  }
+
+  addCustomFont(orgId: string, font: { family: string; fileId: string; path: string; weights: number[] }) {
+    return this._repository.addCustomFont(orgId, font);
+  }
+
+  removeCustomFont(orgId: string, fileId: string) {
+    return this._repository.removeCustomFont(orgId, fileId);
   }
 }

@@ -13,7 +13,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
+import { MediaDto } from '@gitroom/nestjs-libraries/dtos/file/media.dto';
 import {
   allProviders,
   type AllProvidersSettings,

@@ -112,7 +112,6 @@ repository.
 | `social-comments/` | Social comment sync, read-state tracking |
 | `storage/` | Storage provider config (S3, R2, B2, etc.) |
 | `subscriptions/` | Billing subscriptions |
-| `third-party/` | Third-party API key management |
 | `users/` | User CRUD, profiles (`UserProfile`), sessions |
 | `watchlist/` | Competitor account and metric tracking |
 | `webhooks/` | Webhook CRUD + integration-webhook linking |

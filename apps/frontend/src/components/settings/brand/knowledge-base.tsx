@@ -92,6 +92,16 @@ export const KnowledgeBase = () => {
   const [qdrantApiKey, setQdrantApiKey] = useState('');
   const [qdrantCollection, setQdrantCollection] = useState('postmill_rag');
   const [distance, setDistance] = useState('Cosine');
+  // Remote pgvector
+  const [pgUrl, setPgUrl] = useState('');
+  const [pgTable, setPgTable] = useState('postmill_rag');
+  const [pgConfigured, setPgConfigured] = useState(false);
+  // Pinecone
+  const [pineconeApiKey, setPineconeApiKey] = useState('');
+  const [pineconeIndex, setPineconeIndex] = useState('');
+  const [pineconeHost, setPineconeHost] = useState('');
+  const [pineconeConfigured, setPineconeConfigured] = useState(false);
+  const [qdrantConfigured, setQdrantConfigured] = useState(false);
   const [embeddingDimension, setEmbeddingDimension] = useState(1536);
   const [chunkStrategy, setChunkStrategy] = useState('fixed-size');
   const [chunkSize, setChunkSize] = useState(500);
@@ -103,6 +113,8 @@ export const KnowledgeBase = () => {
   const [bm25K1, setBm25K1] = useState(1.2);
   const [bm25B, setBm25B] = useState(0.75);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  // Tucks the technical cards (Vector Database, Auto-Index) away from beginners.
+  const [kbAdvancedOpen, setKbAdvancedOpen] = useState(false);
   const [autoIndex, setAutoIndex] = useState(false);
   const [autoIndexSources, setAutoIndexSources] = useState<string[]>([]);
   const [newAutoIndexSource, setNewAutoIndexSource] = useState('');
@@ -117,6 +129,12 @@ export const KnowledgeBase = () => {
     setQdrantUrl(data.qdrantUrl || '');
     setQdrantCollection(data.qdrantCollection || 'postmill_rag');
     setDistance(data.distance || 'Cosine');
+    setQdrantConfigured(!!data.qdrantConfigured);
+    setPgTable(data.pgTable || 'postmill_rag');
+    setPgConfigured(!!data.pgConfigured);
+    setPineconeIndex(data.pineconeIndex || '');
+    setPineconeHost(data.pineconeHost || '');
+    setPineconeConfigured(!!data.pineconeConfigured);
     setEmbeddingDimension(data.embeddingDimension || 1536);
     setChunkStrategy(data.chunkStrategy || 'fixed-size');
     setChunkSize(data.chunkSize || 500);
@@ -142,6 +160,11 @@ export const KnowledgeBase = () => {
           qdrantApiKey: vectorStore === 'qdrant' && qdrantApiKey ? qdrantApiKey : undefined,
           qdrantCollection: vectorStore === 'qdrant' ? qdrantCollection : undefined,
           distance: vectorStore === 'qdrant' ? distance : undefined,
+          pgUrl: vectorStore === 'pgvector-remote' && pgUrl ? pgUrl : undefined,
+          pgTable: vectorStore === 'pgvector-remote' ? pgTable : undefined,
+          pineconeApiKey: vectorStore === 'pinecone' && pineconeApiKey ? pineconeApiKey : undefined,
+          pineconeIndex: vectorStore === 'pinecone' ? pineconeIndex : undefined,
+          pineconeHost: vectorStore === 'pinecone' ? pineconeHost : undefined,
           embeddingDimension,
           chunkStrategy,
           chunkSize,
@@ -167,7 +190,7 @@ export const KnowledgeBase = () => {
     } finally {
       setVecSaving(false);
     }
-  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, distance, embeddingDimension, chunkStrategy, chunkSize, chunkOverlap, fusionStrategy, rrfK, vectorWeight, bm25Weight, bm25K1, bm25B, autoIndex, autoIndexSources, toaster, t, mutateStatus]);
+  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, distance, pgUrl, pgTable, pineconeApiKey, pineconeIndex, pineconeHost, embeddingDimension, chunkStrategy, chunkSize, chunkOverlap, fusionStrategy, rrfK, vectorWeight, bm25Weight, bm25K1, bm25B, autoIndex, autoIndexSources, toaster, t, mutateStatus]);
   const handleTestConnection = useCallback(async () => {
     setVecTesting(true);
     setVecTestResult(null);
@@ -179,6 +202,12 @@ export const KnowledgeBase = () => {
           qdrantUrl: vectorStore === 'qdrant' ? qdrantUrl : undefined,
           qdrantApiKey: vectorStore === 'qdrant' && qdrantApiKey ? qdrantApiKey : undefined,
           qdrantCollection: vectorStore === 'qdrant' ? qdrantCollection : undefined,
+          distance: vectorStore === 'qdrant' ? distance : undefined,
+          pgUrl: vectorStore === 'pgvector-remote' && pgUrl ? pgUrl : undefined,
+          pgTable: vectorStore === 'pgvector-remote' ? pgTable : undefined,
+          pineconeApiKey: vectorStore === 'pinecone' && pineconeApiKey ? pineconeApiKey : undefined,
+          pineconeIndex: vectorStore === 'pinecone' ? pineconeIndex : undefined,
+          pineconeHost: vectorStore === 'pinecone' ? pineconeHost : undefined,
           embeddingDimension,
         }),
       });
@@ -189,7 +218,7 @@ export const KnowledgeBase = () => {
     } finally {
       setVecTesting(false);
     }
-  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, embeddingDimension]);
+  }, [fetch, vectorStore, qdrantUrl, qdrantApiKey, qdrantCollection, distance, pgUrl, pgTable, pineconeApiKey, pineconeIndex, pineconeHost, embeddingDimension]);
 
   const handleAddContent = useCallback(async () => {
     if (!addContent.trim()) return;
@@ -304,17 +333,18 @@ export const KnowledgeBase = () => {
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
         <div className="flex items-center justify-between">
           <div className="flex flex-col">
-            <div className="text-[14px]">{t('knowledge_base', 'Knowledge Base')}</div>
-            <div className="text-[12px] text-newTableText">
-              {t('knowledge_base_description', 'Manage your RAG knowledge base for AI-powered content generation')}
+            <div className="text-[14px]">{t('knowledge_base', 'What the AI knows about you')}</div>
+            <div className="text-[12px] text-newTableText max-w-[560px] leading-relaxed">
+              {t('knowledge_base_description_v2', "Give the AI examples and facts about your business — your best posts, web pages, or notes. It'll use them to sound more like you and get the details right. Nothing here is required to start.")}
             </div>
           </div>
           <button
-            className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50"
+            className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px] hover:opacity-90 disabled:opacity-50 shrink-0"
             onClick={handleBackfill}
             disabled={backfilling}
+            title={t('backfill_tip', 'Learn from your best-performing past posts automatically')}
           >
-            {backfilling ? t('indexing', 'Indexing...') : t('backfill', 'Backfill')}
+            {backfilling ? t('indexing', 'Learning...') : t('backfill', 'Learn from my posts')}
           </button>
         </div>
 
@@ -358,23 +388,63 @@ export const KnowledgeBase = () => {
         </div>
       </div>
 
+      <button
+        type="button"
+        onClick={() => setKbAdvancedOpen((v) => !v)}
+        className="text-[12px] text-newTableText hover:text-textColor self-start"
+      >
+        {kbAdvancedOpen
+          ? t('hide_kb_advanced', '▾ Hide advanced settings')
+          : t('show_kb_advanced', '▸ Advanced settings (most people can skip these)')}
+      </button>
+
+      {kbAdvancedOpen && (
+        <>
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="text-[14px]">{t('vector_store', 'Vector Database')}</div>
         <div className="text-[12px] text-newTableText">
-          {t('vector_store_description', 'Configure the hybrid-RAG vector store adapter.')}
+          {t('vector_store_description_v2', "Where your knowledge is stored. The default (Postmill) works for everyone — only change this if your team runs its own database.")}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-[16px]">
           <div className="flex flex-col gap-[4px]">
-            <label className="text-[12px] text-newTableText">{t('adapter_type', 'Adapter')}</label>
+            <label className="text-[12px] text-newTableText">{t('adapter_type', 'Vector database')}</label>
             <select
               value={vectorStore}
               onChange={(e) => setVectorStore(e.target.value)}
               className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
             >
-              <option value="pgvector">pgvector (built-in PostgreSQL)</option>
-              <option value="qdrant">Qdrant (external)</option>
+              <option value="pgvector">{t('vs_postmill_default', 'Postmill (Default)')}</option>
+              <option value="pgvector-remote">{t('vs_pgvector_remote', 'PG Vector (Remote)')}</option>
+              <option value="qdrant">{t('vs_qdrant_remote', 'Qdrant (Remote)')}</option>
+              <option value="pinecone">{t('vs_pinecone_remote', 'Pinecone (Remote)')}</option>
             </select>
           </div>
+
+          {vectorStore === 'pgvector-remote' && (
+            <>
+              <div className="flex flex-col gap-[4px] md:col-span-2">
+                <label className="text-[12px] text-newTableText">{t('pg_connection_string', 'Connection string')}</label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  value={pgUrl}
+                  onChange={(e) => setPgUrl(e.target.value)}
+                  placeholder={pgConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : 'postgres://user:pass@host:5432/db'}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('pg_table', 'Table')}</label>
+                <input
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  value={pgTable}
+                  onChange={(e) => setPgTable(e.target.value)}
+                  placeholder="postmill_rag"
+                />
+              </div>
+            </>
+          )}
+
           {vectorStore === 'qdrant' && (
             <>
               <div className="flex flex-col gap-[4px]">
@@ -383,17 +453,18 @@ export const KnowledgeBase = () => {
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantUrl}
                   onChange={(e) => setQdrantUrl(e.target.value)}
-                  placeholder="http://qdrant:6333"
+                  placeholder="https://your-cluster.qdrant.io:6333"
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
                 <label className="text-[12px] text-newTableText">{t('qdrant_api_key', 'API Key')}</label>
                 <input
                   type="password"
+                  autoComplete="off"
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
                   value={qdrantApiKey}
                   onChange={(e) => setQdrantApiKey(e.target.value)}
-                  placeholder={t('optional', '(optional)')}
+                  placeholder={qdrantConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : t('optional', '(optional)')}
                 />
               </div>
               <div className="flex flex-col gap-[4px]">
@@ -419,27 +490,66 @@ export const KnowledgeBase = () => {
               </div>
             </>
           )}
-          <div className="flex flex-col gap-[4px]">
-            <label className="text-[12px] text-newTableText">{t('embedding_dimension', 'Embedding Dimension')}</label>
-            <input
-              type="number"
-              min={128}
-              max={4096}
-              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-              value={embeddingDimension}
-              onChange={(e) => setEmbeddingDimension(parseInt(e.target.value, 10) || 1536)}
-            />
-          </div>
+
+          {vectorStore === 'pinecone' && (
+            <>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('pinecone_api_key', 'API Key')}</label>
+                <input
+                  type="password"
+                  autoComplete="off"
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  value={pineconeApiKey}
+                  onChange={(e) => setPineconeApiKey(e.target.value)}
+                  placeholder={pineconeConfigured ? t('configured_leave_blank', '•••• configured — leave blank to keep') : 'pcsk_...'}
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('pinecone_index', 'Index')}</label>
+                <input
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  value={pineconeIndex}
+                  onChange={(e) => setPineconeIndex(e.target.value)}
+                  placeholder="postmill-rag"
+                />
+              </div>
+              <div className="flex flex-col gap-[4px]">
+                <label className="text-[12px] text-newTableText">{t('pinecone_host', 'Host')} <span className="text-[10px]">{t('optional', '(optional)')}</span></label>
+                <input
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  value={pineconeHost}
+                  onChange={(e) => setPineconeHost(e.target.value)}
+                  placeholder="idx-xxxx.svc.region.pinecone.io"
+                />
+              </div>
+            </>
+          )}
+
+          {vectorStore !== 'pgvector' && (
+            <div className="flex flex-col gap-[4px]">
+              <label className="text-[12px] text-newTableText">{t('embedding_dimension', 'Embedding Dimension')}</label>
+              <input
+                type="number"
+                min={128}
+                max={4096}
+                className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                value={embeddingDimension}
+                onChange={(e) => setEmbeddingDimension(parseInt(e.target.value, 10) || 1536)}
+              />
+            </div>
+          )}
         </div>
 
-        <button
-          className="text-[12px] text-textColor hover:underline self-start"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
-        </button>
+        {vectorStore !== 'pgvector' && (
+          <button
+            className="text-[12px] text-textColor hover:underline self-start"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
+          </button>
+        )}
 
-        {showAdvanced && (
+        {vectorStore !== 'pgvector' && showAdvanced && (
           <div className="flex flex-col gap-[16px]">
             <div className="text-[13px] font-medium">{t('chunking', 'Chunking')}</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
@@ -567,19 +677,21 @@ export const KnowledgeBase = () => {
           </div>
         )}
 
-        {vecTestResult && (
+        {vectorStore !== 'pgvector' && vecTestResult && (
           <div className={`text-[12px] ${vecTestResult.ok ? 'text-green-500' : 'text-red-500'}`}>
             {vecTestResult.ok ? t('connection_ok', 'Connection successful') : (vecTestResult.error || t('connection_failed', 'Connection failed'))}
           </div>
         )}
         <div className="flex gap-[8px]">
-          <button
-            className="bg-newBgColorInner border border-newTableBorder text-textColor rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
-            onClick={handleTestConnection}
-            disabled={vecTesting}
-          >
-            {vecTesting ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
-          </button>
+          {vectorStore !== 'pgvector' && (
+            <button
+              className="bg-newBgColorInner border border-newTableBorder text-textColor rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
+              onClick={handleTestConnection}
+              disabled={vecTesting}
+            >
+              {vecTesting ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
+            </button>
+          )}
           <button
             className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90 disabled:opacity-50"
             onClick={handleSaveVecSettings}
@@ -648,10 +760,12 @@ export const KnowledgeBase = () => {
           </div>
         )}
       </div>
+        </>
+      )}
 
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
         <div className="flex items-center justify-between">
-          <div className="text-[14px]">{t('add_content', 'Add Content')}</div>
+          <div className="text-[14px]">{t('add_content', 'Teach the AI something')}</div>
           <button
             className="text-[13px] text-textColor hover:underline"
             onClick={() => setShowAddContent(!showAddContent)}
@@ -751,7 +865,7 @@ export const KnowledgeBase = () => {
       </div>
 
       <div className="flex flex-col gap-[16px]">
-        <div className="text-[14px]">{t('indexed_content', 'Indexed Content')}</div>
+        <div className="text-[14px]">{t('indexed_content', "What you've added")}</div>
 
         <DataTable
           columns={[
@@ -786,11 +900,14 @@ export const KnowledgeBase = () => {
       </div>
 
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px]">
-        <div className="text-[14px]">{t('search_knowledge_base', 'Search Knowledge Base')}</div>
+        <div className="text-[14px]">{t('search_knowledge_base', 'Try a search')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('search_knowledge_base_hint', 'See what the AI finds for a topic — a quick way to check it learned the right things.')}
+        </div>
         <div className="flex gap-[8px]">
           <input
             className="flex-1 bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-            placeholder={t('search_placeholder', 'Search your knowledge base...')}
+            placeholder={t('search_placeholder', 'Search what the AI knows…')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}

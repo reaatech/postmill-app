@@ -1,0 +1,432 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useReplicateStore } from './replicate.store';
+import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
+import { VideoPlayer } from './players/video-player';
+import { ElapsedTimer } from './elapsed-timer';
+import { useGenerate } from './use-generate';
+
+type Medium = 'image' | 'video' | 'audio';
+
+function useJobPoll(jobId: string | null) {
+  const fetch = useFetch();
+  return useSWR(
+    jobId ? `replicate-job-${jobId}` : null,
+    async () => {
+      const res = await fetch(`/media/replicate/jobs/${jobId}`);
+      return (await res.json()) as {
+        status: string;
+        result: { kind: string; urls: string[] } | null;
+      };
+    },
+    { refreshInterval: 6000 }
+  );
+}
+
+function downloadBlob(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function generateSrt(segments: Array<{ text: string; start?: number; end?: number }>): string {
+  return segments
+    .map((seg, i) => {
+      const start = seg.start ?? 0;
+      const end = seg.end ?? start + 1;
+      const fmt = (s: number) => {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = Math.floor(s % 60);
+        const ms = Math.floor((s % 1) * 1000);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')},${String(ms).padStart(3, '0')}`;
+      };
+      return `${i + 1}\n${fmt(start)} --> ${fmt(end)}\n${seg.text}\n`;
+    })
+    .join('\n');
+}
+
+const MEDIUM_ICON: Record<Medium, string> = {
+  image: '🖼️',
+  video: '🎬',
+  audio: '🎵',
+};
+
+function Frame({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="h-full w-full flex items-center justify-center p-6">
+      <div className="w-full max-w-2xl">{children}</div>
+    </div>
+  );
+}
+
+// ── Hover action overlay (oc-platform: Download / Regenerate / New) ───────────
+function ActionOverlay({
+  onDownload,
+  onRegenerate,
+  onNew,
+}: {
+  onDownload?: () => void;
+  onRegenerate: () => void;
+  onNew: () => void;
+}) {
+  const btn =
+    'flex items-center justify-center w-9 h-9 rounded-full bg-black/60 backdrop-blur text-white hover:bg-black/80 transition-colors';
+  return (
+    <div className="absolute top-3 right-3 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+      {onDownload && (
+        <button type="button" onClick={onDownload} className={btn} title="Download">
+          ⤓
+        </button>
+      )}
+      <button type="button" onClick={onRegenerate} className={btn} title="Regenerate">
+        ⟳
+      </button>
+      <button type="button" onClick={onNew} className={btn} title="New">
+        ＋
+      </button>
+    </div>
+  );
+}
+
+function DetailsCard() {
+  const meta = useReplicateStore((s) => s.resultMeta);
+  const estimate = useReplicateStore((s) => s.estimate);
+  if (!meta) return null;
+  const entries = Object.entries(meta.input).filter(
+    ([, v]) => v !== undefined && v !== null && v !== ''
+  );
+  return (
+    <div className="mt-4 rounded-xl border border-newBorder bg-newBgColorInner p-3">
+      <div className="flex gap-6 mb-2">
+        <div>
+          <div className="text-[10px] uppercase tracking-wider text-gray-500">Model</div>
+          <div className="text-sm text-white">{meta.modelName}</div>
+        </div>
+        {estimate && !estimate.approximate && (
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-gray-500">Est. cost</div>
+            <div className="text-sm text-green-400">${estimate.usd.toFixed(4)}</div>
+          </div>
+        )}
+      </div>
+      {entries.length > 0 && (
+        <div className="border-t border-newBorder pt-2 space-y-1">
+          {entries.map(([k, v]) => {
+            const display =
+              typeof v === 'object' ? (v as any).url || (v as any).fileId || JSON.stringify(v) : String(v);
+            return (
+              <div key={k} className="text-[11px] text-gray-400">
+                <span className="text-gray-500">{k.replace(/_/g, ' ')}: </span>
+                <span className={k === 'prompt' ? 'text-gray-300' : 'text-gray-300'}>{display}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function ResultPanel({ medium }: { medium: Medium }) {
+  const runState = useReplicateStore((s) => s.runState);
+  const result = useReplicateStore((s) => s.result);
+  const error = useReplicateStore((s) => s.error);
+  const selectedModel = useReplicateStore((s) => s.selectedModel);
+  const selectedCategory = useReplicateStore((s) => s.selectedCategory);
+  const saveFolderId = useReplicateStore((s) => s.saveFolderId);
+  const setResult = useReplicateStore((s) => s.setResult);
+  const setRunState = useReplicateStore((s) => s.setRunState);
+  const setError = useReplicateStore((s) => s.setError);
+  const resultJobId = useReplicateStore((s) => s.result?.jobId);
+
+  const fetch = useFetch();
+  const generate = useGenerate();
+  const [saving, setSaving] = useState(false);
+  const [savedPaths, setSavedPaths] = useState<Record<string, string>>({});
+
+  const isPolling = runState === 'running' && !!result?.jobId;
+  const { data: jobData } = useJobPoll(isPolling ? result!.jobId! : null);
+
+  useEffect(() => {
+    if (jobData?.status === 'completed' && jobData.result) {
+      setResult({
+        kind: jobData.result.kind as Medium | 'text',
+        urls: jobData.result.urls,
+        jobId: resultJobId,
+      });
+      setRunState('success');
+    }
+    if (jobData?.status === 'failed') {
+      setError('Generation failed');
+      setRunState('error');
+    }
+  }, [jobData, setResult, setRunState, setError, resultJobId]);
+
+  const handleNew = useCallback(() => {
+    setResult(null);
+    setError(null);
+    setRunState('idle');
+  }, [setResult, setError, setRunState]);
+
+  const handleSaveToFiles = useCallback(
+    async (url: string) => {
+      setSaving(true);
+      try {
+        const res = await fetch('/media/replicate/save-url', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url, name: `replicate-${Date.now()}`, folderId: saveFolderId }),
+        });
+        const data = await res.json();
+        if (data.path) setSavedPaths((prev) => ({ ...prev, [url]: data.path }));
+      } catch {
+        setError('Failed to save to Files');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [fetch, saveFolderId, setError]
+  );
+
+  const handleDownload = useCallback((url: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = '';
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, []);
+
+  const openInFiles = useCallback(() => {
+    const target = saveFolderId ? `/files?folderId=${encodeURIComponent(saveFolderId)}` : '/files';
+    window.open(target, '_blank');
+  }, [saveFolderId]);
+
+  const openInDesigner = useCallback(
+    (url: string) => {
+      const storedUrl = savedPaths[url] || url;
+      const params = new URLSearchParams({ url: storedUrl, type: 'photo', w: '', h: '' });
+      window.open(`/media/designer?${params.toString()}`, '_blank');
+    },
+    [savedPaths]
+  );
+
+  // ── State 1: placeholder ───────────────────────────────────────────────────
+  if (!selectedModel) {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-newBorder py-20 text-center">
+          <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
+          <p className="text-gray-400">Nothing generated yet</p>
+          <p className="text-xs text-gray-600">Pick a model and configure it to get started.</p>
+        </div>
+      </Frame>
+    );
+  }
+
+  // ── State 2: example media (model picked, idle) ────────────────────────────
+  if (runState === 'idle' && !result) {
+    return (
+      <Frame>
+        <div className="flex flex-col gap-2">
+          <div className="text-xs text-gray-500">
+            Example of <span className="text-designerAccent">{selectedModel.id}</span>
+          </div>
+          {selectedModel.coverImageUrl ? (
+            <img
+              src={selectedModel.coverImageUrl}
+              alt="Model example"
+              className="w-full rounded-2xl border border-newBorder object-contain max-h-[60vh]"
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-newBorder py-20">
+              <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
+              <p className="text-xs text-gray-600">No example available — generate to see output.</p>
+            </div>
+          )}
+        </div>
+      </Frame>
+    );
+  }
+
+  // ── State 3: loading ───────────────────────────────────────────────────────
+  if (runState === 'running') {
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-newBorder py-20">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-designerAccent" />
+          <p className="text-gray-300">Generating your {medium}…</p>
+          <p className="text-xs text-gray-500">
+            {medium === 'image' ? 'This usually takes 10–30 seconds.' : 'This can take a few minutes.'}
+          </p>
+          <ElapsedTimer />
+        </div>
+      </Frame>
+    );
+  }
+
+  // ── State 4: error ─────────────────────────────────────────────────────────
+  if (runState === 'error') {
+    // A missing-field error is self-explanatory; any other failure may be an
+    // out-of-credit / rate-limit on Replicate (which has no balance API), so
+    // point the user at their Replicate billing.
+    const isInputError = /missing required/i.test(error || '');
+    return (
+      <Frame>
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
+          <p className="text-red-400 text-center">{error || 'Generation failed'}</p>
+          {!isInputError && (
+            <p className="text-xs text-gray-500 text-center max-w-sm">
+              If a generation fails for no clear reason, check your{' '}
+              <a
+                href="https://replicate.com/account/billing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-designerAccent underline"
+              >
+                Replicate balance
+              </a>{' '}
+              — low or empty credit causes rate-limiting and failed runs.
+            </p>
+          )}
+          <button
+            onClick={() => generate()}
+            className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </Frame>
+    );
+  }
+
+  // ── State 5: result ────────────────────────────────────────────────────────
+  if (runState === 'success' && result) {
+    const urls = result.urls || [];
+    const single = urls.length <= 1;
+
+    return (
+      <Frame>
+        <div className="flex flex-col gap-3">
+          {selectedCategory === 'caption' && (
+            <p className="text-xs text-gray-400">
+              Captions are burned into the video — the output is an MP4, not a subtitle file.
+            </p>
+          )}
+
+          {result.kind === 'image' && urls.length > 0 && (
+            <div className={single ? '' : 'grid grid-cols-2 gap-3'}>
+              {urls.map((url, i) => (
+                <div key={i} className="group relative">
+                  <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-newBorder" />
+                  <ActionOverlay
+                    onDownload={() => handleDownload(url)}
+                    onRegenerate={() => generate()}
+                    onNew={handleNew}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+
+          {result.kind === 'video' && urls.length > 0 && (
+            <div className="group relative">
+              <VideoPlayer src={urls[0]} />
+              <ActionOverlay onDownload={() => handleDownload(urls[0])} onRegenerate={() => generate()} onNew={handleNew} />
+            </div>
+          )}
+
+          {result.kind === 'audio' && urls.length > 0 && (
+            <div className="group relative rounded-2xl border border-newBorder p-3">
+              <AudioPlayer src={urls[0]} />
+              <ActionOverlay onDownload={() => handleDownload(urls[0])} onRegenerate={() => generate()} onNew={handleNew} />
+            </div>
+          )}
+
+          {result.kind === 'text' && result.text && (
+            <div className="rounded-2xl border border-newBorder bg-newBgColorInner p-4 max-h-[50vh] overflow-y-auto">
+              <p className="text-sm text-white whitespace-pre-wrap">{result.text}</p>
+            </div>
+          )}
+
+          {/* Persist / open actions */}
+          {urls.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {!result.jobId ? (
+                <button
+                  onClick={() => handleSaveToFiles(urls[0])}
+                  disabled={saving}
+                  className="px-3 py-1.5 rounded-lg bg-[#2B5CD3] text-white text-xs hover:bg-[#2B5CD3]/80 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                  </svg>
+                  {saving ? 'Saving…' : 'Save to Files'}
+                </button>
+              ) : (
+                <button
+                  onClick={openInFiles}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                >
+                  Open in Files
+                </button>
+              )}
+              {result.kind === 'image' && (
+                <button
+                  onClick={() => openInDesigner(urls[0])}
+                  className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
+                >
+                  Open in Designer
+                </button>
+              )}
+            </div>
+          )}
+
+          {result.kind === 'text' && result.text && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => navigator.clipboard.writeText(result.text!)}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+              >
+                Copy
+              </button>
+              <button
+                onClick={() => downloadBlob(result.text!, 'transcript.txt', 'text/plain')}
+                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+              >
+                Download .txt
+              </button>
+              {result.segments && result.segments.length > 0 && (
+                <button
+                  onClick={() => downloadBlob(generateSrt(result.segments!), 'transcript.srt', 'text/plain')}
+                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                >
+                  Download .srt
+                </button>
+              )}
+              <button onClick={handleNew} className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors">
+                New
+              </button>
+            </div>
+          )}
+
+          <DetailsCard />
+        </div>
+      </Frame>
+    );
+  }
+
+  return null;
+}

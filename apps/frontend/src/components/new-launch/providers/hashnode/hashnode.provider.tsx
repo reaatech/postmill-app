@@ -13,7 +13,7 @@ import { HashnodeSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/provid
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import clsx from 'clsx';
-import { MediaComponent } from '@gitroom/frontend/components/media/media.component';
+import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { Canonical } from '@gitroom/react/form/canonical';
 
 const HashnodeSettings: FC = () => {
@@ -28,7 +28,7 @@ const HashnodeSettings: FC = () => {
         label="Canonical Link"
         {...form.register('canonical')}
       />
-      <MediaComponent
+      <FileComponent
         label="Cover picture"
         description="Add a cover picture"
         {...form.register('main_image')}

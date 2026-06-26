@@ -16,7 +16,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `Organization` | Tenant — every resource belongs to an org | FK to `Subscription`; has many `Integration`, `UserOrganization`, `Post`, `Campaign` |
 | `User` | Identity/auth only — email, password, `providerName`/`providerId`, `isSuperAdmin`, `activated`, last-online telemetry. Profile fields moved to `UserProfile` in v3.8.10. | Unique on `(email, providerName)`; has one `UserProfile`, many `Session`, `UserOrganization` |
-| `UserProfile` | 1:1 profile split off from `User` — name, lastName, bio, `avatarUrl` (provider/Gravatar), `pictureId` (uploaded), IANA `timezone`, notification prefs | FK → `User` (unique, cascade), `Media` (picture) |
+| `UserProfile` | 1:1 profile split off from `User` — name, lastName, bio, `avatarUrl` (provider/Gravatar), `pictureId` (uploaded), IANA `timezone`, notification prefs | FK → `User` (unique, cascade), `File` (picture) |
 | `Session` | Login session backing refresh-token rotation — `tokenHash` (sha256 of the refresh token, rotated on every use), `previousTokenHash` (last rotated-out hash; reusing it revokes the session), userAgent/ip, `expiresAt`, `revokedAt` | FK → `User` (cascade) |
 | `UserOrganization` | Many-to-many join between users and orgs. The legacy `role` enum column was dropped in v3.8.10 — `roleId` → `AppRole` is the role pointer. | FK → `Organization`, `User`, `AppRole` (nullable `roleId`) |
 | `AppRole` | RBAC role. Org-scoped when `organizationId` is set; NULL org = seeded system role (`owner`/`admin`/`editor`/`member`/`viewer`, `isSystem: true`) | FK → `Organization` (nullable); has many `AppRolePermission`, `UserOrganization` |
@@ -32,11 +32,10 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `Tags` | Per-org color-coded tags for posts | FK → `Organization`; has many `TagsPosts` |
 | `TagsPosts` | Many-to-many join between posts and tags | FK → `Post`, `Tags` |
-| `Sets` | Named content blocks (reusable text/JSON) | FK → `Organization` |
-| `Signatures` | Per-org post signatures with auto-add flag | FK → `Organization` |
+| `Sets` | Named, reusable post templates (serialized composer payload) | FK → `Organization` |
+| `Signatures` | Per-org post signatures — content, channel scope (`channels[]`), auto-add, usage count, optional logo/sticker | FK → `Organization`, FK → `File` (`pictureId`) |
 | `Notifications` | Per-org notification feed entries | FK → `Organization` |
 | `Errors` | Post-publish errors with platform and message | FK → `Organization`, `Post` |
-| `ThirdParty` | Per-org third-party API keys (n8n, Zapier, etc.) | FK → `Organization` |
 | `Announcement` | System-wide announcements (info/warning/error) | Standalone |
 
 ---
@@ -45,9 +44,9 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Media` | Uploaded media files (image/video), with path, type, thumbnail, tags, and `metadata Json?` (dimensions, duration, model, provenance — populated on AI-generated ingest, v3.8.10) | FK → `Organization`, `MediaFolder` |
-| `MediaFolder` | Folder tree for organizing media, supports cloud-store mounting | FK → `Organization`, parent `MediaFolder`, `StorageProviderConfig` |
-| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL). `accountFingerprint` (v3.8.10) enforces unique account per org via `@@unique([organizationId, accountFingerprint])`. | FK → `Organization`; has many `MediaFolder`, `MediaProviderConfig` |
+| `File` | Uploaded media files (image/video), with path, type, thumbnail, tags, and `metadata Json?` (dimensions, duration, model, provenance — populated on AI-generated ingest, v3.8.10) | FK → `Organization`, `FileFolder` |
+| `FileFolder` | Folder tree for organizing files, supports cloud-store mounting | FK → `Organization`, parent `FileFolder`, `StorageProviderConfig` |
+| `StorageProviderConfig` | Per-org cloud storage config (S3, R2, B2, IDrive E2, LOCAL). `accountFingerprint` (v3.8.10) enforces unique account per org via `@@unique([organizationId, accountFingerprint])`. | FK → `Organization`; has many `FileFolder`, `MediaProviderConfig` |
 | `MediaProviderConfig` | Per-org AI media-generation provider config (v3.8.10) — encrypted credentials, storage binding (`storageProviderId`, null = LOCAL; `storageRootFolderId`) | FK → `Organization`, `StorageProviderConfig` (nullable); unique on `(organizationId, identifier)` |
 | `MultipartUpload` | Tracks ownership and state of multipart S3 uploads | FK → `Organization` |
 
@@ -60,8 +59,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 | `Integration` | Connected social/chat channel with encrypted OAuth tokens | FK → `Organization`, `Customer`; has many `Post`, `Plugs`, `AnalyticsSnapshot` |
 | `Plugs` | Installed plug functions (analytics, comments, etc.) per integration | FK → `Organization`, `Integration` |
 | `ExisingPlugData` | Cached plug data (e.g., page lists, group lists) | FK → `Integration` |
-| `IntegrationsWebhooks` | Many-to-many join between integrations and webhooks | FK → `Integration`, `Webhooks` |
-| `Webhooks` | Per-org webhook URLs (outbound notifications) | FK → `Organization` |
+| `Webhooks` | Per-org webhook URLs (outbound notifications) | FK → `Organization`; implicit many-to-many with `Integration` |
 | `AutoPost` | RSS/feed-based auto-posting configuration | FK → `Organization` |
 
 ---
@@ -111,7 +109,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 |---|---|---|
 | `AIOrgProviderConfig` | Per-org AI provider + encrypted credentials + `defaultModel` (standard) and `reasoningModel` (v3.8.10). `imageModel` was dropped in v3.8.10 — image generation lives in the Media provider system. | FK → `Organization` |
 | `AISpendLog` | Cost ledger — input/output tokens, cost, provider, model, scope | FK → `Organization` (nullable), `User` (nullable) |
-| `AIBrandProfile` | Brand voice instructions + language. **Many per org** since v3.8.10 (`name`, `isDefault`, `slug`); one default per org, selectable per-post via `Post.brandId`. | FK → `Organization`; has many `Post` |
+| `AIBrandProfile` | Brand voice instructions + language **and a brand kit** — `palette`, `fontFamilies`/`customFonts`, `logoFileIds`, `enforcement`, and attached `assets[]` (`{fileId,url,caption}`). **Many per org** since v3.8.10 (`name`, `isDefault`, `slug`); one default per org, selectable per-post via `Post.brandId`. | FK → `Organization`; has many `Post` |
 | `AIPromptTemplate` | Editable prompt templates (org-scoped or global, with key) | FK → `Organization` (nullable) |
 | `AISettingsAudit` | Append-only audit of AI-settings changes | FK → `User` (nullable) |
 | `AIMediaJob` | Media pipeline job — operation, status, artifact URL, provenance, cost. Tracks async media generation (video/audio/avatar) in the v3.8.10 media-provider system. | FK → `Organization`, `User` (nullable) |
@@ -144,7 +142,7 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `OAuthApp` | OAuth 2.0 application registration (client credentials, redirect URL) | FK → `Organization`, `Media` (picture) |
+| `OAuthApp` | OAuth 2.0 application registration (client credentials, redirect URL) | FK → `Organization`, `File` (picture) |
 | `OAuthAuthorization` | OAuth authorization grant — PKCE, scopes, encrypted tokens, expiry, revocation | FK → `OAuthApp`, `User`, `Organization` |
 
 ---
@@ -203,7 +201,6 @@ through Prisma repositories — Mastra manages its own tables.
 |---|---|
 | `State` | `QUEUE`, `PUBLISHED`, `ERROR`, `DRAFT` |
 | `SubscriptionTier` | `STANDARD`, `PRO`, `TEAM`, `ULTIMATE` |
-| `Period` | `MONTHLY`, `YEARLY` |
 | `Provider` | `LOCAL`, `GITHUB`, `GOOGLE`, `FARCASTER`, `WALLET`, `GENERIC` |
 | `ShortLinkPreference` | `ASK`, `YES`, `NO` |
 | `CreationMethod` | `UNKNOWN`, `WEB`, `MCP`, `API`, `AUTOPOST`, `CLI` |
@@ -229,4 +226,4 @@ destructive push (preceded by a DB snapshot):
 
 See [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10) for the operational procedure.
 
-> Verified against v3.8.10
+> Verified against v3.9.0

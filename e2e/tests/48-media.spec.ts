@@ -15,8 +15,8 @@ import { inventory, brokenImages } from './lib/crawl';
  * media-API 4xx/5xx, and a blank page with neither items nor an empty-state. 429s
  * are recorded as throttle and mark the run contaminated.
  *
- * UI facts sourced from media/media.component.tsx + media/new.uploader.tsx:
- *  - Route /media renders a MediaBox: an "Upload" <button> that proxies clicks to a
+ * UI facts sourced from files/file.component.tsx + files/new.uploader.tsx:
+ *  - Route /files renders a FileBox: an "Upload" <button> that proxies clicks to a
  *    hidden <input type="file">, an Uppy uploader (drag-drop + that input), a search
  *    <input> placeholder "Search by file name", and a media grid.
  *  - Each grid item exposes a select toggle (number badge), a delete control
@@ -25,8 +25,8 @@ import { inventory, brokenImages } from './lib/crawl';
  *  - Pagination uses aria-label "Go to previous page" / "Go to next page".
  *  - AI media controls (AiImage / AiVideo / AiMediaOperations) render only when
  *    user.tier.ai is set — presence is recorded, not required.
- *  - API: GET /api/media (list, paginated), POST upload (multipart),
- *    DELETE /api/media/:id.
+  *  - API: GET /api/files (list, paginated), POST upload (multipart),
+ *    DELETE /api/files/:id.
  */
 
 // 1x1 transparent PNG.
@@ -39,7 +39,7 @@ test('media library deep audit', async ({ page }) => {
   const auditor = new PageAuditor(page).attach();
 
   const findings: any = {
-    route: '/media',
+    route: '/files',
     load: {},
     mediaCount: 0,
     brokenImages: 0,
@@ -80,9 +80,9 @@ test('media library deep audit', async ({ page }) => {
     }
   };
 
-  // ===== 1. Load /media =====
+  // ===== 1. Load /files =====
   try {
-    const resp = await page.goto('/media', { timeout: 25000 });
+    const resp = await page.goto('/files', { timeout: 25000 });
     findings.load.status = resp?.status() ?? 0;
     await settle();
     findings.load.url = page.url();
@@ -94,9 +94,9 @@ test('media library deep audit', async ({ page }) => {
     } catch {
       findings.load.textLen = 0;
     }
-    // GET /api/media* status from the auditor.
+    // GET /api/files* status from the auditor.
     const snap = auditor.snapshot();
-    const listCall = snap.apiCalls.find((c) => c.method === 'GET' && c.url.includes('/api/media'));
+    const listCall = snap.apiCalls.find((c) => c.method === 'GET' && c.url.includes('/api/files'));
     findings.load.mediaListStatus = listCall ? listCall.status : null;
     await page.screenshot({ path: 'media-load.png' }).catch(() => {});
   } catch (e: any) {
@@ -199,7 +199,7 @@ test('media library deep audit', async ({ page }) => {
 
       const snap = auditor.snapshot();
       const uploadCall = snap.apiCalls.find(
-        (c) => c.method === 'POST' && c.url.includes('/api/media')
+        (c) => c.method === 'POST' && c.url.includes('/api/files')
       );
       findings.uploadStatus = uploadCall ? uploadCall.status : null;
 
@@ -272,7 +272,7 @@ test('media library deep audit', async ({ page }) => {
         }
         await settle();
         const snap = auditor.snapshot();
-        const delCall = snap.apiCalls.find((c) => c.method === 'DELETE' && c.url.includes('/api/media'));
+        const delCall = snap.apiCalls.find((c) => c.method === 'DELETE' && c.url.includes('/api/files'));
         findings.deleteStatus = delCall ? delCall.status : null;
         findings.deletedTestItem = !!delCall && delCall.status < 400;
         if (delCall && delCall.status >= 400) findings.gaps.push('delete-api-' + delCall.status);
@@ -322,7 +322,7 @@ function finish(findings: any, auditor: PageAuditor) {
   findings.throttled = auditor.hadThrottle();
   if (findings.throttled) findings.gaps.push('THROTTLED-429');
 
-  const mediaErr = snap.apiErrors.filter((c) => c.url.includes('/api/media'));
+  const mediaErr = snap.apiErrors.filter((c) => c.url.includes('/api/files'));
   for (const c of mediaErr) {
     const tag = `media-api-${c.status}`;
     if (!findings.gaps.includes(tag)) findings.gaps.push(tag);
@@ -359,7 +359,7 @@ function finish(findings: any, auditor: PageAuditor) {
 
   console.log('\n===== MEDIA LIBRARY DEEP AUDIT =====');
   console.log(
-    `Load: HTTP ${findings.load.status ?? '?'} | textLen ${findings.load.textLen ?? '?'} | auth-redirect ${!!findings.load.redirectedToAuth} | GET /api/media ${findings.load.mediaListStatus ?? '-'}`
+    `Load: HTTP ${findings.load.status ?? '?'} | textLen ${findings.load.textLen ?? '?'} | auth-redirect ${!!findings.load.redirectedToAuth} | GET /api/files ${findings.load.mediaListStatus ?? '-'}`
   );
   console.log(
     `Media items: ${findings.mediaCount} | broken images: ${findings.brokenImages} | empty-state: ${findings.emptyStateShown}`

@@ -9,7 +9,7 @@ import {
   ValidateIf,
   ValidateNested, Allow } from 'class-validator';
 import { Type } from 'class-transformer';
-import { MediaDto } from '@gitroom/nestjs-libraries/dtos/media/media.dto';
+import { MediaDto } from '@gitroom/nestjs-libraries/dtos/file/media.dto';
 
 export class HashnodeTagsSettings {
   @IsString()

@@ -2,10 +2,31 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
-import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
+import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 
 const STANDARD_FOLDERS = ['documents', 'audio', 'images', 'video', 'other'];
+
+// Providers whose media credential is the SAME key as their AI/LLM provider (Qwen on
+// DashScope). When no dedicated media credential exists, fall back to the org's AI
+// provider key — configure once, works for both surfaces. (openai/minimax instead
+// write-mirror both ways via ProviderCredentialLinkService; Qwen has no media-side
+// settings flow yet, so a read-fallback is the lighter, immediate path.)
+const UNIVERSAL_AI_CREDENTIAL = new Set([
+  'qwen',
+  'google',
+  'togetherai',
+  'siliconflow',
+  'groq',
+  'openrouter',
+  'fireworks',
+  'deepinfra',
+  'gateway',
+  'bedrock',
+  'azure',
+  'xai',
+]);
 
 export interface MediaProviderExtraConfig {
   operations?: string[];
@@ -27,21 +48,26 @@ export class OrgMediaProviderSettingsService {
     private _repository: OrgMediaProviderSettingsRepository,
     private _encryption: EncryptionService,
     private _registry: MediaProviderRegistry,
-    private _mediaRepository: MediaRepository,
+    private _fileRepository: FileRepository,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
+    @Optional() private _orgAiRepository?: OrgAiSettingsRepository,
   ) {}
 
   async getProviders(orgId: string) {
     const configs = await this._repository.getByOrg(orgId);
     const adapters = this._registry.getAll();
+    // Universal-credential providers (Qwen) count as configured/active when the org has
+    // the matching AI provider key, even without a dedicated media credential row.
+    const universalConfigured = await this._universalAiConfigured(orgId, adapters);
     return adapters.map((adapter) => {
       const dbConfig = configs.find((c) => c.identifier === adapter.identifier);
+      const inherited = universalConfigured.has(adapter.identifier);
       return {
         identifier: adapter.identifier,
         name: adapter.name,
         capabilities: adapter.capabilities,
-        enabled: dbConfig?.enabled || false,
-        isConfigured: !!dbConfig?.credentials,
+        enabled: dbConfig?.enabled || inherited || false,
+        isConfigured: !!dbConfig?.credentials || inherited,
         storageProviderId: dbConfig?.storageProviderId || null,
         storageRootFolderId: dbConfig?.storageRootFolderId || null,
         createdAt: dbConfig?.createdAt || null,
@@ -128,8 +154,20 @@ export class OrgMediaProviderSettingsService {
 
   async getConfigForProvider(orgId: string, identifier: string) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
+    const credentials = config ? this._decryptCredentials(config.credentials) : {};
+    // Prefer the dedicated media credential; for universal-credential providers (Qwen),
+    // fall back to the org's AI provider key so the same key drives both surfaces.
+    if (Object.keys(credentials).length === 0 && UNIVERSAL_AI_CREDENTIAL.has(identifier)) {
+      const aiCredentials = await this._aiCredentials(orgId, identifier);
+      if (aiCredentials) {
+        return {
+          credentials: aiCredentials,
+          storageProviderId: config?.storageProviderId ?? null,
+          storageRootFolderId: config?.storageRootFolderId ?? null,
+        };
+      }
+    }
     if (!config) return null;
-    const credentials = this._decryptCredentials(config.credentials);
     return { credentials, storageProviderId: config.storageProviderId, storageRootFolderId: config.storageRootFolderId };
   }
 
@@ -146,11 +184,48 @@ export class OrgMediaProviderSettingsService {
 
     const decrypted = this._decryptCredentials(config.credentials);
     try {
-      await adapter.generateImage('test', { credentials: decrypted });
-      return { ok: true, message: 'Connection successful' };
+      // Prefer the adapter's own auth check; only image-capable providers can be
+      // verified via generateImage. Without either, the key can't be actively tested.
+      if (adapter.testConnection) {
+        return await adapter.testConnection({ credentials: decrypted });
+      }
+      if (adapter.capabilities.image) {
+        await adapter.generateImage('test', { credentials: decrypted });
+        return { ok: true, message: 'Connection successful' };
+      }
+      return { ok: true, message: 'Credentials saved (no live connection test for this provider)' };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }
+  }
+
+  // Decrypt the org's AI provider credentials for a universal-credential provider. Per-org
+  // AI configs (AIOrgProviderConfig, written by OrgAiSettingsService) are encrypted with the
+  // SAME EncryptionService as media creds — so reuse our own _decryptCredentials. (Note: the
+  // GLOBAL AIProviderConfig uses AuthService.fixedEncryption instead; the two are NOT
+  // interchangeable, which is why we read the org row directly rather than via AiSettingsService.)
+  private async _aiCredentials(orgId: string, identifier: string): Promise<Record<string, string> | null> {
+    if (!this._orgAiRepository) return null;
+    const config = await this._orgAiRepository.getByIdentifier(orgId, identifier);
+    if (!config?.credentials) return null;
+    const credentials = this._decryptCredentials(config.credentials);
+    return Object.keys(credentials).length > 0 ? credentials : null;
+  }
+
+  // Which universal-credential adapters (Qwen) the org has an AI key for — drives the
+  // configured/active flags in getProviders without a media credential row.
+  private async _universalAiConfigured(
+    orgId: string,
+    adapters: { identifier: string }[],
+  ): Promise<Set<string>> {
+    const universal = adapters.filter((a) => UNIVERSAL_AI_CREDENTIAL.has(a.identifier));
+    const configured = new Set<string>();
+    await Promise.all(
+      universal.map(async (a) => {
+        if (await this._aiCredentials(orgId, a.identifier)) configured.add(a.identifier);
+      }),
+    );
+    return configured;
   }
 
   private _parseExtraConfig(extraConfig: string | null | undefined): MediaProviderExtraConfig {
@@ -176,13 +251,13 @@ export class OrgMediaProviderSettingsService {
   // Ensure the provider root's typed 5-folder tree (§11.5). Public so the async-job
   // completion path can lazily (re)create it before landing an artifact.
   async ensureStandardFolders(orgId: string, rootFolderId: string) {
-    const existing = await this._mediaRepository.findFoldersByParent(orgId, rootFolderId);
+    const existing = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
     const existingNames = new Set(existing.map((f) => f.name.toLowerCase()));
 
     for (const folderName of STANDARD_FOLDERS) {
       if (!existingNames.has(folderName)) {
         try {
-          await this._mediaRepository.createFolder(orgId, {
+          await this._fileRepository.createFolder(orgId, {
             name: folderName,
             parentId: rootFolderId,
           });
@@ -197,7 +272,7 @@ export class OrgMediaProviderSettingsService {
   async getStandardFolderId(orgId: string, rootFolderId: string, folderName: string): Promise<string | null> {
     if (!STANDARD_FOLDERS.includes(folderName)) return null;
     await this.ensureStandardFolders(orgId, rootFolderId);
-    const folders = await this._mediaRepository.findFoldersByParent(orgId, rootFolderId);
+    const folders = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
     const match = folders.find((f) => f.name.toLowerCase() === folderName);
     return match?.id ?? null;
   }

@@ -336,6 +336,10 @@ export class AiSettingsService {
     costUsd?: number;
     creditType?: string;
     error?: string;
+    folderId?: string | null;
+    model?: string | null;
+    versionId?: string | null;
+    inputJson?: string | null;
   }) {
     return this._repository.createMediaJob(data);
   }
@@ -348,6 +352,11 @@ export class AiSettingsService {
       provenance?: string;
       costUsd?: number;
       error?: string | null;
+      folderId?: string | null;
+      model?: string | null;
+      versionId?: string | null;
+      inputJson?: string | null;
+      creditType?: string | null;
     },
   ) {
     return this._repository.updateMediaJob(id, data);
@@ -355,6 +364,10 @@ export class AiSettingsService {
 
   getMediaJobs(organizationId: string, limit = 50) {
     return this._repository.getMediaJobs(organizationId, limit);
+  }
+
+  getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {
+    return this._repository.getMediaJobsByProvider(organizationId, provider, limit);
   }
 
   getMediaJobById(id: string) {

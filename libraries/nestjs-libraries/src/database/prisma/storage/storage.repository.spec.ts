@@ -12,14 +12,14 @@ const mockModel = {
     delete: vi.fn(),
     count: vi.fn(),
   },
-  mediaFolder: {
+  fileFolder: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
   },
-  media: {
+  file: {
     findMany: vi.fn(),
     count: vi.fn(),
     aggregate: vi.fn(),
@@ -72,8 +72,8 @@ describe('StorageRepository', () => {
 
   describe('countSourceMedia', () => {
     it('counts LOCAL unfoldered media and sums their size', async () => {
-      mockModel.media.count.mockResolvedValue(5);
-      mockModel.media.aggregate.mockResolvedValue({
+      mockModel.file.count.mockResolvedValue(5);
+      mockModel.file.aggregate.mockResolvedValue({
         _sum: { fileSize: 1024 },
       });
       const repo = makeRepo();
@@ -85,7 +85,7 @@ describe('StorageRepository', () => {
 
       expect(result.count).toBe(5);
       expect(result.totalBytes).toBe(BigInt(1024));
-      expect(mockModel.media.count).toHaveBeenCalledWith(
+      expect(mockModel.file.count).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ organizationId: 'org-1' }),
         })
@@ -93,8 +93,8 @@ describe('StorageRepository', () => {
     });
 
     it('counts cloud-mounted media for a specific provider', async () => {
-      mockModel.media.count.mockResolvedValue(3);
-      mockModel.media.aggregate.mockResolvedValue({
+      mockModel.file.count.mockResolvedValue(3);
+      mockModel.file.aggregate.mockResolvedValue({
         _sum: { fileSize: 2048 },
       });
       const repo = makeRepo();
@@ -111,7 +111,7 @@ describe('StorageRepository', () => {
 
   describe('findSourceMediaPage', () => {
     it('returns a page of media with cursor', async () => {
-      mockModel.media.findMany.mockResolvedValue([
+      mockModel.file.findMany.mockResolvedValue([
         { id: 'm1', name: 'a.png', path: 'p1', type: 'image', fileSize: 10 },
       ]);
       const repo = makeRepo();
@@ -122,7 +122,7 @@ describe('StorageRepository', () => {
       }, 'cursor-1', 25);
 
       expect(result).toHaveLength(1);
-      expect(mockModel.media.findMany).toHaveBeenCalledWith(
+      expect(mockModel.file.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.any(Object),
           take: 25,
@@ -133,7 +133,7 @@ describe('StorageRepository', () => {
     });
 
     it('starts from the beginning without a cursor', async () => {
-      mockModel.media.findMany.mockResolvedValue([]);
+      mockModel.file.findMany.mockResolvedValue([]);
       const repo = makeRepo();
 
       await repo.findSourceMediaPage('org-1', {
@@ -141,7 +141,7 @@ describe('StorageRepository', () => {
         type: StorageProviderType.LOCAL,
       }, undefined, 10);
 
-      const call = mockModel.media.findMany.mock.calls[0][0];
+      const call = mockModel.file.findMany.mock.calls[0][0];
       expect(call).not.toHaveProperty('cursor');
       expect(call).not.toHaveProperty('skip');
     });
@@ -149,12 +149,12 @@ describe('StorageRepository', () => {
 
   describe('updateMediaLocation', () => {
     it('updates a media item path and folder', async () => {
-      mockModel.media.update.mockResolvedValue({ id: 'm1' });
+      mockModel.file.update.mockResolvedValue({ id: 'm1' });
       const repo = makeRepo();
 
       await repo.updateMediaLocation('m1', 'new-path', 'folder-1');
 
-      expect(mockModel.media.update).toHaveBeenCalledWith({
+      expect(mockModel.file.update).toHaveBeenCalledWith({
         where: { id: 'm1' },
         data: { path: 'new-path', folderId: 'folder-1' },
       });
@@ -163,7 +163,7 @@ describe('StorageRepository', () => {
 
   describe('findMountFolder', () => {
     it('finds the root folder for a mounted provider', async () => {
-      mockModel.mediaFolder.findFirst.mockResolvedValue({
+      mockModel.fileFolder.findFirst.mockResolvedValue({
         id: 'folder-1',
         storageProviderId: 'provider-1',
       });
@@ -177,32 +177,32 @@ describe('StorageRepository', () => {
 
   describe('removeOrDetachMountFolders', () => {
     it('deletes empty mount folders', async () => {
-      mockModel.mediaFolder.findMany.mockResolvedValue([
+      mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
-          _count: { media: 0, children: 0 },
+          _count: { files: 0, children: 0 },
         },
       ]);
-      mockModel.mediaFolder.delete.mockResolvedValue({ id: 'folder-1' });
+      mockModel.fileFolder.delete.mockResolvedValue({ id: 'folder-1' });
       const repo = makeRepo();
 
       await repo.removeOrDetachMountFolders('provider-1');
 
-      expect(mockModel.mediaFolder.delete).toHaveBeenCalledWith({
+      expect(mockModel.fileFolder.delete).toHaveBeenCalledWith({
         where: { id: 'folder-1' },
       });
     });
 
     it('detaches non-empty folders instead of deleting', async () => {
-      mockModel.mediaFolder.findMany.mockResolvedValue([
+      mockModel.fileFolder.findMany.mockResolvedValue([
         {
           id: 'folder-1',
           storageProviderId: 'provider-1',
-          _count: { media: 5, children: 0 },
+          _count: { files: 5, children: 0 },
         },
       ]);
-      mockModel.mediaFolder.update.mockResolvedValue({
+      mockModel.fileFolder.update.mockResolvedValue({
         id: 'folder-1',
         storageProviderId: null,
       });
@@ -210,7 +210,7 @@ describe('StorageRepository', () => {
 
       await repo.removeOrDetachMountFolders('provider-1');
 
-      expect(mockModel.mediaFolder.update).toHaveBeenCalledWith({
+      expect(mockModel.fileFolder.update).toHaveBeenCalledWith({
         where: { id: 'folder-1' },
         data: { storageProviderId: null },
       });
@@ -241,7 +241,7 @@ describe('StorageRepository', () => {
 
   describe('getStorageUsedByOrg', () => {
     it('returns sum of file sizes for an org', async () => {
-      mockModel.media.aggregate.mockResolvedValue({
+      mockModel.file.aggregate.mockResolvedValue({
         _sum: { fileSize: 1000 },
       });
       const repo = makeRepo();
@@ -252,7 +252,7 @@ describe('StorageRepository', () => {
     });
 
     it('returns 0 when no media', async () => {
-      mockModel.media.aggregate.mockResolvedValue({
+      mockModel.file.aggregate.mockResolvedValue({
         _sum: { fileSize: null },
       });
       const repo = makeRepo();

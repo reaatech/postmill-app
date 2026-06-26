@@ -5,6 +5,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Designer semantic tokens (M11/G1) — surface/selection/accent for the
+        // media editor; centralizes the previously raw `#2B5CD3` accent.
+        designerAccent: '#2B5CD3',
+        designerSurface: '#1e1e2e',
+        designerCanvas: '#1a1a2e',
+        designerGuide: '#FF3B7F',
         primary: 'var(--color-primary)',
         secondary: 'var(--color-secondary)',
         textColor: 'var(--new-btn-text)',
@@ -79,6 +85,8 @@ module.exports = {
         newSep: 'var(--new-sep)',
         newBorder: 'var(--new-border)',
         newBgColorInner: 'var(--new-bgColorInner)',
+        studioBg: 'var(--studio-bg)',
+        studioBorder: 'var(--studio-border)',
         newBgLineColor: 'var(--new-bgLineColor)',
         textItemFocused: 'var(--new-textItemFocused)',
         textItemBlur: 'var(--new-textItemBlur)',

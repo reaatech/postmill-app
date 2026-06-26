@@ -17,7 +17,7 @@ import { IStorageAdapter, StorageFileEntry } from '../upload.interface';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { parseDataUrl } from '@gitroom/nestjs-libraries/upload/data.url';
-import { fromBuffer } from 'file-type';
+import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
 const ALLOWED_MIME_TYPES = new Set<string>([
   'image/jpeg',
@@ -32,6 +32,9 @@ const ALLOWED_MIME_TYPES = new Set<string>([
   'audio/mp4',
   'audio/wav',
   'audio/ogg',
+  'font/ttf',
+  'font/otf',
+  'font/woff2',
 ]);
 
 const ALLOWED_EXT_TO_MIME: Record<string, string> = {

@@ -5,6 +5,7 @@ import {
   MediaGenerateOptions,
   MediaCredentialOptions,
   MediaJobSubmission,
+  MediaInputValue,
   MediaPollResult,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
@@ -48,15 +49,28 @@ export class DIDAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    const sourceUrl = options?.sourceUrl || options?.credentials?.sourceUrl;
+    // The studio resolves the source-image media field to a reachable URL in `options.input`;
+    // legacy callers still pass it via top-level options/credentials.
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const sourceUrl =
+      options?.sourceUrl ||
+      (typeof input.source_image === 'string' ? input.source_image : undefined) ||
+      (typeof input.source_url === 'string' ? input.source_url : undefined) ||
+      options?.credentials?.sourceUrl;
     if (!sourceUrl) throw new Error('D-ID talking-avatar generation requires a source image (sourceUrl)');
+
+    const voiceProvider = typeof input.voice_provider === 'string' ? input.voice_provider : undefined;
+    const voiceId = typeof input.voice_id === 'string' ? input.voice_id : undefined;
+    const provider =
+      voiceProvider && voiceId ? { provider: { type: voiceProvider, voice_id: voiceId } } : {};
 
     const res = await safeFetch(`${BASE}/talks`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({
-        script: { type: 'text', input: prompt },
+        script: { type: 'text', input: prompt, ...provider },
         source_url: sourceUrl,
+        ...(input.stitch !== undefined ? { config: { stitch: Boolean(input.stitch) } } : {}),
         ...(options?.webhookUrl ? { webhook: options.webhookUrl } : {}),
       }),
     });

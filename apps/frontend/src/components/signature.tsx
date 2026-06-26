@@ -1,16 +1,27 @@
-import { FC, useCallback } from 'react';
+import { FC } from 'react';
 import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+
+export interface AppendSignaturePayload {
+  content: string;
+  picture?: { id: string; path: string } | null;
+}
+
 export const SignatureBox: FC<{
   editor: any;
-}> = ({ editor }) => {
+  appendImages?: (value: { id: string; path: string }[]) => void;
+}> = ({ editor, appendImages }) => {
   const modals = useModals();
-  const appendValue = (val: string) => {
-    editor?.commands?.insertContent('\n\n' + val);
+  const appendValue = (sig: AppendSignaturePayload) => {
+    editor?.commands?.insertContent('\n\n' + sig.content);
     editor?.commands?.focus();
+    // Attach the signature's logo/sticker as post media, when present.
+    if (sig.picture?.id && appendImages) {
+      appendImages([{ id: sig.picture.id, path: sig.picture.path }]);
+    }
   };
 
-  const addSignature = useCallback(() => {
+  const addSignature = () => {
     modals.openModal({
       title: 'Add Signature',
       withCloseButton: true,
@@ -18,7 +29,7 @@ export const SignatureBox: FC<{
         <SignatureModal appendSignature={appendValue} close={close} />
       ),
     });
-  }, [appendValue]);
+  };
 
   return (
     <>
@@ -61,7 +72,7 @@ export const SignatureBox: FC<{
 };
 export const SignatureModal: FC<{
   close: () => void;
-  appendSignature: (sign: string) => void;
+  appendSignature: (sign: AppendSignaturePayload) => void;
 }> = (props) => {
   const { appendSignature } = props;
   return <SignaturesComponent appendSignature={appendSignature} />;

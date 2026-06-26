@@ -460,19 +460,25 @@ export class AIModelProvider {
 
     if (!brand?.enabled) return { instructions: '', language: '' };
 
-    let instructions = brand.instructions || '';
+    // Prefer the active language's per-language profile; fall back to the legacy
+    // top-level fields for brands that predate languageProfiles.
+    const language = brand.language || '';
+    const profiles =
+      (brand.languageProfiles as Record<
+        string,
+        { instructions?: string; overrides?: Record<string, string> }
+      >) || {};
+    const profile = profiles[language];
 
-    if (platform && brand.platformInstructions) {
-      const platformInstructions = brand.platformInstructions as Record<string, string>;
-      if (platformInstructions[platform]) {
-        instructions = platformInstructions[platform];
-      }
+    let instructions = (profile?.instructions ?? brand.instructions) || '';
+
+    const overrides =
+      (profile?.overrides ?? (brand.platformInstructions as Record<string, string>)) || {};
+    if (platform && overrides[platform]) {
+      instructions = overrides[platform];
     }
 
-    return {
-      instructions,
-      language: brand.language || '',
-    };
+    return { instructions, language };
   }
 
   private async _resolvePromptTemplate(key?: string, orgId?: string): Promise<string | undefined> {

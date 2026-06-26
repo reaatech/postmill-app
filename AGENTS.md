@@ -11,8 +11,10 @@ time.
 
 ## Repository layout
 
-PNPM monorepo with a single root `package.json` for dependencies. Workspaces are driven by
-`pnpm --filter`.
+PNPM monorepo. Workspaces are driven by `pnpm --filter`. Dependencies are split between the root
+`package.json` (shared tooling and cross-cutting packages) and per-workspace `package.json` files in
+`apps/*` and `libraries/*` (feature-specific packages). Do not add a backend-only or frontend-only
+package to the root manifest unless it is genuinely shared across multiple workspaces.
 
 Apps (`apps/`):
 - `backend` — NestJS REST API. Kept **thin**: controllers + module wiring. Real logic lives in libraries. Serves the Inngest handler.
@@ -46,6 +48,7 @@ pnpm install              # also runs prisma-generate via postinstall
 
 # Develop (all apps in parallel)
 pnpm run dev              # extension + backend + frontend
+pnpm run dev:minimal      # backend + frontend only (recommended for daily dev)
 pnpm run dev:backend      # backend only
 pnpm run dev:frontend     # frontend only (port 4200)
 
@@ -66,6 +69,64 @@ pnpm run prisma-db-push   # push schema to the DB (see Database below)
   not add jest-style configuration.
 - **Lint runs from the repo root only**, via the flat `eslint.config.mjs` (eslint 8 +
   `eslint-config-next`). There is no per-package `lint` script.
+
+## Local development performance
+
+The stack is large; use the feature flags and lightweight commands below to keep your machine
+responsive. Full details are in `docs/developer-docs/local-development.md`.
+
+### Infrastructure (Docker)
+
+```bash
+# Required services only: postgres + redis
+docker compose -f docker-compose.dev.yaml up -d
+
+# Add background jobs (Inngest dev server)
+docker compose -f docker-compose.dev.yaml --profile jobs up -d
+
+# Add pgAdmin (convenience UI)
+docker compose -f docker-compose.dev.yaml --profile tools up -d
+```
+
+### Lightweight app startup
+
+```bash
+# Skip heavy optional subsystems you are not working on
+DEV_DISABLE_AI=true \
+DEV_DISABLE_MCP=true \
+DEV_DISABLE_MEDIA=true \
+DEV_DISABLE_SHORTLINKS=true \
+DEV_DISABLE_EMAIL=true \
+pnpm run dev:minimal
+```
+
+Available flags (all default to **enabled**):
+
+- `DEV_DISABLE_AI` — skip AI adapter registration.
+- `DEV_DISABLE_MCP` — skip Mastra/MCP/A2A server startup.
+- `DEV_DISABLE_MEDIA` — skip media-generation adapter registration.
+- `DEV_DISABLE_SHORTLINKS` — skip short-link adapter registration.
+- `DEV_DISABLE_EMAIL` — skip email-provider adapter registration.
+- `DEV_DISABLE_VIDEO` — skip video-generation adapter registration.
+- `DEV_DISABLE_AGENT` — skip agent-graph services.
+- `DEV_DISABLE_CRON` — skip `ScheduleModule.forRoot()`.
+- `DEV_DISABLE_SENTRY` — skip Sentry initialization.
+- `DEV_DISABLE_OPENTELEMETRY` — skip OpenTelemetry exporter setup.
+
+### Frontend dev variants
+
+- `pnpm run dev:frontend` — default Turbopack dev.
+- `pnpm run dev:webpack` — webpack fallback if Turbopack exhausts memory.
+- `pnpm run analyze` — generate webpack bundle report in `.next/analyze/`.
+- Sentry source-map upload is disabled in dev unless `SENTRY_AUTH_TOKEN` and
+  `NEXT_PUBLIC_SENTRY_DSN` are set.
+- Browser profiling (`Document-Policy: js-profiling`) is disabled in dev unless
+  `FRONTEND_PROFILING=1` is set.
+
+### Backend memory cap
+
+The backend dev script sets `--max-old-space-size=2048`. If you still hit the cap, lower it further
+or disable more feature flags.
 
 ## Backend conventions (NestJS)
 
@@ -146,6 +207,27 @@ at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
 
 # Architecture notes
 
+## Background jobs (Inngest)
+
+All scheduled/async work runs on **Inngest** (the Temporal orchestrator was removed — commit #39).
+The backend serves the Inngest handler at **`/api/inngest`**; functions live in
+`apps/backend/src/inngest/functions/`, with the heavier domain logic in
+`libraries/nestjs-libraries/src/inngest/activities/`. **There is no `while(true)` poll loop and no
+`continueAsNew`** — jobs are either cron-triggered or event-triggered, and durable steps
+(`step.run`, `step.sleepUntil`) provide retries/idempotency.
+
+- **Toggle**: events are only sent when `USE_INNGEST=true` (`isInngestEnabled()` gates every
+  `inngest.send(...)`). Locally, run the Inngest dev server (`--profile jobs`) with `INNGEST_DEV=1`;
+  in Cloud, set `INNGEST_EVENT_KEY` + `INNGEST_SIGNING_KEY`. See `.env.example` for the full set.
+- **Event-triggered**: `post/publish` (`post-publish.ts` — sleeps until the publish date, posts,
+  posts thread items as comments, then first comment / webhooks / plugins; per-`taskQueue`
+  concurrency cap), `autopost/process`, `integration/refresh-token`, `email/send` (global 1/sec),
+  `email/digest`, `analytics/backfill`, `streak/start`.
+- **Cron-triggered**: `comments-collection.ts` (every minute — sync comments, dispatch webhooks,
+  prune, notify), `analytics-collection.ts` (daily 02:00 UTC — the snapshot sweep below),
+  `media-jobs-poll.ts` (every minute — poll pending media jobs + FFmpeg video renders),
+  `missing-post-finder.ts` (hourly — recover posts that should have published).
+
 ## Analytics
 
 Refactored from single-channel live-fetch to a persisted multi-channel dashboard.
@@ -187,8 +269,8 @@ Two feature tracks added to `/launches`.
 - **`ISocialMediaComments`** interface in `social.integrations.interface.ts` with optional
   `fetchComments` / `replyToComment` / `likeComment`.
 - Social comments **Controller → Service → Repository** layer.
-- Inngest **`CommentsActivity` + `commentsCollection`** for periodic sync (gated by background jobs
-  configured).
+- Inngest **`comments-collection.ts` cron** (backed by `CommentsActivity`) for periodic sync — gated
+  on `USE_INNGEST`. See **Background jobs (Inngest)** above.
 
 ## AI Providers (v3.4.0)
 
@@ -296,12 +378,13 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
   sentiment/priority badges (from 2E), bulk mark-read, quick replies. Additive to the post-detail
   comments view.
 
-### First comment (2F, workflow v1.0.6)
-- New `post.workflow.v1.0.6.ts` auto-posts a first comment after a successful `post()` when
+### First comment (2F)
+- The `post-publish.ts` Inngest function auto-posts a first comment after a successful `post()` when
   `settings.firstComment` is set. **Three invariants:** capability-gated on
-  `providerCapabilities.firstComment`; **idempotent** (records the posted comment id /
-  `firstCommentPostedAt` so a retry or `continueAsNew` can't double-post); **non-fatal** (a failed
-  first comment warns + notifies, but the post stays published — never fail/roll back the post).
+  `providerCapabilities.firstComment`; **idempotent** (records `firstCommentId` /
+  `firstCommentPostedAt` back into the post's `settings` JSON so a retry can't double-post);
+  **non-fatal** (a failed first comment warns + notifies, but the post stays published — never
+  fail/roll back the post).
 
 ### Poll posts (3F)
 - Polls are part of the post payload (not a follow-up step), wired through `post()` for X and
@@ -437,3 +520,404 @@ AI, Media, Storage, and Shortlinks settings surfaces share:
 ## Dropped Gitroom subsystems (v3.8.10)
 
 Dead marketplace/GitHub-stars models and code removed: `SocialMediaAgency`, `MessagesGroup`, `Orders`, `OrderItems`, `PayoutProblems`, `ItemUser`, `GitHub`, `Star`, `Trending`, `TrendingLog`, `Messages` + associated enums (`OrderStatus`, `From`, `APPROVED_SUBMIT_FOR_ORDER`) and their relations on `User`, `Post`, `Organization`, `Media`, `Integration`. Code-only removal in step 6, schema drops in step 7. The legacy `Role` enum and its `UserOrganization.role` column were also dropped — superseded by `AppRole`-based RBAC (`UserOrganization.roleId`).
+
+**Legacy `/third-party` integration platform — removed.** The Gitroom-era third-party provider
+subsystem (the `/third-party` route, `@ThirdParty` decorator + `ThirdPartyManager`, the HeyGen and
+ReelFarm providers, and the composer's "insert third-party media" path) was deleted, along with the
+`ThirdParty` Prisma model + its `Organization.thirdParty` relation. AI avatar video now lives only in
+the modern **HeyGen Studio** (above).
+
+## Media surface, Stock & Content Packs (v3.8.10+)
+
+### `/media` vs `/files`
+- **`/files` is the asset library** — uploads plus anything a tool saved out. It is both the input
+  source and the output destination for the tools.
+- **`/media` is tools only** (no library inside it). Each tool: pick/produce media → **save to
+  `/files`** (or send straight to the composer). The nav lives in
+  `apps/frontend/src/app/(app)/(site)/media/layout.tsx`, grouped (alphabetised within each section):
+  - **Platform** — Designer (header-less; the default landing for `/media`).
+  - **Providers** — HeyGen, Kling, Luma, MiniMax, Replicate, Runway.
+  - **Content Pack** — Stock Photos, Stock Videos, Vectors, Stickers, Stock Audio, Icons.
+
+### Designer (Konva)
+- The Designer (`apps/frontend/src/components/media-tools/designer/`) is **Konva/react-konva**, not
+  Polotno (fully removed). Two modes: a **static canvas** (images/text/shapes) and a **video
+  timeline** (`video-timeline.tsx` — video/image/text/caption/audio/sticker tracks, canvas-decoded
+  audio waveforms; renders via headless Chromium + FFmpeg).
+- Opens from a single asset (`?url=&type=&w=&h=…`) or a bulk handoff (Files → bulk **Open all in
+  Designer**, which stashes the selection in `sessionStorage` and navigates to `?bulk=1`), or a
+  **caption handoff** (`?captions=1` + `sessionStorage['designer:caption-handoff']`) from the Deepgram
+  studio — the one path that loads a **video onto the timeline** (`setMode('video')` + a caption track
+  built from word timings); the single-asset `?type=video` open only drops a static thumbnail. Animated
+  GIF/WebP export only exists in **video** mode — static mode never offers it (Konva flattens to
+  frame 1).
+
+### Canvas-app (studio) UI conventions
+A **studio** is a full-height `/media/*` canvas tool (Designer, Replicate, HeyGen — more coming).
+They share a deliberate visual language; **follow it when building a new one** rather than inventing
+per-tool styling. Reference implementation: `apps/frontend/src/components/media-tools/heygen/heygen-studio.tsx`.
+
+- **Shell:** a full-height flex column. Header bar (`h-[52px]`, `border-b border-studioBorder`) with —
+  left: the Postmill **`Logo`** (`components/new-layout/logo.tsx`, `size={20–22}`) + the studio title;
+  right: tool tabs + a **`FullscreenButton`**. Body below fills the rest.
+- **Theme tokens (light + dark, defined in `app/colors.scss`, mapped in `tailwind.config.cjs`):**
+  - `bg-studioBg` — the studio backdrop. Light `#d4e0f0` (soft blue-gray), dark `#0a0f1f` (near-black navy).
+  - `border-studioBorder` — **use this for every studio border** (cards, inputs, tabs, dividers). Light
+    `#aebdd4`, dark `#2a3450`. It is tuned to contrast with `studioBg` in both modes.
+  - **Do not** use `newBorder`/`newColColor` for studio borders — they are near-white in light mode
+    (`#eaecee`/`#eff1f3`) and vanish on `studioBg` ("whitewashed"). `newSep` is also too close to the bg.
+  - Accent is `#2B5CD3` (a.k.a. `designerAccent`); active item = `bg-[#2B5CD3]/20 text-textColor`.
+- **Light-mode contrast rules (this codebase is dark-mode-first — these break in light otherwise):**
+  - Never hard-code `text-white` for active/selected state or titles; use **`text-textColor`** (adapts).
+    `text-white` is only for text on a solid accent fill (e.g. a `bg-[#2B5CD3]` button).
+  - Warning/validation text uses **`text-amber-600`**, not `text-yellow-400` (pale and unreadable on light).
+- **Rounded corners:** when **not** full-screen, the studio root is `rounded-[12px] overflow-hidden`
+  (matches the app layout/menu card radius). Full-screen drops the radius (full-bleed).
+- **Full-screen = the canvas, not the page.** Use the shared `useFullscreen()` hook
+  (`media-tools/use-fullscreen.ts`) + `FullscreenButton`. It requests fullscreen on
+  `document.documentElement` (hides browser chrome **and** keeps modals, which mount at the app root,
+  visible) and the studio root goes immersive — `fixed inset-0 z-[100]` — to cover the app nav/sidebar
+  so the canvas fills the screen. **`z-[100]` is deliberate: above app chrome, below modals (`z 200+`).**
+  Never element-scope the Fullscreen API to the studio root — modals would be hidden by the top-layer.
+- **Input + output:** pick source assets from `/files` via **`MediaSelectorModal`** (returns
+  `{source,url,fileId,type,…}`). Long-running generation goes through the **media-job pipeline**
+  (`MediaJobLifecycleService.createPendingJob` → poll/webhook → land in `/files`); a live **render
+  queue** polls the jobs endpoint. Finished artifacts offer **Edit in Designer** (`/media/designer?url=&type=`)
+  and **Post** (composer `AddEditModal` with `onlyValues:[{image:[{id,path}]}]`). Reuse
+  **`SaveToFilesModal`** and the **`AudioPlayer`** (`media-tools/audio-player.tsx`) rather than rebuilding.
+- **SWR:** one hook per resource via `useFetch` (e.g. `use-heygen.ts`); the render queue uses a
+  `refreshInterval` that polls only while a job is pending.
+
+### HeyGen Studio (AI avatar video)
+- A bespoke tool at **`/media/heygen`** built on the **AI Media provider** stack (`HeyGenAdapter`,
+  per-org `MediaProviderConfig` `'heygen'`, `AIMediaJob` async spine) — **not** the legacy
+  `/third-party` HeyGen (that whole Gitroom-era subsystem was removed; see below). Configure the key
+  at **Settings → Media** (no env fallback). Frontend lives in
+  `apps/frontend/src/components/media-tools/heygen/`; logic in
+  `libraries/nestjs-libraries/src/media/heygen/heygen.service.ts` (controller `/media/heygen`).
+- Four tabs + a live **Render queue** (polls `GET /media/heygen/jobs`): **Storyboard** (multi-scene
+  avatar video via `video_inputs[]` — each scene = avatar + voice + script + color/file background),
+  **Talking Photo** (upload a `/files` image → `talking_photo_id`), **Voiceover** (TTS → audio
+  folder), **Translate** (one `AIMediaJob` per target language; source must be a HeyGen-reachable URL).
+- Every render lands in `/files` via the existing `MediaJobLifecycleService` → cron/webhook pipeline,
+  then offers **Edit in Designer** (`?url=&type=video`) and **Post** (composer `AddEditModal`).
+- **Operation-namespaced poll routing:** `HeyGenService` stores the provider ref as `<op>:<id>`
+  (`video:` / `tts:` / `translate:`); `HeyGenAdapter.pollJob` branches on the prefix to hit the right
+  HeyGen status endpoint. A bare id (no prefix) = avatar video — preserves the generic
+  governance/grid path, which stores the raw id.
+
+### Studio Kit (descriptor-driven provider studios)
+A reusable scaffold so a new provider studio is mostly a **descriptor**, not a from-scratch build.
+It extracts HeyGen's shell + the three handoffs and generalizes Replicate's form engine into a
+provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
+(`studio-shell.tsx`, `studio-form.tsx`, `render-queue.tsx`, `types.ts`, `hooks.ts`). A studio =
+`<StudioShell descriptor={...} />`.
+- **Descriptor** (`StudioDescriptor`): `{ provider, title, tabs[] }`. Each tab has an `operation`
+  (`video`/`image`/`audio` → backend routing + Designer handoff type), an optional fixed `model` (or a
+  `select` field named `model`), and `fields[]`. Field types: `prompt`/`text`/`select`/`number`/
+  `toggle`/`media`. **Field names are the provider's native API params** — they ride straight into the
+  adapter request body, so the descriptor IS the full feature surface (no lowest-common-denominator
+  cap). A tab may instead supply a `custom` React component (escape hatch for HeyGen-style structured
+  tools).
+- **Generic backend** — one endpoint serves every simple "prompt → job" provider (no per-provider
+  controller): `GET /media/studio/:provider/status`, `GET /media/studio/:provider/jobs`,
+  `POST /media/studio/:provider/generate` (`MediaStudioController` →
+  `libraries/nestjs-libraries/src/media/studio/media-studio.service.ts`). It resolves credentials,
+  creates the `AIMediaJob`, dispatches to the registry adapter by `operation`, and tracks completion
+  through the shared `MediaJobLifecycleService` (**webhook-first**, poll-cron fallback). `mediaInputs`
+  (`field → fileId`) is resolved server-side to a provider-reachable URL (handles local storage).
+  **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
+  descriptor.**
+- **Current studios on the kit:**
+  - **Video** — Runway, Luma, MiniMax, Kling and **Pika** (both via the `fal` adapter — config
+    identifier `fal`, but the descriptor's `provider: 'fal'` + `title` give each its own branded
+    studio; the `model` field carries the full fal endpoint id and the adapter spreads `input` into
+    the body, so they reuse the org's fal key — Pika's official API is fal-hosted per pika.art/api.
+    Pika's studio has Text→Video + Image→Video (`fal-ai/pika/v2.2/*`) and a **Pikaffects** tab
+    (`fal-ai/pika/v1.5/pikaffects`, 16 one-click VFX). Frontend-only — no new adapter/registry id),
+    Vertex (Google **Veo**), Qwen (Alibaba **Wan2.x** text→video + image→video).
+  - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), Qwen
+    (Alibaba **Qwen-Image**, a third tab on the Qwen studio), OpenAI
+    (gpt-image-1 + DALL·E 3 as two fixed-model tabs), Vertex (Google **Imagen**, a second tab on the
+    Vertex studio). `operation: 'image'` completes **synchronously**
+    inside `MediaStudioService.generate` (the adapter returns the artifact inline / via its own
+    bounded poll — no webhook), and base64 `data:` URLs are decoded by `completeJob`.
+  - **Audio (TTS)** — ElevenLabs, OpenAI (a third `Text → Speech` tab on the OpenAI studio).
+    `operation: 'audio'` also completes **synchronously**: the adapter returns the voiced clip inline
+    as a `data:audio/…;base64,` URL (mime derived from the chosen `response_format`), decoded by
+    `completeJob` into the org's audio files — no webhook.
+  - **Avatar / character video** — D-ID (talking-head from a portrait), Hedra (character video from a
+    keyframe), Tavus (replica video). `operation: 'video'`, completed **webhook-first** (poll-cron
+    fallback). The portrait/keyframe media field is resolved server-side to a provider-reachable URL
+    (same LOCAL-storage caveat as HeyGen translate). These overlap HeyGen's avatar surface by design —
+    HeyGen keeps its bespoke studio.
+  - Each is a `media-tools/<provider>/descriptor.ts` + a 3-line studio + a route page. Adapters merge
+  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax, the three image
+  adapters, and the audio/avatar adapters — ElevenLabs/OpenAI TTS + D-ID/Hedra/Tavus — enriched with
+  native param passthrough; `model` is lifted out by the service and selects the endpoint/variant,
+  everything else in `input` rides into the body). The passthrough is back-compatible: when `input`
+  is absent the legacy `AiMediaService` defaults apply unchanged. **Vertex (Veo video + Imagen
+  image)** uses GCP credentials, **not** a single API key: the `vertex-media.adapter.ts` declares a
+  `credentialFields` schema (`project` + `location` + service-account `googleCredentials` JSON, same
+  keys as the AI Vertex adapter) and mints a **short-lived access token per call** via
+  `google-auth-library` — a stored static `accessToken` would expire in ~1h. The Settings → Media
+  modal renders `adapter.credentialFields` dynamically (multi-field), falling back to the single
+  `apiKey` input for every other provider. Veo has no completion webhook → it relies on the
+  `media-jobs-poll` cron (like Runway). **Deepgram is a bespoke studio, not a kit studio** — its real
+  capability is STT (text output), which doesn't fit the kit's "prompt → media artifact in `/files`"
+  model, so it uses the StudioShell chrome with a `custom` panel over a dedicated `/media/deepgram`
+  backend (see **Deepgram Studio** below). HeyGen and Replicate are also intentionally **not**
+  retrofitted onto the kit (they keep their bespoke implementations).
+- **Qwen (Alibaba DashScope)** is a single-key kit studio with three tabs — Text→Image (`qwen-image*`),
+  Text→Video and Image→Video (`wan2.x`). Both surfaces are DashScope **async task APIs** (POST with
+  `X-DashScope-Async: enable` → `task_id`, then poll `GET /tasks/{id}`): image keeps the synchronous
+  contract via bounded internal polling (like BFL/Runway); video has **no webhook** → poll-cron
+  completion (like Runway/Veo). The `qwen-media.adapter.ts` routes `prompt`/`negative_prompt`/`img_url`
+  into DashScope's `input` and every other native param into `parameters`. **Credential is shared with
+  the Qwen LLM provider** (`ai.module.ts`): Qwen is a *universal-credential* provider, so when no
+  dedicated media credential exists `OrgMediaProviderSettingsService.getConfigForProvider` falls back
+  to the org's **AIOrgProviderConfig** Qwen key (read via `OrgAiSettingsRepository`, decrypted with the
+  media `EncryptionService` — per-org AI configs use AES-GCM, **not** the global config's
+  `AuthService.fixedEncryption`). Configure the DashScope key once at Settings → AI **or** Settings →
+  Media and both work. (openai/minimax instead write-mirror both ways via `ProviderCredentialLinkService`;
+  Qwen has no media-side settings flow, so a read-fallback is the lighter path — extend
+  `UNIVERSAL_AI_CREDENTIAL` to add more such providers.)
+- **Wan (Alibaba Model Studio)** is a dedicated, Wan-branded kit studio (`/media/wan`) with three tabs
+  — Text→Image (`wan2.2-t2i*` / `wanx2.1-t2i*` via `…/text2image/image-synthesis`), Text→Video and
+  Image→Video (`wan2.x-t2v*` / `wan2.x-i2v*` via `…/video-generation/video-synthesis`). It is the **same
+  DashScope async-task protocol as Qwen** (`X-DashScope-Async` → `task_id`, poll `GET /tasks/{id}`,
+  `output.video_url`/`output.results[].url`; image bounded-poll-synchronous, video poll-cron with no
+  webhook) but pointed at the **international host** `dashscope-intl.aliyuncs.com` (clicking "API" on
+  wan.video lands on `modelstudio.alibabacloud.com` — wan.video IS Model Studio, with Wan as the model
+  family). Unlike Qwen, Wan is an **own-key** provider configured at Settings → Media — it is
+  intentionally **NOT** in `UNIVERSAL_AI_CREDENTIAL` (a Wan key need not be the Qwen LLM key), so it
+  surfaces purely by adapter registration. `wan.adapter.ts` reuses Qwen's `INPUT_KEYS` routing
+  (`negative_prompt`/`img_url`/`audio_url` → `input`, all else → `parameters`). Model lists are curated
+  in the descriptor (DashScope has no clean per-modality catalog for the task API). **Built without a
+  live key** — endpoints/model ids are grounded in Alibaba's public Model Studio API reference; the
+  exact intl host/region may need a live smoke test.
+- **Higgsfield** (`platform.higgsfield.ai`) is an **own-key** kit studio (`/media/higgsfield`) with a
+  **two-part credential** — `keyId` + `keySecret` (declared via `credentialFields`, rendered as the
+  multi-field Settings → Media modal like Vertex), sent as the single header
+  `Authorization: Key <id>:<secret>` (the official `higgsfield-js` V2 scheme). Every generation is
+  **submit-and-poll**: POST the input fields **directly** (not wrapped) to the model endpoint →
+  `{ request_id, status }`, then poll `GET /requests/{id}/status` until `completed` (or `nsfw`/`failed`)
+  — image bounded-poll-synchronous, video poll-cron (no webhook). Three model surfaces, routed by
+  operation + the `model` value: **Soul** text→image (`/v1/text2image/soul`, optional `image_reference`
+  for image-to-image), **DoP** image→video (`/v1/image2video/dop`, `model=dop-lite|dop-turbo|dop-standard`),
+  and **Speak** audio→talking-video (`/v1/speak/higgsfield`, `model='speak'` as a routing marker only).
+  `higgsfield.adapter.ts` wraps the flat media-field URLs into Higgsfield's nested input objects
+  (`input_images[]` / `input_image` / `input_audio` / `image_reference`); `result.video.url` or
+  `result.images[].url` (Soul `batch_size: 4` returns multiple). **Built without a live key** —
+  endpoints/shapes are grounded in the official higgsfield-js SDK source; Soul `width_and_height`
+  presets may need a live smoke test.
+- **LTX Studio** (Lightricks, `api.ltx.video`) is an **own-key** kit studio (`/media/ltx`) configured at
+  Settings → Media — single Bearer key, **video-only** (LTX-2 / LTX-2.3 family). Three tabs, all
+  `operation: 'video'`: **Text→Video** (`POST /v2/text-to-video`), **Image→Video** (`/v2/image-to-video`,
+  `image_uri` + optional `last_frame_uri`), **Audio→Video** (`/v2/audio-to-video`, `audio_uri` + optional
+  `image_uri`; Pro models only). Every generation is **async submit-and-poll**: POST → `{ id }`, then poll
+  `GET /v2/<op>/{id}` until `status: completed`, reading `result.video_url` (no webhook → poll-cron, like
+  Runway/Wan). The sub-operation is **routed by the media inputs present** (audio → audio-to-video, else
+  image → image-to-video, else text-to-video), and because the poll path mirrors the submit path the
+  `ltx.adapter.ts` **namespaces the job id as `<op>:<id>`** (the HeyGen pattern) so `pollJob` hits the
+  right status endpoint. Native params (`model`/`resolution`/`duration`/`fps`/`generate_audio`/
+  `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
+  live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
+  vs. named-preset formatting may need a live smoke test.
+- **Reel.Farm** (`reel.farm`) and **Genviral** (`genviral.io`) are two **own-key** faceless/short-form
+  **video** kit studios configured at Settings → Media — each a `<provider>.adapter.ts` + descriptor +
+  3-line studio + route + nav entry (`/media/reelfarm`, `/media/genviral`), `operation: 'video'`, single
+  Bearer key. Both are **async submit-and-poll**, no webhook → poll-cron (like Runway/LTX). **Reel.Farm**
+  renders an AI TikTok slideshow from a prompt: `POST /api/v1/slideshows/generate` → `{ slideshow_id }`,
+  poll `GET /slideshows/{id}/status`; the status response carries **no mp4 URL**, so `pollJob` fetches
+  `GET /videos/{video_id}` once a `video_id` exists and reads `video_url`. The prompt is sent as
+  `additional_context`; optional `image_N` media fields are collected into the `images[]` background array.
+  **Genviral** Studio AI: `POST /studio/videos` (required `model_id` from a **live `/studio/models`** catalog
+  → the descriptor's dynamic `source: 'models'` field) → poll `GET /studio/videos/{id}` until
+  `data.status: succeeded` (`data.output_url`); the adapter routes `resolution`/`duration_seconds`/`fps`/
+  `aspect_ratio`/`generate_audio` into the nested `params` object and everything else (incl. resolved
+  `image_url`/`audio_url`) flat. These are the resolved survivors of a 6-provider ask — Superscale AI,
+  NullFace AI, SendShort, and Vireel were **dropped: no public API exists** (don't re-add without one).
+  **Built without a live key** — Reel.Farm's slideshow `video_url` field and Genviral's `/studio/models`
+  shape (mapped defensively) need a live smoke test.
+- **Sora** (OpenAI) is a branded kit studio (`/media/sora`) that **reuses the `openai` provider/key** —
+  `descriptor.provider: 'openai'`, like Pika rides `fal` — so no separate credential: the org's existing
+  Settings → AI / Media OpenAI key drives it. Video-only, two tabs (Text→Video, Image→Video). Sora lives
+  on the **async Videos API** (`POST /v1/videos` → `{ id }`, poll `GET /v1/videos/{id}` until
+  `completed`; no webhook → poll-cron). The wrinkle: the finished MP4 is **auth-only bytes** at
+  `GET /v1/videos/{id}/content` (no public URL), so `openai-media.adapter.ts` `pollJob` downloads it with
+  the key and returns it **inline as a `data:video/mp4;base64,…` URL** — the lifecycle `_download`
+  decodes data URLs (512 MB cap), whereas the default unauthenticated re-download of a provider URL would
+  401. Image-to-video uploads the source frame as the multipart `input_reference` field (the adapter
+  fetches the resolved media URL → bytes); text-to-video sends a plain JSON body. `generateVideo` +
+  `pollJob` were added to the existing OpenAI media adapter (capabilities flipped `video: true`); the
+  existing OpenAI image/TTS studio is unchanged (separate descriptor, no video tab). **Built without a
+  live key** — grounded in the official OpenAI Videos API reference. (Note: OpenAI lists the Sora-2 Videos
+  API as deprecated with a 2026-09-24 shutdown.)
+- **Google AI Studio** (`/media/google-ai`, registry id `google`) is the **Gemini Developer API**
+  (`generativelanguage.googleapis.com`) — keyed by a single Gemini API key (`AIza…`), the **same key**
+  the org sets at Settings → AI → "Google Gemini". So `google` is a **universal-credential** media
+  provider (added to `UNIVERSAL_AI_CREDENTIAL` alongside Qwen): configure the Gemini key once and it
+  drives both the LLM and the media studio; no Settings → Media config needed (registering the adapter
+  auto-surfaces it, marked configured when the AI key exists). This is **distinct from `vertex`**, which
+  is the enterprise GCP path (service-account `project`/`location`/`googleCredentials`, short-lived
+  minted token) — the media adapter `name` was renamed `Google Vertex AI` → **Google Vertex** (AI +
+  media surfaces, studio title, nav) to disambiguate the two Google surfaces. `google-ai-media.adapter.ts`
+  serves **image** (synchronous): **Nano Banana** (`gemini-2.5-flash-image` via `:generateContent` →
+  inline `candidates[].content.parts[].inlineData` base64) and **Imagen** (`imagen-*` via `:predict` →
+  `predictions[].bytesBase64Encoded`), routed by the chosen model id; and **video**: **Veo**
+  (`veo-*` via `:predictLongRunning` → operation name as `jobId`, polled at `GET /v1beta/{name}`; no
+  webhook → media-jobs poll-cron, like Vertex Veo). Veo's finished MP4 is **auth-only bytes** at the
+  returned file `uri`, so `pollJob` downloads it **with the key** and returns a `data:video/mp4;base64,…`
+  URL (the Sora pattern — the lifecycle's unauthenticated re-download would 401). The key rides as the
+  `x-goog-api-key` header. **Built without a live key** — endpoints grounded in the official
+  `ai.google.dev` Gemini API reference (Imagen `:predict`, Gemini-image `:generateContent`, Veo
+  `:predictLongRunning`); image `aspectRatio`/`sampleCount` shaping and the Veo file-download header may
+  need a live smoke test. (Note: Imagen `:predict` is slated for shutdown 2026-08-17 in favour of Nano
+  Banana — both remain selectable model options.)
+- **Recraft** (`/media/recraft`), **Ideogram** (`/media/ideogram`), and **Leonardo.ai**
+  (`/media/leonardo`) are three **own-key image** kit studios configured at Settings → Media. Each is a
+  `<hub>-media.adapter.ts` (image-only capability) + descriptor + 3-line studio + route + nav entry.
+  **Recraft** (`external.api.recraft.ai`, Bearer) — raster + vector/SVG + icons; one synchronous POST
+  → hosted URL; native params (style/substyle/size/n) ride via `options.input`. **Ideogram**
+  (`api.ideogram.ai/v1/ideogram-v3/generate`) — accurate in-image text; the key rides as the **`Api-Key`
+  header** (not Bearer) and the body is **multipart/form-data** (the adapter builds a `FormData`, no
+  Content-Type so fetch sets the boundary), single endpoint with **no model param**; synchronous.
+  **Leonardo.ai** (`cloud.leonardo.ai/api/rest/v1`, Bearer) — its API is async (create → `generationId`
+  → poll `GET /generations/{id}` until `COMPLETE`), but image must be synchronous, so the adapter
+  **polls internally** (the BFL/Qwen bounded-poll pattern) to keep the contract; the `model` select
+  carries a Leonardo model **UUID** (→ `modelId`), width/height/num_images ride via `options.input`. All
+  three return hosted public URLs (re-downloaded by the lifecycle via `safeFetch`). **Built without a
+  live key** — endpoints grounded in the official Recraft / Ideogram / Leonardo API references; param
+  names and Leonardo model UUIDs may need a live smoke test.
+
+### AI-hub media studios (image/video/audio, credential-reuse)
+
+The AI **hub/aggregator** LLM providers also serve large media catalogs, exposed as kit studios that
+**reuse the org's existing Settings → AI key** (the Qwen `UNIVERSAL_AI_CREDENTIAL` pattern, now a
+10-entry set: `qwen`, `togetherai`, `siliconflow`, `groq`, `openrouter`, `fireworks`, `deepinfra`,
+`gateway`, `bedrock`, `azure`). Each is a `<hub>-media.adapter.ts` + `media-tools/<hub>/descriptor.ts`
++ a 3-line studio + route page + nav entry — no Settings → Media config needed (registering the
+adapter auto-surfaces it, marked configured/enabled when the AI key exists).
+
+- **Mechanism per (hub, modality):** native REST dominates; AI-SDK delegation is the narrow exception
+  for hard auth and experimental video.
+  - **Native REST** (Qwen pattern, `safeFetch`, native-param passthrough via `options.input`):
+    Together (image `/v1/images/generations`, video `/v1/videos` async+poll, TTS `/v1/audio/speech`),
+    SiliconFlow (image + Wan2.x video `/v1/video/submit`+`/video/status` + TTS), Groq (TTS only,
+    `/openai/v1/audio/speech`), OpenRouter (image only, dedicated `/api/v1/images` → `b64_json`),
+    Fireworks (image only, `…/{model}/text_to_image`, `Accept: application/json` → `base64[]`),
+    DeepInfra (image/video/TTS via native `/v1/inference/{model}`). Together + SiliconFlow share the
+    OpenAI-compatible image+audio shape via `openai-compatible-media.adapter.ts` (abstract base —
+    subclasses add their own async video).
+  - **AI-SDK delegation** (`ai-sdk-media.adapter.ts` + `ai-sdk-media.helper.ts`): Bedrock + Azure
+    image generation runs through the matching **AI** adapter's `createImageModel` (so SigV4 / Azure
+    deployment auth is handled by `@ai-sdk/amazon-bedrock` / `@ai-sdk/azure`, never hand-rolled). The
+    media adapters are dependency-free `new`'d objects, so `MediaModule.onModuleInit` static-injects
+    the `AIProviderRegistry` into the helper (`setAiRegistry`) — `MediaStudioService` stays provider-
+    agnostic. Image-only this batch (Bedrock Nova Reel video / Azure Speech deferred).
+  - **Gateway** (`gateway-media.adapter.ts`): image via AI-SDK delegation; **video via AI SDK v6
+    `experimental_generateVideo`** (`createGateway({apiKey}).video(modelId)`), which is inherently
+    synchronous (one long await) — we extend the Undici dispatcher timeout to 15 min and complete the
+    job inline (no poll/webhook). Audio is omitted (no gateway speech model in the AI adapter).
+- **Dynamic model discovery (the "many models" surface):** a new optional
+  `listModels(operation, options)` on `MediaProviderAdapter` hits the hub's `/v1/models` (filtered by
+  modality) or reuses the AI adapter's catalog; served by `GET /media/studio/:provider/models?operation=`
+  (`MediaStudioService.listModels`, Redis-cached ~60s). The Studio Kit `select` field gains
+  `source: 'models'` → a **searchable combobox** (`studio-kit/model-select.tsx`) populated live, with
+  the descriptor's static `options` as fallback. The combobox **accepts a typed model id** too, so an
+  incomplete catalog (hubs don't tag every modality) never blocks a render.
+- **Risk:** these were built source-grounded but **without live keys** — per-hub request/response
+  bodies (esp. DeepInfra's native `/inference` keys, Together/SiliconFlow video model ids) may need
+  adjustment against a real key; structure keeps each (hub, modality) independently verifiable.
+
+### Deepgram Studio (transcription / captions)
+- A bespoke tool at **`/media/deepgram`** — every media adapter now has a studio. It reuses the
+  Studio Kit's `StudioShell` (header/tabs/fullscreen/render-queue chrome) via a single `custom` tab
+  (`media-tools/deepgram/deepgram-panel.tsx`), because STT returns **text**, not a `/files` artifact,
+  so it can't ride the generic kit form/`MediaStudioService` job pipeline. Configure the key at
+  **Settings → Media** (no env fallback); the unconfigured state shows the shell's "isn't configured"
+  empty state.
+- **Backend** is a dedicated `DeepgramController` (`/media/deepgram`) → `DeepgramService`
+  (`libraries/nestjs-libraries/src/media/deepgram/deepgram.service.ts`), **not** the generic studio
+  service. It reads the source file's **bytes directly from storage** (`IStorageAdapter.readFile` —
+  works for local + cloud, no outbound HTTP/SSRF surface), calls the `deepgram` registry adapter's
+  `speechToTextWords`, and returns `{ text, words, segments }` (segments are phrase-chunked for
+  captions). `POST /transcribe` (gated on the org's Deepgram key) and `POST /save-transcript`.
+- **Transcript history rides the render queue.** `save-transcript` persists the transcript as a
+  **completed `stt` `AIMediaJob`** via `MediaJobLifecycleService.completeJobWithBuffer` (the text lands
+  in the media tree, bypassing the `/files` import content-type allowlist), so it surfaces through the
+  existing `GET /media/studio/:provider/jobs`. `stt` is created already-complete, so it never enters
+  the async poll path (`'stt'` added to the lifecycle `AsyncOperation` union). The shared studio-kit
+  `RenderQueue` gained an **additive `stt` branch** — a text card with **Copy** / **To composer**
+  (no AV preview, no Edit-in-Designer/Post); other studios never emit `stt`, so they're unchanged.
+- The panel exports captions **client-side** — `.srt` / `.vtt` / `.txt` Blob downloads (no `/files`
+  write, so no allowlist change), plus copy, Save-to-Files (→ render queue), and a Send-to-composer
+  handoff. The adapter's `speechToTextWords` gained an **opt-in** `input.smartFormat`
+  (→ `smart_format`+`punctuate`) and `input.language` passthrough; the Designer timeline's existing
+  auto-caption call passes neither, so its request is unchanged.
+- **Edit in Designer (captions burned, no re-transcribe).** For a video source, the panel stashes
+  `{ url, fileId, width, height, words }` in `sessionStorage` (`designer:caption-handoff`) and opens
+  `/media/designer?captions=1`. The Designer reads it (new `initialCaptionVideo` prop on the `Designer`
+  component) and **builds a video project**: `setMode('video')`, loads the clip's duration via a
+  metadata probe (`onloadedmetadata` → real duration, `onerror`/5s-timeout → 10s fallback so a
+  hanging source can't block), adds the video clip, then a **caption track** phrase-grouped from the
+  word timings (same grouping as the timeline's auto-caption). This is the **only** path that loads a
+  video onto the Designer timeline from a URL (the `?url=&type=video` open still drops a static
+  thumbnail).
+
+### Stock providers (free)
+`StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via
+`GET /media/stock/{photos|videos|vectors|stickers|icons|audio}`. Each capability is backed by one
+free provider, keyed by env (results carry `source`/`license`/`attribution` through preview, Designer
+open, and `/files/import`):
+
+| Capability | Provider | Env key |
+|---|---|---|
+| Photos | Unsplash | `UNSPLASH_ACCESS_KEY` |
+| Videos | Pexels | `PEXELS_API_KEY` |
+| Vectors / illustrations | Pixabay | `PIXABAY_API_KEY` |
+| Stickers | GIPHY | `GIPHY_API_KEY` |
+| Audio | Jamendo | `JAMENDO_CLIENT_ID` |
+| Icons | Iconify | *(public API — no key)* |
+
+Redis caches free stock search results globally for 60s (incl. negative-cache for missing-key /
+empty configs).
+
+### Content Packs (premium, BYOK)
+- Per-org packs configured at **Settings → Content Packs**, resolved per-org-per-capability by
+  `OrgContentPackSettingsService` (`database/prisma/content-packs/`). Backed by `ContentPackConfig`
+  (encrypted credentials + provider `extraConfig`) and a pointer `Organization.activeContentPackIdentifier`.
+- **A `ContentPack` registry is the single source of truth** (`media/stock/content-packs/
+  content-pack.registry.ts`): each entry declares `{ name, capabilities, credentialFields, factory }`.
+  Adding a pack there surfaces it in the settings list, the credential form, and per-capability
+  resolution — no other wiring. Every pack implements the shared `ContentPack` interface
+  (`content-pack.interface.ts`: `search(capability, …)` + `resolveDownload(id, capability)`); all
+  outbound HTTP goes through `safeFetch`; a provider 429 throws `ContentPackDailyCapError` → the import
+  controller maps it to a 402.
+- **Four packs**: **Magnific** (photos/vectors/icons/videos), **Vecteezy** (photos/vectors/videos),
+  **Adobe Stock** (photos/vectors/videos — the user's "Adobe Firefly" ask resolved to the licensable
+  Adobe *Stock* library, not Firefly generative), **Envato Elements** (photos/vectors/videos/audio).
+  Only ONE pack is active per org. When the active pack covers a capability it takes precedence over
+  the matching free catalog; **anything it does NOT declare falls back to the free provider** for that
+  capability (`StockMediaService.resolveSearch` → `getActiveForCapability` returns null → free). Saving
+  uses a **mint-then-ingest** step (`resolveContentPackDownload` → the pack's `resolveDownload` mints a
+  licensed URL before `/files/import`; the import gate fires for any `source` in the registry).
+  Credentials are encrypted at rest and never returned to the client.
+- **Risk**: Vecteezy and Envato were built source-grounded but **without live keys** (Vecteezy's
+  content API is partner-gated; Envato's download entitlement differs between Market and Elements), and
+  Adobe Stock's full *licensed* download needs an OAuth entitlement (search + comp URL work with a key
+  alone). Per-pack request/response shapes may need a live smoke test; each pack is independently
+  verifiable behind its own adapter.
+
+### Saving into `/files`
+- All saves go through **`POST /files/import`** → `FileService.importFromUrl`
+  (`database/prisma/file/file.service.ts`): `safeFetch` the URL, enforce a 512 MB cap, validate the
+  **real** content-type against an allowlist (image/* + `video/mp4` + audio mp3/mp4/wav/ogg),
+  sniffing bytes via the `file-type.compat` shim when a source mislabels the MIME (e.g. Jamendo
+  serves an MP3 as `text/html`). Stores `source`/`attribution` in file metadata.
+- Shared frontend pieces under `apps/frontend/src/components/`: a native canvas **audio player**
+  (`media-tools/audio-player.tsx`, lazy waveform decode, one-at-a-time playback — used in stock
+  audio, Files grid/details, and the file preview modal), the **Save to Files** modal
+  (`media-tools/save-to-files-modal.tsx`, with an `allowPost` flag), the stock **preview modal**, and
+  the Files **preview modal** (`files/file-preview-modal.tsx`).

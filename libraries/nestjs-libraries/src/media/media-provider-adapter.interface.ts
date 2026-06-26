@@ -22,6 +22,7 @@ export interface MediaArtifactMetadata {
   width?: number;
   height?: number;
   durationSeconds?: number;
+  fps?: number;
   seed?: number;
   costUsd?: number;
   provenance?: string;
@@ -38,6 +39,19 @@ export interface MediaGenerationResult {
 }
 
 export type MediaInputValue = string | number | boolean;
+
+// Per-provider credential schema for the Settings → Media modal. Most providers need a
+// single API key (the modal's default) and omit this; multi-field providers (e.g. Google
+// Vertex: project + location + service-account JSON) declare their fields here so the modal
+// renders them dynamically. Mirrors the AI provider's `CredentialField`.
+export interface MediaCredentialField {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea';
+  required: boolean;
+  placeholder?: string;
+  help?: string;
+}
 
 export interface MediaCredentialOptions {
   apiKey?: string;
@@ -83,6 +97,14 @@ export interface MediaPollResult {
   metadata?: MediaArtifactMetadata;
 }
 
+export type MediaOperation = 'image' | 'video' | 'audio';
+
+// A single entry in a provider's runtime model catalog for one modality.
+export interface MediaModelOption {
+  id: string;
+  label: string;
+}
+
 export function resolveApiKey(options?: MediaCredentialOptions): string | undefined {
   return (
     options?.apiKey ||
@@ -98,6 +120,10 @@ export interface MediaProviderAdapter {
   readonly name: string;
   readonly capabilities: MediaProviderCapabilities;
 
+  // Optional multi-field credential schema. When absent, the Settings → Media modal
+  // collects a single `apiKey`.
+  readonly credentialFields?: MediaCredentialField[];
+
   generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult>;
 
   generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
@@ -106,8 +132,22 @@ export interface MediaProviderAdapter {
 
   pollJob?(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult>;
 
+  // Optional runtime model catalog for a modality — powers the studio's dynamic model
+  // dropdown (`select` field with `source: 'models'`). Hubs with large/changing catalogs
+  // implement this (hitting their `/models` endpoint, or reusing the AI adapter's
+  // `listModels`); providers with a small fixed set omit it and rely on the descriptor's
+  // static options. Returns [] when the modality has no models.
+  listModels?(operation: MediaOperation, options?: MediaCredentialOptions): Promise<MediaModelOption[]>;
+
+  // Lightweight credential/auth check for the Settings → Media "Test connection" action.
+  // Image-only providers can rely on the generateImage fallback; providers without image
+  // generation (video/avatar/tts/stt) should implement this so the test doesn't
+  // misleadingly fail with a "does not support image generation" error.
+  testConnection?(options?: MediaCredentialOptions): Promise<{ ok: boolean; message: string }>;
+
   textToSpeech?(text: string, options?: MediaGenerateOptions): Promise<Buffer | string>;
   speechToText?(audio: Buffer, options?: MediaGenerateOptions): Promise<string>;
+  speechToTextWords?(audio: Buffer, options?: MediaGenerateOptions): Promise<{ text: string; words: { word: string; start: number; end: number }[] }>;
   upscaleImage?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   removeBackground?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   inpaintImage?(imageUrl: string, maskUrl: string, prompt: string, options?: MediaGenerateOptions): Promise<string>;

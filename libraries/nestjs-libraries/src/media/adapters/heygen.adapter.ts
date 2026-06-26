@@ -23,6 +23,24 @@ interface HeyGenStatusResponse {
   };
 }
 
+interface HeyGenTranslateStatusResponse {
+  data?: {
+    status?: string;
+    url?: string;
+    message?: string;
+  };
+}
+
+interface HeyGenAudioStatusResponse {
+  data?: {
+    status?: string;
+    audio_url?: string;
+    url?: string;
+    duration?: number;
+    error?: { message?: string };
+  };
+}
+
 export class HeyGenAdapter implements MediaProviderAdapter {
   readonly identifier = 'heygen';
   readonly name = 'HeyGen';
@@ -50,6 +68,19 @@ export class HeyGenAdapter implements MediaProviderAdapter {
 
   async generateImage(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     throw new Error('HeyGen does not support image generation');
+  }
+
+  // Validate the key with a cheap authenticated GET (the avatar catalog) so the
+  // Settings → Media "Test connection" doesn't fall back to image generation.
+  async testConnection(options?: MediaCredentialOptions): Promise<{ ok: boolean; message: string }> {
+    try {
+      const res = await safeFetch('https://api.heygen.com/v2/avatars', { headers: this._headers(options) });
+      if (res.ok) return { ok: true, message: 'Connection successful' };
+      if (res.status === 401 || res.status === 403) return { ok: false, message: 'Invalid HeyGen API key' };
+      return { ok: false, message: `HeyGen returned ${res.status}` };
+    } catch (err) {
+      return { ok: false, message: (err as Error).message };
+    }
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
@@ -81,8 +112,28 @@ export class HeyGenAdapter implements MediaProviderAdapter {
     return this.generateVideo(prompt, options);
   }
 
+  // HeyGen has distinct status endpoints per operation (avatar video, video translation,
+  // text-to-speech). The HeyGen Studio stores the provider reference as `<op>:<id>` so a
+  // single pollJob can route to the right one. A bare id (no `:`) is an avatar-video job —
+  // this preserves the generic media-provider path (governance/grid), which stores the raw id.
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const res = await safeFetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`, {
+    const sep = jobId.indexOf(':');
+    const op = sep > 0 ? jobId.slice(0, sep) : 'video';
+    const id = sep > 0 ? jobId.slice(sep + 1) : jobId;
+
+    switch (op) {
+      case 'translate':
+        return this._pollTranslate(id, options);
+      case 'tts':
+        return this._pollTts(id, options);
+      case 'video':
+      default:
+        return this._pollVideo(id, options);
+    }
+  }
+
+  private async _pollVideo(videoId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    const res = await safeFetch(`https://api.heygen.com/v1/video_status.get?video_id=${encodeURIComponent(videoId)}`, {
       headers: this._headers(options),
     });
 
@@ -95,6 +146,53 @@ export class HeyGenAdapter implements MediaProviderAdapter {
         status: 'completed',
         artifactUrl: data.video_url,
         metadata: { provider: this.identifier, mime: 'video/mp4', durationSeconds: data.duration },
+      };
+    }
+    if (data?.status === 'failed') return { status: 'failed', error: data.error?.message };
+    return { status: 'pending' };
+  }
+
+  // Video translation status — GET /v2/video_translate/{id}. Terminal status is
+  // `success` with a downloadable `url`; `failed` carries a message.
+  private async _pollTranslate(translateId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    const res = await safeFetch(`https://api.heygen.com/v2/video_translate/${encodeURIComponent(translateId)}`, {
+      headers: this._headers(options),
+    });
+
+    if (!res.ok) return { status: 'failed', error: await res.text() };
+    const { data } = (await res.json()) as HeyGenTranslateStatusResponse;
+    const status = data?.status;
+
+    if (status === 'success') {
+      if (!data?.url) return { status: 'failed', error: 'HeyGen translation completed without a URL' };
+      return {
+        status: 'completed',
+        artifactUrl: data.url,
+        metadata: { provider: this.identifier, mime: 'video/mp4' },
+      };
+    }
+    if (status === 'failed') return { status: 'failed', error: data?.message || 'Translation failed' };
+    return { status: 'pending' };
+  }
+
+  // Text-to-speech status — GET /v1/audio_status.get. Returns a downloadable audio URL on
+  // completion. Wrapped so a not-yet-available endpoint surfaces as a graceful job failure
+  // rather than crashing the polling sweep.
+  private async _pollTts(audioId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    const res = await safeFetch(`https://api.heygen.com/v1/audio_status.get?audio_id=${encodeURIComponent(audioId)}`, {
+      headers: this._headers(options),
+    });
+
+    if (!res.ok) return { status: 'failed', error: await res.text() };
+    const { data } = (await res.json()) as HeyGenAudioStatusResponse;
+
+    if (data?.status === 'completed' || data?.status === 'success') {
+      const url = data.audio_url || data.url;
+      if (!url) return { status: 'failed', error: 'HeyGen audio completed without a URL' };
+      return {
+        status: 'completed',
+        artifactUrl: url,
+        metadata: { provider: this.identifier, mime: 'audio/mpeg', durationSeconds: data.duration },
       };
     }
     if (data?.status === 'failed') return { status: 'failed', error: data.error?.message };

@@ -260,6 +260,10 @@ export class AiSettingsRepository {
     costUsd?: number;
     creditType?: string;
     error?: string;
+    folderId?: string | null;
+    model?: string | null;
+    versionId?: string | null;
+    inputJson?: string | null;
   }) {
     return this._aiMediaJob.model.aIMediaJob.create({ data });
   }
@@ -272,6 +276,11 @@ export class AiSettingsRepository {
       provenance?: string;
       costUsd?: number;
       error?: string | null;
+      folderId?: string | null;
+      model?: string | null;
+      versionId?: string | null;
+      inputJson?: string | null;
+      creditType?: string | null;
     },
   ) {
     return this._aiMediaJob.model.aIMediaJob.update({
@@ -283,6 +292,14 @@ export class AiSettingsRepository {
   getMediaJobs(organizationId: string, limit = 50) {
     return this._aiMediaJob.model.aIMediaJob.findMany({
       where: { organizationId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+  }
+
+  getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {
+    return this._aiMediaJob.model.aIMediaJob.findMany({
+      where: { organizationId, provider },
       orderBy: { createdAt: 'desc' },
       take: limit,
     });

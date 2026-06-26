@@ -106,9 +106,16 @@ function scrubEvent(event: any): any {
 }
 
 export const initializeSentry = (appName: string, allowLogs = false) => {
+  if (process.env.DEV_DISABLE_SENTRY === 'true' || process.env.DEV_DISABLE_SENTRY === '1') {
+    return null;
+  }
+
   if (!process.env.NEXT_PUBLIC_SENTRY_DSN) {
     return null;
   }
+
+  const isDev = process.env.NODE_ENV === 'development';
+  const profilingEnabled = process.env.SENTRY_PROFILING === '1' || !isDev;
 
   try {
     Sentry.init({
@@ -127,8 +134,9 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
       dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
       spotlight: process.env.SENTRY_SPOTLIGHT === '1',
       integrations: [
-        // Add our Profiling integration
-        nodeProfilingIntegration(),
+        // Profiling is opt-in in development to avoid the CPU/memory overhead of
+        // @sentry/profiling-node on every local boot. Production keeps it enabled.
+        ...(profilingEnabled ? [nodeProfilingIntegration()] : []),
         ...(allowLogs
           ? [Sentry.consoleLoggingIntegration({ levels: ['warn', 'error'] })]
           : []),
@@ -141,7 +149,7 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
       enableLogs: true,
 
       // Profiling
-      profileSessionSampleRate: process.env.NODE_ENV === 'development' ? 1.0 : 0.45,
+      profileSessionSampleRate: profilingEnabled ? (isDev ? 1.0 : 0.45) : 0,
       profileLifecycle: 'trace',
 
       beforeSend(event, _hint) {

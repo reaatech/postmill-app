@@ -5,6 +5,7 @@ import {
   MediaGenerateOptions,
   MediaCredentialOptions,
   MediaJobSubmission,
+  MediaInputValue,
   MediaPollResult,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
@@ -46,7 +47,13 @@ export class TavusAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    const replicaId = options?.avatarId || options?.credentials?.replicaId;
+    // The studio supplies the replica id as a descriptor field in `options.input`; legacy
+    // callers pass it via top-level options/credentials.
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const replicaId =
+      options?.avatarId ||
+      (typeof input.replica_id === 'string' ? input.replica_id : undefined) ||
+      options?.credentials?.replicaId;
     if (!replicaId) throw new Error('Tavus video generation requires a replica id (avatarId)');
 
     const res = await safeFetch(`${BASE}/videos`, {
@@ -55,6 +62,7 @@ export class TavusAdapter implements MediaProviderAdapter {
       body: JSON.stringify({
         replica_id: replicaId,
         script: prompt,
+        ...(typeof input.video_name === 'string' && input.video_name ? { video_name: input.video_name } : {}),
         ...(options?.webhookUrl ? { callback_url: options.webhookUrl } : {}),
       }),
     });

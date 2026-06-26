@@ -6,7 +6,7 @@ import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-pro
 import { MediaArtifactMetadata } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-token';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
@@ -21,7 +21,10 @@ const JOB_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 // Defensive cap when downloading provider artifacts.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
-type AsyncOperation = 'video' | 'audio' | 'avatar';
+// 'stt' jobs are created already-complete (transcript stored inline via
+// completeJobWithBuffer), so they never enter the async poll path — but the type must
+// admit them so the Deepgram studio can record transcript history as media jobs.
+type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image' | 'stt';
 
 const OPERATION_FOLDER: Record<string, string> = {
   image: 'images',
@@ -45,6 +48,7 @@ const MIME_EXT: Record<string, string> = {
   'image/png': 'png',
   'image/jpeg': 'jpg',
   'image/webp': 'webp',
+  'image/gif': 'gif',
   'video/mp4': 'mp4',
   'video/webm': 'webm',
   'audio/mpeg': 'mp3',
@@ -69,7 +73,7 @@ export class MediaJobLifecycleService {
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private _registry: MediaProviderRegistry,
     private _storageService: StorageService,
-    private _mediaRepository: MediaRepository,
+    private _fileRepository: FileRepository,
     private _notificationService: NotificationService,
   ) {}
 
@@ -82,6 +86,10 @@ export class MediaJobLifecycleService {
     operation: AsyncOperation;
     costUsd?: number;
     creditType?: string;
+    folderId?: string | null;
+    model?: string | null;
+    versionId?: string | null;
+    inputJson?: string | null;
   }): Promise<AIMediaJob> {
     return this._aiSettings.createMediaJob({
       organizationId: params.organizationId,
@@ -91,14 +99,29 @@ export class MediaJobLifecycleService {
       status: 'pending',
       costUsd: params.costUsd,
       creditType: params.creditType,
+      folderId: params.folderId,
+      model: params.model,
+      versionId: params.versionId,
+      inputJson: params.inputJson,
     });
   }
 
   // Webhook completion URL (§11.2) — unguessable (HMAC token) and org-bound.
   // Returns undefined when no backend base URL is configured (polling still covers it).
+  // Only a public HTTPS base produces a webhook: providers (e.g. Replicate) reject
+  // non-HTTPS webhook URLs with a 422, and a webhook pointed at http/localhost can
+  // never be delivered anyway. For those bases we omit the webhook and let the
+  // polling sweep / per-request poll complete the job.
   webhookUrlFor(jobId: string, organizationId: string): string | undefined {
     const base = process.env.NEXT_PUBLIC_BACKEND_URL;
     if (!base) return undefined;
+    let parsed: URL;
+    try {
+      parsed = new URL(base);
+    } catch {
+      return undefined;
+    }
+    if (parsed.protocol !== 'https:') return undefined;
     try {
       const token = mediaJobWebhookToken(jobId, organizationId);
       return `${base.replace(/\/+$/, '')}/media-jobs/webhook/${jobId}/${token}`;
@@ -171,7 +194,7 @@ export class MediaJobLifecycleService {
       return 'failed';
     }
     if (poll.status === 'completed' && poll.artifactUrl) {
-      const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata);
+      const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
       return ok ? 'completed' : 'failed';
     }
 
@@ -183,10 +206,88 @@ export class MediaJobLifecycleService {
 
   // Download the artifact (provider URLs expire), land it in tenant storage under the
   // provider root's typed folder, persist metadata, mark completed and notify (§11.2/11.5/11.7).
+  /**
+   * Complete a job where the artifact is already a local Buffer (e.g. the
+   * chromium-ffmpeg render pipeline). Stores the buffer in tenant storage,
+   * persists metadata, and notifies the org.
+   */
+  async completeJobWithBuffer(
+    job: AIMediaJob,
+    buffer: Buffer,
+    mime: string,
+    metadata?: MediaArtifactMetadata,
+    thumbnailBuffer?: Buffer,
+    folderId?: string,
+  ): Promise<boolean> {
+    try {
+      const stored = await this._writeToTenantStorage({
+        organizationId: job.organizationId,
+        provider: job.provider,
+        operation: job.operation,
+        baseName: `${job.operation}-${job.id}`,
+        buffer,
+        mime,
+        folderId,
+        metadata: {
+          ...metadata,
+          provider: metadata?.provider || job.provider,
+          mime,
+          source: 'ai-media',
+        },
+      });
+
+      let thumbnailPath: string | undefined;
+      if (thumbnailBuffer) {
+        const thumbStored = await this._writeToTenantStorage({
+          organizationId: job.organizationId,
+          provider: job.provider,
+          operation: 'image',
+          baseName: `${job.operation}-${job.id}-thumb`,
+          buffer: thumbnailBuffer,
+          mime: 'image/jpeg',
+          folderId,
+          metadata: {
+            provider: job.provider,
+            mime: 'image/jpeg',
+            source: 'ai-media-thumbnail',
+          },
+        });
+        thumbnailPath = thumbStored.path;
+      }
+
+      await this._aiSettings.updateMediaJob(job.id, {
+        status: 'completed',
+        artifactUrl: stored.path,
+        error: null,
+      });
+
+      if (thumbnailPath) {
+        await this._fileRepository.saveMediaInformation(job.organizationId, {
+          id: stored.mediaId,
+          thumbnail: thumbnailPath,
+          alt: '',
+          thumbnailTimestamp: 0,
+        });
+      }
+
+      await this._notify(
+        job,
+        'success',
+        `AI ${job.operation} ready`,
+        `Your generated ${job.operation} is ready in the media library.`,
+      );
+      return true;
+    } catch (err) {
+      await this.failJob(job, `Failed to store generated artifact: ${(err as Error).message}`);
+      return false;
+    }
+  }
+
   async completeJob(
     job: AIMediaJob,
     artifactUrl: string,
     metadata?: MediaArtifactMetadata,
+    folderId?: string | null,
   ): Promise<boolean> {
     try {
       const stored = await this.storeArtifact({
@@ -196,6 +297,7 @@ export class MediaJobLifecycleService {
         jobId: job.id,
         artifactUrl,
         metadata,
+        folderId,
       });
 
       await this._aiSettings.updateMediaJob(job.id, {
@@ -241,6 +343,7 @@ export class MediaJobLifecycleService {
     jobId: string;
     artifactUrl: string;
     metadata?: MediaArtifactMetadata;
+    folderId?: string | null;
   }): Promise<StoredArtifact> {
     const { buffer, mime } = await this._download(params.artifactUrl, params.metadata?.mime);
     const metadata: Record<string, unknown> = {
@@ -256,6 +359,7 @@ export class MediaJobLifecycleService {
       baseName: `${params.operation}-${params.jobId}`,
       buffer,
       mime,
+      folderId: params.folderId,
       metadata,
     });
   }
@@ -341,6 +445,7 @@ export class MediaJobLifecycleService {
     baseName: string;
     buffer: Buffer;
     mime: string;
+    folderId?: string;
     metadata: Record<string, unknown>;
   }): Promise<StoredArtifact> {
     const config = await this._orgMediaProviderSettings.getConfigForProvider(
@@ -355,16 +460,18 @@ export class MediaJobLifecycleService {
     const path = await adapter.writeBuffer(params.buffer, params.mime);
 
     const folderName = OPERATION_FOLDER[params.operation] || 'other';
-    const folderId = config?.storageRootFolderId
-      ? await this._orgMediaProviderSettings.getStandardFolderId(
-          params.organizationId,
-          config.storageRootFolderId,
-          folderName,
-        )
-      : null;
+    const folderId =
+      params.folderId ??
+      (config?.storageRootFolderId
+        ? await this._orgMediaProviderSettings.getStandardFolderId(
+            params.organizationId,
+            config.storageRootFolderId,
+            folderName,
+          )
+        : null);
 
     const ext = MIME_EXT[params.mime] || 'bin';
-    const media = await this._mediaRepository.saveGeneratedMedia(params.organizationId, {
+    const media = await this._fileRepository.saveGeneratedMedia(params.organizationId, {
       name: `${params.baseName}.${ext}`,
       path,
       type: OPERATION_MEDIA_TYPE[params.operation] || 'other',

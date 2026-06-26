@@ -16,8 +16,8 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.serv
   IntegrationService: vi.fn(),
 }));
 
-vi.mock('@gitroom/nestjs-libraries/database/prisma/media/media.service', () => ({
-  MediaService: vi.fn(),
+vi.mock('@gitroom/nestjs-libraries/database/prisma/file/file.service', () => ({
+  FileService: vi.fn(),
 }));
 
 vi.mock('@gitroom/nestjs-libraries/short-linking/short.link.service', () => ({

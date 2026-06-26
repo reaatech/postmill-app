@@ -1,3 +1,11 @@
+# WARNING: This file is manually maintained and likely out of date.
+# The NestJS Swagger decorators (@ApiTags, @ApiOperation, etc.) on the
+# controllers auto-generate the spec at build time. Regenerate it from
+# decorators rather than editing this file by hand. The stale
+# `/media/upload-server` and `/media/save-media` entries have been removed
+# (the routes now live under `/files/*`). New `/media/stock/*` routes are
+# also absent here.
+
 openapi: 3.1.0
 
 info:
@@ -1361,20 +1369,6 @@ paths:
       parameters: [{ $ref: '#/components/parameters/PathId' }]
       responses: { '200': { description: Deleted } }
 
-  /media/upload-server:
-    post:
-      tags: [Media]
-      summary: Upload a file (multipart) and save to library
-      operationId: uploadServer
-      requestBody:
-        required: true
-        content:
-          multipart/form-data:
-            schema:
-              type: object
-              properties: { file: { type: string, format: binary } }
-      responses: { '200': { description: Saved media, content: { application/json: { schema: { $ref: '#/components/schemas/Media' } } } } }
-
   /media/upload-simple:
     post:
       tags: [Media]
@@ -1401,22 +1395,6 @@ paths:
         `complete-multipart-upload`). On completion, also saves the file to the library.
       parameters: [{ name: endpoint, in: path, required: true, schema: { type: string } }]
       responses: { '200': { description: R2 response (and `saved` on completion) } }
-
-  /media/save-media:
-    post:
-      tags: [Media]
-      summary: Save an already-uploaded media by name
-      operationId: saveMedia
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                name: { type: string }
-                originalName: { type: string }
-      responses: { '200': { description: Saved media (or false) } }
 
   /media/information:
     post:
@@ -1456,6 +1434,56 @@ paths:
         required: true
         content: { application/json: { schema: { type: object, properties: { prompt: { type: string } } } } }
       responses: { '200': { description: Saved media (or false), content: { application/json: { schema: { type: object, additionalProperties: true } } } } }
+
+  /media/remove-background:
+    post:
+      tags: [Media]
+      summary: Remove an image background (AI, credit-checked)
+      operationId: removeBackground
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [imageUrl], properties: { imageUrl: { type: string, format: uri } } } } }
+      responses: { '200': { description: Resulting image URL, content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } } }
+
+  /media/inpaint:
+    post:
+      tags: [Media]
+      summary: Inpaint / magic-edit an image (AI, credit-checked)
+      operationId: inpaintImage
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [imageUrl, maskUrl, prompt], properties: { imageUrl: { type: string, format: uri }, maskUrl: { type: string, format: uri }, prompt: { type: string } } } } }
+      responses: { '200': { description: Resulting image URL, content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } } }
+
+  /media/upscale:
+    post:
+      tags: [Media]
+      summary: Upscale an image (AI, credit-checked)
+      operationId: upscaleImage
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [imageUrl], properties: { imageUrl: { type: string, format: uri }, scale: { type: number, minimum: 1, maximum: 8 } } } } }
+      responses: { '200': { description: Resulting image URL, content: { application/json: { schema: { type: object, properties: { url: { type: string } } } } } } }
+
+  /media/designs/render:
+    post:
+      tags: [Media]
+      summary: Server-side render a design document to PNG or PDF
+      operationId: renderDesign
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [doc], properties: { doc: { type: object }, pageIndex: { type: integer }, format: { type: string, enum: [png, pdf] }, pixelRatio: { type: number }, transparent: { type: boolean } } } } }
+      responses: { '200': { description: Rendered image/pdf, content: { image/png: { schema: { type: string, format: binary } }, application/pdf: { schema: { type: string, format: binary } } } } }
+
+  /media/designs/bulk-generate:
+    post:
+      tags: [Media]
+      summary: Data-driven bulk design generation ({{variables}} per row)
+      operationId: bulkGenerateDesigns
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [doc, rows], properties: { doc: { type: object }, rows: { type: array, items: { type: object, additionalProperties: { type: string } } }, format: { type: string } } } } }
+      responses: { '200': { description: Base64 image data URLs, content: { application/json: { schema: { type: object, properties: { images: { type: array, items: { type: string } }, truncated: { type: boolean }, totalRows: { type: integer } } } } } } }
 
   /media/generate-video:
     post:

@@ -36,7 +36,7 @@ export class MastodonCustomProvider extends MastodonProvider {
     };
   }
   override async generateAuthUrl(
-    refresh?: string,
+    refresh?: ClientInformation,
     external?: ClientInformation
   ) {
     const state = makeId(6);

@@ -21,13 +21,17 @@ export class TelemetryService {
   private _tracer: Tracer;
   private _logger = new Logger(TelemetryService.name);
   private _configured = false;
+  private _disabled = false;
 
   constructor() {
     this._tracer = trace.getTracer('postmill-ai');
+    if (process.env.DEV_DISABLE_OPENTELEMETRY === 'true' || process.env.DEV_DISABLE_OPENTELEMETRY === '1') {
+      this._disabled = true;
+    }
   }
 
   configure(observability: any, _secretSettings?: Record<string, string>) {
-    if (this._configured) return;
+    if (this._disabled || this._configured) return;
     if (!observability?.endpoint) return;
 
     if (!OTLPTraceExporter) {

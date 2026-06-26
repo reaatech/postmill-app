@@ -8,7 +8,6 @@ import { PublicApiModule } from '@gitroom/backend/public-api/public.api.module';
 import { ThrottlerBehindProxyGuard } from '@gitroom/nestjs-libraries/throttler/throttler.provider';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AgentModule } from '@gitroom/nestjs-libraries/agent/agent.module';
-import { ThirdPartyModule } from '@gitroom/nestjs-libraries/3rdparties/thirdparty.module';
 import { VideoModule } from '@gitroom/nestjs-libraries/videos/video.module';
 import { SentryModule } from '@sentry/nestjs/setup';
 import { FILTER } from '@gitroom/nestjs-libraries/sentry/sentry.exception';
@@ -21,21 +20,31 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
 import { InngestController } from '@gitroom/backend/api/controllers/inngest.controller';
 import { ScheduleModule } from '@nestjs/schedule';
+import { FeatureFlagsModule, FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
+import { CollaborationModule } from '@gitroom/backend/services/collaboration/collaboration.module';
+
+// Module-level feature flags are read at bootstrap time. Defaults keep all
+// features enabled for production/CI; local developers opt-out via env vars.
+const featureFlags = new FeatureFlagsService();
+const scheduleModule = featureFlags.isEnabled('cron')
+  ? [ScheduleModule.forRoot()]
+  : [];
 
 @Global()
 @Module({
   imports: [
+    FeatureFlagsModule,
     SentryModule.forRoot(),
-    ScheduleModule.forRoot(),
+    ...scheduleModule,
     DatabaseModule,
     ApiModule,
     PublicApiModule,
     AgentModule,
-    ThirdPartyModule,
     VideoModule,
     ChatModule,
     InngestModule,
     AiModule,
+    CollaborationModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {

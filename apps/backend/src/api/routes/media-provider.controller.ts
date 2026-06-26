@@ -37,6 +37,7 @@ export class MediaProviderController {
       identifier: adapter.identifier,
       name: adapter.name,
       capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields ?? null,
     }));
   }
 

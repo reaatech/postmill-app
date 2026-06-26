@@ -7,7 +7,7 @@ manage media assets across campaigns and channels.
 ## Folder tree navigation
 
 The left sidebar in the media library displays a hierarchical folder tree backed by the
-`MediaFolder` model. Each folder has a `parentId`, enabling an unlimited nesting depth.
+`FileFolder` model. Each folder has a `parentId`, enabling an unlimited nesting depth.
 
 - Click any folder to filter the file grid to that folder's contents.
 - Click **All Files** at the top to view files across the entire library (unfiltered by folder).

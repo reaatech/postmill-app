@@ -1,4 +1,5 @@
 import { Module, Global, OnModuleInit, NestModule, MiddlewareConsumer, RequestMethod, Logger } from '@nestjs/common';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { AIProviderRegistry } from './ai-provider.registry';
 import { OpenAIAdapter } from './adapters/openai.adapter';
 import { OpenAICompatibleAdapter } from './adapters/openai-compatible.adapter';
@@ -95,6 +96,7 @@ export class AiModule implements OnModuleInit, NestModule {
 
   constructor(
     private readonly _registry: AIProviderRegistry,
+    private readonly _flags: FeatureFlagsService,
   ) {}
 
   configure(consumer: MiddlewareConsumer) {
@@ -112,6 +114,11 @@ export class AiModule implements OnModuleInit, NestModule {
   }
 
   onModuleInit() {
+    if (this._flags.isDisabled('ai')) {
+      this._logger.log('AI module is disabled via DEV_DISABLE_AI; skipping adapter registration');
+      return;
+    }
+
     if (process.env.OPENAI_API_KEY) {
       this._logger.warn(
         'DEPRECATION: OPENAI_API_KEY environment variable is deprecated. ' +

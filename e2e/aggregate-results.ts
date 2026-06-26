@@ -141,7 +141,6 @@ UI Pages Tested:
   ✓ Composer (draft, schedule, publish flows)
   ✓ Settings (account, workspace, channels, billing)
   ✓ Media Library (upload, filter, delete)
-  ✓ Integrations (connect, configure, channels)
   ✓ Error States (validation, API errors, edge cases)
   ✓ Post Detail (modal, KPI, comments, edit, delete)
 

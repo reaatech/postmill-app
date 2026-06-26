@@ -26,7 +26,7 @@ model Organization {
   customers           Customer[]
   errors              Errors[]
   Integration         Integration[]
-  media               Media[]
+  files               File[]
   notifications       Notifications[]
   plugs               Plugs[]
   post                Post[]               @relation("organization")
@@ -37,7 +37,6 @@ model Organization {
   signatures          Signatures[]
   subscription        Subscription?
   tags                Tags[]
-  thirdParty          ThirdParty[]
   usedCodes           UsedCodes[]
   users               UserOrganization[]
   webhooks            Webhooks[]
@@ -52,16 +51,20 @@ model Organization {
   aiContentIndexes    AIContentIndex[]
   multipartUploads    MultipartUpload[]
   localStorageQuotaBytes BigInt @default(5368709120) // 5 GB default
-  mediaFolders        MediaFolder[]
+  fileFolders         FileFolder[]
   storageProviders    StorageProviderConfig[]
   orgProviderConfigs  OrgProviderConfiguration[]
   mediaProviderConfigs MediaProviderConfig[]
+  contentPackConfigs   ContentPackConfig[]
+  activeContentPackIdentifier String? // null = free default; pointer to the active premium content pack identifier
   auditLogs           AuditLog[]
   orgShortLinkConfigs  OrgShortLinkConfig[]
   shortLinks           ShortLink[]
   shortLinkSnapshots   ShortLinkSnapshot[]
   apiKeys              ApiKey[]
   roles                AppRole[]
+  designs              Design[]
+  designTemplates      DesignTemplate[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -121,6 +124,7 @@ model User {
   apiKeys               ApiKey[]
   profile               UserProfile?
   sessions              Session[]
+  designs               Design[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -158,7 +162,7 @@ model UserOrganization {
 
 
 
-model Media {
+model File {
   id                 String              @id @default(uuid())
   name               String
   originalName       String?
@@ -176,10 +180,13 @@ model Media {
   tags               String?    // JSON: string[]
   description        String?
   metadata           Json?
-  folder             MediaFolder? @relation(fields: [folderId], references: [id])
+  folder             FileFolder? @relation(fields: [folderId], references: [id])
   organization       Organization        @relation(fields: [organizationId], references: [id])
   userProfiles       UserProfile[]
   oauthApps          OAuthApp[]
+  designPreviews     Design[]
+  designTemplateThumbnails DesignTemplate[]
+  signatures         Signatures[]
 
   @@index([name])
   @@index([organizationId])
@@ -208,7 +215,7 @@ model Subscription {
   subscriptionTier SubscriptionTier
   identifier       String?
   cancelAt         DateTime?
-  period           Period
+  period           String          @default("MONTHLY")
   totalChannels    Int
   isLifetime       Boolean          @default(false)
   createdAt        DateTime         @default(now())
@@ -259,7 +266,7 @@ model Integration {
   exisingPlugData       ExisingPlugData[]
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
-  webhooks              IntegrationsWebhooks[]
+  webhooks              Webhooks[]
   plugs                 Plugs[]
   posts                     Post[]
   analyticsSnapshots        AnalyticsSnapshot[]
@@ -334,12 +341,17 @@ model ProviderConfiguration {
 model Signatures {
   id             String       @id @default(uuid())
   organizationId String
+  name           String?
   content        String
   autoAdd        Boolean
+  channels       String[]     @default([])
+  usageCount     Int          @default(0)
+  pictureId      String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
+  picture        File?        @relation(fields: [pictureId], references: [id])
 
   @@index([createdAt])
   @@index([organizationId])
@@ -529,28 +541,16 @@ model PopularPosts {
   updatedAt DateTime @updatedAt
 }
 
-model IntegrationsWebhooks {
-  integrationId String
-  webhookId     String
-  integration   Integration @relation(fields: [integrationId], references: [id])
-  webhook       Webhooks    @relation(fields: [webhookId], references: [id])
-
-  @@id([integrationId, webhookId])
-  @@unique([integrationId, webhookId])
-  @@index([integrationId])
-  @@index([webhookId])
-}
-
 model Webhooks {
-  id             String                 @id @default(uuid())
+  id             String        @id @default(uuid())
   name           String
   organizationId String
   url            String
   deletedAt      DateTime?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  integrations   IntegrationsWebhooks[]
-  organization   Organization           @relation(fields: [organizationId], references: [id])
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  integrations   Integration[]
+  organization   Organization  @relation(fields: [organizationId], references: [id])
 
   @@index([organizationId])
   @@index([deletedAt])
@@ -589,23 +589,6 @@ model Sets {
   @@index([organizationId])
 }
 
-model ThirdParty {
-  id             String       @id @default(uuid())
-  organizationId String
-  identifier     String
-  name           String
-  internalId     String
-  apiKey         String
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
-
-  @@unique([organizationId, internalId])
-  @@index([organizationId])
-  @@index([deletedAt])
-}
-
 model Errors {
   id             String       @id @default(uuid())
   message        String
@@ -634,8 +617,7 @@ model Mentions {
   @@index([createdAt])
 }
 
-// ── v3.6.0: MediaFolder for the media manager rebuild ──
-model MediaFolder {
+model FileFolder {
   id                String        @id @default(uuid())
   organizationId    String
   parentId          String?
@@ -646,9 +628,9 @@ model MediaFolder {
   storageProviderId String?       // foreign key to StorageProviderConfig (mounted cloud root)
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
-  parent            MediaFolder?  @relation("FolderTree", fields: [parentId], references: [id])
-  children          MediaFolder[] @relation("FolderTree")
-  media             Media[]
+  parent            FileFolder?   @relation("FolderTree", fields: [parentId], references: [id])
+  children          FileFolder[]  @relation("FolderTree")
+  files             File[]
   storageProvider   StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
   organization      Organization  @relation(fields: [organizationId], references: [id])
 
@@ -663,6 +645,14 @@ enum StorageProviderType {
   CLOUDFLARE_R2
   BACKBLAZE_B2
   IDRIVE_E2
+  WASABI
+  DIGITALOCEAN_SPACES
+  HETZNER
+  STORJ
+  SCALEWAY
+  VULTR
+  LINODE
+  S3_COMPATIBLE
 }
 
 model StorageProviderConfig {
@@ -684,7 +674,7 @@ model StorageProviderConfig {
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
   organization     Organization        @relation(fields: [organizationId], references: [id])
-  folders          MediaFolder[]
+  folders          FileFolder[]
   mediaProviderConfigs MediaProviderConfig[]
 
   @@unique([organizationId, accountFingerprint])
@@ -901,7 +891,7 @@ model OAuthApp {
   updatedAt      DateTime             @updatedAt
   deletedAt      DateTime?
   organization   Organization         @relation(fields: [organizationId], references: [id])
-  picture        Media?               @relation(fields: [pictureId], references: [id])
+  picture        File?                @relation(fields: [pictureId], references: [id])
   authorizations OAuthAuthorization[]
 
   @@unique([organizationId, deletedAt])
@@ -1154,7 +1144,7 @@ model UserProfile {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  picture           Media?   @relation(fields: [pictureId], references: [id])
+  picture           File?    @relation(fields: [pictureId], references: [id])
 
   @@index([pictureId])
 }
@@ -1216,6 +1206,22 @@ model MediaProviderConfig {
   @@index([organizationId])
 }
 
+// ── v3.x: Per-organization premium content pack (BYOK) ──
+model ContentPackConfig {
+  id             String   @id @default(cuid())
+  organizationId String
+  identifier     String   // e.g. 'magnific'
+  credentials    String?  // encrypted JSON
+  extraConfig    Json?    // provider-specific non-secret config
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+}
+
 // Per-org brand voice / custom instructions + localization
 model AIBrandProfile {
   id                String       @id @default(cuid())
@@ -1223,10 +1229,22 @@ model AIBrandProfile {
   instructions      String?
   language          String?
   platformInstructions Json?    @default("{}")
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  // `language` is the active language; instructions/platformInstructions mirror its profile.
+  languageProfiles  Json?        @default("{}")
   enabled           Boolean      @default(true)
   name              String?
   isDefault         Boolean      @default(false)
   slug              String?
+  logoFileIds       Json?        @default("[]")
+  palette           Json?        @default("[]")
+  fontFamilies      Json?        @default("[]")
+  customFonts       Json?        @default("[]")
+  introFileId       String?
+  outroFileId       String?
+  enforcement       Json?        @default("{}")
+  // Attached brand assets — [{ fileId, url, caption }] (logos, reference imagery, etc.).
+  assets            Json?        @default("[]")
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
@@ -1281,6 +1299,10 @@ model AIMediaJob {
   costUsd        Float        @default(0)
   creditType     String?
   error          String?
+  folderId    String?
+  model       String?
+  versionId   String?
+  inputJson   String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -1344,11 +1366,6 @@ enum SubscriptionTier {
   PRO
   TEAM
   ULTIMATE
-}
-
-enum Period {
-  MONTHLY
-  YEARLY
 }
 
 enum Provider {
@@ -1456,8 +1473,57 @@ model Campaign {
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
   posts          Post[]
+  designs        Design[]
 
   @@index([organizationId])
+  @@index([deletedAt])
+}
+
+// Editable design documents — one per org-scoped design
+model Design {
+  id              String        @id @default(cuid())
+  organizationId  String
+  name            String
+  doc             Json
+  width           Int           @default(1080)
+  height          Int           @default(1080)
+  previewDataUrl  String?
+  previewFileId   String?
+  createdById     String
+  campaignId      String?
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization    Organization  @relation(fields: [organizationId], references: [id])
+  createdBy       User          @relation(fields: [createdById], references: [id])
+  campaign        Campaign?     @relation(fields: [campaignId], references: [id])
+  previewFile     File?         @relation(fields: [previewFileId], references: [id])
+
+  @@index([organizationId])
+  @@index([createdById])
+  @@index([campaignId])
+  @@index([deletedAt])
+}
+
+// Design templates — system-seeded or org-saved — for the Templates panel
+model DesignTemplate {
+  id              String        @id @default(cuid())
+  organizationId  String?
+  name            String
+  category        String
+  doc             Json
+  thumbnailFileId String?
+  isSystem        Boolean       @default(false)
+  deletedAt       DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  organization    Organization? @relation(fields: [organizationId], references: [id])
+  thumbnailFile   File?         @relation(fields: [thumbnailFileId], references: [id])
+
+  @@index([organizationId])
+  @@index([category])
   @@index([deletedAt])
 }
 

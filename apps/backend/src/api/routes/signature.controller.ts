@@ -20,6 +20,20 @@ export class SignatureController {
     return (await this._signatureService.getDefaultSignature(org.id)) || {};
   }
 
+  @Get('/auto')
+  async getAutoAddSignatures(@GetOrgFromRequest() org: Organization) {
+    return this._signatureService.getAutoAddSignatures(org.id);
+  }
+
+  @Post('/:id/track-usage')
+  async trackUsage(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    await this._signatureService.trackUsage(org.id, id);
+    return { success: true };
+  }
+
   @Post('/')
   async createSignature(
     @GetOrgFromRequest() org: Organization,

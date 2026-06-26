@@ -25,7 +25,7 @@ Every environment variable Postmill recognises, sourced from `.env.example` and
 |----------|---------|---------|
 | `UPLOAD_DIRECTORY` | — | Local path for file uploads (e.g. `/uploads`). Avatars and app-internal images always use LOCAL. Since v3.8.10, local files are partitioned per tenant under `<UPLOAD_DIRECTORY>/<tenantId>/`. |
 | `NEXT_PUBLIC_UPLOAD_STATIC_DIRECTORY` | — | Public URL path serving uploads (e.g. `/uploads`) |
-| `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/media/upload-server` (default 1 GB) |
+| `MEDIA_UPLOAD_MAX_BYTES` | `1073741824` | Maximum upload file size for `/files/upload-server` (default 1 GB) |
 | `LOCAL_STORAGE_QUOTA_GB` | `5` | **(v3.8.10)** Default soft quota for each org's local storage, in GB. Per-org override via the org's `localStorageQuotaBytes`. |
 
 ## Email (v3.8.1+)
@@ -178,9 +178,30 @@ fallback (login only — channel credentials are configured in Settings → Chan
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `NEXT_PUBLIC_DISCORD_SUPPORT` | — | Discord support server invite URL |
-| `NEXT_PUBLIC_POLOTNO` | — | Polotno license key for the image editor |
 | `NX_ADD_PLUGINS` | — | Nx build plugin setting (development) |
 | `PORT` | `3000` | Backend listen port inside the container |
+
+## Stock Media (v3.8)
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `UNSPLASH_ACCESS_KEY` | — | Unsplash API access key for stock photo browsing and download |
+| `PEXELS_API_KEY` | — | Pexels API key for stock video browsing and download |
+| `PIXABAY_API_KEY` | — | Pixabay API key for free vector/illustration browsing |
+| `GIPHY_API_KEY` | — | GIPHY API key for free sticker browsing |
+| `JAMENDO_CLIENT_ID` | — | Jamendo API client ID for stock audio browsing in the video editor |
+
+Iconify (SVG icons) does not require an API key.
+
+### Content Packs (v3.8.10+)
+
+Premium stock sources are configured **per-organization** in-app via **Settings → Content Packs**.
+Bring-your-own-key (BYOK) packs take precedence over the free catalogs above for the capabilities
+they support.
+
+| Provider | Setup location | Notes |
+|----------|----------------|-------|
+| **Magnific** | Settings → Content Packs | Add your Magnific API key; it is encrypted at rest and never returned to the client. Supports photos, vectors, icons, and videos. |
 
 ## Variables no longer read (v3.7.1+)
 
@@ -201,4 +222,4 @@ The **login** provider env vars (`GITHUB_CLIENT_*`, `YOUTUBE_CLIENT_*` for Googl
 fallback for `/admin`-managed auth providers (v3.8.10) and must never be used for channel or AI
 credentials.
 
-> Verified against v3.8.10
+> Verified against v3.9.0

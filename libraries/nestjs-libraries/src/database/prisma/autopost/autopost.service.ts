@@ -97,7 +97,7 @@ export class AutopostService {
         Logger.debug(
           `Skipping autopost/process event for ${id} — Inngest is disabled`
         );
-        return;
+        return false;
       }
 
       try {

@@ -46,9 +46,15 @@ export class BrandsRepository {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
       isDefault?: boolean;
       slug?: string;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
+      assets?: { fileId?: string; url: string; caption?: string }[];
+      enforcement?: Record<string, any>;
     },
   ) {
     return this._aiBrandProfile.model.aIBrandProfile.create({
@@ -58,9 +64,15 @@ export class BrandsRepository {
         instructions: data.instructions,
         language: data.language,
         platformInstructions: data.platformInstructions || {},
+        languageProfiles: data.languageProfiles ?? {},
         enabled: data.enabled ?? true,
         isDefault: data.isDefault ?? false,
         slug: data.slug,
+        logoFileIds: data.logoFileIds ?? [],
+        palette: data.palette ?? [],
+        fontFamilies: data.fontFamilies ?? [],
+        assets: data.assets ?? [],
+        enforcement: data.enforcement ?? {},
       },
     });
   }
@@ -73,7 +85,15 @@ export class BrandsRepository {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
+      logoFileIds?: string[];
+      palette?: string[];
+      fontFamilies?: string[];
+      introFileId?: string | null;
+      outroFileId?: string | null;
+      assets?: { fileId?: string; url: string; caption?: string }[];
+      enforcement?: Record<string, any>;
     },
   ) {
     const brand = await this._aiBrandProfile.model.aIBrandProfile.findFirst({
@@ -112,5 +132,39 @@ export class BrandsRepository {
       where: { id: brandId },
       data: { isDefault: true },
     });
+  }
+
+  async getCustomFonts(organizationId: string) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const fonts = brand.customFonts as any[] | null;
+    return Array.isArray(fonts) ? fonts : [];
+  }
+
+  async addCustomFont(
+    organizationId: string,
+    font: { family: string; fileId: string; path: string; weights: number[] }
+  ) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const existing = (brand.customFonts as any[]) || [];
+    existing.push(font);
+    await this._aiBrandProfile.model.aIBrandProfile.update({
+      where: { id: brand.id },
+      data: { customFonts: existing },
+    });
+    return existing;
+  }
+
+  async removeCustomFont(organizationId: string, fileId: string) {
+    const brand = await this.getDefaultBrand(organizationId) || await this.getFirstBrand(organizationId);
+    if (!brand) return [];
+    const existing = (brand.customFonts as any[]) || [];
+    const next = existing.filter((f: any) => f.fileId !== fileId);
+    await this._aiBrandProfile.model.aIBrandProfile.update({
+      where: { id: brand.id },
+      data: { customFonts: next },
+    });
+    return next;
   }
 }

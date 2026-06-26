@@ -1,0 +1,323 @@
+'use client';
+
+import React, { useCallback, useMemo, useState } from 'react';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import type { StudioCustomProps } from '@gitroom/frontend/components/media-tools/studio-kit/types';
+
+interface Segment {
+  start: number;
+  end: number;
+  text: string;
+}
+interface TranscriptResult {
+  text: string;
+  words: { word: string; start: number; end: number }[];
+  segments: Segment[];
+}
+interface SelectedSource {
+  fileId?: string;
+  url: string;
+  type: 'image' | 'video' | 'audio';
+  width: number;
+  height: number;
+}
+
+const MODELS = [
+  { value: 'nova-2', label: 'Nova-2 (recommended)' },
+  { value: 'nova-3', label: 'Nova-3' },
+  { value: 'whisper', label: 'Whisper' },
+];
+
+// seconds → SRT (00:00:00,000) / VTT (00:00:00.000) timecodes.
+const pad = (n: number, w = 2) => String(Math.floor(n)).padStart(w, '0');
+const timecode = (sec: number, sep: ',' | '.') => {
+  const ms = Math.round((sec - Math.floor(sec)) * 1000);
+  return `${pad(sec / 3600)}:${pad((sec % 3600) / 60)}:${pad(sec % 60)}${sep}${pad(ms, 3)}`;
+};
+
+const buildSrt = (segments: Segment[]) =>
+  segments
+    .map((s, i) => `${i + 1}\n${timecode(s.start, ',')} --> ${timecode(s.end, ',')}\n${s.text}`)
+    .join('\n\n') + '\n';
+
+const buildVtt = (segments: Segment[]) =>
+  'WEBVTT\n\n' +
+  segments.map((s) => `${timecode(s.start, '.')} --> ${timecode(s.end, '.')}\n${s.text}`).join('\n\n') +
+  '\n';
+
+const download = (filename: string, content: string, mime: string) => {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const modal = useModals();
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [source, setSource] = useState<SelectedSource | null>(null);
+  const [model, setModel] = useState('nova-2');
+  const [language, setLanguage] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<TranscriptResult | null>(null);
+  const [transcript, setTranscript] = useState('');
+
+  const onSelect = useCallback(
+    (item: {
+      source: string;
+      url: string;
+      fileId?: string;
+      type: 'image' | 'video' | 'audio';
+      width: number;
+      height: number;
+    }) => {
+      if (item.type !== 'audio' && item.type !== 'video') {
+        toaster.show('Pick an audio or video file to transcribe', 'warning');
+        return;
+      }
+      if (!item.fileId) {
+        toaster.show('Transcription needs a file from your library', 'warning');
+        return;
+      }
+      setSource({
+        fileId: item.fileId,
+        url: item.url,
+        type: item.type,
+        width: item.width,
+        height: item.height,
+      });
+      setResult(null);
+      setTranscript('');
+    },
+    [toaster]
+  );
+
+  const transcribe = useCallback(async () => {
+    if (!source?.fileId) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/media/deepgram/transcribe', {
+        method: 'POST',
+        body: JSON.stringify({ fileId: source.fileId, model, language: language.trim() || undefined }),
+      });
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        toaster.show(msg || 'Transcription failed', 'warning');
+        return;
+      }
+      const data = (await res.json()) as TranscriptResult;
+      if (!data.text) {
+        toaster.show('No speech detected', 'warning');
+        return;
+      }
+      setResult(data);
+      setTranscript(data.text);
+    } catch {
+      toaster.show('Transcription failed', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  }, [source, model, language, fetch, toaster]);
+
+  const saveToFiles = useCallback(async () => {
+    if (!result) return;
+    try {
+      const res = await fetch('/media/deepgram/save-transcript', {
+        method: 'POST',
+        body: JSON.stringify({ text: transcript, segments: result.segments }),
+      });
+      if (!res.ok) {
+        toaster.show('Could not save transcript', 'warning');
+        return;
+      }
+      toaster.show('Transcript saved to Files', 'success');
+      onGenerated();
+    } catch {
+      toaster.show('Could not save transcript', 'warning');
+    }
+  }, [result, transcript, fetch, toaster, onGenerated]);
+
+  const sendToComposer = useCallback(async () => {
+    if (!transcript) return;
+    const integrationsRes = await fetch('/integrations');
+    if (!integrationsRes.ok) {
+      toaster.show('Could not load channels', 'warning');
+      return;
+    }
+    const integrations = await integrationsRes.json();
+    const { AddEditModal } = await import('@gitroom/frontend/components/new-launch/add.edit.modal');
+    const dayjs = (await import('dayjs')).default;
+    modal.openModal({
+      fullScreen: true,
+      removeLayout: true,
+      children: (
+        <AddEditModal
+          date={dayjs()}
+          integrations={integrations}
+          allIntegrations={integrations}
+          onlyValues={[{ content: transcript, id: 'new', image: [] }]}
+          mutate={() => {}}
+          reopenModal={() => {}}
+        />
+      ),
+    });
+  }, [transcript, fetch, modal, toaster]);
+
+  const copy = useCallback(() => {
+    navigator.clipboard.writeText(transcript).then(
+      () => toaster.show('Copied', 'success'),
+      () => toaster.show('Copy failed', 'warning')
+    );
+  }, [transcript, toaster]);
+
+  // Hand the source video + computed word timings to the Designer so it opens a video
+  // project with a caption track already built — no re-transcribe. Payload rides in
+  // sessionStorage (too large/long for the query string), keyed for the Designer to read.
+  const editInDesigner = useCallback(() => {
+    if (!source || source.type !== 'video' || !result) return;
+    const payload = {
+      url: source.url,
+      fileId: source.fileId,
+      width: source.width || undefined,
+      height: source.height || undefined,
+      words: result.words,
+    };
+    try {
+      window.sessionStorage.setItem('designer:caption-handoff', JSON.stringify(payload));
+    } catch {
+      toaster.show('Could not open the Designer', 'warning');
+      return;
+    }
+    window.open('/media/designer?captions=1', '_blank');
+  }, [source, result, toaster]);
+
+  const segments = useMemo(() => result?.segments ?? [], [result]);
+
+  return (
+    <div className="max-w-[760px] mx-auto flex flex-col gap-[18px]">
+      <p className="text-[13px] text-newTextColor/55">
+        Transcribe any audio or video from your library with Deepgram, then export captions
+        (.srt / .vtt), copy the transcript, or send it to the composer.
+      </p>
+
+      {/* Source */}
+      <div className="flex flex-col gap-[8px]">
+        <label className="text-[12px] font-[600] text-textColor">Source</label>
+        <div className="flex items-center gap-[10px] flex-wrap">
+          <button
+            type="button"
+            onClick={() => setPickerOpen(true)}
+            className="px-[14px] py-[9px] rounded-[8px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+          >
+            {source ? 'Change file' : 'Pick audio / video'}
+          </button>
+          {source && (
+            <span className="text-[12px] text-newTextColor/60 truncate max-w-[420px]">
+              {source.type} · {source.url.split('/').pop()}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* Options */}
+      <div className="flex gap-[14px] flex-wrap">
+        <div className="flex flex-col gap-[6px]">
+          <label className="text-[12px] font-[600] text-textColor">Model</label>
+          <select
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            className="h-[38px] px-[10px] rounded-[8px] border border-studioBorder bg-newBgColorInner text-[13px] text-textColor"
+          >
+            {MODELS.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col gap-[6px]">
+          <label className="text-[12px] font-[600] text-textColor">Language</label>
+          <input
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            placeholder="auto-detect"
+            className="h-[38px] px-[10px] rounded-[8px] border border-studioBorder bg-newBgColorInner text-[13px] text-textColor w-[160px]"
+          />
+        </div>
+      </div>
+
+      <button
+        type="button"
+        onClick={transcribe}
+        disabled={!source || loading}
+        className="self-start px-[20px] py-[10px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[600] hover:bg-[#2B5CD3]/80 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Transcribing…' : 'Transcribe'}
+      </button>
+
+      {/* Result */}
+      {result && (
+        <div className="flex flex-col gap-[14px] border-t border-studioBorder pt-[18px]">
+          <div className="flex flex-col gap-[8px]">
+            <label className="text-[12px] font-[600] text-textColor">Transcript</label>
+            <textarea
+              value={transcript}
+              onChange={(e) => setTranscript(e.target.value)}
+              rows={6}
+              className="w-full p-[12px] rounded-[8px] border border-studioBorder bg-newBgColorInner text-[13px] text-textColor leading-[1.6] resize-y"
+            />
+          </div>
+
+          <div className="flex gap-[8px] flex-wrap">
+            <button type="button" onClick={copy} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              Copy
+            </button>
+            <button type="button" onClick={() => download('transcript.srt', buildSrt(segments), 'application/x-subrip')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              Download .srt
+            </button>
+            <button type="button" onClick={() => download('captions.vtt', buildVtt(segments), 'text/vtt')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              Download .vtt
+            </button>
+            <button type="button" onClick={() => download('transcript.txt', transcript, 'text/plain')} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              Download .txt
+            </button>
+            <button type="button" onClick={saveToFiles} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              Save to Files
+            </button>
+            {source?.type === 'video' && (
+              <button type="button" onClick={editInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+                Edit in Designer
+              </button>
+            )}
+            <button type="button" onClick={sendToComposer} className="px-[12px] py-[8px] rounded-[8px] bg-[#2B5CD3] text-white text-[12px] font-[500] hover:bg-[#2B5CD3]/80 transition-all">
+              Send to composer
+            </button>
+          </div>
+
+          {/* Segments with timecodes */}
+          <div className="flex flex-col gap-[6px] max-h-[280px] overflow-y-auto">
+            {segments.map((s, i) => (
+              <div key={i} className="flex gap-[10px] text-[12px]">
+                <span className="shrink-0 text-newTextColor/40 tabular-nums w-[64px]">{timecode(s.start, '.').slice(0, 8)}</span>
+                <span className="text-textColor">{s.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <MediaSelectorModal open={pickerOpen} onClose={() => setPickerOpen(false)} onSelect={onSelect} />
+    </div>
+  );
+};

@@ -1,0 +1,17 @@
+{
+  "name": "@gitroom/helpers",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "bcrypt": "^6.0.0",
+    "dotenv": "^16.5.0",
+    "evp_bytestokey": "^1.0.3",
+    "parse5": "^6.0.1",
+    "tldts": "^6.1.47",
+    "twitter-text": "^3.1.0",
+    "next-plausible": "^3.12.0"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.0"
+  }
+}

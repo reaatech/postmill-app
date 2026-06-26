@@ -99,16 +99,39 @@ const PROVIDER_TYPE_LABELS: Record<string, string> = {
   CLOUDFLARE_R2: 'Cloudflare R2',
   BACKBLAZE_B2: 'Backblaze B2',
   IDRIVE_E2: 'IDrive e2',
+  WASABI: 'Wasabi',
+  DIGITALOCEAN_SPACES: 'DigitalOcean Spaces',
+  HETZNER: 'Hetzner Object Storage',
+  STORJ: 'Storj',
+  SCALEWAY: 'Scaleway',
+  VULTR: 'Vultr Object Storage',
+  LINODE: 'Linode / Akamai',
+  S3_COMPATIBLE: 'S3-Compatible',
 };
 
 type SubTab = 'providers' | 'audit' | 'breakdown';
+
+const CLOUD_TYPES = [
+  'S3',
+  'CLOUDFLARE_R2',
+  'BACKBLAZE_B2',
+  'IDRIVE_E2',
+  'WASABI',
+  'DIGITALOCEAN_SPACES',
+  'HETZNER',
+  'STORJ',
+  'SCALEWAY',
+  'VULTR',
+  'LINODE',
+  'S3_COMPATIBLE',
+];
 
 export const StorageTab: React.FC = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
 
-  const { data: providers, isLoading: providersLoading, mutate: mutateProviders } = useStorageProviders();
+  const { data: providers, mutate: mutateProviders } = useStorageProviders();
   const { data: usage, mutate: mutateUsage } = useStorageUsage();
   const { data: quotaStatus, mutate: mutateQuota } = useQuotaStatus();
   const { data: usageBreakdown, mutate: mutateBreakdown } = useUsageBreakdown();
@@ -116,6 +139,7 @@ export const StorageTab: React.FC = () => {
   const [subTab, setSubTab] = useState<SubTab>('providers');
   const [showModal, setShowModal] = useState(false);
   const [editProvider, setEditProvider] = useState<StorageProviderRow | null>(null);
+  const [presetType, setPresetType] = useState<string | undefined>(undefined);
   const [migrateSource, setMigrateSource] = useState<StorageProviderRow | null>(null);
 
   const usageMap: Record<string, number> = {};
@@ -186,11 +210,80 @@ export const StorageTab: React.FC = () => {
   const handleSaved = useCallback(() => {
     setShowModal(false);
     setEditProvider(null);
+    setPresetType(undefined);
     refresh();
   }, [refresh]);
 
   const otherProviders = (providers || []).filter((p) => p.type !== 'LOCAL');
   const localProvider = (providers || []).find((p) => p.type === 'LOCAL');
+  const configuredInstances = [...otherProviders].sort((a, b) => a.name.localeCompare(b.name));
+  const instanceMap = new Map(configuredInstances.map((p) => [p.id, p]));
+
+  const handleAdd = useCallback((type?: string) => {
+    setEditProvider(null);
+    setPresetType(type);
+    setShowModal(true);
+  }, []);
+
+  const openEdit = useCallback((p: StorageProviderRow) => {
+    setEditProvider(p);
+    setPresetType(undefined);
+    setShowModal(true);
+  }, []);
+
+  // A single inline list: local pinned to the very top, then configured cloud
+  // instances (pinned), then one always-present "add another" row per cloud
+  // provider type so the same provider can be configured again.
+  const shellProviders = [
+    ...(localProvider
+      ? [{ id: localProvider.id, identifier: 'postmill', name: t('postmill_storage', 'Postmill Storage'), enabled: true }]
+      : []),
+    ...configuredInstances.map((p) => ({
+      id: p.id,
+      identifier: p.type,
+      name: p.name,
+      enabled: true,
+      mounted: p.mounted,
+    })),
+    ...[...CLOUD_TYPES]
+      .sort((a, b) =>
+        (PROVIDER_TYPE_LABELS[a] || a).localeCompare(PROVIDER_TYPE_LABELS[b] || b)
+      )
+      .map((type) => ({
+        id: `template-${type}`,
+        identifier: type,
+        name: PROVIDER_TYPE_LABELS[type] || type,
+        enabled: false,
+      })),
+  ];
+
+  const usageBar = (usageBytes: number | null, quotaBytes: number | null) => {
+    const percent =
+      quotaBytes && usageBytes !== null && quotaBytes > 0
+        ? Math.round((usageBytes / quotaBytes) * 100)
+        : null;
+    return (
+      <div className="flex flex-col gap-[4px] mt-[4px]">
+        <span className="text-[12px] text-newTableText">
+          {usageBytes !== null ? formatBytes(usageBytes) : '—'}
+          {quotaBytes ? ` / ${formatBytes(quotaBytes)}` : ''}
+        </span>
+        {percent !== null && (
+          <div className="flex items-center gap-[6px]">
+            <div className="w-[80px] bg-newTableHeader rounded-[2px] h-[4px] overflow-hidden">
+              <div
+                className={`h-full rounded-[2px] ${
+                  percent >= 90 ? 'bg-[#ef4444]' : percent >= 80 ? 'bg-[#f59e0b]' : 'bg-btnPrimary'
+                }`}
+                style={{ width: `${Math.min(percent, 100)}%` }}
+              />
+            </div>
+            <span className="text-[10px] text-newTableText">{percent}%</span>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   const subTabs: { key: SubTab; label: string }[] = [
     { key: 'providers', label: t('providers', 'Providers') },
@@ -201,7 +294,7 @@ export const StorageTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-[16px]">
       <div className="flex items-center justify-between">
-        <h3 className="text-[20px]">{t('storage_settings', 'Storage Settings')}</h3>
+        <h3 className="text-[20px]">{t('file_storage', 'File Storage')}</h3>
       </div>
 
       <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
@@ -228,132 +321,21 @@ export const StorageTab: React.FC = () => {
       )}
 
       {subTab === 'providers' && (
-        <div className="flex flex-col gap-[24px]">
-          {quotaStatus && (
-            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex items-center justify-between">
-              <div className="flex flex-col gap-[4px]">
-                <span className="text-[12px] text-newTableText">{t('storage_used', 'Storage Used')}</span>
-                <span className="text-[20px] font-semibold text-textColor">
-                  {formatBytes(quotaStatus.usedBytes)} / {formatBytes(quotaStatus.quotaBytes)}
-                </span>
-              </div>
-              <div className="flex flex-col items-end gap-[4px]">
-                <div className="w-[120px] bg-newTableHeader rounded-[4px] h-[8px] overflow-hidden">
-                  <div
-                    className={`h-full rounded-[4px] ${
-                      quotaStatus.percentUsed >= 90
-                        ? 'bg-[#ef4444]'
-                        : quotaStatus.percentUsed >= 80
-                          ? 'bg-[#f59e0b]'
-                          : 'bg-[#10b981]'
-                    }`}
-                    style={{ width: `${Math.min(quotaStatus.percentUsed, 100)}%` }}
-                  />
-                </div>
-                <span className="text-[11px] text-newTableText">
-                  {quotaStatus.percentUsed.toFixed(1)}% used
-                </span>
-              </div>
-            </div>
-          )}
-
-          {localProvider && (
-            <ProviderListShell
-              title={t('base_storage', 'Base Storage')}
-              providers={[{
-                id: localProvider.id,
-                identifier: localProvider.type,
-                name: localProvider.name,
-                enabled: true,
-                mounted: true,
-                status: ['always_on'],
-              }]}
-              onConfigure={() => {
-                setEditProvider(localProvider);
-                setShowModal(true);
-              }}
-              onRemove={() => {}}
-              ProviderIconComponent={ProviderIcon}
-              renderBadges={(provider) => {
-                const usageBytes = usageMap[provider.id] || null;
-                const quota = localProvider.quotaBytes ? BigInt(localProvider.quotaBytes) : null;
-                const usage = usageBytes ? BigInt(usageBytes) : null;
-                const usagePercent = quota && usage !== null && quota > 0
-                  ? Number((usage * BigInt(100)) / quota)
-                  : null;
-                return (
-                  <div className="flex flex-col gap-[2px]">
-                    <span className="text-[12px] text-newTableText">
-                      {PROVIDER_TYPE_LABELS[localProvider.type] || localProvider.type}
-                      {localProvider.bucket ? ` · ${localProvider.bucket}` : ''}
-                      {localProvider.region ? ` · ${localProvider.region}` : ''}
-                    </span>
-                    {usagePercent !== null && (
-                      <div className="flex items-center gap-[6px] mt-[4px]">
-                        <div className="w-[60px] bg-newTableHeader rounded-[2px] h-[4px] overflow-hidden">
-                          <div
-                            className="h-full bg-btnPrimary rounded-[2px]"
-                            style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-newTableText">{usagePercent}%</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              }}
-              renderActions={(provider) => (
-                <>
-                  <button onClick={() => { setEditProvider(localProvider); setShowModal(true); }} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
-                    Edit
-                  </button>
-                  <button onClick={() => handleTest(localProvider.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors">
-                    Test
-                  </button>
-                </>
-              )}
-            />
-          )}
-
-          <ProviderListShell
-            title={t('additional_providers', 'Additional Providers')}
-            providers={(otherProviders || []).map((p) => ({
-              id: p.id,
-              identifier: p.type,
-              name: p.name,
-              enabled: true,
-              mounted: p.mounted,
-              status: p.mounted ? ['mounted'] : ['unmounted'],
-            }))}
-            onConfigure={(id) => {
-              const p = otherProviders.find((pr) => pr.id === id);
-              if (p) {
-                setEditProvider(p);
-                setShowModal(true);
-              }
-            }}
-            onRemove={(id) => handleDelete(id)}
-            addProviderButton={
-              <button
-                onClick={() => {
-                  setEditProvider(null);
-                  setShowModal(true);
-                }}
-                className="px-[12px] py-[6px] rounded-[6px] bg-btnPrimary text-white text-[12px] font-medium hover:bg-btnPrimary/80 transition-colors"
-              >
-                {t('add_provider', 'Add Provider')}
-              </button>
+        <ProviderListShell
+          title=""
+          providers={shellProviders}
+          onConfigure={(id) => {
+            const p = instanceMap.get(id);
+            if (p) openEdit(p);
+          }}
+          onRemove={(id) => handleDelete(id)}
+          ProviderIconComponent={ProviderIcon}
+          renderBadges={(provider) => {
+            if (localProvider && provider.id === localProvider.id) {
+              return usageBar(quotaStatus?.usedBytes ?? null, quotaStatus?.quotaBytes ?? null);
             }
-            ProviderIconComponent={ProviderIcon}
-            renderBadges={(provider) => {
-              const p = otherProviders.find((pr) => pr.id === provider.id);
-              if (!p) return null;
-              const usageBytes = usageMap[provider.id] || null;
-              const quota = p.quotaBytes ? BigInt(p.quotaBytes) : null;
-              const usage = usageBytes ? BigInt(usageBytes) : null;
-              const usagePercent = quota && usage !== null && quota > 0
-                ? Number((usage * BigInt(100)) / quota)
-                : null;
+            const p = instanceMap.get(provider.id);
+            if (p) {
               return (
                 <div className="flex flex-col gap-[2px]">
                   <span className="text-[12px] text-newTableText">
@@ -361,23 +343,32 @@ export const StorageTab: React.FC = () => {
                     {p.bucket ? ` · ${p.bucket}` : ''}
                     {p.region ? ` · ${p.region}` : ''}
                   </span>
-                  {usagePercent !== null && (
-                    <div className="flex items-center gap-[6px] mt-[4px]">
-                      <div className="w-[60px] bg-newTableHeader rounded-[2px] h-[4px] overflow-hidden">
-                        <div
-                          className="h-full bg-btnPrimary rounded-[2px]"
-                          style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                        />
-                      </div>
-                      <span className="text-[10px] text-newTableText">{usagePercent}%</span>
-                    </div>
-                  )}
+                  {usageBar(usageMap[p.id] ?? null, p.quotaBytes)}
                 </div>
               );
-            }}
-            renderActions={(provider) => {
-              const p = otherProviders.find((pr) => pr.id === provider.id);
-              if (!p) return null;
+            }
+            // Template row
+            return (
+              <span className="text-[12px] text-newTableText">
+                {t('not_configured_add_another', 'Not configured — add a bucket')}
+              </span>
+            );
+          }}
+          renderActions={(provider) => {
+            if (localProvider && provider.id === localProvider.id) {
+              return (
+                <>
+                  <button onClick={() => openEdit(localProvider)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
+                    Edit
+                  </button>
+                  <button onClick={() => handleTest(localProvider.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors">
+                    Test
+                  </button>
+                </>
+              );
+            }
+            const p = instanceMap.get(provider.id);
+            if (p) {
               return (
                 <>
                   {p.mounted ? (
@@ -389,13 +380,13 @@ export const StorageTab: React.FC = () => {
                       Mount
                     </button>
                   )}
-                  <button onClick={() => { setEditProvider(p); setShowModal(true); }} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
+                  <button onClick={() => openEdit(p)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-newTableText hover:bg-[#3a3a3a] transition-colors">
                     Edit
                   </button>
                   <button onClick={() => handleTest(p.id)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#60a5fa] hover:bg-[#1a2a3a] transition-colors">
                     Test
                   </button>
-                  {otherProviders.length > 1 && (
+                  {configuredInstances.length > 1 && (
                     <button onClick={() => setMigrateSource(p)} className="text-[11px] px-[8px] py-[4px] rounded-[6px] bg-newTableHeader text-[#f59e0b] hover:bg-[#3a2a1a] transition-colors">
                       Migrate
                     </button>
@@ -405,9 +396,16 @@ export const StorageTab: React.FC = () => {
                   </button>
                 </>
               );
-            }}
-          />
-        </div>
+            }
+            // Template row — configure another instance of this provider type.
+            const type = provider.id.replace('template-', '');
+            return (
+              <button onClick={() => handleAdd(type)} className="text-[12px] text-btnPrimary hover:underline">
+                {t('configure', 'Configure')}
+              </button>
+            );
+          }}
+        />
       )}
 
       {subTab === 'audit' && <AuditTab />}
@@ -459,9 +457,11 @@ export const StorageTab: React.FC = () => {
           onClose={() => {
             setShowModal(false);
             setEditProvider(null);
+            setPresetType(undefined);
           }}
           onSaved={handleSaved}
           editProvider={editProvider}
+          presetType={presetType}
         />
       )}
 

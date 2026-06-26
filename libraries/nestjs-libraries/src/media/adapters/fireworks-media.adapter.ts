@@ -1,0 +1,101 @@
+import {
+  MediaProviderAdapter,
+  MediaProviderCapabilities,
+  MediaGenerationResult,
+  MediaGenerateOptions,
+  MediaCredentialOptions,
+  MediaJobSubmission,
+  MediaModelOption,
+  resolveApiKey,
+} from '../media-provider-adapter.interface';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+
+// Fireworks AI — same key as the Fireworks LLM provider (registry id `fireworks`), reused via
+// the universal-credential fallback. Image generation uses Fireworks' workflow endpoint
+// (`/inference/v1/workflows/accounts/fireworks/models/{model}/text_to_image`) with
+// `Accept: application/json` → `{ base64: [...] }`. Audio was deprecated (2026-06); no video.
+const BASE = 'https://api.fireworks.ai/inference/v1/workflows/accounts/fireworks/models';
+
+interface FireworksImageResponse {
+  base64?: string[];
+  finishReason?: string;
+}
+
+export class FireworksMediaAdapter implements MediaProviderAdapter {
+  readonly identifier = 'fireworks';
+  readonly name = 'Fireworks AI';
+  readonly capabilities: MediaProviderCapabilities = {
+    image: true,
+    video: false,
+    audio: false,
+    avatar: false,
+    tts: false,
+    stt: false,
+    upscale: false,
+    bgRemove: false,
+    inpaint: false,
+  };
+
+  async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) throw new Error('Fireworks API key is required');
+    const model = options?.model || 'flux-1-schnell-fp8';
+    const input: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(options?.input || {})) {
+      if (v !== undefined && v !== '') input[k] = v;
+    }
+    const res = await safeFetch(`${BASE}/${model}/text_to_image`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ prompt, ...input }),
+    });
+    if (!res.ok) throw new Error(`Fireworks image generation failed: ${await res.text()}`);
+    const data = (await res.json()) as FireworksImageResponse;
+    const urls = (data.base64 || [])
+      .filter(Boolean)
+      .map((b) => (b.startsWith('data:') ? b : `data:image/png;base64,${b}`));
+    if (!urls.length) throw new Error('Fireworks returned no image');
+    return {
+      multi: urls.length > 1,
+      image: urls[0],
+      images: urls,
+      metadata: { provider: this.identifier, model, prompt },
+    };
+  }
+
+  async generateVideo(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    throw new Error('Fireworks does not support video generation');
+  }
+
+  async generateAudio(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    throw new Error('Fireworks does not support audio generation');
+  }
+
+  async generateAvatar(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    throw new Error('Fireworks does not support avatar generation');
+  }
+
+  // Fireworks has no image-model catalog endpoint — the descriptor's curated list + free
+  // entry drives the dropdown.
+  async listModels(): Promise<MediaModelOption[]> {
+    return [];
+  }
+
+  async testConnection(options?: MediaCredentialOptions): Promise<{ ok: boolean; message: string }> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) return { ok: false, message: 'Fireworks API key is required' };
+    try {
+      const res = await safeFetch('https://api.fireworks.ai/inference/v1/models', {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      if (res.ok) return { ok: true, message: 'Connection successful' };
+      return { ok: false, message: `Fireworks connection failed: ${await res.text()}` };
+    } catch (err) {
+      return { ok: false, message: (err as Error).message };
+    }
+  }
+}

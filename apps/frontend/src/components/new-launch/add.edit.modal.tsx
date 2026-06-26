@@ -3,6 +3,8 @@ import 'reflect-metadata';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import dayjs from 'dayjs';
 import { FC, useEffect } from 'react';
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ManageModal } from '@gitroom/frontend/components/new-launch/manage.modal';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
@@ -108,6 +110,7 @@ export const AddEditModalInner: FC<AddEditModalProps> = (props) => {
 
 export const AddEditModalInnerInner: FC<AddEditModalProps> = (props) => {
   const existingData = useExistingData();
+  const fetch = useFetch();
   const {
     reset,
     addGlobalValue,
@@ -131,6 +134,71 @@ export const AddEditModalInnerInner: FC<AddEditModalProps> = (props) => {
       setRepeater: state.setRepeater,
     }))
   );
+
+  // Auto-add signatures: a brand-new post is seeded with each auto-add
+  // signature's content (and its logo/sticker), gated by channel scope. The
+  // TipTap editor only reads its initial value, so signatures must be baked
+  // into the *initial* global value — hence we defer the new-post seed until
+  // the auto-add list has loaded. Skipped for edits, set-building, onlyValues
+  // handoffs and dummy modals.
+  const isNewPost =
+    !existingData.integration &&
+    !props.onlyValues?.length &&
+    !props.set?.posts?.length &&
+    !props.addEditSets &&
+    !props.dummy;
+
+  const { data: autoSignatures } = useSWR(
+    isNewPost ? 'signatures-auto' : null,
+    async () => {
+      // Never throw — a failure must still resolve so the new-post composer
+      // seeds (empty) instead of hanging on a blank editor.
+      try {
+        const res = await fetch('/signatures/auto');
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+
+  useEffect(() => {
+    if (!isNewPost) return;
+    // Wait for the fetch to settle (success → [...] or error → []).
+    if (autoSignatures === undefined) return;
+    // Seed only when the global value is empty — re-seeds correctly after the
+    // init effect's reset() (e.g. React StrictMode's mount/cleanup/remount).
+    if (useLaunchStore.getState().global.length) return;
+
+    // Scope against the channels known at open time (empty scope = all).
+    const selectedIds = props.selectedChannels || [];
+    const matching = (autoSignatures as any[]).filter(
+      (s) =>
+        !s.channels?.length ||
+        s.channels.some((c: string) => selectedIds.includes(c))
+    );
+    const content = matching
+      .map((s) =>
+        s.content
+          .split('\n')
+          .map((line: string) => `<p>${line}</p>`)
+          .join('')
+      )
+      .join('');
+    const media = matching
+      .filter((s) => s.picture?.id)
+      .map((s) => ({ id: s.picture.id, path: s.picture.path }));
+
+    addGlobalValue(0, [{ content, id: makeId(10), media, delay: 0 }]);
+
+    matching.forEach((s) =>
+      fetch(`/signatures/${s.id}/track-usage`, { method: 'POST' }).catch(
+        () => undefined
+      )
+    );
+  }, [isNewPost, autoSignatures, props.selectedChannels, addGlobalValue, fetch]);
 
   useEffect(() => {
     if (existingData.integration) {
@@ -170,41 +238,45 @@ export const AddEditModalInnerInner: FC<AddEditModalProps> = (props) => {
       setCurrent(props.focusedChannel);
     }
 
-    addGlobalValue(
-      0,
-      props.onlyValues?.length
-        ? props.onlyValues.map((p) => ({
-            content:
-              p.content.indexOf('<p>') > -1
-                ? p.content
-                : p.content
-                    .split('\n')
-                    .map((line: string) => `<p>${line}</p>`)
-                    .join(''),
-            id: makeId(10),
-            media: p.image || [],
-          }))
-        : props.set?.posts?.length
-        ? props.set.posts[0].value.map((p: any) => ({
-            id: makeId(10),
-            content:
-              p.content.indexOf('<p>') > -1
-                ? p.content
-                : p.content
-                    .split('\n')
-                    .map((line: string) => `<p>${line}</p>`)
-                    .join(''),
-            // @ts-ignore
-            media: p.media,
-          }))
-        : [
-            {
-              content: '',
+    // A plain new post's global value is seeded by the auto-add effect above
+    // (it must wait for the signature list); seed the other modes here.
+    if (!isNewPost) {
+      addGlobalValue(
+        0,
+        props.onlyValues?.length
+          ? props.onlyValues.map((p) => ({
+              content:
+                p.content.indexOf('<p>') > -1
+                  ? p.content
+                  : p.content
+                      .split('\n')
+                      .map((line: string) => `<p>${line}</p>`)
+                      .join(''),
               id: makeId(10),
-              media: [],
-            },
-          ]
-    );
+              media: p.image || [],
+            }))
+          : props.set?.posts?.length
+          ? props.set.posts[0].value.map((p: any) => ({
+              id: makeId(10),
+              content:
+                p.content.indexOf('<p>') > -1
+                  ? p.content
+                  : p.content
+                      .split('\n')
+                      .map((line: string) => `<p>${line}</p>`)
+                      .join(''),
+              // @ts-ignore
+              media: p.media,
+            }))
+          : [
+              {
+                content: '',
+                id: makeId(10),
+                media: [],
+              },
+            ]
+      );
+    }
 
     return () => {
       reset();

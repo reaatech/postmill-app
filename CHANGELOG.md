@@ -11,6 +11,305 @@
 ## Unreleased
 
 ### Changed
+- **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
+  Brand Kit + Knowledge Base stacked) is now split into three tabs — **Voice & Tone**, **Brand Kit**,
+  **Knowledge** — each with a one-line "what this does" hint, and all copy rewritten in plain language
+  for non-technical users. The Knowledge tab's technical cards (Vector Database, Auto-Index) are tucked
+  behind an "Advanced settings (most people can skip these)" toggle so the default view stays simple.
+
+### Added
+- **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
+  scopes the dataset: each language has its own instructions **and** its own optional per-channel
+  overrides; switching the language shows a fresh dataset. Backed by a new additive
+  `AIBrandProfile.languageProfiles` JSON column (`{ [lang]: { instructions, overrides } }`,
+  db-push-safe); the active language's profile is mirrored into the legacy
+  `instructions`/`platformInstructions` columns so `_loadBrandVoice` (the only reader) keeps working,
+  and brands that predate the column migrate their single set into the active language on first edit.
+  Channel overrides are keyed by the connected channel (integration id), chosen from a dropdown of the
+  org's active channels. (Per-channel overrides are stored but not yet consumed at generation; the
+  per-language global instructions are.)
+- **RAG vector database — remote pgvector + Pinecone, alongside Qdrant.** The Knowledge Base vector
+  store now offers four options: **Postmill (Default)** (built-in pgvector, no config), **PG Vector
+  (Remote)** (external Postgres via a `pg` pool — new `RemotePgVectorStoreAdapter`), **Qdrant
+  (Remote)**, and **Pinecone (Remote)** (new `PineconeVectorStoreAdapter`, REST via `safeFetch`, no
+  SDK dependency). The `VectorStoreAdapter` selection was generalised from pgvector-vs-qdrant to a
+  `local | external` dispatch; remote stores are lazily built from settings, probed, and fall back to
+  the built-in store when unreachable. Each remote has a **Test Connection** button. Secrets (remote
+  DB connection string, Qdrant/Pinecone API keys) are now stored **encrypted** in
+  `AISystemSettings.secretSettings` (fixing a pre-existing bug where the Qdrant key was written in
+  cleartext) and never returned to the client. No schema migration (settings are JSON).
+- **Brand assets in Settings → Brands.** The brand editor now surfaces a brand kit that previously
+  only the Designer could edit: a **colour palette**, **attached assets** (logos / reference imagery
+  picked via `MediaSelectorModal` — stock picks are imported to Files so they persist — each with an
+  optional caption), and the **brand-enforcement** toggle, all saved through the existing
+  `PUT /brands/:id`. New additive `AIBrandProfile.assets Json[]` column (`{fileId,url,caption}`,
+  db-push-safe) backs the attachments; `CreateBrandDto`/`UpdateBrandDto` + service/repo carry it. The
+  brand list shows a colour-swatch + asset-count preview, the delete uses the shared confirm dialog,
+  and a dead `useT()` local was removed.
+- **Unified "Content" settings page.** Settings now has a single **Content** tab with sub-tabs for
+  **AI Media**, **Content Packs**, **Sets** and **Signatures** (replacing the standalone AI Media,
+  Content Packs, Sets and Signatures entries). Sub-tabs respect their existing gates (Content Packs on
+  `media-config:manage`; Sets/Signatures on paid tiers). The old `?tab=media_providers`,
+  `?tab=content_packs`, `?tab=sets` and `?tab=signatures` deep-links still resolve to the right
+  Content sub-tab.
+- **Signatures — channel scope, logo/sticker, usage tracking & auto-add wiring.** Signatures gained
+  a `name`, a `channels[]` scope (integration ids; empty = all channels), a `usageCount`, and an
+  optional `pictureId → File` logo/sticker. New endpoints: `GET /signatures/auto` (all auto-add
+  signatures) and `POST /signatures/:id/track-usage`. The Settings → Signatures tab was rebuilt
+  (channel-scope avatar chips, logo picker via `MediaSelectorModal`, usage, modern card list) and the
+  broken auto-add toggle was fixed. New posts are now **seeded with each auto-add signature's text and
+  logo**, gated by channel scope — baked into the composer's initial value (the only path the TipTap
+  editor honours); applying a signature (auto or manual) tracks usage. The single-auto-add restriction
+  was removed so several channel-scoped auto-add signatures can coexist. *(Schema: additive columns
+  on `Signatures` + a `File.signatures` back-relation, db-push-safe.)*
+- **Sets — media-rich list + RBAC gating.** The Sets list (which previously showed blank channels and
+  a `0` post count because it parsed the composer payload as an array) now reads `content.posts`:
+  real post count, channel avatars (joined against `/integrations/list`), and a media-thumbnail stack,
+  in a modern card layout. `SetsController` is now gated on the `posts` RBAC resource
+  (`OrgRbacGuard` + `@RequirePermission`) — it was previously ungated.
+- **Recraft, Ideogram, and Leonardo.ai media studios** (`/media/recraft`, `/media/ideogram`,
+  `/media/leonardo`) — three own-key image-generation Studio Kit studios configured at Settings → Media.
+  **Recraft** (Bearer) for raster + vector/SVG + icons; **Ideogram** for accurate in-image text (key as
+  `Api-Key` header, multipart/form-data body, single v3 endpoint); **Leonardo.ai** (Bearer) across its
+  fine-tuned model family — its API is async (create → poll), so the adapter polls internally to keep
+  the synchronous image contract (the BFL/Qwen pattern). All three return hosted URLs and land artifacts
+  in `/files`. Built source-grounded against each official API reference (no live key).
+- **Google AI Studio media studio** (`/media/google-ai`, registry id `google`) — a full Studio Kit
+  studio for the **Gemini Developer API**. Image tab covers **Nano Banana** (`gemini-2.5-flash-image`
+  via `:generateContent`) and **Imagen** (`imagen-*` via `:predict`), routed by the chosen model; Video
+  tab runs **Veo** (`veo-*` via `:predictLongRunning`, polled to completion — no webhook → poll-cron).
+  It is a **universal-credential** provider: it reuses the org's existing Settings → AI "Google Gemini"
+  key (added to `UNIVERSAL_AI_CREDENTIAL`, the Qwen pattern) — configure once, works for both LLM and
+  media. Veo's finished MP4 is auth-only bytes at the returned file URI, so `pollJob` downloads it with
+  the key and returns it inline as a `data:video/mp4` URL (the Sora pattern). Built source-grounded
+  against the official `ai.google.dev` reference (no live key).
+- **Sora media studio** (`/media/sora`) — a branded Studio Kit studio for OpenAI Sora that reuses the
+  org's existing OpenAI key (`descriptor.provider: 'openai'`, the Pika-rides-fal pattern). Video-only
+  with Text→Video and Image→Video tabs (`sora-2` / `sora-2-pro`). `generateVideo` + `pollJob` were added
+  to the OpenAI media adapter (async Videos API: `POST /v1/videos` → poll `GET /v1/videos/{id}`, no
+  webhook → poll-cron). Because the finished MP4 is auth-only bytes at `/v1/videos/{id}/content` (no
+  public URL), `pollJob` downloads it with the key and returns it inline as a `data:video/mp4` URL so the
+  lifecycle decodes it directly. Image-to-video uploads the source frame as multipart `input_reference`.
+  Built source-grounded against the official OpenAI Videos API (no live key).
+- **LTX Studio media studio** (`/media/ltx`) — an own-key Studio Kit studio for LTX Studio (Lightricks,
+  `api.ltx.video`), video-only on the LTX-2 / LTX-2.3 model family. Three tabs: **Text→Video**,
+  **Image→Video** (source + optional last-frame), and **Audio→Video** (Pro models only). Single Bearer
+  key at Settings → Media. All async submit-and-poll (`POST /v2/<op>` → `{ id }`, poll
+  `GET /v2/<op>/{id}` → `result.video_url`, no webhook → poll-cron). The sub-operation is routed by the
+  media inputs present, and the adapter namespaces the job id as `<op>:<id>` so polling hits the right
+  status endpoint. Built source-grounded against the official `docs.ltx.video` reference (no live key) —
+  resolution-string formatting may need a live smoke test.
+- **Pika media studio** (`/media/pika`) — a branded Studio Kit studio for Pika, served through the
+  existing fal.ai adapter (Pika's official API is fal-hosted per pika.art/api), mirroring the Kling
+  pattern: `provider: 'fal'`, the `model` field carries the fal endpoint id, reuses the org's fal key.
+  Three tabs: Text→Video and Image→Video (`fal-ai/pika/v2.2/*`) plus **Pikaffects**
+  (`fal-ai/pika/v1.5/pikaffects`, 16 one-click VFX). Frontend-only — no new adapter or registry id.
+- **Higgsfield media studio** (`/media/higgsfield`) — an own-key Studio Kit studio for Higgsfield
+  (`platform.higgsfield.ai`) with three tabs: **Soul** Text→Image (+ optional reference image), **DoP**
+  Image→Video (`dop-lite/turbo/standard`), and **Speak** (portrait + audio → talking video). Two-part
+  credential (`keyId` + `keySecret`, `Authorization: Key <id>:<secret>`) configured at Settings → AI
+  Media via the multi-field modal. Submit-and-poll (`POST {endpoint}` → poll `/requests/{id}/status`):
+  image bounded-poll-synchronous, video poll-cron. Built source-grounded against the official
+  higgsfield-js SDK — no live key, so Soul size presets may need a smoke test.
+- **Wan media studio** (`/media/wan`) — a dedicated, Wan-branded Studio Kit studio for Alibaba Wan
+  (Tongyi Wanxiang) on **Alibaba Cloud Model Studio** with three tabs: Text→Image (`wan2.2-t2i*` /
+  `wanx2.1-t2i*`), Text→Video and Image→Video (`wan2.x-t2v*` / `wan2.x-i2v*`). Same DashScope
+  async-task protocol as the Qwen studio (`X-DashScope-Async` → poll `GET /tasks/{id}`; image
+  bounded-poll-synchronous, video poll-cron) pointed at the **international** host
+  `dashscope-intl.aliyuncs.com`. **Own-key** provider configured at Settings → AI Media (not a
+  credential-reuse hub). Built source-grounded against Alibaba's public Model Studio API reference —
+  the exact intl host/region may need a live smoke test.
+- **AI-hub media studios** (`/media/{togetherai,siliconflow,groq,openrouter,fireworks,deepinfra,gateway,bedrock,azure}`)
+  — The AI hub/aggregator providers from Settings → AI now also expose their **media** catalogs as
+  full Studio Kit studios, each **reusing the org's existing AI key** (the Qwen
+  `UNIVERSAL_AI_CREDENTIAL` pattern, now 10 providers). Coverage per hub: Together (image + async
+  video + TTS), SiliconFlow (image + Wan2.x video + TTS), DeepInfra (image + video + TTS), Groq (TTS),
+  OpenRouter (image), Fireworks (image), Vercel AI Gateway (image + video via AI SDK v6
+  `experimental_generateVideo`), Amazon Bedrock + Azure OpenAI (image, via AI-SDK delegation so SigV4 /
+  Azure-deployment auth is handled by the provider packages — no hand-rolled signing).
+  - **Dynamic model discovery** — because these catalogs are large and change often, the studio model
+    dropdown is populated **live** from each hub's `/v1/models` (filtered by modality) via a new
+    `GET /media/studio/:provider/models?operation=` route (Redis-cached) and a `source: 'models'`
+    searchable combobox in the Studio Kit; it also accepts a typed model id so an incomplete catalog
+    never blocks a render.
+  - Native-REST adapters share an `openai-compatible-media.adapter.ts` base (Together/SiliconFlow);
+    Bedrock/Azure/Gateway delegate image to the AI registry via a static-injected helper, keeping
+    `MediaStudioService` provider-agnostic. No schema migration; no env fallback.
+- **Studio Kit + AI Video studios** (`/media/{runway,luma,minimax,kling}`) — A reusable scaffold so a
+  new media-provider studio is mostly a descriptor, not a from-scratch build. Shared shell, render
+  queue, and the three handoffs (Save-to-Files / Edit-in-Designer / Post-to-Composer) are write-once;
+  each provider supplies a declarative descriptor whose field names are the provider's native API
+  params, so studios are **full-featured** (no lowest-common-denominator cap), with a `custom` escape
+  hatch for structured tools.
+  - **Four full-featured video studios:** Runway (image→video + text→image), Luma (text/image→video
+    with keyframes + loop), MiniMax (text/image→video + subject reference), Kling via fal
+    (text/image→video). All land renders in `/files` via the existing media-job pipeline
+    (webhook-first, poll-cron fallback).
+  - One **generic backend endpoint** serves every simple provider (no per-provider controller):
+    `GET/POST /media/studio/:provider/{status,jobs,generate}` (`MediaStudioController` +
+    `MediaStudioService`), dispatching to the registry adapter by operation. Runway/Luma/MiniMax
+    adapters enriched with native-param passthrough; no schema migration.
+  - Frontend kit at `media-tools/studio-kit/`; HeyGen and Replicate keep their bespoke
+    implementations (not retrofitted). Veo (Vertex) deferred pending OAuth credential confirmation.
+- **AI Image studios** (`/media/{black-forest-labs,stability-ai,openai}`) — Three full-featured
+  image-generation studios on the Studio Kit, one per provider (not a bundled multi-provider form):
+  Black Forest Labs (FLUX 1.1 Pro/Ultra/Pro/Dev — width/height, aspect ratio, prompt upsampling,
+  safety tolerance, seed), Stability AI (Stable Image Core/Ultra/SD3 — aspect ratio, negative prompt,
+  style presets, output format, seed), and OpenAI (gpt-image-1 and DALL·E 3 as separate fixed-model
+  tabs with each model's correct size/quality/background/style params). `operation: 'image'` completes
+  synchronously and lands in `/files`. The `black-forest-labs`, `stability-ai`, and `openai-media`
+  adapters gained the same native-param `options.input` passthrough (back-compatible — legacy defaults
+  apply when `input` is absent); no schema migration.
+- **Qwen media studio** (`/media/qwen`) — Alibaba DashScope added as a media provider with a
+  three-tab Studio Kit studio: Text→Image (Qwen-Image), Text→Video and Image→Video (Wan2.x). Both are
+  DashScope **async task APIs** (`X-DashScope-Async` → `task_id` → poll `/tasks/{id}`): image keeps the
+  synchronous contract via bounded internal polling; video completes via the poll-cron (no webhook).
+  The adapter routes `prompt`/`negative_prompt`/`img_url` into DashScope's `input` and all other native
+  params into `parameters`. **The DashScope key is shared with the Qwen LLM provider** — Qwen is a
+  *universal-credential* provider, so the media surface falls back to the org's existing Settings → AI
+  Qwen key when no dedicated media credential exists (read from `AIOrgProviderConfig` via
+  `OrgAiSettingsRepository`, decrypted with the media `EncryptionService`). Configure the key once on
+  either surface; no schema migration, no env fallback.
+- **AI Voiceover + Avatar-video studios** (`/media/{elevenlabs,did,hedra,tavus}` + an OpenAI TTS tab) —
+  The remaining kit-fit media providers, completing the Studio Kit's `audio` and avatar-`video` paths:
+  - **Audio (TTS)** — **ElevenLabs** (model, premade voice, stability, similarity boost, style,
+    speaker boost) and a third **Text → Speech** tab on the existing **OpenAI** studio (model, voice,
+    MP3/WAV, speed). `operation: 'audio'` completes synchronously — the clip returns inline as a
+    `data:audio/…;base64,` URL and lands in the org's audio files (no webhook).
+  - **Avatar / character video** — **D-ID** (talking-head from a portrait + voice provider/id),
+    **Hedra** (character video from a keyframe + aspect ratio), **Tavus** (replica video from a replica
+    id + script). `operation: 'video'`, completed webhook-first (poll-cron fallback); the source image
+    is resolved server-side to a provider-reachable URL.
+  - The `elevenlabs`, `openai-media`, `did`, `hedra`, and `tavus` adapters gained the same
+    native-param `options.input` passthrough (back-compatible — legacy `AiMediaService` defaults apply
+    when `input` is absent); no schema migration. **Deepgram** (STT → text) is intentionally not a kit
+    studio.
+- **Deepgram studio** (`/media/deepgram`) — transcription / captions tool; the last media adapter
+  without a studio now has one. STT returns text (not a `/files` artifact), so it can't use the
+  generic kit pipeline: it reuses the Studio Kit `StudioShell` chrome with a bespoke `custom` panel
+  over a dedicated `/media/deepgram` backend (`DeepgramController` → `DeepgramService`). Reads source
+  bytes straight from storage (`readFile`, no SSRF surface), transcribes via the `deepgram` adapter,
+  and returns transcript + phrase-chunked caption segments. Exports `.srt` / `.vtt` / `.txt`
+  client-side (no allowlist change), plus copy and a Send-to-composer handoff. Adapter
+  `speechToTextWords` gained opt-in `smart_format`/`punctuate` + `language` passthrough (the Designer
+  timeline's auto-caption call is unchanged). No schema migration.
+  - **Transcript history in the render queue** — Save-to-Files persists the transcript as a completed
+    `stt` `AIMediaJob` (via `completeJobWithBuffer`), surfaced through the existing studio jobs
+    endpoint; the shared `RenderQueue` gained an additive `stt` text card (Copy / To composer).
+  - **Edit in Designer (captions, no re-transcribe)** — for a video source, hands the clip + word
+    timings to the Designer (`?captions=1` + `sessionStorage`), which builds a video project with a
+    caption track pre-built from the words — the only path that loads a video onto the Designer
+    timeline from a URL.
+- **Kling studio name** — the `fal` media adapter's display name is now **"Kling"** (was "fal.ai") so
+  Settings → Media matches the studio (`/media/kling`, nav + title "Kling"). Config identifier stays
+  `fal` (unchanged at-rest key).
+- **Vertex AI studio** (`/media/vertex`) — Google **Veo** (Text → Video) and **Imagen** (Text →
+  Image) as a two-tab kit studio. Unlike every other media provider, Vertex uses GCP credentials, not
+  a single API key: the adapter declares a `credentialFields` schema (project + location +
+  service-account JSON, matching the AI Vertex adapter) and the Settings → Media modal renders those
+  fields dynamically (single `apiKey` remains the default for all other providers). A short-lived
+  access token is **minted per request** from the service-account key via `google-auth-library` — a
+  stored static token would expire in ~1h. Veo has no completion webhook, so it completes via the
+  `media-jobs-poll` cron (like Runway); Imagen completes synchronously inline. No schema migration.
+- **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
+  provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
+  env-var fallback).
+  - **Storyboard** canvas: multi-scene avatar video via HeyGen `video_inputs[]` — each scene is an
+    avatar + voice + script + color/file background, with add/remove/reorder and 16:9 / 9:16 / 1:1.
+  - **Talking Photo**: turn a `/files` image into a talking avatar (uploads to mint a `talking_photo_id`).
+  - **Voiceover**: text-to-speech into the Files audio folder.
+  - **Translate**: lip-synced video translation, one render per target language.
+  - Avatar/voice catalogs cached per-org (Redis); voice previews in-picker. Live **Render queue**
+    polling `GET /media/heygen/jobs`.
+  - Every render saves to `/files` via the existing media-job pipeline, then offers **Edit in
+    Designer** and **Post** to the composer.
+  - Backend `HeyGenService` + `/media/heygen` controller; reuses `MediaJobLifecycleService`. Async
+    poll routing is operation-namespaced (`video:` / `tts:` / `translate:`) in `HeyGenAdapter.pollJob`
+    (backward-compatible with the generic media-provider path). No schema migration.
+- **Replicate Studio** (`/media/replicate`) — Native generative media workspace powered by Replicate.
+  - 18 categories: text-to-image, image-to-image, inpaint, upscale, background removal, text-to-video,
+    image-to-video, video-to-video, caption, text-to-speech, speech-to-text, voice clone, music
+    generation, music-to-music, meme generator, and video merge.
+  - Warm official models by default with instant cost badges; optional community-model toggle with
+    usage-based pricing.
+  - Dynamic input forms per model, live cost estimation, and folder-aware async delivery for
+    video/audio jobs.
+  - Native mask painter for inpainting, ffmpeg-based merge editor for up to 6 clips, and a canvas
+    meme generator with draggable text layers.
+  - Audio enablement: upload, preview, and select audio files in Files; audio inputs for voice clone
+    and music-to-music.
+  - Per-org Replicate token configuration in Settings → Media Providers; no env-var fallback.
+- **Designer** — Native open-source design editor replacing the proprietary Polotno SDK.
+  - Built on react-konva (MIT), no license key required.
+  - Full canvas editor with text, image, and shape elements; drag/resize/rotate via Konva Transformer.
+  - Per-mount Zustand store (no singleton; resets on unmount).
+  - Autosave, export to PNG via `POST /files/upload-simple`, and "Use in post" flow.
+  - Channel size presets + safe-zone overlays from `channel-presets.ts`.
+  - 9 side panels: Templates, Text, Elements, Photos/Videos, Uploads, Background, Layers, AI, Brand.
+  - AI image generation via existing `/media/generate-image` endpoint (tenant's own AI providers).
+  - Brand kit (logos, palette, fonts) via additive fields on `AIBrandProfile`.
+  - Magic resize (proportional scaling to channel presets).
+  - "Open in Designer" from stock photo/video preview.
+  - Route: `/media/designer`, with navbar tab under Media Tools.
+  - Backend: `Design` + `DesignTemplate` Prisma models, `/media/designs`, `/media/design-templates`, `/media/designer/proxy` endpoints.
+- **Designer Phase 2** (`dev/MEDIA_PHASE_2.md`) — completeness pass on the editor:
+  - **Editing:** selection-aware right Inspector + contextual selection toolbar; premium controls
+    (color swatch/popover, slider, segmented, stepper, font-preview picker); opacity, flip, image
+    replace, and crop.
+  - **Canvas:** multi-select (shift/⌘ + marquee), group-aware selection, group/ungroup, snapping &
+    alignment guides, custom transformer handles + dimension HUD, drag-and-drop from panels,
+    clipboard (copy/cut/paste), and a full keyboard-shortcut matrix with a help overlay.
+  - **Panels:** text effects (shadow/outline) + self-hosted OFL fonts, icons/stickers, gradient &
+    image backgrounds, skeleton/retry loading states, and AI panel queued/failed/cancel states.
+  - **Multi-page & export:** page thumbnails strip (add/duplicate/reorder/remove), high-res
+    `pixelRatio` export, transparent-PNG, carousel (multi-page → multi-image) export, and export
+    reusing `SaveToFilesModal`.
+  - **AI & brand:** background-removal / inpaint / upscale endpoints (`/media/remove-background`,
+    `/media/inpaint`, `/media/upscale`, credit-checked); brand-kit logo/palette/font write API;
+    AI panel gated on an active org provider; magic-resize and safe-zone overlays wired.
+  - **Video & animation (Phase 4):** per-element entrance animations + a timeline with live preview
+    and WebM export (via `MediaRecorder`, no ffmpeg dependency).
+  - **Server-side rendering (Phase 4):** headless `DesignRenderService` (node-canvas) renders a
+    design doc to PNG/PDF (`/media/designs/render`); data-driven bulk generation
+    (`/media/designs/bulk-generate`) substitutes `{{variables}}` per row.
+  - **Stock surface:** masonry photo grid, infinite scroll, personality empty/error states, color
+    swatch filters, responsive layout.
+  - **Not included:** real-time multi-user collaboration (O5) — requires adding a WebSocket platform
+    + CRDT (Yjs); tracked in `dev/MEDIA_PHASE_2.md` as the one deferred item.
+- **Stock surface UX hardening** — Grid tiles are now keyboard-accessible buttons; error states don't wipe toolbar; skeleton grid loading; search magnifier + clear button; custom select styling; hover affordances.
+- **Stock content expansion** — Free stock browsing now covers vectors (Pixabay), stickers (GIPHY),
+  and icons (Iconify) alongside existing photos (Unsplash) and videos (Pexels). Each source carries
+  `source`, `license`, and `attribution` metadata through preview, Designer open, and the
+  `/files/import` save path.
+- **Content Packs (premium BYOK)** — Per-organization premium stock packs via **Settings → Content
+  Packs**. Magnific is the first supported pack: add a Magnific API key, set it active, and search
+  results for photos/vectors/icons/videos are served from your own Magnific plan before falling back
+  to free catalogs. Keys are encrypted at rest; minted download URLs are used for import.
+
+### Removed
+- **Legacy `/third-party` integration platform** — Removed the Gitroom-era third-party provider
+  subsystem: the `/third-party` route + `third-parties/` UI, the `@ThirdParty` decorator,
+  `ThirdPartyManager`/`ThirdPartyService`/`ThirdPartyController`, the HeyGen and ReelFarm providers,
+  the `DEV_DISABLE_THIRDPARTY` flag, and the composer/Files "insert third-party media" path. AI
+  avatar video now lives only in the new **HeyGen Studio**. The shared `slider.component` used by the
+  TikTok/Instagram composer previews was moved to `components/ui/`. The "Integrations" nav entry was
+  removed and the miswired "Connect a Social Channel" CTAs repointed to `/settings?tab=channels`.
+  The `ThirdParty` Prisma model + `Organization.thirdParty` relation were dropped from the schema.
+
+### Changed
+- **Renamed "Vercel AI Gateway" / "AI Gateway" → "Vercel AI"** across the AI provider, media provider,
+  the `/media/gateway` studio title, and the media nav. Identifier unchanged (`gateway`); display-name
+  only.
+- **Renamed "Google Vertex AI" → "Google Vertex"** across the AI provider, media provider, the
+  `/media/vertex` studio title, and the media nav — disambiguating the enterprise GCP path (`vertex`,
+  service-account auth) from the new consumer Gemini-key path (Google AI Studio, `google`). Identifier
+  unchanged (`vertex`); display-name only.
+- **Polotno removal** — Removed all `polotno`, `polonto`, `plontoKey` references across the codebase.
+  - Deleted: `polonto.tsx`, `polonto/` directory, `polonto.css`, global.scss imports/rules.
+  - Removed: `NEXT_PUBLIC_POLOTNO` from `.env.example`, `docker-compose.yaml`, and docs.
+  - Removed: `plontoKey` from `VariableContext`, all three `layout.tsx` files.
+  - Removed: `@blueprintjs/core` and `@blueprintjs/icons` (indirect deps no longer pulled in).
+  - Gating: Designer opens on `media:read` for all members (previously `user?.tier?.ai` on multi-file picker).
 - **Inngest migration** — Replaced Temporal with Inngest Cloud for durable background jobs.
   - Removed `RUN_CRON`, `TEMPORAL_ADDRESS`, `TEMPORAL_NAMESPACE`, and Temporal/Elasticsearch
     services from Docker Compose and Coolify compose.

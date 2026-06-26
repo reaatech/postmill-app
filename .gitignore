@@ -77,3 +77,7 @@ coolify-compose.yml
 /.pnpm-store/
 /node-compile-cache/
 /.kimi-code/
+
+# host-dev local upload tree (UPLOAD_DIRECTORY points at a repo-root/local uploads dir)
+uploads/
+apps/backend/uploads/

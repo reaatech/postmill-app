@@ -27,6 +27,24 @@ server) instead of a separate Temporal orchestrator:
 
 See [Inngest & Cron](../operations-guide/inngest-and-cron.md) for operation details.
 
+The v3.9.0 release also adds the **Replicate Studio** (`/media/replicate`), a native generative media
+workspace backed by [Replicate](https://replicate.com). It supports 18 categories covering image
+generation/editing (text-to-image, image-to-image, inpaint, upscale, background removal), video
+(text-to-video, image-to-video, video-to-video, caption, merge), audio (text-to-speech, voice clone,
+music generation, music-to-music), speech-to-text transcription, and utility surfaces (meme
+generator). Warm official models are shown by default with fixed-cost badges; community models are
+available via a per-category toggle with usage-based pricing. Async video/audio jobs require a target
+Files folder and complete through the Inngest poll sweep. The studio is intentionally a standalone
+surface in v1: it does **not** participate in C2PA provenance signing or the shared media-pipeline
+cost ledger; accounting is tracked per job through `AIMediaJob.costUsd`/`creditType`.
+
+Stock browsing was expanded with free vectors (Pixabay), stickers (GIPHY), and icons (Iconify),
+joining existing photos (Unsplash) and videos (Pexels). Results carry `source`, `license`, and
+`attribution` metadata through preview, Designer open, and `/files/import`. Premium Content Packs
+(BYOK) were added under **Settings → Content Packs**, with Magnific as the first supported pack
+(photos, vectors, icons, videos). An active pack takes precedence over the matching free catalog;
+credentials are encrypted at rest and never returned to the client.
+
 ### v3.8.10 (June 2026)
 
 Identity, tenancy, RBAC & provider-surface redesign:
@@ -122,7 +140,7 @@ writes through the per-org LOCAL storage adapter.
 - **`UploadFactory`, `cloudflare.storage.ts`, and `r2.uploader.ts` deleted** — these files read
   `STORAGE_PROVIDER`/`CLOUDFLARE_*` env vars at module-load time and are no longer used.
 - **Multipart catch-all removed** — `POST /media/:endpoint` (presigned multipart for Cloudflare R2)
-  is gone. Large files upload through `/media/upload-server` with a raised configurable limit
+  is gone. Large files upload through `/files/upload-server` (v3.8+: `/media/upload-server` was renamed)
   (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB).
 - **Frontend de-cloudflared** — `uppy.upload.ts` has no `cloudflare` case; layouts hard-pin
   `storageProvider` to `'local'`; `cloudflareUrl` removed from context; `/uploads` rewrites in

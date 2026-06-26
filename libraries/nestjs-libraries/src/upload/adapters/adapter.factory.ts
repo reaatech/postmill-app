@@ -5,6 +5,14 @@ import { S3Adapter } from './s3.adapter';
 import { R2Adapter } from './r2.adapter';
 import { B2Adapter } from './b2.adapter';
 import { IdriveE2Adapter } from './idrive-e2.adapter';
+import { WasabiAdapter } from './wasabi.adapter';
+import { DigitalOceanSpacesAdapter } from './digitalocean.adapter';
+import { HetznerAdapter } from './hetzner.adapter';
+import { StorjAdapter } from './storj.adapter';
+import { ScalewayAdapter } from './scaleway.adapter';
+import { VultrAdapter } from './vultr.adapter';
+import { LinodeAdapter } from './linode.adapter';
+import { S3CompatibleAdapter } from './s3-compatible.adapter';
 
 const CREDENTIAL_SCHEMAS: Record<StorageProviderType, { key: string; label: string }[]> = {
   LOCAL: [],
@@ -21,6 +29,38 @@ const CREDENTIAL_SCHEMAS: Record<StorageProviderType, { key: string; label: stri
     { key: 'applicationKey', label: 'Application Key' },
   ],
   IDRIVE_E2: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  WASABI: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  DIGITALOCEAN_SPACES: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  HETZNER: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  STORJ: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  SCALEWAY: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  VULTR: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  LINODE: [
+    { key: 'accessKeyId', label: 'Access Key ID' },
+    { key: 'secretAccessKey', label: 'Secret Access Key' },
+  ],
+  S3_COMPATIBLE: [
     { key: 'accessKeyId', label: 'Access Key ID' },
     { key: 'secretAccessKey', label: 'Secret Access Key' },
   ],
@@ -82,6 +122,70 @@ export class StorageAdapterFactory {
         );
       case 'IDRIVE_E2':
         return new IdriveE2Adapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'WASABI':
+        return new WasabiAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'DIGITALOCEAN_SPACES':
+        return new DigitalOceanSpacesAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'HETZNER':
+        return new HetznerAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'STORJ':
+        return new StorjAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'SCALEWAY':
+        return new ScalewayAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'VULTR':
+        return new VultrAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'LINODE':
+        return new LinodeAdapter(
+          config.region!,
+          creds,
+          config.bucket!,
+          config.endpoint || undefined,
+          config.publicUrl || undefined
+        );
+      case 'S3_COMPATIBLE':
+        return new S3CompatibleAdapter(
           config.region!,
           creds,
           config.bucket!,

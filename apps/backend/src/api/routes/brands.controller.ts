@@ -19,7 +19,7 @@ import {
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
-import { IsString, IsOptional, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsArray, IsObject } from 'class-validator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
@@ -38,9 +38,38 @@ class CreateBrandDto {
   @IsOptional()
   platformInstructions?: Record<string, string>;
 
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  @IsOptional()
+  @IsObject()
+  languageProfiles?: Record<string, any>;
+
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  logoFileIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  palette?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fontFamilies?: string[];
+
+  // Attached brand assets — [{ fileId?, url, caption? }].
+  @IsOptional()
+  @IsArray()
+  assets?: { fileId?: string; url: string; caption?: string }[];
+
+  @IsOptional()
+  @IsObject()
+  enforcement?: Record<string, any>;
 }
 
 class UpdateBrandDto {
@@ -59,9 +88,46 @@ class UpdateBrandDto {
   @IsOptional()
   platformInstructions?: Record<string, string>;
 
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  @IsOptional()
+  @IsObject()
+  languageProfiles?: Record<string, any>;
+
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  logoFileIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  palette?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  fontFamilies?: string[];
+
+  @IsOptional()
+  @IsString()
+  introFileId?: string;
+
+  @IsOptional()
+  @IsString()
+  outroFileId?: string;
+
+  // Attached brand assets — [{ fileId?, url, caption? }].
+  @IsOptional()
+  @IsArray()
+  assets?: { fileId?: string; url: string; caption?: string }[];
+
+  @IsOptional()
+  @IsObject()
+  enforcement?: Record<string, any>;
 }
 
 @ApiTags('Brands')

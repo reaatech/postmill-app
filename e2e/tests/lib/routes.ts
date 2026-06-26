@@ -23,7 +23,6 @@ export const ROUTES: RouteDef[] = [
   { name: 'Campaigns', path: '/campaigns', expectsContent: true, minActionables: 1 },
   { name: 'Plugs', path: '/plugs', expectsContent: true, minActionables: 1 },
   { name: 'Agents', path: '/agents', expectsContent: true, minActionables: 1 },
-  { name: 'Integrations', path: '/third-party', expectsContent: true, minActionables: 1 },
   { name: 'Billing', path: '/billing', expectsContent: true, minActionables: 1 },
   { name: 'Settings', path: '/settings', expectsContent: true, minActionables: 2 },
 ];
@@ -37,7 +36,6 @@ export const NAV_LINKS: { label: RegExp; path: string }[] = [
   { label: /^media$/i, path: '/media' },
   { label: /^plugs$/i, path: '/plugs' },
   { label: /^campaigns$/i, path: '/campaigns' },
-  { label: /^integrations$/i, path: '/third-party' },
   { label: /^billing$|^lifetime$/i, path: '/billing' },
   { label: /^settings$/i, path: '/settings' },
 ];

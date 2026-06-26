@@ -55,10 +55,24 @@ export class StabilityAdapter implements MediaProviderAdapter {
   }
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
+    // Native Stable Image params (negative_prompt, aspect_ratio, style_preset, seed,
+    // output_format, …) ride through `options.input`. `model` selects the endpoint
+    // (core/ultra/sd3). Defaults apply only when input omits them; merge before append
+    // so a descriptor value never produces a duplicate form field.
+    const fields: Record<string, string | number | boolean> = {
+      output_format: options?.format || 'png',
+      ...(options?.input || {}),
+    };
+    if (options?.aspectRatio && !('aspect_ratio' in fields)) {
+      fields.aspect_ratio = options.aspectRatio;
+    }
+
     const form = new FormData();
     form.append('prompt', prompt);
-    form.append('output_format', options?.format || 'png');
-    if (options?.aspectRatio) form.append('aspect_ratio', options.aspectRatio);
+    for (const [key, value] of Object.entries(fields)) {
+      if (value === undefined || value === '') continue;
+      form.append(key, String(value));
+    }
 
     const model = options?.model || 'core';
     const res = await safeFetch(`${BASE}/v2beta/stable-image/generate/${model}`, {
@@ -69,7 +83,8 @@ export class StabilityAdapter implements MediaProviderAdapter {
     if (!res.ok) throw new Error(`Stability AI image generation failed: ${await res.text()}`);
     const data = (await res.json()) as StabilityImageResponse;
     if (!data.image) throw new Error('Stability AI returned no image');
-    const mime = options?.format === 'jpeg' ? 'image/jpeg' : 'image/png';
+    const fmt = String(fields.output_format || 'png');
+    const mime = fmt === 'jpeg' ? 'image/jpeg' : fmt === 'webp' ? 'image/webp' : 'image/png';
     const image = `data:${mime};base64,${data.image}`;
     return {
       multi: false,

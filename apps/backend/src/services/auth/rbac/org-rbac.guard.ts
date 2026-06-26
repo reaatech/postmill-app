@@ -8,6 +8,7 @@ const RBAC_PERMS_CACHE = Symbol('rbacPermsCache');
 interface RbacRequest {
   user?: { id?: string; isSuperAdmin?: boolean };
   orgId?: string;
+  org?: { id?: string };
   path?: string;
   [RBAC_PERMS_CACHE]?: Map<string, string[] | null>;
 }
@@ -36,7 +37,9 @@ export class OrgRbacGuard implements CanActivate {
       return true;
     }
     const userId = request?.user?.id;
-    const orgId = request?.orgId;
+    // AuthMiddleware sets `req.org` (the Organization), matching PoliciesGuard's
+    // source; other auth paths may set `req.orgId` directly. Accept either.
+    const orgId = request?.orgId ?? request?.org?.id;
 
     if (!userId || !orgId) {
       throw new ForbiddenException('Not authenticated');

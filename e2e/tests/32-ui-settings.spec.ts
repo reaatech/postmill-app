@@ -23,7 +23,6 @@ test('settings pages full coverage', async ({ page }) => {
   // /channels, /ai-settings, or /admin landing page — admin surfaces live under /admin/*.
   const settingsPages = [
     { label: 'Settings', path: '/settings' },
-    { label: 'Integrations', path: '/third-party' },
     { label: 'Billing', path: '/billing' },
   ];
 

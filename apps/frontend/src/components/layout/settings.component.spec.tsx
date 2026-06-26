@@ -74,10 +74,10 @@ vi.mock('@hookform/resolvers/class-validator', () => ({
   classValidatorResolver: vi.fn(() => vi.fn()),
 }));
 
-vi.mock('@gitroom/frontend/components/media/new.uploader', () => ({}));
+vi.mock('@gitroom/frontend/components/files/new.uploader', () => ({}));
 
-vi.mock('@gitroom/frontend/components/media/media.component', () => ({
-  showMediaBox: vi.fn(),
+vi.mock('@gitroom/frontend/components/files/file.component', () => ({
+  showFileBox: vi.fn(),
 }));
 
 vi.mock('@gitroom/frontend/components/launches/launches.component', () => ({
@@ -127,10 +127,11 @@ describe('SettingsPopup', () => {
   it('groups tabs into sections', () => {
     render(<SettingsPopup />);
 
-    expect(screen.getByText('Workspace')).toBeDefined();
-    expect(screen.getByText('Providers')).toBeDefined();
-    expect(screen.getByText('Automation')).toBeDefined();
-    expect(screen.getByText('Developer')).toBeDefined();
+    // Sections render in both the desktop rail and the mobile sub-menu strip.
+    expect(screen.getAllByText('Workspace').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Providers').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Automation').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Developer').length).toBeGreaterThan(0);
   });
 
   it('does not have a Profile tab', () => {
@@ -154,7 +155,7 @@ describe('SettingsPopup', () => {
 
     render(<SettingsPopup />);
 
-    expect(screen.getByText('Roles')).toBeDefined();
+    expect(screen.getAllByText('Roles').length).toBeGreaterThan(0);
   });
 
   it('hides the Roles tab for members without members:manage or settings:update', () => {

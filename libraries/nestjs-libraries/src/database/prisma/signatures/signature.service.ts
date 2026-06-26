@@ -14,6 +14,14 @@ export class SignatureService {
     return this._signatureRepository.getDefaultSignature(orgId);
   }
 
+  getAutoAddSignatures(orgId: string) {
+    return this._signatureRepository.getAutoAddSignatures(orgId);
+  }
+
+  trackUsage(orgId: string, id: string) {
+    return this._signatureRepository.incrementUsage(orgId, id);
+  }
+
   createOrUpdateSignature(orgId: string, signature: SignatureDto, id?: string) {
     return this._signatureRepository.createOrUpdateSignature(
       orgId,

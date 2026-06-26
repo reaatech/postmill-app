@@ -39,7 +39,7 @@ const VERTEX_MODELS: ModelInfo[] = [
 export class VertexAdapter implements AIProviderAdapter {
   private readonly _logger = new Logger(VertexAdapter.name);
   readonly identifier = 'vertex';
-  readonly name = 'Google Vertex AI';
+  readonly name = 'Google Vertex';
   // Hub: Google cloud aggregator fronting Gemini + Anthropic + Llama + others.
   readonly type = 'hub' as const;
   readonly credentialFields = VERTEX_CREDENTIAL_FIELDS;

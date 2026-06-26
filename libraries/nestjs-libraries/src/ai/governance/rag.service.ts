@@ -7,20 +7,38 @@ import { AiSettingsManager } from '../ai-settings.manager';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { PgVectorStoreAdapter } from '../rag/pgvector.adapter';
 import { QdrantVectorStoreAdapter } from '../rag/qdrant.adapter';
+import { PineconeVectorStoreAdapter } from '../rag/pinecone.adapter';
+import { RemotePgVectorStoreAdapter } from '../rag/remote-pgvector.adapter';
 import { VectorStoreAdapter } from '../rag/vector-store.adapter';
+
+export type VectorStoreKind = 'pgvector' | 'pgvector-remote' | 'qdrant' | 'pinecone';
 
 export interface RagSettings {
   enabled: boolean;
   embeddingDimension?: number;
   chunkSize?: number;
   chunkOverlap?: number;
-  // Pluggable vector store via hybrid-rag adapter architecture.
-  vectorStore?: 'pgvector' | 'qdrant';
+  // Pluggable vector store. 'pgvector' = the built-in Postmill default (app DB);
+  // the others are remote stores configured per-deployment.
+  vectorStore?: VectorStoreKind;
+  // Qdrant (remote)
   qdrantUrl?: string;
   qdrantCollection?: string;
   qdrantApiKey?: string;
   distance?: 'Cosine' | 'Euclid' | 'Dot';
+  // Remote pgvector (external Postgres) — pgUrl is a secret (carries the password)
+  pgUrl?: string;
+  pgTable?: string;
+  // Pinecone (remote) — pineconeApiKey is a secret
+  pineconeApiKey?: string;
+  pineconeIndex?: string;
+  pineconeHost?: string;
 }
+
+const EXTERNAL_STORES: VectorStoreKind[] = ['qdrant', 'pgvector-remote', 'pinecone'];
+
+const isExternalStore = (v?: string): v is VectorStoreKind =>
+  EXTERNAL_STORES.includes(v as VectorStoreKind);
 
 const DEFAULT_EMBEDDING_DIMENSION = 1536;
 const DEFAULT_CHUNK_SIZE = 500;
@@ -60,18 +78,31 @@ export class RagService implements OnModuleInit {
     const raw = settings?.ragSettings;
     let result: RagSettings;
     if (raw && typeof raw === 'object' && typeof raw.enabled === 'boolean') {
+      const secret = (settings as any)?.secretSettings || {};
+      const vectorStore: VectorStoreKind = [
+        'pgvector',
+        'pgvector-remote',
+        'qdrant',
+        'pinecone',
+      ].includes(raw.vectorStore)
+        ? raw.vectorStore
+        : 'pgvector';
       result = {
         enabled: raw.enabled,
         embeddingDimension: typeof raw.embeddingDimension === 'number' ? raw.embeddingDimension : undefined,
         chunkSize: typeof raw.chunkSize === 'number' ? raw.chunkSize : undefined,
         chunkOverlap: typeof raw.chunkOverlap === 'number' ? raw.chunkOverlap : undefined,
-        vectorStore: raw.vectorStore === 'qdrant' ? 'qdrant' : 'pgvector',
+        vectorStore,
         qdrantUrl: typeof raw.qdrantUrl === 'string' ? raw.qdrantUrl : undefined,
         qdrantCollection: typeof raw.qdrantCollection === 'string' ? raw.qdrantCollection : undefined,
-        // The qdrant api key is a secret — read from the decrypted secretSettings blob (#7).
-        qdrantApiKey:
-          (settings as any)?.secretSettings?.qdrantApiKey ??
-          (typeof raw.qdrantApiKey === 'string' ? raw.qdrantApiKey : undefined),
+        // Secrets come from the decrypted secretSettings blob (fall back to any
+        // legacy plaintext value still living in ragSettings).
+        qdrantApiKey: secret.qdrantApiKey ?? (typeof raw.qdrantApiKey === 'string' ? raw.qdrantApiKey : undefined),
+        pgUrl: secret.pgUrl ?? (typeof raw.pgUrl === 'string' ? raw.pgUrl : undefined),
+        pgTable: typeof raw.pgTable === 'string' ? raw.pgTable : undefined,
+        pineconeApiKey: secret.pineconeApiKey ?? (typeof raw.pineconeApiKey === 'string' ? raw.pineconeApiKey : undefined),
+        pineconeIndex: typeof raw.pineconeIndex === 'string' ? raw.pineconeIndex : undefined,
+        pineconeHost: typeof raw.pineconeHost === 'string' ? raw.pineconeHost : undefined,
       };
     } else {
       result = { enabled: false };
@@ -204,14 +235,14 @@ export class RagService implements OnModuleInit {
     userId?: string,
   ): Promise<void> {
     const store = await this._resolveStore();
-    const useQdrant = store.kind === 'qdrant';
+    const useExternal = store.kind === 'external';
 
-    const { pgvectorAvailable } = useQdrant
+    const { pgvectorAvailable } = useExternal
       ? { pgvectorAvailable: false }
       : await this._ensureSideTable();
 
     let embeddings: number[][] = [];
-    if (pgvectorAvailable || useQdrant) {
+    if (pgvectorAvailable || useExternal) {
       embeddings = await this._computeEmbeddings(chunks, organizationId, scope, userId);
     }
 
@@ -226,7 +257,7 @@ export class RagService implements OnModuleInit {
       formatVector: (arr) => this._formatVector(arr),
     });
 
-    if (useQdrant && embeddings.length === created.length) {
+    if (useExternal && embeddings.length === created.length) {
       const points = created
         .map((idx, i) => ({
           id: idx.id,
@@ -320,39 +351,92 @@ export class RagService implements OnModuleInit {
     return '[' + arr.join(',') + ']';
   }
 
-  private _qdrantAdapter: QdrantVectorStoreAdapter | null = null;
-  private _qdrantProbed: boolean | null = null;
+  private _externalAdapter: VectorStoreAdapter | null = null;
+  private _externalKey: string | null = null;
+  private _externalProbed: boolean | null = null;
 
-  private _buildQdrantAdapter(rag: RagSettings): QdrantVectorStoreAdapter {
-    return new QdrantVectorStoreAdapter({
-      url: rag.qdrantUrl || '',
-      apiKey: rag.qdrantApiKey,
-      collectionName: rag.qdrantCollection || 'postiz_rag',
-      dimension: rag.embeddingDimension || DEFAULT_EMBEDDING_DIMENSION,
-      distance: rag.distance || 'Cosine',
+  // Build the configured remote adapter, or null when its required settings are
+  // missing. Returns null for the built-in pgvector default.
+  private _buildExternalAdapter(rag: RagSettings): VectorStoreAdapter | null {
+    const dimension = rag.embeddingDimension || DEFAULT_EMBEDDING_DIMENSION;
+    if (rag.vectorStore === 'qdrant' && rag.qdrantUrl) {
+      return new QdrantVectorStoreAdapter({
+        url: rag.qdrantUrl,
+        apiKey: rag.qdrantApiKey,
+        collectionName: rag.qdrantCollection || 'postiz_rag',
+        dimension,
+        distance: rag.distance || 'Cosine',
+      });
+    }
+    if (rag.vectorStore === 'pgvector-remote' && rag.pgUrl) {
+      return new RemotePgVectorStoreAdapter({
+        connectionString: rag.pgUrl,
+        table: rag.pgTable,
+        dimension,
+      });
+    }
+    if (rag.vectorStore === 'pinecone' && rag.pineconeApiKey && (rag.pineconeHost || rag.pineconeIndex)) {
+      return new PineconeVectorStoreAdapter({
+        apiKey: rag.pineconeApiKey,
+        host: rag.pineconeHost,
+        indexName: rag.pineconeIndex,
+        dimension,
+      });
+    }
+    return null;
+  }
+
+  // A signature over the settings that affect adapter construction, so the cached
+  // adapter (and its pooled connections) is rebuilt only when config changes.
+  private _externalSignature(rag: RagSettings): string {
+    return JSON.stringify({
+      vs: rag.vectorStore,
+      d: rag.embeddingDimension,
+      qu: rag.qdrantUrl,
+      qc: rag.qdrantCollection,
+      qk: rag.qdrantApiKey ? 1 : 0,
+      pg: rag.pgUrl ? 1 : 0,
+      pt: rag.pgTable,
+      pk: rag.pineconeApiKey ? 1 : 0,
+      pi: rag.pineconeIndex,
+      ph: rag.pineconeHost,
     });
   }
 
-  private async _resolveStore(): Promise<{ kind: 'pgvector' | 'qdrant'; adapter: VectorStoreAdapter }> {
+  private async _resolveStore(): Promise<{
+    kind: 'local' | 'external';
+    adapter: VectorStoreAdapter;
+  }> {
     const rag = await this._getRagSettings();
-    if (rag.vectorStore !== 'qdrant' || !rag.qdrantUrl) {
-      return { kind: 'pgvector', adapter: this._pgVectorAdapter };
+    if (!isExternalStore(rag.vectorStore)) {
+      return { kind: 'local', adapter: this._pgVectorAdapter };
     }
+
+    const signature = this._externalSignature(rag);
+    if (this._externalKey !== signature) {
+      // Settings changed — tear down the previous pool (remote pgvector) and rebuild.
+      void this._externalAdapter?.close?.();
+      this._externalAdapter = this._buildExternalAdapter(rag);
+      this._externalKey = signature;
+      this._externalProbed = null;
+    }
+
+    if (!this._externalAdapter) {
+      return { kind: 'local', adapter: this._pgVectorAdapter };
+    }
+
     try {
-      if (!this._qdrantAdapter) {
-        this._qdrantAdapter = this._buildQdrantAdapter(rag);
+      if (this._externalProbed === null) {
+        this._externalProbed = await this._externalAdapter.probe();
       }
-      if (this._qdrantProbed === null) {
-        this._qdrantProbed = await this._qdrantAdapter.probe();
+      if (this._externalProbed) {
+        return { kind: 'external', adapter: this._externalAdapter };
       }
-      if (this._qdrantProbed) {
-        return { kind: 'qdrant', adapter: this._qdrantAdapter };
-      }
-      this._logger.warn('Qdrant selected but unreachable — falling back to pgvector/text');
+      this._logger.warn(`${rag.vectorStore} selected but unreachable — falling back to pgvector/text`);
     } catch (err) {
-      this._logger.warn('Qdrant store resolution failed: ' + (err as Error).message);
+      this._logger.warn(`${rag.vectorStore} store resolution failed: ` + (err as Error).message);
     }
-    return { kind: 'pgvector', adapter: this._pgVectorAdapter };
+    return { kind: 'local', adapter: this._pgVectorAdapter };
   }
 
   // §3.6 — BM25 (Okapi) arm fused with the vector arm via reciprocal-rank fusion
@@ -419,7 +503,7 @@ export class RagService implements OnModuleInit {
 
     const store = await this._resolveStore();
 
-    if (store.kind === 'qdrant') {
+    if (store.kind === 'external') {
       try {
         const embeddings = await this._computeEmbeddings([params.query], params.organizationId);
         if (embeddings.length && embeddings[0]?.length) {
@@ -428,7 +512,7 @@ export class RagService implements OnModuleInit {
           return fused ?? vectorHits;
         }
       } catch (err) {
-        this._logger.warn('Qdrant search failed, falling back to text: ' + (err as Error).message);
+        this._logger.warn('Remote vector search failed, falling back to text: ' + (err as Error).message);
       }
       return this._textSearch(params.organizationId, params.query, limit);
     }
@@ -550,18 +634,32 @@ export class RagService implements OnModuleInit {
   }
 
   async testConnection(settings: RagSettings): Promise<{ ok: boolean; error?: string }> {
-    if (settings.vectorStore === 'qdrant') {
-      if (!settings.qdrantUrl) {
+    if (isExternalStore(settings.vectorStore)) {
+      // Required-field guards with friendly messages before probing.
+      if (settings.vectorStore === 'qdrant' && !settings.qdrantUrl) {
         return { ok: false, error: 'Qdrant URL is required' };
       }
+      if (settings.vectorStore === 'pgvector-remote' && !settings.pgUrl) {
+        return { ok: false, error: 'PostgreSQL connection string is required' };
+      }
+      if (
+        settings.vectorStore === 'pinecone' &&
+        (!settings.pineconeApiKey || !(settings.pineconeHost || settings.pineconeIndex))
+      ) {
+        return { ok: false, error: 'Pinecone API key and index (or host) are required' };
+      }
+      const adapter = this._buildExternalAdapter(settings);
+      if (!adapter) {
+        return { ok: false, error: 'Missing required settings for the selected store' };
+      }
       try {
-        const adapter = this._buildQdrantAdapter(settings);
         const ok = await adapter.probe();
-        return ok
-          ? { ok: true }
-          : { ok: false, error: 'Qdrant endpoint unreachable' };
+        return ok ? { ok: true } : { ok: false, error: 'Vector store unreachable' };
       } catch (err) {
         return { ok: false, error: (err as Error).message };
+      } finally {
+        // Tear down any transient pool (remote pgvector) opened for the probe.
+        void adapter.close?.();
       }
     }
 

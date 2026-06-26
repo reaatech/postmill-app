@@ -23,6 +23,9 @@ function makeService() {
   const credentialLink = {
     syncFromMediaProvider: vi.fn().mockResolvedValue(undefined),
   };
+  const orgAiRepository = {
+    getByIdentifier: vi.fn().mockResolvedValue(null),
+  };
 
   const service = new OrgMediaProviderSettingsService(
     repository as never,
@@ -30,9 +33,10 @@ function makeService() {
     registry as never,
     mediaRepository as never,
     credentialLink as never,
+    orgAiRepository as never,
   );
 
-  return { service, repository, encryption, registry, mediaRepository, credentialLink };
+  return { service, repository, encryption, registry, mediaRepository, credentialLink, orgAiRepository };
 }
 
 describe('OrgMediaProviderSettingsService', () => {
@@ -131,6 +135,84 @@ describe('OrgMediaProviderSettingsService', () => {
       const { service } = makeService();
       expect(await service.getConfigForProvider('org-1', 'nope')).toBeNull();
     });
+
+    it('falls back to the org AI key for Qwen when no media credential exists', async () => {
+      const { service, orgAiRepository } = makeService();
+      // No media config row for qwen, but the org has an AI Qwen key (AES-GCM encrypted,
+      // same scheme as media creds → decrypted with the media EncryptionService).
+      orgAiRepository.getByIdentifier.mockResolvedValue({
+        identifier: 'qwen',
+        credentials: `enc(${JSON.stringify({ apiKey: 'dashscope-key' })})`,
+      });
+
+      const config = await service.getConfigForProvider('org-1', 'qwen');
+      expect(orgAiRepository.getByIdentifier).toHaveBeenCalledWith('org-1', 'qwen');
+      expect(config).toEqual({
+        credentials: { apiKey: 'dashscope-key' },
+        storageProviderId: null,
+        storageRootFolderId: null,
+      });
+    });
+
+    it('prefers the dedicated media credential over the AI fallback for Qwen', async () => {
+      const { service, repository, orgAiRepository } = makeService();
+      repository.getByIdentifier.mockResolvedValue({
+        identifier: 'qwen',
+        credentials: `enc(${JSON.stringify({ apiKey: 'media-key' })})`,
+        storageProviderId: 'sp-1',
+        storageRootFolderId: 'root-1',
+      });
+      const config = await service.getConfigForProvider('org-1', 'qwen');
+      expect(config?.credentials).toEqual({ apiKey: 'media-key' });
+      expect(orgAiRepository.getByIdentifier).not.toHaveBeenCalled();
+    });
+
+    it('does not fall back for non-universal providers', async () => {
+      const { service, orgAiRepository } = makeService();
+      orgAiRepository.getByIdentifier.mockResolvedValue({ credentials: `enc(${JSON.stringify({ apiKey: 'x' })})` });
+      expect(await service.getConfigForProvider('org-1', 'runway')).toBeNull();
+      expect(orgAiRepository.getByIdentifier).not.toHaveBeenCalled();
+    });
+
+    it('reuses the org AI key for the new hub providers (single + multi-field)', async () => {
+      const { service, orgAiRepository } = makeService();
+      orgAiRepository.getByIdentifier.mockImplementation(async (_org: string, id: string) => {
+        if (id === 'togetherai') return { credentials: `enc(${JSON.stringify({ apiKey: 'tg-key' })})` };
+        // Bedrock reuses its multi-field AWS credentials verbatim.
+        if (id === 'bedrock')
+          return {
+            credentials: `enc(${JSON.stringify({ region: 'us-east-1', accessKeyId: 'AK', secretAccessKey: 'SK' })})`,
+          };
+        return null;
+      });
+
+      expect((await service.getConfigForProvider('org-1', 'togetherai'))?.credentials).toEqual({ apiKey: 'tg-key' });
+      expect((await service.getConfigForProvider('org-1', 'bedrock'))?.credentials).toEqual({
+        region: 'us-east-1',
+        accessKeyId: 'AK',
+        secretAccessKey: 'SK',
+      });
+    });
+  });
+
+  describe('getProviders universal-credential fallback', () => {
+    it('marks Qwen configured + enabled when only the AI key exists', async () => {
+      const { service, registry, repository, orgAiRepository } = makeService();
+      registry.getAll.mockReturnValue([
+        { identifier: 'qwen', name: 'Qwen', capabilities: { image: true, video: true } },
+        { identifier: 'runway', name: 'Runway', capabilities: { video: true } },
+      ]);
+      repository.getByOrg.mockResolvedValue([]); // no media config rows
+      orgAiRepository.getByIdentifier.mockImplementation(async (_org: string, id: string) =>
+        id === 'qwen' ? { credentials: `enc(${JSON.stringify({ apiKey: 'k' })})` } : null,
+      );
+
+      const providers = await service.getProviders('org-1');
+      const qwen = providers.find((p) => p.identifier === 'qwen');
+      const runway = providers.find((p) => p.identifier === 'runway');
+      expect(qwen).toMatchObject({ isConfigured: true, enabled: true });
+      expect(runway).toMatchObject({ isConfigured: false, enabled: false });
+    });
   });
 
   describe('getStandardFolderId', () => {
@@ -208,7 +290,7 @@ describe('OrgMediaProviderSettingsService', () => {
     it('testConnection runs a probe generation with decrypted credentials', async () => {
       const { service, repository, registry } = makeService();
       const generateImage = vi.fn().mockResolvedValue({ multi: false, image: 'ok' });
-      registry.get.mockReturnValue({ identifier: 'fal', generateImage });
+      registry.get.mockReturnValue({ identifier: 'fal', capabilities: { image: true }, generateImage });
       repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({"apiKey":"k"})' });
 
       const result = await service.testConnection('org-1', 'fal');
@@ -220,6 +302,7 @@ describe('OrgMediaProviderSettingsService', () => {
       const { service, repository, registry } = makeService();
       registry.get.mockReturnValue({
         identifier: 'fal',
+        capabilities: { image: true },
         generateImage: vi.fn().mockRejectedValue(new Error('bad key')),
       });
       repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({})' });
@@ -230,6 +313,35 @@ describe('OrgMediaProviderSettingsService', () => {
 
       repository.getByIdentifier.mockResolvedValue(null);
       await expect(service.testConnection('org-1', 'nope')).rejects.toThrow('not configured');
+    });
+
+    it('testConnection prefers the adapter testConnection over image generation', async () => {
+      const { service, repository, registry } = makeService();
+      const generateImage = vi.fn();
+      const testConnection = vi.fn().mockResolvedValue({ ok: true, message: 'Connection successful' });
+      registry.get.mockReturnValue({
+        identifier: 'heygen',
+        capabilities: { image: false, video: true, avatar: true },
+        generateImage,
+        testConnection,
+      });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'heygen', credentials: 'enc({"apiKey":"k"})' });
+
+      const result = await service.testConnection('org-1', 'heygen');
+      expect(testConnection).toHaveBeenCalledWith({ credentials: { apiKey: 'k' } });
+      expect(generateImage).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, message: 'Connection successful' });
+    });
+
+    it('testConnection does not run image generation for a non-image provider without a test', async () => {
+      const { service, repository, registry } = makeService();
+      const generateImage = vi.fn();
+      registry.get.mockReturnValue({ identifier: 'deepgram', capabilities: { image: false, stt: true }, generateImage });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'deepgram', credentials: 'enc({})' });
+
+      const result = await service.testConnection('org-1', 'deepgram');
+      expect(generateImage).not.toHaveBeenCalled();
+      expect(result.ok).toBe(true);
     });
   });
 });

@@ -4,7 +4,7 @@ import * as path from 'path';
 
 // Click through the real left-nav like a user; on each page check it renders content
 // and capture console errors + failing API calls. Then exercise a couple of interactions.
-const NAV = ['Calendar', 'Agent', 'Comments', 'Analytics', 'Media', 'Plugs', 'Campaigns', 'Integrations', 'AI Settings', 'Channels', 'Errors', 'Billing'];
+const NAV = ['Calendar', 'Agent', 'Comments', 'Analytics', 'Media', 'Plugs', 'Campaigns', 'AI Settings', 'Channels', 'Errors', 'Billing'];
 
 test('navigate the app via sidebar clicks', async ({ page }) => {
   const findings: any[] = [];

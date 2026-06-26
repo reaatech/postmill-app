@@ -30,7 +30,7 @@ export class EmailService {
   ) {
     if (!isInngestEnabled()) {
       this._logger.debug('Skipping email/send event — Inngest is disabled');
-      return;
+      return undefined;
     }
 
     return inngest.send({

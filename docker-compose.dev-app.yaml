@@ -44,7 +44,6 @@ services:
       - postmill-network
     depends_on:
       - postmill-postgres
-      - postmill-redis
 
 volumes:
   app-node-modules-root:

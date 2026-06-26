@@ -5,6 +5,7 @@ import {
   MediaGenerateOptions,
   MediaCredentialOptions,
   MediaJobSubmission,
+  MediaInputValue,
   MediaPollResult,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
@@ -47,6 +48,16 @@ export class HedraAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    // The studio resolves the start-keyframe media field to a reachable URL in `options.input`;
+    // legacy callers still pass it via top-level options.
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const startKeyframe =
+      options?.sourceUrl ||
+      (typeof input.start_keyframe === 'string' ? input.start_keyframe : undefined) ||
+      (typeof input.start_keyframe_url === 'string' ? input.start_keyframe_url : undefined);
+    const aspectRatio =
+      options?.aspectRatio || (typeof input.aspect_ratio === 'string' ? input.aspect_ratio : undefined);
+
     const res = await safeFetch(`${BASE}/generations`, {
       method: 'POST',
       headers: this._headers(options),
@@ -55,8 +66,8 @@ export class HedraAdapter implements MediaProviderAdapter {
         text_prompt: prompt,
         ...(options?.model ? { ai_model_id: options.model } : {}),
         ...(options?.avatarId ? { avatar_id: options.avatarId } : {}),
-        ...(options?.sourceUrl ? { start_keyframe_url: options.sourceUrl } : {}),
-        ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+        ...(startKeyframe ? { start_keyframe_url: startKeyframe } : {}),
+        ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
       }),
     });
     if (!res.ok) throw new Error(`Hedra video generation failed: ${await res.text()}`);

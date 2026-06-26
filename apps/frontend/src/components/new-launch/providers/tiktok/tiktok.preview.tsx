@@ -4,7 +4,7 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import { FC, ReactNode } from 'react';
-import { SliderComponent } from '@gitroom/frontend/components/third-parties/slider.component';
+import { SliderComponent } from '@gitroom/frontend/components/ui/slider.component';
 import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 

@@ -3,7 +3,7 @@ import {
   Injectable,
   PipeTransform,
 } from '@nestjs/common';
-import { fromBuffer, fromFile } from 'file-type';
+import { fromBuffer, fromFile } from './file-type.compat';
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
 
@@ -16,6 +16,7 @@ const ALLOWED_MIME_TYPES = new Set<string>([
   'image/bmp',
   'image/tiff',
   'video/mp4',
+  'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg',
 ]);
 
 @Injectable()
@@ -74,6 +75,8 @@ export class CustomFileValidationPipe implements PipeTransform {
       return 10 * 1024 * 1024; // 10 MB
     } else if (mimeType.startsWith('video/')) {
       return 1024 * 1024 * 1024; // 1 GB
+    } else if (mimeType.startsWith('audio/')) {
+      return 50 * 1024 * 1024; // 50 MB
     } else {
       throw new BadRequestException('Unsupported file type.');
     }

@@ -19,7 +19,7 @@ import useSWR from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ShowMediaBoxModal } from '@gitroom/frontend/components/media/media.component';
+import { ShowFileBoxModal } from '@gitroom/frontend/components/files/file.component';
 import { ShowLinkedinCompany } from '@gitroom/frontend/components/launches/helpers/linkedin.component';
 import { MediaSettingsLayout } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { Toaster } from '@gitroom/react/toaster/toaster';
@@ -46,6 +46,7 @@ import { FirstBillingComponent } from '@gitroom/frontend/components/billing/firs
 import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import SafeImage from '@gitroom/react/helpers/safe.image';
+import { BottomTabBar } from '@gitroom/frontend/components/new-layout/bottom-tab-bar';
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -84,7 +85,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
           <Toaster />
           <TrialTracker />
           <CheckPayment check={searchParams.get('check') || ''} mutate={mutate}>
-            <ShowMediaBoxModal />
+            <ShowFileBoxModal />
             <ShowLinkedinCompany />
             <MediaSettingsLayout />
             <ShowPostSelector />
@@ -93,7 +94,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
             <ContinueProvider />
             <div
               className={clsx(
-                'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px]',
+                'flex flex-col min-h-screen min-w-screen text-newTextColor p-[12px] mobile:pb-[72px]',
                 jakartaSans.className
               )}
             >
@@ -105,7 +106,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                   <AnnouncementBanner />
                   <div className="flex-1 flex gap-[8px]">
                     <Support />
-                    <div className="flex flex-col bg-newBgColorInner w-[80px] rounded-[12px]">
+                    <div className="mobile:hidden flex flex-col bg-newBgColorInner w-[80px] rounded-[12px]">
                       <div
                         id="left-menu"
                         className={clsx(
@@ -119,30 +120,38 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         </div>
                       </div>
                     </div>
-                    <div className="flex-1 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
+                    <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
                       <div className="flex bg-newBgColorInner h-[80px] px-[20px] items-center">
-                        <div className="text-[24px] font-[600] flex flex-1">
+                        <div className="text-[24px] font-[600] flex flex-1 items-center gap-[10px] min-w-0">
+                          {/* Brand mark — only on mobile, where the left rail
+                              (which normally shows the logo) is hidden. */}
+                          <span className="mobile:flex hidden shrink-0">
+                            <Logo size={34} className="" />
+                          </span>
                           <Title />
                         </div>
                         <div className="flex gap-[20px] text-textItemBlur items-center">
-                          <div className="flex items-center justify-center w-[36px] h-[36px]">
-                            <StreakComponent />
-                          </div>
-                          <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <OrganizationSelector />
-                          <div className="hover:text-newTextColor flex items-center justify-center w-[36px] h-[36px]">
-                            <ModeComponent />
-                          </div>
-                          <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <div className="flex items-center justify-center w-[36px] h-[36px]">
-                            <LanguageComponent />
-                          </div>
-                          <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
-                            <ChromeExtensionComponent />
-                          </div>
-                          <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                          <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
-                            <AttachToFeedbackIcon />
+                          {/* Secondary utilities collapse into the avatar menu on mobile. */}
+                          <div className="contents mobile:hidden">
+                            <div className="flex items-center justify-center w-[36px] h-[36px]">
+                              <StreakComponent />
+                            </div>
+                            <div className="w-[1px] h-[20px] bg-blockSeparator" />
+                            <OrganizationSelector />
+                            <div className="hover:text-newTextColor flex items-center justify-center w-[36px] h-[36px]">
+                              <ModeComponent />
+                            </div>
+                            <div className="w-[1px] h-[20px] bg-blockSeparator" />
+                            <div className="flex items-center justify-center w-[36px] h-[36px]">
+                              <LanguageComponent />
+                            </div>
+                            <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
+                              <ChromeExtensionComponent />
+                            </div>
+                            <div className="w-[1px] h-[20px] bg-blockSeparator" />
+                            <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
+                              <AttachToFeedbackIcon />
+                            </div>
                           </div>
                           <div className="flex items-center justify-center w-[36px] h-[36px]">
                             <NotificationComponent />
@@ -155,6 +164,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                       <div className="flex flex-1 gap-[1px]">{children}</div>
                     </div>
                   </div>
+                  <BottomTabBar />
                 </>
               )}
             </div>
@@ -222,7 +232,7 @@ const UserAvatarMenu = () => {
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-[36px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]" role="menu">
+        <div className="absolute right-0 top-[36px] w-[200px] mobile:w-[260px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]" role="menu">
           <div className="px-[14px] py-[8px] border-b border-newTableBorder">
             <div className="text-[13px] font-[600] text-textColor truncate">
               {user.profile?.name || user.email}
@@ -232,6 +242,28 @@ const UserAvatarMenu = () => {
                 {user.email}
               </div>
             )}
+          </div>
+          {/* Secondary utilities live here on mobile (hidden on desktop, where
+              they sit in the top bar). */}
+          <div className="mobile:block hidden px-[14px] py-[10px] border-b border-newTableBorder text-textItemBlur">
+            <div className="flex items-center gap-[18px] flex-wrap">
+              <StreakComponent />
+              <div className="hover:text-newTextColor flex items-center justify-center">
+                <ModeComponent />
+              </div>
+              <div className="flex items-center justify-center">
+                <LanguageComponent />
+              </div>
+              <div className="flex items-center justify-center empty:hidden">
+                <AttachToFeedbackIcon />
+              </div>
+              <div className="flex items-center justify-center empty:hidden">
+                <ChromeExtensionComponent />
+              </div>
+            </div>
+            <div className="mt-[10px] empty:hidden">
+              <OrganizationSelector asOpenSelect={true} />
+            </div>
           </div>
           <a
             href="/user/me"

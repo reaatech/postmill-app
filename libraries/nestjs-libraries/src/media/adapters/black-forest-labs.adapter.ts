@@ -51,6 +51,9 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
     const [width, height] = (options?.size || '1024x1024')
       .split('x')
       .map((v) => Number.parseInt(v, 10));
+    // Native FLUX params (prompt_upsampling, seed, safety_tolerance, aspect_ratio for
+    // -ultra, output_format, …) ride through `options.input` so the studio descriptor
+    // is the full feature surface. Defaults below apply only when input omits them.
     const res = await safeFetch(`${BASE}/${model}`, {
       method: 'POST',
       headers: this._headers(options),
@@ -58,6 +61,7 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
         prompt,
         width: Number.isFinite(width) ? width : 1024,
         height: Number.isFinite(height) ? height : 1024,
+        ...(options?.input || {}),
       }),
     });
     if (!res.ok) throw new Error(`Black Forest Labs image generation failed: ${await res.text()}`);

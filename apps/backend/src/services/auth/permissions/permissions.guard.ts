@@ -46,8 +46,16 @@ export class PoliciesGuard implements CanActivate {
 
     const refreshChannelId = typeof request.query?.refresh === 'string' ? request.query.refresh : undefined;
 
-    // @ts-ignore
-    const ability = await this._authorizationService.check(org.id, org.createdAt, org.users[0].role, policyHandlers, refreshChannelId);
+    // The v3.8.10 RBAC migration replaced UserOrganization.role with roleId → AppRole.
+    // Resolve the member's role key from the loaded roleRef (preferred) or the legacy
+    // users[0].users.role shape used by PublicAuthMiddleware.
+    const membership = (org as any).users?.[0];
+    const roleKey =
+      membership?.roleRef?.key ??
+      membership?.users?.role ??
+      membership?.role ??
+      'member';
+    const ability = await this._authorizationService.check(org.id, org.createdAt, roleKey, policyHandlers, refreshChannelId);
 
     const item = policyHandlers.find(
       (handler) => !this.execPolicyHandler(handler, ability)

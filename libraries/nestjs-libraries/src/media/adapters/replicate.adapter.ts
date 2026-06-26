@@ -41,24 +41,24 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     inpaint: true,
   };
 
-  private _headers(options?: MediaCredentialOptions, wait = false): Record<string, string> {
+  private _headers(options?: MediaCredentialOptions, preferWait?: number): Record<string, string> {
     const apiKey = resolveApiKey(options);
     if (!apiKey) throw new Error('Replicate API key is required');
     return {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
-      ...(wait ? { Prefer: 'wait' } : {}),
+      ...(preferWait ? { Prefer: `wait=${preferWait}` } : {}),
     };
   }
 
   private async _createPrediction(
     options: MediaGenerateOptions | undefined,
     input: Record<string, string | number | boolean | undefined>,
-    wait: boolean,
+    preferWait?: number,
   ): Promise<ReplicatePredictionResponse> {
     const res = await safeFetch(`${BASE}/predictions`, {
       method: 'POST',
-      headers: this._headers(options, wait),
+      headers: this._headers(options, preferWait),
       body: JSON.stringify({
         version: options?.version,
         input: { ...input, ...options?.input },
@@ -75,7 +75,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     const data = await this._createPrediction(
       { ...options, version: options?.version || options?.model || 'black-forest-labs/flux-schnell' },
       { prompt },
-      true,
+      60,
     );
     const output = data.output;
     if (!output) throw new Error('Replicate returned no output');
@@ -92,7 +92,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    const data = await this._createPrediction(options, { prompt }, false);
+    const data = await this._createPrediction(options, { prompt });
     if (!data.id) throw new Error('Replicate returned no prediction id');
     return { jobId: data.id };
   }
@@ -131,7 +131,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     const data = await this._createPrediction(
       { ...options, version: options?.version || 'nightmareai/real-esrgan' },
       { image: imageUrl, scale: options?.scale || 4 },
-      true,
+      60,
     );
     return firstOutputUrl(data.output) || '';
   }
@@ -140,7 +140,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     const data = await this._createPrediction(
       { ...options, version: options?.version || 'cjwbw/rembg' },
       { image: imageUrl },
-      true,
+      60,
     );
     return firstOutputUrl(data.output) || '';
   }
@@ -149,8 +149,47 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     const data = await this._createPrediction(
       { ...options, version: options?.version || 'stability-ai/stable-diffusion-inpainting' },
       { image: imageUrl, mask: maskUrl, prompt },
-      true,
+      60,
     );
     return firstOutputUrl(data.output) || '';
+  }
+
+  async runOfficial(
+    modelId: string,
+    input: Record<string, unknown>,
+    opts?: { wait?: boolean; webhookUrl?: string; apiKey?: string; credentials?: Record<string, string> },
+  ): Promise<ReplicatePredictionResponse> {
+    const res = await safeFetch(`${BASE}/models/${modelId}/predictions`, {
+      method: 'POST',
+      headers: this._headers(opts, opts?.wait ? 60 : undefined),
+      body: JSON.stringify({
+        input,
+        ...(opts?.webhookUrl
+          ? { webhook: opts.webhookUrl, webhook_events_filter: ['completed'] }
+          : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`Replicate request failed: ${await res.text()}`);
+    return (await res.json()) as ReplicatePredictionResponse;
+  }
+
+  async runCommunity(
+    versionId: string,
+    input: Record<string, unknown>,
+    opts?: { wait?: boolean; webhookUrl?: string; apiKey?: string; credentials?: Record<string, string> },
+  ): Promise<ReplicatePredictionResponse> {
+    const res = await safeFetch(`${BASE}/predictions`, {
+      method: 'POST',
+      headers: this._headers(opts, opts?.wait ? 60 : undefined),
+      body: JSON.stringify({
+        version: versionId,
+        input,
+        ...(opts?.webhookUrl
+          ? { webhook: opts.webhookUrl, webhook_events_filter: ['completed'] }
+          : {}),
+      }),
+    });
+    if (!res.ok) throw new Error(`Replicate request failed: ${await res.text()}`);
+    return (await res.json()) as ReplicatePredictionResponse;
   }
 }

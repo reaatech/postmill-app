@@ -72,6 +72,49 @@ describe('OrgRbacGuard', () => {
     expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
   });
 
+  // Regression: AuthMiddleware sets `req.org` (the Organization object), NOT
+  // `req.orgId`. The guard must resolve the org id from either shape. Before the
+  // fix it only read `req.orgId`, so `req.org`-only requests (i.e. every real
+  // cookie-authenticated request) 403'd on EVERY @RequirePermission route — even
+  // for super-admins, because the org-id check runs before the super-admin bypass.
+  it('resolves the org id from req.org.id (AuthMiddleware shape) for super-admin', async () => {
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1', isSuperAdmin: true }, org: { id: 'o1' } })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).not.toHaveBeenCalled();
+  });
+
+  it('resolves the org id from req.org.id when checking a member permission', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'admin',
+      permissions: ['settings:read'],
+    });
+    const result = await guard.canActivate(
+      buildContext({ user: { id: 'u1' }, org: { id: 'o1' } })
+    );
+    expect(result).toBe(true);
+    expect(rolesService.getEffectivePermissions).toHaveBeenCalledWith('o1', 'u1');
+  });
+
+  it('prefers req.orgId over req.org.id when both are present', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'admin',
+      permissions: ['settings:read'],
+    });
+    await guard.canActivate(
+      buildContext({
+        user: { id: 'u1' },
+        orgId: 'direct',
+        org: { id: 'fromObject' },
+      })
+    );
+    expect(rolesService.getEffectivePermissions).toHaveBeenCalledWith(
+      'direct',
+      'u1'
+    );
+  });
+
   it('403s when the user is not a member (null resolution)', async () => {
     rolesService.getEffectivePermissions.mockResolvedValue(null);
     await expect(

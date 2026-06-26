@@ -87,12 +87,21 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
     const model = options?.model || 'video-01';
+    // Native params (first_frame_image, prompt_optimizer, …) ride `options.input`.
+    // `subject_image` is a flattened convenience field folded into MiniMax's nested
+    // `subject_reference` array (S2V models).
+    const input = (options?.input || {}) as Record<string, unknown>;
+    const { subject_image, ...rest } = input;
     const res = await safeFetch(`${BASE}/video_generation`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({
         model,
         prompt,
+        ...rest,
+        ...(typeof subject_image === 'string'
+          ? { subject_reference: [{ type: 'character', image: [subject_image] }] }
+          : {}),
         ...(options?.webhookUrl ? { callback_url: options.webhookUrl } : {}),
       }),
     });

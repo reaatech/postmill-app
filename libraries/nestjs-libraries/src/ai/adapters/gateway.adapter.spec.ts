@@ -29,8 +29,8 @@ describe('GatewayAdapter', () => {
       expect(adapter.identifier).toBe('gateway');
     });
 
-    it('has name "Vercel AI Gateway"', () => {
-      expect(adapter.name).toBe('Vercel AI Gateway');
+    it('has name "Vercel AI"', () => {
+      expect(adapter.name).toBe('Vercel AI');
     });
 
     it('has type "hub"', () => {

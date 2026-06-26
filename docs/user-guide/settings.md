@@ -228,14 +228,37 @@ The tab shows a brand list with create, edit, and delete, plus a **Default** bad
 - Brand management requires the `brands: manage` permission (owner/admin by default); all members
   can read brands so the composer picker works.
 
-### Brand Voice (per brand)
+### Brand Voice (per brand, per language)
 
-- **Instructions** — freeform text defining the brand's writing style, tone, and voice. This is
-  injected into AI-generated content.
-- **Language** — default language for AI content generation.
-- **Platform instructions** — per-platform overrides. For example, you might specify a different
-  tone for LinkedIn (professional) versus X (witty).
 - **Enable/disable** — toggle whether the brand profile is applied to AI generations.
+- **Language** — at the top of the editor; it selects which language's dataset you are editing. The
+  active language is the one used for AI generation. Switching the language shows a fresh dataset
+  (its own instructions and channel overrides) for that brand/language — so a brand can carry a
+  distinct voice per language.
+- **Instructions** — freeform text defining the brand's writing style, tone, and voice **for the
+  selected language**. This is injected into AI-generated content.
+- **Channel overrides** — optional, per language: override the instructions for a specific connected
+  channel (pick a channel from the dropdown to add one). Channels without an override use the
+  language's instructions above.
+
+Stored in `AIBrandProfile.languageProfiles` (`{ [lang]: { instructions, overrides } }`); the active
+language's profile is mirrored into the legacy `instructions`/`platformInstructions` fields for
+generation. (Per-channel overrides are stored but not yet applied at generation time — the generation
+path does not currently pass the channel; the per-language instructions do apply.)
+
+### Brand Assets (per brand)
+
+Each brand carries a brand kit, surfaced both in Settings → Brands and in the Designer:
+
+- **Colour palette** — define the brand's colours; the Designer uses these and (when enforcement is
+  on) warns on off-palette exports.
+- **Attached assets** — attach logos and reference imagery (picked from your Files or the stock
+  library; stock picks are imported into Files so they persist), each with an optional caption.
+- **Brand enforcement** — toggle whether the Designer warns when an export uses off-palette colours
+  or non-brand fonts.
+
+Assets are saved via `PUT /brands/:id` (fields `palette`, `assets`, `enforcement`). The brand list
+shows a colour-swatch + asset-count preview per brand.
 
 ### Knowledge Base
 
@@ -243,8 +266,18 @@ The tab shows a brand list with create, edit, and delete, plus a **Default** bad
   The system selects the 10 posts with the highest engagement metrics.
 - **Search brand memory** — semantic search across your indexed top-performing content. Use this
   to find past posts that performed well for a given topic.
-- **RAG status** — shows whether the vector store is enabled, which backend is in use (pgvector
-  or Qdrant), and index statistics.
+- **RAG status** — shows whether the vector store is enabled, which backend is in use, and index
+  statistics.
+- **Vector database** — choose where embeddings are stored:
+  - **Postmill (Default)** — the built-in PostgreSQL + pgvector store; no configuration.
+  - **PG Vector (Remote)** — an external Postgres + pgvector (connection string + table).
+  - **Qdrant (Remote)** — a Qdrant cluster (URL, API key, collection, distance).
+  - **Pinecone (Remote)** — a Pinecone serverless index (API key, index name, optional host).
+
+  The three remote options require connection settings and offer a **Test Connection** button.
+  Secrets (the remote DB connection string, Qdrant/Pinecone API keys) are encrypted at rest in
+  `AISystemSettings.secretSettings` and never returned to the client. When a remote store is
+  unreachable, indexing/search fall back to the built-in pgvector/text path.
 - **Manual index** — index custom content items (text, URLs, files) into the RAG store.
 - **Backfill** — trigger a full re-index of all historical content.
 
@@ -367,22 +400,46 @@ Available when your subscription tier includes auto-posting. Configure scheduled
 - **AI content** — optionally use AI to rewrite or summarise scraped content before posting.
 - **Schedule** — define how often to check the source and when to publish.
 
-## Sets tab
+## Content tab
 
-Available on paid tiers (not FREE). Create named collections of post content templates:
+The **Content** page groups the content-authoring surfaces into one tabbed view:
 
-- Create sets with multiple pre-written posts.
-- Quickly load a set into the composer when preparing a campaign.
+- **AI Media** — the AI media-generation providers (see the **Media** section above for provider
+  configuration).
+- **Content Packs** — premium stock-media packs (gated on `media-config:manage`).
+- **Sets** and **Signatures** — described below (paid tiers only).
+
+### Sets sub-tab
+
+Available on paid tiers (not FREE). Create named, reusable post templates:
+
+- A **Set** captures a full composer payload — the selected channels, per-channel settings, post
+  content, and any attached media — so you can reload it into the composer in one click.
+- The Sets list shows a rich preview of each set: the channels it targets (as avatars), how many
+  posts it contains, and thumbnails of its media.
 - Edit and delete existing sets.
 
-## Signatures tab
+Managing sets requires the `posts` permission (RBAC). Endpoints: `GET/POST/PUT /sets`,
+`DELETE /sets/:id`.
 
-Available on paid tiers (not FREE). Manage reusable auto-append text blocks:
+### Signatures sub-tab
 
-- Create signatures — short text that appends to the end of every post (e.g. hashtag blocks,
-  legal disclosures, "Follow us" CTAs).
-- Assign signatures per channel.
-- Signatures are configurable per post type.
+Available on paid tiers (not FREE). Manage reusable, channel-aware signatures:
+
+- **Content** — a reusable text block appended to a post (hashtag blocks, legal disclosures,
+  "Follow us" CTAs).
+- **Logo / sticker** — optionally attach an image (from your Files or the stock library) to a
+  signature. When the signature is applied, the image is added to the post's media.
+- **Channel scope** — apply a signature to all channels, or restrict it to specific channels.
+- **Auto-add** — mark one or more signatures to be appended automatically to new posts (text **and**
+  logo), respecting each signature's channel scope. Several scoped auto-add signatures can coexist.
+- **Usage** — each signature tracks how many times it has been applied.
+- Insert a signature manually from the composer's signature toolbar button (its logo is attached
+  too).
+
+Endpoints: `GET /signatures`, `GET /signatures/auto` (auto-add signatures), `GET /signatures/default`,
+`POST /signatures`, `PUT /signatures/:id`, `POST /signatures/:id/track-usage`,
+`DELETE /signatures/:id`.
 
 ## Developers tab
 

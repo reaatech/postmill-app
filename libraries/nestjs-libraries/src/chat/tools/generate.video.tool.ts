@@ -9,7 +9,7 @@ import {
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
@@ -17,7 +17,7 @@ import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 @Injectable()
 export class GenerateVideoTool implements AgentToolInterface {
   constructor(
-    private _mediaService: MediaService,
+    private _aiGeneration: AiMediaGenerationService,
     private _videoManager: VideoManager
   ) {}
   name = 'generateVideoTool';
@@ -60,7 +60,7 @@ export class GenerateVideoTool implements AgentToolInterface {
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
-        const value = await this._mediaService.generateVideo(org, {
+        const value = await this._aiGeneration.generateVideo(org, {
           type: inputData.identifier,
           output: inputData.output,
           customParams: inputData.customParams.reduce(

@@ -11,7 +11,6 @@ interface VariableContextInterface {
   mcpUrl?: string;
   mainUrl: string;
   frontEndUrl: string;
-  plontoKey: string;
   storageProvider: 'local';
   backendUrl: string;
   environment: string;
@@ -44,7 +43,6 @@ const VariableContext = createContext({
   mainUrl: '',
   frontEndUrl: '',
   storageProvider: 'local' as const,
-  plontoKey: '',
   backendUrl: '',
   discordUrl: '',
   uploadDirectory: '',

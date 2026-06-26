@@ -6,7 +6,6 @@ import { Input } from '@gitroom/react/form/input';
 import { useDebouncedCallback } from 'use-debounce';
 import { Button } from '@gitroom/react/form/button';
 import clsx from 'clsx';
-import { MultiMediaComponent } from '@gitroom/frontend/components/media/media.component';
 import { useWatch } from 'react-hook-form';
 import { Select } from '@gitroom/react/form/select';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';

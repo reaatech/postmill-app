@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { PrismaRepository, PrismaService, PrismaTransaction } from './prisma.service';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
@@ -12,8 +13,9 @@ import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { MediaService } from '@gitroom/nestjs-libraries/database/prisma/media/media.service';
-import { MediaRepository } from '@gitroom/nestjs-libraries/database/prisma/media/media.repository';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
@@ -28,6 +30,8 @@ import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/databa
 import { MediaModule } from '@gitroom/nestjs-libraries/media/media.module';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
+import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
+import { OrgContentPackSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.repository';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { BitlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/bitly.adapter';
@@ -57,8 +61,6 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { SetsService } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.service';
 import { SetsRepository } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.repository';
-import { ThirdPartyRepository } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.repository';
-import { ThirdPartyService } from '@gitroom/nestjs-libraries/database/prisma/third-party/third-party.service';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -109,10 +111,17 @@ import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
 import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
+import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
+import { DesignService } from '@gitroom/nestjs-libraries/database/prisma/design/design.service';
+import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
+import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
+import { FontLoaderService } from '@gitroom/nestjs-libraries/media/design-render/font-loader.service';
+import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render/video-render.module';
 
 @Global()
 @Module({
-  imports: [MediaModule],
+  imports: [MediaModule, VideoRenderModule],
   controllers: [],
   providers: [
     PrismaService,
@@ -137,8 +146,9 @@ import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/ro
     AutopostRepository,
     AutopostService,
     SignatureService,
-    MediaService,
-    MediaRepository,
+    FileService,
+    FileRepository,
+    AiMediaGenerationService,
     IntegrationManager,
     RefreshIntegrationService,
     ExtractContentService,
@@ -149,8 +159,6 @@ import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/ro
     ShortLinkService,
     SetsService,
     SetsRepository,
-    ThirdPartyRepository,
-    ThirdPartyService,
     OAuthRepository,
     OAuthService,
     VideoManager,
@@ -188,13 +196,6 @@ import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/ro
     EmailLogRepository,
     EmailLogService,
     EmailAdapterRegistry,
-    EmptyAdapter,
-    ResendAdapter,
-    SendGridAdapter,
-    MailgunAdapter,
-    PostmarkAdapter,
-    SesAdapter,
-    SmtpAdapter,
     ShortLinkRegistry,
     OrgShortLinkSettingsService,
     OrgShortLinkSettingsRepository,
@@ -204,98 +205,47 @@ import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/ro
     // never receives the adapter registrations from MediaModule.onModuleInit.
     OrgMediaProviderSettingsService,
     OrgMediaProviderSettingsRepository,
+    OrgContentPackSettingsService,
+    OrgContentPackSettingsRepository,
     ProviderCredentialLinkService,
     MediaJobLifecycleService,
-    BitlyAdapter,
-    BlinkAdapter,
-    CuttlyAdapter,
-    DubAdapter,
-    IsgdAdapter,
-    RebrandlyAdapter,
-    ShortioAdapter,
-    TinyccAdapter,
-    TinyurlAdapter,
-    TlyAdapter,
-    VgdAdapter,
-    CleanuriAdapter,
-    LinklyAdapter,
-    OwlyAdapter,
-    PixelmeAdapter,
-    ReplugAdapter,
-    SniplyAdapter,
-    SwitchyAdapter,
-    T2mAdapter,
     {
       provide: 'SHORT_LINK_ADAPTER_REGISTRATION',
-      useFactory: (
-        registry: ShortLinkRegistry,
-        bitly: BitlyAdapter,
-        blink: BlinkAdapter,
-        cuttly: CuttlyAdapter,
-        dub: DubAdapter,
-        isgd: IsgdAdapter,
-        rebrandly: RebrandlyAdapter,
-        shortio: ShortioAdapter,
-        tinycc: TinyccAdapter,
-        tinyurl: TinyurlAdapter,
-        tly: TlyAdapter,
-        vgd: VgdAdapter,
-        cleanuri: CleanuriAdapter,
-        linkly: LinklyAdapter,
-        owly: OwlyAdapter,
-        pixelme: PixelmeAdapter,
-        replug: ReplugAdapter,
-        sniply: SniplyAdapter,
-        switchy: SwitchyAdapter,
-        t2m: T2mAdapter,
-      ) => {
-        registry.register(bitly);
-        registry.register(blink);
-        registry.register(cuttly);
-        registry.register(dub);
-        registry.register(isgd);
-        registry.register(rebrandly);
-        registry.register(shortio);
-        registry.register(tinycc);
-        registry.register(tinyurl);
-        registry.register(tly);
-        registry.register(vgd);
-        registry.register(cleanuri);
-        registry.register(linkly);
-        registry.register(owly);
-        registry.register(pixelme);
-        registry.register(replug);
-        registry.register(sniply);
-        registry.register(switchy);
-        registry.register(t2m);
+      useFactory: (registry: ShortLinkRegistry, flags: FeatureFlagsService) => {
+        if (flags.isDisabled('shortlinks')) {
+          return;
+        }
+        registry.registerFactory('bitly', BitlyAdapter);
+        registry.registerFactory('blink', BlinkAdapter);
+        registry.registerFactory('cuttly', CuttlyAdapter);
+        registry.registerFactory('dub', DubAdapter);
+        registry.registerFactory('isgd', IsgdAdapter);
+        registry.registerFactory('rebrandly', RebrandlyAdapter);
+        registry.registerFactory('shortio', ShortioAdapter);
+        registry.registerFactory('tinycc', TinyccAdapter);
+        registry.registerFactory('tinyurl', TinyurlAdapter);
+        registry.registerFactory('tly', TlyAdapter);
+        registry.registerFactory('vgd', VgdAdapter);
+        registry.registerFactory('cleanuri', CleanuriAdapter);
+        registry.registerFactory('linkly', LinklyAdapter);
+        registry.registerFactory('owly', OwlyAdapter);
+        registry.registerFactory('pixelme', PixelmeAdapter);
+        registry.registerFactory('replug', ReplugAdapter);
+        registry.registerFactory('sniply', SniplyAdapter);
+        registry.registerFactory('switchy', SwitchyAdapter);
+        registry.registerFactory('t2m', T2mAdapter);
       },
-      inject: [
-        ShortLinkRegistry,
-        BitlyAdapter,
-        BlinkAdapter,
-        CuttlyAdapter,
-        DubAdapter,
-        IsgdAdapter,
-        RebrandlyAdapter,
-        ShortioAdapter,
-        TinyccAdapter,
-        TinyurlAdapter,
-        TlyAdapter,
-        VgdAdapter,
-        CleanuriAdapter,
-        LinklyAdapter,
-        OwlyAdapter,
-        PixelmeAdapter,
-        ReplugAdapter,
-        SniplyAdapter,
-        SwitchyAdapter,
-        T2mAdapter,
-      ],
+      inject: [ShortLinkRegistry, FeatureFlagsService],
     },
     RbacSeeder,
     BackfillService,
     RolesRepository,
     RolesService,
+    DesignRepository,
+    DesignService,
+    DesignRenderService,
+    DesignBulkService,
+    FontLoaderService,
     {
       provide: 'RBAC_SEED_ON_INIT',
       useFactory: (seeder: RbacSeeder, backfill: BackfillService) => {
@@ -310,40 +260,28 @@ import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/ro
     },
     {
       provide: 'EMAIL_ADAPTER_REGISTRATION',
-      useFactory: (
-        registry: EmailAdapterRegistry,
-        empty: EmptyAdapter,
-        resend: ResendAdapter,
-        sendgrid: SendGridAdapter,
-        mailgun: MailgunAdapter,
-        postmark: PostmarkAdapter,
-        ses: SesAdapter,
-        smtp: SmtpAdapter,
-      ) => {
-        registry.register(empty);
-        registry.register(resend);
-        registry.register(sendgrid);
-        registry.register(mailgun);
-        registry.register(postmark);
-        registry.register(ses);
-        registry.register(smtp);
+      useFactory: (registry: EmailAdapterRegistry, flags: FeatureFlagsService) => {
+        // Empty adapter is always registered so EmailService has a safe fallback.
+        registry.registerFactory('empty', EmptyAdapter);
+        if (flags.isDisabled('email')) {
+          return;
+        }
+        registry.registerFactory('resend', ResendAdapter);
+        registry.registerFactory('sendgrid', SendGridAdapter);
+        registry.registerFactory('mailgun', MailgunAdapter);
+        registry.registerFactory('postmark', PostmarkAdapter);
+        registry.registerFactory('ses', SesAdapter);
+        registry.registerFactory('smtp', SmtpAdapter);
       },
-      inject: [
-        EmailAdapterRegistry,
-        EmptyAdapter,
-        ResendAdapter,
-        SendGridAdapter,
-        MailgunAdapter,
-        PostmarkAdapter,
-        SesAdapter,
-        SmtpAdapter,
-      ],
+      inject: [EmailAdapterRegistry, FeatureFlagsService],
     },
   ],
   get exports() {
     // Re-export MediaModule so the populated MediaProviderRegistry (adapters are
-    // registered in MediaModule.onModuleInit) is globally injectable.
-    return [...this.providers, MediaModule];
+    // registered in MediaModule.onModuleInit) is globally injectable. VideoRenderModule
+    // is likewise re-exported so VideoRenderService is globally injectable (MediaJobsActivity
+    // in InngestModule, design.controller in ApiModule) without each module re-importing it.
+    return [...this.providers, MediaModule, VideoRenderModule];
   },
 })
 export class DatabaseModule {}

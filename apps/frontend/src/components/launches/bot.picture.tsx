@@ -8,7 +8,7 @@ import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { showMediaBox } from '@gitroom/frontend/components/media/media.component';
+import { showFileBox } from '@gitroom/frontend/components/files/file.component';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 export const BotPicture: FC<{
   integration: Integrations;
@@ -41,7 +41,7 @@ export const BotPicture: FC<{
     [nick, picture, props.mutate]
   );
   const openMedia = useCallback(() => {
-    showMediaBox((values) => {
+    showFileBox((values) => {
       setPicture(values.path);
     });
   }, []);

@@ -5,10 +5,25 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
+interface CredentialField {
+  key: string;
+  label: string;
+  type: 'string' | 'password' | 'textarea';
+  required: boolean;
+  placeholder?: string;
+  help?: string;
+}
+
+// Providers without a declared schema collect a single API key.
+const DEFAULT_FIELDS: CredentialField[] = [
+  { key: 'apiKey', label: 'API Key', type: 'password', required: true, placeholder: 'Enter your API key' },
+];
+
 interface ProviderDetail {
   identifier: string;
   name: string;
   capabilities: { image: boolean; video: boolean; audio: boolean; avatar: boolean };
+  credentialFields: CredentialField[] | null;
   isConfigured: boolean;
   enabled: boolean;
 }
@@ -17,6 +32,7 @@ interface ProviderListItem {
   identifier: string;
   name: string;
   capabilities: ProviderDetail['capabilities'];
+  credentialFields?: CredentialField[] | null;
 }
 
 interface ProviderConfigItem {
@@ -41,7 +57,18 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{ success: boolean; message?: string } | null>(null);
   const [provider, setProvider] = useState<ProviderDetail | null>(null);
-  const [apiKey, setApiKey] = useState('');
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const fields = provider?.credentialFields?.length ? provider.credentialFields : DEFAULT_FIELDS;
+  // Only send fields the admin actually filled in (avoids overwriting stored creds with blanks).
+  const filledCredentials = () => {
+    const out: Record<string, string> = {};
+    for (const f of fields) {
+      const v = values[f.key]?.trim();
+      if (v) out[f.key] = v;
+    }
+    return out;
+  };
 
   useEffect(() => {
     (async () => {
@@ -58,6 +85,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
               identifier: match.identifier,
               name: match.name,
               capabilities: match.capabilities,
+              credentialFields: match.credentialFields ?? null,
               isConfigured: false,
               enabled: false,
             });
@@ -85,10 +113,11 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     setSaving(true);
     setTestResult(null);
     try {
+      const credentials = filledCredentials();
       const res = await fetch(`/settings/media/config/${identifier}`, {
         method: 'PUT',
         body: JSON.stringify({
-          credentials: apiKey ? { apiKey } : undefined,
+          credentials: Object.keys(credentials).length ? credentials : undefined,
         }),
       });
       if (!res.ok) {
@@ -103,15 +132,16 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     } finally {
       setSaving(false);
     }
-  }, [identifier, apiKey, fetch, toaster, t, onSaved, onClose]);
+  }, [identifier, values, provider, fetch, toaster, t, onSaved, onClose]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
     setTestResult(null);
     try {
       const body: any = {};
-      if (apiKey) {
-        body.credentials = { apiKey };
+      const credentials = filledCredentials();
+      if (Object.keys(credentials).length) {
+        body.credentials = credentials;
       }
       const res = await fetch(`/settings/media/config/${identifier}/test`, {
         method: 'POST',
@@ -124,7 +154,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     } finally {
       setTesting(false);
     }
-  }, [identifier, apiKey, fetch]);
+  }, [identifier, values, provider, fetch]);
 
   if (loading) {
     return (
@@ -166,18 +196,31 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
         </div>
 
         <div className="flex flex-col gap-[16px]">
-          <div className="flex flex-col gap-[4px]">
-            <label className="text-[13px] text-newTableText">
-              API Key <span className="text-red-500 ml-[2px]">*</span>
-            </label>
-            <input
-              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
-              type="password"
-              placeholder="Enter your API key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-            />
-          </div>
+          {fields.map((field) => (
+            <div key={field.key} className="flex flex-col gap-[4px]">
+              <label className="text-[13px] text-newTableText">
+                {field.label}
+                {field.required && <span className="text-red-500 ml-[2px]">*</span>}
+              </label>
+              {field.type === 'textarea' ? (
+                <textarea
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px] font-mono min-h-[120px] resize-y"
+                  placeholder={field.placeholder}
+                  value={values[field.key] || ''}
+                  onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                />
+              ) : (
+                <input
+                  className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] text-textColor text-[13px]"
+                  type={field.type === 'password' ? 'password' : 'text'}
+                  placeholder={field.placeholder}
+                  value={values[field.key] || ''}
+                  onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                />
+              )}
+              {field.help && <div className="text-[11px] text-newTableText">{field.help}</div>}
+            </div>
+          ))}
         </div>
 
         {testResult && (

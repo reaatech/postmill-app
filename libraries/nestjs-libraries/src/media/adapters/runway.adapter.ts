@@ -55,13 +55,16 @@ export class RunwayAdapter implements MediaProviderAdapter {
   // synchronous image contract (§11.2) — near-real-time or fail.
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     const model = options?.model || 'gen4_image';
+    const input = (options?.input || {}) as Record<string, unknown>;
     const res = await safeFetch(`${BASE}/text_to_image`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({
         promptText: prompt,
         model,
-        ratio: options?.aspectRatio || '1360:768',
+        ratio: '1360:768',
+        ...(options?.aspectRatio ? { ratio: options.aspectRatio } : {}),
+        ...input,
       }),
     });
     if (!res.ok) throw new Error(`Runway image generation failed: ${await res.text()}`);
@@ -87,19 +90,28 @@ export class RunwayAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    if (!options?.sourceUrl) {
-      throw new Error('Runway video generation requires a source image (sourceUrl)');
+    // Source image arrives as the native `promptImage` field in `options.input` (the
+    // studio's media picker) or the legacy `options.sourceUrl`. Other native params
+    // (duration, ratio, seed) ride `options.input` straight into the body.
+    const input = (options?.input || {}) as Record<string, unknown>;
+    const { promptImage: inputImage, ...rest } = input;
+    const promptImage =
+      (typeof inputImage === 'string' ? inputImage : undefined) || options?.sourceUrl;
+    if (!promptImage) {
+      throw new Error('Runway video generation requires a source image');
     }
     const model = options?.model || 'gen4_turbo';
     const res = await safeFetch(`${BASE}/image_to_video`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({
-        promptImage: options.sourceUrl,
+        promptImage,
         promptText: prompt,
         model,
         duration: options?.durationSeconds || 5,
-        ratio: options?.aspectRatio || '1280:720',
+        ratio: '1280:720',
+        ...(options?.aspectRatio ? { ratio: options.aspectRatio } : {}),
+        ...rest,
       }),
     });
     if (!res.ok) throw new Error(`Runway video generation failed: ${await res.text()}`);

@@ -185,13 +185,31 @@ a folder has no assigned provider, the system picks any mounted provider.
 ## Large file uploads
 
 Large media files (up to `MEDIA_UPLOAD_MAX_BYTES`, default 1 GB) are uploaded through
-`/media/upload-server` using XHRUpload (streamed to disk). The pre-v3.8.2 presigned multipart
+`/files/upload-server` using XHRUpload (streamed to disk). The pre-v3.8.2 presigned multipart
 Cloudflare R2 path has been removed. If an S3/R2 provider is configured for media-library
 uploads, large files go through the backend as well.
+
+## Canvas CORS (Designer)
+
+The native **Designer** renders images onto an HTML canvas and exports via Konva's
+`toBlob`/`toDataURL`. The browser **taints** a canvas that has drawn a cross-origin image without
+CORS, and a tainted canvas throws `SecurityError` on export. So when designs include media served
+from external object storage (S3/R2/B2/e2), that bucket must return permissive CORS headers:
+
+```
+Access-Control-Allow-Origin: <your app origin>   # or *
+Access-Control-Allow-Methods: GET, HEAD
+```
+
+The Designer loads element images with `crossOrigin="anonymous"`. If a bucket cannot be configured
+for CORS, the Designer falls back to the same-origin image proxy (`GET /media/designer/proxy`),
+which is org-bound, fetches through `safeFetch`, fails closed on non-image content, and is
+size-capped. `LOCAL` storage is same-origin and needs no CORS.
 
 ## Related
 
 - [Configuration](./configuration.md) — all storage env vars
 - [Requirements](./requirements.md) — object storage options
+- [Designer](../developer-docs/designer.md) — editor architecture & endpoints
 
-> Verified against v3.8.10
+> Verified against v3.9.0

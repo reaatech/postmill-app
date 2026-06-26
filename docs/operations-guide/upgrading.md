@@ -298,7 +298,7 @@ API route was deleted. LOCAL is now the implicit always-on base storage; all oth
 **What changed:**
 - Avatars and all app-internal image writes now always use the org's LOCAL storage (not Cloudflare R2
   via env vars). The global-env `STORAGE_PROVIDER` and `CLOUDFLARE_*` vars are **removed**.
-- Large media uploads stream through `/media/upload-server` with a configurable limit
+- Large media uploads stream through `/files/upload-server` (formerly `/media/upload-server`) with a configurable limit
   (`MEDIA_UPLOAD_MAX_BYTES`, default 1 GB). The presigned multipart Cloudflare R2 path is removed.
 - Cloud providers (S3/R2/B2/IDrive e2) remain configurable per-organization in Settings → Storage,
   but they are **write-inert** for avatars and app-internal writes. Media-library uploads also go
