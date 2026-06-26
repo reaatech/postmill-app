@@ -34,6 +34,7 @@ import { BedrockMediaAdapter, AzureMediaAdapter } from './adapters/ai-sdk-media.
 import { RecraftMediaAdapter } from './adapters/recraft-media.adapter';
 import { IdeogramMediaAdapter } from './adapters/ideogram-media.adapter';
 import { LeonardoMediaAdapter } from './adapters/leonardo-media.adapter';
+import { XaiMediaAdapter } from './adapters/xai-media.adapter';
 
 const ALL_ADAPTERS = [
   FalAdapter,
@@ -68,6 +69,7 @@ const ALL_ADAPTERS = [
   RecraftMediaAdapter,
   IdeogramMediaAdapter,
   LeonardoMediaAdapter,
+  XaiMediaAdapter,
 ];
 
 @Module({

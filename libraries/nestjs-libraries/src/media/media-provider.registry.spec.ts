@@ -68,6 +68,7 @@ describe('MediaModule', () => {
       'togetherai',
       'vertex',
       'wan',
+      'xai',
     ]);
   });
 });

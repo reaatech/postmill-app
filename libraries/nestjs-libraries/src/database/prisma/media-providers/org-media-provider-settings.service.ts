@@ -25,6 +25,7 @@ const UNIVERSAL_AI_CREDENTIAL = new Set([
   'gateway',
   'bedrock',
   'azure',
+  'xai',
 ]);
 
 export interface MediaProviderExtraConfig {

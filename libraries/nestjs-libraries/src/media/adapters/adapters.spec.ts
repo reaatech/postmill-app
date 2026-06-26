@@ -25,6 +25,7 @@ import { TogetherAiMediaAdapter } from './togetherai-media.adapter';
 import { SiliconFlowMediaAdapter } from './siliconflow-media.adapter';
 import { GroqMediaAdapter } from './groq-media.adapter';
 import { OpenRouterMediaAdapter } from './openrouter-media.adapter';
+import { XaiMediaAdapter } from './xai-media.adapter';
 import { FireworksMediaAdapter } from './fireworks-media.adapter';
 import { DeepInfraMediaAdapter } from './deepinfra-media.adapter';
 import { WanAdapter } from './wan.adapter';
@@ -1179,6 +1180,33 @@ describe('OpenRouterMediaAdapter', () => {
       { id: 'anthropic/claude', architecture: { output_modalities: ['text'] } },
     ] }));
     expect(await adapter.listModels('image', CREDS)).toEqual([{ id: 'openai/gpt-image-1', label: 'gpt-image-1' }]);
+  });
+
+  it('rejects video/audio', async () => {
+    await expect(adapter.generateVideo('x', CREDS)).rejects.toThrow('video');
+    await expect(adapter.generateAudio('x', CREDS)).rejects.toThrow('audio');
+  });
+});
+
+describe('XaiMediaAdapter', () => {
+  const adapter = new XaiMediaAdapter();
+
+  it('generates images via /v1/images/generations and returns the url', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ url: 'https://img.x.ai/a.png' }] }));
+    const result = await adapter.generateImage('a robot', { ...CREDS, model: 'grok-2-image-1212', input: { n: 1 } });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.x.ai/v1/images/generations');
+    expect(result.image).toBe('https://img.x.ai/a.png');
+  });
+
+  it('decodes b64_json when no url is present', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ data: [{ b64_json: 'AAAA' }] }));
+    const result = await adapter.generateImage('a robot', { ...CREDS, model: 'grok-2-image-1212' });
+    expect(result.image).toBe('data:image/png;base64,AAAA');
+  });
+
+  it('lists image models from /v1/image-generation-models', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ models: [{ id: 'grok-2-image-1212', name: 'Grok 2 Image' }] }));
+    expect(await adapter.listModels('image', CREDS)).toEqual([{ id: 'grok-2-image-1212', label: 'Grok 2 Image' }]);
   });
 
   it('rejects video/audio', async () => {
