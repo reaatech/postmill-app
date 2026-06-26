@@ -5,6 +5,21 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // aspect_ratio, style_preset, seed, output_format) ride through the request body.
 // Stable Image is synchronous — the adapter returns the artifact inline.
 export const stabilityDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://stability.ai",
+    "tagline": "Open generative media for everyone",
+    "description": "The company behind Stable Diffusion and the Stable Image models, offering open, enterprise-grade generative media for image creation and editing with full creative control.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "Stable Image core, ultra, and SD3 models",
+      "Sequential generate-and-edit production workflows",
+      "Enterprise self-host, API, and managed cloud",
+      "Open-weight heritage of Stable Diffusion",
+      "Trusted by AWS, Nvidia, Arm, EA, UMG"
+    ]
+  },
   provider: 'stability-ai',
   title: 'Stability AI',
   tabs: [

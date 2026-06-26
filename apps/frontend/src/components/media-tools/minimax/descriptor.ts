@@ -4,6 +4,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // `options.input`; `first_frame_image`/`subject_image` are resolved to URLs and folded
 // into MiniMax's request shape by the adapter.
 export const minimaxDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://hailuoai.video",
+    "tagline": "Turn your imagination into video",
+    "description": "Hailuo, MiniMax's AI video generator, is known for striking cinematic motion and strong prompt following from text or a single image — with templates for dance, effects, and character animation.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Cinematic motion with strong prompt adherence",
+      "Text-to-video and image-to-video generation",
+      "Templates: dance, transformations, characters",
+      "Image generation and audio tools alongside video",
+      "Fast, accessible creation for everyday creators"
+    ]
+  },
   provider: 'minimax',
   title: 'MiniMax',
   tabs: [

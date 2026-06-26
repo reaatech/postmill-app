@@ -27,6 +27,22 @@ const IMAGE_ASPECT = [
 ];
 
 export const vertexDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://cloud.google.com/vertex-ai",
+    "tagline": "Enterprise generative media on Google Cloud",
+    "description": "Google Cloud's unified AI platform for building and scaling generative apps — featuring Imagen for photorealistic images and Veo for high-quality text-to-video, with governance built in.",
+    "badges": [
+      "Image",
+      "Video"
+    ],
+    "highlights": [
+      "Imagen for photorealistic text-to-image",
+      "Veo for high-quality text-to-video",
+      "Model Garden: Google plus open-source models",
+      "Enterprise controls: VPC-SC, encryption, audit",
+      "Full MLOps lifecycle with monitoring"
+    ]
+  },
   provider: 'vertex',
   title: 'Google Vertex',
   tabs: [

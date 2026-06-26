@@ -6,6 +6,7 @@ import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fulls
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { StudioForm } from './studio-form';
+import { StudioLanding } from './studio-landing';
 import { RenderQueue } from './render-queue';
 import { useStudioStatus, useStudioJobs, useStudioGenerate } from './hooks';
 import type {
@@ -103,6 +104,9 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
   }
 
   if (!configured) {
+    if (descriptor.landing) {
+      return <StudioLanding identifier={provider} title={title} landing={descriptor.landing} />;
+    }
     return (
       <div className="flex flex-col items-center justify-center h-full gap-[14px] text-center px-[20px]">
         <div className="text-[42px]">🎬</div>

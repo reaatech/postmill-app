@@ -25,6 +25,22 @@ const MODELS = [
 ];
 
 export const soraDescriptor: StudioDescriptor = {
+  landing: {
+    "icon": "sora",
+    "website": "https://openai.com/sora/",
+    "tagline": "OpenAI's flagship text-to-video model",
+    "description": "OpenAI's video model — Sora 2 delivers far more realistic, physically accurate, and controllable video, plus synchronized dialogue and sound effects from a simple text prompt.",
+    "badges": [
+      "Video"
+    ],
+    "highlights": [
+      "Sora 2: realistic, physically accurate motion",
+      "Text-to-video and image-to-video generation",
+      "Synchronized dialogue and sound effects",
+      "Strong world physics and scene controllability",
+      "From the makers of ChatGPT"
+    ]
+  },
   provider: 'openai',
   title: 'Sora',
   tabs: [

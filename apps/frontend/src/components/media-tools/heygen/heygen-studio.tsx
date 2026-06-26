@@ -9,7 +9,23 @@ import { TalkingPhoto } from './talking-photo';
 import { Voiceover } from './voiceover';
 import { Translate } from './translate';
 import { RenderQueue } from './render-queue';
+import { StudioLanding } from '@gitroom/frontend/components/media-tools/studio-kit/studio-landing';
 import { useHeygenStatus, useHeygenAvatars, useHeygenVoices, useHeygenJobs } from './use-heygen';
+
+const HEYGEN_LANDING = {
+  website: 'https://www.heygen.com',
+  tagline: 'Studio-quality AI avatar video from text',
+  description:
+    'HeyGen turns scripts, slides, or PDFs into professional videos with hyper-realistic AI avatars and natural voiceovers — no camera or crew. Best known for digital twins and video translation.',
+  badges: ['Avatar', 'Video', 'Voice'],
+  highlights: [
+    'Photo avatars & digital twins with realistic lip-sync',
+    'Video translation across 175+ languages',
+    'Storyboard multi-scene avatar videos',
+    'Talking Photo: animate a single portrait',
+    'AI voiceover with controllable tone & delivery',
+  ],
+};
 
 type TabKey = 'storyboard' | 'talking-photo' | 'translate' | 'voiceover';
 
@@ -43,21 +59,7 @@ export function HeyGenStudio() {
   }
 
   if (!configured) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-[14px] text-center px-[20px]">
-        <div className="text-[42px]">🎬</div>
-        <h2 className="text-[18px] font-[600] text-textColor">HeyGen isn&apos;t configured</h2>
-        <p className="text-[13px] text-newTextColor/50 max-w-[360px]">
-          Add your HeyGen API key to start generating AI avatar videos, then come back here.
-        </p>
-        <a
-          href="/settings?tab=media_providers"
-          className="mt-[4px] px-[16px] py-[9px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[500] hover:bg-[#2B5CD3]/80 transition-all"
-        >
-          Configure HeyGen
-        </a>
-      </div>
-    );
+    return <StudioLanding identifier="heygen" title="HeyGen" landing={HEYGEN_LANDING} />;
   }
 
   return (

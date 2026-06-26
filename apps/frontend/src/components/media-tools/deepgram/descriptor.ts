@@ -6,6 +6,22 @@ import { DeepgramPanel } from './deepgram-panel';
 // chrome with a bespoke `custom` panel that calls the dedicated /media/deepgram backend.
 // `operation` is required by the type but unused for a custom tab.
 export const deepgramDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://deepgram.com",
+    "tagline": "Enterprise speech-to-text at scale",
+    "description": "An enterprise voice-AI platform delivering fast, accurate real-time and batch transcription via its Nova models — known for high-accuracy, low-cost speech-to-text and captions.",
+    "badges": [
+      "Transcription",
+      "Audio"
+    ],
+    "highlights": [
+      "Nova speech-to-text, real-time & batch",
+      "Word-level timings for accurate captions",
+      "Export .srt / .vtt / .txt or burn into video",
+      "Smart formatting, punctuation & diarization",
+      "Trusted by Twilio, IBM & Cloudflare"
+    ]
+  },
   provider: 'deepgram',
   title: 'Deepgram',
   tabs: [

@@ -10,6 +10,23 @@ const VIDEO_SIZES = [
 ];
 
 export const siliconflowDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://siliconflow.com",
+    "tagline": "One API for all your AI inference needs",
+    "description": "A lightning-fast inference platform serving 200+ open and commercial models — LLMs plus image, video, and audio — through a single OpenAI-compatible API with predictable pricing.",
+    "badges": [
+      "Image",
+      "Video",
+      "Audio"
+    ],
+    "highlights": [
+      "200+ optimized LLM & multimodal models",
+      "Image, video, and audio generation in one API",
+      "Blazing-fast inference, high throughput",
+      "Fully OpenAI-compatible — drop-in integration",
+      "Predictable, fair pay-as-you-go pricing"
+    ]
+  },
   provider: 'siliconflow',
   title: 'SiliconFlow',
   tabs: [

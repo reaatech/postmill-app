@@ -15,6 +15,21 @@ const MODELS = [
 ];
 
 export const leonardoDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://leonardo.ai",
+    "tagline": "Generative AI for images and art",
+    "description": "A creative platform powered by its foundational Phoenix model — known for high-resolution output, coherent text, and a Real-Time Canvas that turns sketches into polished art instantly.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "Foundational Phoenix model, native high-res output",
+      "Real-Time Canvas: sketch to art instantly",
+      "Strong prompt adherence and coherent text",
+      "Inpainting, outpainting, and composite editing",
+      "Custom fine-tuned and community models"
+    ]
+  },
   provider: 'leonardo',
   title: 'Leonardo.ai',
   tabs: [

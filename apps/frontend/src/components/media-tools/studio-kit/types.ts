@@ -66,10 +66,30 @@ export interface StudioTab {
   custom?: React.ComponentType<StudioCustomProps>;
 }
 
+// Marketing content for the "not configured yet" landing page. Most users have never
+// heard of these providers, so each studio ships a short, grounded pitch — what it is,
+// what it supports, why use it, and where to learn more / sign up.
+export interface StudioLanding {
+  // Official provider homepage (opened in a new tab via an external-link button).
+  website: string;
+  // Punchy one-line headline.
+  tagline: string;
+  // 1-2 sentence description of what the provider is and why it's notable.
+  description: string;
+  // Capability tags (e.g. 'Image', 'Video', 'Audio', 'Avatar', 'Voice').
+  badges: string[];
+  // 4-5 short benefit bullets.
+  highlights: string[];
+  // Optional brand-icon override (ProviderIcon id) for studios whose `provider` is a
+  // shared credential id rather than the brand — e.g. Pika/Kling ride `fal`, Sora rides `openai`.
+  icon?: string;
+}
+
 export interface StudioDescriptor {
   provider: string;
   title: string;
   tabs: StudioTab[];
+  landing?: StudioLanding;
 }
 
 export interface StudioJob {

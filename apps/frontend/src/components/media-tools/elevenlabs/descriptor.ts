@@ -4,6 +4,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // the adapter returns the audio inline as a data URL. Field names are native ElevenLabs
 // params (voice_id + voice_settings), so they ride straight into the request body.
 export const elevenlabsDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://elevenlabs.io",
+    "tagline": "Lifelike AI voice generation & TTS",
+    "description": "The leading AI audio platform for ultra-realistic text-to-speech, voice cloning, and multilingual dubbing across 70+ languages — known for the most natural-sounding AI voices available.",
+    "badges": [
+      "Voice",
+      "Audio"
+    ],
+    "highlights": [
+      "Lifelike text-to-speech in 70+ languages",
+      "5,000+ voices, plus custom voice cloning",
+      "Dubbing that preserves the speaker's emotion",
+      "Scribe speech-to-text, music & SFX generation",
+      "APIs, SDKs & multiple TTS models"
+    ]
+  },
   provider: 'elevenlabs',
   title: 'ElevenLabs',
   tabs: [

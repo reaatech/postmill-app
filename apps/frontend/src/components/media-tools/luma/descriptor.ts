@@ -27,6 +27,22 @@ const DURATION = [
 ];
 
 export const lumaDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://lumalabs.ai/dream-machine",
+    "tagline": "Dream Machine: ideas into video, fast",
+    "description": "Luma AI's Dream Machine turns text and images into realistic, fluid video. Its Ray models are known for natural motion, strong physics, and fast, prolific creative iteration.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Ray models for high-quality, lifelike motion",
+      "Text-to-video and image-to-video generation",
+      "Animate still images with natural camera moves",
+      "Extend clips and build smooth transitions",
+      "Strong physics and realistic, fluid movement"
+    ]
+  },
   provider: 'luma',
   title: 'Luma',
   tabs: [

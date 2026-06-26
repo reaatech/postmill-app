@@ -36,6 +36,22 @@ const RESOLUTIONS = [
 ];
 
 export const googleAiDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://aistudio.google.com",
+    "tagline": "AI media for every developer",
+    "description": "Google's Gemini Developer API for media generation — spanning Nano Banana and Imagen image models plus Veo video, all driven by a single Gemini API key.",
+    "badges": [
+      "Image",
+      "Video"
+    ],
+    "highlights": [
+      "Nano Banana (Gemini) conversational image gen",
+      "Imagen high-quality text-to-image model",
+      "Veo text- and image-to-video generation",
+      "One Gemini API key across image and video",
+      "Simple developer API via Google AI Studio"
+    ]
+  },
   provider: 'google',
   title: 'Google AI Studio',
   tabs: [

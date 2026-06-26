@@ -6,6 +6,23 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // combobox also accepts a typed model id, since Together's catalog doesn't tag every
 // modality. Field names are Together's native API params.
 export const togetheraiDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://www.together.ai",
+    "tagline": "The AI-native cloud for open-source models",
+    "description": "A full-stack inference cloud serving 200+ open-source models through one API — chat, image, audio, and video — with optimized kernels for faster, cheaper generation at scale.",
+    "badges": [
+      "Image",
+      "Video",
+      "Audio"
+    ],
+    "highlights": [
+      "200+ open-source models behind one API",
+      "Image, video, and audio model support",
+      "Up to 2x faster inference with custom kernels",
+      "Up to 60% lower cost vs. standard inference",
+      "Serverless, dedicated, and batch inference"
+    ]
+  },
   provider: 'togetherai',
   title: 'Together AI',
   tabs: [

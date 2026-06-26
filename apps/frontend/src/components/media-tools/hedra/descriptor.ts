@@ -4,6 +4,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // prompt drive an expressive character clip; completion arrives via webhook (poll-cron
 // fallback). The keyframe image is resolved server-side to a provider-reachable URL.
 export const hedraDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://www.hedra.com",
+    "tagline": "The creative agent for character video",
+    "description": "A multimodal creative platform built on its proprietary Character-3 model, generating expressive character video, image, and audio — known for lifelike performance from a keyframe.",
+    "badges": [
+      "Avatar",
+      "Video"
+    ],
+    "highlights": [
+      "Proprietary Character-3 character video model",
+      "Multimodal video, image & audio generation",
+      "Infinite Canvas to combine Character-3 with others",
+      "Agent learns your workflow and brand elements",
+      "Reusable skills, web search & brand asset reuse"
+    ]
+  },
   provider: 'hedra',
   title: 'Hedra',
   tabs: [

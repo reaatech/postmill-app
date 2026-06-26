@@ -6,6 +6,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // Wan2.x video is async (poll-cron completion). The key is shared with the Qwen LLM
 // provider — configure it once at Settings → AI (or Settings → Media) and both work.
 export const qwenDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://qwen.ai",
+    "tagline": "Alibaba's Qwen image & Wan video models",
+    "description": "Alibaba's Qwen family, served via DashScope / Model Studio — Qwen-Image generates native 2K images from long prompts, and Wan delivers text-to-video and image-to-video.",
+    "badges": [
+      "Image",
+      "Video"
+    ],
+    "highlights": [
+      "Qwen-Image: native 2K (2048px) image generation",
+      "Wan video: text-to-video and image-to-video",
+      "Handles long prompts up to ~1,000 tokens",
+      "Served via DashScope / Alibaba Cloud Model Studio",
+      "Strong cost-performance for pro-grade output"
+    ]
+  },
   provider: 'qwen',
   title: 'Qwen',
   tabs: [

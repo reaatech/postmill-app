@@ -21,6 +21,22 @@ const DOP_MODELS = [
 ];
 
 export const higgsfieldDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://higgsfield.ai",
+    "tagline": "AI-native creative suite for image & video",
+    "description": "An AI-native creative suite that generates images, videos, and voice from text or references — Soul for image, DoP for cinematic image-to-video, and Speak for talking-video.",
+    "badges": [
+      "Image",
+      "Video"
+    ],
+    "highlights": [
+      "Soul image generation from text or references",
+      "DoP cinematic image-to-video",
+      "Speak: lifelike talking-head videos",
+      "40+ creative tools and viral effect presets",
+      "Built for fast, production-grade social content"
+    ]
+  },
   provider: 'higgsfield',
   title: 'Higgsfield',
   tabs: [

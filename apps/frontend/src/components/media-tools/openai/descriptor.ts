@@ -5,6 +5,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // third tab covers TTS (operation `audio`, synchronous data-URL artifact). Field names are
 // native OpenAI params and ride straight into the request body.
 export const openaiDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://openai.com",
+    "tagline": "The image model that powers ChatGPT",
+    "description": "OpenAI's image generation via gpt-image-1 — the natively multimodal model behind ChatGPT — delivering versatile styles, strong world knowledge, accurate text, and prompt-driven edits.",
+    "badges": [
+      "Image",
+      "Audio"
+    ],
+    "highlights": [
+      "gpt-image-1 powers image generation in ChatGPT",
+      "Natively multimodal: text + image inputs",
+      "Generate and edit existing images by prompt",
+      "Text-to-speech voices for narration & audio",
+      "Strong instruction-following and world knowledge"
+    ]
+  },
   provider: 'openai',
   title: 'OpenAI',
   tabs: [

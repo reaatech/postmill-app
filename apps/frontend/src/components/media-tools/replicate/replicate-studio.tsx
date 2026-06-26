@@ -15,7 +15,23 @@ import { InpaintMaskEditor } from './inpaint-mask-editor';
 import { MergeEditor } from './merge-editor';
 import { MemeEditor } from './meme-editor';
 import { CommandPalette } from './command-palette';
+import { StudioLanding } from '@gitroom/frontend/components/media-tools/studio-kit/studio-landing';
 import { useGenerate, missingRequiredFields, FOLDER_REQUIRED_CATEGORIES } from './use-generate';
+
+const REPLICATE_LANDING = {
+  website: 'https://replicate.com',
+  tagline: 'Run thousands of AI models with one line',
+  description:
+    'A cloud hub for running thousands of open-source models via API — image, video, speech, and music generation — with pay-per-use pricing, fine-tuning, and custom deploys.',
+  badges: ['Image', 'Video', 'Audio'],
+  highlights: [
+    'Thousands of community models via API',
+    'Image, video, and audio generation models',
+    'Run and fine-tune with one line of code',
+    'Pay only for active compute time',
+    'Inpaint, merge, upscale and meme tools built in',
+  ],
+};
 
 type Medium = 'image' | 'video' | 'audio';
 
@@ -281,19 +297,7 @@ export function ReplicateStudio() {
   }
 
   if (!configured) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full gap-4 text-gray-400">
-        <span className="text-5xl">⚡</span>
-        <h2 className="text-lg font-medium text-white">Replicate is not configured</h2>
-        <p className="text-sm">Connect your Replicate API key to start generating media.</p>
-        <a
-          href="/settings?tab=media_providers"
-          className="mt-2 px-4 py-2 bg-designerAccent text-white rounded-lg hover:bg-designerAccent/80 transition-colors"
-        >
-          Configure Replicate
-        </a>
-      </div>
-    );
+    return <StudioLanding identifier="replicate" title="Replicate" landing={REPLICATE_LANDING} />;
   }
 
   // Controls: rendered only when open (⚙ toggles). In-flow column on desktop,

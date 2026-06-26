@@ -14,6 +14,23 @@ const ASPECT = [
 ];
 
 export const klingDescriptor: StudioDescriptor = {
+  landing: {
+    "icon": "kling",
+    "website": "https://klingai.com",
+    "tagline": "Next-gen AI video by Kuaishou",
+    "description": "A leading video generator by Kuaishou, known for long, cinematic clips with strong realism and physics. Recent models add native audio, voiceovers, and sound in a single pass.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Cinematic clips up to ~2 minutes at up to 1080p",
+      "Text-to-video and image-to-video generation",
+      "Native audio: voiceovers, sound effects, ambience",
+      "Multi-image reference for character consistency",
+      "Multi-shot storyboarding with camera control"
+    ]
+  },
   provider: 'fal',
   title: 'Kling',
   tabs: [

@@ -4,6 +4,21 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // Azure provider on the org's existing Azure AI credentials (universal-credential reuse).
 // The model id is your Azure deployment name.
 export const azureDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://azure.microsoft.com/en-us/products/ai-services/openai-service",
+    "tagline": "OpenAI image models with enterprise-grade Azure",
+    "description": "Microsoft Azure's managed access to OpenAI models, including gpt-image generation — backed by Azure's enterprise security, regional deployment, and compliance controls.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "Image generation via OpenAI's gpt-image models",
+      "Enterprise security with Entra ID & Key Vault",
+      "50+ compliance certifications, global regions",
+      "Your prompts and data never train the models",
+      "Built-in content filtering and abuse monitoring"
+    ]
+  },
   provider: 'azure',
   title: 'Azure OpenAI',
   tabs: [

@@ -29,6 +29,23 @@ const PIKAFFECTS = [
 ].map((e) => ({ value: e, label: e }));
 
 export const pikaDescriptor: StudioDescriptor = {
+  landing: {
+    "icon": "pika",
+    "website": "https://pika.art",
+    "tagline": "Fun, fast AI video for everyone",
+    "description": "A playful, accessible AI video platform built around viral creation — best known for Pikaffects, one-tap surreal effects that squish, melt, or transform photos into shareable video.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Pikaffects: one-tap surreal video effects",
+      "Text-to-video and image-to-video generation",
+      "Trend-based clips from selfies and audio",
+      "Pika 2.5 model for higher-quality output",
+      "Designed to make creation accessible to all"
+    ]
+  },
   provider: 'fal',
   title: 'Pika',
   tabs: [

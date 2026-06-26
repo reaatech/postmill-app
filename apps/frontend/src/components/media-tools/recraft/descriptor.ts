@@ -26,6 +26,22 @@ const SIZES = [
 ];
 
 export const recraftDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://www.recraft.ai",
+    "tagline": "AI design tool with visual taste",
+    "description": "A design-focused AI image platform best known for generating editable vector/SVG graphics alongside photoreal images, with reusable custom brand styles that need no training.",
+    "badges": [
+      "Image",
+      "Vector"
+    ],
+    "highlights": [
+      "Editable vector / SVG and icon generation",
+      "Custom brand styles without any training",
+      "Photoreal images with quality text rendering",
+      "Mockups, upscaler, background remover, eraser",
+      "Design-forward, production-ready outputs"
+    ]
+  },
   provider: 'recraft',
   title: 'Recraft',
   tabs: [

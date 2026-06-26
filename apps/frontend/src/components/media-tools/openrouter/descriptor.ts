@@ -4,6 +4,21 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // existing OpenRouter LLM key (universal-credential reuse). Image models are discovered live
 // (catalog filtered to image-output models).
 export const openrouterDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://openrouter.ai",
+    "tagline": "One API for any AI model",
+    "description": "A unified gateway to 400+ models from 70+ providers through a single OpenAI-compatible API — including a dedicated image API spanning 30+ models — with automatic failover.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "400+ models from 70+ providers, one API",
+      "Image API across 30+ models, 8 providers",
+      "Automatic fallbacks for higher availability",
+      "OpenAI SDK works out of the box",
+      "Better prices and custom data policies"
+    ]
+  },
   provider: 'openrouter',
   title: 'OpenRouter',
   tabs: [

@@ -4,6 +4,22 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // `promptImage` is the i2v source image. Runway has no callback, so renders complete via
 // the poll cron / on-read poll.
 export const runwayDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://runwayml.com",
+    "tagline": "Cinematic AI video, built to simulate the world",
+    "description": "A pioneering generative-AI platform whose Gen-4 family produces cinematic, high-fidelity video from text and images — prized for consistent characters, scenes, and director-grade motion control.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Gen-4 models: state-of-the-art motion & adherence",
+      "Text-to-video and image-to-video generation",
+      "Consistent characters, scenes, and objects",
+      "Camera and motion controls for cinematic results",
+      "Trusted by filmmakers and creative studios"
+    ]
+  },
   provider: 'runway',
   title: 'Runway',
   tabs: [

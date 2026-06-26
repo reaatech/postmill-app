@@ -43,6 +43,22 @@ const AUDIO_MODELS = [
 ];
 
 export const ltxDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://ltx.studio",
+    "tagline": "The AI platform for video production",
+    "description": "LTX Studio by Lightricks is an end-to-end AI video production platform. Powered by the open-source LTX-2 model, it takes you from script to storyboard to finished video.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "LTX-2: open-source multimodal video model",
+      "Text-to-video, image-to-video, audio-to-video",
+      "AI storyboard generator from a script",
+      "Character, location, and style consistency",
+      "Timeline editing, camera control, sound design"
+    ]
+  },
   provider: 'ltx',
   title: 'LTX Studio',
   tabs: [

@@ -4,6 +4,21 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // are native FLUX params — they ride straight into the request body. FLUX generation is
 // submit+poll inside the adapter, so the image completes synchronously.
 export const blackForestLabsDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://bfl.ai",
+    "tagline": "The frontier lab for visual intelligence",
+    "description": "Creators of the FLUX model family — a frontier image lab known for state-of-the-art photorealism, precise prompt control, and production-grade character and style consistency.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "FLUX.2 family: base, [max] quality, [klein] fast",
+      "Production-grade character & style consistency",
+      "Physically accurate lighting and realism",
+      "Multi-image reference for style & object edits",
+      "Trusted by Adobe, Microsoft, Mistral, Freepik"
+    ]
+  },
   provider: 'black-forest-labs',
   title: 'Black Forest Labs',
   tabs: [

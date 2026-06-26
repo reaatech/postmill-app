@@ -4,6 +4,23 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // the org's existing DeepInfra LLM key (universal-credential reuse). The model id is the
 // DeepInfra model path (curated lists + free entry).
 export const deepinfraDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://deepinfra.com",
+    "tagline": "Run the best AI models at the lowest cost",
+    "description": "A developer-friendly inference hub serving 100+ models across text, image, video, and speech via simple APIs — pay-as-you-go on its own cost-optimized US infrastructure.",
+    "badges": [
+      "Image",
+      "Video",
+      "Audio"
+    ],
+    "highlights": [
+      "100+ models across every modality",
+      "Text-to-image, text-to-video, TTS and STT",
+      "Low pay-as-you-go pricing, no hidden fees",
+      "Zero-retention, SOC 2 & ISO 27001 certified",
+      "Own inference-optimized US data centers"
+    ]
+  },
   provider: 'deepinfra',
   title: 'DeepInfra',
   tabs: [

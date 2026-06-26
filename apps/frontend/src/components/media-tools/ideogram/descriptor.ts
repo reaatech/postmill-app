@@ -34,6 +34,21 @@ const STYLE_TYPE = [
 ];
 
 export const ideogramDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://ideogram.ai",
+    "tagline": "Stunning realism, accurate text in images",
+    "description": "An AI image generator best known for industry-leading in-image text rendering — crisp, correctly-spelled typography ideal for posters, ads, and social designs.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "Best-in-class accurate, legible text rendering",
+      "Style References from up to 3 images",
+      "Billions of style presets and reusable codes",
+      "Strong photorealism and prompt alignment",
+      "Built for campaigns, posters, and brand design"
+    ]
+  },
   provider: 'ideogram',
   title: 'Ideogram',
   tabs: [

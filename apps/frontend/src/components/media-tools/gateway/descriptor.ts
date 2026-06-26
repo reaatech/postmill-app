@@ -10,6 +10,22 @@ const RATIOS = [
 ];
 
 export const gatewayDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://vercel.com/ai-gateway",
+    "tagline": "One API key for hundreds of AI models",
+    "description": "Vercel AI Gateway routes requests to hundreds of models across many providers through a single API — text, image, and video — with automatic failover and no platform markup.",
+    "badges": [
+      "Image",
+      "Video"
+    ],
+    "highlights": [
+      "Hundreds of models from many providers",
+      "Image generation and editing plus video",
+      "Automatic failover during provider outages",
+      "No platform fees — pay provider rates",
+      "Unified billing, spend tracking & observability"
+    ]
+  },
   provider: 'gateway',
   title: 'Vercel AI',
   tabs: [

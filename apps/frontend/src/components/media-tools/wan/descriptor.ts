@@ -50,6 +50,22 @@ const I2V_RESOLUTION = [
 ];
 
 export const wanDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://wan.video",
+    "tagline": "Open AI video and image generation by Alibaba",
+    "description": "Alibaba's Wan creative platform (Model Studio) lowers the barrier to content creation with the Wan2.x model family — spanning text-to-video, image-to-video, and text-to-image.",
+    "badges": [
+      "Video",
+      "Image"
+    ],
+    "highlights": [
+      "Wan2.x text-to-video and image-to-video",
+      "Text-to-image and image editing in one suite",
+      "First-and-last-frame control for video",
+      "Strong visual fidelity and motion consistency",
+      "Open, large-scale generative video models"
+    ]
+  },
   provider: 'wan',
   title: 'Wan',
   tabs: [

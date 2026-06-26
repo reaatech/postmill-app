@@ -4,6 +4,21 @@ import type { StudioDescriptor } from '@gitroom/frontend/components/media-tools/
 // provider (SigV4 auth) on the org's existing Bedrock AI credentials (universal-credential
 // reuse). Models are discovered from the AI Bedrock adapter's catalog.
 export const bedrockDescriptor: StudioDescriptor = {
+  landing: {
+    "website": "https://aws.amazon.com/bedrock/",
+    "tagline": "Build generative AI at production scale on AWS",
+    "description": "AWS's fully managed service for generative-AI apps and agents, offering foundation models from leading providers — including image generation via Amazon Nova, Titan, and Stability AI.",
+    "badges": [
+      "Image"
+    ],
+    "highlights": [
+      "Image gen via Nova, Titan & Stability (SDXL)",
+      "One API across many foundation-model providers",
+      "Enterprise security: HIPAA, FedRAMP High, GDPR",
+      "Bedrock Guardrails block harmful content",
+      "Your data is never used to train the models"
+    ]
+  },
   provider: 'bedrock',
   title: 'Amazon Bedrock',
   tabs: [
