@@ -67,6 +67,51 @@ const tabs = [
     ),
   },
   {
+    href: '/media/kling',
+    label: 'Kling',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="2" y="4" width="14" height="16" rx="2" />
+        <path d="M16 9l6-3v12l-6-3" />
+        <path d="M7 9l4 3-4 3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/luma',
+    label: 'Luma',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 3a9 9 0 0 0 0 18" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/minimax',
+    label: 'MiniMax',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 18V6l5 7 5-7v12" />
+        <path d="M20 6v12" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/runway',
+    label: 'Runway',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 3l14 9-14 9V3z" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/stock-vectors',
     label: 'Vectors',
     section: 'Content Pack',

@@ -49,13 +49,26 @@ export class LumaAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    // Native Luma params (model, resolution, duration, loop, aspect_ratio) ride
+    // `options.input` straight into the body. `start_image_url`/`end_image_url` are
+    // flattened convenience fields the adapter folds into the nested `keyframes`.
+    const input = (options?.input || {}) as Record<string, unknown>;
+    const { start_image_url, end_image_url, ...rest } = input;
+    const keyframes: Record<string, unknown> = {};
+    if (typeof start_image_url === 'string') keyframes.frame0 = { type: 'image', url: start_image_url };
+    if (typeof end_image_url === 'string') keyframes.frame1 = { type: 'image', url: end_image_url };
+
     const res = await safeFetch(`${BASE}/generations`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({
         prompt,
-        aspect_ratio: options?.aspectRatio || '16:9',
-        loop: options?.loop || false,
+        aspect_ratio: '16:9',
+        ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
+        ...(options?.loop !== undefined ? { loop: options.loop } : {}),
+        ...(options?.model ? { model: options.model } : {}),
+        ...rest,
+        ...(Object.keys(keyframes).length ? { keyframes } : {}),
         ...(options?.webhookUrl ? { callback_url: options.webhookUrl } : {}),
       }),
     });

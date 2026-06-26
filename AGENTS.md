@@ -534,8 +534,9 @@ the modern **HeyGen Studio** (above).
   source and the output destination for the tools.
 - **`/media` is tools only** (no library inside it). Each tool: pick/produce media → **save to
   `/files`** (or send straight to the composer). The nav lives in
-  `apps/frontend/src/app/(app)/(site)/media/layout.tsx`, grouped + alphabetised into two sections:
-  - **Tools** — Designer, HeyGen, Replicate.
+  `apps/frontend/src/app/(app)/(site)/media/layout.tsx`, grouped (alphabetised within each section):
+  - **Platform** — Designer (header-less; the default landing for `/media`).
+  - **Providers** — HeyGen, Kling, Luma, MiniMax, Replicate, Runway.
   - **Content Pack** — Stock Photos, Stock Videos, Vectors, Stickers, Stock Audio, Icons.
 
 ### Designer (Konva)
@@ -601,6 +602,35 @@ per-tool styling. Reference implementation: `apps/frontend/src/components/media-
   (`video:` / `tts:` / `translate:`); `HeyGenAdapter.pollJob` branches on the prefix to hit the right
   HeyGen status endpoint. A bare id (no prefix) = avatar video — preserves the generic
   governance/grid path, which stores the raw id.
+
+### Studio Kit (descriptor-driven provider studios)
+A reusable scaffold so a new provider studio is mostly a **descriptor**, not a from-scratch build.
+It extracts HeyGen's shell + the three handoffs and generalizes Replicate's form engine into a
+provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
+(`studio-shell.tsx`, `studio-form.tsx`, `render-queue.tsx`, `types.ts`, `hooks.ts`). A studio =
+`<StudioShell descriptor={...} />`.
+- **Descriptor** (`StudioDescriptor`): `{ provider, title, tabs[] }`. Each tab has an `operation`
+  (`video`/`image`/`audio` → backend routing + Designer handoff type), an optional fixed `model` (or a
+  `select` field named `model`), and `fields[]`. Field types: `prompt`/`text`/`select`/`number`/
+  `toggle`/`media`. **Field names are the provider's native API params** — they ride straight into the
+  adapter request body, so the descriptor IS the full feature surface (no lowest-common-denominator
+  cap). A tab may instead supply a `custom` React component (escape hatch for HeyGen-style structured
+  tools).
+- **Generic backend** — one endpoint serves every simple "prompt → job" provider (no per-provider
+  controller): `GET /media/studio/:provider/status`, `GET /media/studio/:provider/jobs`,
+  `POST /media/studio/:provider/generate` (`MediaStudioController` →
+  `libraries/nestjs-libraries/src/media/studio/media-studio.service.ts`). It resolves credentials,
+  creates the `AIMediaJob`, dispatches to the registry adapter by `operation`, and tracks completion
+  through the shared `MediaJobLifecycleService` (**webhook-first**, poll-cron fallback). `mediaInputs`
+  (`field → fileId`) is resolved server-side to a provider-reachable URL (handles local storage).
+  **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
+  descriptor.**
+- **Current studios on the kit:** Runway, Luma, MiniMax, Kling (via the `fal` adapter). Each is a
+  `media-tools/<provider>/descriptor.ts` + a 3-line studio + a route page. Adapters merge
+  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax enriched with native
+  param passthrough + i2v/keyframes/subject-ref branching). **Veo (Vertex) deferred** — OAuth
+  credential shape (`accessToken`+`projectId`+`region`) must be confirmed first. HeyGen and Replicate
+  are intentionally **not** retrofitted (they keep their bespoke implementations).
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via

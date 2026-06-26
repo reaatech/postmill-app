@@ -78,6 +78,8 @@ import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate
 import { ReplicateStudioController } from './routes/replicate-studio.controller';
 import { HeyGenModule } from '@gitroom/nestjs-libraries/media/heygen/heygen.module';
 import { HeyGenController } from './routes/heygen.controller';
+import { MediaStudioModule } from '@gitroom/nestjs-libraries/media/studio/studio.module';
+import { MediaStudioController } from './routes/media-studio.controller';
 
 const authenticatedController = [
   UsersController,
@@ -123,9 +125,10 @@ const authenticatedController = [
   AdminController,
   ReplicateStudioController,
   HeyGenController,
+  MediaStudioController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule],
   controllers: [
     RootController,
     HealthController,

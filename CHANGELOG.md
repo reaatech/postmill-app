@@ -11,6 +11,22 @@
 ## Unreleased
 
 ### Added
+- **Studio Kit + AI Video studios** (`/media/{runway,luma,minimax,kling}`) — A reusable scaffold so a
+  new media-provider studio is mostly a descriptor, not a from-scratch build. Shared shell, render
+  queue, and the three handoffs (Save-to-Files / Edit-in-Designer / Post-to-Composer) are write-once;
+  each provider supplies a declarative descriptor whose field names are the provider's native API
+  params, so studios are **full-featured** (no lowest-common-denominator cap), with a `custom` escape
+  hatch for structured tools.
+  - **Four full-featured video studios:** Runway (image→video + text→image), Luma (text/image→video
+    with keyframes + loop), MiniMax (text/image→video + subject reference), Kling via fal
+    (text/image→video). All land renders in `/files` via the existing media-job pipeline
+    (webhook-first, poll-cron fallback).
+  - One **generic backend endpoint** serves every simple provider (no per-provider controller):
+    `GET/POST /media/studio/:provider/{status,jobs,generate}` (`MediaStudioController` +
+    `MediaStudioService`), dispatching to the registry adapter by operation. Runway/Luma/MiniMax
+    adapters enriched with native-param passthrough; no schema migration.
+  - Frontend kit at `media-tools/studio-kit/`; HeyGen and Replicate keep their bespoke
+    implementations (not retrofitted). Veo (Vertex) deferred pending OAuth credential confirmation.
 - **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
   provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
   env-var fallback).
