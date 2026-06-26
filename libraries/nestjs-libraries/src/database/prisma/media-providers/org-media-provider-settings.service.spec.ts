@@ -208,7 +208,7 @@ describe('OrgMediaProviderSettingsService', () => {
     it('testConnection runs a probe generation with decrypted credentials', async () => {
       const { service, repository, registry } = makeService();
       const generateImage = vi.fn().mockResolvedValue({ multi: false, image: 'ok' });
-      registry.get.mockReturnValue({ identifier: 'fal', generateImage });
+      registry.get.mockReturnValue({ identifier: 'fal', capabilities: { image: true }, generateImage });
       repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({"apiKey":"k"})' });
 
       const result = await service.testConnection('org-1', 'fal');
@@ -220,6 +220,7 @@ describe('OrgMediaProviderSettingsService', () => {
       const { service, repository, registry } = makeService();
       registry.get.mockReturnValue({
         identifier: 'fal',
+        capabilities: { image: true },
         generateImage: vi.fn().mockRejectedValue(new Error('bad key')),
       });
       repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({})' });
@@ -230,6 +231,35 @@ describe('OrgMediaProviderSettingsService', () => {
 
       repository.getByIdentifier.mockResolvedValue(null);
       await expect(service.testConnection('org-1', 'nope')).rejects.toThrow('not configured');
+    });
+
+    it('testConnection prefers the adapter testConnection over image generation', async () => {
+      const { service, repository, registry } = makeService();
+      const generateImage = vi.fn();
+      const testConnection = vi.fn().mockResolvedValue({ ok: true, message: 'Connection successful' });
+      registry.get.mockReturnValue({
+        identifier: 'heygen',
+        capabilities: { image: false, video: true, avatar: true },
+        generateImage,
+        testConnection,
+      });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'heygen', credentials: 'enc({"apiKey":"k"})' });
+
+      const result = await service.testConnection('org-1', 'heygen');
+      expect(testConnection).toHaveBeenCalledWith({ credentials: { apiKey: 'k' } });
+      expect(generateImage).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, message: 'Connection successful' });
+    });
+
+    it('testConnection does not run image generation for a non-image provider without a test', async () => {
+      const { service, repository, registry } = makeService();
+      const generateImage = vi.fn();
+      registry.get.mockReturnValue({ identifier: 'deepgram', capabilities: { image: false, stt: true }, generateImage });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'deepgram', credentials: 'enc({})' });
+
+      const result = await service.testConnection('org-1', 'deepgram');
+      expect(generateImage).not.toHaveBeenCalled();
+      expect(result.ok).toBe(true);
     });
   });
 });

@@ -107,6 +107,12 @@ export interface MediaProviderAdapter {
 
   pollJob?(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult>;
 
+  // Lightweight credential/auth check for the Settings → Media "Test connection" action.
+  // Image-only providers can rely on the generateImage fallback; providers without image
+  // generation (video/avatar/tts/stt) should implement this so the test doesn't
+  // misleadingly fail with a "does not support image generation" error.
+  testConnection?(options?: MediaCredentialOptions): Promise<{ ok: boolean; message: string }>;
+
   textToSpeech?(text: string, options?: MediaGenerateOptions): Promise<Buffer | string>;
   speechToText?(audio: Buffer, options?: MediaGenerateOptions): Promise<string>;
   speechToTextWords?(audio: Buffer, options?: MediaGenerateOptions): Promise<{ text: string; words: { word: string; start: number; end: number }[] }>;

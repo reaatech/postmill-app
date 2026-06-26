@@ -146,8 +146,16 @@ export class OrgMediaProviderSettingsService {
 
     const decrypted = this._decryptCredentials(config.credentials);
     try {
-      await adapter.generateImage('test', { credentials: decrypted });
-      return { ok: true, message: 'Connection successful' };
+      // Prefer the adapter's own auth check; only image-capable providers can be
+      // verified via generateImage. Without either, the key can't be actively tested.
+      if (adapter.testConnection) {
+        return await adapter.testConnection({ credentials: decrypted });
+      }
+      if (adapter.capabilities.image) {
+        await adapter.generateImage('test', { credentials: decrypted });
+        return { ok: true, message: 'Connection successful' };
+      }
+      return { ok: true, message: 'Credentials saved (no live connection test for this provider)' };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }
