@@ -5,7 +5,6 @@ import { Injectable } from '@nestjs/common';
 export class OrgAiSettingsRepository {
   constructor(
     private _aiOrgProviderConfig: PrismaRepository<'aIOrgProviderConfig'>,
-    private _aiSpendLog: PrismaRepository<'aISpendLog'>,
     private _aiSystemSettings: PrismaRepository<'aISystemSettings'>,
   ) {}
 
@@ -60,17 +59,6 @@ export class OrgAiSettingsRepository {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.update({
       where: { organizationId_identifier: { organizationId: orgId, identifier } },
       data: { isActive: true, enabled: true },
-    });
-  }
-
-  getSpendLogs(orgId: string, scope?: string, limit = 100, offset = 0) {
-    const where: Record<string, any> = { organizationId: orgId };
-    if (scope) where.scope = scope;
-    return this._aiSpendLog.model.aISpendLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      skip: offset,
     });
   }
 

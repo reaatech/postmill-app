@@ -9,7 +9,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
@@ -146,20 +145,6 @@ export class OrgAiSettingsController {
   ) {
     await this._orgAiSettings.delete(org.id, identifier);
     return { success: true };
-  }
-
-  @Get('/spend')
-  @RequirePermission('settings', 'read')
-  @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  async getSpend(
-    @GetOrgFromRequest() org: Organization,
-    @Query('scope') scope?: string,
-    @Query('offset') offset?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const parsedOffset = offset ? Math.max(0, parseInt(offset, 10)) : 0;
-    const parsedLimit = limit ? Math.min(1000, Math.max(1, parseInt(limit, 10))) : 100;
-    return this._orgAiSettings.getSpend(org.id, scope, parsedLimit, parsedOffset);
   }
 
   @Get('/budget')

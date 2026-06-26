@@ -7,7 +7,6 @@ import {
   Param,
   Post,
   Put,
-  Query,
   HttpException,
   HttpStatus,
   UseGuards,
@@ -353,31 +352,6 @@ export class AiSettingsController {
     await this._aiSettingsManager.refreshCache();
 
     return { success: true };
-  }
-
-  @Get('/spend')
-  @RequirePermission('ai-config', 'manage')
-  async getSpend(
-    @GetUserFromRequest() user: User,
-    @Query('scope') scope?: string,
-    @Query('provider') provider?: string,
-    @Query('offset') offset?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const parsedOffset = offset ? parseInt(offset, 10) : undefined;
-    const parsedLimit = limit ? parseInt(limit, 10) : 100;
-    return this._aiSettingsService.getSpendLogs({
-      scope,
-      provider,
-      offset: parsedOffset !== undefined && parsedOffset < 0 ? 0 : parsedOffset,
-      limit: parsedLimit < 1 ? 1 : parsedLimit > 1000 ? 1000 : parsedLimit,
-    });
-  }
-
-  @Get('/spend/summary')
-  @RequirePermission('ai-config', 'manage')
-  async getSpendSummary(@GetUserFromRequest() user: User) {
-    return this._aiSettingsService.getSpendSummary();
   }
 
   @Get('/audit')

@@ -88,26 +88,6 @@ export class AiSettingsRepository {
   }
 
   // ── AISpendLog ──
-  getSpendLogs(params: {
-    organizationId?: string;
-    scope?: string;
-    provider?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    const where: any = {};
-    if (params.organizationId) where.organizationId = params.organizationId;
-    if (params.scope) where.scope = params.scope;
-    if (params.provider) where.provider = params.provider;
-
-    return this._aiSpendLog.model.aISpendLog.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: params.limit || 100,
-      skip: params.offset || 0,
-    });
-  }
-
   createSpendLog(data: {
     organizationId?: string;
     userId?: string;

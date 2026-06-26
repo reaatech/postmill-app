@@ -178,12 +178,14 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                         />
                       </label>
                     )}
-                    <button
-                      className="text-[12px] text-red-500 hover:underline"
-                      onClick={() => onRemove(provider.identifier)}
-                    >
-                      Remove
-                    </button>
+                    {provider.isConfigured && (
+                      <button
+                        className="text-[12px] text-red-500 hover:underline"
+                        onClick={() => onRemove(provider.identifier)}
+                      >
+                        Remove
+                      </button>
+                    )}
                   </>
                 )}
               </div>

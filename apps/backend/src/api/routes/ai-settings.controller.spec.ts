@@ -33,7 +33,6 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
     getDecryptedSystemSettings = vi.fn().mockResolvedValue(null);
     createAuditLog = vi.fn().mockResolvedValue({});
     createSpendLog = vi.fn().mockResolvedValue({});
-    getSpendLogs = vi.fn().mockResolvedValue([]);
     getSpendSummary = vi.fn().mockResolvedValue([]);
     getAuditLogs = vi.fn().mockResolvedValue([]);
     decryptProviderConfig = vi.fn().mockReturnValue({ credentials: { apiKey: 'sk-test' } });

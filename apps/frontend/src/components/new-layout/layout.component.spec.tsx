@@ -152,10 +152,6 @@ vi.mock('@gitroom/react/helpers/mantine.wrapper', () => ({
   MantineWrapper: ({ children }: any) => children,
 }));
 
-vi.mock('../layout/impersonate', () => ({
-  Impersonate: () => null,
-}));
-
 vi.mock('../layout/announcement.banner', () => ({
   AnnouncementBanner: () => null,
 }));

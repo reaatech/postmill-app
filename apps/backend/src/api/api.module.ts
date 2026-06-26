@@ -69,7 +69,6 @@ import { GoogleProvider } from '@gitroom/backend/services/auth/providers/google.
 import { FarcasterProvider } from '@gitroom/backend/services/auth/providers/farcaster.provider';
 import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.provider';
 import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
-import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
@@ -124,7 +123,6 @@ const authenticatedController = [
   DesignController,
   DesignTemplateController,
   DesignerProxyController,
-  AdminController,
   ReplicateStudioController,
   HeyGenController,
   MediaStudioController,

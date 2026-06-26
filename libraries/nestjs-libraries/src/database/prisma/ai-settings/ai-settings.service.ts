@@ -151,16 +151,6 @@ export class AiSettingsService {
 
   // ── AISpendLog ──
 
-  getSpendLogs(params: {
-    organizationId?: string;
-    scope?: string;
-    provider?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    return this._repository.getSpendLogs(params);
-  }
-
   createSpendLog(data: {
     organizationId?: string;
     userId?: string;

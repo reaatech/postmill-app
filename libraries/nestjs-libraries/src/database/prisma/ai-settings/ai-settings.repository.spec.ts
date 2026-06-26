@@ -276,47 +276,6 @@ describe('AiSettingsRepository', () => {
 
   // ── AISpendLog ──
 
-  describe('getSpendLogs', () => {
-    it('returns logs with default limit/offset', async () => {
-      mockSpendLog.findMany.mockResolvedValue([]);
-
-      await repository.getSpendLogs({});
-
-      expect(mockSpendLog.findMany).toHaveBeenCalledWith({
-        where: {},
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        skip: 0,
-      });
-    });
-
-    it('applies all filters', async () => {
-      await repository.getSpendLogs({
-        organizationId: 'org1',
-        scope: 'chat',
-        provider: 'openai',
-        limit: 10,
-        offset: 20,
-      });
-
-      expect(mockSpendLog.findMany).toHaveBeenCalledWith({
-        where: { organizationId: 'org1', scope: 'chat', provider: 'openai' },
-        orderBy: { createdAt: 'desc' },
-        take: 10,
-        skip: 20,
-      });
-    });
-
-    it('omits undefined filter properties from where clause', async () => {
-      await repository.getSpendLogs({ scope: 'chat' });
-
-      const call = mockSpendLog.findMany.mock.calls[0][0];
-      expect(call.where).not.toHaveProperty('organizationId');
-      expect(call.where).not.toHaveProperty('provider');
-      expect(call.where.scope).toBe('chat');
-    });
-  });
-
   describe('createSpendLog', () => {
     it('creates a spend log entry', async () => {
       const data = {

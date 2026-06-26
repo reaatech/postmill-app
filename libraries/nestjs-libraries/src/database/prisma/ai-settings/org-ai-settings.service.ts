@@ -130,17 +130,6 @@ export class OrgAiSettingsService {
     return adapter.validateCredentials(decrypted);
   }
 
-  async getSpend(
-    orgId: string,
-    scope?: string,
-    limit = 100,
-    offset = 0,
-  ) {
-    const clampedLimit = limit < 1 ? 1 : limit > 1000 ? 1000 : limit;
-    const safeOffset = offset < 0 ? 0 : offset;
-    return this._repository.getSpendLogs(orgId, scope, clampedLimit, safeOffset);
-  }
-
   async getBudget(orgId: string) {
     return this._repository.getBudget(orgId);
   }
