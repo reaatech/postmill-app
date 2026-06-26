@@ -28,7 +28,6 @@ import { Sets } from '@gitroom/frontend/components/sets/sets';
 import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
 import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
 import { ApprovedAppsComponent } from '@gitroom/frontend/components/approved-apps/approved-apps.component';
 import { BrandTab } from '@gitroom/frontend/components/settings/brand/brand.tab';
 import { AITab } from '@gitroom/frontend/components/settings/ai/ai.tab';
@@ -216,10 +215,12 @@ export const SettingsPopup: FC<{
 
   return (
     <>
-      {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip. */}
+      {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip.
+          Bounded to the viewport (desktop) so it matches the fixed main menu's
+          height and scrolls internally — offset = outer p-12 + 80px header. */}
       <div
         className={clsx(
-          'mobile:hidden bg-newBgColorInner flex flex-col transition-all p-[20px]',
+          'mobile:hidden bg-newBgColorInner flex flex-col transition-all p-[20px] h-[calc(100vh-104px)] mobile:h-auto min-h-0',
           collapsed ? 'w-[76px]' : 'w-[260px]'
         )}
       >
@@ -251,7 +252,7 @@ export const SettingsPopup: FC<{
             </svg>
           </button>
         </div>
-        <div className="flex flex-1 min-h-0 flex-col gap-[15px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
+        <div className="flex flex-1 min-h-0 flex-col gap-[4px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
           {(() => {
             const elements: React.ReactNode[] = [];
             let currentSection = '';
@@ -264,32 +265,31 @@ export const SettingsPopup: FC<{
                   </div>
                 );
               }
+              const active = tabIsActive(item.tab);
               elements.push(
                 <button
                   type="button"
                   key={item.tab}
                   title={item.label}
-                  aria-current={tabIsActive(item.tab) ? 'page' : undefined}
+                  aria-current={active ? 'page' : undefined}
                   className={clsx(
-                    'cursor-pointer flex items-center gap-[12px] group/profile hover:bg-boxHover rounded-e-[8px] text-start w-full',
-                    collapsed && 'justify-center',
-                    tabIsActive(item.tab) && 'bg-boxHover'
+                    'group/rail relative w-full text-start flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
+                    collapsed ? 'justify-center px-[8px] py-[10px]' : 'ps-[10px] pe-[12px] py-[8px]',
+                    active ? 'bg-boxHover' : 'hover:bg-boxHover'
                   )}
                   onClick={() => setTab(item.tab)}
                 >
-                  <div
+                  <span
                     className={clsx(
-                      'h-full w-[4px] rounded-s-[3px] opacity-0 group-hover/profile:opacity-100 transition-opacity',
-                      tabIsActive(item.tab) && 'opacity-100',
+                      'absolute start-0 top-1/2 -translate-y-1/2 h-[18px] w-[3px] rounded-e-[2px] bg-btnPrimary transition-opacity',
+                      active ? 'opacity-100' : 'opacity-0 group-hover/rail:opacity-100',
                       collapsed && 'hidden'
                     )}
-                  >
-                    <SVGLine />
-                  </div>
-                  <span className={clsx('flex items-center gap-[8px]', collapsed && 'py-[8px]')}>
+                  />
+                  <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
                     {item.icon}
-                    <span className={clsx(collapsed && 'hidden')}>{item.label}</span>
                   </span>
+                  {!collapsed && <span className="truncate">{item.label}</span>}
                 </button>
               );
             });
@@ -305,7 +305,7 @@ export const SettingsPopup: FC<{
         </div>
       </div>
 
-      <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px]">
+      <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px] h-[calc(100vh-104px)] mobile:h-auto min-h-0 overflow-y-auto mobile:overflow-visible">
         <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
         <div className="flex flex-col gap-[12px] mobile:p-[16px]">
         {!isContentTab && tab !== 'storage' && <PageHeader title="Settings" />}

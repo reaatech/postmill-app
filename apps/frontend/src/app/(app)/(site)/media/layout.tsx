@@ -4,6 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import clsx from 'clsx';
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
 import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
@@ -526,10 +528,58 @@ const sortedTabs = [...tabs].sort((a, b) => {
   return a.label.localeCompare(b.label);
 });
 
+// Display labels for section headers (the internal section key stays stable).
+const SECTION_LABELS: Record<string, string> = {
+  Providers: 'AI Media',
+};
+
+// Most studio routes equal the provider identifier (/media/<id>). These few
+// don't — they're frontend-only studios that ride another provider's
+// credential/config, so their menu visibility tracks that provider's state.
+const ROUTE_TO_IDENTIFIER: Record<string, string> = {
+  'google-ai': 'google',
+  kling: 'fal',
+  pika: 'fal',
+  sora: 'openai',
+};
+const providerIdentifier = (href: string) => {
+  const seg = href.replace('/media/', '');
+  return ROUTE_TO_IDENTIFIER[seg] || seg;
+};
+
+// The set of media provider identifiers the org has enabled (active +
+// configured). Used to show only enabled providers in the rail.
+const useEnabledMediaProviders = () => {
+  const fetch = useFetch();
+  return useSWR<Set<string>>(
+    'media-enabled-providers',
+    async () => {
+      const res = await fetch('/settings/media/config');
+      const enabled = new Set<string>();
+      if (!res.ok) return enabled;
+      const data: { providers?: { identifier: string; isConfigured?: boolean; enabled?: boolean }[] } =
+        await res.json();
+      for (const cfg of data.providers || []) {
+        if (cfg.enabled && cfg.isConfigured) enabled.add(cfg.identifier);
+      }
+      return enabled;
+    },
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+};
+
 export default function MediaLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const permissions = usePermissions();
   const { collapsed, toggle } = useSidebarCollapse('media:sidebar-collapsed');
+  const { data: enabledProviders } = useEnabledMediaProviders();
+
+  // Show only enabled providers under "AI Media"; non-provider sections always
+  // show. Filtering an empty Providers section also drops its header below.
+  const visibleTabs = sortedTabs.filter((t) => {
+    if (t.section !== 'Providers') return true;
+    return enabledProviders?.has(providerIdentifier(t.href)) ?? false;
+  });
 
   if (permissions.isLoaded && !permissions.hasPermission('media', 'read')) {
     return (
@@ -544,12 +594,15 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  // Bound the section to the viewport (desktop) so the side rail matches the
+  // fixed main menu's height and scrolls internally instead of growing the
+  // page. Offset = outer p-12 (top+bottom) + the 80px app header = 104px.
   return (
-    <div className="flex flex-1 h-full min-w-0 gap-[15px] p-[20px] mobile:p-0 mobile:gap-0 bg-newBgColorInner">
+    <div className="flex flex-1 h-[calc(100vh-104px)] mobile:h-auto min-w-0 gap-[15px] p-[20px] mobile:p-0 mobile:gap-0 bg-newBgColorInner">
       {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip. */}
       <div
         className={clsx(
-          'mobile:hidden shrink-0 flex flex-col gap-[4px] transition-all',
+          'mobile:hidden shrink-0 flex flex-col gap-[4px] transition-all min-h-0',
           collapsed ? 'w-[56px]' : 'w-[220px]'
         )}
       >
@@ -586,12 +639,12 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex flex-1 min-h-0 flex-col gap-[4px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
-          {sortedTabs.map((t, i) => {
+          {visibleTabs.map((t, i) => {
             const active = pathname.startsWith(t.href);
             // 'Platform' (Designer) is the lone built-in tool — no section header.
             const showHeader =
               t.section !== 'Platform' &&
-              (i === 0 || sortedTabs[i - 1].section !== t.section);
+              (i === 0 || visibleTabs[i - 1].section !== t.section);
             return (
               <React.Fragment key={t.href}>
                 {showHeader && (
@@ -601,20 +654,26 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                       collapsed && 'hidden'
                     )}
                   >
-                    {t.section}
+                    {SECTION_LABELS[t.section] || t.section}
                   </div>
                 )}
                 <Link
                   href={t.href}
                   title={t.label}
+                  aria-current={active ? 'page' : undefined}
                   className={clsx(
-                    'flex items-center gap-[10px] rounded-[6px] text-[13px] transition-all',
-                    collapsed ? 'justify-center px-0 py-[10px]' : 'px-[12px] py-[8px]',
-                    active
-                      ? 'bg-designerAccent/20 text-textColor'
-                      : 'text-textColor hover:bg-newColColor/50'
+                    'group/rail relative flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
+                    collapsed ? 'justify-center px-[8px] py-[10px]' : 'ps-[10px] pe-[12px] py-[8px]',
+                    active ? 'bg-boxHover' : 'hover:bg-boxHover'
                   )}
                 >
+                  <span
+                    className={clsx(
+                      'absolute start-0 top-1/2 -translate-y-1/2 h-[18px] w-[3px] rounded-e-[2px] bg-btnPrimary transition-opacity',
+                      active ? 'opacity-100' : 'opacity-0 group-hover/rail:opacity-100',
+                      collapsed && 'hidden'
+                    )}
+                  />
                   <span className="w-[18px] h-[18px] flex items-center justify-center shrink-0">
                     {t.icon}
                   </span>
@@ -627,17 +686,17 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
       </div>
 
       {/* Page area: mobile gets a horizontal sub-menu strip above the content. */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <SubmenuStrip
           ariaLabel="Media tools"
-          items={sortedTabs.map((t) => ({
+          items={visibleTabs.map((t) => ({
             href: t.href,
             label: t.label,
             icon: t.icon,
             active: pathname.startsWith(t.href),
           }))}
         />
-        <div className="flex-1 min-w-0">{children}</div>
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible">{children}</div>
       </div>
     </div>
   );
