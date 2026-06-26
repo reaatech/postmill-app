@@ -629,8 +629,12 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
   descriptor.**
 - **Current studios on the kit:**
-  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter — config identifier `fal`, but the
-    adapter's display name + studio are both **"Kling"** so Settings → Media and the studio match),
+  - **Video** — Runway, Luma, MiniMax, Kling and **Pika** (both via the `fal` adapter — config
+    identifier `fal`, but the descriptor's `provider: 'fal'` + `title` give each its own branded
+    studio; the `model` field carries the full fal endpoint id and the adapter spreads `input` into
+    the body, so they reuse the org's fal key — Pika's official API is fal-hosted per pika.art/api.
+    Pika's studio has Text→Video + Image→Video (`fal-ai/pika/v2.2/*`) and a **Pikaffects** tab
+    (`fal-ai/pika/v1.5/pikaffects`, 16 one-click VFX). Frontend-only — no new adapter/registry id),
     Vertex (Google **Veo**), Qwen (Alibaba **Wan2.x** text→video + image→video).
   - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), Qwen
     (Alibaba **Qwen-Image**, a third tab on the Qwen studio), OpenAI

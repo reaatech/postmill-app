@@ -11,6 +11,11 @@
 ## Unreleased
 
 ### Added
+- **Pika media studio** (`/media/pika`) — a branded Studio Kit studio for Pika, served through the
+  existing fal.ai adapter (Pika's official API is fal-hosted per pika.art/api), mirroring the Kling
+  pattern: `provider: 'fal'`, the `model` field carries the fal endpoint id, reuses the org's fal key.
+  Three tabs: Text→Video and Image→Video (`fal-ai/pika/v2.2/*`) plus **Pikaffects**
+  (`fal-ai/pika/v1.5/pikaffects`, 16 one-click VFX). Frontend-only — no new adapter or registry id.
 - **Higgsfield media studio** (`/media/higgsfield`) — an own-key Studio Kit studio for Higgsfield
   (`platform.higgsfield.ai`) with three tabs: **Soul** Text→Image (+ optional reference image), **DoP**
   Image→Video (`dop-lite/turbo/standard`), and **Speak** (portrait + audio → talking video). Two-part
