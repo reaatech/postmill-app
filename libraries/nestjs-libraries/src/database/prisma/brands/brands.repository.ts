@@ -46,6 +46,7 @@ export class BrandsRepository {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
       isDefault?: boolean;
       slug?: string;
@@ -63,6 +64,7 @@ export class BrandsRepository {
         instructions: data.instructions,
         language: data.language,
         platformInstructions: data.platformInstructions || {},
+        languageProfiles: data.languageProfiles ?? {},
         enabled: data.enabled ?? true,
         isDefault: data.isDefault ?? false,
         slug: data.slug,
@@ -83,6 +85,7 @@ export class BrandsRepository {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
       logoFileIds?: string[];
       palette?: string[];

@@ -228,14 +228,23 @@ The tab shows a brand list with create, edit, and delete, plus a **Default** bad
 - Brand management requires the `brands: manage` permission (owner/admin by default); all members
   can read brands so the composer picker works.
 
-### Brand Voice (per brand)
+### Brand Voice (per brand, per language)
 
-- **Instructions** — freeform text defining the brand's writing style, tone, and voice. This is
-  injected into AI-generated content.
-- **Language** — default language for AI content generation.
-- **Platform instructions** — per-platform overrides. For example, you might specify a different
-  tone for LinkedIn (professional) versus X (witty).
 - **Enable/disable** — toggle whether the brand profile is applied to AI generations.
+- **Language** — at the top of the editor; it selects which language's dataset you are editing. The
+  active language is the one used for AI generation. Switching the language shows a fresh dataset
+  (its own instructions and channel overrides) for that brand/language — so a brand can carry a
+  distinct voice per language.
+- **Instructions** — freeform text defining the brand's writing style, tone, and voice **for the
+  selected language**. This is injected into AI-generated content.
+- **Channel overrides** — optional, per language: override the instructions for a specific connected
+  channel (pick a channel from the dropdown to add one). Channels without an override use the
+  language's instructions above.
+
+Stored in `AIBrandProfile.languageProfiles` (`{ [lang]: { instructions, overrides } }`); the active
+language's profile is mirrored into the legacy `instructions`/`platformInstructions` fields for
+generation. (Per-channel overrides are stored but not yet applied at generation time — the generation
+path does not currently pass the channel; the per-language instructions do apply.)
 
 ### Brand Assets (per brand)
 

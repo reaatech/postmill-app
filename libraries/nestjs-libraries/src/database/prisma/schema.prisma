@@ -1229,6 +1229,9 @@ model AIBrandProfile {
   instructions      String?
   language          String?
   platformInstructions Json?    @default("{}")
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  // `language` is the active language; instructions/platformInstructions mirror its profile.
+  languageProfiles  Json?        @default("{}")
   enabled           Boolean      @default(true)
   name              String?
   isDefault         Boolean      @default(false)

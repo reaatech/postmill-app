@@ -1,33 +1,25 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Slider } from '@gitroom/react/form/slider';
 import { Select } from '@gitroom/react/form/select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
+interface LanguageProfile {
+  instructions?: string;
+  overrides?: Record<string, string>;
+}
+
 interface BrandProfile {
   instructions?: string;
   language?: string;
   enabled?: boolean;
   platformInstructions?: Record<string, string>;
+  languageProfiles?: Record<string, LanguageProfile>;
 }
-
-const PLATFORM_OPTIONS = [
-  { value: 'x', label: 'X/Twitter' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'facebook', label: 'Facebook' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'tiktok', label: 'TikTok' },
-  { value: 'threads', label: 'Threads' },
-  { value: 'bluesky', label: 'Bluesky' },
-  { value: 'mastodon', label: 'Mastodon' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'discord', label: 'Discord' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'slack', label: 'Slack' },
-];
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -52,26 +44,118 @@ const LANGUAGES = [
   { value: 'fi', label: 'Finnish' },
 ];
 
+interface NormalizedProfile {
+  instructions: string;
+  overrides: Record<string, string>;
+}
+
+// Seed the per-language map from the brand. Brands that predate languageProfiles
+// migrate their single instructions/overrides set into the active language.
+const seedProfiles = (initial?: BrandProfile): Record<string, NormalizedProfile> => {
+  const lp = initial?.languageProfiles;
+  if (lp && typeof lp === 'object' && Object.keys(lp).length) {
+    const out: Record<string, NormalizedProfile> = {};
+    for (const [lang, prof] of Object.entries(lp)) {
+      out[lang] = {
+        instructions: prof?.instructions || '',
+        overrides: prof?.overrides || {},
+      };
+    }
+    return out;
+  }
+  return {
+    [initial?.language || 'en']: {
+      instructions: initial?.instructions || '',
+      overrides: initial?.platformInstructions || {},
+    },
+  };
+};
+
 const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile; brandId?: string; onMutate?: () => void }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
 
-  const [instructions, setInstructions] = useState(initial?.instructions || '');
-  const [language, setLanguage] = useState(initial?.language || 'en');
   const [enabled, setEnabled] = useState(initial?.enabled ?? false);
-  const [platformInstructions, setPlatformInstructions] = useState<Record<string, string>>(initial?.platformInstructions || {});
-  const [selectedPlatform, setSelectedPlatform] = useState('');
+  const [language, setLanguage] = useState(initial?.language || 'en');
+  const [languageProfiles, setLanguageProfiles] = useState<Record<string, NormalizedProfile>>(
+    () => seedProfiles(initial)
+  );
+  // The channel currently selected to add/edit an override (within this language).
+  const [selectedChannel, setSelectedChannel] = useState('');
+
+  // The dataset for the active language.
+  const current = useMemo(
+    () => languageProfiles[language] || { instructions: '', overrides: {} },
+    [languageProfiles, language]
+  );
+
+  // The org's connected (active) channels populate the override dropdown.
+  const { data: channelData } = useSWR(
+    'brand-voice-channels',
+    async () => {
+      const res = await fetch('/integrations/list');
+      if (!res.ok) return [];
+      return (await res.json()).integrations || [];
+    },
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+  const channels: { id: string; name: string; disabled?: boolean }[] = (
+    channelData || []
+  ).filter((c: any) => !c.disabled);
+  const channelName = (id: string) => channels.find((c) => c.id === id)?.name || id;
+
+  const setInstructions = useCallback((value: string) => {
+    setLanguageProfiles((prev) => {
+      const cur = prev[language] || { instructions: '', overrides: {} };
+      return { ...prev, [language]: { ...cur, instructions: value } };
+    });
+  }, [language]);
+
+  const setOverride = useCallback((channelId: string, value: string) => {
+    setLanguageProfiles((prev) => {
+      const cur = prev[language] || { instructions: '', overrides: {} };
+      return {
+        ...prev,
+        [language]: { ...cur, overrides: { ...cur.overrides, [channelId]: value } },
+      };
+    });
+  }, [language]);
+
+  const removeOverride = useCallback((channelId: string) => {
+    setLanguageProfiles((prev) => {
+      const cur = prev[language] || { instructions: '', overrides: {} };
+      const overrides = { ...cur.overrides };
+      delete overrides[channelId];
+      return { ...prev, [language]: { ...cur, overrides } };
+    });
+  }, [language]);
 
   const handleSave = useCallback(async () => {
+    // Prune empty override strings; drop languages with no content.
+    const prunedProfiles: Record<string, NormalizedProfile> = {};
+    for (const [lang, prof] of Object.entries(languageProfiles)) {
+      const overrides: Record<string, string> = {};
+      for (const [ch, v] of Object.entries(prof.overrides || {})) {
+        if (v && v.trim()) overrides[ch] = v;
+      }
+      if ((prof.instructions && prof.instructions.trim()) || Object.keys(overrides).length) {
+        prunedProfiles[lang] = { instructions: prof.instructions || '', overrides };
+      }
+    }
+    // Mirror the active language's profile into the legacy fields so generation
+    // (which reads brand.language) keeps working.
+    const active = prunedProfiles[language] || { instructions: '', overrides: {} };
+
     const url = brandId ? `/brands/${brandId}` : '/ai/brand-profile';
     const res = await fetch(url, {
       method: 'PUT',
       body: JSON.stringify({
-        instructions,
-        language,
         enabled,
-        platformInstructions,
+        language,
+        languageProfiles: prunedProfiles,
+        instructions: active.instructions,
+        platformInstructions: active.overrides,
       }),
     });
     if (!res.ok) {
@@ -80,18 +164,7 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
     }
     toaster.show(t('brand_profile_saved', 'Brand profile saved'), 'success');
     onMutate?.();
-  }, [instructions, language, enabled, platformInstructions, fetch, toaster, t, onMutate, brandId]);
-
-  const handlePlatformSelect = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedPlatform(e.target.value);
-  }, []);
-
-  const handlePlatformInstructionChange = useCallback((platform: string, value: string) => {
-    setPlatformInstructions((prev) => ({
-      ...prev,
-      [platform]: value,
-    }));
-  }, []);
+  }, [enabled, language, languageProfiles, fetch, toaster, t, onMutate, brandId]);
 
   return (
     <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
@@ -118,91 +191,12 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
         />
       </div>
 
-      <div className="flex flex-col gap-[8px]">
-        <div className="text-[14px]">{t('brand_instructions', 'Brand Instructions')}</div>
-        <div className="text-[12px] text-newTableText">
-          {t('brand_instructions_description', 'Define tone, banned words, emoji policy, CTA style, and other brand guidelines for AI-generated content')}
-        </div>
-        <textarea
-          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
-          value={instructions}
-          onChange={(e) => setInstructions(e.target.value)}
-          placeholder={t('brand_instructions_placeholder', 'e.g. Keep a friendly and professional tone. Never use emojis. Always include a call-to-action at the end.')}
-        />
-      </div>
-
-      <div className="flex flex-col gap-[12px]">
-        <div className="text-[14px]">{t('platform_overrides', 'Per-Platform Overrides')}</div>
-        <div className="text-[12px] text-newTableText">
-          {t('platform_overrides_description', 'Override brand instructions for specific platforms. Falls back to global instructions when not set.')}
-        </div>
-
-        <div className="w-[250px]">
-          <Select
-            name="platformSelector"
-            label=""
-            disableForm={true}
-            hideErrors={true}
-            value={selectedPlatform}
-            onChange={handlePlatformSelect}
-          >
-            <option value="">{t('select_platform', 'Select platform...')}</option>
-            {PLATFORM_OPTIONS.map((p) => (
-              <option key={p.value} value={p.value}>
-                {p.label}
-              </option>
-            ))}
-          </Select>
-        </div>
-
-        {selectedPlatform && (
-          <div className="flex flex-col gap-[4px]">
-            <div className="text-[13px] text-newTableText">
-              {t('platform_instructions', `Instructions for ${PLATFORM_OPTIONS.find((p) => p.value === selectedPlatform)?.label || selectedPlatform}`)}
-            </div>
-            <textarea
-              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
-              value={platformInstructions[selectedPlatform] || ''}
-              onChange={(e) => handlePlatformInstructionChange(selectedPlatform, e.target.value)}
-              placeholder={t('platform_instructions_placeholder', 'e.g. Be more casual on this platform')}
-            />
-          </div>
-        )}
-
-        {Object.keys(platformInstructions).length > 0 && (
-          <div className="flex flex-wrap gap-[6px]">
-            {Object.entries(platformInstructions).map(([platform, instr]) =>
-              instr ? (
-                <div
-                  key={platform}
-                  className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
-                >
-                  <span className="font-medium">{PLATFORM_OPTIONS.find((p) => p.value === platform)?.label || platform}</span>
-                  <button
-                    onClick={() => {
-                      setPlatformInstructions((prev) => {
-                        const next = { ...prev };
-                        delete next[platform];
-                        return next;
-                      });
-                    }}
-                    className="text-red-500 hover:opacity-80 ml-[4px]"
-                    aria-label={`Remove ${platform} override`}
-                  >
-                    ×
-                  </button>
-                </div>
-              ) : null
-            )}
-          </div>
-        )}
-      </div>
-
+      {/* Language — selects which language's dataset is being edited below. */}
       <div className="flex items-center justify-between gap-[24px]">
         <div className="flex flex-col flex-1">
           <div className="text-[14px]">{t('brand_language', 'Language')}</div>
           <div className="text-[12px] text-newTableText">
-            {t('brand_language_description', 'Default language for AI-generated content')}
+            {t('brand_language_description_v2', 'The instructions and channel overrides below apply to this language. Switch to author another language.')}
           </div>
         </div>
         <div className="w-[200px]">
@@ -212,7 +206,10 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
             disableForm={true}
             hideErrors={true}
             value={language}
-            onChange={(e) => setLanguage(e.target.value)}
+            onChange={(e) => {
+              setLanguage(e.target.value);
+              setSelectedChannel('');
+            }}
           >
             {LANGUAGES.map((lang) => (
               <option key={lang.value} value={lang.value}>
@@ -221,6 +218,80 @@ const BrandVoiceForm = ({ initial, brandId, onMutate }: { initial?: BrandProfile
             ))}
           </Select>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-[8px]">
+        <div className="text-[14px]">{t('brand_instructions', 'Brand Instructions')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('brand_instructions_description', 'Define tone, banned words, emoji policy, CTA style, and other brand guidelines for AI-generated content')}
+        </div>
+        <textarea
+          className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[100px] p-[12px] text-textColor resize-y bg-newBgColor"
+          value={current.instructions}
+          onChange={(e) => setInstructions(e.target.value)}
+          placeholder={t('brand_instructions_placeholder', 'e.g. Keep a friendly and professional tone. Never use emojis. Always include a call-to-action at the end.')}
+        />
+      </div>
+
+      <div className="flex flex-col gap-[12px]">
+        <div className="text-[14px]">{t('channel_overrides', 'Channel Overrides')}</div>
+        <div className="text-[12px] text-newTableText">
+          {t('channel_overrides_description', 'Optionally override the brand instructions for a specific channel. Falls back to the instructions above when not set.')}
+        </div>
+
+        <div className="w-[250px]">
+          <Select
+            name="channelSelector"
+            label=""
+            disableForm={true}
+            hideErrors={true}
+            value={selectedChannel}
+            onChange={(e) => setSelectedChannel(e.target.value)}
+          >
+            <option value="">{t('select_channel', 'Select channel...')}</option>
+            {channels.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        {selectedChannel && (
+          <div className="flex flex-col gap-[4px]">
+            <div className="text-[13px] text-newTableText">
+              {t('channel_instructions', `Instructions for ${channelName(selectedChannel)}`)}
+            </div>
+            <textarea
+              className="bg-newBgColorInner border border-newTableBorder rounded-[8px] min-h-[80px] p-[12px] text-textColor resize-y bg-newBgColor text-[13px]"
+              value={current.overrides[selectedChannel] || ''}
+              onChange={(e) => setOverride(selectedChannel, e.target.value)}
+              placeholder={t('channel_instructions_placeholder', 'e.g. Be more casual on this channel')}
+            />
+          </div>
+        )}
+
+        {Object.keys(current.overrides).length > 0 && (
+          <div className="flex flex-wrap gap-[6px]">
+            {Object.entries(current.overrides).map(([channelId, instr]) =>
+              instr ? (
+                <div
+                  key={channelId}
+                  className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[4px] text-[12px] flex items-center gap-[4px]"
+                >
+                  <span className="font-medium">{channelName(channelId)}</span>
+                  <button
+                    onClick={() => removeOverride(channelId)}
+                    className="text-red-500 hover:opacity-80 ml-[4px]"
+                    aria-label={`Remove ${channelName(channelId)} override`}
+                  >
+                    ×
+                  </button>
+                </div>
+              ) : null
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex justify-end">

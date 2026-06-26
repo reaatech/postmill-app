@@ -38,6 +38,11 @@ class CreateBrandDto {
   @IsOptional()
   platformInstructions?: Record<string, string>;
 
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  @IsOptional()
+  @IsObject()
+  languageProfiles?: Record<string, any>;
+
   @IsOptional()
   @IsBoolean()
   enabled?: boolean;
@@ -82,6 +87,11 @@ class UpdateBrandDto {
 
   @IsOptional()
   platformInstructions?: Record<string, string>;
+
+  // Per-language datasets: { [lang]: { instructions, overrides: { [channelId]: string } } }.
+  @IsOptional()
+  @IsObject()
+  languageProfiles?: Record<string, any>;
 
   @IsOptional()
   @IsBoolean()

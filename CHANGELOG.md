@@ -11,6 +11,16 @@
 ## Unreleased
 
 ### Added
+- **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
+  scopes the dataset: each language has its own instructions **and** its own optional per-channel
+  overrides; switching the language shows a fresh dataset. Backed by a new additive
+  `AIBrandProfile.languageProfiles` JSON column (`{ [lang]: { instructions, overrides } }`,
+  db-push-safe); the active language's profile is mirrored into the legacy
+  `instructions`/`platformInstructions` columns so `_loadBrandVoice` (the only reader) keeps working,
+  and brands that predate the column migrate their single set into the active language on first edit.
+  Channel overrides are keyed by the connected channel (integration id), chosen from a dropdown of the
+  org's active channels. (Per-channel overrides are stored but not yet consumed at generation; the
+  per-language global instructions are.)
 - **RAG vector database — remote pgvector + Pinecone, alongside Qdrant.** The Knowledge Base vector
   store now offers four options: **Postmill (Default)** (built-in pgvector, no config), **PG Vector
   (Remote)** (external Postgres via a `pg` pool — new `RemotePgVectorStoreAdapter`), **Qdrant

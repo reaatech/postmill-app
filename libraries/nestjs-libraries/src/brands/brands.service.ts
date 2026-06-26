@@ -24,6 +24,7 @@ export class BrandsService {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
       logoFileIds?: string[];
       palette?: string[];
@@ -56,6 +57,7 @@ export class BrandsService {
       instructions?: string;
       language?: string;
       platformInstructions?: Record<string, string>;
+      languageProfiles?: Record<string, any>;
       enabled?: boolean;
       logoFileIds?: string[];
       palette?: string[];
