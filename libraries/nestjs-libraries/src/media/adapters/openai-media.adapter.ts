@@ -3,11 +3,24 @@ import {
   MediaProviderCapabilities,
   MediaGenerationResult,
   MediaGenerateOptions,
+  MediaCredentialOptions,
   MediaJobSubmission,
+  MediaPollResult,
   MediaInputValue,
   resolveApiKey,
 } from '../media-provider-adapter.interface';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+
+// Sora video models (sora-2 / sora-2-pro) on the async Videos API. The finished MP4 is auth-only
+// bytes at /v1/videos/{id}/content (no public URL), so pollJob downloads it with the key and
+// returns it inline as a data URL — see pollJob.
+const SORA_BASE = 'https://api.openai.com/v1/videos';
+
+interface SoraJob {
+  id?: string;
+  status?: 'queued' | 'in_progress' | 'completed' | 'failed';
+  error?: { message?: string } | null;
+}
 
 // Map a TTS response_format to the data-URL mime so the artifact lands with the right type.
 const TTS_MIME: Record<string, string> = {
@@ -32,7 +45,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
   readonly name = 'OpenAI';
   readonly capabilities: MediaProviderCapabilities = {
     image: true,
-    video: false,
+    video: true,
     audio: true,
     avatar: false,
     tts: true,
@@ -87,8 +100,83 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
     };
   }
 
-  async generateVideo(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    throw new Error('OpenAI does not support video generation');
+  // Sora text-to-video and image-to-video via the async Videos API. POST /v1/videos returns a job
+  // id; the poll-cron drives pollJob to completion (no webhook). Native params (size, seconds)
+  // ride through `options.input`. A source frame (`input_reference`, resolved to a URL server-side)
+  // is uploaded as the multipart `input_reference` field; text-to-video sends a plain JSON body.
+  async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    const apiKey = this._apiKey(options);
+    const model = options?.model || 'sora-2';
+    const input = (options?.input || {}) as Record<string, MediaInputValue>;
+    const { input_reference, ...rest } = input;
+
+    const params: Record<string, string> = {
+      model,
+      prompt,
+      size: String(rest.size || options?.size || '1280x720'),
+      seconds: String(rest.seconds || '8'),
+    };
+    for (const [k, v] of Object.entries(rest)) {
+      if (k === 'size' || k === 'seconds') continue;
+      if (v !== undefined && v !== '') params[k] = String(v);
+    }
+
+    let res;
+    if (typeof input_reference === 'string' && input_reference) {
+      // Image-to-video: fetch the source frame and upload it as a multipart file.
+      const imgRes = await safeFetch(input_reference);
+      if (!imgRes.ok) throw new Error(`Sora reference image fetch failed (${imgRes.status})`);
+      const bytes = Buffer.from(await imgRes.arrayBuffer());
+      const mime = imgRes.headers.get('content-type')?.split(';')[0] || 'image/png';
+      const ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
+      const form = new FormData();
+      for (const [k, v] of Object.entries(params)) form.append(k, v);
+      form.append('input_reference', new Blob([new Uint8Array(bytes)], { type: mime }), `reference.${ext}`);
+      res = await safeFetch(SORA_BASE, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+      });
+    } else {
+      res = await safeFetch(SORA_BASE, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+        body: JSON.stringify(params),
+      });
+    }
+
+    if (!res.ok) throw new Error(`Sora video generation failed: ${await res.text()}`);
+    const data = (await res.json()) as SoraJob;
+    if (!data.id) throw new Error('Sora returned no job id');
+    return { jobId: data.id, metadata: { provider: this.identifier, model } };
+  }
+
+  async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) return { status: 'failed', error: 'OpenAI API key is required' };
+    const headers = { Authorization: `Bearer ${apiKey}` };
+
+    const res = await safeFetch(`${SORA_BASE}/${jobId}`, { headers });
+    if (!res.ok) return { status: 'failed', error: await res.text() };
+    const data = (await res.json()) as SoraJob;
+
+    if (data.status === 'completed') {
+      // The finished MP4 is auth-only bytes at /content (no public URL). Download it with the key
+      // and return it inline as a data URL — the lifecycle decodes data URLs, whereas the default
+      // unauthenticated re-download of a provider URL would 401 here.
+      const contentRes = await safeFetch(`${SORA_BASE}/${jobId}/content`, { headers });
+      if (!contentRes.ok) return { status: 'failed', error: `Sora content download failed (${contentRes.status})` };
+      const base64 = Buffer.from(await contentRes.arrayBuffer()).toString('base64');
+      return {
+        status: 'completed',
+        artifactUrl: `data:video/mp4;base64,${base64}`,
+        metadata: { provider: this.identifier, mime: 'video/mp4' },
+      };
+    }
+    if (data.status === 'failed') {
+      return { status: 'failed', error: data.error?.message || 'Sora generation failed' };
+    }
+    return { status: 'pending' };
   }
 
   // OpenAI TTS is synchronous — return the artifact inline.

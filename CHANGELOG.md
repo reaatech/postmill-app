@@ -11,6 +11,14 @@
 ## Unreleased
 
 ### Added
+- **Sora media studio** (`/media/sora`) — a branded Studio Kit studio for OpenAI Sora that reuses the
+  org's existing OpenAI key (`descriptor.provider: 'openai'`, the Pika-rides-fal pattern). Video-only
+  with Text→Video and Image→Video tabs (`sora-2` / `sora-2-pro`). `generateVideo` + `pollJob` were added
+  to the OpenAI media adapter (async Videos API: `POST /v1/videos` → poll `GET /v1/videos/{id}`, no
+  webhook → poll-cron). Because the finished MP4 is auth-only bytes at `/v1/videos/{id}/content` (no
+  public URL), `pollJob` downloads it with the key and returns it inline as a `data:video/mp4` URL so the
+  lifecycle decodes it directly. Image-to-video uploads the source frame as multipart `input_reference`.
+  Built source-grounded against the official OpenAI Videos API (no live key).
 - **LTX Studio media studio** (`/media/ltx`) — an own-key Studio Kit studio for LTX Studio (Lightricks,
   `api.ltx.video`), video-only on the LTX-2 / LTX-2.3 model family. Three tabs: **Text→Video**,
   **Image→Video** (source + optional last-frame), and **Audio→Video** (Pro models only). Single Bearer

@@ -724,6 +724,20 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
   live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
   vs. named-preset formatting may need a live smoke test.
+- **Sora** (OpenAI) is a branded kit studio (`/media/sora`) that **reuses the `openai` provider/key** —
+  `descriptor.provider: 'openai'`, like Pika rides `fal` — so no separate credential: the org's existing
+  Settings → AI / Media OpenAI key drives it. Video-only, two tabs (Text→Video, Image→Video). Sora lives
+  on the **async Videos API** (`POST /v1/videos` → `{ id }`, poll `GET /v1/videos/{id}` until
+  `completed`; no webhook → poll-cron). The wrinkle: the finished MP4 is **auth-only bytes** at
+  `GET /v1/videos/{id}/content` (no public URL), so `openai-media.adapter.ts` `pollJob` downloads it with
+  the key and returns it **inline as a `data:video/mp4;base64,…` URL** — the lifecycle `_download`
+  decodes data URLs (512 MB cap), whereas the default unauthenticated re-download of a provider URL would
+  401. Image-to-video uploads the source frame as the multipart `input_reference` field (the adapter
+  fetches the resolved media URL → bytes); text-to-video sends a plain JSON body. `generateVideo` +
+  `pollJob` were added to the existing OpenAI media adapter (capabilities flipped `video: true`); the
+  existing OpenAI image/TTS studio is unchanged (separate descriptor, no video tab). **Built without a
+  live key** — grounded in the official OpenAI Videos API reference. (Note: OpenAI lists the Sora-2 Videos
+  API as deprecated with a 2026-09-24 shutdown.)
 
 ### AI-hub media studios (image/video/audio, credential-reuse)
 

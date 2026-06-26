@@ -358,6 +358,68 @@ describe('OpenaiMediaAdapter', () => {
   });
 });
 
+describe('OpenaiMediaAdapter Sora video', () => {
+  const adapter = new OpenaiMediaAdapter();
+
+  it('submits text-to-video as JSON and returns the job id', async () => {
+    mockSafeFetch.mockResolvedValue(jsonResponse({ id: 'vid-t2v', status: 'queued' }));
+    const submission = await adapter.generateVideo('a sunset', {
+      ...CREDS,
+      model: 'sora-2',
+      input: { size: '1280x720', seconds: '8' },
+    });
+    const url = mockSafeFetch.mock.calls[0][0] as string;
+    expect(url).toBe('https://api.openai.com/v1/videos');
+    const init = mockSafeFetch.mock.calls[0][1] as RequestInit;
+    expect((init.headers as Record<string, string>).Authorization).toBe('Bearer test-key');
+    expect(typeof init.body).toBe('string');
+    expect(JSON.parse(init.body as string)).toMatchObject({
+      model: 'sora-2',
+      prompt: 'a sunset',
+      size: '1280x720',
+      seconds: '8',
+    });
+    expect(submission.jobId).toBe('vid-t2v');
+  });
+
+  it('uploads input_reference as multipart for image-to-video', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({})) // source image fetch
+      .mockResolvedValueOnce(jsonResponse({ id: 'vid-i2v', status: 'queued' }));
+    const submission = await adapter.generateVideo('pan across', {
+      ...CREDS,
+      input: { input_reference: 'https://img/src.png', size: '720x1280', seconds: '4' },
+    });
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://img/src.png');
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://api.openai.com/v1/videos');
+    const init = mockSafeFetch.mock.calls[1][1] as RequestInit;
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(submission.jobId).toBe('vid-i2v');
+  });
+
+  it('polls to completion and inlines the auth-only content as a data URL', async () => {
+    mockSafeFetch
+      .mockResolvedValueOnce(jsonResponse({ id: 'vid-t2v', status: 'completed' }))
+      .mockResolvedValueOnce(jsonResponse({})); // /content → bytes [1,2,3] from the helper
+    const poll = await adapter.pollJob('vid-t2v', CREDS);
+    expect(mockSafeFetch.mock.calls[0][0]).toBe('https://api.openai.com/v1/videos/vid-t2v');
+    expect(mockSafeFetch.mock.calls[1][0]).toBe('https://api.openai.com/v1/videos/vid-t2v/content');
+    expect(poll.status).toBe('completed');
+    expect(poll.artifactUrl).toMatch(/^data:video\/mp4;base64,/);
+  });
+
+  it('reports pending and failed poll states', async () => {
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'in_progress' }));
+    expect((await adapter.pollJob('vid-t2v', CREDS)).status).toBe('pending');
+    mockSafeFetch.mockResolvedValueOnce(jsonResponse({ status: 'failed', error: { message: 'moderated' } }));
+    expect(await adapter.pollJob('vid-t2v', CREDS)).toMatchObject({ status: 'failed', error: 'moderated' });
+  });
+
+  it('requires a key for video generation', async () => {
+    await expect(adapter.generateVideo('x', {})).rejects.toThrow('API key');
+  });
+});
+
 describe('ReplicateMediaAdapter', () => {
   const adapter = new ReplicateMediaAdapter();
 
@@ -954,7 +1016,7 @@ describe('OpenaiMediaAdapter speech + errors', () => {
   });
 
   it('rejects unsupported operations', async () => {
-    await expect(adapter.generateVideo('x', CREDS)).rejects.toThrow('video');
+    // video is now supported (Sora); avatar remains unsupported.
     await expect(adapter.generateAvatar('x', CREDS)).rejects.toThrow('avatar');
   });
 
