@@ -525,14 +525,16 @@ export const KnowledgeBase = () => {
           )}
         </div>
 
-        <button
-          className="text-[12px] text-textColor hover:underline self-start"
-          onClick={() => setShowAdvanced(!showAdvanced)}
-        >
-          {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
-        </button>
+        {vectorStore !== 'pgvector' && (
+          <button
+            className="text-[12px] text-textColor hover:underline self-start"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+          >
+            {showAdvanced ? t('hide_advanced', 'Hide advanced settings') : t('show_advanced', 'Show advanced settings')}
+          </button>
+        )}
 
-        {showAdvanced && (
+        {vectorStore !== 'pgvector' && showAdvanced && (
           <div className="flex flex-col gap-[16px]">
             <div className="text-[13px] font-medium">{t('chunking', 'Chunking')}</div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-[16px]">
