@@ -61,6 +61,9 @@ overrides:
   # ws <8.21.0: high memory-exhaustion DoS from tiny fragments (GHSA-96hv-2xvq-fx4p), pulled by
   # @toruslabs/solana-embed -> socket.io-client -> engine.io-client. Bump to patched 8.21.x.
   'ws@<8.21.0': '>=8.21.0 <9'
+  # happy-dom <20.0.0: critical VM-context-escape RCE (GHSA-96g7-g7g9-jxw8), pulled transitively
+  # via vitest's optional peer. Bump vulnerable <20 to patched 20.x (same DOM API).
+  'happy-dom@<20.0.0': '>=20.0.0 <21'
 
 onlyBuiltDependencies:
   - bcrypt
