@@ -24,8 +24,6 @@ import { useSearchParams } from 'next/navigation';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { PublicComponent } from '@gitroom/frontend/components/public-api/public.component';
 import { Webhooks } from '@gitroom/frontend/components/webhooks/webhooks';
-import { Sets } from '@gitroom/frontend/components/sets/sets';
-import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
 import { Autopost } from '@gitroom/frontend/components/autopost/autopost';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ApprovedAppsComponent } from '@gitroom/frontend/components/approved-apps/approved-apps.component';
@@ -106,7 +104,13 @@ export const SettingsPopup: FC<{
   // "Content" unifies the former media_providers + content_packs tabs. Keep
   // their old ?tab= values as deep-link aliases so existing links (and the
   // studios' "Configure" CTAs) still land on the right Content sub-tab.
-  const CONTENT_ALIASES = ['content', 'media_providers', 'content_packs'];
+  const CONTENT_ALIASES = [
+    'content',
+    'media_providers',
+    'content_packs',
+    'sets',
+    'signatures',
+  ];
   const isContentTab = CONTENT_ALIASES.includes(tab);
   const tabIsActive = (itemTab: string) =>
     itemTab === tab || (itemTab === 'content' && isContentTab);
@@ -136,12 +140,6 @@ export const SettingsPopup: FC<{
     }
     if (user?.tier.current !== 'FREE') {
       arr.push({ tab: 'brand', label: t('brands', 'Brands'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg> });
-    }
-    if (user?.tier.current !== 'FREE') {
-      arr.push({ tab: 'signatures', label: t('signatures', 'Signatures'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> });
-    }
-    if (user?.tier.current !== 'FREE') {
-      arr.push({ tab: 'sets', label: t('sets', 'Sets'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> });
     }
     arr.push({ tab: 'channels', label: t('channels', 'Channels'), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> });
     arr.push({ tab: 'ai', label: t('ai_llm', "AI (LLM's)"), section: 'Providers', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10l5.1-1.7z"/><path d="M18.5 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg> });
@@ -359,8 +357,17 @@ export const SettingsPopup: FC<{
               {isContentTab && (
                 <div>
                   <ContentTab
-                    initialSubTab={tab === 'content_packs' ? 'packs' : 'media'}
+                    initialSubTab={
+                      tab === 'content_packs'
+                        ? 'packs'
+                        : tab === 'sets'
+                          ? 'sets'
+                          : tab === 'signatures'
+                            ? 'signatures'
+                            : 'media'
+                    }
                     canManagePacks={permissions.hasPermission('media-config', 'manage')}
+                    canManageTemplates={user?.tier.current !== 'FREE'}
                   />
                 </div>
               )}
@@ -380,18 +387,6 @@ export const SettingsPopup: FC<{
               {tab === 'autopost' && !!user?.tier?.autoPost && (
                 <div>
                   <Autopost />
-                </div>
-              )}
-
-              {tab === 'sets' && user?.tier.current !== 'FREE' && (
-                <div>
-                  <Sets />
-                </div>
-              )}
-
-              {tab === 'signatures' && user?.tier.current !== 'FREE' && (
-                <div>
-                  <SignaturesComponent />
                 </div>
               )}
 

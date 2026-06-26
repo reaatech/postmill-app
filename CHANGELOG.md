@@ -11,6 +11,12 @@
 ## Unreleased
 
 ### Added
+- **Unified "Content" settings page.** Settings now has a single **Content** tab with sub-tabs for
+  **AI Media**, **Content Packs**, **Sets** and **Signatures** (replacing the standalone AI Media,
+  Content Packs, Sets and Signatures entries). Sub-tabs respect their existing gates (Content Packs on
+  `media-config:manage`; Sets/Signatures on paid tiers). The old `?tab=media_providers`,
+  `?tab=content_packs`, `?tab=sets` and `?tab=signatures` deep-links still resolve to the right
+  Content sub-tab.
 - **Signatures — channel scope, logo/sticker, usage tracking & auto-add wiring.** Signatures gained
   a `name`, a `channels[]` scope (integration ids; empty = all channels), a `usageCount`, and an
   optional `pictureId → File` logo/sticker. New endpoints: `GET /signatures/auto` (all auto-add

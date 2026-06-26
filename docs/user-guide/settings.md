@@ -367,7 +367,16 @@ Available when your subscription tier includes auto-posting. Configure scheduled
 - **AI content** — optionally use AI to rewrite or summarise scraped content before posting.
 - **Schedule** — define how often to check the source and when to publish.
 
-## Sets tab
+## Content tab
+
+The **Content** page groups the content-authoring surfaces into one tabbed view:
+
+- **AI Media** — the AI media-generation providers (see the **Media** section above for provider
+  configuration).
+- **Content Packs** — premium stock-media packs (gated on `media-config:manage`).
+- **Sets** and **Signatures** — described below (paid tiers only).
+
+### Sets sub-tab
 
 Available on paid tiers (not FREE). Create named, reusable post templates:
 
@@ -380,7 +389,7 @@ Available on paid tiers (not FREE). Create named, reusable post templates:
 Managing sets requires the `posts` permission (RBAC). Endpoints: `GET/POST/PUT /sets`,
 `DELETE /sets/:id`.
 
-## Signatures tab
+### Signatures sub-tab
 
 Available on paid tiers (not FREE). Manage reusable, channel-aware signatures:
 
