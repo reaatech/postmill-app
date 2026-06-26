@@ -1,14 +1,30 @@
 'use client';
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ProviderModal } from '@gitroom/frontend/components/settings/media-providers/provider-modal';
-import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+
+// Most media studio routes match the provider identifier (/media/<id>); these two differ.
+const ROUTE_OVERRIDES: Record<string, string> = {
+  google: 'google-ai',
+  fal: 'kling',
+};
+const studioHref = (identifier: string) =>
+  `/media/${ROUTE_OVERRIDES[identifier] || identifier}`;
+
+// Capability filter chips. A provider matches if it has ANY of the selected
+// capabilities (faceted-OR), so "Image + Video" widens to either.
+const CAPABILITY_FILTERS: { key: string; label: string; active: string }[] = [
+  { key: 'image', label: 'Image', active: 'bg-blue-500/20 text-blue-400 border-blue-500/40' },
+  { key: 'video', label: 'Video', active: 'bg-red-500/20 text-red-400 border-red-500/40' },
+  { key: 'audio', label: 'Audio', active: 'bg-green-500/20 text-green-400 border-green-500/40' },
+];
 
 interface MediaProvider {
   identifier: string;
@@ -17,17 +33,6 @@ interface MediaProvider {
   isConfigured: boolean;
   enabled: boolean;
 }
-
-const OPERATION_LABELS: Record<string, string> = {
-  image: 'Image Generation',
-  video: 'Video Generation',
-  tts: 'Text-to-Speech',
-  stt: 'Speech-to-Text',
-  upscale: 'Image Upscale',
-  'bg-remove': 'Background Removal',
-  inpaint: 'Inpainting',
-  embedding: 'Embeddings',
-};
 
 const OPERATION_SHORT_LABELS: Record<string, string> = {
   image: 'Image',
@@ -51,17 +56,10 @@ const OPERATION_COLORS: Record<string, string> = {
   embedding: 'bg-yellow-500/20 text-yellow-400',
 };
 
-const ALL_OPERATIONS = ['image', 'video', 'tts', 'stt', 'upscale', 'bg-remove', 'inpaint'];
-
 interface MediaProviderConfig {
   identifier: string;
   isConfigured: boolean;
   enabled: boolean;
-}
-
-interface OperationRow {
-  op: string;
-  supportedMap: Record<string, boolean>;
 }
 
 const useMediaProviders = () => {
@@ -110,6 +108,45 @@ export const MediaProvidersTab = () => {
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
+  // Seed the filter from ?search= so a studio's "Configure" CTA deep-links straight to its provider.
+  const searchParams = useSearchParams();
+  const [search, setSearch] = useState(searchParams.get('search') || '');
+  const [selectedCaps, setSelectedCaps] = useState<string[]>([]);
+
+  const toggleCap = useCallback((cap: string) => {
+    setSelectedCaps((prev) =>
+      prev.includes(cap) ? prev.filter((c) => c !== cap) : [...prev, cap],
+    );
+  }, []);
+
+  // Configured providers pinned to the top, everything else alphabetical by name.
+  const sortedProviders = useMemo(() => {
+    return [...(providers || [])].sort((a, b) => {
+      if (a.isConfigured !== b.isConfigured) return a.isConfigured ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+  }, [providers]);
+
+  const filteredProviders = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return sortedProviders.filter((p) => {
+      if (
+        q &&
+        !p.name.toLowerCase().includes(q) &&
+        !p.identifier.toLowerCase().includes(q)
+      ) {
+        return false;
+      }
+      if (
+        selectedCaps.length &&
+        !selectedCaps.some((c) => p.capabilities.includes(c))
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [sortedProviders, search, selectedCaps]);
+
   const handleToggle = useCallback(async (identifier: string, enabled: boolean) => {
     try {
       const res = enabled
@@ -133,7 +170,7 @@ export const MediaProvidersTab = () => {
     mutate();
   }, [mutate]);
 
-  const title = t('media_providers', 'Media Providers');
+  const title = t('ai_media_providers', 'AI Media Providers');
 
   if (error) {
     return (
@@ -176,7 +213,52 @@ export const MediaProvidersTab = () => {
 
       <ProviderListShell
         title={title}
-        providers={(providers || []).map((p) => ({
+        toolbar={
+          <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
+            <div className="flex-1 relative">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={t('search_providers', 'Search providers...')}
+                className="w-full px-[12px] py-[8px] pr-[36px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  aria-label={t('clear_search', 'Clear search')}
+                  className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center rounded-full text-newTableText hover:text-textColor hover:bg-boxHover transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M18 6 6 18M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="flex items-center gap-[8px]">
+              {CAPABILITY_FILTERS.map((f) => {
+                const active = selectedCaps.includes(f.key);
+                return (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => toggleCap(f.key)}
+                    aria-pressed={active}
+                    className={`text-[13px] px-[12px] py-[8px] rounded-[8px] border transition-colors ${
+                      active
+                        ? f.active
+                        : 'bg-newBgColor border-newTableBorder text-newTableText hover:bg-boxHover'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        }
+        providers={filteredProviders.map((p) => ({
           id: p.identifier,
           identifier: p.identifier,
           name: p.name,
@@ -185,6 +267,7 @@ export const MediaProvidersTab = () => {
           isConfigured: p.isConfigured,
           capabilities: p.capabilities,
         }))}
+        getProviderHref={(provider) => studioHref(provider.identifier)}
         onConfigure={(id) => setConfiguringProvider(id)}
         onRemove={(id) => handleToggle(id, false)}
         onToggle={(id, enabled) => handleToggle(id, enabled)}
@@ -208,89 +291,6 @@ export const MediaProvidersTab = () => {
           );
         }}
       />
-
-      {providers && providers.length > 0 && (
-        <>
-          <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[16px] mt-[24px]">
-            <div className="text-[14px]">{t('operations_overview', 'Operations Overview')}</div>
-            <div className="text-[12px] text-newTableText">
-              {t('operations_overview_description', 'Which providers support each media operation')}
-            </div>
-
-            <DataTable
-              columns={[
-                { key: 'operation', header: t('operation', 'Operation'), render: (row: OperationRow) => <span className="font-medium">{OPERATION_LABELS[row.op] || row.op}</span> },
-                ...providers.map((p) => ({
-                  key: p.identifier,
-                  header: p.name,
-                  align: 'center' as const,
-                  render: (row: OperationRow) => {
-                    const supports = row.supportedMap[p.identifier];
-                    const configEnabled = p.enabled && p.isConfigured;
-                    if (supports) {
-                      return configEnabled
-                        ? <span className="text-green-500 text-[16px]">✓</span>
-                        : <span className="text-yellow-500 text-[16px]">○</span>;
-                    }
-                    return <span className="text-newTableText text-[16px]">—</span>;
-                  },
-                })),
-              ]}
-              data={ALL_OPERATIONS.map((op) => ({
-                op,
-                supportedMap: Object.fromEntries(
-                  providers.map((p) => [p.identifier, p.capabilities.includes(op)])
-                ),
-              }))}
-              keyExtractor={(row: OperationRow) => row.op}
-            />
-
-            <div className="flex items-center gap-[16px] text-[12px] text-newTableText">
-              <span className="flex items-center gap-[4px]">
-                <span className="text-green-500">✓</span> {t('available', 'Available & Enabled')}
-              </span>
-              <span className="flex items-center gap-[4px]">
-                <span className="text-yellow-500">○</span> {t('configured_disabled', 'Configured but Disabled')}
-              </span>
-              <span className="flex items-center gap-[4px]">
-                <span className="text-newTableText">—</span> {t('not_supported', 'Not Supported')}
-              </span>
-            </div>
-          </div>
-
-          <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[12px] mt-[16px]">
-            {ALL_OPERATIONS.map((op) => {
-              const supported = providers.filter(
-                (p) =>
-                  p.capabilities.includes(op) && p.enabled && p.isConfigured,
-              );
-              return (
-                <div key={op} className="flex items-center gap-[12px]">
-                  <div className="w-[140px] shrink-0 text-[13px] font-medium">
-                    {OPERATION_LABELS[op] || op}
-                  </div>
-                  <div className="flex gap-[6px] flex-wrap">
-                    {supported.length > 0 ? (
-                      supported.map((p) => (
-                        <span
-                          key={p.identifier}
-                          className="bg-newTableHeader border border-newTableBorder rounded-[4px] px-[8px] py-[3px] text-[12px]"
-                        >
-                          {p.name}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-[12px] text-newTableText">
-                        {t('no_provider_available', 'No provider available')}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
     </div>
   );
 };

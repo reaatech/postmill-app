@@ -18,6 +18,10 @@ vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
   useT: () => (key: string, fallback?: string) => fallback || key,
 }));
 
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 import { MediaProvidersTab } from './media-providers.tab';
 
 const providersResponse = [
@@ -78,7 +82,7 @@ describe('MediaProvidersTab (F2)', () => {
       expect(screen.getAllByText('OpenAI').length).toBeGreaterThan(0);
     });
     expect(screen.getAllByText('ElevenLabs').length).toBeGreaterThan(0);
-    expect(screen.getByText('Media Providers')).toBeTruthy();
+    expect(screen.getByText('AI Media Providers')).toBeTruthy();
   });
 
   it('does not render any credential or secret fields', async () => {
@@ -89,13 +93,16 @@ describe('MediaProvidersTab (F2)', () => {
     });
 
     // No credential entry fields in the list view (the only inputs allowed
-    // are the enable/disable toggles on the provider cards).
+    // are the enable/disable toggles on the provider cards and the search box).
     expect(container.querySelectorAll('input[type="password"]').length).toBe(0);
-    expect(container.querySelectorAll('input[type="text"]').length).toBe(0);
-    const nonCheckboxInputs = Array.from(
+    const nonSearchInputs = Array.from(
       container.querySelectorAll('input')
-    ).filter((el) => el.getAttribute('type') !== 'checkbox');
-    expect(nonCheckboxInputs.length).toBe(0);
+    ).filter(
+      (el) =>
+        el.getAttribute('type') !== 'checkbox' &&
+        !(el.getAttribute('placeholder') || '').toLowerCase().includes('search')
+    );
+    expect(nonSearchInputs.length).toBe(0);
 
     // No secret-ish text leaks into the DOM.
     const html = container.innerHTML.toLowerCase();

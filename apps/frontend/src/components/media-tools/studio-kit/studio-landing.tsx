@@ -55,7 +55,7 @@ export function StudioLanding({
         {/* CTAs */}
         <div className="flex flex-wrap items-center justify-center gap-[10px] mt-[24px]">
           <a
-            href="/settings?tab=media_providers"
+            href={`/settings?tab=media_providers&search=${encodeURIComponent(identifier)}`}
             className="inline-flex items-center gap-[8px] px-[20px] py-[11px] rounded-[10px] bg-[#2B5CD3] text-white text-[14px] font-[600] hover:bg-[#2B5CD3]/85 transition-all"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

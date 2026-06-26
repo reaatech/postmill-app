@@ -59,7 +59,6 @@ const ICONS: Record<string, Entry> = {
   deepgram: { viewBox: '0 0 24 24', color: '#13EF93', full: true, node: (<><circle cx="12" cy="12" r="10" fill="#13EF93" /><path d="M7 9.5a4.5 4.5 0 0 1 4.5-4.5H17l-2.2 2.5H11.5A2 2 0 0 0 9.5 12v5L7 14.5v-5Zm10 5a4.5 4.5 0 0 1-4.5 4.5H7l2.2-2.5h3.3a2 2 0 0 0 2-2v-5l2.5 2.5v2.5Z" fill="#0B0B0B" /></>) },
   ideogram: { viewBox: '0 0 24 24', color: '#111111', node: (<path d="M6 4h12v3h-4.25v10H18v3H6v-3h4.25V7H6V4z" />) },
   leonardo: { viewBox: '0 0 24 24', color: '#0EA5E9', node: (<path d="M12 2 3 9l9 13 9-13-9-7zm0 2.54L18.6 9 12 18.2 5.4 9 12 4.54z" />) },
-  xai: { viewBox: '0 0 24 24', color: '#000000', node: (<path d="M4 3h4l4.2 5.9L17 3h2.6l-5.9 8.2L20 21h-4l-4.5-6.3L6.6 21H4l6.1-8.5L4 3z" />) },
 
   // ── Storage Providers ─────────────────────────────────────
   S3: { viewBox: '0 0 24 24', color: '#FF9900', node: (<path d="M12 2 4 7v10l8 5 8-5V7Zm0 3 4 2.5v3L12 11l-4 2.5v-3Z" />) },

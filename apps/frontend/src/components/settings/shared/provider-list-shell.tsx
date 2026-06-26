@@ -1,6 +1,7 @@
 'use client';
 
 import React, { ReactNode } from 'react';
+import Link from 'next/link';
 
 export interface ProviderConfigItem {
   id: string;
@@ -23,9 +24,11 @@ export interface ProviderListShellProps {
   title: string;
   description?: string;
   ProviderIconComponent: React.FC<{ identifier: string; name: string; size?: number }>;
+  getProviderHref?: (provider: ProviderConfigItem) => string | undefined;
   renderBadges?: (provider: ProviderConfigItem) => ReactNode;
   renderActions?: (provider: ProviderConfigItem) => ReactNode;
   addProviderButton?: ReactNode;
+  toolbar?: ReactNode;
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -45,9 +48,11 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
   title,
   description,
   ProviderIconComponent,
+  getProviderHref,
   renderBadges,
   renderActions,
   addProviderButton,
+  toolbar,
 }) => {
   return (
     <div className="flex flex-col gap-[16px]">
@@ -60,6 +65,8 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
         </div>
         {addProviderButton}
       </div>
+
+      {toolbar}
 
       <div className="flex flex-col gap-[8px]">
         {providers.length === 0 ? (
@@ -82,9 +89,21 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
 
               <div className="flex flex-col gap-[4px] flex-1 min-w-0">
                 <div className="flex items-center gap-[8px] flex-wrap">
-                  <span className="text-[14px] font-semibold truncate">
-                    {provider.name}
-                  </span>
+                  {(() => {
+                    const href = getProviderHref?.(provider);
+                    return href ? (
+                      <Link
+                        href={href}
+                        className="text-[14px] font-semibold truncate hover:text-btnPrimary hover:underline transition-colors"
+                      >
+                        {provider.name}
+                      </Link>
+                    ) : (
+                      <span className="text-[14px] font-semibold truncate">
+                        {provider.name}
+                      </span>
+                    );
+                  })()}
                   {(provider.status || []).map((s) => (
                     <span
                       key={s}
