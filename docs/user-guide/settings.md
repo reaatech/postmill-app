@@ -257,8 +257,18 @@ shows a colour-swatch + asset-count preview per brand.
   The system selects the 10 posts with the highest engagement metrics.
 - **Search brand memory** — semantic search across your indexed top-performing content. Use this
   to find past posts that performed well for a given topic.
-- **RAG status** — shows whether the vector store is enabled, which backend is in use (pgvector
-  or Qdrant), and index statistics.
+- **RAG status** — shows whether the vector store is enabled, which backend is in use, and index
+  statistics.
+- **Vector database** — choose where embeddings are stored:
+  - **Postmill (Default)** — the built-in PostgreSQL + pgvector store; no configuration.
+  - **PG Vector (Remote)** — an external Postgres + pgvector (connection string + table).
+  - **Qdrant (Remote)** — a Qdrant cluster (URL, API key, collection, distance).
+  - **Pinecone (Remote)** — a Pinecone serverless index (API key, index name, optional host).
+
+  The three remote options require connection settings and offer a **Test Connection** button.
+  Secrets (the remote DB connection string, Qdrant/Pinecone API keys) are encrypted at rest in
+  `AISystemSettings.secretSettings` and never returned to the client. When a remote store is
+  unreachable, indexing/search fall back to the built-in pgvector/text path.
 - **Manual index** — index custom content items (text, URLs, files) into the RAG store.
 - **Backfill** — trigger a full re-index of all historical content.
 

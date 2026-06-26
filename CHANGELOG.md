@@ -11,6 +11,16 @@
 ## Unreleased
 
 ### Added
+- **RAG vector database — remote pgvector + Pinecone, alongside Qdrant.** The Knowledge Base vector
+  store now offers four options: **Postmill (Default)** (built-in pgvector, no config), **PG Vector
+  (Remote)** (external Postgres via a `pg` pool — new `RemotePgVectorStoreAdapter`), **Qdrant
+  (Remote)**, and **Pinecone (Remote)** (new `PineconeVectorStoreAdapter`, REST via `safeFetch`, no
+  SDK dependency). The `VectorStoreAdapter` selection was generalised from pgvector-vs-qdrant to a
+  `local | external` dispatch; remote stores are lazily built from settings, probed, and fall back to
+  the built-in store when unreachable. Each remote has a **Test Connection** button. Secrets (remote
+  DB connection string, Qdrant/Pinecone API keys) are now stored **encrypted** in
+  `AISystemSettings.secretSettings` (fixing a pre-existing bug where the Qdrant key was written in
+  cleartext) and never returned to the client. No schema migration (settings are JSON).
 - **Brand assets in Settings → Brands.** The brand editor now surfaces a brand kit that previously
   only the Designer could edit: a **colour palette**, **attached assets** (logos / reference imagery
   picked via `MediaSelectorModal` — stock picks are imported to Files so they persist — each with an
