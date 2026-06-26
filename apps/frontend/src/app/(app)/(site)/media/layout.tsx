@@ -112,6 +112,42 @@ const tabs = [
     ),
   },
   {
+    href: '/media/black-forest-labs',
+    label: 'Black Forest Labs',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l9 5v10l-9 5-9-5V7l9-5z" />
+        <path d="M12 12l9-5" />
+        <path d="M12 12v10" />
+        <path d="M12 12L3 7" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/stability-ai',
+    label: 'Stability AI',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M8 15c1.5 1 6.5 1 6.5-1.5S8 11 8 9s5-1.5 6.5-.5" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/openai',
+    label: 'OpenAI',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/stock-vectors',
     label: 'Vectors',
     section: 'Content Pack',

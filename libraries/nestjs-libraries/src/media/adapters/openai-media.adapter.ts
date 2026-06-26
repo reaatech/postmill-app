@@ -42,6 +42,9 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
     const apiKey = this._apiKey(options);
     const model = options?.model || 'dall-e-3';
 
+    // Native params (size, quality, style, background, output_format, n, …) ride through
+    // `options.input` so the descriptor exposes each model's full surface; defaults below
+    // apply only when input omits them. gpt-image-1 returns b64_json (no url).
     const res = await safeFetch('https://api.openai.com/v1/images/generations', {
       method: 'POST',
       headers: {
@@ -54,13 +57,16 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
         n: options?.n || 1,
         size: options?.size || '1024x1024',
         quality: options?.quality || 'standard',
+        ...(options?.input || {}),
       }),
     });
 
     if (!res.ok) throw new Error(`OpenAI image generation failed: ${await res.text()}`);
     const data = (await res.json()) as OpenAIImageResponse;
+    const fmt = String(options?.input?.output_format || 'png');
+    const dataMime = fmt === 'jpeg' ? 'image/jpeg' : fmt === 'webp' ? 'image/webp' : 'image/png';
     const urls = (data.data || [])
-      .map((d) => d.url || (d.b64_json ? `data:image/png;base64,${d.b64_json}` : undefined))
+      .map((d) => d.url || (d.b64_json ? `data:${dataMime};base64,${d.b64_json}` : undefined))
       .filter((u): u is string => typeof u === 'string' && u.length > 0);
     if (urls.length === 0) throw new Error('OpenAI returned no images');
     return {

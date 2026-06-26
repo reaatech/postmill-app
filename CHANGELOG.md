@@ -27,6 +27,15 @@
     adapters enriched with native-param passthrough; no schema migration.
   - Frontend kit at `media-tools/studio-kit/`; HeyGen and Replicate keep their bespoke
     implementations (not retrofitted). Veo (Vertex) deferred pending OAuth credential confirmation.
+- **AI Image studios** (`/media/{black-forest-labs,stability-ai,openai}`) — Three full-featured
+  image-generation studios on the Studio Kit, one per provider (not a bundled multi-provider form):
+  Black Forest Labs (FLUX 1.1 Pro/Ultra/Pro/Dev — width/height, aspect ratio, prompt upsampling,
+  safety tolerance, seed), Stability AI (Stable Image Core/Ultra/SD3 — aspect ratio, negative prompt,
+  style presets, output format, seed), and OpenAI (gpt-image-1 and DALL·E 3 as separate fixed-model
+  tabs with each model's correct size/quality/background/style params). `operation: 'image'` completes
+  synchronously and lands in `/files`. The `black-forest-labs`, `stability-ai`, and `openai-media`
+  adapters gained the same native-param `options.input` passthrough (back-compatible — legacy defaults
+  apply when `input` is absent); no schema migration.
 - **HeyGen Studio** (`/media/heygen`) — Native AI avatar-video workspace built on the AI Media
   provider stack (per-org `MediaProviderConfig` `'heygen'`, encrypted key in Settings → Media; no
   env-var fallback).

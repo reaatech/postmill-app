@@ -625,12 +625,20 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   (`field → fileId`) is resolved server-side to a provider-reachable URL (handles local storage).
   **Keep it dumb — no `if (provider === …)`; every provider difference lives in its adapter +
   descriptor.**
-- **Current studios on the kit:** Runway, Luma, MiniMax, Kling (via the `fal` adapter). Each is a
-  `media-tools/<provider>/descriptor.ts` + a 3-line studio + a route page. Adapters merge
-  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax enriched with native
-  param passthrough + i2v/keyframes/subject-ref branching). **Veo (Vertex) deferred** — OAuth
-  credential shape (`accessToken`+`projectId`+`region`) must be confirmed first. HeyGen and Replicate
-  are intentionally **not** retrofitted (they keep their bespoke implementations).
+- **Current studios on the kit:**
+  - **Video** — Runway, Luma, MiniMax, Kling (via the `fal` adapter).
+  - **Image** — Black Forest Labs (FLUX), Stability AI (Stable Image core/ultra/sd3), OpenAI
+    (gpt-image-1 + DALL·E 3 as two fixed-model tabs). `operation: 'image'` completes **synchronously**
+    inside `MediaStudioService.generate` (the adapter returns the artifact inline / via its own
+    bounded poll — no webhook), and base64 `data:` URLs are decoded by `completeJob`.
+  - Each is a `media-tools/<provider>/descriptor.ts` + a 3-line studio + a route page. Adapters merge
+  `options.input` into the provider body (fal already did; Runway/Luma/MiniMax + the three image
+  adapters enriched with native param passthrough — `model` is lifted out by the service and selects
+  the endpoint/variant, everything else in `input` rides into the body). The passthrough is
+  back-compatible: when `input` is absent the legacy defaults apply unchanged. **Veo (Vertex)
+  deferred** — OAuth credential shape (`accessToken`+`projectId`+`region`) must be confirmed first.
+  HeyGen and Replicate are intentionally **not** retrofitted (they keep their bespoke
+  implementations).
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via
