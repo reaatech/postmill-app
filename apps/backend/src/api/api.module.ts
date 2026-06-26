@@ -80,6 +80,8 @@ import { HeyGenModule } from '@gitroom/nestjs-libraries/media/heygen/heygen.modu
 import { HeyGenController } from './routes/heygen.controller';
 import { MediaStudioModule } from '@gitroom/nestjs-libraries/media/studio/studio.module';
 import { MediaStudioController } from './routes/media-studio.controller';
+import { DeepgramModule } from '@gitroom/nestjs-libraries/media/deepgram/deepgram.module';
+import { DeepgramController } from './routes/deepgram.controller';
 
 const authenticatedController = [
   UsersController,
@@ -126,9 +128,10 @@ const authenticatedController = [
   ReplicateStudioController,
   HeyGenController,
   MediaStudioController,
+  DeepgramController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule],
   controllers: [
     RootController,
     HealthController,

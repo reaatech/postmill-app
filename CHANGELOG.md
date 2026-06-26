@@ -50,6 +50,15 @@
     native-param `options.input` passthrough (back-compatible — legacy `AiMediaService` defaults apply
     when `input` is absent); no schema migration. **Deepgram** (STT → text) is intentionally not a kit
     studio.
+- **Deepgram studio** (`/media/deepgram`) — transcription / captions tool; the last media adapter
+  without a studio now has one. STT returns text (not a `/files` artifact), so it can't use the
+  generic kit pipeline: it reuses the Studio Kit `StudioShell` chrome with a bespoke `custom` panel
+  over a dedicated `/media/deepgram` backend (`DeepgramController` → `DeepgramService`). Reads source
+  bytes straight from storage (`readFile`, no SSRF surface), transcribes via the `deepgram` adapter,
+  and returns transcript + phrase-chunked caption segments. Exports `.srt` / `.vtt` / `.txt`
+  client-side (no allowlist change), plus copy, Save-to-Files (`storeTranscript`), and a
+  Send-to-composer handoff. Adapter `speechToTextWords` gained opt-in `smart_format`/`punctuate` +
+  `language` passthrough (the Designer timeline's auto-caption call is unchanged). No schema migration.
 - **Vertex AI studio** (`/media/vertex`) — Google **Veo** (Text → Video) and **Imagen** (Text →
   Image) as a two-tab kit studio. Unlike every other media provider, Vertex uses GCP credentials, not
   a single API key: the adapter declares a `credentialFields` schema (project + location +

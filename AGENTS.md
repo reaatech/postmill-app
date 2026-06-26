@@ -653,9 +653,32 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `google-auth-library` — a stored static `accessToken` would expire in ~1h. The Settings → Media
   modal renders `adapter.credentialFields` dynamically (multi-field), falling back to the single
   `apiKey` input for every other provider. Veo has no completion webhook → it relies on the
-  `media-jobs-poll` cron (like Runway). **Deepgram is not a kit studio** — its real capability is STT
-  (text output), which doesn't fit the kit's "prompt → media artifact in `/files`" model. HeyGen and
-  Replicate are intentionally **not** retrofitted (they keep their bespoke implementations).
+  `media-jobs-poll` cron (like Runway). **Deepgram is a bespoke studio, not a kit studio** — its real
+  capability is STT (text output), which doesn't fit the kit's "prompt → media artifact in `/files`"
+  model, so it uses the StudioShell chrome with a `custom` panel over a dedicated `/media/deepgram`
+  backend (see **Deepgram Studio** below). HeyGen and Replicate are also intentionally **not**
+  retrofitted onto the kit (they keep their bespoke implementations).
+
+### Deepgram Studio (transcription / captions)
+- A bespoke tool at **`/media/deepgram`** — every media adapter now has a studio. It reuses the
+  Studio Kit's `StudioShell` (header/tabs/fullscreen/render-queue chrome) via a single `custom` tab
+  (`media-tools/deepgram/deepgram-panel.tsx`), because STT returns **text**, not a `/files` artifact,
+  so it can't ride the generic kit form/`MediaStudioService` job pipeline. Configure the key at
+  **Settings → Media** (no env fallback); the unconfigured state shows the shell's "isn't configured"
+  empty state.
+- **Backend** is a dedicated `DeepgramController` (`/media/deepgram`) → `DeepgramService`
+  (`libraries/nestjs-libraries/src/media/deepgram/deepgram.service.ts`), **not** the generic studio
+  service. It reads the source file's **bytes directly from storage** (`IStorageAdapter.readFile` —
+  works for local + cloud, no outbound HTTP/SSRF surface), calls the `deepgram` registry adapter's
+  `speechToTextWords`, and returns `{ text, words, segments }` (segments are phrase-chunked for
+  captions). `POST /transcribe` (gated on the org's Deepgram key) and `POST /save-transcript`
+  (persists the transcript as a text document via `MediaJobLifecycleService.storeTranscript`, which
+  bypasses the `/files` import content-type allowlist).
+- The panel exports captions **client-side** — `.srt` / `.vtt` / `.txt` Blob downloads (no `/files`
+  write, so no allowlist change), plus copy, Save-to-Files, and a Send-to-composer handoff
+  (`AddEditModal` with the transcript as content). The adapter's `speechToTextWords` gained an
+  **opt-in** `input.smartFormat` (→ `smart_format`+`punctuate`) and `input.language` passthrough; the
+  Designer timeline's existing auto-caption call passes neither, so its request is unchanged.
 
 ### Stock providers (free)
 `StockMediaService` (`libraries/nestjs-libraries/src/media/stock/`), exposed via

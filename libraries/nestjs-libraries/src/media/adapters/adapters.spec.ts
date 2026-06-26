@@ -452,6 +452,37 @@ describe('ElevenLabsAdapter / DeepgramAdapter', () => {
     const adapter = new DeepgramAdapter();
     await expect(adapter.speechToText(Buffer.from('a'), CREDS)).rejects.toThrow('no transcript');
   });
+
+  it('deepgram words returns timings and passes smart_format + language opts', async () => {
+    mockSafeFetch.mockResolvedValue(
+      jsonResponse({
+        results: { channels: [{ alternatives: [{ transcript: 'hi there', words: [{ word: 'hi', start: 0, end: 0.5 }] }] }] },
+      }),
+    );
+    const adapter = new DeepgramAdapter();
+    const result = await adapter.speechToTextWords(Buffer.from('a'), {
+      ...CREDS,
+      model: 'nova-2',
+      input: { smartFormat: true, language: 'es' },
+    });
+    expect(result.words).toHaveLength(1);
+    const url = mockSafeFetch.mock.calls.at(-1)![0] as string;
+    expect(url).toContain('model=nova-2');
+    expect(url).toContain('smart_format=true');
+    expect(url).toContain('punctuate=true');
+    expect(url).toContain('language=es');
+  });
+
+  it('deepgram words omits opts the caller did not set', async () => {
+    mockSafeFetch.mockResolvedValue(
+      jsonResponse({ results: { channels: [{ alternatives: [{ transcript: 'hi', words: [] }] }] } }),
+    );
+    const adapter = new DeepgramAdapter();
+    await adapter.speechToTextWords(Buffer.from('a'), CREDS);
+    const url = mockSafeFetch.mock.calls.at(-1)![0] as string;
+    expect(url).not.toContain('smart_format');
+    expect(url).not.toContain('language=');
+  });
 });
 
 // ── Additional branch coverage ──

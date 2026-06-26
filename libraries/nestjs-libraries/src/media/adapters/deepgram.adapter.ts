@@ -74,7 +74,17 @@ export class DeepgramAdapter implements MediaProviderAdapter {
     const apiKey = resolveApiKey(options);
     if (!apiKey) throw new Error('Deepgram API key is required');
 
-    const res = await safeFetch(`https://api.deepgram.com/v1/listen?model=${options?.model || 'whisper'}&word_timestamps=true`, {
+    const params = new URLSearchParams({ model: options?.model || 'whisper' });
+    // Opt-in caption niceties — callers (the Deepgram studio) pass these via input;
+    // the existing timeline path passes none, so its request is unchanged.
+    if (options?.input?.smartFormat) {
+      params.set('smart_format', 'true');
+      params.set('punctuate', 'true');
+    }
+    const language = options?.input?.language;
+    if (typeof language === 'string' && language) params.set('language', language);
+
+    const res = await safeFetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${apiKey}`,

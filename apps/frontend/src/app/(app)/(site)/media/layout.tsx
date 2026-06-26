@@ -184,6 +184,18 @@ const tabs = [
     ),
   },
   {
+    href: '/media/deepgram',
+    label: 'Deepgram',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" />
+        <path d="M5 11a7 7 0 0 0 14 0" />
+        <path d="M12 18v3" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/hedra',
     label: 'Hedra',
     section: 'Providers',
