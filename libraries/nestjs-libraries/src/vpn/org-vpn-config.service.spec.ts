@@ -16,6 +16,7 @@ import { PurevpnAdapter } from './adapters/purevpn.adapter';
 import { VyprvpnAdapter } from './adapters/vyprvpn.adapter';
 import { HidemeAdapter } from './adapters/hideme.adapter';
 import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
+import { CustomProxyAdapter } from './adapters/custom-proxy.adapter';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { VpnDispatcherService } from './vpn-dispatcher.service';
@@ -59,6 +60,7 @@ describe('OrgVpnConfigService', () => {
       new VyprvpnAdapter(),
       new HidemeAdapter(),
       new MozillavpnAdapter(),
+      new CustomProxyAdapter(),
     );
 
     dispatcher = { invalidate: vi.fn() } as unknown as VpnDispatcherService;
@@ -68,8 +70,9 @@ describe('OrgVpnConfigService', () => {
 
   it('returns provider metadata with all adapters', () => {
     const meta = service.getProviderMetadata();
-    expect(meta).toHaveLength(15);
+    expect(meta).toHaveLength(16);
     expect(meta.map((m) => m.identifier).sort()).toEqual([
+      'custom',
       'cyberghost',
       'expressvpn',
       'hideme',
@@ -86,6 +89,8 @@ describe('OrgVpnConfigService', () => {
       'vyprvpn',
       'windscribe',
     ]);
+    expect(meta.find((m) => m.identifier === 'custom')!.isDynamicRegions).toBe(true);
+    expect(meta.find((m) => m.identifier === 'nordvpn')!.isDynamicRegions).toBe(false);
   });
 
   it('marks provider configured when required credentials are present', async () => {
@@ -201,6 +206,69 @@ describe('OrgVpnConfigService', () => {
     it('invalidates pooled dispatchers on upsert', async () => {
       await service.upsert('org-1', 'nordvpn', { regions: ['us-atlanta'] });
       expect(dispatcher.invalidate).toHaveBeenCalledWith('org-1', 'nordvpn');
+    });
+  });
+
+  describe('custom proxy (dynamic regions)', () => {
+    const customRow = {
+      id: 'cfg-custom',
+      organizationId: 'org-1',
+      identifier: 'custom',
+      name: null,
+      credentials: `enc:${JSON.stringify({
+        label: 'Office VPN',
+        host: 'proxy.acme.example',
+        port: '1080',
+        protocol: 'socks5',
+        username: 'me',
+        password: 'pw',
+      })}`,
+      regions: null,
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any;
+
+    it('derives a single region from the stored endpoint and auto-enables it', async () => {
+      vi.spyOn(repository, 'getByOrg').mockResolvedValue([customRow]);
+      const providers = await service.getProviders('org-1');
+      const custom = providers.find((p) => p.identifier === 'custom')!;
+      expect(custom.isDynamicRegions).toBe(true);
+      expect(custom.proxyRegions).toHaveLength(1);
+      expect(custom.proxyRegions[0].label).toBe('Office VPN');
+      expect(custom.enabledRegions).toEqual(['custom']);
+    });
+
+    it('lists the derived region without any stored region toggle', async () => {
+      vi.spyOn(repository, 'getByOrg').mockResolvedValue([customRow]);
+      const list = await service.listEnabledRegions('org-1');
+      expect(list).toEqual([
+        { identifier: 'custom', providerName: 'Custom VPN / Proxy', regionId: 'custom', regionLabel: 'Office VPN' },
+      ]);
+    });
+
+    it('resolves the custom endpoint + auth for a channel', async () => {
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue(customRow);
+      const resolved = await service.resolveProxyForChannel('org-1', 'custom', 'custom');
+      expect(resolved!.region.host).toBe('proxy.acme.example');
+      expect(resolved!.region.protocol).toBe('socks5');
+      expect(resolved!.auth).toEqual({ username: 'me', password: 'pw' });
+    });
+
+    it('supports a no-auth custom proxy', async () => {
+      const noAuth = {
+        ...customRow,
+        credentials: `enc:${JSON.stringify({
+          label: 'Open proxy',
+          host: 'proxy.acme.example',
+          port: '8080',
+          protocol: 'http-connect',
+        })}`,
+      };
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue(noAuth);
+      const resolved = await service.resolveProxyForChannel('org-1', 'custom', 'custom');
+      expect(resolved!.auth).toEqual({ username: '', password: '' });
+      expect(resolved!.region.protocol).toBe('http-connect');
     });
   });
 });

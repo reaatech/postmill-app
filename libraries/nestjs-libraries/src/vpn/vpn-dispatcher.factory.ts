@@ -53,13 +53,16 @@ export function buildVpnDispatcher(
     throw new Error(`VPN proxy host is not a public endpoint: ${region.host}`);
   }
 
+  // Auth is optional — an org's own proxy may be open on a trusted network.
+  const hasAuth = !!auth.username;
+
   if (region.protocol === 'http-connect') {
-    const token =
-      'Basic ' +
-      Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+    const token = hasAuth
+      ? 'Basic ' + Buffer.from(`${auth.username}:${auth.password}`).toString('base64')
+      : undefined;
     return new ProxyAgent({
       uri: `http://${region.host}:${region.port}`,
-      token,
+      ...(token ? { token } : {}),
       connect: { lookup: ssrfLookup, timeout: CONNECT_TIMEOUT },
     });
   }
@@ -72,8 +75,7 @@ export function buildVpnDispatcher(
           host: region.host,
           port: region.port,
           type: 5,
-          userId: auth.username,
-          password: auth.password,
+          ...(hasAuth ? { userId: auth.username, password: auth.password } : {}),
         },
         command: 'connect',
         destination: {

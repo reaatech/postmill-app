@@ -15,6 +15,7 @@ import { PurevpnAdapter } from './adapters/purevpn.adapter';
 import { VyprvpnAdapter } from './adapters/vyprvpn.adapter';
 import { HidemeAdapter } from './adapters/hideme.adapter';
 import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
+import { CustomProxyAdapter } from './adapters/custom-proxy.adapter';
 import { OrgVpnConfigService } from './org-vpn-config.service';
 import { VpnDispatcherService } from './vpn-dispatcher.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
@@ -37,6 +38,7 @@ import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prism
     VyprvpnAdapter,
     HidemeAdapter,
     MozillavpnAdapter,
+    CustomProxyAdapter,
     VpnProviderRegistry,
     OrgVpnConfigService,
     OrgVpnConfigRepository,

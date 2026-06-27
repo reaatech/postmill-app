@@ -14,11 +14,21 @@ export interface VpnProviderAdapter {
   readonly setupNotes?: string;
 
   /**
-   * Egress regions this provider exposes as request-routable proxies. Present
-   * only on SOCKS5 / HTTP-CONNECT-capable providers; absent ⇒ the provider
-   * never appears in the per-channel VPN region picker and never routes traffic.
+   * Static catalog of egress regions this provider exposes as request-routable
+   * proxies. Present only on SOCKS5 / HTTP-CONNECT-capable providers; absent ⇒
+   * the provider has no fixed catalog (it may still derive regions dynamically —
+   * see `resolveRegions`). A provider with neither never appears in the
+   * per-channel VPN region picker and never routes traffic.
    */
   readonly proxyRegions?: VpnProxyRegion[];
+
+  /**
+   * Derive regions from the org's stored config instead of a fixed catalog —
+   * used by the generic "bring-your-own proxy" adapter where the endpoint
+   * (host/port/protocol) IS the region. When present, it takes precedence over
+   * `proxyRegions` and the region is auto-enabled (no per-region toggle).
+   */
+  resolveRegions?(config: Record<string, string>): VpnProxyRegion[];
 
   validateConfig(config: Record<string, string>): VpnConfigValidationResult;
 

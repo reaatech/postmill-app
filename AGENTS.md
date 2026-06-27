@@ -237,6 +237,14 @@ Dispatchers are keyed by `(org, provider, region, creds-fingerprint)` and invali
 config change. **Known gap:** providers that bypass `this.fetch()` (raw `fetch`/`axios` — Medium,
 parts of LinkedIn auth, Bluesky) are not proxied.
 
+VPN adapters expose regions one of two ways: a **static `proxyRegions`** catalog (consumer VPNs the
+user ticks region-by-region), or **dynamic `resolveRegions(config)`** that derives the region(s) from
+the org's own stored config — used by the generic **`custom`** ("Custom VPN / Proxy") adapter where
+the user supplies their own host/port/protocol/auth (e.g. an office proxy). Dynamic providers have a
+single derived region, auto-enabled (no per-region toggle; UI hides the checklist via
+`isDynamicRegions`). The custom proxy host is still SSRF-validated — private addresses need
+`SSRF_ALLOWED_PRIVATE_CIDRS` on a self-hosted instance.
+
 ---
 
 # Architecture notes

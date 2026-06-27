@@ -31,6 +31,7 @@ export interface VpnProviderInfo {
   credentialFields: VpnCredentialFieldInfo[];
   proxyRegions: VpnProxyRegionInfo[];
   enabledRegions: string[];
+  isDynamicRegions: boolean;
   setupNotes?: string;
 }
 

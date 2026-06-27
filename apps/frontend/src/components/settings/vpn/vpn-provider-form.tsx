@@ -172,7 +172,7 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
         </div>
       )}
 
-      {provider.proxyRegions?.length > 0 && (
+      {!provider.isDynamicRegions && provider.proxyRegions?.length > 0 && (
         <div className="flex flex-col gap-[8px]">
           <label className="text-[13px] text-newTableText">
             {t('vpn_egress_regions', 'Egress regions')}

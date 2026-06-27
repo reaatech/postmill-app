@@ -33,6 +33,19 @@ describe('buildVpnDispatcher', () => {
     void d.close();
   });
 
+  it('builds a no-auth SOCKS5 dispatcher (empty credentials)', () => {
+    const region: VpnProxyRegion = {
+      id: 'custom',
+      label: 'Office',
+      host: 'proxy.acme.example',
+      port: 1080,
+      protocol: 'socks5',
+    };
+    const d = buildVpnDispatcher(region, { username: '', password: '' });
+    expect(d).toBeInstanceOf(Agent);
+    void d.close();
+  });
+
   it('rejects a proxy host that is a literal private/loopback IP', () => {
     const region: VpnProxyRegion = {
       id: 'evil',

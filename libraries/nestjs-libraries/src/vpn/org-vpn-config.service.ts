@@ -27,6 +27,9 @@ export interface VpnProviderListItem {
   }>;
   proxyRegions: VpnProxyRegion[];
   enabledRegions: string[];
+  // True when regions are derived from the org's own config (custom proxy) rather
+  // than a fixed catalog — the UI hides the per-region checklist for these.
+  isDynamicRegions: boolean;
   setupNotes?: string;
 }
 
@@ -56,6 +59,16 @@ export class OrgVpnConfigService {
     private _dispatcher: VpnDispatcherService,
   ) {}
 
+  // Effective region catalog for an adapter: derived from config for dynamic
+  // (custom proxy) providers, else the adapter's static catalog.
+  private _regionsFor(
+    adapter: VpnProviderAdapter,
+    decrypted: Record<string, string>,
+  ): VpnProxyRegion[] {
+    if (adapter.resolveRegions) return adapter.resolveRegions(decrypted);
+    return adapter.proxyRegions ?? [];
+  }
+
   getProviderMetadata(): VpnProviderListItem[] {
     return this._registry.list().map((adapter) => ({
       identifier: adapter.identifier,
@@ -64,8 +77,10 @@ export class OrgVpnConfigService {
       isConfigured: false,
       capabilities: adapter.capabilities,
       credentialFields: adapter.credentialFields,
+      // No org config ⇒ dynamic providers have no derived region yet.
       proxyRegions: adapter.proxyRegions ?? [],
       enabledRegions: [],
+      isDynamicRegions: !!adapter.resolveRegions,
       setupNotes: adapter.setupNotes,
     }));
   }
@@ -78,11 +93,15 @@ export class OrgVpnConfigService {
       const config = configs.find((c) => c.identifier === adapter.identifier);
       const decrypted = this._decryptCredentials(config?.credentials);
       const isConfigured = this._hasRequiredCredentials(adapter, decrypted);
-      const catalog = adapter.proxyRegions ?? [];
-      // Keep only enabled ids that still exist in the adapter catalog.
-      const enabledRegions = this._parseRegions(config?.regions).filter((id) =>
-        catalog.some((r) => r.id === id),
-      );
+      const isDynamic = !!adapter.resolveRegions;
+      const catalog = this._regionsFor(adapter, decrypted);
+      // Dynamic providers have a single derived region, auto-enabled. Static
+      // providers keep only the stored ids that still exist in their catalog.
+      const enabledRegions = isDynamic
+        ? catalog.map((r) => r.id)
+        : this._parseRegions(config?.regions).filter((id) =>
+            catalog.some((r) => r.id === id),
+          );
 
       return {
         identifier: adapter.identifier,
@@ -93,6 +112,7 @@ export class OrgVpnConfigService {
         credentialFields: adapter.credentialFields,
         proxyRegions: catalog,
         enabledRegions,
+        isDynamicRegions: isDynamic,
         setupNotes: adapter.setupNotes,
       };
     });
@@ -105,11 +125,16 @@ export class OrgVpnConfigService {
     for (const config of configs) {
       if (!config.enabled) continue;
       const adapter = this._registry.getAdapter(config.identifier);
-      const catalog = adapter?.proxyRegions ?? [];
-      if (!adapter || catalog.length === 0) continue;
+      if (!adapter) continue;
       const decrypted = this._decryptCredentials(config.credentials);
       if (!this._hasRequiredCredentials(adapter, decrypted)) continue;
-      for (const id of this._parseRegions(config.regions)) {
+      const catalog = this._regionsFor(adapter, decrypted);
+      if (catalog.length === 0) continue;
+      // Dynamic ⇒ all derived regions; static ⇒ only the org-enabled ids.
+      const enabledIds = adapter.resolveRegions
+        ? catalog.map((r) => r.id)
+        : this._parseRegions(config.regions);
+      for (const id of enabledIds) {
         const region = catalog.find((r) => r.id === id);
         if (!region) continue;
         out.push({
@@ -135,16 +160,23 @@ export class OrgVpnConfigService {
     if (!config || !config.enabled) return null;
 
     const adapter = this._registry.getAdapter(identifier);
-    const region = adapter?.proxyRegions?.find((r) => r.id === regionId);
-    if (!adapter || !region) return null;
-    if (!this._parseRegions(config.regions).includes(regionId)) return null;
+    if (!adapter) return null;
 
     const decrypted = this._decryptCredentials(config.credentials);
+    const region = this._regionsFor(adapter, decrypted).find((r) => r.id === regionId);
+    if (!region) return null;
+    // Static providers gate on the per-region toggle; dynamic ones don't have one.
+    if (!adapter.resolveRegions && !this._parseRegions(config.regions).includes(regionId)) {
+      return null;
+    }
+
     const auth = adapter.resolveProxyAuth?.(decrypted) ?? null;
     if (!auth) return null;
 
+    // Fingerprint the full endpoint + auth so a host/port/protocol change (custom
+    // proxy) or a credential rotation produces a new dispatcher cache key.
     const credsFingerprint = createHash('sha256')
-      .update(`${auth.username}:${auth.password}`)
+      .update(`${region.host}:${region.port}:${region.protocol}:${auth.username}:${auth.password}`)
       .digest('hex');
     return { region, auth, credsFingerprint };
   }

@@ -15,6 +15,7 @@ import { PurevpnAdapter } from './adapters/purevpn.adapter';
 import { VyprvpnAdapter } from './adapters/vyprvpn.adapter';
 import { HidemeAdapter } from './adapters/hideme.adapter';
 import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
+import { CustomProxyAdapter } from './adapters/custom-proxy.adapter';
 
 @Injectable()
 export class VpnProviderRegistry {
@@ -36,6 +37,7 @@ export class VpnProviderRegistry {
     vyprvpn: VyprvpnAdapter,
     hideme: HidemeAdapter,
     mozillavpn: MozillavpnAdapter,
+    customProxy: CustomProxyAdapter,
   ) {
     this.register(nordvpn);
     this.register(expressvpn);
@@ -52,6 +54,7 @@ export class VpnProviderRegistry {
     this.register(vyprvpn);
     this.register(hideme);
     this.register(mozillavpn);
+    this.register(customProxy);
   }
 
   register(adapter: VpnProviderAdapter): void {

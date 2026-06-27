@@ -60,6 +60,13 @@
   providers that call raw `fetch`/`axios` instead of `this.fetch()` (Medium, parts of LinkedIn auth,
   Bluesky) are not yet proxied. Region endpoints/credential schemes are source-grounded and need a
   live smoke test.
+- **Bring-your-own-proxy: a "Custom VPN / Proxy" provider.** Alongside the consumer-VPN catalog,
+  Settings → VPN now offers a generic provider where the org enters its **own** SOCKS5 / HTTP-CONNECT
+  endpoint (connection name, host, port, protocol, optional username/password) — e.g. a proxy on your
+  office network — and channels using it egress from that proxy's IP. Its single region is **derived
+  from the stored config** (no fixed catalog, no per-region checklist); auth is optional for open
+  proxies. The proxy must be reachable from the Postmill server (a public host, or a private address
+  with `SSRF_ALLOWED_PRIVATE_CIDRS` set on a self-hosted instance).
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
   scopes the dataset: each language has its own instructions **and** its own optional per-channel
   overrides; switching the language shows a fresh dataset. Backed by a new additive
