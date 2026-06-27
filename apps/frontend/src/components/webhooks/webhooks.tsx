@@ -244,13 +244,6 @@ export const Webhooks: FC = () => {
 
   return (
     <div className="flex flex-col">
-      <div className="mb-[16px]">
-        <h3 className="text-[20px]">{t('webhooks', 'Webhooks')}</h3>
-        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
-          {t('webhooks_description', 'Webhooks are HTTP callbacks that notify your application when events happen in Postmill. When a triggered event occurs, we send an HTTP POST request to the URLs you configure.')}
-        </div>
-      </div>
-
       <div className="flex items-center gap-[12px] mb-[16px]">
         <div className="flex-1">
           <input
@@ -289,7 +282,7 @@ export const Webhooks: FC = () => {
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_webhooks', 'No webhooks configured yet')}</div>
             <p className="text-[12px] text-newTableText max-w-[400px] text-center">
-              {t('webhooks_empty_hint', 'Webhooks let you receive real-time notifications when posts are published, comments are received, or other events occur.')}
+              {t('webhooks_empty_hint', 'Webhooks send updates to your apps whenever posts publish, comments arrive, or other events occur.')}
             </p>
             <Button onClick={addWebhook()}>{t('create_first_webhook', 'Create your first webhook')}</Button>
           </div>

@@ -129,16 +129,7 @@ export const RolesTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-[20px]">{t('roles', 'Roles')}</h3>
-          <div className="text-newTableText mt-[4px] text-[13px]">
-            {t(
-              'roles_description',
-              'Manage which permissions each role grants and assign roles to team members'
-            )}
-          </div>
-        </div>
+      <div className="flex items-center justify-end">
         <Button onClick={openCreate}>{t('create_role', 'Create Role')}</Button>
       </div>
 

@@ -233,17 +233,9 @@ export const TeamsComponent = () => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between mb-[16px]">
-        <div>
-          <h3 className="text-[20px]">{t('team_members', 'Team Members')}</h3>
-          <div className="text-newTableText mt-[4px]">
-            {t('invite_your_assistant_or_team_member_to_manage_your_account', 'Invite your assistant or team member to manage your account')}
-          </div>
-        </div>
-        <div className="flex gap-[8px]">
-          <Button onClick={openInvite}>{t('invite_member', 'Invite Member')}</Button>
-          {canManageMembers && <Button secondary onClick={openCreateUser}>{t('create_user', 'Create User')}</Button>}
-        </div>
+      <div className="flex items-center justify-end gap-[8px] mb-[16px]">
+        <Button onClick={openInvite}>{t('invite_member', 'Invite Member')}</Button>
+        {canManageMembers && <Button secondary onClick={openCreateUser}>{t('create_user', 'Create User')}</Button>}
       </div>
 
       <div className="flex items-center gap-[12px] mb-[16px]">

@@ -293,10 +293,6 @@ export const StorageTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[20px]">{t('file_storage', 'File Storage')}</h3>
-      </div>
-
       <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
         {subTabs.map((tab) => (
           <button
@@ -321,9 +317,21 @@ export const StorageTab: React.FC = () => {
       )}
 
       {subTab === 'providers' && (
-        <ProviderListShell
-          title=""
-          providers={shellProviders}
+        <div className="flex flex-col gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">
+              {t('storage_providers', 'Storage Providers')}
+            </h3>
+            <p className="text-[13px] text-newTableText max-w-[640px]">
+              {t(
+                'storage_providers_description',
+                'See and manage where your files are stored. Mount a provider to make it active.'
+              )}
+            </p>
+          </div>
+          <ProviderListShell
+            title=""
+            providers={shellProviders}
           onConfigure={(id) => {
             const p = instanceMap.get(id);
             if (p) openEdit(p);
@@ -405,14 +413,33 @@ export const StorageTab: React.FC = () => {
               </button>
             );
           }}
-        />
+          />
+        </div>
       )}
 
-      {subTab === 'audit' && <AuditTab />}
+      {subTab === 'audit' && (
+        <div className="flex flex-col gap-[16px]">
+          <p className="text-[13px] text-newTableText max-w-[640px]">
+            {t(
+              'storage_audit_description',
+              'Review recent changes to your storage, like mounts and migrations.'
+            )}
+          </p>
+          <AuditTab />
+        </div>
+      )}
 
       {subTab === 'breakdown' && (
         <div className="flex flex-col gap-[20px]">
-          <h3 className="text-[18px] text-textColor">{t('usage_breakdown', 'Usage Breakdown')}</h3>
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">{t('usage_breakdown', 'Usage Breakdown')}</h3>
+            <p className="text-[13px] text-newTableText max-w-[640px]">
+              {t(
+                'storage_usage_description',
+                'Check how much storage you are using and which folders use the most space.'
+              )}
+            </p>
+          </div>
           {usageBreakdown ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-[20px]">
               <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex flex-col gap-[12px]">

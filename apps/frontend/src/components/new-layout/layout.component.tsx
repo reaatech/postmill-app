@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import useSWR from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
@@ -112,7 +113,9 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         )}
                       >
                         <div className="flex flex-col h-full gap-[32px] flex-1 py-[12px]">
-                          <Logo />
+                          <Link href="/" aria-label="Home">
+                            <Logo />
+                          </Link>
                           <TopMenu />
                         </div>
                       </div>
@@ -122,9 +125,9 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                         <div className="text-[24px] font-[600] flex flex-1 items-center gap-[10px] min-w-0">
                           {/* Brand mark — only on mobile, where the left rail
                               (which normally shows the logo) is hidden. */}
-                          <span className="mobile:flex hidden shrink-0">
+                          <Link href="/" aria-label="Home" className="mobile:flex hidden shrink-0">
                             <Logo size={34} className="" />
-                          </span>
+                          </Link>
                           <Title />
                         </div>
                         <div className="flex gap-[20px] text-textItemBlur items-center">

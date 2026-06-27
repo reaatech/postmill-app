@@ -60,7 +60,7 @@ export const AuditTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[20px]">
-      <h3 className="text-[20px] text-textColor">Audit Log</h3>
+      <h3 className="text-[18px] font-semibold text-textColor">Audit Log</h3>
 
       <DataTable
         columns={[

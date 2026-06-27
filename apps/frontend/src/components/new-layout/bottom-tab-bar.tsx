@@ -12,7 +12,7 @@ import { MenuItemRow } from './menu-item-row';
 
 // Primary destinations pinned to the bottom bar (in order). Everything else
 // goes into the "More" sheet.
-const PRIMARY_PATHS = ['/dashboard', '/schedule', '/analytics', '/media'];
+const PRIMARY_PATHS = ['/schedule', '/analytics', '/media'];
 
 const MoreIcon = (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -55,9 +55,9 @@ export const BottomTabBar: FC = () => {
   };
 
   const all = [...firstMenu, ...secondMenu].filter(visible).map(resolve);
-  const primary = PRIMARY_PATHS.map((p) => all.find((i) => i.path === p)).filter(
+  const primary = (PRIMARY_PATHS.map((p) => all.find((i) => i.path === p)).filter(
     Boolean
-  ) as any[];
+  ) as any[]).sort((a, b) => a.name.localeCompare(b.name));
   const primaryPaths = new Set(primary.map((i) => i.path));
   const rest = all.filter((i) => !primaryPaths.has(i.path));
 

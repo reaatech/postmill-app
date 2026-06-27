@@ -92,7 +92,7 @@ export const ContentPacksTab: React.FC = () => {
   return (
     <div className="flex flex-col gap-[16px]">
       <div className="flex flex-col gap-[4px]">
-        <h3 className="text-[20px]">{t('content_packs', 'Content Packs')}</h3>
+        <h3 className="text-[18px] font-semibold text-textColor">{t('content_packs', 'Content Packs')}</h3>
         <p className="text-[13px] text-newTableText max-w-[640px]">
           {t(
             'content_packs_description',

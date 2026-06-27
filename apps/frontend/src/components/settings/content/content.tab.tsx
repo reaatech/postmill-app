@@ -39,10 +39,6 @@ export const ContentTab: React.FC<{
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[20px]">{t('content', 'Content')}</h3>
-      </div>
-
       <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
         {subTabs.map((tab) => (
           <button

@@ -177,7 +177,7 @@ export const ShortlinksTab = () => {
         />
       ) : (
         <ProviderListShell
-          title={t('shortlink_providers', 'Shortlink Providers')}
+          title=""
           toolbar={
             <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
               <div className="flex-1 relative">

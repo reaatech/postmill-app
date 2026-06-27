@@ -59,7 +59,9 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
       {(title || description || addProviderButton) && (
         <div className="flex items-center justify-between">
           <div className="flex flex-col gap-[4px]">
-            {title && <h3 className="text-[20px] font-semibold">{title}</h3>}
+            {title && (
+              <h3 className="text-[18px] font-semibold text-textColor">{title}</h3>
+            )}
             {description && (
               <p className="text-[13px] text-newTableText">{description}</p>
             )}

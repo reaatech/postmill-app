@@ -170,12 +170,12 @@ export const MediaProvidersTab = () => {
     mutate();
   }, [mutate]);
 
-  const title = t('ai_media_providers', 'AI Media Providers');
+  const title = t('ai_media', 'AI Media');
 
   if (error) {
     return (
       <div className="flex flex-col">
-        <h3 className="text-[20px] mb-[16px]">{title}</h3>
+        <h3 className="text-[18px] mb-[16px] font-semibold text-textColor">{title}</h3>
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">{t('failed_to_load_media_providers', 'Failed to load media providers')}</span>
           <button
@@ -192,7 +192,7 @@ export const MediaProvidersTab = () => {
   if (isLoading) {
     return (
       <div className="flex flex-col">
-        <h3 className="text-[20px] mb-[16px]">{title}</h3>
+        <h3 className="text-[18px] mb-[16px] font-semibold text-textColor">{title}</h3>
         <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
           <div className="animate-pulse">{t('loading', 'Loading...')}</div>
         </div>
@@ -213,6 +213,10 @@ export const MediaProvidersTab = () => {
 
       <ProviderListShell
         title={title}
+        description={t(
+          'ai_media_settings_description',
+          'Connect tools that generate images, videos, and audio for your posts.'
+        )}
         toolbar={
           <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
             <div className="flex-1 relative">

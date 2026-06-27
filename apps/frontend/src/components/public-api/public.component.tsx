@@ -610,8 +610,38 @@ export const PublicComponent = () => {
           </button>
         ))}
       </div>
-      {subTab === 'api' && <PublicApiContent />}
-      {subTab === 'developer' && <DeveloperComponent />}
+      {subTab === 'api' && (
+        <div className="flex flex-col gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">
+              {t('access', 'Access')}
+            </h3>
+            <p className="text-[13px] text-newTableText">
+              {t(
+                'access_description',
+                'Create and manage API keys to connect Postmill to your own tools and scripts.'
+              )}
+            </p>
+          </div>
+          <PublicApiContent />
+        </div>
+      )}
+      {subTab === 'developer' && (
+        <div className="flex flex-col gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">
+              {t('apps', 'Apps')}
+            </h3>
+            <p className="text-[13px] text-newTableText">
+              {t(
+                'apps_description',
+                'Register developer apps and MCP clients that can connect to Postmill on your behalf.'
+              )}
+            </p>
+          </div>
+          <DeveloperComponent />
+        </div>
+      )}
     </div>
   );
 };

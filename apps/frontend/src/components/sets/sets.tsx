@@ -196,10 +196,10 @@ export const Sets: FC = () => {
   return (
     <div className="flex flex-col">
       <div className="mb-[16px]">
-        <h3 className="text-[20px]">{t('sets', 'Sets')}</h3>
-        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
-          {t('sets_description', 'A Set is a saved group of social accounts and post content that you can reuse across multiple posts. Create sets for recurring campaigns, weekly digests, or common post configurations.')}
-        </div>
+        <h3 className="text-[18px] font-semibold text-textColor">{t('sets', 'Sets')}</h3>
+        <p className="text-[13px] text-newTableText mt-[4px]">
+          {t('sets_description', 'Save a reusable bundle of channels, text, and media for posts you create often.')}
+        </p>
       </div>
 
       <div className="flex items-center gap-[12px] mb-[16px]">

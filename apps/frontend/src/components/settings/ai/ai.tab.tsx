@@ -237,6 +237,10 @@ export const AITab = () => {
           ) : (
             <ProviderListShell
               title={t('llm_providers', 'LLM Providers')}
+              description={t(
+                'llm_providers_description',
+                'Choose the AI for writing and replies. Add your account key and click Set Active.'
+              )}
               toolbar={
                 <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
                   <div className="flex-1 relative">

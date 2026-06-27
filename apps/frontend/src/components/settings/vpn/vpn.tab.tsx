@@ -115,7 +115,7 @@ export const VpnTab = () => {
         />
       ) : (
         <ProviderListShell
-          title={t('vpn_providers', 'VPN Providers')}
+          title=""
           toolbar={
             <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
               <div className="flex-1 relative">

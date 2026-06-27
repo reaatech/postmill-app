@@ -57,16 +57,6 @@ export const BroadcastTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex flex-col gap-[4px]">
-        <h3 className="text-[20px]">{t('admin_broadcast', 'Admin Broadcast')}</h3>
-        <p className="text-[13px] text-newTableText max-w-[640px]">
-          {t(
-            'admin_broadcast_description',
-            'Send a system notification to all organization members. Optionally target specific role keys (comma-separated).'
-          )}
-        </p>
-      </div>
-
       <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px]">
         <div className="flex flex-col gap-[12px]">
           <div className="flex flex-col gap-[4px]">

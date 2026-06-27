@@ -170,11 +170,19 @@ export const BrandTab = () => {
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between mb-[16px]">
-        <h3 className="text-[20px]">{t('brands', 'Brands')}</h3>
+      <div className="flex items-start justify-between gap-[16px] mb-[16px]">
+        <div className="flex flex-col gap-[4px]">
+          <h3 className="text-[18px] font-semibold text-textColor">{t('brands', 'Brands')}</h3>
+          <p className="text-[13px] text-newTableText max-w-[640px]">
+            {t(
+              'brands_description',
+              'Create AI personalities for your brand — set how it writes, what it looks like, and what it knows — so every post sounds on-brand.'
+            )}
+          </p>
+        </div>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[14px] hover:opacity-90"
+          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[14px] hover:opacity-90 shrink-0"
         >
           {t('create_brand', 'Create Brand')}
         </button>

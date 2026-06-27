@@ -31,7 +31,6 @@ import { ContentTab } from '@gitroom/frontend/components/settings/content/conten
 import { StorageTab } from '@gitroom/frontend/components/settings/storage/storage.tab';
 import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/channels.tab';
 import { VpnTab } from '@gitroom/frontend/components/settings/vpn/vpn.tab';
-import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { RolesTab } from '@gitroom/frontend/components/settings/roles/roles.tab';
 import { BroadcastTab } from '@gitroom/frontend/components/settings/broadcast/broadcast.tab';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
@@ -211,6 +210,67 @@ export const SettingsPopup: FC<{
     onClick: () => setTab(item.tab),
   }));
 
+  // Page heading + beginner description, rendered once at the top of every
+  // settings page. The h2 text is sourced from the same `list` the nav uses, so
+  // it always matches the nav label (the content sub-tabs all map to "Content").
+  const PAGE_DESCRIPTIONS: Record<string, string> = {
+    teams: t(
+      'teams_page_description',
+      'Invite teammates, create accounts, and manage who has access to your workspace.'
+    ),
+    roles: t(
+      'roles_description',
+      'Create and edit roles to control what each team member can see and do. Assign roles to team members from the list below.'
+    ),
+    broadcast: t(
+      'broadcast_description',
+      'Send a message or announcement to everyone in your organization.'
+    ),
+    channels: t(
+      'channels_settings_description',
+      'Connect your social media accounts so you can publish posts from Postmill. Choose a platform, follow the steps, and you are ready to post.'
+    ),
+    ai: t(
+      'ai_settings_description',
+      'Choose the AI assistant that helps you write posts and create images. Pick a provider, enter your account key, and turn it on.'
+    ),
+    shortlinks: t(
+      'shortlinks_settings_description',
+      'Connect a link-shortening service so long URLs in your posts become short, trackable links.'
+    ),
+    content: t(
+      'content_settings_description',
+      'Manage the tools that create and organize media for your posts. Connect AI media tools, stock libraries, saved post sets, and signatures.'
+    ),
+    vpn: t(
+      'vpn_settings_description',
+      'Route your posts through a private connection for extra security or to meet location rules.'
+    ),
+    storage: t(
+      'storage_settings_description',
+      'Choose where Postmill saves your uploaded files. Use the built-in storage or connect your own cloud bucket.'
+    ),
+    webhooks: t(
+      'webhooks_description',
+      'Get automatic notifications sent to your other apps when something happens in Postmill.'
+    ),
+    autopost: t(
+      'autopost_description',
+      'Automatically create posts from an RSS feed. Add a feed, pick channels, and Postmill will publish new items for you.'
+    ),
+    api: t(
+      'developers_description',
+      'Build custom connections with Postmill. Create API keys, set up MCP clients, and manage OAuth apps.'
+    ),
+    approved_apps: t(
+      'apps_you_have_authorized',
+      'See which outside apps can access your Postmill account. Remove access anytime.'
+    ),
+  };
+  const activePageTab = isContentTab ? 'content' : tab;
+  const activePage = list.find((i) => i.tab === activePageTab);
+  const activePageDescription = PAGE_DESCRIPTIONS[activePageTab];
+
   return (
     <>
       {/* Desktop side rail (collapsible). Hidden on mobile — replaced by the strip.
@@ -306,19 +366,6 @@ export const SettingsPopup: FC<{
       <div className="bg-newBgColorInner flex-1 flex-col flex min-w-0 mobile:p-0 p-[20px] gap-[12px] h-[calc(100vh-104px)] mobile:h-auto min-h-0 overflow-y-auto mobile:overflow-visible">
         <SubmenuStrip ariaLabel="Settings sections" items={stripItems} />
         <div className="flex flex-col gap-[12px] mobile:p-[16px]">
-        {!isContentTab && tab !== 'storage' && (
-          <PageHeader
-            title={
-              tab === 'channels'
-                ? 'Channels'
-                : tab === 'ai'
-                  ? 'AI'
-                  : tab === 'vpn'
-                    ? 'VPN'
-                    : 'Settings'
-            }
-          />
-        )}
         <FormProvider {...form}>
           <form onSubmit={form.handleSubmit(submit)}>
             {!!getRef && (
@@ -330,6 +377,19 @@ export const SettingsPopup: FC<{
                 !getRef && 'rounded-[4px]'
               )}
             >
+              {activePage && (
+                <div className="flex flex-col gap-[4px]">
+                  <h2 className="text-[20px] font-semibold text-textColor">
+                    {activePage.label}
+                  </h2>
+                  {activePageDescription && (
+                    <p className="text-[13px] text-newTableText">
+                      {activePageDescription}
+                    </p>
+                  )}
+                </div>
+              )}
+
               {tab === 'teams' && !!user?.tier?.team_members && isGeneral && (
                 <div>
                   <TeamsComponent />
