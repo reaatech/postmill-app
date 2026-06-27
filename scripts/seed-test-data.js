@@ -110,8 +110,10 @@ async function cleanup() {
     await prisma.analyticsSnapshot.deleteMany({ where: { organizationId: orgId } });
     await prisma.tagsPosts.deleteMany({ where: { postId: { in: postIds } } });
     await prisma.post.deleteMany({ where: { organizationId: orgId } });
+    await prisma.campaignItem.deleteMany({ where: { organizationId: orgId } });
     await prisma.campaign.deleteMany({ where: { organizationId: orgId } });
     await prisma.integration.deleteMany({ where: { organizationId: orgId } });
+    await prisma.orgProviderConfiguration.deleteMany({ where: { organizationId: orgId } });
     await prisma.subscription.deleteMany({ where: { organizationId: orgId } });
     await prisma.userOrganization.deleteMany({ where: { organizationId: orgId } });
     await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
@@ -205,6 +207,45 @@ async function main() {
     integrations[c.key] = { id: integ.id, def: c };
   }
   console.log(`  ${channelDefs.length} channels created (X, LinkedIn page)`);
+
+  // --- channel credential sets (Settings -> Channels) ---
+  // Named OrgProviderConfiguration rows so Settings -> Channels is populated.
+  // Credentials use the same AES-GCM scheme as EncryptionService (fixedEncryption),
+  // so they decrypt cleanly if a channel is later bound to the set.
+  const providerConfigDefs = [
+    { identifier: 'x', name: 'X (Acme app)', bindKey: 'x',
+      scopes: 'tweet.read tweet.write users.read offline.access',
+      setupNotes: 'Seeded credential set for local UI testing — not a real X app.' },
+    { identifier: 'linkedin-page', name: 'LinkedIn (Acme app)', bindKey: 'li',
+      scopes: 'openid profile email w_member_social r_organization_social w_organization_social',
+      setupNotes: 'Seeded credential set for local UI testing — not a real LinkedIn app.' },
+  ];
+
+  let providerConfigCount = 0;
+  for (const pc of providerConfigDefs) {
+    const cfg = await prisma.orgProviderConfiguration.create({
+      data: {
+        organizationId: orgId,
+        identifier: pc.identifier,
+        name: pc.name,
+        enabled: true,
+        clientId: fixedEncryption('seed-' + pc.identifier + '-client-id'),
+        clientSecret: fixedEncryption('seed-' + pc.identifier + '-client-secret'),
+        scopes: pc.scopes,
+        setupNotes: pc.setupNotes,
+      },
+      select: { id: true },
+    });
+    // Bind the matching seeded channel to its credential set (realistic linkage).
+    if (integrations[pc.bindKey]) {
+      await prisma.integration.update({
+        where: { id: integrations[pc.bindKey].id },
+        data: { providerConfigId: cfg.id },
+      });
+    }
+    providerConfigCount++;
+  }
+  console.log(`  ${providerConfigCount} channel credential sets created (Settings -> Channels)`);
 
   // --- channel-level analytics: 14 daily snapshots per metric per channel ---
   let chSnapRows = 0;
