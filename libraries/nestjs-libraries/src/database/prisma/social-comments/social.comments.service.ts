@@ -28,6 +28,8 @@ export interface InboxFilterOptions {
   assigneeId?: string;
   cursor?: string;
   unreadOnly?: boolean;
+  campaignId?: string;
+  integrationId?: string;
 }
 
 @Injectable()
@@ -438,6 +440,12 @@ export class SocialCommentsService {
 
   async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
     return this._socialCommentsRepository.getInbox(orgId, userId, filters);
+  }
+
+  // Count of synced comments across all posts in a campaign — backs the campaign
+  // dashboard's "Comments" KPI (distinct from the platform-reported lastComments sum).
+  async countCampaignComments(orgId: string, campaignId: string): Promise<number> {
+    return this._socialCommentsRepository.countByCampaign(orgId, campaignId);
   }
 
   async bulkMarkRead(commentIds: string[], orgId: string) {

@@ -20,6 +20,10 @@ export class UsersService {
     return this._usersRepository.getUserById(id);
   }
 
+  getNamesByIds(ids: string[]) {
+    return this._usersRepository.getNamesByIds(ids);
+  }
+
   getImpersonateUser(name: string) {
     return this._organizationRepository.getImpersonateUser(name);
   }

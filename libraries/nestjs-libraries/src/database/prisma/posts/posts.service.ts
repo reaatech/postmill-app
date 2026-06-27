@@ -14,6 +14,8 @@ import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-librar
 import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -75,6 +77,8 @@ export class PostsService {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _ragService: RagService,
     private _storageService: StorageService,
+    private _campaignsRepository: CampaignsRepository,
+    private _auditRepository: AuditRepository,
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -973,6 +977,40 @@ export class PostsService {
     return '';
   }
 
+  private _parsePostJson<T>(raw: string | null | undefined, fallback: T): T {
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private async _appendUtmToMessages(
+    messages: string[],
+    campaignId: string | undefined,
+    organizationId: string,
+    providerIdentifier: string | undefined
+  ): Promise<string[]> {
+    if (!campaignId || !providerIdentifier) return messages;
+    const campaign = await this._campaignsRepository.findById(campaignId, organizationId);
+    if (!campaign?.utmEnabled) return messages;
+
+    const slug = campaign.name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    const utm = `utm_campaign=${encodeURIComponent(slug)}&utm_source=${encodeURIComponent(providerIdentifier)}&utm_medium=social`;
+
+    return messages.map((msg) =>
+      msg.replace(/(https?:\/\/[^\s<"']+)/g, (url) => {
+        if (url.includes('utm_campaign')) return url;
+        const sep = url.includes('?') ? '&' : '?';
+        return `${url}${sep}${utm}`;
+      })
+    );
+  }
+
   async createPost(
     orgId: string,
     body: CreatePostDto,
@@ -980,12 +1018,20 @@ export class PostsService {
   ): Promise<any[]> {
     const postList = [];
     for (const post of body.posts) {
+      const providerIdentifier = (post.settings as any)?.__type;
       const provider = await this._integrationManager.getSocialIntegration(
-        (post.settings as any)?.__type
+        providerIdentifier
       );
       const removeLinks = !!provider?.stripLinks?.();
 
-      const messages = (post.value || []).map((p) => p.content);
+      let messages = (post.value || []).map((p) => p.content);
+      // Append campaign UTM params before short-linking so short links carry them.
+      messages = await this._appendUtmToMessages(
+        messages,
+        body.campaignId,
+        orgId,
+        providerIdentifier
+      );
       // No point shortlinking links on platforms that strip them out anyway
       const updateContent =
         !body.shortLink || removeLinks
@@ -1228,6 +1274,159 @@ export class PostsService {
     } catch (err) {}
 
     return { id, state };
+  }
+
+  async getCampaignDrafts(orgId: string, campaignId: string) {
+    const drafts = await this._postRepository.getCampaignDrafts(campaignId, orgId);
+    const grouped: Record<string, typeof drafts> = {};
+    for (const draft of drafts) {
+      const key = draft.group || 'Uncategorized';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(draft);
+    }
+    return grouped;
+  }
+
+  async getCampaignPosts(orgId: string, campaignId: string) {
+    return this._postRepository.getCampaignPosts(campaignId, orgId);
+  }
+
+  async setPostCampaign(orgId: string, postId: string, campaignId: string | null) {
+    return this._postRepository.setPostCampaign(postId, orgId, campaignId);
+  }
+
+  async setCampaign(orgId: string, postId: string, campaignId: string | null) {
+    return this.setPostCampaign(orgId, postId, campaignId);
+  }
+
+  async approveDraft(orgId: string, postId: string, approvedById: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'approved', approvedById);
+
+    if (post.campaignId) {
+      const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
+      await this._auditRepository.create({
+        organizationId: orgId,
+        userId: approvedById,
+        action: 'campaign.draft.approve',
+        entity: 'campaign',
+        entityId: post.campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ postId, postContent: post.content?.slice(0, 100) }),
+      });
+    }
+
+    return { id: postId, approvalStatus: 'approved' };
+  }
+
+  async rejectDraft(orgId: string, postId: string, rejectedById?: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'rejected');
+
+    if (post.campaignId) {
+      const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
+      await this._auditRepository.create({
+        organizationId: orgId,
+        userId: rejectedById,
+        action: 'campaign.draft.reject',
+        entity: 'campaign',
+        entityId: post.campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ postId, postContent: post.content?.slice(0, 100) }),
+      });
+    }
+
+    return { id: postId, approvalStatus: 'rejected' };
+  }
+
+  async setDraftPending(orgId: string, postId: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'pending');
+    return { id: postId, approvalStatus: 'pending' };
+  }
+
+  async promoteDrafts(orgId: string, campaignId: string, postIds: string[], promotedById?: string) {
+    const results: Array<{ id: string; status: 'promoted' | 'blocked' | 'not_found'; reason?: string }> = [];
+    for (const id of postIds) {
+      const post = await this._postRepository.getPostById(id, orgId);
+      if (!post || post.state !== 'DRAFT' || post.campaignId !== campaignId) {
+        results.push({ id, status: 'not_found' });
+        continue;
+      }
+      if (post.approvalStatus !== 'approved') {
+        results.push({ id, status: 'blocked', reason: 'Draft must be approved before promotion' });
+        continue;
+      }
+      await this.changePostStatus(orgId, id, 'schedule');
+      results.push({ id, status: 'promoted' });
+    }
+
+    const promotedCount = results.filter((r) => r.status === 'promoted').length;
+    if (promotedCount > 0) {
+      const campaign = await this._campaignsRepository.findById(campaignId, orgId);
+      await this._auditRepository.create({
+        organizationId: orgId,
+        userId: promotedById,
+        action: 'campaign.promote',
+        entity: 'campaign',
+        entityId: campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ count: promotedCount, postIds }),
+      });
+    }
+
+    return results;
+  }
+
+  buildCreateDtoFromPost(post: any): any {
+    // Read-only DTO snapshot suitable for creating a new draft clone.
+    // Post.settings and Post.image are JSON strings in the DB — parse them
+    // before handing them back to createOrUpdatePost, which stringifies again.
+    const settings = this._parsePostJson(post.settings, {});
+    const image = this._parsePostJson(post.image, []);
+    const values = [
+      {
+        content: post.content || '',
+        image,
+        delay: post.delay || 0,
+      },
+    ];
+
+    // Preserve direct thread children if they were loaded (best-effort).
+    if (Array.isArray(post.childrenPost)) {
+      for (const child of post.childrenPost) {
+        values.push({
+          content: child.content || '',
+          image: this._parsePostJson(child.image, []),
+          delay: child.delay || 0,
+        });
+      }
+    }
+
+    return {
+      type: 'draft',
+      date: post.publishDate ? new Date(post.publishDate).toISOString() : new Date().toISOString(),
+      posts: [
+        {
+          integration: { id: post.integration?.id || post.integrationId },
+          value: values,
+          settings,
+        },
+      ],
+      tags: [],
+      shortLink: false,
+      campaignId: undefined,
+      brandId: post.brandId,
+    };
   }
 
   async changeDate(

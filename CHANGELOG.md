@@ -11,6 +11,14 @@
 ## Unreleased
 
 ### Added
+- **Campaign comments — view & reply, folded into the dashboard.** Each campaign's dashboard gains a
+  full **Comments** section over its posts' synced comments: filter by status, **channel**, assignee,
+  or unread; **reply** inline (with AI draft), like, cycle status, assign, and mark handled —
+  individually or in bulk. It reuses the existing cross-channel inbox endpoint, now with optional
+  `campaignId` + `integrationId` filters, plus a shared `CommentCard` (also adopted by the standalone
+  `/comments` inbox). The dashboard's **"Comments" KPI and `comments` goal now count the synced,
+  replyable comments** (matching the section and the public report) rather than the platform-reported
+  engagement total. Additive — no schema change.
 - **Channels settings: many named credential sets per provider.** Settings → Channels now manages
   *named* OAuth-app credential sets — an org can add **multiple sets for the same provider**, each
   with a required **name** and its **own auth** (client id/secret/scopes/redirect). Configuration
@@ -33,6 +41,18 @@
   behind an "Advanced settings (most people can skip these)" toggle so the default view stays simple.
 
 ### Added
+- **Campaign Hub.** Campaigns now have a dedicated dashboard (`/campaigns/:id`) with KPIs,
+  recent changelog, planning workspace, tagged items (tags, media, notes, tasks, personas, tone,
+  messages, goals, KPIs), and a post section. Draft approval flow: drafts inside a campaign must be
+  marked `approved` before they can be promoted to scheduled posts. Campaign-level UTM tagging
+  (`utmEnabled`) automatically appends `utm_campaign`, `utm_source`, and `utm_medium` to outbound
+  links. Campaigns can be copied with optional date shifting, cloning only draft posts and re-tagging
+  all campaign items. A shareable public report (`/public/campaign-report/:token`) exposes a read-only
+  JSON view when enabled, plus CSV/PDF export for org members. Daily cron `campaign-tag-purge`
+  soft-deletes/expunges stale campaign items after `CAMPAIGN_PURGE_DAYS` (default 30). Backend:
+  `CampaignsController`, `CampaignsService`, `CampaignReportService`, `CampaignActivity`,
+  `CampaignReportActivity`, `CampaignTagPurgeActivity`. Frontend:
+  `apps/frontend/src/components/campaigns/`.
 - **VPN provider settings surface.** Settings → VPN is a new credential-only provider page that
   mirrors AI/Shortlinks: provider cards with brand icons, configured/enabled badges, search, and
   per-provider configuration. Adapters are included for 15 consumer VPN providers: **NordVPN**,

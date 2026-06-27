@@ -1122,6 +1122,7 @@ model ShortLink {
   @@unique([organizationId, shortUrl])
   @@index([organizationId, provider])
   @@index([organizationId, createdAt])
+  @@index([postId])
 }
 
 model ShortLinkSnapshot {

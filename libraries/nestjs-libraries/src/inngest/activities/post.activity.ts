@@ -18,6 +18,7 @@ import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/pri
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
 import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
 import { runWithVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import type { Dispatcher } from 'undici';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
@@ -54,7 +55,8 @@ export class PostActivity {
     private _subscriptionService: SubscriptionService,
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgVpnConfigService: OrgVpnConfigService,
-    private _vpnDispatcherService: VpnDispatcherService
+    private _vpnDispatcherService: VpnDispatcherService,
+    private _campaignsRepository: CampaignsRepository
   ) {}
 
   // Resolve the per-channel VPN proxy dispatcher (or undefined) for a publish.
@@ -282,6 +284,21 @@ export class PostActivity {
     );
   }
 
+  private async _maybeAppendUtm(content: string, campaignId: string | null, organizationId: string, providerIdentifier: string): Promise<string> {
+    if (!campaignId) return content;
+    const campaign = await this._campaignsRepository.findById(campaignId, organizationId);
+    if (!campaign?.utmEnabled) return content;
+
+    const slug = encodeURIComponent(campaign.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+    const utm = `utm_campaign=${slug}&utm_source=${encodeURIComponent(providerIdentifier)}&utm_medium=social`;
+
+    return content.replace(/(https?:\/\/[^\s<"']+)/g, (url) => {
+      if (url.includes('utm_campaign')) return url;
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}${utm}`;
+    });
+  }
+
   async postSocial(integration: Integration, posts: Post[]) {
     if (process.env.STRIPE_SECRET_KEY) {
       const subscription = await this._subscriptionService.getSubscription(
@@ -313,24 +330,32 @@ export class PostActivity {
     const vpnDispatcher = await this._resolveVpnDispatcher(integration);
 
     const postPayload = await Promise.all(
-      (newPosts || []).map(async (p) => ({
-        id: p.id,
-        message: stripHtmlValidation(
-          getIntegration.editor,
+      (newPosts || []).map(async (p) => {
+        const contentWithUtm = await this._maybeAppendUtm(
           p.content,
-          true,
-          false,
-          !/<\/?[a-z][\s\S]*>/i.test(p.content),
-          getIntegration.mentionFormat
-        ),
-        settings: JSON.parse(p.settings || '{}'),
-        media: await this._postService.updateMedia(
-          p.id,
-          JSON.parse(p.image || '[]'),
-          getIntegration?.convertToJPEG || false,
-          integration.organizationId
-        ),
-      }))
+          p.campaignId,
+          integration.organizationId,
+          integration.providerIdentifier
+        );
+        return {
+          id: p.id,
+          message: stripHtmlValidation(
+            getIntegration.editor,
+            contentWithUtm,
+            true,
+            false,
+            !/<\/?[a-z][\s\S]*>/i.test(contentWithUtm),
+            getIntegration.mentionFormat
+          ),
+          settings: JSON.parse(p.settings || '{}'),
+          media: await this._postService.updateMedia(
+            p.id,
+            JSON.parse(p.image || '[]'),
+            getIntegration?.convertToJPEG || false,
+            integration.organizationId
+          ),
+        };
+      })
     );
 
     const postNow = await runWithVpnDispatcher(vpnDispatcher, () =>

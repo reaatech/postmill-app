@@ -9,13 +9,15 @@ import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.content.service';
 import { CodesService } from '@gitroom/nestjs-libraries/services/codes.service';
 import { PublicIntegrationsController } from '@gitroom/backend/public-api/routes/v1/public.integrations.controller';
+import { PublicCampaignController } from '@gitroom/backend/public-api/routes/public.campaign.controller';
 import { PublicAuthMiddleware } from '@gitroom/backend/services/auth/public.auth.middleware';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 
 const authenticatedController = [PublicIntegrationsController];
+const publicController = [PublicCampaignController];
 @Module({
   imports: [UploadModule],
-  controllers: [...authenticatedController],
+  controllers: [...authenticatedController, ...publicController],
   providers: [
     AuthService,
     StripeService,

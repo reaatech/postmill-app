@@ -18,6 +18,8 @@ export interface Campaign {
   startDate: string | null;
   endDate: string | null;
   archived: boolean;
+  utmEnabled: boolean;
+  goals?: Array<{ metric: string; target: number }>;
   createdAt: string;
   _count?: { posts: number };
 }

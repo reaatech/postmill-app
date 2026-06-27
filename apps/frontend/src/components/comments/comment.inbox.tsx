@@ -6,26 +6,8 @@ import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { CommentInboxFilters, InboxFilters } from './comment.inbox.filters';
+import { CommentCard, InboxComment } from './comment.card';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
-
-interface InboxComment {
-  id: string;
-  content: string;
-  authorName: string;
-  authorPicture?: string;
-  platformCreatedAt: string;
-  status?: string;
-  isOwn: boolean;
-  post?: {
-    id: string;
-    content?: string;
-    integration?: {
-      name: string;
-      providerIdentifier: string;
-      picture?: string;
-    };
-  };
-}
 
 interface InboxResponse {
   comments: InboxComment[];
@@ -59,17 +41,6 @@ export const CommentInbox: FC = () => {
       return res.json();
     },
     { revalidateOnFocus: false }
-  );
-
-  const handleMarkRead = useCallback(
-    async (commentId: string) => {
-      await fetch('/posts/inbox/bulk-read', {
-        method: 'POST',
-        body: JSON.stringify({ commentIds: [commentId] }),
-      });
-      mutate();
-    },
-    [fetch, mutate]
   );
 
   const loadMore = useCallback(() => {
@@ -200,60 +171,7 @@ export const CommentInbox: FC = () => {
 
       <div className="flex flex-col gap-[8px]">
         {comments.map((comment) => (
-          <div
-            key={comment.id}
-            className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]"
-          >
-            {comment.authorPicture ? (
-              <img
-                src={comment.authorPicture}
-                alt={comment.authorName}
-                className="w-[36px] h-[36px] rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
-              <div className="w-[36px] h-[36px] rounded-full bg-btnPrimary flex items-center justify-center text-white text-[14px] font-bold flex-shrink-0">
-                {comment.authorName?.[0]?.toUpperCase() || '?'}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-[8px] mb-[4px]">
-                <span className="text-[13px] font-semibold text-textColor">
-                  {comment.authorName}
-                </span>
-                {comment.post?.integration && (
-                  <span className="text-[11px] text-newTableText">
-                    {t('comment_inbox.on_platform', `on ${comment.post.integration.name}`)}
-                  </span>
-                )}
-                <span className="text-[11px] text-newTableText ml-auto">
-                  {dayjs(comment.platformCreatedAt).fromNow()}
-                </span>
-              </div>
-              <p className="text-[13px] text-textColor break-words mb-[8px]">
-                {comment.content}
-              </p>
-              {comment.post && (
-                <div className="text-[11px] text-newTableText mb-[8px]">
-                    {t('comment_inbox.post_label', `Post: ${comment.post.content?.substring(0, 100) || comment.post.id}`)}
-                </div>
-              )}
-              <div className="flex gap-[8px]">
-                {comment.status !== 'handled' && (
-                  <button
-                    onClick={() => handleMarkRead(comment.id)}
-                    className="text-[12px] text-textColor hover:underline"
-                  >
-                    {t('comment_inbox.mark_handled', 'Mark handled')}
-                  </button>
-                )}
-                {comment.status && (
-                  <span className="text-[11px] text-newTableText capitalize">
-                    {comment.status.replace(/_/g, ' ')}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+          <CommentCard key={comment.id} comment={comment} onChanged={mutate} />
         ))}
       </div>
 

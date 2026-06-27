@@ -10,7 +10,7 @@ import {
 import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { isISO8601 } from 'class-validator';
+import { isISO8601, isUUID } from 'class-validator';
 
 @Controller('/posts')
 export class SocialCommentsController {
@@ -25,12 +25,20 @@ export class SocialCommentsController {
     @Query('assigneeId') assigneeId: string | undefined,
     @Query('cursor') cursor: string | undefined,
     @Query('unreadOnly') unreadOnly: string | undefined,
+    @Query('campaignId') campaignId: string | undefined,
+    @Query('integrationId') integrationId: string | undefined,
   ) {
     if (status && !(VALID_COMMENT_STATUSES as readonly string[]).includes(status)) {
       throw new BadRequestException(`Invalid status: ${status}. Must be one of: ${VALID_COMMENT_STATUSES.join(', ')}`);
     }
     if (assigneeId && !isCuid(assigneeId)) {
       throw new BadRequestException('Invalid assigneeId');
+    }
+    if (campaignId && !isUUID(campaignId)) {
+      throw new BadRequestException('Invalid campaignId');
+    }
+    if (integrationId && !isCuid(integrationId)) {
+      throw new BadRequestException('Invalid integrationId');
     }
     if (cursor && !isISO8601(cursor)) {
       throw new BadRequestException('Invalid cursor: must be a valid ISO 8601 date string');
@@ -40,6 +48,8 @@ export class SocialCommentsController {
       assigneeId,
       cursor,
       unreadOnly: unreadOnly === 'true',
+      campaignId,
+      integrationId,
     });
   }
 

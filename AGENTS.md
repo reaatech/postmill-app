@@ -399,6 +399,51 @@ unmodified (passthrough). Publishes never fail due to missing short-link config.
 short-link toggle is hidden when no provider is configured, and the Settings → Shortlinks tab shows
 an empty state guiding the admin to configure one.
 
+## Campaign Hub (v3.9.0+)
+
+A campaign is an org-scoped command center for posts, channels, brands, files, and planning notes.
+It supports tagged items, draft approvals, UTM tagging, goals, copy/clone, shareable public reports,
+and a dashboard of KPIs.
+
+### Data model
+- `Campaign` — org-scoped folder; `shareToken` / `shareEnabled` control public reports; `utmEnabled`
+  toggles automatic UTM query-string append; `goals` stores a JSON array of `{ metric, target }`.
+- `CampaignEntityType` enum — `POST`, `INTEGRATION`, `ORG_VPN_CONFIG`, `AI_ORG_PROVIDER_CONFIG`,
+  `AI_BRAND_PROFILE`, `STORAGE_PROVIDER_CONFIG`, `FILE`, `SETS`, `SIGNATURES`.
+- `CampaignItem` — polymorphic tag table (`campaignId`, `entityType`, `entityId`) for the 8 non-post
+  types. Posts remain single-campaign via the existing `Post.campaignId` FK.
+- `CampaignItemResolverRepository` resolves batches of `CampaignItem` ids to display names/icons per
+  type, skipping orphans (deleted source rows).
+- `Post.approvalStatus` / `approvedById` / `approvedAt` — draft approval state; only `approved`
+  drafts can be promoted to scheduled.
+
+### Architecture
+- Backend: `CampaignsController` + `CampaignTagService` (apps/backend) and `CampaignsService`,
+  `CampaignReportService`, `CampaignItemRepository`, `CampaignItemResolverRepository`,
+  `CampaignActivity` in `libraries/nestjs-libraries/src/database/prisma/campaigns/`.
+  `PostsService` appends UTM parameters before short-linking when a post belongs to a campaign with
+  `utmEnabled`.
+- Frontend: `apps/frontend/src/components/campaigns/` — index, dashboard, planning workspace,
+  copy modal, report view, public share page. Uses existing `useFetch`/`useSWR` conventions.
+- Cron: `campaign-tag-purge` runs daily 03:00 UTC and deletes `CampaignItem` rows for campaigns whose
+  `endDate` is more than `CAMPAIGN_PURGE_DAYS` (default 30) ago; ongoing campaigns (`endDate: null`)
+  are never purged.
+- **Comments section** (`dashboard/campaign-comments-section.tsx`): a full view/reply surface over
+  the campaign's posts' synced comments. It reuses the existing **`/posts/inbox`** endpoint — which
+  gained optional **`campaignId`** + **`integrationId`** filters (`SocialCommentsRepository.getInbox`
+  adds a `post: { campaignId }` relation filter; campaign id is a **uuid**, validated with `isUUID`,
+  not `isCuid`) — plus the per-post reply/like/status/assign/bulk-read routes and the shared
+  `CommentCard` + `CommentComposer`. The dashboard's **"Comments" KPI and `comments` goal now reflect
+  the synced `SocialComment` count** (`SocialCommentsService.countCampaignComments`), not the
+  platform-reported `lastComments` sum — `CampaignsService.getDashboard` and
+  `CampaignReportService.buildReport` both override `engagement.totalComments` with that count, so the
+  KPI, goal, section, and public report all agree.
+
+### Public share
+`GET /public/campaign-report/:token` returns a read-only, stripped JSON report when `shareEnabled`
+is true. The token is a random 64-character hex string minted by `CampaignsService.mintShareToken()`;
+`POST /campaigns/:id/share` mints/rotates it, and `DELETE /campaigns/:id/share` disables sharing.
+
 ## Feature surfaces (v3.5.0)
 
 New analytics/AI/social surfaces, all additive on existing infrastructure.

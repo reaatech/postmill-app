@@ -326,10 +326,10 @@ async function main() {
   const campaignDefs = [
     { name: 'Summer Product Launch', color: '#2b5cd3',
       description: 'Coordinated push for the v4 release across X and LinkedIn.',
-      startOffset: -10, endOffset: 20, archived: false, take: 3 },
+      startOffset: -10, endOffset: 20, archived: false, take: 3, goals: [{ metric: 'impressions', target: 50000 }, { metric: 'likes', target: 1000 }] },
     { name: 'Weekly Tips Series', color: '#f59e0b',
       description: 'Evergreen short-form tips — one per week, ongoing.',
-      startOffset: -14, endOffset: null, archived: false, take: 3 },
+      startOffset: -14, endOffset: null, archived: false, take: 3, goals: [{ metric: 'posts', target: 12 }] },
     { name: 'Customer Stories', color: '#db2777',
       description: 'Social proof: quotes, case studies, and wins from real teams.',
       startOffset: -7, endOffset: 14, archived: false, take: 2 },
@@ -347,6 +347,7 @@ async function main() {
   const publishedForCampaigns = createdPosts.filter((p) => p.state === 'PUBLISHED');
   const scheduledForCampaigns = createdPosts.filter((p) => p.state === 'QUEUE');
   let pubCursor = 0, schedCursor = 0, assigned = 0;
+  let firstCampaignId = null;
   for (const def of campaignDefs) {
     const campaign = await prisma.campaign.create({
       data: {
@@ -357,9 +358,11 @@ async function main() {
         startDate: dateOnly(dayOffset(def.startOffset)),
         endDate: def.endOffset == null ? null : dateOnly(dayOffset(def.endOffset)),
         archived: def.archived,
+        goals: def.goals || [],
       },
       select: { id: true },
     });
+    if (!firstCampaignId) firstCampaignId = campaign.id;
     const slice = publishedForCampaigns.slice(pubCursor, pubCursor + (def.take || 0));
     pubCursor += def.take || 0;
     const schedSlice = scheduledForCampaigns.slice(schedCursor, schedCursor + (def.takeScheduled || 0));
@@ -370,7 +373,51 @@ async function main() {
       assigned += ids.length;
     }
   }
-  console.log(`  ${campaignDefs.length} campaigns created, ${assigned} posts assigned`);
+
+  // Tag the first campaign onto a brand, channel, and file for the dashboard demo.
+  if (firstCampaignId) {
+    const firstBrand = await prisma.aIBrandProfile.findFirst({ where: { organizationId: orgId } });
+    const firstChannel = await prisma.integration.findFirst({ where: { organizationId: orgId } });
+    const firstFile = await prisma.file.findFirst({ where: { organizationId: orgId } });
+    const tags = [];
+    if (firstBrand) tags.push({ entityType: 'AI_BRAND_PROFILE', entityId: firstBrand.id });
+    if (firstChannel) tags.push({ entityType: 'INTEGRATION', entityId: firstChannel.id });
+    if (firstFile) tags.push({ entityType: 'FILE', entityId: firstFile.id });
+    if (tags.length) {
+      await prisma.campaignItem.createMany({
+        data: tags.map((t) => ({ campaignId: firstCampaignId, organizationId: orgId, entityType: t.entityType, entityId: t.entityId })),
+      });
+    }
+
+    // Enable public share link on the first campaign.
+    await prisma.campaign.update({
+      where: { id: firstCampaignId },
+      data: { shareEnabled: true, shareToken: crypto.randomBytes(32).toString('hex') },
+    });
+
+    // Create approved + pending drafts on the first campaign.
+    const draftIntegration = firstChannel || (await prisma.integration.findFirst({ where: { organizationId: orgId } }));
+    if (draftIntegration) {
+      const drafts = [
+        { content: 'Approved draft ready to promote 🚀', approvalStatus: 'approved', group: 'Launch Drafts' },
+        { content: 'Pending draft awaiting review', approvalStatus: 'pending', group: 'Launch Drafts' },
+      ];
+      for (const d of drafts) {
+        await prisma.post.create({
+          data: {
+            organizationId: orgId,
+            integrationId: draftIntegration.id,
+            content: d.content,
+            state: 'DRAFT',
+            publishDate: atHour(dayOffset(3), 10),
+            group: d.group,
+            campaignId: firstCampaignId,
+            approvalStatus: d.approvalStatus,
+          },
+        });
+      }
+    }
+  }
 
   // --- comment inbox: comments on ~7 published posts, some threaded/own/assigned ---
   let commentRows = 0, cId = 0;
@@ -422,6 +469,7 @@ async function main() {
   console.log('\n✅ Seed complete.');
   console.log(`   Login: ${EMAIL}  /  ${PASSWORD}`);
   console.log('   Campaigns: /campaigns  (6 folders grouping the seeded posts)');
+  console.log('   Campaign dashboard: /campaigns/<id>  (tags, goals, drafts, share link)');
 }
 
 main()

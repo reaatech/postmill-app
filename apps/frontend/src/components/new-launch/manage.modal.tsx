@@ -83,6 +83,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     activateExitButton,
     setHide,
     brandId,
+    campaignId,
   } = useLaunchStore(
     useShallow((state) => ({
       hide: state.hide,
@@ -100,6 +101,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       locked: state.locked,
       activateExitButton: state.activateExitButton,
       brandId: state.brandId,
+      campaignId: state.campaignId,
     }))
   );
 
@@ -434,6 +436,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         tags,
         shortLink,
         brandId,
+        ...(campaignId ? { campaignId } : {}),
         date: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
         posts,
       };
@@ -458,7 +461,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         if (addEditSets) {
           addEditSets(data);
         } else {
-          await fetch('/posts', {
+          const url =
+            campaignId && type === 'draft'
+              ? `/campaigns/${campaignId}/drafts`
+              : '/posts';
+          await fetch(url, {
             method: 'POST',
             body: JSON.stringify(data),
           });
@@ -494,6 +501,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       dummy,
       shortlinkPreferenceData,
       brandId,
+      campaignId,
       customClose,
       existingData,
       fetch,

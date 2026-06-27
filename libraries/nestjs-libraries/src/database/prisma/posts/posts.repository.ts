@@ -641,6 +641,7 @@ export class PostsRepository {
             }),
         image: JSON.stringify(value.image),
         settings: JSON.stringify(body.settings),
+        ...(state === 'draft' && campaignId ? { approvalStatus: 'pending' as const } : {}),
         organization: {
           connect: {
             id: orgId,
@@ -1003,6 +1004,62 @@ export class PostsRepository {
         parentPostId: null,
         integration: { deletedAt: null, organizationId: orgId },
       },
+    });
+  }
+
+  getCampaignDrafts(campaignId: string, orgId: string) {
+    return this._post.model.post.findMany({
+      where: {
+        campaignId,
+        organizationId: orgId,
+        state: State.DRAFT,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'asc' },
+      include: {
+        integration: { select: { id: true, name: true, providerIdentifier: true, picture: true } },
+      },
+    });
+  }
+
+  getCampaignPosts(campaignId: string, orgId: string) {
+    return this._post.model.post.findMany({
+      where: {
+        campaignId,
+        organizationId: orgId,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'desc' },
+      include: {
+        integration: { select: { id: true, name: true, providerIdentifier: true, picture: true } },
+      },
+    });
+  }
+
+  async updateApprovalStatus(
+    id: string,
+    orgId: string,
+    status: 'pending' | 'approved' | 'rejected',
+    approvedById?: string
+  ) {
+    return this._post.model.post.updateMany({
+      where: { id, organizationId: orgId, state: State.DRAFT },
+      data: {
+        approvalStatus: status,
+        approvedById: status === 'approved' ? approvedById : null,
+        approvedAt: status === 'approved' ? new Date() : null,
+      },
+    });
+  }
+
+  async setPostCampaign(id: string, orgId: string, campaignId: string | null) {
+    return this._post.model.post.updateMany({
+      where: { id, organizationId: orgId },
+      data: { campaignId },
     });
   }
 

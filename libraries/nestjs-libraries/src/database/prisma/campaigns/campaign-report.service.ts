@@ -1,0 +1,174 @@
+import { Injectable } from '@nestjs/common';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
+import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
+import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { ENTITY_ENUM_TO_SLUG } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-entity.types';
+import { campaignReportHtml } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.html';
+import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-goal-progress';
+import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
+import type { CampaignEntityType, State } from '@prisma/client';
+
+export interface CampaignReport {
+  campaign: any;
+  engagement: {
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+    avgViews: number;
+    avgLikes: number;
+    avgComments: number;
+    clickTotal: number;
+  };
+  posts: any[];
+  channelBreakdown: Record<string, { views: number; likes: number; comments: number; posts: number }>;
+  itemInventory: Record<string, any[]>;
+  goals: Array<{ metric: string; target: number; current: number; pct: number }>;
+}
+
+@Injectable()
+export class CampaignReportService {
+  constructor(
+    private _campaignsRepository: CampaignsRepository,
+    private _campaignItems: CampaignItemRepository,
+    private _campaignItemResolver: CampaignItemResolverRepository,
+    private _postsRepository: PostsRepository,
+    private _socialCommentsService: SocialCommentsService,
+  ) {}
+
+  async buildReport(id: string, organizationId: string): Promise<CampaignReport> {
+    const campaign = await this._campaignsRepository.findById(id, organizationId);
+    if (!campaign) {
+      throw new Error('Campaign not found');
+    }
+
+    const [engagement, posts, stateCounts, clickTotal, itemCounts, syncedCommentCount] = await Promise.all([
+      this._campaignsRepository.getEngagement(id, organizationId),
+      this._postsRepository.getCampaignPosts(id, organizationId),
+      this._campaignsRepository.getPostStateCounts(id, organizationId),
+      this._campaignsRepository.getCampaignClickTotal(id, organizationId),
+      this._campaignItems.countByCampaignGroupedByType(id, organizationId),
+      this._socialCommentsService.countCampaignComments(organizationId, id),
+    ]);
+
+    // Match the dashboard: totalComments reflects synced, replyable comments.
+    engagement.totalComments = syncedCommentCount;
+
+    const channelBreakdown: CampaignReport['channelBreakdown'] = {};
+    for (const post of posts) {
+      const name = post.integration?.name || 'Unknown';
+      if (!channelBreakdown[name]) {
+        channelBreakdown[name] = { views: 0, likes: 0, comments: 0, posts: 0 };
+      }
+      channelBreakdown[name].views += post.lastViews || 0;
+      channelBreakdown[name].likes += post.lastLikes || 0;
+      channelBreakdown[name].comments += post.lastComments || 0;
+      channelBreakdown[name].posts += 1;
+    }
+
+    const allItems = await this._campaignItems.listByCampaign(id, organizationId);
+    const itemInventory: Record<string, any[]> = {};
+    for (const row of itemCounts) {
+      const slug = ENTITY_ENUM_TO_SLUG[row.entityType];
+      const ids = allItems.filter((i) => i.entityType === row.entityType).map((i) => i.entityId);
+      const resolved = await this._campaignItemResolver.resolveBatch(organizationId, row.entityType, ids);
+      itemInventory[slug] = Array.from(resolved.values()).map((r) => ({ ...r, entityType: slug }));
+    }
+
+    const goals = computeGoalProgress(campaign.goals, engagement, stateCounts, clickTotal);
+
+    return {
+      campaign,
+      engagement: { ...engagement, clickTotal },
+      posts,
+      channelBreakdown,
+      itemInventory,
+      goals,
+    };
+  }
+
+  async toJson(id: string, organizationId: string) {
+    return this.buildReport(id, organizationId);
+  }
+
+  async toPublicJson(token: string) {
+    const campaign = await this._campaignsRepository.findByShareToken(token);
+    if (!campaign || !campaign.shareEnabled) {
+      throw new Error('Campaign not found');
+    }
+    const full = await this.buildReport(campaign.id, campaign.organizationId);
+
+    // Strip internal/sensitive fields from the public-facing report.
+    const sanitizeItem = (item: any) => ({
+      name: item.name,
+      entityType: item.entityType,
+      subtitle: item.subtitle,
+    });
+
+    return {
+      campaign: {
+        id: campaign.id,
+        name: campaign.name,
+        color: campaign.color,
+        description: campaign.description,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+      },
+      engagement: full.engagement,
+      goals: full.goals,
+      posts: full.posts.map((p) => ({
+        title: p.title,
+        content: p.content,
+        state: p.state,
+        publishDate: p.publishDate,
+        lastViews: p.lastViews,
+        lastLikes: p.lastLikes,
+        lastComments: p.lastComments,
+        integration: { name: p.integration?.name },
+      })),
+      channelBreakdown: full.channelBreakdown,
+      itemInventory: Object.fromEntries(
+        Object.entries(full.itemInventory).map(([type, items]) => [
+          type,
+          items.map(sanitizeItem),
+        ])
+      ),
+    };
+  }
+
+  async toCsv(id: string, organizationId: string): Promise<string> {
+    const report = await this.buildReport(id, organizationId);
+    const rows = report.posts.map((p) => ({
+      id: p.id,
+      title: p.title || p.content?.slice(0, 100) || '',
+      channel: p.integration?.name || '',
+      state: p.state,
+      publishDate: p.publishDate?.toISOString?.() || p.publishDate,
+      views: p.lastViews || 0,
+      likes: p.lastLikes || 0,
+      comments: p.lastComments || 0,
+    }));
+
+    const headers = ['id', 'title', 'channel', 'state', 'publishDate', 'views', 'likes', 'comments'];
+    const lines = [headers.join(','), ...rows.map((r) => headers.map((h) => `"${String((r as any)[h] ?? '').replace(/"/g, '""')}"`).join(','))];
+    return lines.join('\n');
+  }
+
+  async toPdf(id: string, organizationId: string): Promise<Buffer> {
+    const report = await this.buildReport(id, organizationId);
+    const html = campaignReportHtml(report);
+
+    const puppeteer = (await import('puppeteer')).default;
+    const browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+    });
+    try {
+      const page = await browser.newPage();
+      await page.setContent(html, { waitUntil: 'networkidle0' });
+      return await page.pdf({ format: 'A4', printBackground: true });
+    } finally {
+      await browser.close();
+    }
+  }
+}

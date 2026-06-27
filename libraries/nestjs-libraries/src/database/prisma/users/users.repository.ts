@@ -12,6 +12,16 @@ export class UsersRepository {
     private _profile: PrismaRepository<'userProfile'>
   ) {}
 
+  async getNamesByIds(ids: string[]): Promise<Map<string, string>> {
+    const rows = await this._user.model.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, email: true, profile: { select: { name: true } } },
+    });
+    return new Map(
+      rows.map((r) => [r.id, r.profile?.name || r.email || r.id])
+    );
+  }
+
   getImpersonateUser(name: string) {
     return this._user.model.user.findMany({
       where: {

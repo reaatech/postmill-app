@@ -53,6 +53,19 @@ joining existing photos (Unsplash) and videos (Pexels). Results carry `source`, 
 (photos, vectors, icons, videos). An active pack takes precedence over the matching free catalog;
 credentials are encrypted at rest and never returned to the client.
 
+v3.9.0 introduces the **Campaign Hub** (`/campaigns/:id`). Campaigns now expose a dashboard with
+KPIs, recent changelog, a planning workspace, tagged items (tags, media, notes, tasks, personas,
+tone, messages, goals, KPIs), and a dedicated posts section. Draft approval gates promotion to
+scheduled posts; campaign-level UTM tagging appends `utm_campaign`, `utm_source`, and `utm_medium` to
+outbound links. Campaign copy clones draft posts with optional date shifting and re-tags all
+campaign items. Org members can export CSV/PDF reports, and a shareable public report
+(`/public/campaign-report/:token`) returns read-only JSON when enabled. A daily Inngest cron
+`campaign-tag-purge` removes stale campaign items after `CAMPAIGN_PURGE_DAYS` (default 30). The
+dashboard also embeds a **campaign-scoped comments view** (filter by status/channel/assignee/unread,
+reply, like, status, assign, bulk mark-handled) reusing the cross-channel inbox endpoint with new
+`campaignId`/`integrationId` filters; the **Comments KPI/goal count synced, replyable comments**
+rather than the platform-reported engagement total.
+
 ### v3.8.10 (June 2026)
 
 Identity, tenancy, RBAC & provider-surface redesign:

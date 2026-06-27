@@ -139,7 +139,12 @@ resolution falls back to the org's primary set for the provider identifier (enab
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Campaign` | Grouping folder for posts — name, color, date range, archive state | FK → `Organization`; has many `Post` |
+| `Campaign` | Grouping folder for posts — name, color, date range, archive state, goals, public-share token/settings, UTM toggle | FK → `Organization`; has many `Post` |
+| `CampaignItem` | Polymorphic tagged item (`entityType` + `entityId`) linking a campaign to one of 8 non-post entity types | FK → `Campaign` |
+| `CampaignItemResolver` | Internal resolver used by `CampaignTagService`/`CampaignsService` to load display names/icons for `CampaignItem` rows without generic Prisma relations | not a Prisma model; resolves per-type in batches |
+
+`Post` carries `approvalStatus` / `approvedById` / `approvedAt` for the campaign draft-approval
+flow, and `Campaign.utmEnabled` drives automatic UTM append on publish.
 
 ---
 
@@ -205,6 +210,7 @@ through Prisma repositories — Mastra manages its own tables.
 | Enum | Values |
 |---|---|
 | `State` | `QUEUE`, `PUBLISHED`, `ERROR`, `DRAFT` |
+| `CampaignEntityType` | `POST`, `INTEGRATION`, `ORG_VPN_CONFIG`, `AI_ORG_PROVIDER_CONFIG`, `AI_BRAND_PROFILE`, `STORAGE_PROVIDER_CONFIG`, `FILE`, `SETS`, `SIGNATURES` |
 | `SubscriptionTier` | `STANDARD`, `PRO`, `TEAM`, `ULTIMATE` |
 | `Provider` | `LOCAL`, `GITHUB`, `GOOGLE`, `FARCASTER`, `WALLET`, `GENERIC` |
 | `ShortLinkPreference` | `ASK`, `YES`, `NO` |

@@ -6,226 +6,16 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
-import { Input } from '@gitroom/react/form/input';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
+import { CreateEditCampaignModal } from '@gitroom/frontend/components/campaigns/index/create-edit-campaign.modal';
+import { CopyCampaignModal } from '@gitroom/frontend/components/campaigns/index/copy-campaign.modal';
+import { CampaignCard } from '@gitroom/frontend/components/campaigns/index/campaign-card';
+import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
 
 const PAGE_SIZE = 25;
-
-interface Campaign {
-  id: string;
-  name: string;
-  color: string | null;
-  description: string | null;
-  startDate: string | null;
-  endDate: string | null;
-  archived: boolean;
-  createdAt: string;
-  _count: { posts: number };
-}
-
-interface CampaignEngagement {
-  totalViews: number;
-  totalLikes: number;
-  totalComments: number;
-  avgViews: number;
-  avgLikes: number;
-  avgComments: number;
-  topPost: {
-    id: string;
-    title: string;
-    lastViews: number | null;
-    lastLikes: number | null;
-    lastComments: number | null;
-    integration: string;
-  } | null;
-}
-
-const CreateEditCampaignModal: FC<{
-  editing?: Campaign | null;
-  onDone: () => void;
-}> = ({ editing, onDone }) => {
-  const fetch = useFetch();
-  const toast = useToaster();
-  const t = useT();
-  const [name, setName] = useState(editing?.name || '');
-  const [color, setColor] = useState(editing?.color || '');
-  const [description, setDescription] = useState(editing?.description || '');
-  const [startDate, setStartDate] = useState(editing?.startDate ? dayjs(editing.startDate).format('YYYY-MM-DD') : '');
-  const [endDate, setEndDate] = useState(editing?.endDate ? dayjs(editing.endDate).format('YYYY-MM-DD') : '');
-
-  const save = useCallback(async () => {
-    if (!name.trim()) return;
-    if (editing) {
-      await fetch(`/campaigns/${editing.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          color: color || undefined,
-          description: description.trim() || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        }),
-      });
-      toast.show(t('campaign_updated', 'Campaign updated'), 'success');
-    } else {
-      await fetch('/campaigns', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          color: color || undefined,
-          description: description.trim() || undefined,
-          startDate: startDate || undefined,
-          endDate: endDate || undefined,
-        }),
-      });
-      toast.show(t('campaign_created', 'Campaign created'), 'success');
-    }
-    onDone();
-  }, [name, color, description, startDate, endDate, editing, fetch, toast, t, onDone]);
-
-  return (
-    <div className="flex flex-col gap-[16px] p-[16px] min-w-[400px]">
-      <div className="flex flex-col gap-[4px]">
-        <label className="text-[12px] text-newTableText">{t('name', 'Name')}</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
-          placeholder={t('campaign_name_placeholder', 'Campaign name')}
-          autoFocus
-        />
-      </div>
-      <div className="flex gap-[8px]">
-        <div className="flex flex-col gap-[4px] flex-1">
-          <label className="text-[12px] text-newTableText">{t('color', 'Color')}</label>
-          <div className="flex gap-[8px] items-center">
-            <input
-              type="color"
-              value={color || '#2b5cd3'}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-[36px] h-[36px] rounded-[4px] cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none w-[100px]"
-              placeholder="#2b5cd3"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-col gap-[4px]">
-        <label className="text-[12px] text-newTableText">{t('description', 'Description')}</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none resize-none min-h-[60px]"
-          placeholder={t('campaign_desc_placeholder', 'Optional description')}
-        />
-      </div>
-      <div className="flex gap-[8px]">
-        <div className="flex flex-col gap-[4px] flex-1">
-          <label className="text-[12px] text-newTableText">{t('start_date', 'Start Date')}</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none w-full"
-          />
-        </div>
-        <div className="flex flex-col gap-[4px] flex-1">
-          <label className="text-[12px] text-newTableText">{t('end_date', 'End Date')}</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none w-full"
-          />
-        </div>
-      </div>
-      <div className="flex gap-[8px] justify-end mt-[8px]">
-        <Button type="button" secondary onClick={onDone}>{t('cancel', 'Cancel')}</Button>
-        <Button type="button" onClick={save} disabled={!name.trim()}>
-          {editing ? t('update', 'Update') : t('create', 'Create')}
-        </Button>
-      </div>
-    </div>
-  );
-};
-
-const CampaignCard: FC<{ campaign: Campaign }> = ({ campaign }) => {
-  const t = useT();
-  const fetch = useFetch();
-  const { data: engagement } = useSWR<CampaignEngagement>(
-    `campaign-engagement-${campaign.id}`,
-    async () => {
-      const r = await fetch(`/campaigns/${campaign.id}/engagement`);
-      if (!r.ok) throw new Error('Failed to load campaign engagement');
-      return r.json();
-    },
-    { revalidateOnFocus: false },
-  );
-
-  return (
-    <div
-      className="flex items-stretch justify-between p-[16px] bg-newBgColor border border-newTableBorder rounded-[8px] gap-[16px]"
-      style={campaign.color ? { borderLeftColor: campaign.color, borderLeftWidth: 4 } : undefined}
-    >
-      <div className="flex-1 flex flex-col gap-[8px]">
-        <div className="flex items-center gap-[8px]">
-          <span className="text-[15px] font-medium">{campaign.name}</span>
-          {campaign.archived && (
-            <span className="text-[11px] bg-newTableText/20 text-newTableText px-[6px] py-[1px] rounded-full">
-              {t('archived', 'Archived')}
-            </span>
-          )}
-        </div>
-        {campaign.description && (
-          <p className="text-[12px] text-newTableText">{campaign.description}</p>
-        )}
-        <div className="flex gap-[16px] text-[12px] text-newTableText flex-wrap">
-          <span>{campaign._count.posts} {t('posts', 'posts')}</span>
-          {campaign.startDate && (
-            <span>{dayjs(campaign.startDate).format('MMM D')} - {campaign.endDate ? dayjs(campaign.endDate).format('MMM D, YYYY') : t('ongoing', 'Ongoing')}</span>
-          )}
-        </div>
-        {engagement && (
-          <div className="flex gap-[16px] text-[12px] flex-wrap">
-            {engagement.totalViews > 0 && (
-              <span className="text-newTableText">
-                {t('views', 'Views')}: {Math.round(engagement.totalViews).toLocaleString()}
-              </span>
-            )}
-            {engagement.totalLikes > 0 && (
-              <span className="text-newTableText">
-                {t('likes', 'Likes')}: {Math.round(engagement.totalLikes).toLocaleString()}
-              </span>
-            )}
-            {engagement.totalComments > 0 && (
-              <span className="text-newTableText">
-                {t('comments', 'Comments')}: {Math.round(engagement.totalComments).toLocaleString()}
-              </span>
-            )}
-          </div>
-        )}
-        {engagement?.topPost && (
-          <div className="text-[11px] text-newTableText/70">
-            {t('top_post', 'Top Post')}: {engagement.topPost.title} ({engagement.topPost.integration})
-            {engagement.topPost.lastLikes ? ` — ${Math.round(engagement.topPost.lastLikes)} likes` : ''}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
 
 export const CampaignsPage: FC = () => {
   const t = useT();
@@ -269,6 +59,23 @@ export const CampaignsPage: FC = () => {
       children: (
         <CreateEditCampaignModal
           editing={campaign || null}
+          onDone={() => {
+            modal.closeAll();
+            swrMutate('/campaigns');
+          }}
+        />
+      ),
+    });
+  }, [modal, t]);
+
+  const openCopyModal = useCallback((campaign: Campaign) => {
+    modal.openModal({
+      title: t('copy_campaign', 'Copy Campaign'),
+      withCloseButton: true,
+      children: (
+        <CopyCampaignModal
+          campaignId={campaign.id}
+          name={campaign.name}
           onDone={() => {
             modal.closeAll();
             swrMutate('/campaigns');
@@ -353,33 +160,38 @@ export const CampaignsPage: FC = () => {
             <div
               key={campaign.id}
               className="flex flex-col bg-newBgColor border border-newTableBorder rounded-[8px]"
-              style={campaign.color ? { borderLeftColor: campaign.color, borderLeftWidth: 4 } : undefined}
             >
               <CampaignCard campaign={campaign} />
               <div className="flex items-center gap-[8px] justify-end px-[16px] pb-[12px]">
                 <button
-                  onClick={() => openCreateModal(campaign)}
+                  onClick={(e) => { e.preventDefault(); openCreateModal(campaign); }}
                   className="px-[8px] py-[4px] text-[12px] bg-btnPrimary text-white rounded-[8px]"
                 >
                   {t('edit', 'Edit')}
                 </button>
+                <button
+                  onClick={(e) => { e.preventDefault(); openCopyModal(campaign); }}
+                  className="px-[8px] py-[4px] text-[12px] bg-newBgColor border border-newTableBorder text-textColor rounded-[4px]"
+                >
+                  {t('copy', 'Copy')}
+                </button>
                 {campaign.archived ? (
                   <button
-                    onClick={() => archiveCampaign(campaign)}
+                    onClick={(e) => { e.preventDefault(); archiveCampaign(campaign); }}
                     className="px-[8px] py-[4px] text-[12px] border border-newTableBorder text-newTableText rounded-[4px]"
                   >
                     {t('unarchive', 'Unarchive')}
                   </button>
                 ) : (
                   <button
-                    onClick={() => archiveCampaign(campaign)}
+                    onClick={(e) => { e.preventDefault(); archiveCampaign(campaign); }}
                     className="px-[8px] py-[4px] text-[12px] bg-amber-500 text-white rounded-[4px]"
                   >
                     {t('archive', 'Archive')}
                   </button>
                 )}
                 <button
-                  onClick={() => remove(campaign.id)}
+                  onClick={(e) => { e.preventDefault(); remove(campaign.id); }}
                   className="px-[8px] py-[4px] text-[12px] bg-red-500 text-white rounded-[4px]"
                 >
                   {t('delete', 'Delete')}

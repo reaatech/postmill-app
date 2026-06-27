@@ -52,6 +52,13 @@ export const AddEditModal: FC<AddEditModalProps> = (props) => {
     setDate(props.date || newDayjs());
     setAllIntegrations(props.allIntegrations || []);
     setIsCreateSet(!!props.addEditSets);
+
+    return () => {
+      // Campaign/brand context is set by callers (campaign dashboard, etc.) and
+      // should not leak into the next composer session.
+      useLaunchStore.getState().setCampaignId(null);
+      useLaunchStore.getState().setBrandId(null);
+    };
   }, []);
 
   if (!integrations.length) {

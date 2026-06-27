@@ -32,6 +32,14 @@ export class SocialCommentsRepository {
       where.assigneeId = filters.assigneeId;
     }
 
+    if (filters.integrationId) {
+      where.integrationId = filters.integrationId;
+    }
+
+    if (filters.campaignId) {
+      where.post = { campaignId: filters.campaignId, deletedAt: null };
+    }
+
     if (filters.unreadOnly) {
       where.isOwn = false;
       if (where.status) {
@@ -229,6 +237,16 @@ export class SocialCommentsRepository {
   async countComments(postId: string): Promise<number> {
     return this._socialComment.model.socialComment.count({
       where: { postId, deletedAt: null },
+    });
+  }
+
+  async countByCampaign(orgId: string, campaignId: string): Promise<number> {
+    return this._socialComment.model.socialComment.count({
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        post: { campaignId, deletedAt: null },
+      },
     });
   }
 
