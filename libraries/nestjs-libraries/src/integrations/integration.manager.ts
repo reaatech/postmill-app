@@ -42,6 +42,11 @@ import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { ProviderNotConfiguredError } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.error';
+import {
+  getEnvClientInfo,
+  getEnvEnabledIdentifiers,
+  isEnvEnabled,
+} from '@gitroom/nestjs-libraries/integrations/channel-env-credentials';
 
 export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
   new XProvider(),
@@ -102,7 +107,10 @@ export class IntegrationManager {
     const allConfigs = orgId
       ? await this._orgProviderConfigManager.getAllConfigs(orgId)
       : await this._providerConfigManager.getAllConfigs();
-    const enabledSet = new Set(enabledIdentifiers);
+    // Providers the deployment env supplies a platform OAuth app for always stay
+    // connectable (click-connect), even after the org has added its own configs.
+    const envEnabled = getEnvEnabledIdentifiers();
+    const enabledSet = new Set([...enabledIdentifiers, ...envEnabled]);
     const hasAnyConfigs = allConfigs.length > 0;
 
     return {
@@ -202,9 +210,12 @@ export class IntegrationManager {
       console.warn(`IntegrationManager: Unknown provider '${providerName}' requested in getInternalPlugs`);
       return { internalPlugs: [] };
     }
-    const enabled = orgId
-      ? await this._orgProviderConfigManager.isEnabled(orgId, providerName)
-      : await this._providerConfigManager.isEnabled(providerName);
+    const enabled =
+      (orgId
+        ? await this._orgProviderConfigManager.isEnabled(orgId, providerName)
+        : false) ||
+      (await this._providerConfigManager.isEnabled(providerName)) ||
+      isEnvEnabled(providerName);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${providerName}`);
     }
@@ -227,9 +238,12 @@ export class IntegrationManager {
     if (!provider) {
       throw new NotFoundException(`Unknown integration: ${integration}`);
     }
-    const enabled = orgId
-      ? await this._orgProviderConfigManager.isEnabled(orgId, integration)
-      : await this._providerConfigManager.isEnabled(integration);
+    const enabled =
+      (orgId
+        ? await this._orgProviderConfigManager.isEnabled(orgId, integration)
+        : false) ||
+      (await this._providerConfigManager.isEnabled(integration)) ||
+      isEnvEnabled(integration);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${integration}`);
     }
@@ -252,12 +266,26 @@ export class IntegrationManager {
   // the org's primary config for the provider identifier.
   async getClientInformation(integration: string, orgId?: string, configId?: string | null) {
     if (orgId) {
-      if (configId) {
-        return this._orgProviderConfigManager.getClientInfoById(orgId, configId);
+      // A specific named credential set, or the org's own app for this provider,
+      // always wins over the platform default (BYO-app override).
+      const orgInfo = configId
+        ? await this._orgProviderConfigManager.getClientInfoById(orgId, configId)
+        : await this._orgProviderConfigManager.getClientInfo(orgId, integration);
+      if (orgInfo?.client_id || orgInfo?.token) {
+        return orgInfo;
       }
-      return this._orgProviderConfigManager.getClientInfo(orgId, integration);
+      // Platform-owned OAuth app (deployment env) — powers click-connect when the
+      // org hasn't brought its own keys. Falls through to the global config below.
+      const envInfo = getEnvClientInfo(integration);
+      if (envInfo) {
+        return envInfo;
+      }
+      return orgInfo;
     }
-    return this._providerConfigManager.getClientInfo(integration);
+    return (
+      (await this._providerConfigManager.getClientInfo(integration)) ||
+      getEnvClientInfo(integration)
+    );
   }
 
   async requireClientInformation(integration: string, orgId?: string, configId?: string | null) {
@@ -269,9 +297,14 @@ export class IntegrationManager {
   }
 
   async isProviderEnabled(integration: string, orgId?: string) {
-    if (orgId) {
-      return this._orgProviderConfigManager.isEnabled(orgId, integration);
+    if (
+      (orgId &&
+        (await this._orgProviderConfigManager.isEnabled(orgId, integration))) ||
+      (await this._providerConfigManager.isEnabled(integration)) ||
+      isEnvEnabled(integration)
+    ) {
+      return true;
     }
-    return this._providerConfigManager.isEnabled(integration);
+    return false;
   }
 }

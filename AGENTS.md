@@ -191,14 +191,28 @@ source of truth. Because pushes can force destructive diffs against the live pro
 
 ## Channel credentials
 
-All channel provider credentials live exclusively in the database via `OrgProviderConfiguration`,
-encrypted at rest through `EncryptionService` (AES-GCM). There is **no env var fallback** — the
-`getEnvOr()` function and `ChannelEnvMigrationService` were removed in v3.7.1. Each provider
-receives credentials through `clientInformation` (passed from `OrgProviderConfiguration`) or via
-`getOrgCredential(orgId, identifier, key)`. Never read `process.env` for channel credentials.
+Channel (social) OAuth-app credentials resolve along **two paths**, "click-connect primary, keys as
+fallback":
 
-AI provider credentials follow the same pattern: stored in `AIOrgProviderConfig`, encrypted at rest,
-with no `OPENAI_API_KEY` or other env var fallback.
+1. **Per-org `OrgProviderConfiguration`** (Settings → Channels) — named credential sets, encrypted at
+   rest through `EncryptionService` (AES-GCM). This is the **override**: when an org has its own app
+   for a provider it always wins.
+2. **Platform OAuth app from deployment env** (`channel-env-credentials.ts`) — when the operator sets
+   a provider's app keys in the environment, every org gets one-click "Connect" with no key entry.
+   Resolution is **live, per-request, presence-based, and never persisted to a tenant row** (unlike
+   the pre-v3.7.1 `ChannelEnvMigrationService`, which seeded env into the DB and was removed). If the
+   env var is unset, behaviour is per-org-only — no change.
+
+Resolution funnels through `IntegrationManager.getClientInformation(integration, orgId, configId?)`:
+explicit `configId` → org-by-id; else org primary config; else **env platform app**
+(`getEnvClientInfo`); else (no org context) global `ProviderConfiguration` → env. The add-channel
+list and `isEnabled`/`getSocialIntegration` gates union `getEnvEnabledIdentifiers()` so env-backed
+providers always stay connectable. This restores a deliberately-removed (v3.7.1) env path **for
+channels only** — the operator owns the OAuth apps, which is the normal multi-tenant social model.
+
+AI provider credentials do **not** follow this: stored in `AIOrgProviderConfig`, encrypted at rest,
+with **no** `OPENAI_API_KEY` or other env var fallback (a deployment's AI key must never be silently
+billed/leaked as a tenant's — preserve this).
 
 Short-link provider credentials follow the same pattern: stored in `OrgShortLinkConfig`, encrypted
 at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
