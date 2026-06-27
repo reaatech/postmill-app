@@ -34,6 +34,17 @@
   the OAuth `?config=<id>` binding.
 
 ### Changed
+- **Notifications v2 surfaces split to their correct homes.** The combined Settings → Notifications
+  tab is gone: per-user notification preferences (channels × categories + digest) now live in the
+  **Notifications tab of `/user/me`** (replacing the old email-only toggles), and the admin broadcast
+  composer is its own **Settings → Broadcast** tab under the **Workspace** heading (gated on
+  `notifications:manage`). This also fixes two bugs — saving preferences failed validation because
+  `UpdateNotificationPreferenceDto.masters` was typed as nested channel objects instead of flat
+  booleans, and the broadcast panel's `<form>` nested inside the settings form threw a React
+  `validateDOMNesting` console error on load (the broadcast composer no longer uses a `<form>`).
+  The legacy `EmailNotificationsComponent` and its `GET`/`POST /user/email-notifications` shim
+  (success/failure/streak email toggles) were removed — they were a thin adapter over the same v2
+  preferences (streak = the `system` category's email channel), so nothing is lost.
 - **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
   Brand Kit + Knowledge Base stacked) is now split into three tabs — **Voice & Tone**, **Brand Kit**,
   **Knowledge** — each with a one-line "what this does" hint, and all copy rewritten in plain language

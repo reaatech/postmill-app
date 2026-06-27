@@ -1,6 +1,5 @@
 'use client';
 
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import React, {
   FC,
   Ref,
@@ -14,7 +13,6 @@ import { showFileBox } from '@gitroom/frontend/components/files/file.component';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
-import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useSWRConfig } from 'swr';
 import clsx from 'clsx';
 import { TeamsComponent } from '@gitroom/frontend/components/settings/teams.component';
@@ -35,7 +33,7 @@ import { ChannelsTab } from '@gitroom/frontend/components/settings/channels/chan
 import { VpnTab } from '@gitroom/frontend/components/settings/vpn/vpn.tab';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { RolesTab } from '@gitroom/frontend/components/settings/roles/roles.tab';
-import { NotificationsTab } from '@gitroom/frontend/components/settings/notifications/notifications.tab';
+import { BroadcastTab } from '@gitroom/frontend/components/settings/broadcast/broadcast.tab';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
 import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
@@ -45,7 +43,6 @@ export const SettingsPopup: FC<{
   const { isGeneral } = useVariables();
   const { getRef } = props;
   const fetch = useFetch();
-  const toast = useToaster();
   const swr = useSWRConfig();
   const user = useUser();
   const permissions = usePermissions();
@@ -56,10 +53,6 @@ export const SettingsPopup: FC<{
   const form = useForm({
     resolver,
   });
-  const modal = useModals();
-  const close = useCallback(() => {
-    return modal.closeAll();
-  }, [modal]);
   const url = useSearchParams();
   const showLogout = !url.get('onboarding') || user?.tier?.current === 'FREE';
   const loadProfile = useCallback(async () => {
@@ -79,16 +72,19 @@ export const SettingsPopup: FC<{
   }, [form]);
 
   const submit = useCallback(async (val: any) => {
+    // The settings tabs (AI, Channels, VPN, …) render inside this form only so
+    // the onboarding flow's hidden submit button (getRef) can persist the
+    // profile. Outside that flow there is no profile UI here, so a stray button
+    // click or Enter bubbling up from a tab must not POST /user/personal or
+    // toast "Profile updated" — that's the misplaced-toast bug.
+    if (!getRef) {
+      return;
+    }
     await fetch('/user/personal', {
       method: 'POST',
       body: JSON.stringify(val),
     });
-    if (getRef) {
-      return;
-    }
-    toast.show(t('profile_updated', 'Profile updated'));
-    close();
-  }, [close, fetch, getRef, t, toast]);
+  }, [fetch, getRef]);
 
   const { collapsed, toggle } = useSidebarCollapse('settings:sidebar-collapsed');
   const tabParam = url.get('tab');
@@ -118,6 +114,8 @@ export const SettingsPopup: FC<{
   const canManageRoles =
     permissions.hasPermission('members', 'manage') ||
     permissions.hasPermission('settings', 'update');
+  // Admin broadcast tab — mirrors the backend @RequirePermission('notifications','manage').
+  const canBroadcast = permissions.hasPermission('notifications', 'manage');
   // R5: members whose role lacks settings:read get a no-access state instead
   // of the settings surface (the backend 403s the underlying calls anyway).
   const settingsDenied =
@@ -139,8 +137,10 @@ export const SettingsPopup: FC<{
     if (canManageRoles) {
       arr.push({ tab: 'roles', label: t('roles', 'Roles'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg> });
     }
+    if (canBroadcast) {
+      arr.push({ tab: 'broadcast', label: t('broadcast', 'Broadcast'), section: 'Workspace', icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 11l18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></svg> });
+    }
     arr.push({ tab: 'channels', label: t('channels', 'Channels'), icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg> });
-    arr.push({ tab: 'notifications', label: t('notifications', 'Notifications'), icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 21H10M18 8C18 6.4087 17.3679 4.88258 16.2427 3.75736C15.1174 2.63214 13.5913 2 12 2C10.4087 2 8.8826 2.63214 7.75738 3.75736C6.63216 4.88258 6.00002 6.4087 6.00002 8C6.00002 11.0902 5.22049 13.206 4.34968 14.6054C3.61515 15.7859 3.24788 16.3761 3.26134 16.5408C3.27626 16.7231 3.31488 16.7926 3.46179 16.9016C3.59448 17 4.19261 17 5.38887 17H18.6112C19.8074 17 20.4056 17 20.5382 16.9016C20.6852 16.7926 20.7238 16.7231 20.7387 16.5408C20.7522 16.3761 20.3849 15.7859 19.6504 14.6054C18.7795 13.206 18 11.0902 18 8Z"/></svg> });
     arr.push({ tab: 'ai', label: t('ai_llm', 'AI'), icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.3L19 10l-5.1 1.7L12 17l-1.9-5.3L5 10l5.1-1.7z"/><path d="M18.5 14l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"/></svg> });
     arr.push({ tab: 'shortlinks', label: t('shortlinks', 'Shortlinks'), icon: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg> });
     arr.push({ tab: 'content', label: t('content', 'Content'), icon: <svg width="16" height="16" viewBox="0 0 20 21" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7.50008 3L6.66675 7.16667M13.3334 3L12.5001 7.16667M18.3334 7.16667H1.66675M5.66675 18H14.3334C15.7335 18 16.4336 18 16.9684 17.7275C17.4388 17.4878 17.8212 17.1054 18.0609 16.635C18.3334 16.1002 18.3334 15.4001 18.3334 14V7C18.3334 5.59987 18.3334 4.8998 18.0609 4.36502C17.8212 3.89462 17.4388 3.51217 16.9684 3.27248C16.4336 3 15.7335 3 14.3334 3H5.66675C4.26662 3 3.56655 3 3.03177 3.27248C2.56137 3.51217 2.17892 3.89462 1.93923 4.36502C1.66675 4.8998 1.66675 5.59987 1.66675 7V14C1.66675 15.4001 1.66675 16.1002 1.93923 16.635C2.17892 17.1054 2.56137 17.4878 3.03177 17.7275C3.56655 18 4.26662 18 5.66675 18Z"/></svg> });
@@ -165,7 +165,7 @@ export const SettingsPopup: FC<{
       return a.label.localeCompare(b.label);
     });
     return arr;
-  }, [user, isGeneral, showLogout, t, canManageRoles]);
+  }, [user, isGeneral, showLogout, t, canManageRoles, canBroadcast]);
 
   // If the current tab isn't available for this user/tier, fall back to the
   // first available tab (guarded so it converges in a single re-render).
@@ -348,9 +348,9 @@ export const SettingsPopup: FC<{
                 </div>
               )}
 
-              {tab === 'notifications' && (
+              {tab === 'broadcast' && canBroadcast && (
                 <div>
-                  <NotificationsTab />
+                  <BroadcastTab />
                 </div>
               )}
 

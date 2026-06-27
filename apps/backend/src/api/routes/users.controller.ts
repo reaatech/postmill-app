@@ -32,7 +32,6 @@ import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
-import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import crypto from 'crypto';
@@ -46,8 +45,7 @@ export class UsersController {
     private _authService: AuthService,
     private _orgService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService,
-    private _notificationPreferenceService: NotificationPreferenceService
+    private _trackService: TrackService
   ) {}
   @Get('/agent-media-sso')
   async getAgentMediaSsoUrl(
@@ -160,33 +158,6 @@ export class UsersController {
     @Body() body: UserDetailDto
   ) {
     return this._userService.changePersonal(user.id, body);
-  }
-
-  @Get('/email-notifications')
-  async getEmailNotifications(@GetUserFromRequest() user: User) {
-    const prefs = await this._notificationPreferenceService.getPreferences(
-      user.id
-    );
-    return {
-      sendSuccessEmails: prefs.categories.post_published.email,
-      sendFailureEmails: prefs.categories.post_failed.email,
-      sendStreakEmails: prefs.categories.system.email,
-    };
-  }
-
-  @Post('/email-notifications')
-  async updateEmailNotifications(
-    @GetUserFromRequest() user: User,
-    @Body() body: { sendSuccessEmails: boolean; sendFailureEmails: boolean; sendStreakEmails: boolean }
-  ) {
-    await this._notificationPreferenceService.updatePreferences(user.id, {
-      categories: {
-        post_published: { email: body.sendSuccessEmails },
-        post_failed: { email: body.sendFailureEmails },
-        system: { email: body.sendStreakEmails },
-      } as any,
-    });
-    return { success: true };
   }
 
   @Post('/change-password')

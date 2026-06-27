@@ -13,7 +13,7 @@ import clsx from 'clsx';
 import { ProfileComponent } from '@gitroom/frontend/components/settings/profile.component';
 import MetricComponent from '@gitroom/frontend/components/settings/metric.component';
 import ChangePasswordComponent from '@gitroom/frontend/components/settings/change-password.component';
-import EmailNotificationsComponent from '@gitroom/frontend/components/settings/email-notifications.component';
+import { NotificationPreferencesPanel } from '@gitroom/frontend/components/settings/notifications/notification-preferences.panel';
 
 const tabs = [
   { key: 'profile', label: 'Profile' },
@@ -108,7 +108,7 @@ export default function ProfilePage() {
         </>
       )}
 
-      {tab === 'notifications' && <EmailNotificationsComponent />}
+      {tab === 'notifications' && <NotificationPreferencesPanel />}
     </div>
   );
 }

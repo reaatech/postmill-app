@@ -92,8 +92,8 @@ vi.mock('@gitroom/frontend/components/settings/roles/roles.tab', () => ({
   RolesTab: () => <div>Roles Tab Content</div>,
 }));
 
-vi.mock('@gitroom/frontend/components/settings/notifications/notifications.tab', () => ({
-  NotificationsTab: () => <div>Notifications Tab Content</div>,
+vi.mock('@gitroom/frontend/components/settings/broadcast/broadcast.tab', () => ({
+  BroadcastTab: () => <div>Broadcast Tab Content</div>,
 }));
 
 let mockPermissions = {
@@ -211,11 +211,11 @@ describe('SettingsPopup', () => {
     expect(screen.queryByText('No access to settings')).toBeNull();
   });
 
-  it('renders the Notifications tab when selected', () => {
-    mockSearchParams = 'tab=notifications';
+  it('renders the Broadcast tab when selected', () => {
+    mockSearchParams = 'tab=broadcast';
 
     render(<SettingsPopup />);
 
-    expect(screen.getByText('Notifications Tab Content')).toBeDefined();
+    expect(screen.getByText('Broadcast Tab Content')).toBeDefined();
   });
 });

@@ -40,20 +40,6 @@ export class ChannelTogglesDto implements ChannelToggles {
   inApp!: boolean;
 }
 
-export class NotificationPreferenceMastersDto {
-  @ValidateNested()
-  @Type(() => ChannelTogglesDto)
-  email!: ChannelTogglesDto;
-
-  @ValidateNested()
-  @Type(() => ChannelTogglesDto)
-  push!: ChannelTogglesDto;
-
-  @ValidateNested()
-  @Type(() => ChannelTogglesDto)
-  inApp!: ChannelTogglesDto;
-}
-
 export class NotificationPreferenceCategoriesDto {
   @ValidateNested()
   @Type(() => ChannelTogglesDto)
@@ -87,8 +73,8 @@ export class NotificationPreferenceCategoriesDto {
 export class UpdateNotificationPreferenceDto {
   @IsOptional()
   @ValidateNested()
-  @Type(() => NotificationPreferenceMastersDto)
-  masters?: NotificationPreferenceMastersDto;
+  @Type(() => ChannelTogglesDto)
+  masters?: ChannelTogglesDto;
 
   @IsOptional()
   @ValidateNested()
