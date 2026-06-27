@@ -208,7 +208,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(notificationService.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           orgId: 'org-1',
-          category: 'system',
+          category: 'media',
           title: expect.stringContaining('failed'),
           message: expect.stringContaining('failed'),
           channels: { email: false, push: false, inApp: true },
@@ -263,7 +263,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(notificationService.notify).toHaveBeenCalledWith(
         expect.objectContaining({
           orgId: 'org-1',
-          category: 'system',
+          category: 'media',
           title: expect.stringContaining('ready'),
           message: expect.stringContaining('ready'),
           channels: { email: false, push: false, inApp: true },

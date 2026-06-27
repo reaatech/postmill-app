@@ -191,7 +191,7 @@ export class IntegrationService {
   ) {
     await this._notificationService.notify({
       orgId,
-      category: 'channel_error',
+      category: 'channels',
       title: `Could not refresh your ${integration.providerIdentifier} channel ${err}`,
       message: `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/schedule`,
       metadata: { integrationId: integration.id, providerIdentifier: integration.providerIdentifier },

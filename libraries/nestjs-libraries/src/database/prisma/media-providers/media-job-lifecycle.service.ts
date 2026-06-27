@@ -492,7 +492,7 @@ export class MediaJobLifecycleService {
     try {
       await this._notificationService.notify({
         orgId: job.organizationId,
-        category: type === 'success' ? 'system' : 'system',
+        category: 'media',
         title: subject,
         message,
         metadata: { mediaJobId: job.id, operation: job.operation },

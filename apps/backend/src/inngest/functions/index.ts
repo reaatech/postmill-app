@@ -44,7 +44,7 @@ export const createFunctions = (activities: InngestActivities) => [
   createCampaignTagPurge(activities.campaignActivity),
   createAutopostProcess(activities.autopostActivity),
   createRefreshToken(activities.integrationsActivity),
-  createStreakTracker(activities.emailActivity),
+  createStreakTracker(activities.emailActivity, activities.postActivity),
   createAnalyticsBackfill(activities.analyticsActivity),
   ...createPostPublishFunctions(activities.postActivity),
 ];

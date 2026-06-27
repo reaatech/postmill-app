@@ -10,6 +10,22 @@
 
 ## Unreleased
 
+### Changed
+- **Notifications v2 is now the single surface for all email + in-app/push notifications.** The
+  placeholder category set was replaced with eight categories derived from the app's real triggers —
+  `post_published`, `post_failed`, `channels`, `comments`, `budget`, `media`, `announcements`,
+  `streak` — each independently toggleable per channel (email/push/in-app) at `/user/me` →
+  Notifications. The overloaded `system` catch-all and the never-fired `watchlist` category were
+  removed (the unrelated analytics watchlist feature is untouched), and the dead
+  `notifyInboxBacklog` / `notifyWatchlistTrend` / `notifySystem` convenience methods were deleted.
+  The **streak reminder** is now a real, preference-gated category routed through the notification
+  pipeline (it previously emailed every member directly, bypassing preferences, and now also appears
+  in the in-app bell). **Transactional emails** (account activation, password reset, team invite,
+  billing-cancel) are unified onto `NotificationService.sendEmail` as always-on sends (no
+  preference toggle, no stray in-app row) — no email path bypasses `NotificationService` anymore.
+  Code-only; categories persist as JSON, so existing preferences self-heal on read with **no schema
+  migration / no `prisma db push`**.
+
 ### Added
 - **Campaign comments — view & reply, folded into the dashboard.** Each campaign's dashboard gains a
   full **Comments** section over its posts' synced comments: filter by status, **channel**, assignee,

@@ -36,7 +36,7 @@ describe('DigestActivity', () => {
     vi.mocked(digestService.getPendingForUser).mockImplementation(async (userId: string) => {
       if (userId === 'user-1') {
         return [
-          { id: 'q-1', title: 'T1', message: 'M1', html: null, category: 'comment', createdAt: new Date() },
+          { id: 'q-1', title: 'T1', message: 'M1', html: null, category: 'comments', createdAt: new Date() },
         ] as any;
       }
       return [];
@@ -59,7 +59,7 @@ describe('DigestActivity', () => {
       { userId: 'user-1', user: { email: 'a@b.com' } },
     ]);
     vi.mocked(digestService.getPendingForUser).mockResolvedValue([
-      { id: 'q-1', title: 'T1', message: 'M1', html: '<h1>Rich</h1>', category: 'comment', createdAt: new Date() },
+      { id: 'q-1', title: 'T1', message: 'M1', html: '<h1>Rich</h1>', category: 'comments', createdAt: new Date() },
     ] as any);
 
     await activity.sendPendingDigests('weekly');

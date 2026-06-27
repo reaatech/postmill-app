@@ -83,7 +83,10 @@ export class NotificationService {
     override: boolean
   ): boolean {
     if (override) return true;
-    return prefs.masters[channel] && prefs.categories[category][channel];
+    const categoryToggles = prefs.categories[category];
+    // Unknown/legacy category (e.g. a stale string from before a rename) — gate on the master only.
+    if (!categoryToggles) return prefs.masters[channel];
+    return prefs.masters[channel] && categoryToggles[channel];
   }
 
   async notify(options: NotifyOptions): Promise<void> {
@@ -267,7 +270,7 @@ export class NotificationService {
         : `We couldn't post to ${providerIdentifier} for ${integrationName} because it's disabled. Please enable it and try again.`;
     await this.notify({
       orgId,
-      category: 'channel_error',
+      category: 'channels',
       title,
       message,
       metadata: { integrationName, providerIdentifier, reason, postId },
@@ -284,7 +287,7 @@ export class NotificationService {
     const message = `The post was published successfully, but ${integrationName} does not support first comments. Please add the comment manually if the platform allows it.`;
     await this.notify({
       orgId,
-      category: 'system',
+      category: 'post_published',
       title,
       message,
       metadata: { integrationName, postId },
@@ -301,26 +304,11 @@ export class NotificationService {
     const message = `The post was published successfully, but the first comment could not be posted on ${integrationName}. Please add the comment manually.`;
     await this.notify({
       orgId,
-      category: 'system',
+      category: 'post_published',
       title,
       message,
       metadata: { integrationName, postId },
       channels: { email: true, push: false, inApp: true },
-    });
-  }
-
-  async notifyInboxBacklog(orgId: string, backlogCount: number) {
-    if (backlogCount <= 5) return;
-    const title = 'Comment inbox backlog';
-    const message = `You have ${backlogCount} unhandled comments in your inbox. Responding quickly improves engagement.`;
-    await this.notify({
-      orgId,
-      category: 'comment',
-      title,
-      message,
-      metadata: { backlogCount },
-      channels: { email: true, push: false, inApp: true },
-      digest: true,
     });
   }
 
@@ -334,26 +322,6 @@ export class NotificationService {
       message,
       metadata: { scope, usagePct },
       channels: { email: true, push: false, inApp: true },
-    });
-  }
-
-  async notifyWatchlistTrend(
-    orgId: string,
-    accountName: string,
-    metric: string,
-    changePct: number
-  ) {
-    const direction = changePct > 0 ? 'increased' : 'decreased';
-    const title = `Watchlist alert: ${accountName}`;
-    const message = `${accountName} ${metric} has ${direction} by ${Math.abs(changePct).toFixed(1)}%.`;
-    await this.notify({
-      orgId,
-      category: 'watchlist',
-      title,
-      message,
-      metadata: { accountName, metric, changePct },
-      channels: { email: true, push: false, inApp: true },
-      digest: true,
     });
   }
 
@@ -390,7 +358,7 @@ export class NotificationService {
 
     await this.notify({
       orgId,
-      category: 'comment',
+      category: 'comments',
       title: 'Comment inbox backlog',
       message: `You have ${totalNewComments} unhandled comments in your inbox. Responding quickly improves engagement.`,
       metadata: { backlogCount: totalNewComments, posts: posts.map((p) => p.id) },
@@ -400,13 +368,15 @@ export class NotificationService {
     });
   }
 
-  async notifySystem(orgId: string, title: string, message: string, link?: string) {
+  async notifyStreakReminder(orgId: string) {
+    const title = 'Keep your streak alive!';
+    const message =
+      'You have 2 hours left to keep your posting streak alive. Schedule or publish a post to keep it going.';
     await this.notify({
       orgId,
-      category: 'system',
+      category: 'streak',
       title,
       message,
-      link,
       channels: { email: true, push: false, inApp: true },
     });
   }

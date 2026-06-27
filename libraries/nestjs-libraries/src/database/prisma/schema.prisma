@@ -537,7 +537,7 @@ model NotificationPreference {
   id              String @id @default(uuid())
   userId          String @unique
   masters         Json   @default("{\"email\":true,\"push\":true,\"inApp\":true}")
-  categories      Json   @default("{\"post_published\":{\"email\":true,\"push\":false,\"inApp\":true},\"post_failed\":{\"email\":true,\"push\":true,\"inApp\":true},\"channel_error\":{\"email\":true,\"push\":true,\"inApp\":true},\"comment\":{\"email\":true,\"push\":false,\"inApp\":true},\"budget\":{\"email\":true,\"push\":false,\"inApp\":true},\"watchlist\":{\"email\":true,\"push\":false,\"inApp\":true},\"system\":{\"email\":true,\"push\":false,\"inApp\":true}}")
+  categories      Json   @default("{\"post_published\":{\"email\":true,\"push\":false,\"inApp\":true},\"post_failed\":{\"email\":true,\"push\":true,\"inApp\":true},\"channels\":{\"email\":true,\"push\":true,\"inApp\":true},\"comments\":{\"email\":true,\"push\":false,\"inApp\":true},\"budget\":{\"email\":true,\"push\":false,\"inApp\":true},\"media\":{\"email\":false,\"push\":false,\"inApp\":true},\"announcements\":{\"email\":true,\"push\":false,\"inApp\":true},\"streak\":{\"email\":true,\"push\":false,\"inApp\":true}}")
   digestFrequency String @default("instant")
   user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 

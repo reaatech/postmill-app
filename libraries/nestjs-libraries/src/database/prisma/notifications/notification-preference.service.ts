@@ -19,11 +19,12 @@ export interface NotificationPreferenceData {
 export const DEFAULT_CATEGORY_TOGGLES: Record<NotificationCategory, ChannelToggles> = {
   post_published: { email: true, push: false, inApp: true },
   post_failed: { email: true, push: true, inApp: true },
-  channel_error: { email: true, push: true, inApp: true },
-  comment: { email: true, push: false, inApp: true },
+  channels: { email: true, push: true, inApp: true },
+  comments: { email: true, push: false, inApp: true },
   budget: { email: true, push: false, inApp: true },
-  watchlist: { email: true, push: false, inApp: true },
-  system: { email: true, push: false, inApp: true },
+  media: { email: false, push: false, inApp: true },
+  announcements: { email: true, push: false, inApp: true },
+  streak: { email: true, push: false, inApp: true },
 };
 
 export const DEFAULT_MASTERS: ChannelToggles = {

@@ -447,6 +447,10 @@ export class PostActivity {
     );
   }
 
+  async notifyStreakReminder(orgId: string) {
+    await this._notificationService.notifyStreakReminder(orgId);
+  }
+
   async globalPlugs(integration: Integration) {
     return this._postService.checkPlugs(
       integration.organizationId,

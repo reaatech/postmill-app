@@ -8,6 +8,8 @@ import {
   Body,
   Query,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { Organization, User } from '@prisma/client';
@@ -93,7 +95,18 @@ export class NotificationsController {
     return this._preferenceService.getPreferences(user.id);
   }
 
+  // Strip unknown category keys instead of 400-ing on them: during a deploy a
+  // stale frontend may POST the previous category set (or a future one). The
+  // service only merges known keys, so silently dropping extras is safe and
+  // avoids breaking preference saves across a version skew.
   @Post('/preferences')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: false,
+    })
+  )
   async updatePreferences(
     @GetUserFromRequest() user: User,
     @Body() body: UpdateNotificationPreferenceDto

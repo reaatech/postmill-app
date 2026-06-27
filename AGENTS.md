@@ -270,6 +270,33 @@ The backend serves the Inngest handler at **`/api/inngest`**; functions live in
   `media-jobs-poll.ts` (every minute — poll pending media jobs + FFmpeg video renders),
   `missing-post-finder.ts` (hourly — recover posts that should have published).
 
+## Notifications (V2)
+
+`NotificationService` (`libraries/nestjs-libraries/src/database/prisma/notifications/`) is the
+**single chokepoint** for every user-facing email + in-app/push notification. **Do not call
+`EmailService` directly** from feature code — the only exceptions are `digest.activity.ts` (the
+daily/weekly digest flush) and the `email/send` Inngest relay.
+
+- **Two dispatch modes.** `notify({ orgId, category, ... })` fans out to org members and is gated by
+  each member's per-category, per-channel preferences (with digest routing). `sendEmail(to, subject,
+  html, replyTo?)` is the **always-on transactional** path for single/arbitrary recipients
+  (activation, password reset, team invite, billing-cancel) — no preference gate, no in-app row.
+- **Eight categories**, derived from real triggers, each toggleable per channel (email/push/in-app)
+  at `/user/me` → Notifications: `post_published`, `post_failed`, `channels`, `comments`, `budget`,
+  `media`, `announcements`, `streak`. The set is hardcoded in three lockstep places — the DTO
+  (`dtos/notifications/notification-preference.dto.ts`: union + `NOTIFICATION_CATEGORIES` +
+  `NotificationPreferenceCategoriesDto`, whose `whitelist`/`forbidNonWhitelisted` requires the
+  frontend to send exactly these keys), `DEFAULT_CATEGORY_TOGGLES`
+  (`notification-preference.service.ts`), and the frontend panel
+  (`settings/notifications/notification-preferences.panel.tsx`).
+- **No schema migration to change the set.** Categories persist as plain `String`/JSON columns;
+  `ensureDefaults` writes explicit defaults and `toData()` backfills new keys / drops orphaned ones
+  on read, so renames/adds are code-only (the Prisma `@default` JSON is cosmetic). `_channelEnabled`
+  tolerates an unknown category (gates on the master channel only) so stale strings never throw.
+- **Admin broadcast** (`/admin/notifications/broadcast`, `notifications:manage`) sends category
+  `announcements` with `override: true`. The **bell** (`components/notifications/notification.component.tsx`)
+  reads the V2 `/notifications` routes and renders `type` opaquely.
+
 ## Analytics
 
 Refactored from single-channel live-fetch to a persisted multi-channel dashboard.

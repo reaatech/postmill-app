@@ -6,7 +6,7 @@ const mockGetTeam = vi.fn().mockResolvedValue({ users: [] });
 const mockEnsureDefaults = vi.fn().mockResolvedValue({
   masters: { email: true, push: true, inApp: true },
   categories: {
-    system: { email: true, push: true, inApp: true },
+    announcements: { email: true, push: true, inApp: true },
   },
 });
 const mockGetDigestFrequencies = vi.fn().mockResolvedValue({});
@@ -105,7 +105,7 @@ describe('NotificationService', () => {
 
     await service.notify({
       orgId: 'org-1',
-      category: 'system',
+      category: 'announcements',
       title: 'Subject',
       message: 'Message',
     });
@@ -113,7 +113,7 @@ describe('NotificationService', () => {
     expect(mockCreateNotification).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: 'org-1',
-        type: 'system',
+        type: 'announcements',
         title: 'Subject',
         content: 'Message',
       })
@@ -128,7 +128,7 @@ describe('NotificationService', () => {
 
     await service.notify({
       orgId: 'org-1',
-      category: 'system',
+      category: 'announcements',
       title: 'Subject',
       message: 'Message',
       digest: true,
@@ -152,7 +152,7 @@ describe('NotificationService', () => {
 
     await service.notify({
       orgId: 'org-1',
-      category: 'system',
+      category: 'announcements',
       title: 'Subject',
       message: 'Message',
       digest: true,
@@ -165,7 +165,7 @@ describe('NotificationService', () => {
       expect.objectContaining({
         title: 'Subject',
         message: 'Message',
-        category: 'system',
+        category: 'announcements',
       })
     );
   });
@@ -178,7 +178,7 @@ describe('NotificationService', () => {
 
     await service.notify({
       orgId: 'org-1',
-      category: 'system',
+      category: 'announcements',
       title: 'Subject',
       message: 'Message',
       digest: true,
@@ -195,13 +195,13 @@ describe('NotificationService', () => {
     mockEnsureDefaults.mockResolvedValue({
       masters: { email: true, push: true, inApp: true },
       categories: {
-        system: { email: false, push: true, inApp: true },
+        announcements: { email: false, push: true, inApp: true },
       },
     });
 
     await service.notify({
       orgId: 'org-1',
-      category: 'system',
+      category: 'announcements',
       title: 'Subject',
       message: 'Message',
     });

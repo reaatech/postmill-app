@@ -54,7 +54,7 @@ export class AdminNotificationsController {
 
     await this._notificationService.notify({
       orgId: organization.id,
-      category: 'system',
+      category: 'announcements',
       title: body.title,
       message: body.message,
       channels: body.channels ?? { email: true, push: false, inApp: true },

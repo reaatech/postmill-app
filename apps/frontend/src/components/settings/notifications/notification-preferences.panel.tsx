@@ -10,17 +10,23 @@ export type NotificationChannel = 'email' | 'push' | 'inApp';
 export type NotificationCategory =
   | 'post_published'
   | 'post_failed'
-  | 'channel_error'
-  | 'comment'
+  | 'channels'
+  | 'comments'
   | 'budget'
-  | 'watchlist'
-  | 'system';
+  | 'media'
+  | 'announcements'
+  | 'streak';
 
 export interface ChannelToggles {
   email: boolean;
   push: boolean;
   inApp: boolean;
 }
+
+// Fallback for a category the API response doesn't include yet (e.g. a stale
+// backend during a deploy, or a newly added category). Keeps the panel from
+// crashing on `categories[category]` being undefined.
+const EMPTY_TOGGLES: ChannelToggles = { email: false, push: false, inApp: false };
 
 export interface NotificationPreferences {
   masters: ChannelToggles;
@@ -31,21 +37,23 @@ export interface NotificationPreferences {
 const CATEGORY_ORDER: NotificationCategory[] = [
   'post_published',
   'post_failed',
-  'channel_error',
-  'comment',
+  'channels',
+  'comments',
   'budget',
-  'watchlist',
-  'system',
+  'media',
+  'announcements',
+  'streak',
 ];
 
 const CATEGORY_LABEL_KEYS: Record<NotificationCategory, [string, string]> = {
   post_published: ['notification_cat_post_published', 'Post published'],
   post_failed: ['notification_cat_post_failed', 'Post failed'],
-  channel_error: ['notification_cat_channel_error', 'Channel error'],
-  comment: ['notification_cat_comment', 'Comments'],
+  channels: ['notification_cat_channels', 'Channel issues'],
+  comments: ['notification_cat_comments', 'Comments'],
   budget: ['notification_cat_budget', 'AI budget'],
-  watchlist: ['notification_cat_watchlist', 'Watchlist'],
-  system: ['notification_cat_system', 'System'],
+  media: ['notification_cat_media', 'Media jobs'],
+  announcements: ['notification_cat_announcements', 'Announcements'],
+  streak: ['notification_cat_streak', 'Streak reminders'],
 };
 
 const CHANNEL_ORDER: NotificationChannel[] = ['email', 'push', 'inApp'];
@@ -150,7 +158,10 @@ export const NotificationPreferencesPanel: React.FC = () => {
         ...local,
         categories: {
           ...local.categories,
-          [category]: { ...local.categories[category], [channel]: value },
+          [category]: {
+            ...(local.categories[category] ?? EMPTY_TOGGLES),
+            [channel]: value,
+          },
         },
       };
       setLocal(next);
@@ -177,7 +188,7 @@ export const NotificationPreferencesPanel: React.FC = () => {
       channels: CHANNEL_ORDER.map((channel) => ({
         channel,
         label: CHANNEL_LABEL_KEYS[channel],
-        checked: local.categories[category][channel],
+        checked: (local.categories[category] ?? EMPTY_TOGGLES)[channel],
         disabled: !local.masters[channel],
       })),
     }));
