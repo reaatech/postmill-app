@@ -10,6 +10,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 
 const PAGE_SIZE = 25;
 
@@ -204,6 +205,10 @@ const AddOrEditSignature: FC<{
           {content.length} {t('characters', 'characters')}
         </div>
       </div>
+
+      {data?.id && (
+        <CampaignSelector entityType="signature" entityId={data.id} />
+      )}
 
       {/* Logo / sticker */}
       <div>

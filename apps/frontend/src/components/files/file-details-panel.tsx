@@ -6,6 +6,7 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 import type { FileItem } from './file-manager';
 
 const formatDate = (dateStr: string) => {
@@ -201,6 +202,11 @@ export const FileDetailsPanel: FC<{
                 className="flex-1 min-w-[80px] bg-transparent border-b border-newColColor text-[12px] text-textColor outline-none focus:border-[#2B5CD3] placeholder:text-textColor/30"
               />
             </div>
+          </div>
+
+          <div className="border-t border-newBorder pt-[14px]">
+            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500] block mb-[6px]">Campaigns</label>
+            <CampaignSelector entityType="file" entityId={file.id} compact />
           </div>
 
           <div className="border-t border-newBorder pt-[14px] space-y-[8px]">

@@ -8,10 +8,13 @@ import {
   Post,
   Put,
 } from '@nestjs/common';
-import { Organization } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ApiTags } from '@nestjs/swagger';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
+import { CampaignItemDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-item.dto';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
   AuthorizationActions,
@@ -69,7 +72,22 @@ class UpdateCampaignDto {
 @ApiTags('Campaigns')
 @Controller('/campaigns')
 export class CampaignsController {
-  constructor(private _campaignsService: CampaignsService) {}
+  constructor(
+    private _campaignsService: CampaignsService,
+    private _campaignTagService: CampaignTagService
+  ) {}
+
+  // Reverse lookup for the per-entity Campaign selector. Declared before `/:id`
+  // routes (different segment count, but keep it explicit).
+  @Get('/for/:entityType/:entityId')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async campaignsForItem(
+    @GetOrgFromRequest() org: Organization,
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string
+  ) {
+    return this._campaignTagService.listCampaignsForItem(org.id, entityType, entityId);
+  }
 
   @Get('/')
   @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
@@ -142,5 +160,38 @@ export class CampaignsController {
   ) {
     await this._campaignsService.remove(id, org.id);
     return { success: true };
+  }
+
+  // ── Tagging: associate any of the 9 entity types with a campaign ──
+  @Get('/:id/items')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async listItems(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    return this._campaignTagService.listItems(org.id, id);
+  }
+
+  @Post('/:id/items')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async tagItem(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Body() body: CampaignItemDto
+  ) {
+    return this._campaignTagService.tagItem(org.id, id, user?.id, body.entityType, body.entityId);
+  }
+
+  @Delete('/:id/items/:entityType/:entityId')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async untagItem(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Param('entityType') entityType: string,
+    @Param('entityId') entityId: string
+  ) {
+    return this._campaignTagService.untagItem(org.id, id, user?.id, entityType, entityId);
   }
 }

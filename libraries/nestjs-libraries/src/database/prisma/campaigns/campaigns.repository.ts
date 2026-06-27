@@ -22,6 +22,22 @@ export class CampaignsRepository {
     });
   }
 
+  // Lightweight fetch for the per-entity campaign selector (id/name/color/dates).
+  findByIds(organizationId: string, ids: string[]) {
+    return this._prisma.campaign.findMany({
+      where: { id: { in: ids }, organizationId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        startDate: true,
+        endDate: true,
+        archived: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   create(data: {
     organizationId: string;
     name: string;

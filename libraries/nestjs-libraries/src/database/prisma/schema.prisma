@@ -422,6 +422,9 @@ model Post {
   commentCount               Int                       @default(0)
   campaignId                 String?
   campaign                   Campaign?                 @relation(fields: [campaignId], references: [id])
+  approvalStatus             String?                   // campaign draft approval: pending|approved|rejected
+  approvedById               String?
+  approvedAt                 DateTime?
   brandId                    String?
   brand                      AIBrandProfile?          @relation(fields: [brandId], references: [id])
   analyticsSnapshots         PostAnalyticsSnapshot[]
@@ -1552,15 +1555,51 @@ model Campaign {
   startDate      DateTime?
   endDate        DateTime?
   archived       Boolean  @default(false)
+  createdById    String?              // user who created the campaign
+  goals          Json?                // [{ metric, target }] targets shown vs progress on the dashboard
+  shareToken     String?  @unique     // CSPRNG token for the public read-only client report link
+  shareEnabled   Boolean  @default(false)
+  utmEnabled     Boolean  @default(false) // auto-append utm_campaign/source to links in this campaign's posts
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
   posts          Post[]
   designs        Design[]
+  items          CampaignItem[]
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+// Polymorphic association: tags a campaign onto any of the 8 non-post entity types
+// (posts use Post.campaignId). entityType+entityId identify the tagged row; no FK to
+// the source tables (orphans are skipped on read and reaped by the purge cron).
+model CampaignItem {
+  id             String             @id @default(uuid())
+  campaignId     String
+  organizationId String
+  entityType     CampaignEntityType
+  entityId       String
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  campaign       Campaign           @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, entityType, entityId])
+  @@index([organizationId, entityType, entityId])
+  @@index([campaignId, entityType])
+}
+
+enum CampaignEntityType {
+  POST
+  INTEGRATION
+  ORG_VPN_CONFIG
+  AI_ORG_PROVIDER_CONFIG
+  AI_BRAND_PROFILE
+  STORAGE_PROVIDER_CONFIG
+  FILE
+  SETS
+  SIGNATURES
 }
 
 // Editable design documents — one per org-scoped design

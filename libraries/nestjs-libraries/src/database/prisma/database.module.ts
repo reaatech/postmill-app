@@ -95,6 +95,9 @@ import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/w
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
+import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
@@ -191,6 +194,9 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     WatchlistService,
     CampaignsRepository,
     CampaignsService,
+    CampaignItemRepository,
+    CampaignItemResolverRepository,
+    CampaignTagService,
     BrandsService,
     BrandsRepository,
     OrgProviderConfigService,

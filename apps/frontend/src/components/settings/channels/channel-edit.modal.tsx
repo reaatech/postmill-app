@@ -8,6 +8,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useVpnConfig } from '@gitroom/frontend/components/settings/vpn/hooks/useVpnConfig';
 import { ChannelVpnRegionSelect } from './channel-vpn-region-select';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 
 const PROVIDER_APP_LINKS: Record<string, { label: string; url: string | null }> = {
   linkedin: { label: 'LinkedIn Developer Portal', url: 'https://www.linkedin.com/developers/apps' },
@@ -301,6 +302,10 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
             rows={3}
           />
         </div>
+      )}
+
+      {isEdit && config?.id && (
+        <CampaignSelector entityType="channel" entityId={config.id} />
       )}
 
       {vpnOptions.length > 0 && (

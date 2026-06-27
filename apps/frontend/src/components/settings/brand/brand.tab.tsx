@@ -8,6 +8,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { BrandVoice } from '@gitroom/frontend/components/settings/brand/brand-voice';
 import { BrandAssets } from '@gitroom/frontend/components/settings/brand/brand-assets';
 import { KnowledgeBase } from '@gitroom/frontend/components/settings/brand/knowledge-base';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 
 interface BrandAsset {
@@ -124,6 +125,10 @@ export const BrandTab = () => {
         <p className="text-[13px] text-newTableText mb-[16px] max-w-[640px] leading-relaxed">
           {t('brand_editor_intro', "A “brand” is a personality for the AI. Set up how it should write, what your brand looks like, and what it knows about your business — then it'll create on-brand posts for you. Pick a section below to get started.")}
         </p>
+
+        <div className="mb-[16px] max-w-[640px]">
+          <CampaignSelector entityType="brand" entityId={editingBrand.id} />
+        </div>
 
         <div className="flex gap-[8px] flex-wrap mb-[16px]">
           {editTabs.map((tab) => (

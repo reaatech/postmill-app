@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 
 const allProviderTypes = [
   { value: 'LOCAL', label: 'Local Storage' },
@@ -270,6 +271,10 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                 ? 'Connection successful!'
                 : `Connection failed: ${testResult.error}`}
             </div>
+          )}
+
+          {editProvider?.id && (
+            <CampaignSelector entityType="storage" entityId={editProvider.id} />
           )}
 
           <div className="flex gap-[12px] justify-end mt-[8px]">
