@@ -155,7 +155,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
                       : 'border-newTableBorder bg-transparent hover:bg-boxHover'
                   }`}
                 >
-                  <ProviderIcon identifier={value} name={label} size={28} />
+                  <ProviderIcon identifier={value} name={label} size={36} />
                   <span className="text-[10px] text-newTableText text-center">
                     {label}
                   </span>

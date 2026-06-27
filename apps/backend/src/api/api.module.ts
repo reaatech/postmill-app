@@ -49,6 +49,7 @@ import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { OrgVpnSettingsController } from '@gitroom/backend/api/routes/org-vpn-settings.controller';
 import { ContentPackController } from '@gitroom/backend/api/routes/content-pack.controller';
 import { MediaProviderController } from '@gitroom/backend/api/routes/media-provider.controller';
 import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
@@ -111,6 +112,7 @@ const authenticatedController = [
   OrgAiSettingsController,
   RagController,
   OrgShortLinkSettingsController,
+  OrgVpnSettingsController,
   ContentPackController,
   MediaProviderController,
   ApiKeysController,

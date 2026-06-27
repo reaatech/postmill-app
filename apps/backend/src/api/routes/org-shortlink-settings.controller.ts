@@ -138,14 +138,14 @@ export class OrgShortLinkSettingsController {
     }
   }
 
-  @Delete('/config/:id')
+  @Delete('/config/:identifier')
   @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async deleteConfig(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
+    @Param('identifier') identifier: string,
   ) {
-    await this._orgShortLinkSettings.deleteById(org.id, id);
+    await this._orgShortLinkSettings.delete(org.id, identifier);
     return { success: true };
   }
 

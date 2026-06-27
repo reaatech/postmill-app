@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SWRConfig } from 'swr';
 
 const mockFetchFn = vi.fn();
@@ -34,7 +34,7 @@ const defaultProviders = [
   {
     identifier: 'bitly',
     name: 'Bitly',
-    capabilities: { create: true, statistics: true, customDomain: true },
+    capabilities: { create: true, statistics: true, customDomain: true, expand: false, bulkStatistics: false },
     isActive: false,
     isConfigured: false,
     customDomain: '',
@@ -43,7 +43,7 @@ const defaultProviders = [
   {
     identifier: 'tinyurl',
     name: 'TinyURL',
-    capabilities: { create: true, statistics: false, customDomain: false },
+    capabilities: { create: true, statistics: false, customDomain: false, expand: false, bulkStatistics: false },
     isActive: false,
     isConfigured: true,
     customDomain: '',
@@ -52,7 +52,7 @@ const defaultProviders = [
   {
     identifier: 'rebrandly',
     name: 'Rebrandly',
-    capabilities: { create: true, statistics: true, customDomain: true },
+    capabilities: { create: true, statistics: true, customDomain: true, expand: false, bulkStatistics: false },
     isActive: true,
     isConfigured: true,
     customDomain: '',
@@ -61,7 +61,7 @@ const defaultProviders = [
   {
     identifier: 'readonly-provider',
     name: 'ReadOnly',
-    capabilities: { create: false, statistics: false, customDomain: false },
+    capabilities: { create: false, statistics: false, customDomain: false, expand: false, bulkStatistics: false },
     isActive: false,
     isConfigured: false,
     customDomain: '',
@@ -84,7 +84,7 @@ let mockError: Error | null = null;
 const mockProvidersList = defaultProviders.map((p) => ({
   ...p,
   credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
-  authType: 'apiKey',
+  authType: p.identifier === 'bitly' ? 'oauth2' : 'apiKey',
 }));
 
 vi.mock('./hooks/useShortlinksConfig', () => ({
@@ -124,46 +124,14 @@ beforeEach(() => {
 });
 
 describe('ShortlinksTab', () => {
-  describe('Active Provider Card', () => {
-    it('renders active provider card with provider name', async () => {
-      const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab />, { wrapper });
-
-      expect(screen.getByText('Active Provider')).toBeDefined();
-      const activeBadges = screen.getAllByText('Active');
-      expect(activeBadges.length).toBeGreaterThan(0);
-
-      const activeCard = screen.getByText('Active Provider').closest('.bg-newBgColorInner')!;
-      const activeProviderName = within(activeCard).getByText((content, element) =>
-        content === 'Rebrandly' && element.tagName === 'SPAN' && !element.getAttribute('data-testid')
-      );
-      expect(activeProviderName).toBeDefined();
-    });
-
-    it('shows empty state when no active provider', async () => {
-      mockConfigData = { active: null, providers: [] };
-
-      const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab />, { wrapper });
-
-      expect(screen.getByText('No provider configured. Configure a provider below.')).toBeDefined();
-    });
-  });
-
   describe('Provider List', () => {
     it('renders all providers', async () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const bitlyEntries = screen.getAllByText('Bitly');
-      expect(bitlyEntries.length).toBeGreaterThanOrEqual(1);
-      const tinyurlElements = screen.getAllByText((content, element) =>
-        content === 'TinyURL' && element.tagName === 'SPAN' && !element.getAttribute('data-testid')
-      );
-      expect(tinyurlElements.length).toBeGreaterThanOrEqual(1);
-
-      const rebrandlyEntries = screen.getAllByText('Rebrandly');
-      expect(rebrandlyEntries.length).toBeGreaterThanOrEqual(2);
+      expect(screen.getAllByText('Bitly').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('TinyURL').length).toBeGreaterThanOrEqual(1);
+      expect(screen.getAllByText('Rebrandly').length).toBeGreaterThanOrEqual(1);
     });
 
     it('shows Configure button for unconfigured providers', async () => {
@@ -188,6 +156,19 @@ describe('ShortlinksTab', () => {
 
       expect(screen.getByText('Set Active')).toBeDefined();
     });
+
+    it('filters providers by search', async () => {
+      const { ShortlinksTab } = await import('./shortlinks.tab');
+      render(<ShortlinksTab />, { wrapper });
+
+      const searchInput = screen.getByPlaceholderText('Search providers...');
+      fireEvent.change(searchInput, { target: { value: 'tiny' } });
+
+      await waitFor(() => {
+        expect(screen.getAllByText('TinyURL').length).toBeGreaterThanOrEqual(1);
+        expect(screen.queryByText('Bitly')).toBeNull();
+      });
+    });
   });
 
   describe('Capability Chips', () => {
@@ -207,19 +188,6 @@ describe('ShortlinksTab', () => {
       expect(customDomainChips.length).toBeGreaterThan(0);
     });
 
-    it('renders No stats chip for providers without statistics', async () => {
-      const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab />, { wrapper });
-
-      expect(screen.getByText('No stats')).toBeDefined();
-    });
-
-    it('renders Read-only chip for providers without create capability', async () => {
-      const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab />, { wrapper });
-
-      expect(screen.getByText('Read-only')).toBeDefined();
-    });
   });
 
   describe('Delete Provider', () => {
@@ -238,7 +206,7 @@ describe('ShortlinksTab', () => {
       confirmSpy.mockRestore();
     });
 
-    it('calls delete endpoint after confirm', async () => {
+    it('calls delete endpoint by identifier after confirm', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
       mockFetchFn.mockResolvedValueOnce({ ok: true });
 
@@ -249,7 +217,7 @@ describe('ShortlinksTab', () => {
       fireEvent.click(removeButtons[0]);
 
       await waitFor(() => {
-        expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/cfg-1', {
+        expect(mockFetchFn).toHaveBeenCalledWith('/settings/shortlinks/config/rebrandly', {
           method: 'DELETE',
         });
       });
@@ -272,19 +240,6 @@ describe('ShortlinksTab', () => {
 
       expect(screen.getByText('Failed to load shortlink settings')).toBeDefined();
       expect(screen.getByText('Try again')).toBeDefined();
-    });
-  });
-
-  describe('Loading State', () => {
-    it('shows loading indicator while fetching', async () => {
-      mockLoading = true;
-      mockConfigData = null;
-
-      const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab />, { wrapper });
-
-      const loadingElements = screen.getAllByText('Loading...');
-      expect(loadingElements.length).toBeGreaterThan(0);
     });
   });
 

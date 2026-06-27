@@ -356,6 +356,16 @@ drive live VPN connections.
 | Surfshark | Service credentials (`username:password`) | OpenVPN config URL |
 | Proton VPN | OpenVPN / IKEv2 credentials (`username:password`) | Config file URL |
 | Mullvad | 16-digit account number | WireGuard config URL |
+| CyberGhost | Service credentials (`username:password`) | OpenVPN config URL |
+| Private Internet Access | Service credentials (`username:password`) | OpenVPN config URL |
+| IPVanish | Service credentials (`username:password`) | OpenVPN config URL |
+| Windscribe | Service credentials (`username:password`) | OpenVPN / WireGuard config URL |
+| TunnelBear | Service credentials (`username:password`) | Config URL |
+| Hotspot Shield | Service credentials (`username:password`) | Hydra / OpenVPN config URL |
+| PureVPN | Service credentials (`username:password`) | OpenVPN config URL |
+| VyprVPN | Service credentials (`username:password`) | OpenVPN / Chameleon config URL |
+| hide.me | Service credentials (`username:password`) | WireGuard / OpenVPN config URL |
+| Mozilla VPN | Subscription / device key | WireGuard config URL |
 
 ## Storage tab
 

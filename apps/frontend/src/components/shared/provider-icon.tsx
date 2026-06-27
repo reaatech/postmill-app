@@ -104,6 +104,23 @@ const ICONS: Record<string, Entry> = {
   sniply: { viewBox: '0 0 24 24', color: '#4361EE', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-1 5h2v6h-2V7Zm0 8h2v2h-2v-2Z" />) },
   owly: { viewBox: '0 0 24 24', color: '#00A86B', node: (<path d="M12 2a5 5 0 1 0 5 5 5 5 0 0 0-5-5Zm0 14a9 9 0 0 0-9 9h18a9 9 0 0 0-9-9Z" />) },
   cleanuri: { viewBox: '0 0 24 24', color: '#0891B2', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-2 7h4l-2 5h-2l2-5Z" />) },
+
+  // ── VPN Providers ─────────────────────────────────────────
+  nordvpn: { viewBox: '0 0 24 24', color: '#4687FF', full: true, node: (<><rect width="24" height="24" rx="5" fill="#4687FF" /><path d="M6.4 17V7h2.3l4.9 6V7h2.3v10h-2.3l-4.9-6v6H6.4Z" fill="#fff" /></>) },
+  expressvpn: { viewBox: '0 0 24 24', color: '#DA3940', full: true, node: (<><rect width="24" height="24" rx="5" fill="#DA3940" /><path d="M8.1 8.6a5 5 0 1 0 7.8 0" fill="none" stroke="#fff" strokeWidth="1.7" strokeLinecap="round" /><rect x="11.1" y="6" width="1.8" height="6" rx="0.9" fill="#fff" /></>) },
+  surfshark: { viewBox: '0 0 24 24', color: '#1EBFBF', full: true, node: (<><rect width="24" height="24" rx="5" fill="#1EBFBF" /><path d="M5 15.2c3.4 0 5.4-2.4 7.3-5.3C13.7 7.8 15.5 6.8 17.8 6.8c-1.4 1-2 2.4-2.7 3.9-1 2.6-2.8 5-6.4 5H5Z" fill="#fff" /><path d="M5 17.4h10.5" stroke="#fff" strokeWidth="1.2" strokeLinecap="round" opacity="0.65" /></>) },
+  protonvpn: { viewBox: '0 0 24 24', color: '#6D4AFF', full: true, node: (<><rect width="24" height="24" rx="5" fill="#6D4AFF" /><path d="M12 5l5 2v4.1c0 3.2-2.1 6.1-5 7-2.9-.9-5-3.8-5-7V7l5-2Z" fill="#fff" /><path d="M9.8 12.2l1.6 1.6 3-3.2" fill="none" stroke="#6D4AFF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></>) },
+  mullvad: { viewBox: '0 0 24 24', color: '#192E45', full: true, node: (<><rect width="24" height="24" rx="5" fill="#192E45" /><circle cx="12" cy="12.6" r="5.6" fill="#E7C8A2" /><circle cx="9.9" cy="11.6" r="0.95" fill="#192E45" /><circle cx="14.1" cy="11.6" r="0.95" fill="#192E45" /><path d="M12 13.4c1 0 1.8.5 1.8 1.1 0 .6-.8.9-1.8.9s-1.8-.3-1.8-.9c0-.6.8-1.1 1.8-1.1Z" fill="#BE5E78" /></>) },
+  cyberghost: { viewBox: '0 0 24 24', color: '#FFCD00', full: true, node: (<><rect width="24" height="24" rx="5" fill="#FFCD00" /><path d="M6 18.2V11a6 6 0 0 1 12 0v7.2l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5Z" fill="#1A1A1A" /><circle cx="10" cy="11" r="1.1" fill="#FFCD00" /><circle cx="14" cy="11" r="1.1" fill="#FFCD00" /></>) },
+  pia: { viewBox: '0 0 24 24', color: '#4CB02B', full: true, node: (<><rect width="24" height="24" rx="5" fill="#4CB02B" /><rect x="7" y="11" width="10" height="7" rx="1.5" fill="#fff" /><path d="M9.2 11V9.4a2.8 2.8 0 0 1 5.6 0V11" fill="none" stroke="#fff" strokeWidth="1.6" /><circle cx="12" cy="14.3" r="1.1" fill="#4CB02B" /></>) },
+  ipvanish: { viewBox: '0 0 24 24', color: '#65A30D', full: true, node: (<><rect width="24" height="24" rx="5" fill="#65A30D" /><path d="M12 5a5 5 0 0 0-5 5c0 3.5 5 9 5 9s5-5.5 5-9a5 5 0 0 0-5-5Zm0 7a2 2 0 1 1 0-4 2 2 0 0 1 0 4Z" fill="#fff" /></>) },
+  windscribe: { viewBox: '0 0 24 24', color: '#4990E2', full: true, node: (<><rect width="24" height="24" rx="5" fill="#4990E2" /><path d="M5 9.5h7.2a2 2 0 1 0-2-2" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" /><path d="M5 13.5h9a2.2 2.2 0 1 1-2.2 2.2" fill="none" stroke="#fff" strokeWidth="1.6" strokeLinecap="round" /></>) },
+  tunnelbear: { viewBox: '0 0 24 24', color: '#F9B233', full: true, node: (<><rect width="24" height="24" rx="5" fill="#F9B233" /><circle cx="7.8" cy="8.8" r="2.1" fill="#5B3A1A" /><circle cx="16.2" cy="8.8" r="2.1" fill="#5B3A1A" /><circle cx="12" cy="13" r="5" fill="#5B3A1A" /><circle cx="10.2" cy="12.2" r="0.8" fill="#F9B233" /><circle cx="13.8" cy="12.2" r="0.8" fill="#F9B233" /><circle cx="12" cy="14.4" r="1" fill="#F9B233" /></>) },
+  hotspotshield: { viewBox: '0 0 24 24', color: '#00B5E2', full: true, node: (<><rect width="24" height="24" rx="5" fill="#00B5E2" /><path d="M12 5l6 2.2v3.8c0 3.7-2.5 7-6 8-3.5-1-6-4.3-6-8V7.2L12 5Z" fill="#fff" /></>) },
+  purevpn: { viewBox: '0 0 24 24', color: '#8C52FF', full: true, node: (<><rect width="24" height="24" rx="5" fill="#8C52FF" /><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" strokeWidth="1.5" /><ellipse cx="12" cy="12" rx="2.6" ry="6" fill="none" stroke="#fff" strokeWidth="1.5" /><path d="M6.2 10.2h11.6M6.2 13.8h11.6" stroke="#fff" strokeWidth="1.5" /></>) },
+  vyprvpn: { viewBox: '0 0 24 24', color: '#00B6F0', full: true, node: (<><rect width="24" height="24" rx="5" fill="#00B6F0" /><path d="M6.5 7h2.7l2.8 7.2L14.8 7h2.7l-4.4 10h-2.2L6.5 7Z" fill="#fff" /></>) },
+  hideme: { viewBox: '0 0 24 24', color: '#2A2A2A', full: true, node: (<><rect width="24" height="24" rx="5" fill="#2A2A2A" /><path d="M4 10h16" stroke="#FFC400" strokeWidth="1.4" strokeLinecap="round" /><rect x="5" y="11" width="5.5" height="4" rx="2" fill="#FFC400" /><rect x="13.5" y="11" width="5.5" height="4" rx="2" fill="#FFC400" /><path d="M10.5 12.4h3" stroke="#FFC400" strokeWidth="1.2" /></>) },
+  mozillavpn: { viewBox: '0 0 24 24', color: '#9059FF', full: true, node: (<><rect width="24" height="24" rx="5" fill="#9059FF" /><path d="M12 5l6 2.2v3.8c0 3.7-2.5 7-6 8-3.5-1-6-4.3-6-8V7.2L12 5Z" fill="#fff" /><circle cx="12" cy="11.4" r="1.7" fill="#9059FF" /></>) },
 };
 
 const FALLBACK_COLORS: Record<string, string> = {
@@ -127,6 +144,16 @@ const FALLBACK_COLORS: Record<string, string> = {
   VULTR: '#007BFC',
   LINODE: '#00A95C',
   S3_COMPATIBLE: '#6B7280',
+  cyberghost: '#FFCC00',
+  pia: '#4CB02B',
+  ipvanish: '#70BF54',
+  windscribe: '#4990E2',
+  tunnelbear: '#F9B233',
+  hotspotshield: '#00B5E2',
+  purevpn: '#8C52FF',
+  vyprvpn: '#00B6F0',
+  hideme: '#FFC400',
+  mozillavpn: '#FF4F5E',
 };
 
 function hashIdentifier(id: string): number {
@@ -171,20 +198,23 @@ const ProviderIcon: FC<{
   size?: number;
 }> = ({ identifier, name, size = 28 }) => {
   const icon = ICONS[identifier];
-  const glyph = Math.round(size * 0.64);
+  // Larger, rounded, masked tile: full-bleed icons fill the mask edge-to-edge;
+  // bare single-glyph logos get a larger glyph centred on the tile.
+  const glyph = icon?.full ? size : Math.round(size * 0.82);
+  const radius = Math.max(7, Math.round(size * 0.3));
   const label = name?.slice(0, 2).toUpperCase() || LABEL_MAP[identifier] || identifier.slice(0, 2).toUpperCase();
   const bgColor = FALLBACK_COLORS[identifier] || deterministicColor(identifier);
 
   return (
     <span
-      className="inline-flex items-center justify-center shrink-0 rounded-[6px] bg-newBgColor border border-newTableBorder text-textColor overflow-hidden"
-      style={{ width: size, height: size }}
+      className="inline-flex items-center justify-center shrink-0 overflow-hidden text-textColor bg-newBgColor ring-1 ring-inset ring-newTableBorder"
+      style={{ width: size, height: size, borderRadius: radius }}
       role="img"
       aria-label={name ? `${name} icon` : `${identifier} icon`}
     >
       {icon?.src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={icon.src} alt="" width={glyph} height={glyph} className="object-contain" />
+        <img src={icon.src} alt="" width={size} height={size} className="w-full h-full object-cover" />
       ) : icon ? (
         <svg
           width={glyph}

@@ -122,6 +122,9 @@ export class AuthService {
 
         user = create.users[0].user;
 
+        // Set Gravatar avatar for local email signups.
+        await this.handleProviderPicture(user.id, user.email, null);
+
         const jwt = await this.jwt(user);
         const refreshToken = await this.createSession(user.id, ip, userAgent);
 

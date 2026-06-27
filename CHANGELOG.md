@@ -35,9 +35,11 @@
 ### Added
 - **VPN provider settings surface.** Settings → VPN is a new credential-only provider page that
   mirrors AI/Shortlinks: provider cards with brand icons, configured/enabled badges, search, and
-  per-provider configuration. Adapters are included for the top-5 consumer VPN providers: **NordVPN**,
-  **ExpressVPN**, **Surfshark**, **Proton VPN**, and **Mullvad**. Credentials are encrypted at rest in
-  the new `OrgVpnConfig` table and never returned to the browser. Endpoints: `GET /settings/vpn/config`,
+  per-provider configuration. Adapters are included for 15 consumer VPN providers: **NordVPN**,
+  **ExpressVPN**, **Surfshark**, **Proton VPN**, **Mullvad**, **CyberGhost**, **Private Internet Access**,
+  **IPVanish**, **Windscribe**, **TunnelBear**, **Hotspot Shield**, **PureVPN**, **VyprVPN**,
+  **hide.me**, and **Mozilla VPN**. Credentials are encrypted at rest in the new `OrgVpnConfig` table
+  and never returned to the browser. Endpoints: `GET /settings/vpn/config`,
   `GET /settings/vpn/providers`, `PUT/DELETE /settings/vpn/config/:identifier`,
   `POST /settings/vpn/config/:identifier/test`.
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now

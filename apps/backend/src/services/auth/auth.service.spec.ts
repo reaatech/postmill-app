@@ -450,6 +450,14 @@ describe('AuthService (backend)', () => {
       expect(result.jwt).toBe('jwt:user-1');
       expect(result.refreshToken).toMatch(/^[0-9a-f]{128}$/);
       expect(usersService.createSession).toHaveBeenCalled();
+      const md5 = crypto
+        .createHash('md5')
+        .update('new@example.com')
+        .digest('hex');
+      expect(usersService.updateUserAvatar).toHaveBeenCalledWith(
+        'user-1',
+        `https://www.gravatar.com/avatar/${md5}?d=404&s=200`
+      );
     });
 
     it('lowercases the email before lookup', async () => {
@@ -516,6 +524,10 @@ describe('AuthService (backend)', () => {
         'role-member'
       );
       expect(result.addedOrg).toEqual({ id: 'uo-1' });
+      expect(usersService.updateUserAvatar).toHaveBeenCalledWith(
+        'user-1',
+        expect.stringContaining('https://www.gravatar.com/avatar/')
+      );
     });
   });
 

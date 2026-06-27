@@ -1,98 +1,43 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { ShortlinkProviderForm } from '@gitroom/frontend/components/settings/shortlinks/shortlink-provider-form';
-import {
-  useShortlinksConfig,
-  ShortlinkProviderInfo,
-} from '@gitroom/frontend/components/settings/shortlinks/hooks/useShortlinksConfig';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useVpnConfig, VpnProviderInfo } from './hooks/useVpnConfig';
+import { VpnProviderForm } from './vpn-provider-form';
 
 const CAPABILITY_LABELS: Record<string, string> = {
-  create: 'Create links',
-  expand: 'Expand links',
-  statistics: 'Stats',
-  bulkStatistics: 'Bulk stats',
-  customDomain: 'Custom domain',
+  wireguard: 'WireGuard',
+  openvpn: 'OpenVPN',
+  ikev2: 'IKEv2',
+  socks5: 'SOCKS5',
+  multiHop: 'Multi-hop',
+  killSwitch: 'Kill switch',
 };
 
 const CAPABILITY_COLORS: Record<string, string> = {
-  create: 'bg-blue-500/20 text-blue-400',
-  expand: 'bg-indigo-500/20 text-indigo-400',
-  statistics: 'bg-purple-500/20 text-purple-400',
-  bulkStatistics: 'bg-amber-500/20 text-amber-400',
-  customDomain: 'bg-emerald-500/20 text-emerald-400',
+  wireguard: 'bg-cyan-500/20 text-cyan-400',
+  openvpn: 'bg-blue-500/20 text-blue-400',
+  ikev2: 'bg-indigo-500/20 text-indigo-400',
+  socks5: 'bg-amber-500/20 text-amber-400',
+  multiHop: 'bg-purple-500/20 text-purple-400',
+  killSwitch: 'bg-emerald-500/20 text-emerald-400',
 };
 
-export const ShortlinksTab = () => {
+export const VpnTab = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const { data: config, isLoading, error, mutate } = useShortlinksConfig();
+  const { data: config, isLoading, error, mutate } = useVpnConfig();
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [oauthProcessing, setOauthProcessing] = useState(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    const state = params.get('state');
-    if (code && state && !oauthProcessing) {
-      setOauthProcessing(true);
-      const storedIdentifier = sessionStorage.getItem('oauth_shortlink_provider');
-      if (!storedIdentifier) {
-        toaster.show(t('oauth_lost_context', 'Could not resume the connection — please retry.'), 'warning');
-        setOauthProcessing(false);
-        return;
-      }
-      const identifier = storedIdentifier;
-      (async () => {
-        try {
-          const redirectUri = `${window.location.origin}/settings?tab=shortlinks`;
-          const res = await fetch(`/settings/shortlinks/config/${identifier}/oauth/callback`, {
-            method: 'POST',
-            body: JSON.stringify({ code, state, redirectUri }),
-          });
-          if (res.ok) {
-            toaster.show(t('oauth_success', 'Provider connected successfully'), 'success');
-            mutate();
-          } else {
-            toaster.show(t('oauth_failure', 'OAuth connection failed'), 'warning');
-          }
-        } catch {
-          toaster.show(t('oauth_failure', 'OAuth connection failed'), 'warning');
-        } finally {
-          const url = new URL(window.location.href);
-          url.searchParams.delete('code');
-          url.searchParams.delete('state');
-          window.history.replaceState({}, '', url.toString());
-          sessionStorage.removeItem('oauth_shortlink_provider');
-          setOauthProcessing(false);
-        }
-      })();
-    }
-  }, [fetch, mutate, oauthProcessing, t, toaster]);
-
-  const handleSetActive = useCallback(async (identifier: string) => {
-    const res = await fetch(`/settings/shortlinks/config/${identifier}/set-active`, {
-      method: 'POST',
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      toaster.show(err || t('set_active_failed', 'Failed to set active provider'), 'warning');
-      return;
-    }
-    toaster.show(t('provider_activated', 'Provider activated'), 'success');
-    mutate();
-  }, [fetch, mutate, toaster, t]);
 
   const handleDelete = useCallback(async (identifier: string) => {
     if (!confirm(t('confirm_remove', 'Are you sure you want to remove this configuration?'))) return;
-    const res = await fetch(`/settings/shortlinks/config/${identifier}`, {
+    const res = await fetch(`/settings/vpn/config/${identifier}`, {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -103,7 +48,7 @@ export const ShortlinksTab = () => {
     mutate();
   }, [fetch, mutate, toaster, t]);
 
-  const capabilityChips = (provider: ShortlinkProviderInfo) => {
+  const capabilityChips = (provider: VpnProviderInfo) => {
     return Object.entries(provider.capabilities)
       .filter(([, supported]) => supported)
       .map(([key]) => CAPABILITY_LABELS[key] || key);
@@ -112,7 +57,6 @@ export const ShortlinksTab = () => {
   const sortedProviders = useMemo(() => {
     return [...(config?.providers || [])].sort((a, b) => {
       if (a.isConfigured !== b.isConfigured) return a.isConfigured ? -1 : 1;
-      if (a.isActive !== b.isActive) return a.isActive ? -1 : 1;
       return a.name.localeCompare(b.name);
     });
   }, [config?.providers]);
@@ -137,8 +81,7 @@ export const ShortlinksTab = () => {
         id: p.identifier,
         identifier: p.identifier,
         name: p.name,
-        enabled: p.isConfigured,
-        isActive: p.isActive,
+        enabled: p.enabled && p.isConfigured,
         isConfigured: p.isConfigured,
         capabilities: capabilityChips(p),
       })),
@@ -150,7 +93,7 @@ export const ShortlinksTab = () => {
       {error && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
           <span className="text-[14px] text-red-500">
-            {t('failed_to_load', 'Failed to load shortlink settings')}
+            {t('failed_to_load_vpn_settings', 'Failed to load VPN settings')}
           </span>
           <button
             className="text-[13px] bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors"
@@ -162,22 +105,17 @@ export const ShortlinksTab = () => {
       )}
 
       {!error && configuringProvider ? (
-        <ShortlinkProviderForm
+        <VpnProviderForm
           identifier={configuringProvider}
-          isConfigured={filteredProviders.find((p) => p.identifier === configuringProvider)?.isConfigured ?? false}
           onClose={() => setConfiguringProvider(null)}
           onSaved={() => {
-            setConfiguringProvider(null);
-            mutate();
-          }}
-          onRemoved={() => {
             setConfiguringProvider(null);
             mutate();
           }}
         />
       ) : (
         <ProviderListShell
-          title={t('shortlink_providers', 'Shortlink Providers')}
+          title={t('vpn_providers', 'VPN Providers')}
           toolbar={
             <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
               <div className="flex-1 relative">
@@ -205,7 +143,6 @@ export const ShortlinksTab = () => {
           }
           providers={shellProviders}
           onConfigure={(id) => setConfiguringProvider(id)}
-          onSetActive={(id) => handleSetActive(id)}
           onRemove={(id) => handleDelete(id)}
           ProviderIconComponent={ProviderIcon}
           renderBadges={(provider) => {
@@ -230,6 +167,17 @@ export const ShortlinksTab = () => {
                   );
                 })}
               </div>
+            );
+          }}
+          renderActions={(provider) => {
+            const p = filteredProviders.find((pr) => pr.identifier === provider.identifier);
+            return (
+              <button
+                className="text-[12px] text-textColor hover:underline"
+                onClick={() => setConfiguringProvider(provider.identifier)}
+              >
+                {p?.isConfigured ? t('edit', 'Edit') : t('configure', 'Configure')}
+              </button>
             );
           }}
         />

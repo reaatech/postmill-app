@@ -8,11 +8,13 @@ import { useShortlinksProviders } from './hooks/useShortlinksConfig';
 
 interface ShortlinkProviderFormProps {
   identifier: string;
+  isConfigured: boolean;
   onClose: () => void;
   onSaved: () => void;
+  onRemoved?: () => void;
 }
 
-export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: ShortlinkProviderFormProps) => {
+export const ShortlinkProviderForm = ({ identifier, isConfigured, onClose, onSaved, onRemoved }: ShortlinkProviderFormProps) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -87,6 +89,19 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
       setTesting(false);
     }
   }, [identifier, creds, customDomain, fetch, toaster, t]);
+
+  const handleRemove = useCallback(async () => {
+    if (!confirm(t('confirm_remove', 'Are you sure you want to remove this configuration?'))) return;
+    const res = await fetch(`/settings/shortlinks/config/${identifier}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      toaster.show(t('delete_failed', 'Failed to delete'), 'warning');
+      return;
+    }
+    toaster.show(t('deleted', 'Configuration deleted'), 'success');
+    onRemoved?.();
+  }, [identifier, fetch, toaster, t, onRemoved]);
 
   const handleOAuthConnect = useCallback(async () => {
     setConnecting(true);
@@ -276,21 +291,31 @@ export const ShortlinkProviderForm = ({ identifier, onClose, onSaved }: Shortlin
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-[12px]">
-        <button
-          className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
-          onClick={handleTest}
-          disabled={testing}
-        >
-          {testing ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
-        </button>
-        <button
-          className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? t('saving', 'Saving...') : t('save', 'Save')}
-        </button>
+      <div className="flex items-center justify-between">
+        {isConfigured && (
+          <button
+            className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-red-500/50 text-red-500 hover:bg-red-500/10"
+            onClick={handleRemove}
+          >
+            {t('remove', 'Remove')}
+          </button>
+        )}
+        <div className="flex items-center gap-[12px] ml-auto">
+          <button
+            className="text-[13px] px-[16px] py-[8px] rounded-[8px] border border-newTableBorder hover:bg-boxHover"
+            onClick={handleTest}
+            disabled={testing}
+          >
+            {testing ? t('testing', 'Testing...') : t('test_connection', 'Test Connection')}
+          </button>
+          <button
+            className="bg-btnPrimary text-white rounded-[8px] px-[16px] py-[8px] text-[13px] hover:opacity-90"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? t('saving', 'Saving...') : t('save', 'Save')}
+          </button>
+        </div>
       </div>
     </div>
   );

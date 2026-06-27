@@ -59,8 +59,10 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 const defaultProps = {
   identifier: 'bitly',
+  isConfigured: false,
   onClose: vi.fn(),
   onSaved: vi.fn(),
+  onRemoved: vi.fn(),
 };
 
 beforeEach(() => {
@@ -218,7 +220,7 @@ describe('ShortlinkProviderForm', () => {
     it('renders Client ID and Client Secret inputs for oauth2 providers', async () => {
       mockProvidersData = [oauthProvider];
       const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-      render(<ShortlinkProviderForm identifier="bitly-oauth" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
+      render(<ShortlinkProviderForm identifier="bitly-oauth" isConfigured={false} onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
 
       expect(screen.getByText('Client ID')).toBeDefined();
       expect(screen.getByText('Client Secret')).toBeDefined();
@@ -237,7 +239,7 @@ describe('ShortlinkProviderForm', () => {
       mockFetchFn.mockResolvedValueOnce({ ok: true });
       mockProvidersData = [oauthProvider];
       const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-      render(<ShortlinkProviderForm identifier="bitly-oauth" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
+      render(<ShortlinkProviderForm identifier="bitly-oauth" isConfigured={false} onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
 
       const clientIdInput = screen.getByPlaceholderText('Bitly OAuth Client ID');
       fireEvent.change(clientIdInput, { target: { value: 'my-client-id' } });
@@ -261,7 +263,7 @@ describe('ShortlinkProviderForm', () => {
     it('has a password reveal toggle on clientSecret field', async () => {
       mockProvidersData = [oauthProvider];
       const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-      render(<ShortlinkProviderForm identifier="bitly-oauth" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
+      render(<ShortlinkProviderForm identifier="bitly-oauth" isConfigured={false} onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
 
       const showButtons = screen.getAllByText('Show');
       expect(showButtons.length).toBeGreaterThanOrEqual(1);
@@ -296,7 +298,7 @@ describe('ShortlinkProviderForm', () => {
     ];
 
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
-    render(<ShortlinkProviderForm identifier="provider-with-select" onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
+    render(<ShortlinkProviderForm identifier="provider-with-select" isConfigured={false} onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });
 
     const select = screen.getByRole('combobox');
     expect(select).toBeDefined();

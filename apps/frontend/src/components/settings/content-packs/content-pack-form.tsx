@@ -90,7 +90,7 @@ export const ContentPackForm: React.FC<ContentPackFormProps> = ({
     <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-[12px]">
-          <ProviderIcon identifier={provider.identifier} name={provider.name} size={32} />
+          <ProviderIcon identifier={provider.identifier} name={provider.name} size={36} />
           <div className="text-[16px] font-semibold">{provider.name}</div>
         </div>
         <button

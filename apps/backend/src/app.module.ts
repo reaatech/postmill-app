@@ -18,6 +18,7 @@ import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module'
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
+import { VpnModule } from '@gitroom/nestjs-libraries/vpn/vpn.module';
 import { InngestController } from '@gitroom/backend/api/controllers/inngest.controller';
 import { ScheduleModule } from '@nestjs/schedule';
 import { FeatureFlagsModule, FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
@@ -44,6 +45,7 @@ const scheduleModule = featureFlags.isEnabled('cron')
     ChatModule,
     InngestModule,
     AiModule,
+    VpnModule,
     CollaborationModule,
     ThrottlerModule.forRoot({
       throttlers: [

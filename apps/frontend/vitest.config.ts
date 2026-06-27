@@ -30,6 +30,7 @@ export default defineConfig({
       'src/components/settings/media-providers/**/*.spec.{ts,tsx}',
       'src/components/ai/**/*.spec.{ts,tsx}',
       'src/components/settings/shortlinks/**/*.spec.{ts,tsx}',
+      'src/components/settings/vpn/**/*.spec.{ts,tsx}',
       'src/components/layout/settings.component.spec.{ts,tsx}',
       'src/components/layout/use-permissions.spec.{ts,tsx}',
       'src/components/layout/top.menu.spec.{ts,tsx}',

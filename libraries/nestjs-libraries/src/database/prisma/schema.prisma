@@ -61,6 +61,7 @@ model Organization {
   orgShortLinkConfigs  OrgShortLinkConfig[]
   shortLinks           ShortLink[]
   shortLinkSnapshots   ShortLinkSnapshot[]
+  orgVpnConfigs        OrgVpnConfig[]
   apiKeys              ApiKey[]
   roles                AppRole[]
   designs              Design[]
@@ -1207,6 +1208,23 @@ model MediaProviderConfig {
   updatedAt           DateTime       @updatedAt
   organization        Organization   @relation(fields: [organizationId], references: [id])
   storageProvider     StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
+
+  @@unique([organizationId, identifier])
+  @@index([organizationId])
+}
+
+// ── v3.9.0: Per-organization VPN provider config ──
+model OrgVpnConfig {
+  id              String   @id @default(uuid())
+  organizationId  String
+  identifier      String
+  name            String?
+  credentials     String?  // encrypted JSON
+  enabled         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, identifier])
   @@index([organizationId])

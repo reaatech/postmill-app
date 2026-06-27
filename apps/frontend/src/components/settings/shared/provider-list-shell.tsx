@@ -86,7 +86,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
               <ProviderIconComponent
                 identifier={provider.identifier}
                 name={provider.name}
-                size={40}
+                size={36}
               />
 
               <div className="flex flex-col gap-[4px] flex-1 min-w-0">
