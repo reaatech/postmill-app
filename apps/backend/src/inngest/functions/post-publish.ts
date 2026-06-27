@@ -79,13 +79,12 @@ const runPostPublish = (postActivity: PostActivity) =>
 
     if (post.integration?.refreshNeeded) {
       await step.run('notify-refresh-needed', () =>
-        postActivity.inAppNotification(
+        postActivity.notifyChannelError(
           post.organizationId,
-          `We couldn't post to ${post.integration?.providerIdentifier} for ${post?.integration?.name}`,
-          `We couldn't post to ${post.integration?.providerIdentifier} for ${post?.integration?.name} because you need to reconnect it. Please enable it and try again.`,
-          true,
-          false,
-          'info'
+          post?.integration?.name ?? '',
+          post.integration?.providerIdentifier ?? '',
+          'refresh',
+          post.id
         )
       );
       await step.run('mark-error-refresh-needed', () =>
@@ -101,13 +100,12 @@ const runPostPublish = (postActivity: PostActivity) =>
 
     if (post.integration?.disabled) {
       await step.run('notify-disabled', () =>
-        postActivity.inAppNotification(
+        postActivity.notifyChannelError(
           post.organizationId,
-          `We couldn't post to ${post.integration?.providerIdentifier} for ${post?.integration?.name}`,
-          `We couldn't post to ${post.integration?.providerIdentifier} for ${post?.integration?.name} because it's disabled. Please enable it and try again.`,
-          true,
-          false,
-          'info'
+          post?.integration?.name ?? '',
+          post.integration?.providerIdentifier ?? '',
+          'disabled',
+          post.id
         )
       );
       await step.run('mark-error-disabled', () =>
@@ -174,16 +172,11 @@ const runPostPublish = (postActivity: PostActivity) =>
 
           if (i === 0) {
             await step.run('notify-published', () =>
-              postActivity.inAppNotification(
+              postActivity.notifyPostPublished(
                 post.integration.organizationId,
-                `Your post has been published on ${capitalize(
-                  post.integration.providerIdentifier
-                )}`,
-                `Your post has been published on ${capitalize(
-                  post.integration.providerIdentifier
-                )} at ${postsResults[0].releaseURL}`,
-                true,
-                true
+                capitalize(post.integration.providerIdentifier),
+                postsResults[0].releaseURL,
+                post.id
               )
             );
           }
@@ -218,19 +211,12 @@ const runPostPublish = (postActivity: PostActivity) =>
 
           if (err instanceof BadBodyError) {
             await step.run('notify-bad-body', () =>
-              postActivity.inAppNotification(
+              postActivity.notifyPostFailed(
                 post.organizationId,
-                `Error posting${i === 0 ? ' ' : ' comments '}on ${
-                  post.integration?.providerIdentifier
-                } for ${post?.integration?.name}`,
-                `An error occurred while posting${
-                  i === 0 ? ' ' : ' comments '
-                }on ${post.integration?.providerIdentifier}${
-                  err?.message ? `: ${err?.message}` : ``
-                }`,
-                true,
-                false,
-                'fail'
+                post?.integration?.name ?? '',
+                post.id,
+                i === 0 ? undefined : 'comment',
+                err?.message
               )
             );
             return;
@@ -259,17 +245,10 @@ const runPostPublish = (postActivity: PostActivity) =>
             post.integration
           );
           if (!supports) {
-            await postActivity.inAppNotification(
+            await postActivity.notifyFirstCommentUnsupported(
               post.organizationId,
-              `First comment is not supported on ${capitalize(
-                post.integration?.providerIdentifier
-              )}`,
-              `The post was published successfully, but ${capitalize(
-                post.integration?.providerIdentifier
-              )} does not support first comments. Please add the comment manually if the platform allows it.`,
-              true,
-              false,
-              'info'
+              capitalize(post.integration?.providerIdentifier ?? ''),
+              post.id
             );
           } else {
             const firstCommentResult = await postActivity.postFirstComment(
@@ -295,17 +274,10 @@ const runPostPublish = (postActivity: PostActivity) =>
           }
         }
       } catch (err) {
-        await postActivity.inAppNotification(
+        await postActivity.notifyFirstCommentFailed(
           post.organizationId,
-          `First comment could not be posted on ${capitalize(
-            post.integration?.providerIdentifier
-          )}`,
-          `The post was published successfully, but the first comment could not be posted on ${capitalize(
-            post.integration?.providerIdentifier
-          )}. Please add the comment manually.`,
-          true,
-          false,
-          'fail'
+          capitalize(post.integration?.providerIdentifier ?? ''),
+          post.id
         );
       }
     }).catch(() => {});

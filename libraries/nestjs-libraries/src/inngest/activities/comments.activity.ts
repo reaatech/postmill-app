@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
-import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import dayjs from 'dayjs';
@@ -15,7 +14,6 @@ export class CommentsActivity {
     private _prisma: PrismaService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
     private _socialCommentsService: SocialCommentsService,
-    private _emailService: EmailService,
     private _webhooksService: WebhooksService,
     private _notificationService: NotificationService,
   ) {}
@@ -156,62 +154,15 @@ export class CommentsActivity {
 
     if (!posts.length) return;
 
-    const memberships = await this._prisma.userOrganization.findMany({
-      where: { organizationId: orgId },
-      include: {
-        user: { select: { id: true, email: true } },
-      },
-    });
-    const members = memberships.map((m) => m.user);
-
-    if (!members.length) return;
-
     const totalNewComments = posts.reduce(
       (sum, p) => sum + p.socialComments.length,
       0
     );
-    await this._notificationService.notifyInboxBacklog(
+
+    await this._notificationService.notifyCommentDigest(
       orgId,
-      totalNewComments
+      totalNewComments,
+      posts
     );
-
-    const htmlParts: string[] = [];
-    for (const post of posts) {
-      const platform = post.integration?.name ?? 'Unknown';
-      const postTitle = post.content
-        ? post.content.substring(0, 120)
-        : `Post #${post.id}`;
-      htmlParts.push(
-        `<div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #e5e7eb;">
-          <strong style="color:#1f2937;">${platform}</strong>
-          <p style="margin:4px 0;color:#374151;">${postTitle}</p>
-          <span style="font-size:13px;color:#6b7280;">${post.socialComments.length} new comment${post.socialComments.length === 1 ? '' : 's'}</span>
-        </div>`
-      );
-    }
-
-    const html = `
-      <p style="color:#374151;margin-bottom:16px;">
-        You have <strong>${totalNewComments}</strong> new comment${totalNewComments === 1 ? '' : 's'} across <strong>${posts.length}</strong> post${posts.length === 1 ? '' : 's'} in the last 6 hours.
-      </p>
-      ${htmlParts.join('')}
-      <p style="margin-top:16px;font-size:13px;color:#6b7280;">
-        <a href="${process.env.FRONTEND_URL || ''}/schedule" style="color:#6366f1;">View all posts</a>
-      </p>`;
-
-    for (const member of members) {
-      try {
-        await this._emailService.sendEmailSync(
-          member.email,
-          `[Postmill] ${totalNewComments} new comment${totalNewComments === 1 ? '' : 's'} on your posts`,
-          html
-        );
-      } catch (err: any) {
-        this.logger.error(
-          `notifyNewComments: Failed to send email to ${member.email}`,
-          { error: err?.message }
-        );
-      }
-    }
   }
 }

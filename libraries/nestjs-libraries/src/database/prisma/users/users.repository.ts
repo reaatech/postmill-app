@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { Provider } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
-import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 
 @Injectable()
 export class UsersRepository {
@@ -186,38 +185,6 @@ export class UsersRepository {
         picture: body.picture
           ? { connect: { id: body.picture.id } }
           : undefined,
-      },
-    });
-  }
-
-  async getEmailNotifications(userId: string) {
-    return this._profile.model.userProfile.findUnique({
-      where: {
-        userId,
-      },
-      select: {
-        sendSuccessEmails: true,
-        sendFailureEmails: true,
-        sendStreakEmails: true,
-      },
-    });
-  }
-
-  async updateEmailNotifications(userId: string, body: EmailNotificationsDto) {
-    await this._profile.model.userProfile.upsert({
-      where: {
-        userId,
-      },
-      create: {
-        userId,
-        sendSuccessEmails: body.sendSuccessEmails,
-        sendFailureEmails: body.sendFailureEmails,
-        sendStreakEmails: body.sendStreakEmails,
-      },
-      update: {
-        sendSuccessEmails: body.sendSuccessEmails,
-        sendFailureEmails: body.sendFailureEmails,
-        sendStreakEmails: body.sendStreakEmails,
       },
     });
   }

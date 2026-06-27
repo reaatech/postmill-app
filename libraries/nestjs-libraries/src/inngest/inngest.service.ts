@@ -7,6 +7,7 @@ import { EmailActivity } from './activities/email.activity';
 import { IntegrationsActivity } from './activities/integrations.activity';
 import { AutopostActivity } from './activities/autopost.activity';
 import { MediaJobsActivity } from './activities/media-jobs.activity';
+import { DigestActivity } from './activities/digest.activity';
 import { createFunctions } from '@gitroom/backend/inngest/functions';
 import { InngestFunction } from 'inngest';
 
@@ -21,7 +22,8 @@ export class InngestService {
     emailActivity: EmailActivity,
     integrationsActivity: IntegrationsActivity,
     autopostActivity: AutopostActivity,
-    mediaJobsActivity: MediaJobsActivity
+    mediaJobsActivity: MediaJobsActivity,
+    digestActivity: DigestActivity
   ) {
     // Built in the constructor (not onModuleInit) so consumers that read
     // getFunctions() in their own constructor — e.g. InngestController, which
@@ -35,6 +37,7 @@ export class InngestService {
       integrationsActivity,
       autopostActivity,
       mediaJobsActivity,
+      digestActivity,
     });
   }
 

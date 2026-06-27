@@ -5,6 +5,7 @@ const RESOURCES = [
   'posts', 'media', 'channels', 'analytics', 'comments', 'webhooks',
   'autopost', 'settings', 'organization', 'members', 'brands',
   'ai-config', 'media-config', 'storage-config', 'shortlink-config', 'billing',
+  'notifications',
 ] as const;
 
 const ACTIONS = ['create', 'read', 'update', 'delete', 'manage'] as const;

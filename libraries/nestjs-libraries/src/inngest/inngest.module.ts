@@ -7,6 +7,7 @@ import { EmailActivity } from './activities/email.activity';
 import { IntegrationsActivity } from './activities/integrations.activity';
 import { AutopostActivity } from './activities/autopost.activity';
 import { MediaJobsActivity } from './activities/media-jobs.activity';
+import { DigestActivity } from './activities/digest.activity';
 import { InngestService } from './inngest.service';
 
 @Module({
@@ -19,6 +20,7 @@ import { InngestService } from './inngest.service';
     IntegrationsActivity,
     AutopostActivity,
     MediaJobsActivity,
+    DigestActivity,
     InngestService,
   ],
   exports: [
@@ -29,6 +31,7 @@ import { InngestService } from './inngest.service';
     IntegrationsActivity,
     AutopostActivity,
     MediaJobsActivity,
+    DigestActivity,
     InngestService,
   ],
 })

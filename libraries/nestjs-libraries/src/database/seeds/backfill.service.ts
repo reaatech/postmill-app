@@ -11,9 +11,6 @@ type LegacyUserRow = {
   lastName?: string | null;
   bio?: string | null;
   pictureId?: string | null;
-  sendSuccessEmails?: boolean;
-  sendFailureEmails?: boolean;
-  sendStreakEmails?: boolean;
 };
 
 function deriveFingerprint(data: (string | null | undefined)[]): string {
@@ -54,9 +51,6 @@ export class BackfillService {
             bio: user.bio,
             pictureId: user.pictureId,
             timezone: null,
-            sendSuccessEmails: user.sendSuccessEmails,
-            sendFailureEmails: user.sendFailureEmails,
-            sendStreakEmails: user.sendStreakEmails,
           },
         });
       }

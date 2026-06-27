@@ -189,14 +189,14 @@ export class IntegrationService {
     integration: Integration,
     err = ''
   ) {
-    await this._notificationService.inAppNotification(
+    await this._notificationService.notify({
       orgId,
-      `Could not refresh your ${integration.providerIdentifier} channel ${err}`,
-      `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/schedule`,
-      true,
-      false,
-      'info'
-    );
+      category: 'channel_error',
+      title: `Could not refresh your ${integration.providerIdentifier} channel ${err}`,
+      message: `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/schedule`,
+      metadata: { integrationId: integration.id, providerIdentifier: integration.providerIdentifier },
+      channels: { email: true, push: true, inApp: true },
+    });
   }
 
   async refreshNeeded(org: string, id: string) {

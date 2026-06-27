@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import {
-  NotificationService,
-  NotificationType,
-} from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { Integration, Post, State } from '@prisma/client';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
@@ -355,21 +352,73 @@ export class PostActivity {
     return postNow;
   }
 
-  async inAppNotification(
+  async notifyChannelError(
     orgId: string,
-    subject: string,
-    message: string,
-    sendEmail = false,
-    digest = false,
-    type: NotificationType = 'success'
+    integrationName: string,
+    providerIdentifier: string,
+    reason: 'refresh' | 'disabled',
+    postId?: string
   ) {
-    await this._notificationService.inAppNotification(
+    await this._notificationService.notifyChannelError(
       orgId,
-      subject,
-      message,
-      sendEmail,
-      digest,
-      type
+      integrationName,
+      providerIdentifier,
+      reason,
+      postId
+    );
+  }
+
+  async notifyPostPublished(
+    orgId: string,
+    integrationName: string,
+    releaseURL: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyPostPublished(
+      orgId,
+      integrationName,
+      releaseURL,
+      postId
+    );
+  }
+
+  async notifyPostFailed(
+    orgId: string,
+    integrationName: string,
+    postId: string,
+    subStep?: string,
+    errMessage?: string
+  ) {
+    await this._notificationService.notifyPostPublishFailure(
+      orgId,
+      integrationName,
+      postId,
+      subStep,
+      errMessage
+    );
+  }
+
+  async notifyFirstCommentUnsupported(
+    orgId: string,
+    integrationName: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyFirstCommentUnsupported(
+      orgId,
+      integrationName,
+      postId
+    );
+  }
+
+  async notifyFirstCommentFailed(
+    orgId: string,
+    integrationName: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyFirstCommentFailed(
+      orgId,
+      integrationName,
+      postId
     );
   }
 

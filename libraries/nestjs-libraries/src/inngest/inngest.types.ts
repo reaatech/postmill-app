@@ -24,14 +24,6 @@ export type InngestEvents = {
       addTo?: 'top' | 'bottom';
     };
   };
-  'email/digest': {
-    data: {
-      organizationId: string;
-      title: string;
-      message: string;
-      type: string;
-    };
-  };
   'autopost/process': {
     data: {
       id: string;
@@ -69,6 +61,7 @@ export type InngestEvents = {
       organizationId: string;
     };
   };
+
 };
 
 export const inngestSchemas = new EventSchemas().fromRecord<InngestEvents>();

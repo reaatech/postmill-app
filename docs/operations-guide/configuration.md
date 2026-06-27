@@ -83,6 +83,18 @@ webhook configured to point at `POST /webhooks/email` on your backend (e.g.
 outside CSRF (same as Stripe). SES handles SNS topic verification; the `EMAIL_WEBHOOK_SECRET` can
 optionally hold the expected SNS TopicArn to restrict incoming notifications.
 
+## Push notifications
+
+Browser and mobile push notifications are sent via Firebase Cloud Messaging (FCM) v1. Users register
+tokens through the frontend; invalid or unregistered tokens are automatically deactivated. Push is
+globally disabled when these variables are unset.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `FCM_PROJECT_ID` | — | Firebase project ID |
+| `FCM_CLIENT_EMAIL` | — | Firebase service account client email |
+| `FCM_PRIVATE_KEY` | — | Firebase service account private key (PEM) |
+
 ## Analytics & background jobs
 
 | Variable | Default | Purpose |

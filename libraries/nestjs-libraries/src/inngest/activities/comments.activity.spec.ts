@@ -34,7 +34,6 @@ describe('CommentsActivity', () => {
   let prisma: any;
   let providerConfigManager: any;
   let socialCommentsService: any;
-  let emailService: any;
   let webhooksService: any;
   let notificationService: any;
 
@@ -55,15 +54,13 @@ describe('CommentsActivity', () => {
     };
     providerConfigManager = { ensureFresh: vi.fn().mockResolvedValue(undefined) };
     socialCommentsService = { syncComments: vi.fn().mockResolvedValue(undefined) };
-    emailService = { sendEmailSync: vi.fn().mockResolvedValue(undefined) };
     webhooksService = { dispatchEvent: vi.fn().mockResolvedValue(undefined) };
-    notificationService = { notifyInboxBacklog: vi.fn().mockResolvedValue(undefined) };
+    notificationService = { notifyCommentDigest: vi.fn().mockResolvedValue(undefined) };
 
     activity = new CommentsActivity(
       prisma,
       providerConfigManager,
       socialCommentsService,
-      emailService,
       webhooksService as any,
       notificationService as any
     );
@@ -168,11 +165,11 @@ describe('CommentsActivity', () => {
 
       await activity.notifyNewComments('org-1');
 
-      expect(notificationService.notifyInboxBacklog).toHaveBeenCalledWith(
+      expect(notificationService.notifyCommentDigest).toHaveBeenCalledWith(
         'org-1',
-        6
+        6,
+        expect.any(Array)
       );
-      expect(emailService.sendEmailSync).toHaveBeenCalledTimes(1);
     });
   });
 });

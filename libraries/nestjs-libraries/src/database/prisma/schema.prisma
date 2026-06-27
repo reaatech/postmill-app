@@ -28,6 +28,7 @@ model Organization {
   Integration         Integration[]
   files               File[]
   notifications       Notifications[]
+  notificationDigestQueues NotificationDigestQueue[]
   plugs               Plugs[]
   post                Post[]               @relation("organization")
   socialComments      SocialComment[]
@@ -128,6 +129,7 @@ model User {
   designs               Design[]
   notificationReads     NotificationRead[]
   notificationPreference NotificationPreference?
+  notificationDigestQueues NotificationDigestQueue[]
   pushTokens            PushToken[]
 
   @@unique([email, providerName])
@@ -500,18 +502,74 @@ model PostCommentRead {
 model Notifications {
   id             String       @id @default(uuid())
   organizationId String
+  type           String       @default("general")
+  title          String?
   content        String
   link           String?
+  metadata       Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id])
+  reads          NotificationRead[]
 
-  @@index([createdAt])
-  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type])
   @@index([deletedAt])
 }
 
+model NotificationRead {
+  id             String        @id @default(uuid())
+  notificationId String
+  userId         String
+  readAt         DateTime      @default(now())
+  notification   Notifications @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id              String @id @default(uuid())
+  userId          String @unique
+  masters         Json   @default("{\"email\":true,\"push\":true,\"inApp\":true}")
+  categories      Json   @default("{\"post_published\":{\"email\":true,\"push\":false,\"inApp\":true},\"post_failed\":{\"email\":true,\"push\":true,\"inApp\":true},\"channel_error\":{\"email\":true,\"push\":true,\"inApp\":true},\"comment\":{\"email\":true,\"push\":false,\"inApp\":true},\"budget\":{\"email\":true,\"push\":false,\"inApp\":true},\"watchlist\":{\"email\":true,\"push\":false,\"inApp\":true},\"system\":{\"email\":true,\"push\":false,\"inApp\":true}}")
+  digestFrequency String @default("instant")
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NotificationDigestQueue {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  title          String
+  message        String
+  html           String?
+  category       String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model PushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  platform   String
+  deviceName String?
+  active     Boolean  @default(true)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
 
 
 model Plugs {
@@ -1149,9 +1207,6 @@ model UserProfile {
   avatarUrl         String?
   pictureId         String?
   timezone          String?  // IANA tz
-  sendSuccessEmails Boolean  @default(true)
-  sendFailureEmails Boolean  @default(true)
-  sendStreakEmails  Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)

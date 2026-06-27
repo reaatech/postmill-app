@@ -401,11 +401,13 @@ export class OrganizationRepository {
                   select: {
                     name: true,
                     pictureId: true,
-                    sendSuccessEmails: true,
-                    sendFailureEmails: true,
-                    sendStreakEmails: true,
                   },
                 },
+              },
+            },
+            roleRef: {
+              select: {
+                key: true,
               },
             },
           },
@@ -428,8 +430,7 @@ export class OrganizationRepository {
                 id: true,
                 profile: {
                   select: {
-                    sendSuccessEmails: true,
-                    sendFailureEmails: true,
+                    name: true,
                   },
                 },
               },

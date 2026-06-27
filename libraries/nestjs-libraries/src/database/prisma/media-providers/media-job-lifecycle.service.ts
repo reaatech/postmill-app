@@ -490,14 +490,14 @@ export class MediaJobLifecycleService {
     message: string,
   ): Promise<void> {
     try {
-      await this._notificationService.inAppNotification(
-        job.organizationId,
-        subject,
+      await this._notificationService.notify({
+        orgId: job.organizationId,
+        category: type === 'success' ? 'system' : 'system',
+        title: subject,
         message,
-        false,
-        false,
-        type,
-      );
+        metadata: { mediaJobId: job.id, operation: job.operation },
+        channels: { email: false, push: false, inApp: true },
+      });
     } catch (err) {
       this._logger.warn(`Media job notification failed: ${(err as Error).message}`);
     }

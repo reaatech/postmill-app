@@ -1,6 +1,6 @@
 /* eslint-disable */
 // One-shot UI-testing seed: a SUPERADMIN user, an org, 2 channels (X + LinkedIn page),
-// ~2 weeks of posts, channel + post analytics snapshots, and a comment inbox.
+// ~2 weeks of posts, channel + post analytics snapshots, campaign folders, and a comment inbox.
 // Idempotent: re-running wipes the previous seed for test@test.com and recreates it.
 // Run inside the app container:  node scripts/seed-test-data.js
 //
@@ -110,12 +110,15 @@ async function cleanup() {
     await prisma.analyticsSnapshot.deleteMany({ where: { organizationId: orgId } });
     await prisma.tagsPosts.deleteMany({ where: { postId: { in: postIds } } });
     await prisma.post.deleteMany({ where: { organizationId: orgId } });
+    await prisma.campaign.deleteMany({ where: { organizationId: orgId } });
     await prisma.integration.deleteMany({ where: { organizationId: orgId } });
     await prisma.subscription.deleteMany({ where: { organizationId: orgId } });
     await prisma.userOrganization.deleteMany({ where: { organizationId: orgId } });
     await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
   }
-  await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
+  // Keep the user row: other features now hold FK references to it (sessions, push
+  // tokens, notification prefs). The user is reused (reconnected to a fresh org) in
+  // main(), so deleting it is both unnecessary and FK-fragile.
   console.log(`  cleaned previous seed (${orgIds.length} org(s))`);
 }
 
@@ -133,6 +136,11 @@ async function main() {
   if (!ownerRole) {
     console.warn('  ⚠ no "owner" system role found — boot the backend once so RbacSeeder runs; continuing with null roleId');
   }
+  // Reuse the existing user if present (cleanup keeps it); otherwise create it.
+  const existingUser = await prisma.user.findFirst({
+    where: { email: EMAIL, providerName: 'LOCAL' },
+    select: { id: true },
+  });
   const org = await prisma.organization.create({
     data: {
       name: ORG_NAME,
@@ -141,16 +149,18 @@ async function main() {
       users: {
         create: {
           roleRef: ownerRole ? { connect: { id: ownerRole.id } } : undefined,
-          user: {
-            create: {
-              email: EMAIL,
-              password: hashSync(PASSWORD, 12),
-              providerName: 'LOCAL',
-              isSuperAdmin: true,
-              activated: true,
-              profile: { create: { name: 'Test', lastName: 'User', timezone: 'UTC' } },
-            },
-          },
+          user: existingUser
+            ? { connect: { id: existingUser.id } }
+            : {
+                create: {
+                  email: EMAIL,
+                  password: hashSync(PASSWORD, 12),
+                  providerName: 'LOCAL',
+                  isSuperAdmin: true,
+                  activated: true,
+                  profile: { create: { name: 'Test', lastName: 'User', timezone: 'UTC' } },
+                },
+              },
         },
       },
     },
@@ -309,6 +319,59 @@ async function main() {
   }
   console.log(`  ${postSnapRows} post analytics snapshots`);
 
+  // --- campaigns: group posts into folders so /campaigns is populated ---
+  // Each campaign aggregates its posts' lastViews/lastLikes/lastComments (set above),
+  // so engagement totals + top post render. A mix of active, ongoing, future, and
+  // archived campaigns shows the full surface.
+  const campaignDefs = [
+    { name: 'Summer Product Launch', color: '#2b5cd3',
+      description: 'Coordinated push for the v4 release across X and LinkedIn.',
+      startOffset: -10, endOffset: 20, archived: false, take: 3 },
+    { name: 'Weekly Tips Series', color: '#f59e0b',
+      description: 'Evergreen short-form tips — one per week, ongoing.',
+      startOffset: -14, endOffset: null, archived: false, take: 3 },
+    { name: 'Customer Stories', color: '#db2777',
+      description: 'Social proof: quotes, case studies, and wins from real teams.',
+      startOffset: -7, endOffset: 14, archived: false, take: 2 },
+    { name: 'Q2 Brand Awareness', color: '#16a34a',
+      description: 'Top-of-funnel reach campaign that wrapped at the end of Q2.',
+      startOffset: -45, endOffset: -5, archived: true, take: 2 },
+    { name: 'Hiring Push', color: '#7c3aed',
+      description: 'Recruiting drive for the platform team — now closed.',
+      startOffset: -30, endOffset: -3, archived: true, take: 2 },
+    { name: 'Holiday Teasers', color: '#0ea5e9',
+      description: 'Upcoming end-of-year teasers — scheduled, not yet live.',
+      startOffset: 3, endOffset: 30, archived: false, take: 0, takeScheduled: 2 },
+  ];
+
+  const publishedForCampaigns = createdPosts.filter((p) => p.state === 'PUBLISHED');
+  const scheduledForCampaigns = createdPosts.filter((p) => p.state === 'QUEUE');
+  let pubCursor = 0, schedCursor = 0, assigned = 0;
+  for (const def of campaignDefs) {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId: orgId,
+        name: def.name,
+        color: def.color,
+        description: def.description,
+        startDate: dateOnly(dayOffset(def.startOffset)),
+        endDate: def.endOffset == null ? null : dateOnly(dayOffset(def.endOffset)),
+        archived: def.archived,
+      },
+      select: { id: true },
+    });
+    const slice = publishedForCampaigns.slice(pubCursor, pubCursor + (def.take || 0));
+    pubCursor += def.take || 0;
+    const schedSlice = scheduledForCampaigns.slice(schedCursor, schedCursor + (def.takeScheduled || 0));
+    schedCursor += def.takeScheduled || 0;
+    const ids = [...slice, ...schedSlice].map((p) => p.id);
+    if (ids.length) {
+      await prisma.post.updateMany({ where: { id: { in: ids } }, data: { campaignId: campaign.id } });
+      assigned += ids.length;
+    }
+  }
+  console.log(`  ${campaignDefs.length} campaigns created, ${assigned} posts assigned`);
+
   // --- comment inbox: comments on ~7 published posts, some threaded/own/assigned ---
   let commentRows = 0, cId = 0;
   const withComments = published.slice(0, 8);
@@ -358,6 +421,7 @@ async function main() {
 
   console.log('\n✅ Seed complete.');
   console.log(`   Login: ${EMAIL}  /  ${PASSWORD}`);
+  console.log('   Campaigns: /campaigns  (6 folders grouping the seeded posts)');
 }
 
 main()

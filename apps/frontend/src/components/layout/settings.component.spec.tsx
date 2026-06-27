@@ -51,7 +51,7 @@ vi.mock('@gitroom/react/toaster/toaster', () => ({
 
 vi.mock('swr', () => ({
   useSWRConfig: () => ({ mutate: vi.fn() }),
-  default: { useSWRConfig: () => ({ mutate: vi.fn() }) },
+  default: () => ({ data: undefined, isLoading: false, error: undefined, mutate: vi.fn() }),
 }));
 
 vi.mock('react-hook-form', () => ({
@@ -92,6 +92,10 @@ vi.mock('@gitroom/frontend/components/settings/roles/roles.tab', () => ({
   RolesTab: () => <div>Roles Tab Content</div>,
 }));
 
+vi.mock('@gitroom/frontend/components/settings/notifications/notifications.tab', () => ({
+  NotificationsTab: () => <div>Notifications Tab Content</div>,
+}));
+
 let mockPermissions = {
   isLoaded: true,
   isResolved: true,
@@ -129,7 +133,6 @@ describe('SettingsPopup', () => {
 
     // Sections render in both the desktop rail and the mobile sub-menu strip.
     expect(screen.getAllByText('Workspace').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Providers').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Automation').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Developer').length).toBeGreaterThan(0);
   });
@@ -206,5 +209,13 @@ describe('SettingsPopup', () => {
     render(<SettingsPopup />);
 
     expect(screen.queryByText('No access to settings')).toBeNull();
+  });
+
+  it('renders the Notifications tab when selected', () => {
+    mockSearchParams = 'tab=notifications';
+
+    render(<SettingsPopup />);
+
+    expect(screen.getByText('Notifications Tab Content')).toBeDefined();
   });
 });

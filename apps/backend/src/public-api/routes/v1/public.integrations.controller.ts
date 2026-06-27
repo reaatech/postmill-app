@@ -296,7 +296,7 @@ export class PublicIntegrationsController {
     @Query() query: GetNotificationsDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._notificationService.getNotificationsPaginated(
+    return this._notificationService.getNotificationsPaginatedForOrg(
       org.id,
       query.page ?? 0
     );

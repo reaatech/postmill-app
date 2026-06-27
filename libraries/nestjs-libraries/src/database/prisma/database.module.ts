@@ -17,6 +17,9 @@ import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
+import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
+import { PushNotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service';
+import { NotificationDigestService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-digest.service';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.content.service';
@@ -135,6 +138,9 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     SubscriptionRepository,
     NotificationService,
     NotificationsRepository,
+    NotificationPreferenceService,
+    PushNotificationService,
+    NotificationDigestService,
     WebhooksRepository,
     WebhooksService,
     IntegrationService,

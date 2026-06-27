@@ -166,7 +166,11 @@ const CampaignCard: FC<{ campaign: Campaign }> = ({ campaign }) => {
   const fetch = useFetch();
   const { data: engagement } = useSWR<CampaignEngagement>(
     `campaign-engagement-${campaign.id}`,
-    () => fetch(`/campaigns/${campaign.id}/engagement`).then((r: Response) => r.json()),
+    async () => {
+      const r = await fetch(`/campaigns/${campaign.id}/engagement`);
+      if (!r.ok) throw new Error('Failed to load campaign engagement');
+      return r.json();
+    },
     { revalidateOnFocus: false },
   );
 
@@ -235,7 +239,11 @@ export const CampaignsPage: FC = () => {
 
   const { data: campaigns, error, isLoading } = useSWR<Campaign[]>(
     '/campaigns',
-    (url: string) => fetch(url).then((r: Response) => r.json()),
+    async (url: string) => {
+      const r = await fetch(url);
+      if (!r.ok) throw new Error('Failed to load campaigns');
+      return r.json();
+    },
   );
 
   const filtered = useMemo(() => {

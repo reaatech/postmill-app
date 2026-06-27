@@ -5,12 +5,14 @@ import { EmailActivity } from '@gitroom/nestjs-libraries/inngest/activities/emai
 import { IntegrationsActivity } from '@gitroom/nestjs-libraries/inngest/activities/integrations.activity';
 import { AutopostActivity } from '@gitroom/nestjs-libraries/inngest/activities/autopost.activity';
 import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/media-jobs.activity';
+import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/digest.activity';
 import { createAnalyticsCollection } from './analytics-collection';
 import { createCommentsCollection } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
 import { createMediaJobsPoll } from './media-jobs-poll';
 import { createSendEmail } from './send-email';
-import { createDigestEmail } from './digest-email';
+import { createDigestEmailDaily } from './digest-email-daily';
+import { createDigestEmailWeekly } from './digest-email-weekly';
 import { createAutopostProcess } from './autopost-process';
 import { createRefreshToken } from './refresh-token';
 import { createStreakTracker } from './streak-tracker';
@@ -25,6 +27,7 @@ export interface InngestActivities {
   integrationsActivity: IntegrationsActivity;
   autopostActivity: AutopostActivity;
   mediaJobsActivity: MediaJobsActivity;
+  digestActivity: DigestActivity;
 }
 
 export const createFunctions = (activities: InngestActivities) => [
@@ -33,7 +36,8 @@ export const createFunctions = (activities: InngestActivities) => [
   createMissingPostFinder(activities.postActivity),
   createMediaJobsPoll(activities.mediaJobsActivity),
   createSendEmail(activities.emailActivity),
-  createDigestEmail(activities.emailActivity),
+  createDigestEmailDaily(activities.digestActivity),
+  createDigestEmailWeekly(activities.digestActivity),
   createAutopostProcess(activities.autopostActivity),
   createRefreshToken(activities.integrationsActivity),
   createStreakTracker(activities.emailActivity),

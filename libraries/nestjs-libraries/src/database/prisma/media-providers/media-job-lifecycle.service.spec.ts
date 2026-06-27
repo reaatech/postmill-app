@@ -67,7 +67,7 @@ function makeService() {
     saveGeneratedMedia: vi.fn().mockResolvedValue({ id: 'media-1', path: '/uploads/org-1/artifact.mp4' }),
   };
 
-  const notificationService = { inAppNotification: vi.fn().mockResolvedValue(undefined) };
+  const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
 
   const service = new MediaJobLifecycleService(
     aiSettings as never,
@@ -176,7 +176,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         'old-1',
         expect.objectContaining({ status: 'failed' }),
       );
-      expect(notificationService.inAppNotification).toHaveBeenCalled();
+      expect(notificationService.notify).toHaveBeenCalled();
     });
 
     it('stays pending while the provider is still working (and marks processing)', async () => {
@@ -205,13 +205,14 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(await service.processJob('job-1')).toBe('failed');
       expect(jobs.get('job-1')!.status).toBe('failed');
       expect(jobs.get('job-1')!.error).toContain('NSFW rejected');
-      expect(notificationService.inAppNotification).toHaveBeenCalledWith(
-        'org-1',
-        expect.stringContaining('failed'),
-        expect.any(String),
-        false,
-        false,
-        'fail',
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          category: 'system',
+          title: expect.stringContaining('failed'),
+          message: expect.stringContaining('failed'),
+          channels: { email: false, push: false, inApp: true },
+        })
       );
     });
 
@@ -259,13 +260,14 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(jobs.get('job-1')!.status).toBe('completed');
       expect(jobs.get('job-1')!.artifactUrl).toBe('/uploads/org-1/artifact.mp4');
       // user notified
-      expect(notificationService.inAppNotification).toHaveBeenCalledWith(
-        'org-1',
-        expect.stringContaining('ready'),
-        expect.any(String),
-        false,
-        false,
-        'success',
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          category: 'system',
+          title: expect.stringContaining('ready'),
+          message: expect.stringContaining('ready'),
+          channels: { email: false, push: false, inApp: true },
+        })
       );
     });
 
@@ -329,7 +331,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       const { service, jobs, notificationService } = makeService();
       jobs.set('job-1', makeJob());
       await service.failJob(makeJob(), 'provider down', { notify: false });
-      expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+      expect(notificationService.notify).not.toHaveBeenCalled();
     });
   });
 
