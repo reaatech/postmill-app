@@ -126,6 +126,9 @@ model User {
   profile               UserProfile?
   sessions              Session[]
   designs               Design[]
+  notificationReads     NotificationRead[]
+  notificationPreference NotificationPreference?
+  pushTokens            PushToken[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -699,6 +702,7 @@ model OrgProviderConfiguration {
   redirectUri      String?      // if null, platform default is used
   scopes           String?
   setupNotes       String?      // per-provider instructions for the admin
+  vpnSelection     String?      // JSON { enabled, identifier, regionId } — optional VPN egress (not secret)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [organizationId], references: [id])
@@ -1220,6 +1224,7 @@ model OrgVpnConfig {
   identifier      String
   name            String?
   credentials     String?  // encrypted JSON
+  regions         String?  // JSON string[] of enabled proxy-region ids
   enabled         Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

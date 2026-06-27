@@ -17,6 +17,11 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
+import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
+import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
+import { runWithVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
+import type { Dispatcher } from 'undici';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
 function slimPost(post: any) {
@@ -49,8 +54,45 @@ export class PostActivity {
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _webhookService: WebhooksService,
-    private _subscriptionService: SubscriptionService
+    private _subscriptionService: SubscriptionService,
+    private _orgProviderConfigService: OrgProviderConfigService,
+    private _orgVpnConfigService: OrgVpnConfigService,
+    private _vpnDispatcherService: VpnDispatcherService
   ) {}
+
+  // Resolve the per-channel VPN proxy dispatcher (or undefined) for a publish.
+  // Non-fatal: any resolution failure falls back to direct egress so a VPN
+  // misconfig never blocks a post.
+  private async _resolveVpnDispatcher(
+    integration: Integration
+  ): Promise<Dispatcher | undefined> {
+    try {
+      const selection = await this._orgProviderConfigService.getVpnSelectionForIntegration(
+        integration.organizationId,
+        integration.providerConfigId,
+        integration.providerIdentifier
+      );
+      if (!selection) return undefined;
+
+      const resolved = await this._orgVpnConfigService.resolveProxyForChannel(
+        integration.organizationId,
+        selection.identifier,
+        selection.regionId
+      );
+      if (!resolved) return undefined;
+
+      return this._vpnDispatcherService.get(
+        integration.organizationId,
+        selection.identifier,
+        resolved
+      );
+    } catch (err) {
+      this.logger.warn(
+        `VPN dispatcher resolution failed for integration ${integration.id}: ${(err as Error)?.message}`
+      );
+      return undefined;
+    }
+  }
 
   async getIntegrationById(orgId: string, id: string) {
     return this._integrationService.getIntegrationById(orgId, id);
@@ -269,31 +311,39 @@ export class PostActivity {
       integration.providerConfigId
     ).catch(() => undefined);
 
-    const postNow = await getIntegration.post(
-      integration.internalId,
-      integration.token,
-      await Promise.all(
-        (newPosts || []).map(async (p) => ({
-          id: p.id,
-          message: stripHtmlValidation(
-            getIntegration.editor,
-            p.content,
-            true,
-            false,
-            !/<\/?[a-z][\s\S]*>/i.test(p.content),
-            getIntegration.mentionFormat
-          ),
-          settings: JSON.parse(p.settings || '{}'),
-          media: await this._postService.updateMedia(
-            p.id,
-            JSON.parse(p.image || '[]'),
-            getIntegration?.convertToJPEG || false,
-            integration.organizationId
-          ),
-        }))
-      ),
-      integration,
-      clientInformation
+    // If the channel has an enabled VPN selection, route every outbound request
+    // this provider makes through that region's proxy via AsyncLocalStorage.
+    const vpnDispatcher = await this._resolveVpnDispatcher(integration);
+
+    const postPayload = await Promise.all(
+      (newPosts || []).map(async (p) => ({
+        id: p.id,
+        message: stripHtmlValidation(
+          getIntegration.editor,
+          p.content,
+          true,
+          false,
+          !/<\/?[a-z][\s\S]*>/i.test(p.content),
+          getIntegration.mentionFormat
+        ),
+        settings: JSON.parse(p.settings || '{}'),
+        media: await this._postService.updateMedia(
+          p.id,
+          JSON.parse(p.image || '[]'),
+          getIntegration?.convertToJPEG || false,
+          integration.organizationId
+        ),
+      }))
+    );
+
+    const postNow = await runWithVpnDispatcher(vpnDispatcher, () =>
+      getIntegration.post(
+        integration.internalId,
+        integration.token,
+        postPayload,
+        integration,
+        clientInformation
+      )
     );
 
     await inngest.send({

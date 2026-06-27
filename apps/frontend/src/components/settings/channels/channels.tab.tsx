@@ -43,6 +43,7 @@ interface ChannelConfigItem {
   scopes: string | null;
   redirectUri: string | null;
   setupNotes: string | null;
+  vpnSelection?: { enabled: boolean; identifier?: string; regionId?: string } | null;
   updatedAt: string | null;
   capabilities: ProviderCapability | null;
 }
@@ -331,6 +332,7 @@ export const ChannelsTab: FC = () => {
                     redirectUri: config.redirectUri || '',
                     setupNotes: config.setupNotes || '',
                     isConfigured: config.isConfigured,
+                    vpnSelection: config.vpnSelection,
                   }
                 : undefined
             }

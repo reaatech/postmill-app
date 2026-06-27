@@ -23,6 +23,7 @@ export class OrgVpnConfigRepository {
     data: {
       name?: string;
       credentials?: string;
+      regions?: string;
       enabled?: boolean;
     },
   ) {

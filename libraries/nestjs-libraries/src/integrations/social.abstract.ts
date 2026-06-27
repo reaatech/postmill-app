@@ -3,6 +3,8 @@ import { Integration } from '@prisma/client';
 import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import sharp from 'sharp';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+import { getVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
 import {
   RefreshTokenError,
   BadBodyError,
@@ -156,10 +158,19 @@ export abstract class SocialAbstract {
     // hosts. The heavier `safeFetch` (HTTPS + isSafePublicHttpsUrl pre-check +
     // per-hop re-validation) is reserved for the dedicated user-URL paths
     // (mastodon `uploadFile`, bluesky `downloadVideo`, provider connect flows).
+    //
+    // When a per-channel VPN dispatcher is active (set by PostActivity for a
+    // VPN-enabled channel), it replaces the SSRF Agent for this leg. Proxying
+    // bypasses the connect-time DNS pin, so restore the guarantee the proxy
+    // stripped by pre-validating the destination is public HTTPS before dispatch.
+    const vpnDispatcher = (options as any).dispatcher ? undefined : getVpnDispatcher();
+    if (vpnDispatcher && !(await isSafePublicHttpsUrl(url))) {
+      throw new BadBody(identifier, '{}', options.body || '{}', 'Blocked non-public destination over VPN');
+    }
     const request = (await undiciFetch(url, {
       ...(options as any),
       // dispatcher is an undici-only RequestInit option, absorbed by the cast below
-      dispatcher: (options as any).dispatcher ?? ssrfSafeDispatcher,
+      dispatcher: (options as any).dispatcher ?? vpnDispatcher ?? ssrfSafeDispatcher,
     } as any)) as unknown as Response;
 
     if (request.status === 200 || request.status === 201) {

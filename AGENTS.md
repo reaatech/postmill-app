@@ -217,6 +217,26 @@ billed/leaked as a tenant's — preserve this).
 Short-link provider credentials follow the same pattern: stored in `OrgShortLinkConfig`, encrypted
 at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
 
+### Per-channel VPN egress
+
+A channel config (`OrgProviderConfiguration`) can opt into routing **all of its outbound posting
+requests through a VPN region's proxy**. Stored as the non-secret `vpnSelection` JSON column
+(`{ enabled, identifier, regionId }`); selectable only from the org's **enabled** VPN provider×region
+combinations. VPN providers (`OrgVpnConfig`, encrypted creds, Settings → VPN) that expose a public
+proxy declare a `proxyRegions` catalog + `resolveProxyAuth` on their adapter; the org enables a subset
+of regions (`OrgVpnConfig.regions` JSON). Only **SOCKS5 / HTTP-CONNECT** providers route — WireGuard/
+OpenVPN tunnels are out of scope (can't be applied per-request in Node).
+
+Routing chokepoint: `PostActivity.postSocial` resolves the selection → `VpnDispatcherService.get`
+(pooled undici dispatcher: SOCKS5 via `socks`, HTTP-CONNECT via undici `ProxyAgent`) → wraps the
+provider's `post()` in `runWithVpnDispatcher` (AsyncLocalStorage, because providers are singletons).
+`SocialAbstract.fetch()` reads `getVpnDispatcher()` and uses it in place of `ssrfSafeDispatcher`.
+**SSRF posture when proxied:** the proxy host is validated public, the proxy-connect leg keeps the
+private-IP DNS pin, and the destination is re-checked `isSafePublicHttpsUrl` before dispatch.
+Dispatchers are keyed by `(org, provider, region, creds-fingerprint)` and invalidated on any VPN
+config change. **Known gap:** providers that bypass `this.fetch()` (raw `fetch`/`axios` — Medium,
+parts of LinkedIn auth, Bluesky) are not proxied.
+
 ---
 
 # Architecture notes

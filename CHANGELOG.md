@@ -42,6 +42,24 @@
   and never returned to the browser. Endpoints: `GET /settings/vpn/config`,
   `GET /settings/vpn/providers`, `PUT/DELETE /settings/vpn/config/:identifier`,
   `POST /settings/vpn/config/:identifier/test`.
+- **Per-channel VPN egress (multi-region, live routing).** A channel config (Settings → Channels →
+  edit) gains an optional **2-column VPN row** — an Enabled/Disabled switch (off by default) plus a
+  filterable **`provider: region`** combobox. The row is hidden when the org has no enabled VPN
+  regions. Proxy-capable providers (NordVPN, Private Internet Access) now declare a catalog of
+  **egress regions**; Settings → VPN gains a per-provider region multi-select, and the enabled
+  provider×region combinations populate the channel picker. When a channel has an enabled selection,
+  **every outbound posting request that provider makes routes through that region's proxy** — a
+  per-request undici dispatcher (SOCKS5 via the `socks` package, HTTP-CONNECT via undici `ProxyAgent`)
+  injected through `AsyncLocalStorage` at publish time and picked up in `SocialAbstract.fetch()`.
+  SSRF protection is preserved: the proxy endpoint is validated as public, the proxy-connect leg keeps
+  the private-IP DNS pin, and the destination is re-checked as public HTTPS before dispatch.
+  Dispatchers are pooled per `(org, provider, region, creds-fingerprint)` and invalidated on any VPN
+  config change. Additive, db-push-safe schema: `OrgVpnConfig.regions` (JSON id list) and
+  `OrgProviderConfiguration.vpnSelection` (JSON `{enabled, identifier, regionId}`). **Scope/limits:**
+  only SOCKS5/HTTP-CONNECT-capable providers route (WireGuard/OpenVPN tunnels are out of scope);
+  providers that call raw `fetch`/`axios` instead of `this.fetch()` (Medium, parts of LinkedIn auth,
+  Bluesky) are not yet proxied. Region endpoints/credential schemes are source-grounded and need a
+  live smoke test.
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
   scopes the dataset: each language has its own instructions **and** its own optional per-channel
   overrides; switching the language shows a fresh dataset. Backed by a new additive

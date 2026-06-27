@@ -4,6 +4,8 @@ import {
   VpnConfigValidationResult,
   VpnCredentialField,
   VpnProviderCapabilities,
+  VpnProxyAuth,
+  VpnProxyRegion,
 } from '../vpn.types';
 
 @Injectable()
@@ -38,7 +40,20 @@ export class PiaAdapter implements VpnProviderAdapter {
   };
 
   readonly setupNotes =
-    'PIA uses the same username and password as your account for manual OpenVPN/WireGuard configurations.';
+    'PIA uses the same username and password as your account for manual OpenVPN/WireGuard configurations. SOCKS5 proxy egress is Netherlands-only and uses the same credentials.';
+
+  // PIA exposes a single public SOCKS5 proxy (Netherlands), port 1080. Verify
+  // host + credential scheme against a live account.
+  readonly proxyRegions: VpnProxyRegion[] = [
+    { id: 'nl', label: 'Netherlands', host: 'proxy-nl.privateinternetaccess.com', port: 1080, protocol: 'socks5' },
+  ];
+
+  resolveProxyAuth(config: Record<string, string>): VpnProxyAuth | null {
+    const creds = config.serviceCredentials?.trim() || '';
+    const idx = creds.indexOf(':');
+    if (idx <= 0) return null;
+    return { username: creds.slice(0, idx), password: creds.slice(idx + 1) };
+  }
 
   validateConfig(config: Record<string, string>): VpnConfigValidationResult {
     const errors: string[] = [];

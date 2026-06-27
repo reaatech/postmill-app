@@ -29,7 +29,17 @@ export interface VpnProviderInfo {
   isConfigured: boolean;
   capabilities: VpnProviderCapabilityInfo;
   credentialFields: VpnCredentialFieldInfo[];
+  proxyRegions: VpnProxyRegionInfo[];
+  enabledRegions: string[];
   setupNotes?: string;
+}
+
+export interface VpnProxyRegionInfo {
+  id: string;
+  label: string;
+  host: string;
+  port: number;
+  protocol: 'socks5' | 'http-connect';
 }
 
 export interface VpnConfigResponse {

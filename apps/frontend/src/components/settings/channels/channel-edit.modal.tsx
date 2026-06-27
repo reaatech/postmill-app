@@ -1,11 +1,13 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { Input } from '@gitroom/react/form/input';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useVpnConfig } from '@gitroom/frontend/components/settings/vpn/hooks/useVpnConfig';
+import { ChannelVpnRegionSelect } from './channel-vpn-region-select';
 
 const PROVIDER_APP_LINKS: Record<string, { label: string; url: string | null }> = {
   linkedin: { label: 'LinkedIn Developer Portal', url: 'https://www.linkedin.com/developers/apps' },
@@ -30,6 +32,12 @@ const PROVIDER_APP_LINKS: Record<string, { label: string; url: string | null }> 
   bluesky: { label: 'Bluesky Settings', url: 'https://bsky.app/settings/app-passwords' },
 };
 
+export interface ChannelVpnSelection {
+  enabled: boolean;
+  identifier?: string;
+  regionId?: string;
+}
+
 export interface ChannelConfigInstance {
   id: string;
   name: string;
@@ -38,6 +46,7 @@ export interface ChannelConfigInstance {
   redirectUri: string;
   setupNotes: string;
   isConfigured: boolean;
+  vpnSelection?: ChannelVpnSelection | null;
 }
 
 interface ChannelConfigFormProps {
@@ -72,6 +81,28 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
   const [enabled, setEnabled] = useState(config?.enabled || false);
   const [saving, setSaving] = useState(false);
 
+  // Optional VPN egress: built from the org's enabled VPN provider×region combos.
+  const { data: vpnConfig } = useVpnConfig();
+  const vpnOptions = useMemo(() => {
+    const out: { value: string; label: string }[] = [];
+    for (const p of vpnConfig?.providers ?? []) {
+      if (!p.enabled || !p.isConfigured) continue;
+      for (const id of p.enabledRegions ?? []) {
+        const region = p.proxyRegions?.find((r) => r.id === id);
+        if (!region) continue;
+        out.push({ value: `${p.identifier}:${id}`, label: `${p.name}: ${region.label}` });
+      }
+    }
+    return out;
+  }, [vpnConfig]);
+
+  const [vpnEnabled, setVpnEnabled] = useState(config?.vpnSelection?.enabled || false);
+  const [vpnValue, setVpnValue] = useState(
+    config?.vpnSelection?.identifier && config?.vpnSelection?.regionId
+      ? `${config.vpnSelection.identifier}:${config.vpnSelection.regionId}`
+      : ''
+  );
+
   const handleSave = useCallback(async () => {
     if (!name.trim()) {
       toaster.show(t('channel_name_required', 'Please enter a name for this channel.'), 'warning');
@@ -96,6 +127,18 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
       if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
       if (editRedirectUri.trim()) payload.redirectUri = editRedirectUri.trim();
       if (editSetupNotes.trim()) payload.setupNotes = editSetupNotes.trim();
+      if (vpnOptions.length) {
+        if (vpnEnabled && vpnValue) {
+          const sep = vpnValue.indexOf(':');
+          payload.vpnSelection = {
+            enabled: true,
+            identifier: vpnValue.slice(0, sep),
+            regionId: vpnValue.slice(sep + 1),
+          };
+        } else {
+          payload.vpnSelection = { enabled: false };
+        }
+      }
 
       const res = isEdit
         ? await fetch(`/channels/config/${config!.id}`, {
@@ -122,7 +165,7 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [name, enabled, clientId, clientSecret, editScopes, editRedirectUri, editSetupNotes, isConfigured, isEdit, config, identifier, fetch, toaster, t, onSaved, onClose]);
+  }, [name, enabled, clientId, clientSecret, editScopes, editRedirectUri, editSetupNotes, vpnOptions, vpnEnabled, vpnValue, isConfigured, isEdit, config, identifier, fetch, toaster, t, onSaved, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!config) return;
@@ -257,6 +300,46 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
             className="p-[8px] rounded-[8px] border border-newTableBorder bg-bgInput text-textColor min-h-[80px] text-[14px]"
             rows={3}
           />
+        </div>
+      )}
+
+      {vpnOptions.length > 0 && (
+        <div className="flex gap-[12px] items-end">
+          <div className="flex flex-col gap-[6px]">
+            <label className="text-[14px] font-[500]">{t('vpn_connection', 'VPN connection')}</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={vpnEnabled}
+              onClick={() => setVpnEnabled((v) => !v)}
+              className="flex items-center gap-[8px]"
+            >
+              <span
+                className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
+                  vpnEnabled ? 'bg-btnPrimary' : 'bg-newTableBorder'
+                }`}
+              >
+                <span
+                  className={`absolute top-[2px] left-[2px] w-[18px] h-[18px] rounded-full bg-white transition-transform ${
+                    vpnEnabled ? 'translate-x-[18px]' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+              <span className="text-[14px] text-textColor">
+                {vpnEnabled ? t('enabled', 'Enabled') : t('disabled', 'Disabled')}
+              </span>
+            </button>
+          </div>
+          <div className="flex-1 flex flex-col gap-[6px]">
+            <label className="text-[14px] font-[500]">{t('vpn_region', 'Provider & region')}</label>
+            <ChannelVpnRegionSelect
+              value={vpnValue}
+              options={vpnOptions}
+              disabled={!vpnEnabled}
+              placeholder={t('vpn_region_placeholder', 'Search provider: region…')}
+              onChange={setVpnValue}
+            />
+          </div>
         </div>
       )}
 

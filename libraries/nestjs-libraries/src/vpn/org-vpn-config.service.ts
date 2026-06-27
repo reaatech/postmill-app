@@ -1,9 +1,15 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { createHash } from 'node:crypto';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
 import { VpnProviderRegistry } from './vpn-provider.registry';
 import { VpnProviderAdapter } from './vpn-provider.interface';
-import { VpnProviderCapabilities } from './vpn.types';
+import {
+  VpnProviderCapabilities,
+  VpnProxyAuth,
+  VpnProxyRegion,
+} from './vpn.types';
+import { VpnDispatcherService } from './vpn-dispatcher.service';
 
 export interface VpnProviderListItem {
   identifier: string;
@@ -19,7 +25,24 @@ export interface VpnProviderListItem {
     placeholder?: string;
     options?: Array<{ label: string; value: string }>;
   }>;
+  proxyRegions: VpnProxyRegion[];
+  enabledRegions: string[];
   setupNotes?: string;
+}
+
+// One selectable provider×region for the per-channel VPN picker.
+export interface VpnEnabledRegion {
+  identifier: string;
+  providerName: string;
+  regionId: string;
+  regionLabel: string;
+}
+
+// Everything the dispatcher factory needs to build a proxy for one channel.
+export interface VpnResolvedProxy {
+  region: VpnProxyRegion;
+  auth: VpnProxyAuth;
+  credsFingerprint: string;
 }
 
 @Injectable()
@@ -30,6 +53,7 @@ export class OrgVpnConfigService {
     private _repository: OrgVpnConfigRepository,
     private _encryption: EncryptionService,
     private _registry: VpnProviderRegistry,
+    private _dispatcher: VpnDispatcherService,
   ) {}
 
   getProviderMetadata(): VpnProviderListItem[] {
@@ -40,6 +64,8 @@ export class OrgVpnConfigService {
       isConfigured: false,
       capabilities: adapter.capabilities,
       credentialFields: adapter.credentialFields,
+      proxyRegions: adapter.proxyRegions ?? [],
+      enabledRegions: [],
       setupNotes: adapter.setupNotes,
     }));
   }
@@ -52,6 +78,11 @@ export class OrgVpnConfigService {
       const config = configs.find((c) => c.identifier === adapter.identifier);
       const decrypted = this._decryptCredentials(config?.credentials);
       const isConfigured = this._hasRequiredCredentials(adapter, decrypted);
+      const catalog = adapter.proxyRegions ?? [];
+      // Keep only enabled ids that still exist in the adapter catalog.
+      const enabledRegions = this._parseRegions(config?.regions).filter((id) =>
+        catalog.some((r) => r.id === id),
+      );
 
       return {
         identifier: adapter.identifier,
@@ -60,9 +91,62 @@ export class OrgVpnConfigService {
         isConfigured,
         capabilities: adapter.capabilities,
         credentialFields: adapter.credentialFields,
+        proxyRegions: catalog,
+        enabledRegions,
         setupNotes: adapter.setupNotes,
       };
     });
+  }
+
+  // Every (enabled config × enabled region) the org can route a channel through.
+  async listEnabledRegions(orgId: string): Promise<VpnEnabledRegion[]> {
+    const configs = await this._repository.getByOrg(orgId);
+    const out: VpnEnabledRegion[] = [];
+    for (const config of configs) {
+      if (!config.enabled) continue;
+      const adapter = this._registry.getAdapter(config.identifier);
+      const catalog = adapter?.proxyRegions ?? [];
+      if (!adapter || catalog.length === 0) continue;
+      const decrypted = this._decryptCredentials(config.credentials);
+      if (!this._hasRequiredCredentials(adapter, decrypted)) continue;
+      for (const id of this._parseRegions(config.regions)) {
+        const region = catalog.find((r) => r.id === id);
+        if (!region) continue;
+        out.push({
+          identifier: adapter.identifier,
+          providerName: adapter.name,
+          regionId: region.id,
+          regionLabel: region.label,
+        });
+      }
+    }
+    return out;
+  }
+
+  // Resolve a channel's VPN selection into the region + auth + creds fingerprint
+  // the dispatcher factory needs. Returns null when the selection is no longer
+  // valid (provider disabled, region removed, creds missing).
+  async resolveProxyForChannel(
+    orgId: string,
+    identifier: string,
+    regionId: string,
+  ): Promise<VpnResolvedProxy | null> {
+    const config = await this._repository.getByIdentifier(orgId, identifier);
+    if (!config || !config.enabled) return null;
+
+    const adapter = this._registry.getAdapter(identifier);
+    const region = adapter?.proxyRegions?.find((r) => r.id === regionId);
+    if (!adapter || !region) return null;
+    if (!this._parseRegions(config.regions).includes(regionId)) return null;
+
+    const decrypted = this._decryptCredentials(config.credentials);
+    const auth = adapter.resolveProxyAuth?.(decrypted) ?? null;
+    if (!auth) return null;
+
+    const credsFingerprint = createHash('sha256')
+      .update(`${auth.username}:${auth.password}`)
+      .digest('hex');
+    return { region, auth, credsFingerprint };
   }
 
   async upsert(
@@ -71,6 +155,7 @@ export class OrgVpnConfigService {
     data: {
       name?: string;
       credentials?: Record<string, string>;
+      regions?: string[];
       enabled?: boolean;
     },
   ) {
@@ -79,25 +164,42 @@ export class OrgVpnConfigService {
       throw new BadRequestException(`Unknown VPN provider: ${identifier}`);
     }
 
-    const plainConfig = data.credentials || {};
-    const validation = adapter.validateConfig(plainConfig);
-    if (!validation.valid) {
-      throw new BadRequestException(
-        validation.errors?.join(' ') || `Invalid configuration for ${adapter.name}`,
-      );
+    // Credentials are only (re)validated/encrypted when supplied — a regions or
+    // enabled-only toggle must not wipe the stored secret.
+    let encryptedCredentials: string | undefined;
+    if (data.credentials !== undefined) {
+      const validation = adapter.validateConfig(data.credentials);
+      if (!validation.valid) {
+        throw new BadRequestException(
+          validation.errors?.join(' ') || `Invalid configuration for ${adapter.name}`,
+        );
+      }
+      encryptedCredentials = this._encryption.encrypt(JSON.stringify(data.credentials));
     }
 
-    const encryptedCredentials = this._encryption.encrypt(JSON.stringify(plainConfig));
+    let regions: string | undefined;
+    if (data.regions !== undefined) {
+      const catalog = adapter.proxyRegions ?? [];
+      const valid = data.regions.filter((id) => catalog.some((r) => r.id === id));
+      regions = JSON.stringify(valid);
+    }
 
-    return this._repository.upsert(orgId, identifier, {
+    const result = await this._repository.upsert(orgId, identifier, {
       name: data.name,
       credentials: encryptedCredentials,
+      regions,
       enabled: data.enabled,
     });
+
+    // Drop any pooled dispatchers so a cred/region/enabled change takes effect now.
+    this._dispatcher.invalidate(orgId, identifier);
+    return result;
   }
 
   async delete(orgId: string, identifier: string) {
-    return this._repository.delete(orgId, identifier);
+    const result = await this._repository.delete(orgId, identifier);
+    this._dispatcher.invalidate(orgId, identifier);
+    return result;
   }
 
   async testConnection(orgId: string, identifier: string) {
@@ -127,6 +229,16 @@ export class OrgVpnConfigService {
       enabled: config.enabled,
       credentials: this._decryptCredentials(config.credentials),
     };
+  }
+
+  private _parseRegions(raw: string | null | undefined): string[] {
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+    } catch {
+      return [];
+    }
   }
 
   private _decryptCredentials(encrypted: string | null | undefined): Record<string, string> {

@@ -16,6 +16,7 @@ import { VyprvpnAdapter } from './adapters/vyprvpn.adapter';
 import { HidemeAdapter } from './adapters/hideme.adapter';
 import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
 import { OrgVpnConfigService } from './org-vpn-config.service';
+import { VpnDispatcherService } from './vpn-dispatcher.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
 
 @Global()
@@ -39,7 +40,13 @@ import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prism
     VpnProviderRegistry,
     OrgVpnConfigService,
     OrgVpnConfigRepository,
+    VpnDispatcherService,
   ],
-  exports: [VpnProviderRegistry, OrgVpnConfigService, OrgVpnConfigRepository],
+  exports: [
+    VpnProviderRegistry,
+    OrgVpnConfigService,
+    OrgVpnConfigRepository,
+    VpnDispatcherService,
+  ],
 })
 export class VpnModule {}

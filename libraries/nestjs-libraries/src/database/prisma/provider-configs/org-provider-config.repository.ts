@@ -10,6 +10,7 @@ type ConfigData = {
   scopes?: string | null;
   additionalConfig?: string | null;
   setupNotes?: string | null;
+  vpnSelection?: string | null;
 };
 
 @Injectable()
@@ -63,6 +64,7 @@ export class OrgProviderConfigRepository {
         scopes: data.scopes ?? null,
         additionalConfig: data.additionalConfig ?? null,
         setupNotes: data.setupNotes ?? null,
+        vpnSelection: data.vpnSelection ?? null,
       },
     });
   }

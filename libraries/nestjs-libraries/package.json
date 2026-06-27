@@ -126,6 +126,7 @@
     "rss-parser": "^3.13.0",
     "sharp": "^0.33.4",
     "slugify": "^1.6.9",
+    "socks": "^2.8.9",
     "stripe": "^20.4.0",
     "subtitle": "4.2.2-alpha.0",
     "svix": "1.63.0",

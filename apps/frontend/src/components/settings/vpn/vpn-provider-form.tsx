@@ -21,6 +21,7 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
   const provider = providers?.providers?.find((p: any) => p.identifier === identifier);
   const [name, setName] = useState('');
   const [creds, setCreds] = useState<Record<string, string>>({});
+  const [regions, setRegions] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<'success' | 'failure' | null>(null);
@@ -35,7 +36,14 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
     });
     setCreds(defaults);
     setEnabled(provider.enabled ?? false);
+    setRegions(provider.enabledRegions ?? []);
   }, [provider]);
+
+  const toggleRegion = useCallback((id: string) => {
+    setRegions((prev) =>
+      prev.includes(id) ? prev.filter((r) => r !== id) : [...prev, id]
+    );
+  }, []);
 
   const handleSave = useCallback(async () => {
     if (!provider) return;
@@ -46,6 +54,7 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
         body: JSON.stringify({
           name: name || undefined,
           credentials: Object.values(creds).some((v) => v) ? creds : undefined,
+          regions: provider.proxyRegions?.length ? regions : undefined,
           enabled,
         }),
       });
@@ -59,7 +68,7 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
     } finally {
       setSaving(false);
     }
-  }, [provider, identifier, name, creds, enabled, fetch, toaster, t, onSaved]);
+  }, [provider, identifier, name, creds, regions, enabled, fetch, toaster, t, onSaved]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -160,6 +169,36 @@ export const VpnProviderForm = ({ identifier, onClose, onSaved }: VpnProviderFor
       {provider.setupNotes && (
         <div className="text-[12px] text-newTableText bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px]">
           {provider.setupNotes}
+        </div>
+      )}
+
+      {provider.proxyRegions?.length > 0 && (
+        <div className="flex flex-col gap-[8px]">
+          <label className="text-[13px] text-newTableText">
+            {t('vpn_egress_regions', 'Egress regions')}
+          </label>
+          <div className="text-[12px] text-newTableText">
+            {t(
+              'vpn_egress_regions_hint',
+              'Enabled regions become selectable per channel under Settings → Channels.'
+            )}
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            {provider.proxyRegions.map((region: any) => (
+              <label
+                key={region.id}
+                className="flex items-center gap-[8px] cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  className="accent-btnPrimary w-[16px] h-[16px]"
+                  checked={regions.includes(region.id)}
+                  onChange={() => toggleRegion(region.id)}
+                />
+                <span className="text-[13px] text-textColor">{region.label}</span>
+              </label>
+            ))}
+          </div>
         </div>
       )}
 

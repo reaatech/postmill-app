@@ -18,12 +18,14 @@ import { HidemeAdapter } from './adapters/hideme.adapter';
 import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { VpnDispatcherService } from './vpn-dispatcher.service';
 
 describe('OrgVpnConfigService', () => {
   let service: OrgVpnConfigService;
   let repository: OrgVpnConfigRepository;
   let encryption: EncryptionService;
   let registry: VpnProviderRegistry;
+  let dispatcher: VpnDispatcherService;
 
   beforeEach(() => {
     repository = {
@@ -59,7 +61,9 @@ describe('OrgVpnConfigService', () => {
       new MozillavpnAdapter(),
     );
 
-    service = new OrgVpnConfigService(repository, encryption, registry);
+    dispatcher = { invalidate: vi.fn() } as unknown as VpnDispatcherService;
+
+    service = new OrgVpnConfigService(repository, encryption, registry, dispatcher);
   });
 
   it('returns provider metadata with all adapters', () => {
@@ -135,5 +139,68 @@ describe('OrgVpnConfigService', () => {
   it('deletes provider config', async () => {
     await service.delete('org-1', 'nordvpn');
     expect(repository.delete).toHaveBeenCalledWith('org-1', 'nordvpn');
+    expect(dispatcher.invalidate).toHaveBeenCalledWith('org-1', 'nordvpn');
+  });
+
+  describe('regions', () => {
+    const enabledRow = {
+      id: 'cfg-1',
+      organizationId: 'org-1',
+      identifier: 'nordvpn',
+      name: null,
+      credentials: `enc:{"serviceCredentials":"user:pass"}`,
+      regions: JSON.stringify(['us-atlanta', 'nl-amsterdam']),
+      enabled: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as any;
+
+    it('lists enabled provider×region combos with labels', async () => {
+      vi.spyOn(repository, 'getByOrg').mockResolvedValue([enabledRow]);
+      const list = await service.listEnabledRegions('org-1');
+      expect(list).toHaveLength(2);
+      expect(list.map((r) => r.regionId).sort()).toEqual(['nl-amsterdam', 'us-atlanta']);
+      expect(list[0].providerName).toBe('NordVPN');
+      expect(list.find((r) => r.regionId === 'us-atlanta')?.regionLabel).toContain('Atlanta');
+    });
+
+    it('excludes a disabled provider from enabled regions', async () => {
+      vi.spyOn(repository, 'getByOrg').mockResolvedValue([{ ...enabledRow, enabled: false }]);
+      expect(await service.listEnabledRegions('org-1')).toHaveLength(0);
+    });
+
+    it('drops enabled region ids no longer in the adapter catalog', async () => {
+      vi.spyOn(repository, 'getByOrg').mockResolvedValue([
+        { ...enabledRow, regions: JSON.stringify(['us-atlanta', 'ghost-region']) },
+      ]);
+      const providers = await service.getProviders('org-1');
+      const nord = providers.find((p) => p.identifier === 'nordvpn')!;
+      expect(nord.enabledRegions).toEqual(['us-atlanta']);
+      expect(nord.proxyRegions.length).toBeGreaterThan(0);
+    });
+
+    it('resolves a selected region into region + auth + fingerprint', async () => {
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue(enabledRow);
+      const resolved = await service.resolveProxyForChannel('org-1', 'nordvpn', 'us-atlanta');
+      expect(resolved).not.toBeNull();
+      expect(resolved!.region.host).toContain('atlanta');
+      expect(resolved!.auth).toEqual({ username: 'user', password: 'pass' });
+      expect(resolved!.credsFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    });
+
+    it('returns null for a region the org did not enable', async () => {
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue(enabledRow);
+      expect(await service.resolveProxyForChannel('org-1', 'nordvpn', 'se-stockholm')).toBeNull();
+    });
+
+    it('returns null when the provider is disabled', async () => {
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue({ ...enabledRow, enabled: false });
+      expect(await service.resolveProxyForChannel('org-1', 'nordvpn', 'us-atlanta')).toBeNull();
+    });
+
+    it('invalidates pooled dispatchers on upsert', async () => {
+      await service.upsert('org-1', 'nordvpn', { regions: ['us-atlanta'] });
+      expect(dispatcher.invalidate).toHaveBeenCalledWith('org-1', 'nordvpn');
+    });
   });
 });

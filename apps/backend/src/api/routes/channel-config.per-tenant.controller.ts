@@ -19,6 +19,12 @@ import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/so
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
+interface ChannelVpnSelectionBody {
+  enabled: boolean;
+  identifier?: string;
+  regionId?: string;
+}
+
 interface ChannelConfigBody {
   name?: string;
   enabled?: boolean;
@@ -28,6 +34,7 @@ interface ChannelConfigBody {
   scopes?: string;
   additionalConfig?: string;
   setupNotes?: string;
+  vpnSelection?: ChannelVpnSelectionBody | null;
 }
 
 function validateBody(body: ChannelConfigBody) {
@@ -44,6 +51,17 @@ function validateBody(body: ChannelConfigBody) {
       JSON.parse(body.additionalConfig);
     } catch {
       throw new BadRequestException('additionalConfig must be valid JSON');
+    }
+  }
+  if (body.vpnSelection !== undefined && body.vpnSelection !== null) {
+    const v = body.vpnSelection;
+    if (typeof v !== 'object' || typeof v.enabled !== 'boolean') {
+      throw new BadRequestException('vpnSelection.enabled must be a boolean');
+    }
+    for (const key of ['identifier', 'regionId'] as const) {
+      if (v[key] !== undefined && typeof v[key] !== 'string') {
+        throw new BadRequestException(`vpnSelection.${key} must be a string`);
+      }
     }
   }
 }
@@ -131,6 +149,7 @@ export class ChannelConfigPerTenantController {
         scopes: body.scopes,
         additionalConfig: body.additionalConfig,
         setupNotes: body.setupNotes,
+        vpnSelection: body.vpnSelection,
       },
       user.id
     );
@@ -161,6 +180,7 @@ export class ChannelConfigPerTenantController {
         scopes: body.scopes,
         additionalConfig: body.additionalConfig,
         setupNotes: body.setupNotes,
+        vpnSelection: body.vpnSelection,
       },
       user.id
     );
