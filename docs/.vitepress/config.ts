@@ -38,6 +38,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/developer-docs/' },
             { text: 'Architecture', link: '/developer-docs/architecture' },
+            { text: 'Provider Framework', link: '/developer-docs/provider-framework' },
             { text: 'Public API v1', link: '/developer-docs/public-api' },
             { text: 'Analytics API v2', link: '/developer-docs/analytics-api' },
             { text: 'MCP', link: '/developer-docs/mcp' },
@@ -82,6 +83,7 @@ export default defineConfig({
             { text: 'Overview', link: '/reference/' },
             { text: 'Changes From Upstream', link: '/reference/changes-from-upstream' },
             { text: 'Provider Capabilities', link: '/reference/provider-capabilities' },
+            { text: 'Provider Versions', link: '/reference/provider-versions' },
             { text: 'Glossary', link: '/reference/glossary' },
           ],
         },

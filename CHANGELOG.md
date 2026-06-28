@@ -23,10 +23,26 @@
   in the in-app bell). **Transactional emails** (account activation, password reset, team invite,
   billing-cancel) are unified onto `NotificationService.sendEmail` as always-on sends (no
   preference toggle, no stray in-app row) — no email path bypasses `NotificationService` anymore.
-  Code-only; categories persist as JSON, so existing preferences self-heal on read with **no schema
-  migration / no `prisma db push`**.
+  Category *renames* are code-only (categories persist as JSON and self-heal on read), but this
+  release **does add schema** — the new `NotificationPreference`, `NotificationRead`,
+  `NotificationDigestQueue`, and `PushToken` models plus `Notifications.type/title/metadata` — so a
+  `prisma db push` is required. **Migration safety:** the legacy per-user email toggles
+  (`UserProfile.sendSuccessEmails/sendFailureEmails/sendStreakEmails`) are **retained this release**
+  as an expand-contract step; `BackfillService` copies any opt-OUT into
+  `NotificationPreference.categories` on deploy (no manual script needed), and the columns are
+  scheduled for **drop in the next release**. This prevents opted-out users from being silently
+  re-opted-in (the defaults are opt-in). Run `pnpm run prisma-generate` after pulling.
 
 ### Added
+- **Unified, versioned provider framework (v4.0.0).** All provider domains — AI, Media, Storage,
+  Short-link, Social, VPN, Content Packs, Email, Auth — now resolve through a single
+  `ProviderKernel` (`libraries/providers/kernel`) with one workspace package per provider
+  (`libraries/providers/<id>`). Each provider config/ledger row carries a pinned `version`
+  (`v1` today); resolution honors the pinned version so a future `v2` never silently changes an
+  existing org's behavior. A `PROVIDER_KERNEL=legacy` env kill switch reverts to the old
+  in-memory registries for the release window. New endpoints: `GET /providers/catalog?domain=`
+  (public catalog) and `GET /admin/providers/health?domain=` (super-admin health). See
+  `docs/developer-docs/provider-framework.md` and `docs/reference/provider-versions.md`.
 - **Campaign comments — view & reply, folded into the dashboard.** Each campaign's dashboard gains a
   full **Comments** section over its posts' synced comments: filter by status, **channel**, assignee,
   or unread; **reply** inline (with AI draft), like, cycle status, assign, and mark handled —

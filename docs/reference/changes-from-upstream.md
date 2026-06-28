@@ -8,6 +8,24 @@ has the full per-commit detail.
 
 ---
 
+### v4.0.0 (June 2026)
+
+**Unified, versioned provider framework.** All provider domains — AI, Media, Storage, Short-link,
+Social, VPN, Content Packs, Email, and Auth — now resolve through a single `ProviderKernel`
+(`libraries/providers/kernel`) with one workspace package per provider (`libraries/providers/<id>`).
+
+- Every provider config/ledger row carries a pinned `version` (`v1` for all current providers). A
+  future `v2` adapter cannot silently change an existing org's behavior.
+- `ProviderResolutionService` (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`)
+  is the single runtime bridge; the kernel is the sole resolution path.
+- New endpoints: `GET /providers/catalog?domain=` (public catalog) and
+  `GET /admin/providers/health?domain=` (super-admin, per-version health).
+- The `PROVIDER_KERNEL=legacy` kill switch and all legacy in-memory registries have been removed —
+  there is no fallback registry.
+
+See [Provider Framework](../developer-docs/provider-framework.md) and
+[Provider Versions](../reference/provider-versions.md).
+
 ### v3.9.0 (June 2026)
 
 Temporal → Inngest migration — background jobs now run through Inngest Cloud (or the local dev

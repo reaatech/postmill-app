@@ -39,6 +39,27 @@ Docs & plans:
 - `dev/` — release/implementation plans (e.g. `dev/RELEASE_v3.5.0.md`). Plans here drive a release;
   reconcile code against the plan, not the other way around.
 
+## Unified provider framework (v4.0.0)
+
+All provider domains (AI, Media, Storage, Short-link, Social, VPN, Content Packs, Email, Auth)
+resolve through a single **`ProviderKernel`** (`libraries/providers/kernel`).
+
+- **Package-per-provider:** every provider is a workspace package under `libraries/providers/<id>`;
+  each version is an internal module (`src/v1`, `src/v2`, …). The kernel registers them by
+  `(domain, providerId, version)`.
+- **Identity triple:** a provider is addressed as `domain/providerId@version` (e.g. `ai/openai@v1`).
+  Config and ledger rows pin the version at write time (`version` columns on every provider table).
+- **Resolution:** domain services use `ProviderResolutionService`
+  (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`). It resolves the
+  kernel module — the kernel is the **sole** resolution path; the legacy in-memory registries and the
+  `PROVIDER_KERNEL=legacy` kill switch have been removed.
+- **Catalog & health:** `GET /providers/catalog?domain=` returns the public provider catalog;
+  `GET /admin/providers/health?domain=` (super-admin) returns per-version health counters.
+- **Stock providers** (free, env-keyed) are intentionally outside the versioning framework.
+
+See `docs/developer-docs/provider-framework.md` for the full playbook and
+`docs/reference/provider-versions.md` for the catalog.
+
 ## Setup & commands
 
 Use **pnpm only** — never npm or yarn.
@@ -244,6 +265,34 @@ the user supplies their own host/port/protocol/auth (e.g. an office proxy). Dyna
 single derived region, auto-enabled (no per-region toggle; UI hides the checklist via
 `isDynamicRegions`). The custom proxy host is still SSRF-validated — private addresses need
 `SSRF_ALLOWED_PRIVATE_CIDRS` on a self-hosted instance.
+
+---
+
+## Unified provider framework (v4.0.0)
+
+All provider domains — AI, Media, Storage, Short-link, Social, VPN, Content Packs, Email, and Auth —
+resolve through a single **`ProviderKernel`** (`libraries/providers/kernel`) with one workspace
+package per provider (`libraries/providers/<id>`).
+
+- A provider is addressed as `domain/providerId@version` (e.g. `ai/openai@v1`).
+- Every config/ledger row carries a non-null `version` column and keeps using that version until an
+  explicit upgrade. New `v2` adapters cannot silently change existing behavior.
+- Version lifecycle statuses: `preview → active → deprecated → retired`. Deprecated versions reject
+  new writes; retired versions return `410 Gone`.
+- Runtime resolution goes through `ProviderResolutionService`
+  (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`). The kernel is the
+  **sole** resolution path; the legacy in-memory registries and the `PROVIDER_KERNEL=legacy` kill
+  switch have been removed.
+- Telemetry: every resolved capability is wrapped so that provider calls log a `keyString` and feed
+  per-version health counters in the kernel.
+- Public API: `GET /providers/catalog?domain=` returns the live catalog;
+  `GET /admin/providers/health?domain=` (super-admin) returns health counters.
+- Free stock providers (Unsplash, Pexels, Pixabay, GIPHY, Jamendo, Iconify) are intentionally
+  excluded from versioning — they have no stored config row.
+- Email/Auth resolve through the kernel like every other domain; their former legacy registries have
+  been removed along with the kill switch.
+
+See `docs/developer-docs/provider-framework.md` and `docs/reference/provider-versions.md`.
 
 ---
 
