@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Agent, ProxyAgent } from 'undici';
-import { buildVpnDispatcher } from './vpn-dispatcher.factory';
+import dns from 'node:dns';
+import { buildVpnDispatcher, resolveSafeProxyHost } from './vpn-dispatcher.factory';
 import { VpnProxyRegion } from './vpn.types';
 
 const auth = { username: 'user', password: 'pass' };
@@ -66,5 +67,39 @@ describe('buildVpnDispatcher', () => {
       protocol: 'http-connect',
     };
     expect(() => buildVpnDispatcher(region, auth)).toThrow(/not a public endpoint/);
+  });
+});
+
+describe('resolveSafeProxyHost (SOCKS proxy-connect DNS pin)', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('rejects a hostname that resolves to a private IP', async () => {
+    vi.spyOn(dns, 'lookup').mockImplementation(((
+      _host: string,
+      _opts: any,
+      cb: any,
+    ) => cb(null, [{ address: '10.1.2.3', family: 4 }], 4)) as any);
+
+    await expect(resolveSafeProxyHost('rebind.evil.example')).rejects.toThrow(
+      /Blocked IP/
+    );
+  });
+
+  it('returns the resolved public IP for a legitimate proxy host', async () => {
+    vi.spyOn(dns, 'lookup').mockImplementation(((
+      _host: string,
+      _opts: any,
+      cb: any,
+    ) => cb(null, [{ address: '203.0.113.7', family: 4 }], 4)) as any);
+
+    await expect(resolveSafeProxyHost('proxy.example.com')).resolves.toBe(
+      '203.0.113.7'
+    );
+  });
+
+  it('rejects a literal private IP without a DNS lookup', async () => {
+    const spy = vi.spyOn(dns, 'lookup');
+    await expect(resolveSafeProxyHost('127.0.0.1')).rejects.toThrow(/Blocked IP/);
+    expect(spy).not.toHaveBeenCalled();
   });
 });

@@ -38,6 +38,23 @@ const ssrfLookup: net.LookupFunction = (hostname, options, callback) => {
   });
 };
 
+// Resolve a proxy hostname to a validated public IP, applying the same SSRF
+// checks as ssrfLookup. The `socks` package resolves the proxy host itself, so
+// to pin the SOCKS proxy-connect leg we resolve+validate here and hand SocksClient
+// a literal IP. Re-resolved per connection → not bypassable via DNS rebinding.
+export function resolveSafeProxyHost(host: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    ssrfLookup(host, { all: true } as any, (err, address: any) => {
+      if (err) return reject(err);
+      const first = Array.isArray(address) ? address[0]?.address : address;
+      if (!first) {
+        return reject(new Error(`VPN proxy host did not resolve: ${host}`));
+      }
+      resolve(first);
+    });
+  });
+}
+
 // Build an undici Dispatcher that egresses through a VPN region's proxy.
 // SOCKS5 has no native undici support — we open the socket via the `socks`
 // package and hand the connected socket to undici's own connector so undici
@@ -46,9 +63,10 @@ export function buildVpnDispatcher(
   region: VpnProxyRegion,
   auth: VpnProxyAuth,
 ): Dispatcher {
-  // Reject a proxy pointed at a literal private/loopback IP. Hostnames are
-  // additionally pinned at connect time by ssrfLookup (SOCKS path) / the
-  // ProxyAgent connect hook (HTTP path).
+  // Reject a proxy pointed at a literal private/loopback IP up front. Hostnames
+  // are additionally pinned at connect time — resolveSafeProxyHost (SOCKS path)
+  // and the ProxyAgent connect hook's ssrfLookup (HTTP path) re-validate the
+  // resolved address so neither leg can be redirected to a private IP.
   if (net.isIP(region.host) && isBlockedIp(region.host)) {
     throw new Error(`VPN proxy host is not a public endpoint: ${region.host}`);
   }
@@ -70,20 +88,26 @@ export function buildVpnDispatcher(
   const connector = buildConnector({ timeout: CONNECT_TIMEOUT });
   return new Agent({
     connect(opts: any, callback: any) {
-      SocksClient.createConnection({
-        proxy: {
-          host: region.host,
-          port: region.port,
-          type: 5,
-          ...(hasAuth ? { userId: auth.username, password: auth.password } : {}),
-        },
-        command: 'connect',
-        destination: {
-          host: opts.hostname,
-          port: Number(opts.port) || 443,
-        },
-        timeout: CONNECT_TIMEOUT,
-      })
+      // DNS-pin the proxy host: resolve+validate to a public IP before SocksClient
+      // connects, so the SOCKS proxy-connect leg can't be pointed at an internal
+      // address via a hostname that resolves private (or DNS rebinding).
+      resolveSafeProxyHost(region.host)
+        .then((safeHost) =>
+          SocksClient.createConnection({
+            proxy: {
+              host: safeHost,
+              port: region.port,
+              type: 5,
+              ...(hasAuth ? { userId: auth.username, password: auth.password } : {}),
+            },
+            command: 'connect',
+            destination: {
+              host: opts.hostname,
+              port: Number(opts.port) || 443,
+            },
+            timeout: CONNECT_TIMEOUT,
+          })
+        )
         .then(({ socket }) => {
           // Let undici upgrade the raw SOCKS socket to TLS (ALPN/H2, cert check).
           connector({ ...opts, httpSocket: socket }, callback);
