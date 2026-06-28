@@ -85,14 +85,17 @@ export class MediaProviderController {
     body: {
       credentials?: Record<string, string>;
       version?: string;
+      enabled?: boolean;
     },
   ) {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
     // OpenAI/MiniMax credentials live-link to the AI surface inside the service (§11.4).
+    // `enabled` defaults to true (configuring enables); the kit's On/Off toggle sends
+    // an explicit `{ enabled: false }` with no credentials to disable without clearing them.
     await this._orgMediaProviderSettings.upsert(org.id, identifier, {
-      enabled: true,
+      enabled: body.enabled ?? true,
       credentials: body.credentials,
       version: body.version,
     });
@@ -134,12 +137,18 @@ export class MediaProviderController {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
-    await this._orgMediaProviderSettings.upsert(org.id, identifier, {
-      enabled: true,
-      version: body.version,
-    });
-
-    return { identifier, success: true };
+    // "Make Primary" (plan §1.4/§2.4): clears the prior Primary's isActive and pins
+    // this one — enable-many + one Primary. No longer disables the other enabled rows.
+    try {
+      const result = await this._orgMediaProviderSettings.setActive(
+        org.id,
+        identifier,
+        body.version,
+      );
+      return { identifier, success: true, isActive: result.isActive };
+    } catch (err) {
+      throw new BadRequestException((err as Error).message);
+    }
   }
 
   @Throttle({ default: { limit: 10, ttl: 60000 } })

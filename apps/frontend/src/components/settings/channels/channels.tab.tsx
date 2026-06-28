@@ -14,6 +14,9 @@ import {
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { CapabilityBadges as KitCapabilityBadges } from '@gitroom/frontend/components/settings/shared/kit/capabilities';
+import { ProviderSearchToolbar } from '@gitroom/frontend/components/settings/shared/kit/provider-search-toolbar';
+import { CapabilityMeta } from '@gitroom/frontend/components/settings/shared/kit/provider-surface.types';
 
 interface ProviderCapability {
   analytics: boolean;
@@ -93,8 +96,14 @@ const CAPABILITY_COLORS: Record<string, string> = {
   watchlist: 'bg-orange-500/20 text-orange-400',
 };
 
-const capabilityLabel = (cap: CapabilityKey) =>
-  CAPABILITY_FILTERS.find((f) => f.key === cap)?.label || cap;
+// Capability label + color, built from the existing filter labels and the
+// CAPABILITY_COLORS map, passed to the shared kit `CapabilityBadges` primitive.
+const capabilityMeta: Record<string, CapabilityMeta> = Object.fromEntries(
+  CAPABILITY_FILTERS.map((f) => [
+    f.key,
+    { label: f.label, color: CAPABILITY_COLORS[f.key] || '' },
+  ])
+);
 
 const useConfigs = () => {
   const fetch = useFetch();
@@ -133,22 +142,8 @@ const ChannelProviderIcon: FC<{ identifier: string; name: string; size?: number 
 };
 
 const CapabilityBadges: FC<{ capabilities: ProviderCapability | null }> = ({ capabilities }) => {
-  const caps = CAPABILITY_KEYS.filter((c) => capabilities?.[c]);
-  if (!caps.length) return null;
-  return (
-    <div className="flex gap-[4px] mt-[4px] flex-wrap">
-      {caps.map((cap) => (
-        <span
-          key={cap}
-          className={`text-[10px] rounded-[4px] px-[6px] py-[2px] ${
-            CAPABILITY_COLORS[cap] || 'bg-newTableHeader text-newTableText'
-          }`}
-        >
-          {capabilityLabel(cap)}
-        </span>
-      ))}
-    </div>
-  );
+  const keys = CAPABILITY_KEYS.filter((c) => capabilities?.[c]);
+  return <KitCapabilityBadges keys={keys} meta={capabilityMeta} />;
 };
 
 // Single dropdown of capability checkboxes (replaces the row of filter buttons).
@@ -278,21 +273,18 @@ const ProviderPicker: FC<{
 
   return (
     <div className="flex flex-col gap-[12px] w-[520px] max-w-full">
-      <div className="flex items-center gap-[8px] mobile:flex-col mobile:items-stretch">
-        <input
-          type="search"
-          autoFocus
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t('search_providers', 'Search providers...')}
-          className="flex-1 px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
-        />
-        <CapabilityFilter
-          selected={selectedCaps}
-          onToggle={toggleCap}
-          onClear={() => setSelectedCaps([])}
-        />
-      </div>
+      <ProviderSearchToolbar
+        search={search}
+        onSearch={setSearch}
+        placeholder={t('search_providers', 'Search providers...')}
+        trailing={
+          <CapabilityFilter
+            selected={selectedCaps}
+            onToggle={toggleCap}
+            onClear={() => setSelectedCaps([])}
+          />
+        }
+      />
       <div className="flex flex-col gap-[6px] max-h-[440px] overflow-y-auto">
         {filtered.length === 0 ? (
           <div className="text-[13px] text-newTableText text-center py-[24px]">
@@ -483,36 +475,20 @@ export const ChannelsTab: FC = () => {
       onRemove={() => undefined}
       ProviderIconComponent={ChannelProviderIcon}
       toolbar={
-        <div className="flex items-center gap-[12px] mobile:flex-col mobile:items-stretch">
-          <div className="flex-1 relative">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_channels', 'Search channels...')}
-              className="w-full px-[12px] py-[8px] pr-[36px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none [&::-webkit-search-cancel-button]:appearance-none"
-            />
-            {search && (
-              <button
-                type="button"
-                onClick={() => setSearch('')}
-                aria-label={t('clear_search', 'Clear search')}
-                className="absolute right-[8px] top-1/2 -translate-y-1/2 w-[20px] h-[20px] flex items-center justify-center rounded-full text-newTableText hover:text-textColor hover:bg-boxHover transition-colors"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6 6 18M6 6l12 12" />
-                </svg>
-              </button>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={openPicker}
-            className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
-          >
-            + {t('add_channel', 'Add channel')}
-          </button>
-        </div>
+        <ProviderSearchToolbar
+          search={search}
+          onSearch={setSearch}
+          placeholder={t('search_channels', 'Search channels...')}
+          trailing={
+            <button
+              type="button"
+              onClick={openPicker}
+              className="text-[13px] px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white hover:opacity-90 transition-opacity whitespace-nowrap"
+            >
+              + {t('add_channel', 'Add channel')}
+            </button>
+          }
+        />
       }
       renderBadges={(provider) => (
         <div className="flex gap-[6px] mt-[4px] items-center">

@@ -4,6 +4,11 @@ import React, { useState } from 'react';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
+import { ExtraField } from '@gitroom/frontend/components/settings/shared/kit/fields';
+import {
+  ProviderExtraFieldSpec,
+  ProviderFormState,
+} from '@gitroom/frontend/components/settings/shared/kit/provider-surface.types';
 
 const allProviderTypes = [
   { value: 'LOCAL', label: 'Local Storage' },
@@ -21,6 +26,43 @@ const allProviderTypes = [
   { value: 'S3_COMPATIBLE', label: 'S3-Compatible' },
 ];
 
+// Field specs rendered through the shared kit `ExtraField` renderer instead of
+// hand-rolled <input> markup. Credentials + config all live in the form's
+// `extra` bag; `handleSave`/`handleTest` assemble the existing PUT/test body.
+const NAME_SPEC: ProviderExtraFieldSpec = {
+  type: 'instance-name',
+  key: 'name',
+  label: 'Name',
+  placeholder: 'My Storage',
+};
+
+const CREDENTIAL_SPECS: ProviderExtraFieldSpec[] = [
+  { type: 'text', key: 'accessKeyId', label: 'Access Key ID', placeholder: 'AKIA...' },
+  {
+    type: 'password',
+    key: 'secretAccessKey',
+    label: 'Secret Access Key',
+    placeholder: '••••••••',
+  },
+];
+
+const CONFIG_SPECS: ProviderExtraFieldSpec[] = [
+  { type: 'text', key: 'region', label: 'Region', placeholder: 'us-east-1' },
+  { type: 'text', key: 'bucket', label: 'Bucket', placeholder: 'my-bucket' },
+  {
+    type: 'text',
+    key: 'endpoint',
+    label: 'Custom Endpoint (optional)',
+    placeholder: 'https://...',
+  },
+  {
+    type: 'text',
+    key: 'publicUrl',
+    label: 'Public URL (optional)',
+    placeholder: 'https://cdn.example.com',
+  },
+];
+
 interface ProviderFormModalProps {
   onClose: () => void;
   onSaved: () => void;
@@ -36,19 +78,42 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
 }) => {
   const fetch = useFetch();
   const [type, setType] = useState(editProvider?.type || presetType || 'S3');
-  const [name, setName] = useState(editProvider?.name || '');
-  const [accessKeyId, setAccessKeyId] = useState('');
-  const [secretAccessKey, setSecretAccessKey] = useState('');
-  const [region, setRegion] = useState(editProvider?.region || '');
-  const [bucket, setBucket] = useState(editProvider?.bucket || '');
-  const [endpoint, setEndpoint] = useState(editProvider?.endpoint || '');
-  const [publicUrl, setPublicUrl] = useState(editProvider?.publicUrl || '');
+  const [state, setState] = useState<ProviderFormState>({
+    name: editProvider?.name || '',
+    credentials: {},
+    extra: {
+      region: editProvider?.region || '',
+      bucket: editProvider?.bucket || '',
+      endpoint: editProvider?.endpoint || '',
+      publicUrl: editProvider?.publicUrl || '',
+    },
+  });
   const [testResult, setTestResult] = useState<{
     ok?: boolean;
     error?: string;
   } | null>(null);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+
+  const setName = (value: string) => setState((s) => ({ ...s, name: value }));
+  const setExtra = (key: string, value: any) =>
+    setState((s) => ({ ...s, extra: { ...s.extra, [key]: value } }));
+  const setCredentials = (patch: Record<string, string>) =>
+    setState((s) => ({ ...s, credentials: { ...s.credentials, ...patch } }));
+
+  // Generic/instance-name field renderers consume this prop bag.
+  const fieldProps = {
+    state,
+    setName,
+    setExtra,
+    setCredentials,
+    meta: editProvider,
+    identifier: type,
+    basePath: '/settings/storage',
+  };
+
+  const { accessKeyId, secretAccessKey, region, bucket, endpoint, publicUrl } =
+    state.extra;
 
   const handleTest = async () => {
     setTesting(true);
@@ -82,7 +147,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
     setSaving(true);
     try {
       const body: any = {
-        name,
+        name: state.name,
         region,
         bucket,
         endpoint,
@@ -165,99 +230,16 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
             </div>
           </div>
 
-          <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
-              Name
-            </label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="My Storage"
-              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-            />
-          </div>
+          <ExtraField spec={NAME_SPEC} {...fieldProps} />
 
-          {showCredentials && (
-            <>
-              <div>
-                <label className="text-[12px] text-newTableText mb-[6px] block">
-                  Access Key ID
-                </label>
-                <input
-                  type="text"
-                  value={accessKeyId}
-                  onChange={(e) => setAccessKeyId(e.target.value)}
-                  placeholder="AKIA..."
-                  className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-                />
-              </div>
-              <div>
-                <label className="text-[12px] text-newTableText mb-[6px] block">
-                  Secret Access Key
-                </label>
-                <input
-                  type="password"
-                  value={secretAccessKey}
-                  onChange={(e) => setSecretAccessKey(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-                />
-              </div>
-            </>
-          )}
+          {showCredentials &&
+            CREDENTIAL_SPECS.map((spec) => (
+              <ExtraField key={spec.key} spec={spec} {...fieldProps} />
+            ))}
 
-          <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
-              Region
-            </label>
-            <input
-              type="text"
-              value={region}
-              onChange={(e) => setRegion(e.target.value)}
-              placeholder="us-east-1"
-              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-            />
-          </div>
-
-          <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
-              Bucket
-            </label>
-            <input
-              type="text"
-              value={bucket}
-              onChange={(e) => setBucket(e.target.value)}
-              placeholder="my-bucket"
-              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-            />
-          </div>
-
-          <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
-              Custom Endpoint <span className="text-[10px]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={endpoint}
-              onChange={(e) => setEndpoint(e.target.value)}
-              placeholder="https://..."
-              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-            />
-          </div>
-
-          <div>
-            <label className="text-[12px] text-newTableText mb-[6px] block">
-              Public URL <span className="text-[10px]">(optional)</span>
-            </label>
-            <input
-              type="text"
-              value={publicUrl}
-              onChange={(e) => setPublicUrl(e.target.value)}
-              placeholder="https://cdn.example.com"
-              className="w-full bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary"
-            />
-          </div>
+          {CONFIG_SPECS.map((spec) => (
+            <ExtraField key={spec.key} spec={spec} {...fieldProps} />
+          ))}
 
           {testResult && (
             <div
@@ -295,7 +277,7 @@ export const ProviderFormModal: React.FC<ProviderFormModalProps> = ({
             )}
             <button
               onClick={handleSave}
-              disabled={saving || !name.trim()}
+              disabled={saving || !state.name.trim()}
               className="px-[16px] py-[8px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium hover:bg-btnPrimary/80 transition-colors disabled:opacity-50"
             >
               {saving

@@ -10,6 +10,7 @@ export default defineConfig({
       '@gitroom/react': path.resolve(__dirname, '../../libraries/react-shared-libraries/src'),
       '@gitroom/frontend': path.resolve(__dirname, 'src'),
       '@gitroom/nestjs-libraries': path.resolve(__dirname, '../../libraries/nestjs-libraries/src'),
+      '@gitroom/provider-kernel': path.resolve(__dirname, '../../libraries/providers/kernel/src'),
     },
   },
   test: {
@@ -31,6 +32,7 @@ export default defineConfig({
       'src/components/ai/**/*.spec.{ts,tsx}',
       'src/components/settings/shortlinks/**/*.spec.{ts,tsx}',
       'src/components/settings/vpn/**/*.spec.{ts,tsx}',
+      'src/components/settings/storage/**/*.spec.{ts,tsx}',
       'src/components/layout/settings.component.spec.{ts,tsx}',
       'src/components/layout/use-permissions.spec.{ts,tsx}',
       'src/components/layout/top.menu.spec.{ts,tsx}',

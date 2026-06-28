@@ -33,23 +33,36 @@ vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () 
 
 import useSWR from 'swr';
 
-const mockProviders = {
-  providers: [
+// The kit panel consumes the descriptor-mapped `{ rows: ProviderRow[] }` shape.
+const mockRows = {
+  rows: [
     {
+      id: 'nordvpn',
       identifier: 'nordvpn',
       name: 'NordVPN',
-      enabled: false,
       isConfigured: false,
-      capabilities: { wireguard: true, openvpn: true, ikev2: true, socks5: true, multiHop: true, killSwitch: true },
-      credentialFields: [{ key: 'serviceCredentials', label: 'Service Credentials', type: 'password', required: true }],
+      isPrimary: false,
+      enabled: false,
+      capabilities: ['wireguard', 'openvpn', 'ikev2', 'socks5', 'multiHop', 'killSwitch'],
+      meta: {
+        identifier: 'nordvpn',
+        name: 'NordVPN',
+        credentialFields: [{ key: 'serviceCredentials', label: 'Service Credentials', type: 'password', required: true }],
+      },
     },
     {
+      id: 'mullvad',
       identifier: 'mullvad',
       name: 'Mullvad VPN',
-      enabled: true,
       isConfigured: true,
-      capabilities: { wireguard: true, openvpn: true, ikev2: false, socks5: true, multiHop: true, killSwitch: true },
-      credentialFields: [{ key: 'accountNumber', label: 'Account Number', type: 'password', required: true }],
+      isPrimary: false,
+      enabled: true,
+      capabilities: ['wireguard', 'openvpn', 'socks5', 'multiHop', 'killSwitch'],
+      meta: {
+        identifier: 'mullvad',
+        name: 'Mullvad VPN',
+        credentialFields: [{ key: 'accountNumber', label: 'Account Number', type: 'password', required: true }],
+      },
     },
   ],
 };
@@ -59,10 +72,10 @@ describe('VpnTab', () => {
     mockFetch.mockReset();
     mockFetch.mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(mockProviders),
+      json: () => Promise.resolve(mockRows),
     });
     vi.mocked(useSWR).mockReturnValue({
-      data: mockProviders,
+      data: mockRows,
       isLoading: false,
       error: null,
       mutate: mockMutate,

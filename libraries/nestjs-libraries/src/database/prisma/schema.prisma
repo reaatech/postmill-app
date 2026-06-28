@@ -1283,6 +1283,7 @@ model MediaProviderConfig {
   identifier          String
   version             String         @default("v1")
   enabled             Boolean        @default(false)
+  isActive            Boolean        @default(false) // the org's Primary media provider (call-time default); only one per org
   credentials         String?        // encrypted
   storageProviderId   String?        // null = LOCAL
   storageRootFolderId String?        // root folder in storage
@@ -1295,6 +1296,7 @@ model MediaProviderConfig {
 
   @@unique([organizationId, identifier, version])
   @@index([organizationId])
+  @@index([organizationId, isActive])
 }
 
 // ── v3.9.0: Per-organization VPN provider config ──

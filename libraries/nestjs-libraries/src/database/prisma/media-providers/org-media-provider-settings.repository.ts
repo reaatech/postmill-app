@@ -50,6 +50,22 @@ export class OrgMediaProviderSettingsRepository {
     });
   }
 
+  /**
+   * Mark one provider as the org's Primary (call-time default). Clears the
+   * previous Primary's `isActive` only — never touches other rows' `enabled`
+   * (enable-many + one Primary, plan §1.4). Mirrors the AI repo pattern.
+   */
+  async setActive(orgId: string, identifier: string, version = 'v1') {
+    await this._mediaProviderConfig.model.mediaProviderConfig.updateMany({
+      where: { organizationId: orgId, isActive: true },
+      data: { isActive: false },
+    });
+    return this._mediaProviderConfig.model.mediaProviderConfig.update({
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
+      data: { isActive: true, enabled: true },
+    });
+  }
+
   delete(orgId: string, identifier: string, version = 'v1') {
     return this._mediaProviderConfig.model.mediaProviderConfig.delete({
       where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },

@@ -27,14 +27,22 @@ vi.mock('@gitroom/frontend/components/shared/provider-icon', () => ({
   ),
 }));
 
-const mockMutate = vi.fn();
-let mockLocationSearch = '';
+vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () => ({
+  useProviderCatalog: () => ({ data: [] }),
+  selectableVersions: () => [],
+  latestActiveVersion: () => undefined,
+}));
 
+// The migrated tab loads its config through `descriptor.load(fetch)` (one GET to
+// `/settings/shortlinks/config`) rather than the legacy hook, so the providers
+// envelope is served via the mocked fetch below.
 const defaultProviders = [
   {
     identifier: 'bitly',
     name: 'Bitly',
     capabilities: { create: true, statistics: true, customDomain: true, expand: false, bulkStatistics: false },
+    credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
+    authType: 'apiKey',
     isActive: false,
     isConfigured: false,
     customDomain: '',
@@ -44,6 +52,8 @@ const defaultProviders = [
     identifier: 'tinyurl',
     name: 'TinyURL',
     capabilities: { create: true, statistics: false, customDomain: false, expand: false, bulkStatistics: false },
+    credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
+    authType: 'apiKey',
     isActive: false,
     isConfigured: true,
     customDomain: '',
@@ -53,6 +63,8 @@ const defaultProviders = [
     identifier: 'rebrandly',
     name: 'Rebrandly',
     capabilities: { create: true, statistics: true, customDomain: true, expand: false, bulkStatistics: false },
+    credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
+    authType: 'apiKey',
     isActive: true,
     isConfigured: true,
     customDomain: '',
@@ -62,6 +74,8 @@ const defaultProviders = [
     identifier: 'readonly-provider',
     name: 'ReadOnly',
     capabilities: { create: false, statistics: false, customDomain: false, expand: false, bulkStatistics: false },
+    credentialFields: [],
+    authType: 'apiKey',
     isActive: false,
     isConfigured: false,
     customDomain: '',
@@ -69,39 +83,19 @@ const defaultProviders = [
   },
 ];
 
-let mockConfigData: any = {
-  active: {
-    identifier: 'rebrandly',
-    name: 'Rebrandly',
-    capabilities: { create: true, statistics: true, customDomain: true },
-    customDomain: '',
-  },
-  providers: defaultProviders,
+let mockConfigData: any = { active: null, providers: defaultProviders };
+
+const defaultFetchImpl = (url: any) => {
+  if (typeof url === 'string') {
+    if (url.endsWith('/settings/shortlinks/config')) {
+      return Promise.resolve({ ok: true, json: async () => mockConfigData });
+    }
+    if (url.includes('/providers/catalog')) {
+      return Promise.resolve({ ok: true, json: async () => [] });
+    }
+  }
+  return Promise.resolve({ ok: true, text: async () => '' });
 };
-let mockLoading = false;
-let mockError: Error | null = null;
-
-const mockProvidersList = defaultProviders.map((p) => ({
-  ...p,
-  credentialFields: [{ key: 'apiKey', label: 'API Key', type: 'password', required: true }],
-  authType: p.identifier === 'bitly' ? 'oauth2' : 'apiKey',
-}));
-
-vi.mock('./hooks/useShortlinksConfig', () => ({
-  useShortlinksConfig: () => ({
-    data: mockConfigData,
-    isLoading: mockLoading,
-    error: mockError,
-    mutate: mockMutate,
-  }),
-  useShortlinksProviders: () => ({ data: mockProvidersList }),
-}));
-
-vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () => ({
-  useProviderCatalog: () => ({ data: [] }),
-  selectableVersions: () => [],
-  latestActiveVersion: () => undefined,
-}));
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
@@ -111,22 +105,12 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockLocationSearch = '';
   Object.defineProperty(window, 'location', {
     value: { search: '', href: 'https://example.com/settings?tab=shortlinks', origin: 'https://example.com' },
     writable: true,
   });
-  mockConfigData = {
-    active: {
-      identifier: 'rebrandly',
-      name: 'Rebrandly',
-      capabilities: { create: true, statistics: true, customDomain: true },
-      customDomain: '',
-    },
-    providers: [...defaultProviders],
-  };
-  mockLoading = false;
-  mockError = null;
+  mockConfigData = { active: null, providers: [...defaultProviders] };
+  mockFetchFn.mockImplementation(defaultFetchImpl);
 });
 
 describe('ShortlinksTab', () => {
@@ -135,7 +119,7 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      expect(screen.getAllByText('Bitly').length).toBeGreaterThanOrEqual(1);
+      expect((await screen.findAllByText('Bitly')).length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('TinyURL').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('Rebrandly').length).toBeGreaterThanOrEqual(1);
     });
@@ -144,7 +128,7 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const configureButtons = screen.getAllByText('Configure');
+      const configureButtons = await screen.findAllByText('Configure');
       expect(configureButtons.length).toBe(2);
     });
 
@@ -152,22 +136,22 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const editButtons = screen.getAllByText('Edit');
+      const editButtons = await screen.findAllByText('Edit');
       expect(editButtons.length).toBe(2);
     });
 
-    it('shows Set Active button only for configured but inactive providers', async () => {
+    it('shows Make Primary button only for configured but inactive providers', async () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      expect(screen.getByText('Set Active')).toBeDefined();
+      expect(await screen.findByText('Make Primary')).toBeDefined();
     });
 
     it('filters providers by search', async () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const searchInput = screen.getByPlaceholderText('Search providers...');
+      const searchInput = await screen.findByPlaceholderText('Search providers...');
       fireEvent.change(searchInput, { target: { value: 'tiny' } });
 
       await waitFor(() => {
@@ -182,7 +166,7 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const statsChips = screen.getAllByText('Stats');
+      const statsChips = await screen.findAllByText('Stats');
       expect(statsChips.length).toBeGreaterThan(0);
     });
 
@@ -190,36 +174,35 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const customDomainChips = screen.getAllByText('Custom domain');
+      const customDomainChips = await screen.findAllByText('Custom domain');
       expect(customDomainChips.length).toBeGreaterThan(0);
     });
-
   });
 
   describe('Delete Provider', () => {
     it('shows confirm dialog before deleting', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const removeButtons = screen.getAllByText('Remove');
+      const removeButtons = await screen.findAllByText('Remove');
       fireEvent.click(removeButtons[0]);
 
       expect(confirmSpy).toHaveBeenCalledWith('Are you sure you want to remove this configuration?');
-      expect(mockFetchFn).not.toHaveBeenCalled();
+      expect(mockFetchFn).not.toHaveBeenCalledWith('/settings/shortlinks/config/rebrandly', {
+        method: 'DELETE',
+      });
       confirmSpy.mockRestore();
     });
 
     it('calls delete endpoint by identifier after confirm', async () => {
       const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      const removeButtons = screen.getAllByText('Remove');
+      const removeButtons = await screen.findAllByText('Remove');
       fireEvent.click(removeButtons[0]);
 
       await waitFor(() => {
@@ -230,7 +213,6 @@ describe('ShortlinksTab', () => {
 
       await waitFor(() => {
         expect(mockToasterShow).toHaveBeenCalledWith('Configuration deleted', 'success');
-        expect(mockMutate).toHaveBeenCalled();
       });
       confirmSpy.mockRestore();
     });
@@ -238,13 +220,16 @@ describe('ShortlinksTab', () => {
 
   describe('Error State', () => {
     it('renders error message on fetch failure', async () => {
-      mockError = new Error('Failed');
-      mockConfigData = null;
+      mockFetchFn.mockImplementation((url: any) =>
+        typeof url === 'string' && url.includes('/providers/catalog')
+          ? Promise.resolve({ ok: true, json: async () => [] })
+          : Promise.resolve({ ok: false }),
+      );
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      expect(screen.getByText('Failed to load shortlink settings')).toBeDefined();
+      expect(await screen.findByText('Failed to load settings')).toBeDefined();
       expect(screen.getByText('Try again')).toBeDefined();
     });
   });
@@ -254,7 +239,7 @@ describe('ShortlinksTab', () => {
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
-      fireEvent.click(screen.getAllByText('Configure')[0]);
+      fireEvent.click((await screen.findAllByText('Configure'))[0]);
 
       await waitFor(() => {
         expect(screen.getByText('Close')).toBeDefined();
@@ -274,8 +259,6 @@ describe('ShortlinksTab', () => {
     });
 
     it('sends state in the callback POST body', async () => {
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
-
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
 
@@ -287,7 +270,7 @@ describe('ShortlinksTab', () => {
       });
     });
 
-    it('shows warning toast and returns when storedIdentifier is missing', async () => {
+    it('shows warning toast and skips the callback when storedIdentifier is missing', async () => {
       sessionStorage.removeItem('oauth_shortlink_provider');
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
@@ -297,7 +280,10 @@ describe('ShortlinksTab', () => {
         expect(mockToasterShow).toHaveBeenCalledWith('Could not resume the connection — please retry.', 'warning');
       });
 
-      expect(mockFetchFn).not.toHaveBeenCalled();
+      expect(mockFetchFn).not.toHaveBeenCalledWith(
+        '/settings/shortlinks/config/bitly/oauth/callback',
+        expect.anything(),
+      );
     });
   });
 });

@@ -19,6 +19,12 @@ export interface ProviderConfigItem {
   versionStatus?: 'preview' | 'active' | 'deprecated' | 'retired';
   /** Sunset date for the pinned (deprecated) version, ISO string. */
   sunsetAt?: string;
+  /**
+   * Passthrough of the full original provider object so `renderBadges`/
+   * `renderActions` receive it directly via `provider.meta` — kills the
+   * `filteredProviders.find(...)` re-find anti-pattern (plan §1.1/§0.3.4).
+   */
+  meta?: unknown;
 }
 
 export interface ProviderListShellProps {

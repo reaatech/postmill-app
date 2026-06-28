@@ -27,6 +27,12 @@ vi.mock('@gitroom/frontend/components/settings/storage/audit.tab', () => ({
   AuditTab: () => null,
 }));
 
+// storage.tab reads the kernel provider catalog to surface version status;
+// mock it to an empty catalog (mirrors shortlinks/vpn specs).
+vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () => ({
+  useProviderCatalog: () => ({ data: [] }),
+}));
+
 type MockProvider = {
   id: string;
   type: string;
@@ -115,94 +121,75 @@ function renderWithSWR(ui: React.ReactElement) {
 }
 
 describe('StorageTab', () => {
-  describe('Base Storage (always on)', () => {
-    it('renders the "Base Storage" heading when LOCAL providers exist', async () => {
+  describe('provider list (ProviderListShell)', () => {
+    it('renders the "Storage Providers" heading and the always-on LOCAL card', async () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
       renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage')).toBeDefined();
+        expect(screen.getByText('Storage Providers')).toBeDefined();
+        // LOCAL provider surfaces as the "Postmill Storage" card.
+        expect(screen.getByText('Postmill Storage')).toBeDefined();
       });
     });
 
-    it('renders the LOCAL provider card under the base storage section', async () => {
-      mockProviders = [localProvider];
-
-      const { StorageTab } = await import('./storage.tab');
-      renderWithSWR(<StorageTab />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Always on')).toBeDefined();
-        expect(screen.getByText('Local Storage')).toBeDefined();
-      });
-    });
-  });
-
-  describe('Additional Providers', () => {
-    it('renders the "Additional Providers" heading when non-LOCAL providers exist', async () => {
+    it('renders a configured non-LOCAL provider by name with an Unmount action when mounted', async () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
       renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Additional Providers')).toBeDefined();
-      });
-    });
-
-    it('renders non-LOCAL provider cards under the additional providers section', async () => {
-      mockProviders = [s3Provider];
-
-      const { StorageTab } = await import('./storage.tab');
-      renderWithSWR(<StorageTab />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Mounted')).toBeDefined();
         expect(screen.getByText('AWS S3 Provider')).toBeDefined();
+        expect(screen.getByText('Unmount')).toBeDefined();
       });
     });
 
-    it('does not render "Additional Providers" heading when only LOCAL providers exist', async () => {
+    it('shows a Mount action (the On/Off toggle) for an unmounted provider', async () => {
+      mockProviders = [localProvider, { ...s3Provider, mounted: false }];
+
+      const { StorageTab } = await import('./storage.tab');
+      renderWithSWR(<StorageTab />);
+
+      await waitFor(() => {
+        expect(screen.getByText('AWS S3 Provider')).toBeDefined();
+        expect(screen.getByText('Mount')).toBeDefined();
+      });
+      // No mounted instance, so no Unmount affordance.
+      expect(screen.queryByText('Unmount')).toBeNull();
+    });
+
+    it('renders "Configure" template rows for cloud provider types', async () => {
       mockProviders = [localProvider];
 
       const { StorageTab } = await import('./storage.tab');
       renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage')).toBeDefined();
+        expect(screen.getByText('Storage Providers')).toBeDefined();
       });
-
-      expect(screen.queryByText('Additional Providers')).toBeNull();
-    });
-
-    it('shows empty state text when no additional providers exist', async () => {
-      mockProviders = [localProvider];
-
-      const { StorageTab } = await import('./storage.tab');
-      renderWithSWR(<StorageTab />);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText('No additional storage providers configured yet.'),
-        ).toBeDefined();
-      });
+      // Always-present "add another" template rows, one per cloud provider type.
+      expect(screen.getAllByText('Configure').length).toBeGreaterThan(0);
+      expect(screen.getByText('Cloudflare R2')).toBeDefined();
     });
   });
 
-  describe('set-default UI', () => {
-    it('does not render a "Set Default" button', async () => {
+  describe('no Primary (multi-mount; Mount is the toggle)', () => {
+    it('does not render a "Set Default" / "Make Primary" affordance', async () => {
       mockProviders = [localProvider, s3Provider];
 
       const { StorageTab } = await import('./storage.tab');
       renderWithSWR(<StorageTab />);
 
       await waitFor(() => {
-        expect(screen.getByText('Base Storage')).toBeDefined();
+        expect(screen.getByText('Storage Providers')).toBeDefined();
       });
 
+      // Storage is intentionally multi-mount with no Primary (§1.4 / §3.1).
       expect(screen.queryByText('Set Default')).toBeNull();
+      expect(screen.queryByText('Make Primary')).toBeNull();
     });
   });
 });

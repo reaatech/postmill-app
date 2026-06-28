@@ -6,6 +6,7 @@ function makeService() {
     getByOrg: vi.fn().mockResolvedValue([]),
     getByIdentifier: vi.fn().mockResolvedValue(null),
     upsert: vi.fn().mockResolvedValue({ identifier: 'openai' }),
+    setActive: vi.fn().mockResolvedValue({ identifier: 'openai', isActive: true }),
     delete: vi.fn().mockResolvedValue({}),
   };
   const encryption = {
@@ -43,6 +44,37 @@ function makeService() {
 
 describe('OrgMediaProviderSettingsService', () => {
   beforeEach(() => vi.clearAllMocks());
+
+  describe('setActive', () => {
+    it('marks a configured provider Primary (clears prior, pins version) without disabling others', async () => {
+      const { service, repository, resolution } = makeService();
+      resolution.latestActiveVersion.mockReturnValue('v1');
+      // getConfigForProvider sees a credentialed row → configured.
+      repository.getByIdentifier.mockResolvedValue({
+        identifier: 'openai',
+        credentials: `enc(${JSON.stringify({ apiKey: 'sk-1' })})`,
+        storageProviderId: null,
+        storageRootFolderId: null,
+        version: 'v1',
+      });
+      await service.setActive('org-1', 'openai');
+      // ensures a row exists, then flips isActive via the repo's two-step setActive.
+      expect(repository.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        expect.objectContaining({ enabled: true }),
+        'v1',
+      );
+      expect(repository.setActive).toHaveBeenCalledWith('org-1', 'openai', 'v1');
+    });
+
+    it('rejects making an unconfigured provider Primary', async () => {
+      const { service, repository } = makeService();
+      repository.getByIdentifier.mockResolvedValue(null);
+      await expect(service.setActive('org-1', 'openai')).rejects.toThrow(/not configured/);
+      expect(repository.setActive).not.toHaveBeenCalled();
+    });
+  });
 
   describe('upsert', () => {
     it('encrypts credentials at rest', async () => {

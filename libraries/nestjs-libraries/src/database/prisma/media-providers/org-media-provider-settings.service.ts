@@ -87,6 +87,7 @@ export class OrgMediaProviderSettingsService {
         name: adapter.name,
         capabilities: adapter.capabilities,
         enabled: dbConfig?.enabled || inherited || false,
+        isActive: dbConfig?.isActive || false,
         isConfigured: !!dbConfig?.credentials || inherited,
         storageProviderId: dbConfig?.storageProviderId || null,
         storageRootFolderId: dbConfig?.storageRootFolderId || null,
@@ -166,6 +167,33 @@ export class OrgMediaProviderSettingsService {
 
   async delete(orgId: string, identifier: string) {
     return this._repository.delete(orgId, identifier);
+  }
+
+  /**
+   * Mark a provider as the org's Primary media provider (call-time default;
+   * plan §1.4/§2.4). Validates the provider is configured (own creds OR the
+   * universal-credential AI fallback), ensures a row exists to flip, then clears
+   * the prior Primary's `isActive` and sets this one (enable-many + one Primary).
+   */
+  async setActive(orgId: string, identifier: string, version?: string) {
+    const resolvedVersion =
+      version ?? this._resolution.latestActiveVersion('media', identifier) ?? 'v1';
+    const config = await this.getConfigForProvider(orgId, identifier, resolvedVersion);
+    if (!config || Object.keys(config.credentials).length === 0) {
+      throw new Error(
+        `Media provider "${identifier}" is not configured. Add credentials first.`,
+      );
+    }
+    // Universal-credential providers (Qwen) may have no media row yet — make one so
+    // there is an `isActive` flag to flip.
+    await this._repository.upsert(orgId, identifier, { enabled: true }, resolvedVersion);
+    return this._repository.setActive(orgId, identifier, resolvedVersion);
+  }
+
+  /** The org's Primary media provider row, or null. Studio pickers default to it. */
+  async getPrimaryProvider(orgId: string) {
+    const configs = await this._repository.getByOrg(orgId);
+    return configs.find((c) => c.isActive) ?? null;
   }
 
   /** Identifiers enabled in at least one org — for the platform-admin overview. */
