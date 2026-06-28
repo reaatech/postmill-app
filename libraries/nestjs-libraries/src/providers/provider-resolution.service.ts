@@ -18,7 +18,7 @@ import { VpnProviderAdapter } from '@gitroom/nestjs-libraries/vpn/vpn-provider.i
 import { EmailAdapter } from '@gitroom/nestjs-libraries/emails/email-adapter.interface';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { PROVIDER_KERNEL } from './providers.module';
+import { PROVIDER_KERNEL } from './provider-kernel.token';
 import { RuntimeContextFactory } from './runtime-context.factory';
 
 export interface ResolutionOptions {

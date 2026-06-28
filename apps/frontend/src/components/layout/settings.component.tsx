@@ -1,5 +1,8 @@
 'use client';
 
+// class-validator DTOs (via classValidatorResolver) used on this page rely on
+// decorator metadata; ensure the polyfill is loaded in the browser bundle.
+import 'reflect-metadata';
 import React, {
   FC,
   Ref,

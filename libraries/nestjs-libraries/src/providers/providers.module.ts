@@ -11,8 +11,11 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 import { RuntimeContextFactory } from './runtime-context.factory';
 import { ProviderResolutionService } from './provider-resolution.service';
+import { PROVIDER_KERNEL } from './provider-kernel.token';
 
-export const PROVIDER_KERNEL = Symbol('ProviderKernel');
+// Re-exported for backward compatibility; the token lives in its own module to
+// avoid the providers.module ↔ provider-resolution.service circular import.
+export { PROVIDER_KERNEL };
 
 function adaptEncryption(service: EncryptionService): EncryptionPort {
   return {
@@ -70,6 +73,7 @@ export function createProviderKernel(
 @Global()
 @Module({
   providers: [
+    Logger,
     {
       provide: PROVIDER_KERNEL,
       useFactory: (

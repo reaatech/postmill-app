@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
@@ -42,18 +42,52 @@ function deriveFingerprint(data: (string | null | undefined)[]): string {
 
 @Injectable()
 export class BackfillService {
+  private readonly _logger = new Logger(BackfillService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async backfill() {
-    await this.prisma.$transaction(async (tx) => {
-      await this.backfillUserProfiles(tx);
-      await this.backfillNotificationEmailPrefs(tx);
-      await this.backfillUserOrganizationRoles(tx);
-      await this.backfillAIBrandProfiles(tx);
-      await this.backfillStorageProviderFingerprints(tx);
-      await this.backfillShortLinkConfigs(tx);
-      await this.migrateRagSettingsMediaProviders(tx);
-    });
+    // Each step runs in its OWN transaction. Backfill steps are phase-dependent and
+    // idempotent — a column/table a step touches may not exist yet (pre-expand) or
+    // anymore (post-contract). Postgres aborts the ENTIRE transaction on any errored
+    // statement, so a single shared $transaction let one expected failure (e.g. the
+    // deprecated UserProfile.send*Emails columns not yet present) cascade 25P02 into
+    // every later step — silently skipping the RBAC role backfill and the rest.
+    // Per-step isolation keeps an expected/edge failure in one from poisoning the others.
+    await this._runStep('user profiles', (tx) => this.backfillUserProfiles(tx));
+    await this._runStep('notification email prefs', (tx) =>
+      this.backfillNotificationEmailPrefs(tx),
+    );
+    await this._runStep('user-organization roles', (tx) =>
+      this.backfillUserOrganizationRoles(tx),
+    );
+    await this._runStep('AI brand profiles', (tx) =>
+      this.backfillAIBrandProfiles(tx),
+    );
+    await this._runStep('storage provider fingerprints', (tx) =>
+      this.backfillStorageProviderFingerprints(tx),
+    );
+    await this._runStep('short-link configs', (tx) =>
+      this.backfillShortLinkConfigs(tx),
+    );
+    await this._runStep('RAG media providers', (tx) =>
+      this.migrateRagSettingsMediaProviders(tx),
+    );
+  }
+
+  private async _runStep(
+    label: string,
+    fn: (tx: Prisma.TransactionClient) => Promise<void>,
+  ): Promise<void> {
+    try {
+      await this.prisma.$transaction(fn);
+    } catch (e) {
+      this._logger.warn(
+        `Backfill step "${label}" skipped: ${
+          (e as Error).message.split('\n')[0]
+        }`,
+      );
+    }
   }
 
   private async backfillUserProfiles(tx: Prisma.TransactionClient) {
