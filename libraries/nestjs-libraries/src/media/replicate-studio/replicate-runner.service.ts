@@ -15,6 +15,9 @@ import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { estimate } from './replicate-cost';
 import { isWarm } from './replicate-catalog.allowlist';
+import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { renderWorkDir } from '@gitroom/nestjs-libraries/media/design-render/render-job-spec';
+import * as fs from 'fs';
 import { Organization } from '@prisma/client';
 
 const BASE = 'https://api.replicate.com/v1';
@@ -61,6 +64,7 @@ export class ReplicateRunnerService {
     private readonly _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private readonly _fileService: FileService,
     private readonly _organizationService: OrganizationService,
+    private readonly _videoRender: VideoRenderService,
   ) {}
 
   private async _getApiKey(orgId: string): Promise<string> {
@@ -419,38 +423,32 @@ export class ReplicateRunnerService {
       costUsd: 0,
     });
 
-    await this._aiSettings.updateMediaJob(job.id, { status: 'processing' });
-
-    const { mergeClips } = await import('./video-merge');
+    // Resolve clips host-side into the job workdir (storage stays out of the render
+    // container); the ffmpeg trim+xfade runs later in the queued/limited render worker.
+    const workDir = renderWorkDir(job.id);
+    await fs.promises.mkdir(workDir, { recursive: true });
+    const { resolveClipsToFiles } = await import('./video-merge');
 
     try {
-      const buffer = await mergeClips(
+      await resolveClipsToFiles(
         params.clips,
-        params.transitions,
         orgId,
         this._storage,
         (fileId) => this._resolveFileId(fileId, orgId),
+        workDir,
       );
-
-      const adapter = await this._storage.resolveAdapterForFolder(
-        params.folderId,
-        orgId,
-      );
-      await this._storage.assertWithinProviderQuota(adapter, orgId, buffer.length);
-
-      await this._lifecycle.completeJobWithBuffer(
-        job,
-        buffer,
-        'video/mp4',
-        { provider: 'replicate' },
-        undefined,
-        params.folderId ?? undefined,
-      );
-
-      return { jobId: job.id };
     } catch (err) {
       await this._lifecycle.failJob(job, (err as Error).message);
+      await fs.promises.rm(workDir, { recursive: true, force: true }).catch(() => {});
       throw err;
     }
+
+    return this._videoRender.enqueueMerge(
+      orgId,
+      job,
+      params.clips.map((c) => ({ trimStart: c.trimStart, trimEnd: c.trimEnd })),
+      params.transitions,
+      params.folderId,
+    );
   }
 }

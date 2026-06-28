@@ -316,11 +316,29 @@ The backend serves the Inngest handler at **`/api/inngest`**; functions live in
 - **Event-triggered**: `post/publish` (`post-publish.ts` — sleeps until the publish date, posts,
   posts thread items as comments, then first comment / webhooks / plugins; per-`taskQueue`
   concurrency cap), `autopost/process`, `integration/refresh-token`, `email/send` (global 1/sec),
-  `email/digest`, `analytics/backfill`, `streak/start`.
+  `email/digest`, `analytics/backfill`, `streak/start`, `media/render` (`media-render.ts` — local
+  video renders: Designer timeline + clip-merge, `concurrency.limit = VIDEO_RENDER_CONCURRENCY`
+  (default 3), each optionally in a resource-capped Podman container — see **Video rendering** below).
 - **Cron-triggered**: `comments-collection.ts` (every minute — sync comments, dispatch webhooks,
   prune, notify), `analytics-collection.ts` (daily 02:00 UTC — the snapshot sweep below),
-  `media-jobs-poll.ts` (every minute — poll pending media jobs + FFmpeg video renders),
+  `media-jobs-poll.ts` (every minute — poll pending external media jobs; **re-enqueues** stuck
+  local renders to `media/render`, no longer renders inline),
   `missing-post-finder.ts` (hourly — recover posts that should have published).
+
+## Video rendering (queue + Podman workers)
+
+Local video compute — the Designer timeline render (headless Chromium + FFmpeg) and the clip-merge
+(FFmpeg) — is queued through the `media/render` Inngest function and capped to
+`VIDEO_RENDER_CONCURRENCY` (default 3). With `VIDEO_RENDER_PODMAN_ENABLED=true`, each render runs in
+a `postmill-render` Podman container (the backend shells out to the local `podman` CLI); all render
+containers join **one pod** whose cgroup caps the **aggregate** `VIDEO_RENDER_CPUS`/`VIDEO_RENDER_MEMORY`
+across all of them (a lone render may burst to the whole pool). Storage/clip resolution stays
+host-side (no creds in the container); the worker is the app build + distro Chromium/FFmpeg with
+`media-render-worker.ts` as ENTRYPOINT (reads `/work/job.json` → writes `/work/out`). Podman is
+**opt-in**; off (default) = the existing in-process renderer (dev/CI + graceful degradation), with
+the 3-concurrent cap still applied via a host semaphore when `USE_INNGEST` is off. Requires cgroup v2
+for the aggregate pool (else a logged per-container even-split fallback). See
+`docs/operations-guide/video-rendering.md`.
 
 ## Notifications (V2)
 

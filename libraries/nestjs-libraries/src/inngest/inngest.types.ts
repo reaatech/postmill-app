@@ -67,6 +67,12 @@ export type InngestEvents = {
       daysBack: number;
     };
   };
+  'media/render': {
+    data: {
+      jobId: string;
+      op: 'design' | 'merge';
+    };
+  };
 
 };
 
