@@ -32,7 +32,8 @@
       "@gitroom/nestjs-libraries/*": ["libraries/nestjs-libraries/src/*"],
       "@gitroom/react/*": ["libraries/react-shared-libraries/src/*"],
       "@gitroom/plugins/*": ["libraries/plugins/src/*"],
-      "@gitroom/extension/*": ["apps/extension/src/*"]
+      "@gitroom/extension/*": ["apps/extension/src/*"],
+      "@gitroom/provider-kernel": ["libraries/providers/kernel/src"]
     }
   },
   "exclude": ["node_modules", "tmp"]
