@@ -11,6 +11,25 @@ type LegacyUserRow = {
   lastName?: string | null;
   bio?: string | null;
   pictureId?: string | null;
+  sendSuccessEmails?: boolean;
+  sendFailureEmails?: boolean;
+  sendStreakEmails?: boolean;
+};
+
+// UserProfile email opt-out column -> Notifications V2 category key.
+const EMAIL_PREF_COLUMN_TO_CATEGORY: Array<
+  [keyof ProfileEmailFlags, string]
+> = [
+  ['sendSuccessEmails', 'post_published'],
+  ['sendFailureEmails', 'post_failed'],
+  ['sendStreakEmails', 'streak'],
+];
+
+type ProfileEmailFlags = {
+  userId: string;
+  sendSuccessEmails: boolean;
+  sendFailureEmails: boolean;
+  sendStreakEmails: boolean;
 };
 
 function deriveFingerprint(data: (string | null | undefined)[]): string {
@@ -28,6 +47,7 @@ export class BackfillService {
   async backfill() {
     await this.prisma.$transaction(async (tx) => {
       await this.backfillUserProfiles(tx);
+      await this.backfillNotificationEmailPrefs(tx);
       await this.backfillUserOrganizationRoles(tx);
       await this.backfillAIBrandProfiles(tx);
       await this.backfillStorageProviderFingerprints(tx);
@@ -51,12 +71,84 @@ export class BackfillService {
             bio: user.bio,
             pictureId: user.pictureId,
             timezone: null,
+            sendSuccessEmails: user.sendSuccessEmails,
+            sendFailureEmails: user.sendFailureEmails,
+            sendStreakEmails: user.sendStreakEmails,
           },
         });
       }
     } catch {
       // Profile fields on User may already be dropped after the destructive push —
       // this backfill is only needed pre-drop.
+    }
+  }
+
+  // Notifications V2 expand-contract: copy any email opt-OUT still stored on the
+  // (deprecated) UserProfile.send*Emails columns into NotificationPreference.categories
+  // BEFORE those columns are dropped in the follow-up release. Without this, every
+  // user who disabled success/failure/streak emails would silently revert to the
+  // opt-in defaults (NotificationPreferenceService self-heals missing categories to
+  // email:true on read) and start receiving unwanted mail on deploy.
+  // Only opt-outs need carrying — opt-ins already match the defaults. Idempotent:
+  // never clobbers a value already written under the new key (a post-deploy save wins).
+  private async backfillNotificationEmailPrefs(tx: Prisma.TransactionClient) {
+    let profiles: ProfileEmailFlags[];
+    try {
+      profiles = (await tx.userProfile.findMany({
+        where: {
+          OR: [
+            { sendSuccessEmails: false },
+            { sendFailureEmails: false },
+            { sendStreakEmails: false },
+          ],
+        },
+        select: {
+          userId: true,
+          sendSuccessEmails: true,
+          sendFailureEmails: true,
+          sendStreakEmails: true,
+        },
+      })) as ProfileEmailFlags[];
+    } catch {
+      // Columns already dropped (post-contract release) — nothing left to carry.
+      return;
+    }
+
+    for (const profile of profiles) {
+      const optOuts: Record<string, { email: boolean }> = {};
+      for (const [column, category] of EMAIL_PREF_COLUMN_TO_CATEGORY) {
+        if (profile[column] === false) optOuts[category] = { email: false };
+      }
+      if (Object.keys(optOuts).length === 0) continue;
+
+      const existing = await tx.notificationPreference.findUnique({
+        where: { userId: profile.userId },
+      });
+
+      if (!existing) {
+        await tx.notificationPreference.create({
+          data: { userId: profile.userId, categories: optOuts },
+        });
+        continue;
+      }
+
+      const categories = {
+        ...((existing.categories as Record<string, any>) ?? {}),
+      };
+      let dirty = false;
+      for (const [category, value] of Object.entries(optOuts)) {
+        // Don't overwrite a value the user already set under the new key.
+        if (categories[category]?.email === undefined) {
+          categories[category] = { ...(categories[category] ?? {}), ...value };
+          dirty = true;
+        }
+      }
+      if (dirty) {
+        await tx.notificationPreference.update({
+          where: { userId: profile.userId },
+          data: { categories },
+        });
+      }
     }
   }
 
@@ -185,9 +277,10 @@ export class BackfillService {
 
         await tx.mediaProviderConfig.upsert({
           where: {
-            organizationId_identifier: {
+            organizationId_identifier_version: {
               organizationId: org.organizationId,
               identifier,
+              version: 'v1',
             },
           },
           update: {
@@ -197,6 +290,7 @@ export class BackfillService {
           create: {
             organizationId: org.organizationId,
             identifier,
+            version: 'v1',
             enabled: mp.enabled ?? false,
             extraConfig,
           },
