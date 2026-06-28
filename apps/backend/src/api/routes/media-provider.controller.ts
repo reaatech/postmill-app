@@ -6,6 +6,7 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Inject,
   Param,
   Post,
   Put,
@@ -15,30 +16,55 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel } from '@gitroom/provider-kernel';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 
 @ApiTags('Org Media Provider Settings')
 @Controller('/settings/media')
 export class MediaProviderController {
   constructor(
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
-    private _registry: MediaProviderRegistry,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    private _resolution: ProviderResolutionService,
   ) {}
+
+  // Resolve a media adapter through the kernel; null for an unknown provider
+  // (mirrors the old in-memory registry get).
+  private _resolveMedia(identifier: string): MediaProviderAdapter | null {
+    try {
+      return this._resolution.resolveMedia(identifier);
+    } catch {
+      return null;
+    }
+  }
 
   @Get('/providers')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async listProviders() {
-    const adapters = this._registry.getAll();
-    return adapters.map((adapter) => ({
-      identifier: adapter.identifier,
-      name: adapter.name,
-      capabilities: adapter.capabilities,
-      credentialFields: adapter.credentialFields ?? null,
-    }));
+    const seen = new Set<string>();
+    const out: {
+      identifier: string;
+      name: string;
+      capabilities: unknown;
+      credentialFields: unknown;
+    }[] = [];
+    for (const manifest of this._kernel.listManifests('media')) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      out.push({
+        identifier: manifest.providerId,
+        name: manifest.displayName,
+        capabilities: manifest.capabilities,
+        credentialFields: manifest.credentialFields ?? null,
+      });
+    }
+    return out;
   }
 
   @Get('/config')
@@ -58,15 +84,17 @@ export class MediaProviderController {
     @Body()
     body: {
       credentials?: Record<string, string>;
+      version?: string;
     },
   ) {
-    const adapter = this._registry.get(identifier);
+    const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
     // OpenAI/MiniMax credentials live-link to the AI surface inside the service (§11.4).
     await this._orgMediaProviderSettings.upsert(org.id, identifier, {
       enabled: true,
       credentials: body.credentials,
+      version: body.version,
     });
 
     return { identifier, success: true };
@@ -84,7 +112,7 @@ export class MediaProviderController {
       storageRootFolderId?: string;
     },
   ) {
-    const adapter = this._registry.get(identifier);
+    const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
     await this._orgMediaProviderSettings.upsert(org.id, identifier, {
@@ -101,12 +129,14 @@ export class MediaProviderController {
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
+    @Body() body: { version?: string },
   ) {
-    const adapter = this._registry.get(identifier);
+    const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
     await this._orgMediaProviderSettings.upsert(org.id, identifier, {
       enabled: true,
+      version: body.version,
     });
 
     return { identifier, success: true };
@@ -121,7 +151,7 @@ export class MediaProviderController {
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string> },
   ) {
-    const adapter = this._registry.get(identifier);
+    const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
     if (body.credentials) {

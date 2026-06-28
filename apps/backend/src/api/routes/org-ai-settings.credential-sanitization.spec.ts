@@ -13,22 +13,16 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.s
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
-  AIProviderRegistry: class {
-    list = (): unknown[] => [];
-    getAdapter = (): null => null;
-  },
-}));
-
 import { OrgAiSettingsController } from './org-ai-settings.controller';
-import type { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
-    { list: (): unknown[] => [], getAdapter: (): null => null } as unknown as AIProviderRegistry
+    { resolveAI: () => undefined } as unknown as ProviderResolutionService,
+    undefined as any,
   ) as any;
 }
 

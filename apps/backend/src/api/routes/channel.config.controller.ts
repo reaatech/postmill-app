@@ -13,7 +13,7 @@ import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { Prisma } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -24,7 +24,8 @@ import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard
 export class ChannelConfigController {
   constructor(
     private _providerConfigService: ProviderConfigService,
-    private _providerConfigManager: ProviderConfigManager
+    private _providerConfigManager: ProviderConfigManager,
+    private _integrationManager: IntegrationManager
   ) {}
 
   @Get('/')
@@ -33,7 +34,7 @@ export class ChannelConfigController {
     const dbConfigs = await this._providerConfigService.getAll();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
-    return socialIntegrationList.map((p) => {
+    return this._integrationManager.getSocialProviders().map((p) => {
       const dbConfig = dbConfigMap.get(p.identifier);
       const isConfigured = dbConfig
         ? (() => {
@@ -74,9 +75,8 @@ export class ChannelConfigController {
       identifier
     );
 
-    const provider = socialIntegrationList.find(
-      (p) => p.identifier === identifier
-    );
+    const provider =
+      this._integrationManager.getSocialIntegrationUnchecked(identifier);
 
     return {
       identifier,
@@ -140,9 +140,8 @@ export class ChannelConfigController {
         throw new BadRequestException('additionalConfig must be valid JSON');
       }
     }
-    const provider = socialIntegrationList.find(
-      (p) => p.identifier === identifier
-    );
+    const provider =
+      this._integrationManager.getSocialIntegrationUnchecked(identifier);
     if (!provider) {
       throw new BadRequestException('Unknown provider');
     }

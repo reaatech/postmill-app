@@ -14,9 +14,9 @@ export class AuthProviderRepository {
     });
   }
 
-  findByProvider(provider: Provider) {
+  findByProvider(provider: Provider, version = 'v1') {
     return this._authProviderConfig.model.authProviderConfig.findUnique({
-      where: { provider },
+      where: { provider_version: { provider, version } },
     });
   }
 
@@ -29,17 +29,17 @@ export class AuthProviderRepository {
     userInfoUrl?: string;
     scopes?: string;
     displayName?: string;
-  }) {
+  }, version = 'v1') {
     return this._authProviderConfig.model.authProviderConfig.upsert({
-      where: { provider },
-      create: { provider, ...data },
+      where: { provider_version: { provider, version } },
+      create: { provider, version, ...data },
       update: data,
     });
   }
 
-  delete(provider: Provider) {
+  delete(provider: Provider, version = 'v1') {
     return this._authProviderConfig.model.authProviderConfig.delete({
-      where: { provider },
+      where: { provider_version: { provider, version } },
     });
   }
 }

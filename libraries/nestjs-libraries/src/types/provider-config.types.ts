@@ -11,6 +11,8 @@ export interface ProviderConfigDto {
   status: ProviderConfigStatus[];
   displayName?: string;
   capabilities?: string[];
+  /** Pinned provider-framework version (e.g. "v1"). */
+  version?: string;
   createdAt: Date;
   updatedAt: Date;
 }

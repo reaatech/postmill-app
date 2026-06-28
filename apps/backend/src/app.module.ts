@@ -1,7 +1,7 @@
 import { Global, Module } from '@nestjs/common';
 import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/database.module';
 import { ApiModule } from '@gitroom/backend/api/api.module';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { PublicApiModule } from '@gitroom/backend/public-api/public.api.module';
@@ -23,6 +23,9 @@ import { InngestController } from '@gitroom/backend/api/controllers/inngest.cont
 import { ScheduleModule } from '@nestjs/schedule';
 import { FeatureFlagsModule, FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { CollaborationModule } from '@gitroom/backend/services/collaboration/collaboration.module';
+import { ProvidersModule } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProvidersBootstrap } from './providers.bootstrap';
+import { ProviderExceptionFilter } from './api/filters/provider-exception.filter';
 
 // Module-level feature flags are read at bootstrap time. Defaults keep all
 // features enabled for production/CI; local developers opt-out via env vars.
@@ -46,6 +49,7 @@ const scheduleModule = featureFlags.isEnabled('cron')
     InngestModule,
     AiModule,
     VpnModule,
+    ProvidersModule,
     CollaborationModule,
     ThrottlerModule.forRoot({
       throttlers: [
@@ -68,6 +72,7 @@ const scheduleModule = featureFlags.isEnabled('cron')
     FILTER,
     PROVIDER_NOT_CONFIGURED_FILTER,
     SHORT_LINK_PROVIDER_FILTER,
+    ProvidersBootstrap,
     {
       provide: APP_GUARD,
       useClass: ThrottlerBehindProxyGuard,
@@ -79,6 +84,10 @@ const scheduleModule = featureFlags.isEnabled('cron')
     {
       provide: APP_GUARD,
       useClass: OrgRbacGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: ProviderExceptionFilter,
     },
   ],
   exports: [

@@ -54,6 +54,7 @@ export class StorageController {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: number;
+      version?: string;
     }
   ) {
     const created = await this._storageService.createConfig(
@@ -68,6 +69,7 @@ export class StorageController {
         publicUrl: body.publicUrl,
         quotaBytes:
           body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
+        version: body.version,
       },
       user.id
     );
@@ -100,6 +102,7 @@ export class StorageController {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: number;
+      version?: string;
     }
   ) {
     return this.#stripBigInts(
@@ -115,6 +118,7 @@ export class StorageController {
           publicUrl: body.publicUrl,
           quotaBytes:
             body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
+          version: body.version,
         },
         user.id
       )

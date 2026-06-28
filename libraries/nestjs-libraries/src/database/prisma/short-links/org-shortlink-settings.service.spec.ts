@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OrgShortLinkSettingsService } from './org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from './org-shortlink-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
 import type { ShortLinkAdapter, ShortLinkCapabilities, ShortLinkCredentialField } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 const mockCapabilities: ShortLinkCapabilities = {
   create: true,
@@ -56,11 +57,19 @@ describe('OrgShortLinkSettingsService', () => {
   let service: OrgShortLinkSettingsService;
   let repository: OrgShortLinkSettingsRepository;
   let encryption: EncryptionService;
-  let registry: ShortLinkRegistry;
+  let kernel: ProviderKernel;
+  let resolution: ProviderResolutionService;
+
+  // Fake provider registry: adapters are resolved through the kernel manifests +
+  // ProviderResolutionService.resolveShortLink now that the in-memory registry
+  // is gone. `register()` mirrors the old `register()` test helper.
+  const registered = new Map<string, ShortLinkAdapter>();
+  const register = (adapter: ShortLinkAdapter) => registered.set(adapter.identifier, adapter);
 
   const orgId = 'org-1';
 
   beforeEach(() => {
+    registered.clear();
     repository = {
       getByOrg: vi.fn().mockResolvedValue([]),
       getByIdentifier: vi.fn().mockResolvedValue(null),
@@ -88,12 +97,37 @@ describe('OrgShortLinkSettingsService', () => {
       encryptDeterministic: vi.fn(),
     } as any;
 
-    registry = new ShortLinkRegistry();
+    kernel = {
+      listManifests: (domain: string) =>
+        domain === 'shortlink'
+          ? [...registered.keys()].map((providerId) => ({
+              domain: 'shortlink',
+              providerId,
+              version: 'v1',
+            }))
+          : [],
+    } as unknown as ProviderKernel;
+
+    resolution = {
+      resolveShortLink: vi.fn((identifier: string) => {
+        const adapter = registered.get(identifier);
+        if (!adapter) {
+          throw new ProviderNotFoundError({
+            domain: 'shortlink',
+            providerId: identifier,
+            version: 'v1',
+          });
+        }
+        return adapter;
+      }),
+      latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    } as any;
 
     service = new OrgShortLinkSettingsService(
       repository as OrgShortLinkSettingsRepository,
       encryption as EncryptionService,
-      registry,
+      resolution as ProviderResolutionService,
+      kernel,
     );
   });
 
@@ -109,7 +143,7 @@ describe('OrgShortLinkSettingsService', () => {
         defaultDomain: 'bit.ly',
         authType: 'oauth2',
       });
-      registry.register(adapter);
+      register(adapter);
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { enabled: true, isActive: false, customDomain: 'my.com' }),
       ]);
@@ -130,7 +164,7 @@ describe('OrgShortLinkSettingsService', () => {
 
     it('returns isConfigured: true when all required credential fields are present', async () => {
       const adapter = createMockAdapter('bitly', { name: 'Bitly' });
-      registry.register(adapter);
+      register(adapter);
       const creds = JSON.stringify({ accessToken: 'token123' });
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { enabled: true, credentials: `encrypted:${creds}` }),
@@ -142,7 +176,7 @@ describe('OrgShortLinkSettingsService', () => {
 
     it('returns isConfigured: false when required credential is empty', async () => {
       const adapter = createMockAdapter('bitly', { name: 'Bitly' });
-      registry.register(adapter);
+      register(adapter);
       const creds = JSON.stringify({ accessToken: '  ' });
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { credentials: `encrypted:${creds}` }),
@@ -153,7 +187,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns isConfigured: false when no DB config exists for adapter', async () => {
-      registry.register(createMockAdapter('bitly'));
+      register(createMockAdapter('bitly'));
       (repository.getByOrg as any).mockResolvedValue([]);
 
       const result = await service.getProviders(orgId);
@@ -161,8 +195,8 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('handles multiple adapters with mixed configs', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
-      registry.register(createMockAdapter('dub', { name: 'Dub.co' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('dub', { name: 'Dub.co' }));
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { enabled: true, isActive: true }),
       ]);
@@ -192,7 +226,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns decrypted active provider with credentials', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
       const creds = JSON.stringify({ accessToken: 'secret-token' });
       (repository.getActive as any).mockResolvedValue(
         dbConfig('bitly', { credentials: `encrypted:${creds}`, customDomain: 'my.link' }),
@@ -203,12 +237,13 @@ describe('OrgShortLinkSettingsService', () => {
         identifier: 'bitly',
         name: 'Bitly',
         customDomain: 'my.link',
+        version: 'v1',
       });
       expect(result?.credentials).toEqual({ accessToken: 'secret-token' });
     });
 
     it('returns empty credentials object when credentials is null', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
       (repository.getActive as any).mockResolvedValue(dbConfig('bitly', { credentials: null }));
 
       const result = await service.getActiveProvider(orgId);
@@ -216,7 +251,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns empty credentials on decrypt failure', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
       (encryption.decrypt as any).mockImplementation(() => 'not-valid-json');
       (repository.getActive as any).mockResolvedValue(dbConfig('bitly', { credentials: 'bad-data' }));
 
@@ -241,7 +276,38 @@ describe('OrgShortLinkSettingsService', () => {
         expect.objectContaining({
           enabled: true,
           credentials: expect.stringContaining('encrypted:'),
+          version: 'v1',
         }),
+      );
+    });
+
+    it('pins kernel.latestActive version when no explicit version is provided', async () => {
+      (resolution.latestActiveVersion as any).mockReturnValue('v2');
+      await service.upsert(orgId, 'bitly', {
+        enabled: true,
+        credentials: { accessToken: 'token123' },
+      });
+
+      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('shortlink', 'bitly');
+      expect(repository.upsert).toHaveBeenCalledWith(
+        orgId,
+        'bitly',
+        expect.objectContaining({ version: 'v2' }),
+      );
+    });
+
+    it('uses explicit body.version when provided', async () => {
+      await service.upsert(orgId, 'bitly', {
+        enabled: true,
+        credentials: { accessToken: 'token123' },
+        version: 'v3',
+      });
+
+      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+      expect(repository.upsert).toHaveBeenCalledWith(
+        orgId,
+        'bitly',
+        expect.objectContaining({ version: 'v3' }),
       );
     });
 
@@ -294,7 +360,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('throws when required credentials are missing', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
       (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
         credentials: `encrypted:${JSON.stringify({ accessToken: '  ' })}`,
       }));
@@ -303,12 +369,33 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('calls repository.setActive when validation passes', async () => {
-      registry.register(createMockAdapter('bitly', { name: 'Bitly' }));
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
       (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
         credentials: `encrypted:${JSON.stringify({ accessToken: 'valid-token' })}`,
       }));
       await service.setActive(orgId, 'bitly');
-      expect(repository.setActive).toHaveBeenCalledWith(orgId, 'bitly');
+      expect(repository.setActive).toHaveBeenCalledWith(orgId, 'bitly', 'v1');
+    });
+
+    it('pins kernel.latestActive version on setActive when no explicit version is provided', async () => {
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
+      (resolution.latestActiveVersion as any).mockReturnValue('v2');
+      (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
+        credentials: `encrypted:${JSON.stringify({ accessToken: 'valid-token' })}`,
+      }));
+      await service.setActive(orgId, 'bitly');
+      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('shortlink', 'bitly');
+      expect(repository.setActive).toHaveBeenCalledWith(orgId, 'bitly', 'v2');
+    });
+
+    it('uses explicit version on setActive when provided', async () => {
+      register(createMockAdapter('bitly', { name: 'Bitly' }));
+      (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
+        credentials: `encrypted:${JSON.stringify({ accessToken: 'valid-token' })}`,
+      }));
+      await service.setActive(orgId, 'bitly', 'v3');
+      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+      expect(repository.setActive).toHaveBeenCalledWith(orgId, 'bitly', 'v3');
     });
   });
 
@@ -334,7 +421,7 @@ describe('OrgShortLinkSettingsService', () => {
 
     it('calls adapter.validateCredentials with decrypted credentials', async () => {
       const adapter = createMockAdapter('bitly', { name: 'Bitly' });
-      registry.register(adapter);
+      register(adapter);
       const creds = JSON.stringify({ accessToken: 'test-token' });
       (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
         credentials: `encrypted:${creds}`,
@@ -355,7 +442,7 @@ describe('OrgShortLinkSettingsService', () => {
     it('returns ok: false from adapter', async () => {
       const adapter = createMockAdapter('bitly', { name: 'Bitly' });
       adapter.validateCredentials = vi.fn().mockResolvedValue({ ok: false, error: 'Auth failed' });
-      registry.register(adapter);
+      register(adapter);
       (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
         credentials: `encrypted:${JSON.stringify({ accessToken: 'bad' })}`,
       }));
@@ -366,7 +453,7 @@ describe('OrgShortLinkSettingsService', () => {
 
     it('handles missing extraConfig gracefully', async () => {
       const adapter = createMockAdapter('bitly', { name: 'Bitly' });
-      registry.register(adapter);
+      register(adapter);
       (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', {
         credentials: `encrypted:${JSON.stringify({ accessToken: 'tok' })}`,
       }));
@@ -430,7 +517,7 @@ describe('OrgShortLinkSettingsService', () => {
 
   describe('isConfigured helper', () => {
     it('returns false when no DB config', async () => {
-      registry.register(createMockAdapter('bitly'));
+      register(createMockAdapter('bitly'));
       (repository.getByOrg as any).mockResolvedValue([]);
 
       const result = await service.getProviders(orgId);
@@ -438,7 +525,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns false when credentials are null', async () => {
-      registry.register(createMockAdapter('bitly'));
+      register(createMockAdapter('bitly'));
       (repository.getByOrg as any).mockResolvedValue([dbConfig('bitly', { credentials: null })]);
 
       const result = await service.getProviders(orgId);
@@ -446,7 +533,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns false when a required field has empty value', async () => {
-      registry.register(createMockAdapter('bitly'));
+      register(createMockAdapter('bitly'));
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { credentials: `encrypted:${JSON.stringify({ accessToken: '' })}` }),
       ]);
@@ -456,7 +543,7 @@ describe('OrgShortLinkSettingsService', () => {
     });
 
     it('returns true when all required fields have non-empty values', async () => {
-      registry.register(createMockAdapter('bitly'));
+      register(createMockAdapter('bitly'));
       (repository.getByOrg as any).mockResolvedValue([
         dbConfig('bitly', { credentials: `encrypted:${JSON.stringify({ accessToken: 'valid' })}` }),
       ]);
@@ -470,7 +557,7 @@ describe('OrgShortLinkSettingsService', () => {
         name: 'Simple',
         fields: [{ key: 'note', label: 'Note', type: 'string', required: false }],
       });
-      registry.register(adapter);
+      register(adapter);
       (repository.getByOrg as any).mockResolvedValue([dbConfig('simple')]);
 
       const result = await service.getProviders(orgId);

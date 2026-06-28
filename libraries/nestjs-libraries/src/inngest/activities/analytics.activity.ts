@@ -19,7 +19,7 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { decryptIntegrationTokens, decryptPostIntegrationTokens } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration-token.utils';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 
 dayjs.extend(isoWeek);
@@ -64,7 +64,7 @@ export class AnalyticsActivity {
     private readonly _watchlistService: WatchlistService,
     private readonly _shortLinkSettingsService: OrgShortLinkSettingsService,
     private readonly _shortLinkSettingsRepository: OrgShortLinkSettingsRepository,
-    private readonly _shortLinkRegistry: ShortLinkRegistry,
+    private readonly _resolution: ProviderResolutionService,
     private readonly _emailLogService: EmailLogService,
   ) {}
 
@@ -528,7 +528,16 @@ export class AnalyticsActivity {
     const active = await this._shortLinkSettingsService.getActiveProvider(orgId);
     if (!active) return;
 
-    const adapter = this._shortLinkRegistry.getAdapter(active.identifier);
+    let adapter;
+    try {
+      adapter = this._resolution.resolveShortLink(active.identifier, {
+        version: active.version ?? 'v1',
+        credentials: active.credentials || {},
+        orgId,
+      });
+    } catch {
+      return;
+    }
     if (!adapter) return;
     if (!adapter.capabilities.statistics) return;
     if (!adapter.linkStatistics) return;

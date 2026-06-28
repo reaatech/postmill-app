@@ -2,10 +2,7 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import {
-  IntegrationManager,
-  socialIntegrationList,
-} from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 
@@ -38,8 +35,8 @@ export class IntegrationValidationTool implements AgentToolInterface {
         platform: z
           .string()
           .describe(
-            `platform identifier (${socialIntegrationList
-              .map((p) => p.identifier)
+            `platform identifier (${this._integrationManager
+              .getAllowedSocialsIntegrations()
               .join(', ')})`
           ),
       }),
@@ -83,9 +80,10 @@ export class IntegrationValidationTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        const integration = socialIntegrationList.find(
-          (p) => p.identifier === inputData.platform
-        )!;
+        const integration =
+          this._integrationManager.getSocialIntegrationUnchecked(
+            inputData.platform
+          )!;
 
         if (!integration) {
           return {

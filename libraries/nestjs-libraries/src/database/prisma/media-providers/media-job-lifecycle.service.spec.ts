@@ -46,13 +46,14 @@ function makeService() {
 
   const pollJob = vi.fn();
   const adapter = { identifier: 'luma', pollJob };
-  const registry = { get: vi.fn().mockReturnValue(adapter) };
+  const resolution = { resolveMedia: vi.fn().mockReturnValue(adapter) };
 
   const orgSettings = {
     getConfigForProvider: vi.fn().mockResolvedValue({
       credentials: { apiKey: 'luma-key' },
       storageProviderId: null,
       storageRootFolderId: null,
+      version: 'v1',
     }),
     getStandardFolderId: vi.fn().mockResolvedValue('folder-video-1'),
   };
@@ -72,7 +73,7 @@ function makeService() {
   const service = new MediaJobLifecycleService(
     aiSettings as never,
     orgSettings as never,
-    registry as never,
+    resolution as never,
     storageService as never,
     mediaRepository as never,
     notificationService as never,
@@ -83,7 +84,7 @@ function makeService() {
     jobs,
     aiSettings,
     pollJob,
-    registry,
+    resolution,
     orgSettings,
     storageAdapter,
     storageService,
@@ -224,6 +225,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'luma-key' },
         storageProviderId: null,
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
       pollJob.mockResolvedValue({
         status: 'completed',
@@ -278,6 +280,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'k' },
         storageProviderId: 'sp-1',
         storageRootFolderId: null,
+        version: 'v1',
       });
       pollJob.mockResolvedValue({ status: 'completed', artifactUrl: 'data:video/mp4;base64,AAAA' });
 
@@ -310,9 +313,9 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
     });
 
     it('fails jobs whose adapter cannot poll', async () => {
-      const { service, jobs, registry } = makeService();
+      const { service, jobs, resolution } = makeService();
       jobs.set('job-1', makeJob());
-      registry.get.mockReturnValue({ identifier: 'x' }); // no pollJob
+      resolution.resolveMedia.mockReturnValue({ identifier: 'x' }); // no pollJob
 
       expect(await service.processJob('job-1')).toBe('failed');
     });
@@ -342,6 +345,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'k' },
         storageProviderId: null,
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
 
       const result = await service.storeTranscript({

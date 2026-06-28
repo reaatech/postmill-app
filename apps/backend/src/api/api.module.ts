@@ -73,6 +73,10 @@ import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.pr
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
+import {
+  ProvidersController,
+  AdminProvidersController,
+} from '@gitroom/backend/api/routes/providers.controller';
 import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
 import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-studio.module';
 import { ReplicateStudioController } from './routes/replicate-studio.controller';
@@ -129,12 +133,14 @@ const authenticatedController = [
   HeyGenController,
   MediaStudioController,
   DeepgramController,
+  AdminProvidersController,
 ];
 @Module({
   imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule],
   controllers: [
     RootController,
     HealthController,
+    ProvidersController,
     StripeController,
     AuthController,
     PublicController,

@@ -2,10 +2,7 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import {
-  IntegrationManager,
-  socialIntegrationList,
-} from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
@@ -71,9 +68,10 @@ export class IntegrationTriggerTool implements AgentToolInterface {
           };
         }
 
-        const integrationProvider = socialIntegrationList.find(
-          (p) => p.identifier === getIntegration.providerIdentifier
-        )!;
+        const integrationProvider =
+          this._integrationManager.getSocialIntegrationUnchecked(
+            getIntegration.providerIdentifier
+          )!;
 
         if (!integrationProvider) {
           return {

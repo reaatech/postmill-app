@@ -78,7 +78,7 @@ import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/a
 import { timer } from '@gitroom/helpers/utils/timer';
 import type { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import type { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
-import type { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 
 type Mocked<T> = T & { [K in keyof T]: T[K] extends (...args: any[]) => any ? ReturnType<typeof vi.fn> : T[K] };
@@ -166,8 +166,8 @@ describe('AnalyticsActivity', () => {
         getByOrg: vi.fn().mockResolvedValue([]),
       } as unknown as OrgShortLinkSettingsRepository,
       {
-        getAdapter: vi.fn().mockReturnValue(null),
-      } as unknown as ShortLinkRegistry,
+        resolveShortLink: vi.fn().mockReturnValue(null),
+      } as unknown as ProviderResolutionService,
       {
         recordSent: vi.fn().mockResolvedValue(undefined),
       } as unknown as EmailLogService

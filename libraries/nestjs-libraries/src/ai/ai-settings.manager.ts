@@ -1,6 +1,48 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import {
+  parseQualified,
+  qualify,
+  DEFAULT_VERSION,
+} from '@gitroom/provider-kernel';
+
+export function normalizeProviderId(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return value ?? null;
+  const { providerId } = parseQualified(value);
+  return providerId || value;
+}
+
+export function qualifyProviderId(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return value ?? null;
+  const { providerId } = parseQualified(value);
+  if (!providerId) return value;
+  return qualify(providerId);
+}
+
+export function ensureScopeModelsVersion(scopeModels: any): any {
+  if (
+    !scopeModels ||
+    typeof scopeModels !== 'object' ||
+    Array.isArray(scopeModels)
+  ) {
+    return scopeModels;
+  }
+
+  const out: Record<string, any> = {};
+  for (const [key, entry] of Object.entries(scopeModels)) {
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      out[key] = { version: DEFAULT_VERSION, ...(entry as Record<string, any>) };
+    } else {
+      out[key] = entry;
+    }
+  }
+  return out;
+}
 
 interface CachedSettings {
   id: string;
@@ -110,6 +152,13 @@ export class AiSettingsManager implements OnModuleInit {
         }
       }
     }
+
+    parsed.activeProvider = normalizeProviderId(parsed.activeProvider);
+    parsed.fallbackProvider = normalizeProviderId(parsed.fallbackProvider);
+    parsed.fallbackImageProvider = normalizeProviderId(
+      parsed.fallbackImageProvider,
+    );
+    parsed.scopeModels = ensureScopeModelsVersion(parsed.scopeModels);
 
     return parsed;
   }

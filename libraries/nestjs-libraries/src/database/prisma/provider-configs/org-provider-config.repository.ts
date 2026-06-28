@@ -11,6 +11,7 @@ type ConfigData = {
   additionalConfig?: string | null;
   setupNotes?: string | null;
   vpnSelection?: string | null;
+  version?: string;
 };
 
 @Injectable()
@@ -50,13 +51,14 @@ export class OrgProviderConfigRepository {
 
   create(
     orgId: string,
-    data: ConfigData & { identifier: string; name: string }
+    data: ConfigData & { identifier: string; name: string; version?: string }
   ) {
     return this._orgProviderConfig.model.orgProviderConfiguration.create({
       data: {
         organizationId: orgId,
         identifier: data.identifier,
         name: data.name,
+        version: data.version ?? 'v1',
         enabled: data.enabled ?? false,
         clientId: data.clientId ?? null,
         clientSecret: data.clientSecret ?? null,

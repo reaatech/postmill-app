@@ -18,7 +18,8 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { ShortLinkAdapter } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -36,23 +37,24 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 export class OrgShortLinkSettingsController {
   constructor(
     private _orgShortLinkSettings: OrgShortLinkSettingsService,
-    private _registry: ShortLinkRegistry,
+    private _resolution: ProviderResolutionService,
   ) {}
+
+  // Resolve a short-link adapter through the kernel, throwing a 400 when the
+  // provider id is unknown/retired.
+  private _requireAdapter(identifier: string): ShortLinkAdapter {
+    try {
+      return this._resolution.resolveShortLink(identifier);
+    } catch {
+      throw new BadRequestException('Unknown short-link provider');
+    }
+  }
 
   @Get('/providers')
   @RequirePermission('shortlink-config', 'manage')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
-    const adapters = this._registry.list();
-    return adapters.map((adapter) => ({
-      identifier: adapter.identifier,
-      name: adapter.name,
-      capabilities: adapter.capabilities,
-      credentialFields: adapter.credentialFields,
-      authType: adapter.authType,
-      defaultDomain: adapter.defaultDomain,
-      setupNotes: adapter.setupNotes,
-    }));
+    return this._orgShortLinkSettings.listProviderMetadata();
   }
 
   @Get('/config')
@@ -78,8 +80,7 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: UpsertShortlinkConfigDto,
   ) {
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) throw new BadRequestException('Unknown short-link provider');
+    this._requireAdapter(identifier);
 
     await this._orgShortLinkSettings.upsert(org.id, identifier, {
       enabled: true,
@@ -88,6 +89,7 @@ export class OrgShortLinkSettingsController {
       extraConfig: body.extraConfig,
       name: body.name,
       accountFingerprint: body.accountFingerprint,
+      version: body.version,
     });
 
     return { identifier, success: true };
@@ -99,9 +101,10 @@ export class OrgShortLinkSettingsController {
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
+    @Body() body: { version?: string },
   ) {
     try {
-      const result = await this._orgShortLinkSettings.setActive(org.id, identifier);
+      const result = await this._orgShortLinkSettings.setActive(org.id, identifier, body.version);
       return { identifier, isActive: result.isActive };
     } catch (err) {
       throw new BadRequestException((err as Error).message);
@@ -117,8 +120,7 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: TestShortlinkDto,
   ) {
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) throw new BadRequestException('Unknown short-link provider');
+    const adapter = this._requireAdapter(identifier);
 
     if (body.credentials) {
       return adapter.validateCredentials({
@@ -158,8 +160,7 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: OAuthUrlDto,
   ) {
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) throw new BadRequestException('Unknown short-link provider');
+    const adapter = this._requireAdapter(identifier);
     if (!adapter.oauth) throw new BadRequestException('Provider does not support OAuth');
 
     if (!isAllowedReturnUrl(body.redirectUri)) {
@@ -200,8 +201,7 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: OAuthCallbackDto,
   ) {
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) throw new BadRequestException('Unknown short-link provider');
+    const adapter = this._requireAdapter(identifier);
     if (!adapter.oauth) throw new BadRequestException('Provider does not support OAuth');
 
     if (!isAllowedReturnUrl(body.redirectUri)) {

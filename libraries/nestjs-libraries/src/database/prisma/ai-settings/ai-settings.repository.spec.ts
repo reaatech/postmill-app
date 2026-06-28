@@ -199,7 +199,7 @@ describe('AiSettingsRepository', () => {
       const result = await repository.getProviderConfigByIdentifier('openai');
 
       expect(mockProviderConfig.findUnique).toHaveBeenCalledWith({
-        where: { identifier: 'openai' },
+        where: { identifier_version: { identifier: 'openai', version: 'v1' } },
       });
       expect(result).toEqual(config);
     });
@@ -220,8 +220,8 @@ describe('AiSettingsRepository', () => {
       const result = await repository.upsertProviderConfig('openai', data);
 
       expect(mockProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { identifier: 'openai' },
-        create: { identifier: 'openai', ...data },
+        where: { identifier_version: { identifier: 'openai', version: 'v1' } },
+        create: { identifier: 'openai', version: 'v1', ...data },
         update: data,
       });
       expect(result).toEqual(upserted);
@@ -234,8 +234,8 @@ describe('AiSettingsRepository', () => {
       await repository.upsertProviderConfig('mini', data);
 
       expect(mockProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { identifier: 'mini' },
-        create: { identifier: 'mini', enabled: false },
+        where: { identifier_version: { identifier: 'mini', version: 'v1' } },
+        create: { identifier: 'mini', version: 'v1', enabled: false },
         update: { enabled: false },
       });
     });
@@ -249,7 +249,7 @@ describe('AiSettingsRepository', () => {
       const result = await repository.deleteProviderConfig('openai');
 
       expect(mockProviderConfig.delete).toHaveBeenCalledWith({
-        where: { identifier: 'openai' },
+        where: { identifier_version: { identifier: 'openai', version: 'v1' } },
       });
       expect(result).toEqual(deleted);
     });
@@ -589,7 +589,7 @@ describe('AiSettingsRepository', () => {
       expect(result).toEqual(created);
     });
 
-    it('persists new Replicate columns (folderId, model, versionId, inputJson, operation image)', async () => {
+    it('persists new Replicate columns (folderId, model, version, inputJson, operation image)', async () => {
       const data = {
         organizationId: 'org1',
         provider: 'replicate',
@@ -597,7 +597,7 @@ describe('AiSettingsRepository', () => {
         status: 'pending',
         folderId: 'folder-1',
         model: 'black-forest-labs/flux-schnell',
-        versionId: 'v1',
+        version: 'v1',
         inputJson: JSON.stringify({ prompt: 'cat' }),
       };
       const created = { id: 'mj2', ...data };
@@ -852,7 +852,7 @@ describe('AiSettingsRepository', () => {
       const result = await repository.getOrgProviderConfig('org1', 'openai');
 
       expect(mockOrgProviderConfig.findUnique).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: 'org1', identifier: 'openai' } },
+        where: { organizationId_identifier_version: { organizationId: 'org1', identifier: 'openai', version: 'v1' } },
       });
       expect(result).toEqual(config);
     });
@@ -872,8 +872,8 @@ describe('AiSettingsRepository', () => {
       const result = await repository.upsertOrgProviderConfig('org1', 'openai', data);
 
       expect(mockOrgProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: 'org1', identifier: 'openai' } },
-        create: { organizationId: 'org1', identifier: 'openai', ...data },
+        where: { organizationId_identifier_version: { organizationId: 'org1', identifier: 'openai', version: 'v1' } },
+        create: { organizationId: 'org1', identifier: 'openai', version: 'v1', ...data },
         update: data,
       });
       expect(result).toEqual(upserted);
@@ -888,7 +888,7 @@ describe('AiSettingsRepository', () => {
       const result = await repository.deleteOrgProviderConfig('org1', 'openai');
 
       expect(mockOrgProviderConfig.delete).toHaveBeenCalledWith({
-        where: { organizationId_identifier: { organizationId: 'org1', identifier: 'openai' } },
+        where: { organizationId_identifier_version: { organizationId: 'org1', identifier: 'openai', version: 'v1' } },
       });
       expect(result).toEqual(deleted);
     });

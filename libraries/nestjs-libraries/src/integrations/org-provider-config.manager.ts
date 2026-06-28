@@ -13,6 +13,7 @@ type DecryptedConfig = {
   enabled: boolean;
   name: string;
   identifier: string;
+  version?: string;
 };
 
 type OrgCache = {
@@ -70,6 +71,7 @@ export class OrgProviderConfigManager {
         identifier: config.identifier,
         name: config.name,
         enabled: config.enabled,
+        version: config.version ?? undefined,
         clientId: decrypted.clientId,
         clientSecret: decrypted.clientSecret,
         redirectUri: config.redirectUri || undefined,

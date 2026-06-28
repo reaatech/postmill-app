@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "dependencies": {
+    "@gitroom/provider-kernel": "workspace:*",
     "@ag-ui/mastra": "^1.0.3",
     "@ai-sdk/amazon-bedrock": "^2.0.0",
     "@ai-sdk/anthropic": "^2.0.0",

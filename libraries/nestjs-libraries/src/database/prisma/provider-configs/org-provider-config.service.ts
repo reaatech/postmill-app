@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import { OrgProviderConfigRepository } from './org-provider-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { randomBytes } from 'crypto';
 
 // Optional VPN egress selection stored (as JSON) on the channel config. Not a
@@ -10,6 +11,7 @@ export type ChannelVpnSelection = {
   enabled: boolean;
   identifier?: string;
   regionId?: string;
+  vpnVersion?: string;
 };
 
 type WritableConfig = {
@@ -22,6 +24,7 @@ type WritableConfig = {
   additionalConfig?: string | null;
   setupNotes?: string | null;
   vpnSelection?: ChannelVpnSelection | null;
+  version?: string;
 };
 
 @Injectable()
@@ -31,13 +34,25 @@ export class OrgProviderConfigService {
   constructor(
     private _repository: OrgProviderConfigRepository,
     private _encryption: EncryptionService,
-    private _vpn: OrgVpnConfigService
+    private _vpn: OrgVpnConfigService,
+    private _resolution: ProviderResolutionService
   ) {}
 
   // No secrets — orgId/userId/action/provider identity only (#59).
   #audit(action: string, orgId: string, identifier: string, userId?: string) {
     this._logger.log(
       `channel-config.${action} org=${orgId} user=${userId || 'n/a'} provider=${identifier}`
+    );
+  }
+
+  // Pin a new or existing config to the latest active social-provider version unless
+  // the caller supplied an explicit version or a version is already pinned.
+  #resolveVersion(identifier: string, explicitVersion?: string | null, existingVersion?: string | null): string {
+    return (
+      explicitVersion ||
+      existingVersion ||
+      this._resolution.latestActiveVersion('social', identifier) ||
+      'v1'
     );
   }
 
@@ -105,6 +120,7 @@ export class OrgProviderConfigService {
     const result = await this._repository.create(orgId, {
       identifier: data.identifier,
       name,
+      version: this.#resolveVersion(data.identifier, data.version),
       enabled: data.enabled ?? false,
       ...this.#encryptWritable(data),
       redirectUri: data.redirectUri ?? null,
@@ -148,6 +164,7 @@ export class OrgProviderConfigService {
     if (data.redirectUri !== undefined) update.redirectUri = data.redirectUri;
     if (data.scopes !== undefined) update.scopes = data.scopes;
     if (data.setupNotes !== undefined) update.setupNotes = data.setupNotes;
+    update.version = this.#resolveVersion(existing.identifier, data.version, existing.version);
     if (data.vpnSelection !== undefined) {
       (update as any).vpnSelection = await this.#serializeVpn(orgId, data.vpnSelection);
     }
@@ -197,13 +214,13 @@ export class OrgProviderConfigService {
     orgId: string,
     configId: string | null | undefined,
     identifier: string
-  ): Promise<{ identifier: string; regionId: string } | null> {
+  ): Promise<{ identifier: string; regionId: string; vpnVersion?: string } | null> {
     const config = configId
       ? await this._repository.getById(orgId, configId)
       : await this._repository.getByIdentifier(orgId, identifier);
     const parsed = this.#parseVpn(config?.vpnSelection);
     if (parsed?.enabled && parsed.identifier && parsed.regionId) {
-      return { identifier: parsed.identifier, regionId: parsed.regionId };
+      return { identifier: parsed.identifier, regionId: parsed.regionId, vpnVersion: parsed.vpnVersion };
     }
     return null;
   }
@@ -226,7 +243,7 @@ export class OrgProviderConfigService {
     if (!enabled.some((r) => r.identifier === identifier && r.regionId === regionId)) {
       throw new BadRequestException('The selected VPN region is not enabled for this organization.');
     }
-    return JSON.stringify({ enabled: true, identifier, regionId });
+    return JSON.stringify({ enabled: true, identifier, regionId, vpnVersion: sel.vpnVersion });
   }
 
   #parseVpn(raw: string | null | undefined): ChannelVpnSelection | null {
@@ -279,6 +296,7 @@ export class OrgProviderConfigService {
     organizationId: string;
     identifier: string;
     name: string;
+    version: string;
     enabled: boolean;
     clientId: string | null;
     clientSecret: string | null;
@@ -298,6 +316,7 @@ export class OrgProviderConfigService {
       organizationId: config.organizationId,
       identifier: config.identifier,
       name: config.name,
+      version: config.version ?? 'v1',
       enabled: config.enabled,
       isConfigured: hasClientId || hasClientSecret,
       redirectUri: config.redirectUri,

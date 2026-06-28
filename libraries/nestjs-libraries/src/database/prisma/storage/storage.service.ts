@@ -3,14 +3,15 @@ import { StorageProviderType } from '@prisma/client';
 import { StorageRepository } from './storage.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { StorageAdapterFactory } from '@gitroom/nestjs-libraries/upload/adapters/adapter.factory';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 
 type StorageConfigRow = {
   id: string;
   organizationId: string;
   type: StorageProviderType;
+  version: string | null;
   name: string;
   credentials: string | null;
   region: string | null;
@@ -30,7 +31,8 @@ export class StorageService {
   constructor(
     private _storageRepository: StorageRepository,
     private _auditRepository: AuditRepository,
-    private _encryptionService: EncryptionService
+    private _encryptionService: EncryptionService,
+    private _resolution: ProviderResolutionService
   ) {}
 
   // Strip the (encrypted) credential blob from anything returned to a client (#54).
@@ -73,12 +75,28 @@ export class StorageService {
 
   #buildAdapter(config: StorageConfigRow): IStorageAdapter {
     const decrypted = config.credentials
-      ? this._encryptionService.decrypt(config.credentials)
-      : '{}';
-    return StorageAdapterFactory.createFromConfig({
-      ...config,
-      credentials: decrypted,
-    } as any);
+      ? (JSON.parse(this._encryptionService.decrypt(config.credentials)) as Record<string, string>)
+      : {};
+    return this._resolution.resolveStorage(
+      this.#storageTypeToKernelId(config.type),
+      {
+        version: config.version ?? 'v1',
+        credentials: decrypted,
+        orgId: config.organizationId,
+        extras: {
+          bucket: config.bucket,
+          region: config.region,
+          endpoint: config.endpoint,
+          publicUrl: config.publicUrl,
+        },
+      }
+    );
+  }
+
+  #storageTypeToKernelId(type: StorageProviderType): string {
+    // Preserve underscores so the kernel providerId matches the manifest
+    // (e.g. `cloudflare_r2`, `backblaze_b2`, `s3_compatible`).
+    return type.toLowerCase();
   }
 
   async getProviderConfigs(orgId: string) {
@@ -120,6 +138,7 @@ export class StorageService {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: bigint;
+      version?: string;
     },
     userId?: string
   ) {
@@ -138,6 +157,14 @@ export class StorageService {
       }
     }
 
+    const version =
+      data.version ??
+      this._resolution.latestActiveVersion(
+        'storage',
+        this.#storageTypeToKernelId(data.type)
+      ) ??
+      'v1';
+
     const created = await this._storageRepository.create({
       organizationId: orgId,
       type: data.type,
@@ -149,6 +176,7 @@ export class StorageService {
       publicUrl: data.publicUrl,
       quotaBytes: data.quotaBytes,
       accountFingerprint: fp,
+      version,
     });
 
     await this.#audit('create', orgId, created, userId);
@@ -184,6 +212,7 @@ export class StorageService {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: bigint;
+      version?: string;
     },
     userId?: string
   ) {
@@ -201,6 +230,7 @@ export class StorageService {
     if (data.endpoint !== undefined) updateData.endpoint = data.endpoint;
     if (data.publicUrl !== undefined) updateData.publicUrl = data.publicUrl;
     if (data.quotaBytes !== undefined) updateData.quotaBytes = data.quotaBytes;
+    if (data.version !== undefined) updateData.version = data.version;
 
     const updated = await this._storageRepository.update(id, updateData);
     this.#audit('update', orgId, updated, userId);
@@ -267,7 +297,24 @@ export class StorageService {
       return this.#buildAdapter(created);
     }
 
-    return StorageAdapterFactory.createLocal(orgId);
+    // No persisted LOCAL row: resolve a virtual LOCAL adapter straight from the
+    // kernel (replaces the removed StorageAdapterFactory.createLocal helper).
+    return this.#buildAdapter({
+      id: '__virtual_local__',
+      organizationId: orgId,
+      type: StorageProviderType.LOCAL,
+      version: 'v1',
+      name: 'Local Storage',
+      credentials: null,
+      region: null,
+      bucket: null,
+      endpoint: null,
+      publicUrl: null,
+      mounted: false,
+      quotaBytes: null,
+      createdAt: new Date(0),
+      updatedAt: new Date(0),
+    });
   }
 
   // Upload routing (#56): oldest mounted → local/first.

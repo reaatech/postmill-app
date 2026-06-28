@@ -111,7 +111,8 @@ export class IntegrationService {
     refresh?: string,
     timezone?: number,
     customInstanceDetails?: string,
-    providerConfigId?: string
+    providerConfigId?: string,
+    providerVersion = 'v1'
   ) {
     const uploadedPicture = picture
       ? await (await this._storageService.getLocalAdapterForOrg(org, true)).uploadSimple(picture)
@@ -134,7 +135,8 @@ export class IntegrationService {
       refresh,
       timezone,
       customInstanceDetails,
-      providerConfigId
+      providerConfigId,
+      providerVersion
     );
   }
 

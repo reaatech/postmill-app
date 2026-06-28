@@ -13,9 +13,9 @@ export class ProviderConfigRepository {
     });
   }
 
-  getByIdentifier(identifier: string) {
+  getByIdentifier(identifier: string, version = 'v1') {
     return this._providerConfig.model.providerConfiguration.findUnique({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
     });
   }
 
@@ -37,27 +37,29 @@ export class ProviderConfigRepository {
       scopes?: string;
       additionalConfig?: string;
       setupInstructions?: string;
-    }
+    },
+    version = 'v1',
   ) {
     return this._providerConfig.model.providerConfiguration.upsert({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
       create: {
         identifier,
+        version,
         ...data,
       },
       update: data,
     });
   }
 
-  delete(identifier: string) {
+  delete(identifier: string, version = 'v1') {
     return this._providerConfig.model.providerConfiguration.delete({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
     });
   }
 
-  setEnabled(identifier: string, enabled: boolean) {
+  setEnabled(identifier: string, enabled: boolean, version = 'v1') {
     return this._providerConfig.model.providerConfiguration.update({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
       data: { enabled },
     });
   }

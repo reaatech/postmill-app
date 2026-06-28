@@ -16,11 +16,11 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import {
   CONTENT_PACK_IDENTIFIERS,
   CONTENT_PACK_REGISTRY,
   contentPackMeta,
-  createContentPack,
 } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
@@ -31,7 +31,10 @@ import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-p
 @Controller('/settings/content-packs')
 @UseGuards(OrgRbacGuard)
 export class ContentPackController {
-  constructor(private _orgContentPackSettings: OrgContentPackSettingsService) {}
+  constructor(
+    private _orgContentPackSettings: OrgContentPackSettingsService,
+    private _resolution: ProviderResolutionService
+  ) {}
 
   @Get('/providers')
   @RequirePermission('media-config', 'manage')
@@ -126,14 +129,15 @@ export class ContentPackController {
     }
 
     if (body.credentials?.apiKey) {
-      const pack = createContentPack(identifier, body.credentials);
-      if (pack) {
-        try {
-          const result = await pack.search(meta.capabilities[0], 'test', 1);
-          return { ok: true, message: 'Connection successful', result };
-        } catch (err) {
-          return { ok: false, message: (err as Error).message };
-        }
+      try {
+        const pack = this._resolution.resolveContentPack(identifier, {
+          credentials: body.credentials,
+          orgId: org.id,
+        });
+        const result = await pack.search(meta.capabilities[0], 'test', 1);
+        return { ok: true, message: 'Connection successful', result };
+      } catch (err) {
+        return { ok: false, message: (err as Error).message };
       }
     }
 

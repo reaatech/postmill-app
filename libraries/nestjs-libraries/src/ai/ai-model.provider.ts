@@ -1,16 +1,18 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import * as Sentry from '@sentry/nestjs';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIProviderRegistry } from './ai-provider.registry';
 import {
   type AICapabilities,
   type AIScope,
 } from './ai-provider.interface';
+import { ProviderKernel } from '@gitroom/provider-kernel';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from './ai-settings.manager';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import type { ImageModel, LanguageModel } from './ai-provider.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 import { CapabilityNotAvailable, BudgetExceeded, GuardrailViolation } from './governance/errors';
 import { TelemetryService } from './governance/telemetry.service';
@@ -57,6 +59,7 @@ export interface ResolvedConfig {
   modelId: string;
   creds: Record<string, string>;
   providerId: string;
+  version?: string;
   defaultSurface?: SurfaceDefaults;
   settings?: any;
 }
@@ -95,7 +98,6 @@ export class AIModelProvider {
   private readonly _logger = new Logger(AIModelProvider.name);
 
   constructor(
-    private readonly _registry: AIProviderRegistry,
     private readonly _aiSettings: AiSettingsService,
     private readonly _orgAiSettings: OrgAiSettingsService,
     private readonly _aiSettingsManager: AiSettingsManager,
@@ -104,6 +106,8 @@ export class AIModelProvider {
     private readonly _budget: BudgetService,
     private readonly _guardrails: GuardrailService,
     private readonly _brands: BrandsService,
+    private readonly _resolution: ProviderResolutionService,
+    @Inject(PROVIDER_KERNEL) private readonly _kernel: ProviderKernel,
     private readonly _semanticCache?: SemanticCacheService,
     private readonly _modelRouter?: ModelRouterService,
     private readonly _circuitBreaker: CircuitBreakerService = new CircuitBreakerService(),
@@ -125,6 +129,32 @@ export class AIModelProvider {
     if (settings?.observability) {
       this._telemetry.configure(settings.observability, settings.secretSettings);
     }
+  }
+
+  private _resolveAI(
+    providerId: string,
+    options: { version?: string; credentials?: Record<string, string>; orgId?: string } = {},
+  ): any {
+    try {
+      return this._resolution.resolveAI(providerId, {
+        version: options.version ?? 'v1',
+        credentials: options.credentials ?? {},
+        orgId: options.orgId,
+      });
+    } catch {
+      // Unknown/unregistered provider — preserve the legacy registry.getAdapter
+      // semantics (undefined), letting callers surface a friendly message.
+      return undefined;
+    }
+  }
+
+  private _parseProviderRef(ref: string): { providerId: string; version?: string } {
+    const at = ref.lastIndexOf('@');
+    if (at === -1) return { providerId: ref, version: 'v1' };
+    return {
+      providerId: ref.slice(0, at),
+      version: ref.slice(at + 1) || 'v1',
+    };
   }
 
   private _isValidScopedModels(value: unknown): value is Record<string, { provider?: string; model?: string }> {
@@ -168,11 +198,15 @@ export class AIModelProvider {
     }
 
     const selectedProviderId = orgActive.identifier;
-    const adapter = this._registry.getAdapter(selectedProviderId);
+    const adapter = this._resolveAI(selectedProviderId, {
+      version: orgActive.version,
+      credentials: orgActive.credentials,
+      orgId,
+    });
     if (!adapter) {
       throw new Error(
         `AI provider adapter "${selectedProviderId}" is not registered. ` +
-        `Available providers: ${this._registry.list().map((a) => a.identifier).join(', ')}`,
+        `Available providers: ${this._kernel.listManifests('ai').map((m) => m.providerId).join(', ')}`,
       );
     }
 
@@ -190,6 +224,7 @@ export class AIModelProvider {
       modelId: selectedModel,
       creds: orgActive.credentials || {},
       providerId: selectedProviderId,
+      version: orgActive.version ?? 'v1',
       defaultSurface: SURFACE_DEFAULTS[scope],
       settings,
     };
@@ -258,16 +293,21 @@ export class AIModelProvider {
 
       const globalSettings = config.settings || await this._aiSettingsManager.getSettings();
       if (globalSettings?.fallbackProvider && globalSettings.fallbackProvider !== config.providerId) {
-        const fallbackAdapter = this._registry.getAdapter(globalSettings.fallbackProvider);
+        const fallbackRef = this._parseProviderRef(globalSettings.fallbackProvider);
+        const fallbackOrgActive = orgId
+          ? await this._orgAiSettings.getActiveProvider(orgId)
+          : null;
+        const fallbackAdapter = this._resolveAI(fallbackRef.providerId, {
+          version: fallbackRef.version,
+          credentials: fallbackOrgActive?.credentials || {},
+          orgId,
+        });
         if (fallbackAdapter) {
           if (!this._circuitBreaker.canAttempt(globalSettings.fallbackProvider)) {
             throw primaryErr;
           }
           attemptedFallbackProvider = globalSettings.fallbackProvider;
 
-          const fallbackOrgActive = orgId
-            ? await this._orgAiSettings.getActiveProvider(orgId)
-            : null;
           const fallbackCreds = fallbackOrgActive?.credentials || {};
 
           const fallbackRawModels = globalSettings.scopeModels;
@@ -381,12 +421,17 @@ export class AIModelProvider {
           const globalSettings = config.settings || await this._aiSettingsManager.getSettings();
           const fallbackImageProvider = globalSettings?.fallbackImageProvider;
           if (fallbackImageProvider && fallbackImageProvider !== config.providerId) {
-            const fallbackAdapter = this._registry.getAdapter(fallbackImageProvider);
+            const fallbackRef = this._parseProviderRef(fallbackImageProvider);
+            const fallbackOrgActive = orgId
+              ? await this._orgAiSettings.getActiveProvider(orgId)
+              : null;
+            const fallbackCreds = fallbackOrgActive?.credentials || {};
+            const fallbackAdapter = this._resolveAI(fallbackRef.providerId, {
+              version: fallbackRef.version,
+              credentials: fallbackCreds,
+              orgId,
+            });
             if (fallbackAdapter?.createImageModel) {
-              const fallbackOrgActive = orgId
-                ? await this._orgAiSettings.getActiveProvider(orgId)
-                : null;
-              const fallbackCreds = fallbackOrgActive?.credentials || {};
               const fallbackModelId =
                 fallbackOrgActive?.defaultModel ||
                 SURFACE_DEFAULTS[scope].imageModel ||
@@ -801,8 +846,8 @@ export class AIModelProvider {
   }
 
   hasCapability(adapterId: string, capability: keyof AICapabilities): boolean {
-    const caps = this._registry.capabilitiesFor(adapterId);
-    return caps?.[capability] === true;
+    const adapter = this._resolveAI(adapterId);
+    return adapter?.capabilities?.[capability] === true;
   }
 
   async modelHasCapability(
@@ -811,8 +856,12 @@ export class AIModelProvider {
     capability: keyof AICapabilities,
     creds?: Record<string, string>,
   ): Promise<boolean | null> {
-    const caps = await this._registry.modelCapabilitiesFor(adapterId, modelId, creds);
-    return caps?.[capability] ?? null;
+    const adapter = this._resolveAI(adapterId, { credentials: creds });
+    if (!adapter) return null;
+    const models = await adapter.listModels(creds || {});
+    const model = models.find((m: { id: string }) => m.id === modelId);
+    if (!model) return null;
+    return model.capabilities?.[capability] ?? null;
   }
 
   getSurfaceDefaults(scope: AIScope): SurfaceDefaults {

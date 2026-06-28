@@ -4,7 +4,7 @@ import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/pri
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 export interface TranscriptWord {
   word: string;
@@ -57,7 +57,7 @@ export class DeepgramService {
     private readonly _aiSettings: AiSettingsService,
     private readonly _storage: StorageService,
     private readonly _fileService: FileService,
-    private readonly _registry: MediaProviderRegistry,
+    private readonly _resolution: ProviderResolutionService,
   ) {}
 
   async getStatus(orgId: string): Promise<{ configured: boolean }> {
@@ -70,15 +70,19 @@ export class DeepgramService {
     orgId: string,
     params: { fileId: string; model?: string; language?: string },
   ): Promise<TranscriptResult> {
-    const adapter = this._registry.get('deepgram');
-    if (!adapter?.speechToTextWords) {
-      throw new ForbiddenException('Deepgram transcription is not available.');
-    }
-
     const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, 'deepgram');
     const credentials = config?.credentials;
     if (!credentials || Object.keys(credentials).length === 0) {
       throw new ForbiddenException('Deepgram is not configured. Add an API key in Settings → Media.');
+    }
+
+    const adapter = this._resolution.resolveMedia('deepgram', {
+      version: config.version,
+      credentials,
+      orgId,
+    });
+    if (!adapter?.speechToTextWords) {
+      throw new ForbiddenException('Deepgram transcription is not available.');
     }
 
     const { buffer, mimeType } = await this._readFile(orgId, params.fileId);

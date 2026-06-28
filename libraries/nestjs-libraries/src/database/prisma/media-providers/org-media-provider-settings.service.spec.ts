@@ -12,7 +12,8 @@ function makeService() {
     encrypt: vi.fn((v: string) => `enc(${v})`),
     decrypt: vi.fn((v: string) => v.replace(/^enc\((.*)\)$/, '$1')),
   };
-  const registry = { getAll: vi.fn().mockReturnValue([]), get: vi.fn() };
+  const kernel = { listManifests: vi.fn().mockReturnValue([]) };
+  const resolution = { resolveMedia: vi.fn(), latestActiveVersion: vi.fn().mockReturnValue('v1') };
   const mediaRepository = {
     findFoldersByParent: vi.fn().mockResolvedValue([]),
     createFolder: vi.fn().mockImplementation(async (_org: string, data: { name: string }) => ({
@@ -30,13 +31,14 @@ function makeService() {
   const service = new OrgMediaProviderSettingsService(
     repository as never,
     encryption as never,
-    registry as never,
+    resolution as never,
     mediaRepository as never,
+    kernel as never,
     credentialLink as never,
     orgAiRepository as never,
   );
 
-  return { service, repository, encryption, registry, mediaRepository, credentialLink, orgAiRepository };
+  return { service, repository, encryption, kernel, resolution, mediaRepository, credentialLink, orgAiRepository };
 }
 
 describe('OrgMediaProviderSettingsService', () => {
@@ -46,10 +48,40 @@ describe('OrgMediaProviderSettingsService', () => {
     it('encrypts credentials at rest', async () => {
       const { service, repository } = makeService();
       await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' } });
-      expect(repository.upsert).toHaveBeenCalledWith('org-1', 'openai', expect.objectContaining({
-        enabled: true,
-        credentials: `enc(${JSON.stringify({ apiKey: 'sk-1' })})`,
-      }));
+      expect(repository.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        expect.objectContaining({
+          enabled: true,
+          credentials: `enc(${JSON.stringify({ apiKey: 'sk-1' })})`,
+        }),
+        'v1',
+      );
+    });
+
+    it('pins kernel.latestActive version when no explicit version is provided', async () => {
+      const { service, repository, resolution } = makeService();
+      resolution.latestActiveVersion.mockReturnValue('v2');
+      await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' } });
+      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('media', 'openai');
+      expect(repository.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        expect.anything(),
+        'v2',
+      );
+    });
+
+    it('uses explicit body.version when provided', async () => {
+      const { service, repository, resolution } = makeService();
+      await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' }, version: 'v3' });
+      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+      expect(repository.upsert).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        expect.anything(),
+        'v3',
+      );
     });
 
     it('live-links openai/minimax credentials to the AI surface (§11.4)', async () => {
@@ -121,6 +153,7 @@ describe('OrgMediaProviderSettingsService', () => {
         credentials: `enc(${JSON.stringify({ apiKey: 'k-1' })})`,
         storageProviderId: 'sp-1',
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
 
       const config = await service.getConfigForProvider('org-1', 'fal');
@@ -128,6 +161,7 @@ describe('OrgMediaProviderSettingsService', () => {
         credentials: { apiKey: 'k-1' },
         storageProviderId: 'sp-1',
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
     });
 
@@ -151,6 +185,7 @@ describe('OrgMediaProviderSettingsService', () => {
         credentials: { apiKey: 'dashscope-key' },
         storageProviderId: null,
         storageRootFolderId: null,
+        version: 'v1',
       });
     });
 
@@ -161,6 +196,7 @@ describe('OrgMediaProviderSettingsService', () => {
         credentials: `enc(${JSON.stringify({ apiKey: 'media-key' })})`,
         storageProviderId: 'sp-1',
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
       const config = await service.getConfigForProvider('org-1', 'qwen');
       expect(config?.credentials).toEqual({ apiKey: 'media-key' });
@@ -197,10 +233,10 @@ describe('OrgMediaProviderSettingsService', () => {
 
   describe('getProviders universal-credential fallback', () => {
     it('marks Qwen configured + enabled when only the AI key exists', async () => {
-      const { service, registry, repository, orgAiRepository } = makeService();
-      registry.getAll.mockReturnValue([
-        { identifier: 'qwen', name: 'Qwen', capabilities: { image: true, video: true } },
-        { identifier: 'runway', name: 'Runway', capabilities: { video: true } },
+      const { service, kernel, repository, orgAiRepository } = makeService();
+      kernel.listManifests.mockReturnValue([
+        { providerId: 'qwen', displayName: 'Qwen', capabilities: { image: true, video: true } },
+        { providerId: 'runway', displayName: 'Runway', capabilities: { video: true } },
       ]);
       repository.getByOrg.mockResolvedValue([]); // no media config rows
       orgAiRepository.getByIdentifier.mockImplementation(async (_org: string, id: string) =>
@@ -255,10 +291,10 @@ describe('OrgMediaProviderSettingsService', () => {
 
   describe('getProviders / getActiveProviders / delete / testConnection', () => {
     it('merges registry adapters with org config state', async () => {
-      const { service, registry, repository } = makeService();
-      registry.getAll.mockReturnValue([
-        { identifier: 'fal', name: 'fal.ai', capabilities: { image: true } },
-        { identifier: 'luma', name: 'Luma', capabilities: { video: true } },
+      const { service, kernel, repository } = makeService();
+      kernel.listManifests.mockReturnValue([
+        { providerId: 'fal', displayName: 'fal.ai', capabilities: { image: true } },
+        { providerId: 'luma', displayName: 'Luma', capabilities: { video: true } },
       ]);
       repository.getByOrg.mockResolvedValue([
         { identifier: 'fal', enabled: true, credentials: 'enc({})', storageProviderId: 'sp-1', storageRootFolderId: null, createdAt: new Date(1), updatedAt: new Date(2) },
@@ -288,10 +324,10 @@ describe('OrgMediaProviderSettingsService', () => {
     });
 
     it('testConnection runs a probe generation with decrypted credentials', async () => {
-      const { service, repository, registry } = makeService();
+      const { service, repository, resolution } = makeService();
       const generateImage = vi.fn().mockResolvedValue({ multi: false, image: 'ok' });
-      registry.get.mockReturnValue({ identifier: 'fal', capabilities: { image: true }, generateImage });
-      repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({"apiKey":"k"})' });
+      resolution.resolveMedia.mockReturnValue({ identifier: 'fal', capabilities: { image: true }, generateImage });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({"apiKey":"k"})', version: 'v1' });
 
       const result = await service.testConnection('org-1', 'fal');
       expect(generateImage).toHaveBeenCalledWith('test', { credentials: { apiKey: 'k' } });
@@ -299,16 +335,18 @@ describe('OrgMediaProviderSettingsService', () => {
     });
 
     it('testConnection reports probe failures and unknown providers', async () => {
-      const { service, repository, registry } = makeService();
-      registry.get.mockReturnValue({
+      const { service, repository, resolution } = makeService();
+      resolution.resolveMedia.mockReturnValue({
         identifier: 'fal',
         capabilities: { image: true },
         generateImage: vi.fn().mockRejectedValue(new Error('bad key')),
       });
-      repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({})' });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'fal', credentials: 'enc({})', version: 'v1' });
       expect(await service.testConnection('org-1', 'fal')).toEqual({ ok: false, message: 'bad key' });
 
-      registry.get.mockReturnValue(undefined);
+      resolution.resolveMedia.mockImplementation(() => {
+        throw new Error('Unknown media provider: fal');
+      });
       await expect(service.testConnection('org-1', 'fal')).rejects.toThrow('Unknown media provider');
 
       repository.getByIdentifier.mockResolvedValue(null);
@@ -316,16 +354,16 @@ describe('OrgMediaProviderSettingsService', () => {
     });
 
     it('testConnection prefers the adapter testConnection over image generation', async () => {
-      const { service, repository, registry } = makeService();
+      const { service, repository, resolution } = makeService();
       const generateImage = vi.fn();
       const testConnection = vi.fn().mockResolvedValue({ ok: true, message: 'Connection successful' });
-      registry.get.mockReturnValue({
+      resolution.resolveMedia.mockReturnValue({
         identifier: 'heygen',
         capabilities: { image: false, video: true, avatar: true },
         generateImage,
         testConnection,
       });
-      repository.getByIdentifier.mockResolvedValue({ identifier: 'heygen', credentials: 'enc({"apiKey":"k"})' });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'heygen', credentials: 'enc({"apiKey":"k"})', version: 'v1' });
 
       const result = await service.testConnection('org-1', 'heygen');
       expect(testConnection).toHaveBeenCalledWith({ credentials: { apiKey: 'k' } });
@@ -334,10 +372,10 @@ describe('OrgMediaProviderSettingsService', () => {
     });
 
     it('testConnection does not run image generation for a non-image provider without a test', async () => {
-      const { service, repository, registry } = makeService();
+      const { service, repository, resolution } = makeService();
       const generateImage = vi.fn();
-      registry.get.mockReturnValue({ identifier: 'deepgram', capabilities: { image: false, stt: true }, generateImage });
-      repository.getByIdentifier.mockResolvedValue({ identifier: 'deepgram', credentials: 'enc({})' });
+      resolution.resolveMedia.mockReturnValue({ identifier: 'deepgram', capabilities: { image: false, stt: true }, generateImage });
+      repository.getByIdentifier.mockResolvedValue({ identifier: 'deepgram', credentials: 'enc({})', version: 'v1' });
 
       const result = await service.testConnection('org-1', 'deepgram');
       expect(generateImage).not.toHaveBeenCalled();

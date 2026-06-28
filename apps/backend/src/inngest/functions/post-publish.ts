@@ -4,7 +4,8 @@ import {
   RefreshTokenError,
   BadBodyError,
 } from '@gitroom/nestjs-libraries/inngest/errors';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { providerModules } from '@gitroom/backend/providers.generated';
+import { SocialProvider } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { capitalize, sortBy } from 'lodash';
@@ -18,8 +19,19 @@ const MAX_RETRIES = 5;
  * one function per unique task-queue (provider base identifier) and use the most
  * conservative `maxConcurrentJob` when multiple provider variants share a queue
  * (e.g. `instagram` and `instagram-standalone` both map to `instagram`).
+ *
+ * Sourced at import time from the generated provider modules (the same single
+ * source of truth the ProviderKernel registers from) — the kernel itself isn't
+ * populated until app bootstrap, after Inngest functions are built.
  */
-const taskQueueLimits = socialIntegrationList.reduce((acc, provider) => {
+const taskQueueLimits = providerModules.reduce((acc, mod) => {
+  if (mod.manifest.domain !== 'social') {
+    return acc;
+  }
+  const provider = mod.legacyProvider as SocialProvider | undefined;
+  if (!provider) {
+    return acc;
+  }
   const base = provider.identifier.split('-')[0].toLowerCase();
   const limit = provider.maxConcurrentJob ?? 1;
   const existing = acc.get(base);

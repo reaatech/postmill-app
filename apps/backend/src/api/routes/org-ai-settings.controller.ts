@@ -6,6 +6,8 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Inject,
+  Optional,
   Param,
   Post,
   Put,
@@ -15,15 +17,18 @@ import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.reque
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
-import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-config.types';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
 
 export type ProviderConfigSummary = Pick<
   ProviderConfigDto,
-  'identifier' | 'name' | 'enabled' | 'isActive'
+  'identifier' | 'name' | 'enabled' | 'isActive' | 'version'
 >;
 
 @ApiTags('Org AI Settings')
@@ -31,22 +36,66 @@ export type ProviderConfigSummary = Pick<
 export class OrgAiSettingsController {
   constructor(
     private _orgAiSettings: OrgAiSettingsService,
-    private _registry: AIProviderRegistry,
+    private _resolution: ProviderResolutionService,
+    @Optional()
+    @Inject(PROVIDER_KERNEL)
+    private _kernel?: ProviderKernel,
   ) {}
+
+  // Resolve a single AI adapter through the ProviderKernel; undefined for an
+  // unknown/unregistered provider (mirrors the old registry.getAdapter).
+  private _resolveAdapter(identifier: string, version?: string): AIProviderAdapter | undefined {
+    try {
+      return this._resolution.resolveAI(identifier, version ? { version } : {});
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Enumerate the registered AI adapters (one per provider id) — replaces the
+  // legacy in-memory registry enumeration.
+  private _listAdapters(): AIProviderAdapter[] {
+    const seen = new Set<string>();
+    const out: AIProviderAdapter[] = [];
+    for (const manifest of this._kernel?.listManifests('ai') ?? []) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      const adapter = this._resolveAdapter(manifest.providerId, manifest.version);
+      if (adapter) out.push(adapter);
+    }
+    return out;
+  }
+
+  private _aiVersionMeta(identifier: string) {
+    const manifests = this._kernel?.versions('ai', identifier) ?? [];
+    const latestActive = this._kernel?.latestActive('ai', identifier)?.manifest;
+    const version = latestActive?.version ?? manifests[0]?.version ?? DEFAULT_VERSION;
+    const status = latestActive?.status ?? manifests[0]?.status ?? 'active';
+    const availableVersions = manifests.map((m) => ({
+      version: m.version,
+      status: m.status,
+      credentialFields: m.credentialFields,
+    }));
+    return { version, status, availableVersions, credentialFields: latestActive?.credentialFields ?? manifests[0]?.credentialFields };
+  }
 
   @Get('/providers')
   @RequirePermission('settings', 'read')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
-    const adapters = this._registry.list();
-    return adapters.map((adapter) => ({
-      identifier: adapter.identifier,
-      name: adapter.name,
-      type: adapter.type,
-      capabilities: adapter.capabilities,
-      privacy: adapter.privacy,
-      credentialFields: adapter.credentialFields,
-    }));
+    const adapters = this._listAdapters();
+    return adapters.map((adapter) => {
+      const meta = this._aiVersionMeta(adapter.identifier);
+      return {
+        identifier: adapter.identifier,
+        name: adapter.name,
+        type: adapter.type,
+        capabilities: adapter.capabilities,
+        privacy: adapter.privacy,
+        credentialFields: meta.credentialFields ?? adapter.credentialFields,
+        ...meta,
+      };
+    });
   }
 
   @Get('/config')
@@ -61,11 +110,11 @@ export class OrgAiSettingsController {
     // Never ship decrypted provider credentials to the client (#53). The active
     // provider's credentials stay server-side for model resolution only.
     const safeActive = active
-      ? (({ credentials, ...rest }) => rest)(active as any)
+      ? (({ credentials, ...rest }) => ({ ...rest, ...this._aiVersionMeta(rest.identifier) }))(active as any)
       : null;
     return {
       active: safeActive,
-      providers: allConfigs,
+      providers: allConfigs.map((p: any) => ({ ...p, ...this._aiVersionMeta(p.identifier) })),
     };
   }
 
@@ -80,9 +129,10 @@ export class OrgAiSettingsController {
       credentials?: Record<string, string>;
       defaultModel?: string;
       reasoningModel?: string;
+      version?: string;
     },
   ) {
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier, body.version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     await this._orgAiSettings.upsert(org.id, identifier, {
@@ -90,6 +140,7 @@ export class OrgAiSettingsController {
       credentials: body.credentials,
       defaultModel: body.defaultModel,
       reasoningModel: body.reasoningModel,
+      version: body.version,
     });
 
     return { identifier, success: true };
@@ -101,9 +152,10 @@ export class OrgAiSettingsController {
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
+    @Body() body: { version?: string } = {},
   ) {
     try {
-      const result = await this._orgAiSettings.setActive(org.id, identifier);
+      const result = await this._orgAiSettings.setActive(org.id, identifier, body.version);
       return { identifier, isActive: result.isActive };
     } catch (err) {
       throw new BadRequestException((err as Error).message);
@@ -119,7 +171,7 @@ export class OrgAiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string> },
   ) {
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     if (body.credentials) {

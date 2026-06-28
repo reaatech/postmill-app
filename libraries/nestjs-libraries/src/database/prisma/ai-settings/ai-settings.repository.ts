@@ -37,9 +37,9 @@ export class AiSettingsRepository {
     });
   }
 
-  getProviderConfigByIdentifier(identifier: string) {
+  getProviderConfigByIdentifier(identifier: string, version = 'v1') {
     return this._aiProviderConfig.model.aIProviderConfig.findUnique({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
     });
   }
 
@@ -52,17 +52,18 @@ export class AiSettingsRepository {
       reasoningModel?: string;
       extraConfig?: string;
     },
+    version = 'v1',
   ) {
     return this._aiProviderConfig.model.aIProviderConfig.upsert({
-      where: { identifier },
-      create: { identifier, ...data },
+      where: { identifier_version: { identifier, version } },
+      create: { identifier, version, ...data },
       update: data,
     });
   }
 
-  deleteProviderConfig(identifier: string) {
+  deleteProviderConfig(identifier: string, version = 'v1') {
     return this._aiProviderConfig.model.aIProviderConfig.delete({
-      where: { identifier },
+      where: { identifier_version: { identifier, version } },
     });
   }
 
@@ -242,7 +243,7 @@ export class AiSettingsRepository {
     error?: string;
     folderId?: string | null;
     model?: string | null;
-    versionId?: string | null;
+    version?: string | null;
     inputJson?: string | null;
   }) {
     return this._aiMediaJob.model.aIMediaJob.create({ data });
@@ -258,7 +259,7 @@ export class AiSettingsRepository {
       error?: string | null;
       folderId?: string | null;
       model?: string | null;
-      versionId?: string | null;
+      version?: string | null;
       inputJson?: string | null;
       creditType?: string | null;
     },
@@ -398,9 +399,9 @@ export class AiSettingsRepository {
     return rows.map((r) => r.organizationId);
   }
 
-  getOrgProviderConfig(organizationId: string, identifier: string) {
+  getOrgProviderConfig(organizationId: string, identifier: string, version = 'v1') {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.findUnique({
-      where: { organizationId_identifier: { organizationId, identifier } },
+      where: { organizationId_identifier_version: { organizationId, identifier, version } },
     });
   }
 
@@ -414,17 +415,18 @@ export class AiSettingsRepository {
       reasoningModel?: string;
       extraConfig?: string;
     },
+    version = 'v1',
   ) {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.upsert({
-      where: { organizationId_identifier: { organizationId, identifier } },
-      create: { organizationId, identifier, ...data },
+      where: { organizationId_identifier_version: { organizationId, identifier, version } },
+      create: { organizationId, identifier, version, ...data },
       update: data,
     });
   }
 
-  deleteOrgProviderConfig(organizationId: string, identifier: string) {
+  deleteOrgProviderConfig(organizationId: string, identifier: string, version = 'v1') {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.delete({
-      where: { organizationId_identifier: { organizationId, identifier } },
+      where: { organizationId_identifier_version: { organizationId, identifier, version } },
     });
   }
 }

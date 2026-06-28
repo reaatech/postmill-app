@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import type { Dispatcher } from 'undici';
 import { buildVpnDispatcher } from './vpn-dispatcher.factory';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { VpnResolvedProxy } from './org-vpn-config.service';
 
 // Pools undici proxy dispatchers (each owns a connection pool — expensive to
@@ -16,8 +17,23 @@ export class VpnDispatcherService implements OnModuleDestroy {
   >();
   private readonly _max = 50;
 
+  constructor(private _resolution: ProviderResolutionService) {}
+
   get(orgId: string, identifier: string, resolved: VpnResolvedProxy): Dispatcher {
-    const key = `${orgId}:${identifier}:${resolved.region.id}:${resolved.credsFingerprint}`;
+    const version = resolved.version ?? 'v1';
+    const key = `${orgId}:${identifier}:${version}:${resolved.region.id}:${resolved.credsFingerprint}`;
+
+    // Resolve the versioned VPN capability through the kernel for telemetry and
+    // to surface retired/unknown versions early. The proxy endpoint itself comes
+    // from the pre-resolved VpnResolvedProxy (region + auth) passed in.
+    try {
+      this._resolution.resolveVpn(identifier, { version });
+    } catch (err) {
+      this._logger.warn(
+        `VPN kernel resolution failed for ${identifier}@${version}: ${(err as Error)?.message}`
+      );
+    }
+
     const hit = this._cache.get(key);
     if (hit) {
       hit.lastUsed = Date.now();

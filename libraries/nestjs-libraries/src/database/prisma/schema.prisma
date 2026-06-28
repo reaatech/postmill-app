@@ -270,6 +270,7 @@ model Integration {
   rootInternalId        String?
   additionalSettings    String?                @default("[]")
   providerConfigId      String?
+  providerVersion       String                 @default("v1")
   exisingPlugData       ExisingPlugData[]
   customer              Customer?              @relation(fields: [customerId], references: [id])
   organization          Organization           @relation(fields: [organizationId], references: [id])
@@ -332,7 +333,8 @@ model PostAnalyticsSnapshot {
 // Keep model for backward-compatible db-push; drop after migration helper runs.
 model ProviderConfiguration {
   id                String   @id @default(cuid())
-  identifier        String   @unique
+  identifier        String
+  version           String   @default("v1")
   name              String
   enabled           Boolean  @default(false)
   clientId          String?
@@ -344,6 +346,7 @@ model ProviderConfiguration {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  @@unique([identifier, version])
   @@index([enabled])
 }
 
@@ -727,6 +730,7 @@ model StorageProviderConfig {
   id               String              @id @default(cuid())
   organizationId   String
   type             StorageProviderType
+  version          String              @default("v1")
   name             String              // display name (e.g. "My R2 Bucket")
   credentials      String?             // encrypted JSON; schema varies by type
   region           String?
@@ -748,6 +752,7 @@ model StorageProviderConfig {
   @@unique([organizationId, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, mounted])
+  @@index([organizationId, type, version])
 }
 
 // ── v3.6.0: Per-tenant channel provider OAuth credentials (replaces ProviderConfiguration) ──
@@ -763,14 +768,15 @@ model OrgProviderConfiguration {
   redirectUri      String?      // if null, platform default is used
   scopes           String?
   setupNotes       String?      // per-provider instructions for the admin
-  vpnSelection     String?      // JSON { enabled, identifier, regionId } — optional VPN egress (not secret)
+  vpnSelection     String?      // JSON { enabled, identifier, regionId, vpnVersion } — optional VPN egress (not secret)
+  version          String       @default("v1")
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
   organization     Organization @relation(fields: [organizationId], references: [id])
   integrations     Integration[]
 
   // Many named credential sets per provider per org; the name disambiguates them.
-  @@unique([organizationId, identifier, name])
+  @@unique([organizationId, identifier, name, version])
   @@index([organizationId])
   @@index([organizationId, identifier])
 }
@@ -1007,7 +1013,8 @@ model OAuthAuthorization {
 // Keep model for backward-compatible db-push; drop after migration helper runs.
 model AIProviderConfig {
   id            String   @id @default(cuid())
-  identifier    String   @unique
+  identifier    String
+  version       String   @default("v1")
   enabled       Boolean  @default(false)
   credentials   String?
   defaultModel  String?
@@ -1016,6 +1023,7 @@ model AIProviderConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([identifier, version])
   @@index([enabled])
 }
 
@@ -1070,6 +1078,7 @@ model AIOrgProviderConfig {
   id             String       @id @default(cuid())
   organizationId String
   identifier     String
+  version        String       @default("v1")
   enabled        Boolean      @default(false)
   isActive       Boolean      @default(false) // only one can be active per org
   credentials    String?
@@ -1081,7 +1090,7 @@ model AIOrgProviderConfig {
 
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
   @@index([enabled])
   @@index([organizationId, isActive])
@@ -1091,6 +1100,7 @@ model OrgShortLinkConfig {
   id             String   @id @default(cuid())
   organizationId String
   identifier     String
+  version        String   @default("v1")
   enabled        Boolean  @default(false)
   isActive       Boolean  @default(false)
   credentials    String?
@@ -1102,7 +1112,7 @@ model OrgShortLinkConfig {
   updatedAt      DateTime @updatedAt
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@unique([organizationId, identifier, accountFingerprint])
+  @@unique([organizationId, identifier, version, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, isActive])
 }
@@ -1111,6 +1121,7 @@ model ShortLink {
   id             String   @id @default(cuid())
   organizationId String
   provider       String
+  providerVersion String  @default("v1")
   shortUrl       String
   originalUrl    String
   providerLinkId String?
@@ -1211,6 +1222,14 @@ model UserProfile {
   avatarUrl         String?
   pictureId         String?
   timezone          String?  // IANA tz
+  // DEPRECATED (Notifications V2): superseded by NotificationPreference.categories
+  // (post_published / post_failed / streak email toggles). Retained for one release
+  // as an expand-contract step so BackfillService can copy any opt-OUT into the new
+  // preference rows before these columns are dropped in the follow-up release.
+  // No runtime code reads these — do NOT add new readers.
+  sendSuccessEmails Boolean  @default(true)
+  sendFailureEmails Boolean  @default(true)
+  sendStreakEmails  Boolean  @default(true)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1242,6 +1261,7 @@ model Session {
 model AuthProviderConfig {
   id            String   @id @default(uuid())
   provider      Provider
+  version       String   @default("v1")
   enabled       Boolean  @default(false)
   clientId      String?
   clientSecret  String?
@@ -1253,7 +1273,7 @@ model AuthProviderConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([provider])
+  @@unique([provider, version])
 }
 
 // ── v3.8.10: Per-org media provider config ──
@@ -1261,6 +1281,7 @@ model MediaProviderConfig {
   id                  String         @id @default(uuid())
   organizationId      String
   identifier          String
+  version             String         @default("v1")
   enabled             Boolean        @default(false)
   credentials         String?        // encrypted
   storageProviderId   String?        // null = LOCAL
@@ -1272,7 +1293,7 @@ model MediaProviderConfig {
   organization        Organization   @relation(fields: [organizationId], references: [id])
   storageProvider     StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
 }
 
@@ -1281,6 +1302,7 @@ model OrgVpnConfig {
   id              String   @id @default(uuid())
   organizationId  String
   identifier      String
+  version         String   @default("v1")
   name            String?
   credentials     String?  // encrypted JSON
   regions         String?  // JSON string[] of enabled proxy-region ids
@@ -1290,7 +1312,7 @@ model OrgVpnConfig {
 
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
 }
 
@@ -1299,6 +1321,7 @@ model ContentPackConfig {
   id             String   @id @default(cuid())
   organizationId String
   identifier     String   // e.g. 'magnific'
+  version        String   @default("v1")
   credentials    String?  // encrypted JSON
   extraConfig    Json?    // provider-specific non-secret config
   createdAt      DateTime @default(now())
@@ -1306,7 +1329,7 @@ model ContentPackConfig {
 
   organization   Organization @relation(fields: [organizationId], references: [id])
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
 }
 
@@ -1389,7 +1412,11 @@ model AIMediaJob {
   error          String?
   folderId    String?
   model       String?
-  versionId   String?
+  // Provider-framework version pin. Renamed from the former `versionId String?`
+  // under db push (drop+create). Loss-free: no production caller ever populated
+  // `versionId` (it was an unused optional param) — verified NULL everywhere — so
+  // no backfill is required; existing rows default to "v1".
+  version     String       @default("v1")
   inputJson   String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt

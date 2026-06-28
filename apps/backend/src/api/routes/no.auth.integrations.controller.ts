@@ -255,7 +255,8 @@ export class NoAuthIntegrationsController {
               Buffer.from(body.code, 'base64').toString()
             )
           : undefined,
-        providerConfigId || undefined
+        providerConfigId || undefined,
+        (clientInformation as any)?.version ?? 'v1'
       );
 
     this._refreshIntegrationService

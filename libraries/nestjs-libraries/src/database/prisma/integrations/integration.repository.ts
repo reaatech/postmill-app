@@ -222,7 +222,8 @@ export class IntegrationRepository {
     refresh?: string,
     timezone?: number,
     customInstanceDetails?: string,
-    providerConfigId?: string
+    providerConfigId?: string,
+    providerVersion = 'v1'
   ) {
     const postTimes = timezone
       ? {
@@ -266,6 +267,7 @@ export class IntegrationRepository {
         rootInternalId: internalId,
         ...(customInstanceDetails ? { customInstanceDetails } : {}),
         ...(providerConfigId ? { providerConfigId } : {}),
+        providerVersion,
         additionalSettings: additionalSettings
           ? JSON.stringify(additionalSettings)
           : '[]',
@@ -294,6 +296,7 @@ export class IntegrationRepository {
         organizationId: org,
         deletedAt: null,
         refreshNeeded: false,
+        providerVersion,
       },
     });
 

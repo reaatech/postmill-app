@@ -13,7 +13,8 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { parseQualified } from '@gitroom/provider-kernel';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -51,10 +52,7 @@ const PUBLIC_API_ALLOWED_MIME = new Set<string>([
   'video/mp4',
 ]);
 import * as Sentry from '@sentry/nestjs';
-import {
-  socialIntegrationList,
-  IntegrationManager,
-} from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -242,22 +240,56 @@ export class PublicIntegrationsController {
 
   @Get('/social/:integration')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+  @ApiQuery({
+    name: 'version',
+    required: false,
+    description:
+      'Optional provider version (e.g. "v1"). The provider id may also be passed qualified as "providerId@version" in the path. A bare id resolves the latest active version.',
+  })
+  @ApiResponse({
+    status: 410,
+    description:
+      'Gone — the requested provider version has been retired. The body includes { providerId, version, latestActive }.',
+  })
   async getIntegrationUrl(
     @Param('integration') integration: string,
     @Query('refresh') refresh: string,
-    @GetOrgFromRequest() org: Organization
+    @GetOrgFromRequest() org: Organization,
+    @Query('version') version?: string
   ) {
     Sentry.metrics.count('public_api-request', 1);
+    // Accept either a qualified id ("providerId@version") in the path or an
+    // optional ?version= query param. A bare id keeps the original behaviour
+    // (resolve the latest active version) for n8n/Zapier backward compatibility.
+    const { providerId, version: qualifiedVersion } = parseQualified(integration);
+    const requestedVersion = qualifiedVersion ?? version;
+
     if (
       !this._integrationManager
         .getAllowedSocialsIntegrations()
-        .includes(integration)
+        .includes(providerId)
     ) {
       throw new HttpException({ msg: 'Integration not allowed' }, 400);
     }
 
-    const integrationProvider =
-      await this._integrationManager.getSocialIntegration(integration);
+    let integrationProvider =
+      await this._integrationManager.getSocialIntegration(providerId);
+
+    // When a specific version is requested, pin to that version through the
+    // kernel resolution path; an unknown version resolves to undefined → 404.
+    if (requestedVersion) {
+      const pinned = this._integrationManager.getSocialIntegrationUnchecked(
+        providerId,
+        requestedVersion
+      );
+      if (!pinned) {
+        throw new HttpException(
+          { msg: 'Integration version not available' },
+          404
+        );
+      }
+      integrationProvider = pinned;
+    }
 
     if (integrationProvider.externalUrl) {
       throw new HttpException(
@@ -270,7 +302,7 @@ export class PublicIntegrationsController {
 
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
-        integration,
+        providerId,
         org.id
       );
 
@@ -360,8 +392,8 @@ export class PublicIntegrationsController {
         (p: any) => p?.title === 'Verified'
       )?.value || false;
 
-    const integration = socialIntegrationList.find(
-      (p) => p.identifier === loadIntegration.providerIdentifier
+    const integration = this._integrationManager.getSocialIntegrationUnchecked(
+      loadIntegration.providerIdentifier
     )!;
 
     if (!integration) {
@@ -470,9 +502,10 @@ export class PublicIntegrationsController {
       throw new HttpException({ msg: 'Integration not found' }, 404);
     }
 
-    const integrationProvider = socialIntegrationList.find(
-      (p) => p.identifier === getIntegration.providerIdentifier
-    )!;
+    const integrationProvider =
+      this._integrationManager.getSocialIntegrationUnchecked(
+        getIntegration.providerIdentifier
+      )!;
 
     if (!integrationProvider) {
       throw new HttpException({ msg: 'Integration provider not found' }, 404);

@@ -19,9 +19,11 @@ const mockDoGenerate = vi.fn().mockImplementation(async (opts: any) => {
 });
 const mockLanguageModel = { modelId: 'gpt-4.1', doGenerate: mockDoGenerate };
 
-vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
-  AIProviderRegistry: class {
-    getAdapter = vi.fn().mockImplementation((id: string) => {
+// The legacy AIProviderRegistry was deleted; the facade now resolves adapters through
+// ProviderResolutionService.resolveAI(id). Mock it with the same per-id adapter logic.
+vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
+  ProviderResolutionService: class {
+    resolveAI = vi.fn().mockImplementation((id: string) => {
       if (id === 'openai') {
         return {
           identifier: 'openai',
@@ -42,6 +44,9 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
     });
   },
 }));
+
+// Minimal ProviderKernel stub — the facade only calls listManifests('ai') for an error message.
+const mockKernel = { listManifests: vi.fn().mockReturnValue([]) };
 
 const mockGetActiveProvider = vi.fn().mockResolvedValue({
   identifier: 'openai',
@@ -129,7 +134,7 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/guardrail.service', () => ({
   },
 }));
 
-import { AIProviderRegistry } from './ai-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AiSettingsManager } from './ai-settings.manager';
@@ -149,7 +154,7 @@ import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 
 describe('AIModelProvider', () => {
   let provider: AIModelProvider;
-  let registry: AIProviderRegistry;
+  let resolution: ProviderResolutionService;
   let aiSettings: AiSettingsService;
   let orgAiSettings: OrgAiSettingsService;
   let settingsManager: AiSettingsManager;
@@ -170,7 +175,7 @@ describe('AIModelProvider', () => {
       credentials: { apiKey: 'sk-test-key' },
     });
 
-    registry = new (AIProviderRegistry as any)();
+    resolution = new (ProviderResolutionService as any)();
     aiSettings = new (AiSettingsService as any)();
     orgAiSettings = new (OrgAiSettingsService as any)();
     settingsManager = new (AiSettingsManager as any)();
@@ -181,7 +186,6 @@ describe('AIModelProvider', () => {
     brandsService = new (BrandsService as unknown as new () => BrandsService)();
 
     provider = new AIModelProvider(
-      registry as any,
       aiSettings as any,
       orgAiSettings as any,
       settingsManager as any,
@@ -190,6 +194,8 @@ describe('AIModelProvider', () => {
       budget as any,
       guardrails as any,
       brandsService,
+      resolution as any,
+      mockKernel as any,
     );
   });
 
@@ -283,7 +289,7 @@ describe('AIModelProvider', () => {
         defaultModel: 'claude-sonnet-4-20250514',
         credentials: { apiKey: 'sk-anthropic' },
       });
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'openai') return mockOpenaiAdapter;
         if (id === 'anthropic') {
           return {
@@ -357,7 +363,7 @@ describe('AIModelProvider', () => {
         createImageModel: createFallbackImageModel,
       };
 
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'anthropic') return primaryAdapter;
         if (id === 'openai') return fallbackAdapter;
         return undefined;
@@ -421,7 +427,7 @@ describe('AIModelProvider', () => {
       };
       const createFallbackLanguageModel = vi.fn().mockReturnValue(fallbackModel);
 
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'anthropic') {
           return {
             identifier: 'anthropic',
@@ -520,7 +526,6 @@ describe('AIModelProvider', () => {
     }
     function makeProvider(cache?: any, router?: any) {
       return new AIModelProvider(
-        registry as any,
         aiSettings as any,
         orgAiSettings as any,
         settingsManager as any,
@@ -529,6 +534,8 @@ describe('AIModelProvider', () => {
         budget as any,
         guardrails as any,
         brandsService,
+        resolution as any,
+        mockKernel as any,
         cache,
         router,
       );

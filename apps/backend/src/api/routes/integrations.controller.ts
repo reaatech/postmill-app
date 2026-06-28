@@ -29,8 +29,8 @@ import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 
 import { timer } from '@gitroom/helpers/utils/timer';
-import { TelegramProvider } from '@gitroom/nestjs-libraries/integrations/social/telegram.provider';
-import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/moltbook.provider';
+import { TelegramProvider } from '@gitroom/provider-telegram';
+import { MoltbookProvider } from '@gitroom/provider-moltbook';
 import {
   AuthorizationActions,
   Sections,

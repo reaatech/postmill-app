@@ -76,7 +76,8 @@ export class PostActivity {
       const resolved = await this._orgVpnConfigService.resolveProxyForChannel(
         integration.organizationId,
         selection.identifier,
-        selection.regionId
+        selection.regionId,
+        selection.vpnVersion
       );
       if (!resolved) return undefined;
 

@@ -1,5 +1,2 @@
-import crypto from 'crypto';
-
-export const makeId = (length: number) => {
-  return crypto.randomBytes(Math.ceil(length / 2)).toString('hex').slice(0, length);
-};
+// Re-export shim — relocated to @gitroom/provider-kernel (step 7.5.2).
+export { makeId } from '@gitroom/provider-kernel';

@@ -1,8 +1,10 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
-import { VpnProviderRegistry } from './vpn-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
 import { VpnProviderAdapter } from './vpn-provider.interface';
 import {
   VpnProviderCapabilities,
@@ -16,6 +18,7 @@ export interface VpnProviderListItem {
   name: string;
   enabled: boolean;
   isConfigured: boolean;
+  version: string;
   capabilities: VpnProviderCapabilities;
   credentialFields: Array<{
     key: string;
@@ -46,6 +49,7 @@ export interface VpnResolvedProxy {
   region: VpnProxyRegion;
   auth: VpnProxyAuth;
   credsFingerprint: string;
+  version?: string;
 }
 
 @Injectable()
@@ -55,8 +59,9 @@ export class OrgVpnConfigService {
   constructor(
     private _repository: OrgVpnConfigRepository,
     private _encryption: EncryptionService,
-    private _registry: VpnProviderRegistry,
     private _dispatcher: VpnDispatcherService,
+    private _resolution: ProviderResolutionService,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
   ) {}
 
   // Effective region catalog for an adapter: derived from config for dynamic
@@ -69,12 +74,39 @@ export class OrgVpnConfigService {
     return adapter.proxyRegions ?? [];
   }
 
+  // Resolve a single VPN adapter through the kernel, or null when unknown/retired.
+  // The resolved VpnCapability carries the full proxyRegions / resolveRegions /
+  // resolveProxyAuth surface (host/port/protocol included) the old registry held.
+  private _resolveAdapter(
+    identifier: string,
+    version?: string,
+  ): VpnProviderAdapter | null {
+    try {
+      return this._resolution.resolveVpn(identifier, { version: version ?? 'v1' });
+    } catch {
+      return null;
+    }
+  }
+
+  // The full catalog of registered VPN providers (one adapter per id), sourced
+  // from the kernel manifests now that the in-memory registry is gone.
+  private _listAdapters(): VpnProviderAdapter[] {
+    const byId = new Map<string, VpnProviderAdapter>();
+    for (const manifest of this._kernel.listManifests('vpn')) {
+      if (byId.has(manifest.providerId)) continue;
+      const adapter = this._resolveAdapter(manifest.providerId, manifest.version);
+      if (adapter) byId.set(manifest.providerId, adapter);
+    }
+    return [...byId.values()];
+  }
+
   getProviderMetadata(): VpnProviderListItem[] {
-    return this._registry.list().map((adapter) => ({
+    return this._listAdapters().map((adapter) => ({
       identifier: adapter.identifier,
       name: adapter.name,
       enabled: false,
       isConfigured: false,
+      version: 'v1',
       capabilities: adapter.capabilities,
       credentialFields: adapter.credentialFields,
       // No org config ⇒ dynamic providers have no derived region yet.
@@ -87,7 +119,7 @@ export class OrgVpnConfigService {
 
   async getProviders(orgId: string): Promise<VpnProviderListItem[]> {
     const configs = await this._repository.getByOrg(orgId);
-    const adapters = this._registry.list();
+    const adapters = this._listAdapters();
 
     return adapters.map((adapter) => {
       const config = configs.find((c) => c.identifier === adapter.identifier);
@@ -108,6 +140,7 @@ export class OrgVpnConfigService {
         name: adapter.name,
         enabled: config?.enabled ?? false,
         isConfigured,
+        version: config?.version ?? 'v1',
         capabilities: adapter.capabilities,
         credentialFields: adapter.credentialFields,
         proxyRegions: catalog,
@@ -124,7 +157,7 @@ export class OrgVpnConfigService {
     const out: VpnEnabledRegion[] = [];
     for (const config of configs) {
       if (!config.enabled) continue;
-      const adapter = this._registry.getAdapter(config.identifier);
+      const adapter = this._resolveAdapter(config.identifier, config.version ?? 'v1');
       if (!adapter) continue;
       const decrypted = this._decryptCredentials(config.credentials);
       if (!this._hasRequiredCredentials(adapter, decrypted)) continue;
@@ -155,11 +188,14 @@ export class OrgVpnConfigService {
     orgId: string,
     identifier: string,
     regionId: string,
+    version?: string,
   ): Promise<VpnResolvedProxy | null> {
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config || !config.enabled) return null;
 
-    const adapter = this._registry.getAdapter(identifier);
+    // The resolved VpnCapability exposes the full proxyRegions catalog
+    // (host/port/protocol) and resolveProxyAuth the dispatcher factory needs.
+    const adapter = this._resolveAdapter(identifier, version ?? config.version ?? 'v1');
     if (!adapter) return null;
 
     const decrypted = this._decryptCredentials(config.credentials);
@@ -178,7 +214,7 @@ export class OrgVpnConfigService {
     const credsFingerprint = createHash('sha256')
       .update(`${region.host}:${region.port}:${region.protocol}:${auth.username}:${auth.password}`)
       .digest('hex');
-    return { region, auth, credsFingerprint };
+    return { region, auth, credsFingerprint, version: version ?? config.version ?? 'v1' };
   }
 
   async upsert(
@@ -191,24 +227,51 @@ export class OrgVpnConfigService {
       enabled?: boolean;
     },
   ) {
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) {
-      throw new BadRequestException(`Unknown VPN provider: ${identifier}`);
+    const config = await this._repository.getByIdentifier(orgId, identifier);
+    const version =
+      config?.version ??
+      this._resolution.latestActiveVersion('vpn', identifier) ??
+      'v1';
+
+    let adapter;
+    try {
+      adapter = this._resolution.resolveVpn(identifier, {
+        version,
+        credentials: data.credentials ?? {},
+        orgId,
+      });
+    } catch (err) {
+      const message = (err as Error)?.message ?? '';
+      if (
+        err instanceof ProviderNotFoundError ||
+        message.includes('not found')
+      ) {
+        throw new BadRequestException(`Unknown VPN provider: ${identifier}`);
+      }
+      throw err;
     }
 
     // Credentials are only (re)validated/encrypted when supplied — a regions or
     // enabled-only toggle must not wipe the stored secret.
     let encryptedCredentials: string | undefined;
     if (data.credentials !== undefined) {
-      const validation = adapter.validateConfig(data.credentials);
-      if (!validation.valid) {
+      const raw = adapter.validateConfig(data.credentials) as unknown as {
+        ok?: boolean;
+        valid?: boolean;
+        error?: string;
+        errors?: string[];
+      };
+      const ok = raw.ok ?? raw.valid ?? true;
+      if (!ok) {
         throw new BadRequestException(
-          validation.errors?.join(' ') || `Invalid configuration for ${adapter.name}`,
+          raw.error || raw.errors?.join(' ') || `Invalid configuration for ${adapter.name}`,
         );
       }
       encryptedCredentials = this._encryption.encrypt(JSON.stringify(data.credentials));
     }
 
+    // The region allowlist only needs the static catalog's region ids, read off
+    // the adapter already resolved above.
     let regions: string | undefined;
     if (data.regions !== undefined) {
       const catalog = adapter.proxyRegions ?? [];
@@ -221,7 +284,7 @@ export class OrgVpnConfigService {
       credentials: encryptedCredentials,
       regions,
       enabled: data.enabled,
-    });
+    }, version);
 
     // Drop any pooled dispatchers so a cred/region/enabled change takes effect now.
     this._dispatcher.invalidate(orgId, identifier);
@@ -240,9 +303,22 @@ export class OrgVpnConfigService {
       throw new BadRequestException(`VPN provider "${identifier}" is not configured`);
     }
 
-    const adapter = this._registry.getAdapter(identifier);
-    if (!adapter) {
-      throw new BadRequestException(`Unknown VPN provider: ${identifier}`);
+    let adapter;
+    try {
+      adapter = this._resolution.resolveVpn(identifier, {
+        version: config.version ?? 'v1',
+        credentials: this._decryptCredentials(config.credentials),
+        orgId,
+      });
+    } catch (err) {
+      const message = (err as Error)?.message ?? '';
+      if (
+        err instanceof ProviderNotFoundError ||
+        message.includes('not found')
+      ) {
+        throw new BadRequestException(`Unknown VPN provider: ${identifier}`);
+      }
+      throw err;
     }
 
     const decrypted = this._decryptCredentials(config.credentials);

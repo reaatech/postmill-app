@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
   Param,
   Put,
   Post,
@@ -14,8 +15,13 @@ import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import {
+  PROVIDER_CAPABILITIES,
+  ProviderCapability,
+} from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
+import { ProviderKernel } from '@gitroom/provider-kernel';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
@@ -23,6 +29,7 @@ interface ChannelVpnSelectionBody {
   enabled: boolean;
   identifier?: string;
   regionId?: string;
+  vpnVersion?: string;
 }
 
 interface ChannelConfigBody {
@@ -35,13 +42,14 @@ interface ChannelConfigBody {
   additionalConfig?: string;
   setupNotes?: string;
   vpnSelection?: ChannelVpnSelectionBody | null;
+  version?: string;
 }
 
 function validateBody(body: ChannelConfigBody) {
   if (body.enabled !== undefined && typeof body.enabled !== 'boolean') {
     throw new BadRequestException('enabled must be a boolean');
   }
-  for (const key of ['name', 'clientId', 'clientSecret', 'redirectUri', 'scopes', 'setupNotes', 'additionalConfig'] as const) {
+  for (const key of ['name', 'clientId', 'clientSecret', 'redirectUri', 'scopes', 'setupNotes', 'additionalConfig', 'version'] as const) {
     if (body[key] !== undefined && typeof body[key] !== 'string') {
       throw new BadRequestException(`${key} must be a string`);
     }
@@ -58,7 +66,7 @@ function validateBody(body: ChannelConfigBody) {
     if (typeof v !== 'object' || typeof v.enabled !== 'boolean') {
       throw new BadRequestException('vpnSelection.enabled must be a boolean');
     }
-    for (const key of ['identifier', 'regionId'] as const) {
+    for (const key of ['identifier', 'regionId', 'vpnVersion'] as const) {
       if (v[key] !== undefined && typeof v[key] !== 'string') {
         throw new BadRequestException(`vpnSelection.${key} must be a string`);
       }
@@ -72,14 +80,36 @@ export class ChannelConfigPerTenantController {
   constructor(
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
+    private _integrationManager: IntegrationManager,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
   ) {}
+
+  // Source the per-provider capability row from the kernel's social manifests
+  // (manifest.capabilities owns the matrix). Falls back to the static
+  // PROVIDER_CAPABILITIES object when the kernel has no usable manifest for the
+  // provider (e.g. an unknown/unregistered identifier). Returns null for unknown
+  // providers to preserve the existing response shape.
+  private capabilitiesFor(identifier: string): ProviderCapability | null {
+    try {
+      const manifest = this._kernel
+        .listManifests('social')
+        .find((m) => m.providerId === identifier);
+      const caps = manifest?.capabilities as ProviderCapability | undefined;
+      if (caps && Object.keys(caps).length > 0) {
+        return caps;
+      }
+    } catch {
+      // Kernel unavailable — fall through to the static matrix.
+    }
+    return PROVIDER_CAPABILITIES[identifier] || null;
+  }
 
   // Static provider catalog — used by the "Add channel" picker. Declared before
   // the `/:id` routes so it isn't captured as an id.
   @Get('/providers')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async listProviders() {
-    return socialIntegrationList.map((p) => ({
+    return this._integrationManager.getSocialProviders().map((p) => ({
       identifier: p.identifier,
       name: p.name,
       description: p.toolTip || '',
@@ -88,7 +118,7 @@ export class ChannelConfigPerTenantController {
       isChromeExtension: !!p.isChromeExtension,
       customFields: !!p.customFields,
       scopes: p.scopes?.join(', ') || '',
-      capabilities: PROVIDER_CAPABILITIES[p.identifier] || null,
+      capabilities: this.capabilitiesFor(p.identifier),
     }));
   }
 
@@ -99,7 +129,7 @@ export class ChannelConfigPerTenantController {
     const configs = await this._orgProviderConfigService.getConfigs(org.id);
     return configs.map((c) => ({
       ...c,
-      capabilities: PROVIDER_CAPABILITIES[c.identifier] || null,
+      capabilities: this.capabilitiesFor(c.identifier),
     }));
   }
 
@@ -115,7 +145,7 @@ export class ChannelConfigPerTenantController {
     }
     return {
       ...config,
-      capabilities: PROVIDER_CAPABILITIES[config.identifier] || null,
+      capabilities: this.capabilitiesFor(config.identifier),
     };
   }
 
@@ -130,7 +160,7 @@ export class ChannelConfigPerTenantController {
     if (!body.identifier || typeof body.identifier !== 'string') {
       throw new BadRequestException('identifier is required');
     }
-    if (!socialIntegrationList.find((p) => p.identifier === body.identifier)) {
+    if (!this._integrationManager.getSocialIntegrationUnchecked(body.identifier)) {
       throw new BadRequestException('Unknown provider');
     }
     if (!body.name?.trim()) {
@@ -150,6 +180,7 @@ export class ChannelConfigPerTenantController {
         additionalConfig: body.additionalConfig,
         setupNotes: body.setupNotes,
         vpnSelection: body.vpnSelection,
+        version: body.version,
       },
       user.id
     );
@@ -181,6 +212,7 @@ export class ChannelConfigPerTenantController {
         additionalConfig: body.additionalConfig,
         setupNotes: body.setupNotes,
         vpnSelection: body.vpnSelection,
+        version: body.version,
       },
       user.id
     );

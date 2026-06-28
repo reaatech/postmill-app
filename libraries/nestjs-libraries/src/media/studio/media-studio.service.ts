@@ -5,7 +5,7 @@ import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/pri
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { MediaGenerateOptions, MediaModelOption, MediaOperation } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 
@@ -15,6 +15,7 @@ export interface StudioGenerateParams {
   input: Record<string, string | number | boolean>;
   mediaInputs?: Record<string, string>;
   folderId?: string | null;
+  version?: string;
 }
 
 // Provider-agnostic studio backend. Every provider difference lives in its adapter +
@@ -29,7 +30,7 @@ export class MediaStudioService {
     private readonly _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private readonly _lifecycle: MediaJobLifecycleService,
     private readonly _aiSettings: AiSettingsService,
-    private readonly _registry: MediaProviderRegistry,
+    private readonly _resolution: ProviderResolutionService,
     private readonly _storage: StorageService,
     private readonly _fileService: FileService,
     private readonly _redis: RedisService,
@@ -39,11 +40,8 @@ export class MediaStudioService {
   // Cached ~60s per (provider, operation, org) — catalogs are large but change rarely, and
   // every render's status poll must not re-hit the provider's /models endpoint. Returns []
   // when the adapter exposes no catalog (the descriptor's static options then apply).
-  async listModels(orgId: string, provider: string, operation: MediaOperation): Promise<MediaModelOption[]> {
-    const adapter = this._registry.get(provider);
-    if (!adapter?.listModels) return [];
-
-    const cacheKey = `studio:models:${provider}:${operation}:${orgId}`;
+  async listModels(orgId: string, provider: string, operation: MediaOperation, version?: string): Promise<MediaModelOption[]> {
+    const cacheKey = `studio:models:${provider}:${operation}:${orgId}:${version ?? 'default'}`;
     const cached = await this._redis.get(cacheKey).catch(() => null);
     if (cached) {
       try {
@@ -53,8 +51,15 @@ export class MediaStudioService {
       }
     }
 
-    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider);
+    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider, version);
     if (!config?.credentials || Object.keys(config.credentials).length === 0) return [];
+
+    const adapter = this._resolution.resolveMedia(provider, {
+      version: config.version,
+      credentials: config.credentials,
+      orgId,
+    });
+    if (!adapter?.listModels) return [];
 
     let models: MediaModelOption[] = [];
     try {
@@ -67,7 +72,7 @@ export class MediaStudioService {
     return models;
   }
 
-  async getStatus(orgId: string, provider: string): Promise<{ configured: boolean; enabled: boolean }> {
+  async getStatus(orgId: string, provider: string, _version?: string): Promise<{ configured: boolean; enabled: boolean }> {
     const providers = await this._orgMediaProviderSettings.getProviders(orgId);
     const match = providers.find((p) => p.identifier === provider);
     if (!match) throw new ForbiddenException(`Unknown media provider "${provider}"`);
@@ -80,14 +85,17 @@ export class MediaStudioService {
     provider: string,
     params: StudioGenerateParams,
   ): Promise<{ jobId: string }> {
-    const adapter = this._registry.get(provider);
-    if (!adapter) throw new ForbiddenException(`Unknown media provider "${provider}"`);
-
-    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider);
+    const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider, params.version);
     const credentials = config?.credentials;
     if (!credentials || Object.keys(credentials).length === 0) {
       throw new ForbiddenException(`${provider} is not configured. Add credentials in Settings → Media.`);
     }
+
+    const adapter = this._resolution.resolveMedia(provider, {
+      version: config.version,
+      credentials,
+      orgId,
+    });
 
     // Resolve media-field file references to provider-reachable URLs (server-side, so
     // local-storage assets get a usable URL rather than an internal /files path).
@@ -108,6 +116,7 @@ export class MediaStudioService {
       provider,
       operation: params.operation,
       model: model ?? provider,
+      version: config.version,
       folderId: params.folderId,
       inputJson: JSON.stringify({ operation: params.operation, model, prompt: promptStr, input: rest }),
     });
@@ -153,7 +162,7 @@ export class MediaStudioService {
   // Lists recent jobs for the render queue. Drives completion on read so the queue
   // advances even where no public webhook can reach this instance (local dev / private
   // deploys); the media-jobs-poll cron is the backstop.
-  async listJobs(orgId: string, provider: string, limit = 30) {
+  async listJobs(orgId: string, provider: string, _version?: string, limit = 30) {
     const pending = await this._aiSettings.getMediaJobsByProvider(orgId, provider, limit);
     await Promise.all(
       pending

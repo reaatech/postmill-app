@@ -2,7 +2,6 @@ import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { BudgetService } from './budget.service';
-import { AIProviderRegistry } from '../ai-provider.registry';
 
 function parseScopeFromPath(path: string): string | null {
   if (path.includes('/mcp/') || path.endsWith('/mcp')) return 'mcp';
@@ -20,7 +19,6 @@ export class BudgetMiddleware implements NestMiddleware {
   constructor(
     private readonly _aiSettingsManager: AiSettingsManager,
     private readonly _budgetService: BudgetService,
-    private readonly _registry: AIProviderRegistry,
   ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {

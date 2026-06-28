@@ -2,14 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
 import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
+// The social provider list now comes from IntegrationManager (kernel-backed);
+// the controller iterates `getSocialProviders()` / looks up a single provider
+// via `getSocialIntegrationUnchecked(identifier)`.
+const fakeProviders = [
+  { identifier: 'x', name: 'X', toolTip: 'X social', scopes: ['tweet.read', 'tweet.write'] },
+  { identifier: 'facebook', name: 'Facebook', toolTip: 'Facebook social', scopes: ['pages_manage_posts'] },
+  { identifier: 'telegram', name: 'Telegram', toolTip: 'Telegram messenger', externalUrl: 'https://t.me', scopes: [] },
+  { identifier: 'web3-test', name: 'Web3', isWeb3: true, scopes: [] },
+  { identifier: 'ext-test', name: 'Extension', toolTip: 'Ext', isChromeExtension: true, customFields: true, scopes: ['ext_scope'] },
+] as any[];
+
 vi.mock('@gitroom/nestjs-libraries/integrations/integration.manager', () => ({
-  socialIntegrationList: [
-    { identifier: 'x', name: 'X', toolTip: 'X social', scopes: ['tweet.read', 'tweet.write'] },
-    { identifier: 'facebook', name: 'Facebook', toolTip: 'Facebook social', scopes: ['pages_manage_posts'] },
-    { identifier: 'telegram', name: 'Telegram', toolTip: 'Telegram messenger', externalUrl: 'https://t.me', scopes: [] },
-    { identifier: 'web3-test', name: 'Web3', isWeb3: true, scopes: [] },
-    { identifier: 'ext-test', name: 'Extension', toolTip: 'Ext', isChromeExtension: true, customFields: true, scopes: ['ext_scope'] },
-  ],
+  IntegrationManager: class {},
 }));
 
 vi.mock('@prisma/client', () => {
@@ -26,7 +31,6 @@ vi.mock('@prisma/client', () => {
 
 import { ChannelConfigController } from './channel.config.controller';
 import { Prisma } from '@prisma/client';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 
 const mockProviderConfigService = {
   getAll: vi.fn(),
@@ -38,6 +42,12 @@ const mockProviderConfigService = {
 
 const mockProviderConfigManager = {
   refreshCache: vi.fn(),
+};
+
+const mockIntegrationManager = {
+  getSocialProviders: () => fakeProviders,
+  getSocialIntegrationUnchecked: (identifier: string) =>
+    fakeProviders.find((p) => p.identifier === identifier),
 };
 
 function createDbConfig(overrides: Record<string, any> = {}): Record<string, any> {
@@ -64,6 +74,7 @@ beforeEach(() => {
   controller = new ChannelConfigController(
     mockProviderConfigService as any,
     mockProviderConfigManager as any,
+    mockIntegrationManager as any,
   );
   mockProviderConfigService.decryptConfig.mockReturnValue({ clientId: undefined, clientSecret: undefined });
   mockProviderConfigManager.refreshCache.mockResolvedValue(undefined);
@@ -121,7 +132,7 @@ beforeEach(() => {
     const result = await controller.listConfigs(adminUser);
 
     expect(mockProviderConfigService.getAll).toHaveBeenCalledTimes(1);
-    expect(result).toHaveLength(socialIntegrationList.length);
+    expect(result).toHaveLength(fakeProviders.length);
 
     const xConfig = result.find((r: any) => r.identifier === 'x');
     expect(xConfig).toMatchObject({

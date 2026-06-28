@@ -26,6 +26,7 @@ export class OrgVpnConfigRepository {
       regions?: string;
       enabled?: boolean;
     },
+    version = 'v1',
   ) {
     const existing = await this.getByIdentifier(orgId, identifier);
     if (existing) {
@@ -35,7 +36,7 @@ export class OrgVpnConfigRepository {
       });
     }
     return this._prisma.orgVpnConfig.create({
-      data: { organizationId: orgId, identifier, ...data },
+      data: { organizationId: orgId, identifier, version, ...data },
     });
   }
 

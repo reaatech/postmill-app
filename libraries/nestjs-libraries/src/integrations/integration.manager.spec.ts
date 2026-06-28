@@ -215,31 +215,119 @@ vi.mock('@gitroom/nestjs-libraries/integrations/social.abstract', () => ({
   SocialAbstract: class {},
 }));
 
+// IntegrationManager injects the ProviderKernel DI token from providers.module;
+// stub the module so this spec doesn't pull in the kernel's heavy provider graph
+// (the manager is constructed manually with a fake kernel below).
+vi.mock('@gitroom/nestjs-libraries/providers/providers.module', () => ({
+  PROVIDER_KERNEL: Symbol('ProviderKernel'),
+}));
+
 // ---------------------------------------------------------------------------
 // Now it's safe to import the real module under test.
 // ---------------------------------------------------------------------------
-import { IntegrationManager, socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+
+// Populate the registry with the mock providers (mirrors the pre-7.5.1 static
+// list, which the now-stubbed registration module would otherwise have filled).
+import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
+import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
+import { LinkedinPageProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.page.provider';
+import { RedditProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.provider';
+import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.provider';
+import { InstagramStandaloneProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.standalone.provider';
+import { FacebookProvider } from '@gitroom/nestjs-libraries/integrations/social/facebook.provider';
+import { ThreadsProvider } from '@gitroom/nestjs-libraries/integrations/social/threads.provider';
+import { YoutubeProvider } from '@gitroom/nestjs-libraries/integrations/social/youtube.provider';
+import { GmbProvider } from '@gitroom/nestjs-libraries/integrations/social/gmb.provider';
+import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
+import { PinterestProvider } from '@gitroom/nestjs-libraries/integrations/social/pinterest.provider';
+import { DribbbleProvider } from '@gitroom/nestjs-libraries/integrations/social/dribbble.provider';
+import { DiscordProvider } from '@gitroom/nestjs-libraries/integrations/social/discord.provider';
+import { SlackProvider } from '@gitroom/nestjs-libraries/integrations/social/slack.provider';
+import { KickProvider } from '@gitroom/nestjs-libraries/integrations/social/kick.provider';
+import { TwitchProvider } from '@gitroom/nestjs-libraries/integrations/social/twitch.provider';
+import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
+import { BlueskyProvider } from '@gitroom/nestjs-libraries/integrations/social/bluesky.provider';
+import { LemmyProvider } from '@gitroom/nestjs-libraries/integrations/social/lemmy.provider';
+import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
+import { TelegramProvider } from '@gitroom/nestjs-libraries/integrations/social/telegram.provider';
+import { NostrProvider } from '@gitroom/nestjs-libraries/integrations/social/nostr.provider';
+import { VkProvider } from '@gitroom/nestjs-libraries/integrations/social/vk.provider';
+import { MediumProvider } from '@gitroom/nestjs-libraries/integrations/social/medium.provider';
+import { DevToProvider } from '@gitroom/nestjs-libraries/integrations/social/dev.to.provider';
+import { HashnodeProvider } from '@gitroom/nestjs-libraries/integrations/social/hashnode.provider';
+import { WordpressProvider } from '@gitroom/nestjs-libraries/integrations/social/wordpress.provider';
+import { ListmonkProvider } from '@gitroom/nestjs-libraries/integrations/social/listmonk.provider';
+import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/moltbook.provider';
+import { WhopProvider } from '@gitroom/nestjs-libraries/integrations/social/whop.provider';
+import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/skool.provider';
+import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
+import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tumblr.provider';
+import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/pixelfed.provider';
+import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
+
+// The raw social provider singletons now live in the ProviderKernel registry.
+// Build a fake kernel over these mock provider instances; IntegrationManager
+// reads them through kernel.listManifests('social') / kernel.get('social', …)
+// (returning each module's `legacyProvider`).
+const providerInstances: any[] = [
+  XProvider, LinkedinProvider, LinkedinPageProvider, RedditProvider,
+  InstagramProvider, InstagramStandaloneProvider, FacebookProvider,
+  ThreadsProvider, YoutubeProvider, GmbProvider, TiktokProvider,
+  PinterestProvider, DribbbleProvider, DiscordProvider, SlackProvider,
+  KickProvider, TwitchProvider, MastodonProvider, BlueskyProvider,
+  LemmyProvider, FarcasterProvider, TelegramProvider, NostrProvider,
+  VkProvider, MediumProvider, DevToProvider, HashnodeProvider,
+  WordpressProvider, ListmonkProvider, MoltbookProvider, WhopProvider,
+  SkoolProvider, MeweProvider, TumblrProvider, PixelfedProvider,
+  PeerTubeProvider,
+].map((P: any) => new P());
+
+const providerById = new Map(
+  providerInstances.map((p) => [p.identifier, p])
+);
+
+function moduleFor(id: string) {
+  const provider = providerById.get(id);
+  if (!provider) {
+    return undefined;
+  }
+  return {
+    manifest: { domain: 'social', providerId: id, version: 'v1', capabilities: {} },
+    legacyProvider: provider,
+    create: () => provider,
+  };
+}
+
+const fakeKernel = {
+  listManifests: (domain?: string) =>
+    !domain || domain === 'social'
+      ? providerInstances.map((p) => moduleFor(p.identifier)!.manifest)
+      : [],
+  get: (_domain: string, id: string, _version?: string) => moduleFor(id),
+  latestActive: (_domain: string, id: string) => moduleFor(id),
+} as any;
 
 // ---------------------------------------------------------------------------
 // Helpers to set up metadata on specific mock providers
 // ---------------------------------------------------------------------------
 function setToolMetadata(identifier: string, tools: any[]) {
-  const p = socialIntegrationList.find((x) => x.identifier === identifier)!;
+  const p = providerById.get(identifier)!;
   Reflect.defineMetadata('custom:tool', tools, p.constructor.prototype);
 }
 
 function setRulesMetadata(identifier: string, description: string) {
-  const p = socialIntegrationList.find((x) => x.identifier === identifier)!;
+  const p = providerById.get(identifier)!;
   Reflect.defineMetadata('custom:rules:description', description, p.constructor);
 }
 
 function setPlugMetadata(identifier: string, plugs: any[]) {
-  const p = socialIntegrationList.find((x) => x.identifier === identifier)!;
+  const p = providerById.get(identifier)!;
   Reflect.defineMetadata('custom:plug', plugs, p.constructor.prototype);
 }
 
 function setInternalPlugMetadata(identifier: string, plugs: any[]) {
-  const p = socialIntegrationList.find((x) => x.identifier === identifier)!;
+  const p = providerById.get(identifier)!;
   Reflect.defineMetadata('custom:internal_plug', plugs, p.constructor.prototype);
 }
 
@@ -266,10 +354,10 @@ describe('IntegrationManager', () => {
       isEnabled: vi.fn(),
       ensureFresh: vi.fn(),
     };
-    manager = new IntegrationManager(mockPcm as any);
+    manager = new IntegrationManager(mockPcm as any, {} as any, fakeKernel);
 
     // Clear all Reflect metadata from every provider to prevent test leakage
-    for (const p of socialIntegrationList) {
+    for (const p of providerInstances) {
       Reflect.deleteMetadata('custom:tool', p.constructor.prototype);
       Reflect.deleteMetadata('custom:plug', p.constructor.prototype);
       Reflect.deleteMetadata('custom:internal_plug', p.constructor.prototype);
@@ -429,7 +517,7 @@ describe('IntegrationManager', () => {
 
     it('returns empty arrays for all providers when no tool metadata exists', () => {
       const result = manager.getAllTools();
-      const ids = socialIntegrationList.map((p) => p.identifier);
+      const ids = providerInstances.map((p) => p.identifier);
       for (const id of ids) {
         expect(result[id]).toEqual([]);
       }
@@ -453,7 +541,7 @@ describe('IntegrationManager', () => {
 
     it('returns empty string for every provider when no rules metadata exists', () => {
       const result = manager.getAllRulesDescription();
-      const ids = socialIntegrationList.map((p) => p.identifier);
+      const ids = providerInstances.map((p) => p.identifier);
       for (const id of ids) {
         expect(result[id]).toBe('');
       }
@@ -741,6 +829,7 @@ describe('IntegrationManager', () => {
         client_id: 'cid',
         client_secret: 'cs',
         instanceUrl: 'https://example.com',
+        version: 'v1',
       });
     });
   });
@@ -764,11 +853,11 @@ describe('IntegrationManager', () => {
     });
   });
 
-  // ---- Edge cases and direct socialIntegrationList access ----
+  // ---- Edge cases: the kernel-sourced social provider catalog ----
 
-  describe('socialIntegrationList', () => {
+  describe('social provider catalog', () => {
     it('contains all expected providers', () => {
-      const identifiers = socialIntegrationList.map((p) => p.identifier);
+      const identifiers = manager.getAllowedSocialsIntegrations();
 
       expect(identifiers).toContain('x');
       expect(identifiers).toContain('linkedin');

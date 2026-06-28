@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ShortLinkService } from './short.link.service';
-import { ShortLinkRegistry } from './short-link.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import type { ShortLinkAdapter, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat } from './short-link.interface';
@@ -45,18 +45,33 @@ const makeActiveProvider = (id: string, creds = { apiKey: 'key' }) => ({
   capabilities: mockCapabilities,
   customDomain: undefined as string | undefined,
   credentials: creds,
+  version: 'v1',
 });
+
+const registerAdapter = (map: Map<string, ShortLinkAdapter>, adapter: ShortLinkAdapter) => {
+  map.set(adapter.identifier, adapter);
+};
 
 describe('ShortLinkService', () => {
   let service: ShortLinkService;
-  let registry: ShortLinkRegistry;
+  let resolution: ProviderResolutionService;
   let settingsService: OrgShortLinkSettingsService;
   let repository: OrgShortLinkSettingsRepository;
+  let adapterMap: Map<string, ShortLinkAdapter>;
 
   const orgId = 'org-1';
 
   beforeEach(() => {
-    registry = new ShortLinkRegistry();
+    adapterMap = new Map();
+    resolution = {
+      resolveShortLink: vi.fn((identifier: string, options: { version?: string; credentials?: Record<string, string>; orgId?: string }) => {
+        const adapter = adapterMap.get(identifier);
+        if (!adapter) {
+          throw new Error(`Short-link provider ${identifier} not found`);
+        }
+        return adapter;
+      }),
+    } as unknown as ProviderResolutionService;
     settingsService = {
       getActiveProvider: vi.fn(),
       getProviders: vi.fn(),
@@ -81,7 +96,7 @@ describe('ShortLinkService', () => {
       getAggregatedClicks: vi.fn(),
     } as any;
 
-    service = new ShortLinkService(registry, settingsService as OrgShortLinkSettingsService, repository as OrgShortLinkSettingsRepository);
+    service = new ShortLinkService(settingsService as OrgShortLinkSettingsService, repository as OrgShortLinkSettingsRepository, resolution);
   });
 
   describe('askShortLinkedin', () => {
@@ -98,28 +113,28 @@ describe('ShortLinkService', () => {
     });
 
     it('returns false when domain is empty', async () => {
-      registry.register(createMockAdapter('bitly', { domain: 'empty' }));
+      registerAdapter(adapterMap, createMockAdapter('bitly', { domain: 'empty' }));
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
       const result = await service.askShortLinkedin(orgId, ['check https://example.com']);
       expect(result).toBe(false);
     });
 
     it('returns false when messages contain no URLs', async () => {
-      registry.register(createMockAdapter('bitly', { domain: 'bit.ly' }));
+      registerAdapter(adapterMap, createMockAdapter('bitly', { domain: 'bit.ly' }));
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
       const result = await service.askShortLinkedin(orgId, ['hello world']);
       expect(result).toBe(false);
     });
 
     it('returns false when all URLs are already short links', async () => {
-      registry.register(createMockAdapter('bitly', { domain: 'bit.ly' }));
+      registerAdapter(adapterMap, createMockAdapter('bitly', { domain: 'bit.ly' }));
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
       const result = await service.askShortLinkedin(orgId, ['check https://bit.ly/abc']);
       expect(result).toBe(false);
     });
 
     it('returns true when there is a URL not pointing to the short-link domain', async () => {
-      registry.register(createMockAdapter('bitly', { domain: 'bit.ly' }));
+      registerAdapter(adapterMap, createMockAdapter('bitly', { domain: 'bit.ly' }));
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
       const result = await service.askShortLinkedin(orgId, ['check https://example.com/page']);
       expect(result).toBe(true);
@@ -152,7 +167,7 @@ describe('ShortLinkService', () => {
         domain: 'bit.ly',
         createResult: { shortUrl: 'https://bit.ly/short1', providerLinkId: 'lnk_1' },
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertTextToShortLinks(orgId, ['check https://example.com/long']);
@@ -170,7 +185,7 @@ describe('ShortLinkService', () => {
 
     it('skips URLs that are already short links on the same domain', async () => {
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertTextToShortLinks(orgId, ['check https://bit.ly/already-short']);
@@ -187,7 +202,7 @@ describe('ShortLinkService', () => {
         if (url === 'https://b.com') { shortCount.b = true; return { shortUrl: 'https://bit.ly/b' }; }
         return { shortUrl: `https://bit.ly/other` };
       };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertTextToShortLinks(orgId, ['see https://a.com and https://b.com']);
@@ -200,7 +215,7 @@ describe('ShortLinkService', () => {
     it('falls back to original URL on shorten failure', async () => {
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
       adapter.createShortLink = async () => { throw new Error('API error'); };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertTextToShortLinks(orgId, ['check https://example.com/long']);
@@ -212,7 +227,7 @@ describe('ShortLinkService', () => {
         domain: 'bit.ly',
         createResult: { shortUrl: 'https://bit.ly/short1' },
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
       (repository.recordLink as any).mockRejectedValue(new Error('DB error'));
 
@@ -224,7 +239,7 @@ describe('ShortLinkService', () => {
       let callCount = 0;
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
       adapter.createShortLink = async () => { callCount++; return { shortUrl: 'https://bit.ly/abc' }; };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       await service.convertTextToShortLinks(orgId, ['a https://example.com/p b https://example.com/p c']);
@@ -238,7 +253,7 @@ describe('ShortLinkService', () => {
         if (url === 'https://example.com/a') return { shortUrl: 'https://bit.ly/a' };
         throw new Error('fail');
       };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       // URL 'https://example.com/a' succeeds; 'https://example.com/b' fails and stays as original
@@ -261,7 +276,7 @@ describe('ShortLinkService', () => {
     it('returns original messages when adapter has no expandShortLink', async () => {
       const adapter = createMockAdapter('bitly', { caps: { expand: false }, domain: 'bit.ly' });
       delete (adapter as any).expandShortLink;
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertShortLinksToLinks(orgId, ['check https://bit.ly/abc']);
@@ -273,7 +288,7 @@ describe('ShortLinkService', () => {
         domain: 'bit.ly',
         expandImpl: async () => 'https://example.com/original',
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertShortLinksToLinks(orgId, ['check https://bit.ly/abc']);
@@ -282,7 +297,7 @@ describe('ShortLinkService', () => {
 
     it('does not expand URLs on a different domain', async () => {
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertShortLinksToLinks(orgId, ['check https://other.com/page']);
@@ -294,7 +309,7 @@ describe('ShortLinkService', () => {
         domain: 'bit.ly',
         expandImpl: async () => { throw new Error('API down'); },
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertShortLinksToLinks(orgId, ['check https://bit.ly/abc']);
@@ -310,7 +325,7 @@ describe('ShortLinkService', () => {
           throw new Error('not found');
         },
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.convertShortLinksToLinks(orgId, [
@@ -331,7 +346,7 @@ describe('ShortLinkService', () => {
     it('returns empty array when adapter has no linkStatistics', async () => {
       const adapter = createMockAdapter('bitly', { caps: { statistics: false }, domain: 'bit.ly' });
       delete (adapter as any).linkStatistics;
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getStatistics(orgId, ['https://bit.ly/a']);
@@ -341,7 +356,7 @@ describe('ShortLinkService', () => {
     it('returns stats when adapter supports it', async () => {
       const stats: ShortLinkStat[] = [{ short: 'https://bit.ly/a', original: '', clicks: '42' }];
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly', statsResult: stats });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getStatistics(orgId, ['check https://bit.ly/a']);
@@ -350,7 +365,7 @@ describe('ShortLinkService', () => {
 
     it('filters URLs by domain', async () => {
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly', statsResult: [] });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       await service.getStatistics(orgId, ['check https://other.com/page']);
@@ -360,7 +375,7 @@ describe('ShortLinkService', () => {
     it('returns empty array on adapter error', async () => {
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
       adapter.linkStatistics = async () => { throw new Error('API error'); };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getStatistics(orgId, ['check https://bit.ly/a']);
@@ -370,7 +385,7 @@ describe('ShortLinkService', () => {
     // N3: regex escaping for multi-dot domains (e.g. "app.link")
     it('escapes special regex characters in domain (multi-dot)', async () => {
       const adapter = createMockAdapter('app', { domain: 'app.link', statsResult: [] });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('app'));
 
       await service.getStatistics(orgId, ['check https://app.link/abc']);
@@ -383,7 +398,7 @@ describe('ShortLinkService', () => {
     it('matches short links on multi-dot domains', async () => {
       const stats: ShortLinkStat[] = [{ short: 'https://my.shrt.co/x', original: '', clicks: '7' }];
       const adapter = createMockAdapter('shrt', { domain: 'my.shrt.co', statsResult: stats });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('shrt'));
 
       const result = await service.getStatistics(orgId, ['check https://my.shrt.co/x']);
@@ -401,7 +416,7 @@ describe('ShortLinkService', () => {
     it('returns empty array when adapter has no listLinks', async () => {
       const adapter = createMockAdapter('bitly', { caps: { statistics: false } });
       delete (adapter as any).listLinks;
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getAllLinks(orgId);
@@ -413,7 +428,7 @@ describe('ShortLinkService', () => {
         { short: 'https://bit.ly/a', original: 'https://example.com/1', clicks: '5' },
       ];
       const adapter = createMockAdapter('bitly', { listResult });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getAllLinks(orgId);
@@ -440,7 +455,7 @@ describe('ShortLinkService', () => {
         if (page === 2) return page2;
         return [];
       });
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getAllLinks(orgId);
@@ -454,7 +469,7 @@ describe('ShortLinkService', () => {
       }));
       const adapter = createMockAdapter('bitly', { domain: 'bit.ly' });
       adapter.listLinks = vi.fn().mockResolvedValue(fullPage);
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getAllLinks(orgId);
@@ -465,7 +480,7 @@ describe('ShortLinkService', () => {
     it('returns empty array on adapter error', async () => {
       const adapter = createMockAdapter('bitly', {});
       adapter.listLinks = async () => { throw new Error('API error'); };
-      registry.register(adapter);
+      adapterMap.set(adapter.identifier, adapter);
       (settingsService.getActiveProvider as any).mockResolvedValue(makeActiveProvider('bitly'));
 
       const result = await service.getAllLinks(orgId);

@@ -4,7 +4,6 @@ import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
 import {
   IntegrationManager,
-  socialIntegrationList,
 } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';

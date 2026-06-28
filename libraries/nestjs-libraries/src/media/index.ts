@@ -1,4 +1,2 @@
-export { MediaProviderAdapter, MediaGenerationResult, MediaProviderCapabilities } from './media-provider-adapter.interface';
-export { MediaProviderRegistry } from './media-provider.registry';
+export type { MediaProviderAdapter, MediaGenerationResult, MediaProviderCapabilities } from './media-provider-adapter.interface';
 export { MediaModule } from './media.module';
-export * from './adapters';

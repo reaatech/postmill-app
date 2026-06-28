@@ -10,9 +10,22 @@ vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
   },
 }));
 
+// post-publish derives its per-provider task queues at import time from the
+// generated provider modules (the kernel's single source of truth). Mock a
+// small social subset (plus one non-social module that must be ignored).
+vi.mock('@gitroom/backend/providers.generated', () => ({
+  providerModules: [
+    { manifest: { domain: 'social', providerId: 'x', version: 'v1' }, legacyProvider: { identifier: 'x', maxConcurrentJob: 1 } },
+    { manifest: { domain: 'social', providerId: 'instagram', version: 'v1' }, legacyProvider: { identifier: 'instagram', maxConcurrentJob: 400 } },
+    { manifest: { domain: 'social', providerId: 'instagram-standalone', version: 'v1' }, legacyProvider: { identifier: 'instagram-standalone', maxConcurrentJob: 200 } },
+    { manifest: { domain: 'social', providerId: 'mastodon', version: 'v1' }, legacyProvider: { identifier: 'mastodon', maxConcurrentJob: 5 } },
+    { manifest: { domain: 'ai', providerId: 'openai', version: 'v1' } },
+  ],
+}));
+
 import { createPostPublishFunctions } from './post-publish';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { providerModules } from '@gitroom/backend/providers.generated';
 
 describe('createPostPublishFunctions', () => {
   const postActivity = {} as any;
@@ -25,7 +38,9 @@ describe('createPostPublishFunctions', () => {
     createPostPublishFunctions(postActivity);
 
     const expectedQueues = new Set(
-      socialIntegrationList.map((p) => p.identifier.split('-')[0].toLowerCase())
+      providerModules
+        .filter((m: any) => m.manifest.domain === 'social' && m.legacyProvider)
+        .map((m: any) => m.legacyProvider.identifier.split('-')[0].toLowerCase())
     );
 
     expect(inngest.createFunction).toHaveBeenCalledTimes(expectedQueues.size);

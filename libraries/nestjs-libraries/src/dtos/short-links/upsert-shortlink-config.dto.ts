@@ -20,4 +20,8 @@ export class UpsertShortlinkConfigDto {
   @IsOptional()
   @IsString()
   accountFingerprint?: string;
+
+  @IsOptional()
+  @IsString()
+  version?: string;
 }

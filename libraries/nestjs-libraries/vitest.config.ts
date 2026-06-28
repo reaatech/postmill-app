@@ -3,11 +3,17 @@ import path from 'path';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@gitroom/nestjs-libraries': path.resolve(__dirname, 'src'),
-      '@gitroom/helpers': path.resolve(__dirname, '../helpers/src'),
-      '@gitroom/backend': path.resolve(__dirname, '../../apps/backend/src'),
-    },
+    // Array form so the relocated social providers (step 7.5.1) resolve to their
+    // workspace SOURCE rather than the hoisted node_modules copies. Source-resolved
+    // modules are transformed by vitest, so the specs' `vi.mock(...)` of shared
+    // helpers (read.or.fetch, timer, etc.) intercepts the provider's direct imports.
+    alias: [
+      { find: '@gitroom/nestjs-libraries', replacement: path.resolve(__dirname, 'src') },
+      { find: '@gitroom/helpers', replacement: path.resolve(__dirname, '../helpers/src') },
+      { find: '@gitroom/backend', replacement: path.resolve(__dirname, '../../apps/backend/src') },
+      { find: '@gitroom/provider-kernel', replacement: path.resolve(__dirname, '../providers/kernel/src') },
+      { find: /^@gitroom\/provider-(.+)$/, replacement: path.resolve(__dirname, '../providers/$1/src') },
+    ],
   },
   test: {
     globals: true,

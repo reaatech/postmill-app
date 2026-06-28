@@ -15,9 +15,9 @@ export class OrgContentPackSettingsRepository {
     });
   }
 
-  getByIdentifier(orgId: string, identifier: string) {
+  getByIdentifier(orgId: string, identifier: string, version = 'v1') {
     return this._contentPackConfig.model.contentPackConfig.findUnique({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
     });
   }
 
@@ -27,22 +27,24 @@ export class OrgContentPackSettingsRepository {
     data: {
       credentials?: string;
       extraConfig?: any;
-    }
+    },
+    version = 'v1',
   ) {
     return this._contentPackConfig.model.contentPackConfig.upsert({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
       create: {
         organizationId: orgId,
         identifier,
+        version,
         ...data,
       },
       update: data,
     });
   }
 
-  delete(orgId: string, identifier: string) {
+  delete(orgId: string, identifier: string, version = 'v1') {
     return this._contentPackConfig.model.contentPackConfig.deleteMany({
-      where: { organizationId: orgId, identifier },
+      where: { organizationId: orgId, identifier, version },
     });
   }
 

@@ -53,33 +53,56 @@ describe('EmailAdapterRegistry', () => {
   });
 
   describe('getActiveAdapter', () => {
+    // getActiveAdapter resolves exclusively through the provider kernel. Build a
+    // minimal fake kernel that maps provider ids to modules whose create() yields
+    // the supplied adapters.
+    const makeKernel = (adapters: Record<string, EmailAdapter>) => {
+      const modules: Record<string, { create: () => EmailAdapter }> = {};
+      for (const [id, adapter] of Object.entries(adapters)) {
+        modules[id] = { create: () => adapter };
+      }
+      return {
+        latestActive: (_domain: string, id: string) => modules[id],
+        resolveForRead: (_domain: string, id: string) => {
+          if (!modules[id]) throw new Error(`not found: ${id}`);
+          return modules[id];
+        },
+      };
+    };
+    const runtimeContext = { build: () => ({}) };
+
+    const buildRegistry = (adapters: Record<string, EmailAdapter>) =>
+      new EmailAdapterRegistry(
+        makeKernel(adapters) as any,
+        runtimeContext as any,
+      );
+
     it('returns the adapter matching EMAIL_PROVIDER env var when configured', () => {
       const mailgun = makeAdapter('mailgun');
       const empty = makeAdapter('empty');
-      registry.register(mailgun);
-      registry.register(empty);
+      const reg = buildRegistry({ mailgun, empty });
       process.env.EMAIL_PROVIDER = 'mailgun';
 
-      const result = registry.getActiveAdapter();
+      const result = reg.getActiveAdapter();
 
       expect(result).toBe(mailgun);
     });
 
     it('returns empty adapter when EMAIL_PROVIDER is unset', () => {
       const empty = makeAdapter('empty');
-      registry.register(empty);
+      const reg = buildRegistry({ empty });
 
-      const result = registry.getActiveAdapter();
+      const result = reg.getActiveAdapter();
 
       expect(result).toBe(empty);
     });
 
     it('returns empty adapter when EMAIL_PROVIDER points to unknown provider', () => {
       const empty = makeAdapter('empty');
-      registry.register(empty);
+      const reg = buildRegistry({ empty });
       process.env.EMAIL_PROVIDER = 'nonexistent';
 
-      const result = registry.getActiveAdapter();
+      const result = reg.getActiveAdapter();
 
       expect(result).toBe(empty);
     });
@@ -87,11 +110,10 @@ describe('EmailAdapterRegistry', () => {
     it("returns empty adapter when the provider's adapter isConfigured() returns false", () => {
       const mailgun = makeAdapter('mailgun', false);
       const empty = makeAdapter('empty');
-      registry.register(mailgun);
-      registry.register(empty);
+      const reg = buildRegistry({ mailgun, empty });
       process.env.EMAIL_PROVIDER = 'mailgun';
 
-      const result = registry.getActiveAdapter();
+      const result = reg.getActiveAdapter();
 
       expect(result).toBe(empty);
     });

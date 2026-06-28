@@ -327,7 +327,7 @@ export class ReplicateRunnerService {
         provider: 'replicate',
         operation: params.operation,
         model: params.modelId,
-        versionId: params.versionId,
+        version: params.versionId,
         inputJson: JSON.stringify(resolvedInput),
         folderId: params.folderId,
         creditType: opts?.creditType,

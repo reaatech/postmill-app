@@ -88,7 +88,7 @@ function makeAdapter(
 }
 
 interface TestSetup {
-  registry: { get: (id: string) => MediaProviderAdapter | undefined };
+  resolution: { resolveMedia: (id: string) => MediaProviderAdapter | undefined };
   orgSettings: {
     getEnabledProviders: ReturnType<typeof vi.fn>;
     getConfigForProvider: ReturnType<typeof vi.fn>;
@@ -113,7 +113,7 @@ function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]):
     extraConfig: {},
   }));
 
-  const registry = { get: (id: string) => map.get(id) };
+  const resolution = { resolveMedia: (id: string) => map.get(id) };
   const orgSettings = {
     getEnabledProviders: vi.fn().mockResolvedValue(enabled),
     getConfigForProvider: vi.fn().mockImplementation(async (_orgId: string, id: string) => ({
@@ -136,12 +136,12 @@ function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]):
     new (AiSettingsService as never)(),
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
+    resolution as never,
     orgSettings as never,
-    registry as never,
     lifecycle as never,
   );
 
-  return { service, registry, orgSettings, lifecycle };
+  return { service, resolution, orgSettings, lifecycle };
 }
 
 function bareService() {
@@ -149,6 +149,7 @@ function bareService() {
     new (AiSettingsService as never)(),
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
+    { resolveMedia: () => undefined } as never,
   );
 }
 
@@ -689,8 +690,8 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: (id: string) => map.get(id) } as never,
         orgSettings as never,
-        { get: (id: string) => map.get(id) } as never,
         // no lifecycle
       );
 
@@ -720,8 +721,8 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: (id: string) => map.get(id) } as never,
         orgSettings as never,
-        { get: (id: string) => map.get(id) } as never,
       );
 
       await expect(service.generateAudio('a jingle', { orgId: 'org-1' })).rejects.toThrow(
@@ -738,8 +739,8 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: () => undefined } as never,
         orgSettings as never,
-        { get: () => undefined } as never,
       );
       const result = await service.generateImage('a cat', { orgId: 'org-1' });
       expect(result).toBe('https://cdn.example.com/image.png');

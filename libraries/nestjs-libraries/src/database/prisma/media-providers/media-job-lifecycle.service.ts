@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AIMediaJob } from '@prisma/client';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { MediaArtifactMetadata } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-token';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
@@ -71,7 +71,7 @@ export class MediaJobLifecycleService {
   constructor(
     private _aiSettings: AiSettingsService,
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
-    private _registry: MediaProviderRegistry,
+    private _resolution: ProviderResolutionService,
     private _storageService: StorageService,
     private _fileRepository: FileRepository,
     private _notificationService: NotificationService,
@@ -88,7 +88,7 @@ export class MediaJobLifecycleService {
     creditType?: string;
     folderId?: string | null;
     model?: string | null;
-    versionId?: string | null;
+    version?: string | null;
     inputJson?: string | null;
   }): Promise<AIMediaJob> {
     return this._aiSettings.createMediaJob({
@@ -101,7 +101,7 @@ export class MediaJobLifecycleService {
       creditType: params.creditType,
       folderId: params.folderId,
       model: params.model,
-      versionId: params.versionId,
+      version: params.version ?? 'v1',
       inputJson: params.inputJson,
     });
   }
@@ -164,18 +164,33 @@ export class MediaJobLifecycleService {
     const providerJobId = this.providerJobRef(job);
     if (!providerJobId) return 'skipped';
 
-    const adapter = this._registry.get(job.provider);
-    if (!adapter?.pollJob) {
-      await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
-      return 'failed';
-    }
-
     const config = await this._orgMediaProviderSettings.getConfigForProvider(
       job.organizationId,
       job.provider,
     );
     if (!config) {
       await this.failJob(job, `Provider "${job.provider}" is no longer configured`);
+      return 'failed';
+    }
+
+    let adapter;
+    try {
+      adapter = this._resolution.resolveMedia(job.provider, {
+        version: config.version ?? job.version ?? 'v1',
+        credentials: config.credentials,
+        orgId: job.organizationId,
+      });
+    } catch (err) {
+      // Unknown/retired provider version throws — fail the job cleanly instead of
+      // leaving it pending until the 24h timeout (and 500-ing the webhook path).
+      await this.failJob(
+        job,
+        `Provider "${job.provider}" could not be resolved: ${(err as Error).message}`,
+      );
+      return 'failed';
+    }
+    if (!adapter?.pollJob) {
+      await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
       return 'failed';
     }
 

@@ -1,39 +1,13 @@
-export type EmailStatus =
-  | 'queued' | 'sent' | 'failed'
-  | 'delivered' | 'bounced' | 'complained' | 'opened' | 'clicked';
-
-export interface EmailSendParams {
-  to: string;
-  subject: string;
-  html: string;
-  fromName: string;
-  fromAddress: string;
-  replyTo?: string;
-}
-
-export interface EmailSendResult {
-  providerMessageId?: string;
-}
-
-export interface EmailWebhookEvent {
-  providerMessageId?: string;
-  recipient?: string;
-  status: EmailStatus;
-  occurredAt: Date;
-}
-
-export interface EmailAdapterCapabilities {
-  webhooks: boolean;
-  openTracking: boolean;
-  clickTracking: boolean;
-}
-
-export interface EmailAdapter {
-  name: string;
-  capabilities: EmailAdapterCapabilities;
-  requiredEnvKeys: string[];
-  isConfigured(): boolean;
-  send(params: EmailSendParams): Promise<EmailSendResult>;
-  verifyWebhook?(rawBody: Buffer, headers: Record<string, string | undefined>): boolean | Promise<boolean>;
-  parseWebhook?(rawBody: Buffer, headers: Record<string, string | undefined>): EmailWebhookEvent[];
-}
+// Single source of truth for these types is now the provider kernel. They are
+// re-exported here so existing consumers (services, registry, controllers, specs)
+// keep their `@gitroom/nestjs-libraries/emails/email-adapter.interface` import
+// path working unchanged. The legacy `EmailAdapter` name maps to the kernel's
+// `EmailCapability` (identical shape).
+export type {
+  EmailCapability as EmailAdapter,
+  EmailStatus,
+  EmailSendParams,
+  EmailSendResult,
+  EmailWebhookEvent,
+  EmailAdapterCapabilities,
+} from '@gitroom/provider-kernel';

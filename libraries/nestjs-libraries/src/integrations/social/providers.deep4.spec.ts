@@ -47,7 +47,6 @@ import { RefreshTokenError, BadBodyError } from '@gitroom/nestjs-libraries/innge
 import { TumblrProvider } from './tumblr.provider';
 import { PixelfedProvider } from './pixelfed.provider';
 import { PeerTubeProvider } from './peertube.provider';
-import { socialIntegrationList } from '../integration.manager';
 import { getProviderMock } from './provider-mocks';
 
 function respError(body: string, status: number) {
@@ -73,10 +72,6 @@ describe('tumblr deep', () => {
   it('has correct identifier and name', () => {
     expect(provider.identifier).toBe('tumblr');
     expect(provider.name).toBe('Tumblr');
-  });
-
-  it('is present in socialIntegrationList', () => {
-    expect(socialIntegrationList.some((p) => p.identifier === 'tumblr')).toBe(true);
   });
 
   it('maxLength returns 4096', () => {
@@ -276,10 +271,6 @@ describe('pixelfed deep', () => {
     expect(provider.name).toBe('Pixelfed');
   });
 
-  it('is present in socialIntegrationList', () => {
-    expect(socialIntegrationList.some((p) => p.identifier === 'pixelfed')).toBe(true);
-  });
-
   it('maxLength returns 500', () => {
     expect(provider.maxLength()).toBe(500);
   });
@@ -425,10 +416,6 @@ describe('peertube deep', () => {
   it('has correct identifier and name', () => {
     expect(provider.identifier).toBe('peertube');
     expect(provider.name).toBe('PeerTube');
-  });
-
-  it('is present in socialIntegrationList', () => {
-    expect(socialIntegrationList.some((p) => p.identifier === 'peertube')).toBe(true);
   });
 
   it('maxLength returns 10000', () => {

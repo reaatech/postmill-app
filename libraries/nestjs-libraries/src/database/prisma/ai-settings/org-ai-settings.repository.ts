@@ -14,9 +14,9 @@ export class OrgAiSettingsRepository {
     });
   }
 
-  getByIdentifier(orgId: string, identifier: string) {
+  getByIdentifier(orgId: string, identifier: string, version = 'v1') {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.findUnique({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
     });
   }
 
@@ -37,27 +37,28 @@ export class OrgAiSettingsRepository {
       reasoningModel?: string;
       extraConfig?: string;
     },
+    version = 'v1',
   ) {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.upsert({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
-      create: { organizationId: orgId, identifier, ...data },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
+      create: { organizationId: orgId, identifier, version, ...data },
       update: data,
     });
   }
 
-  delete(orgId: string, identifier: string) {
+  delete(orgId: string, identifier: string, version = 'v1') {
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.delete({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
     });
   }
 
-  async setActive(orgId: string, identifier: string) {
+  async setActive(orgId: string, identifier: string, version = 'v1') {
     await this._aiOrgProviderConfig.model.aIOrgProviderConfig.updateMany({
       where: { organizationId: orgId, isActive: true },
       data: { isActive: false },
     });
     return this._aiOrgProviderConfig.model.aIOrgProviderConfig.update({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
       data: { isActive: true, enabled: true },
     });
   }

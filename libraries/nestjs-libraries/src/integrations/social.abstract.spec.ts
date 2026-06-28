@@ -22,10 +22,30 @@ import {
   SocialAbstract,
   NotEnoughScopes,
 } from './social.abstract';
+import { setSocialFetchPorts } from '@gitroom/provider-kernel';
+import sharp from 'sharp';
+import { timer } from '@gitroom/helpers/utils/timer';
+import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
 import {
   RefreshTokenError,
   BadBodyError,
 } from '@gitroom/nestjs-libraries/inngest/errors';
+
+// SocialAbstract was relocated into the kernel (step 7.5.2) and dereferences its
+// security/runtime primitives from injected ports. Wire them with the mocked
+// modules above so behaviour is identical to the pre-relocation direct imports.
+setSocialFetchPorts({
+  getVpnDispatcher: () => undefined,
+  ssrfSafeDispatcher: undefined,
+  isSafePublicHttpsUrl: async () => true,
+  undiciFetch: ((...args: any[]) => (globalThis.fetch as any)(...args)) as any,
+  RefreshTokenError,
+  BadBodyError,
+  timer,
+  sharp,
+  readOrFetch,
+  safeFetch: (async () => ({})) as any,
+});
 
 class TestProvider extends SocialAbstract {
   identifier = 'test';

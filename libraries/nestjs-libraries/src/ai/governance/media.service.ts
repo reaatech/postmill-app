@@ -5,7 +5,7 @@ import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.mana
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -149,10 +149,23 @@ export class AiMediaService {
     private _aiSettings: AiSettingsService,
     private _aiModelProvider: AIModelProvider,
     private _aiSettingsManager: AiSettingsManager,
+    private _resolution: ProviderResolutionService,
     @Optional() private _orgMediaProviderSettings?: OrgMediaProviderSettingsService,
-    @Optional() private _mediaRegistry?: MediaProviderRegistry,
     @Optional() private _lifecycle?: MediaJobLifecycleService,
   ) {}
+
+  // Resolve a media adapter through the ProviderKernel; returns null for an
+  // unknown/unregistered provider (mirrors the old registry.get semantics).
+  private _resolveMediaAdapter(
+    identifier: string,
+    options: { version?: string; credentials?: Record<string, string>; orgId?: string } = {},
+  ): MediaProviderAdapter | null {
+    try {
+      return this._resolution.resolveMedia(identifier, options);
+    } catch {
+      return null;
+    }
+  }
 
   // Lazy, guarded singletons for the @reaatech media-pipeline infra packages.
   // `null` = not yet resolved; `false` = resolved-and-unavailable (don't retry).
@@ -269,7 +282,7 @@ export class AiMediaService {
       const capability = OPERATION_CAPABILITY[operation];
       const providers = enabled
         .filter((cfg) => {
-          const adapter = this._mediaRegistry?.get(cfg.identifier);
+          const adapter = this._resolveMediaAdapter(cfg.identifier);
           if (!adapter?.capabilities[capability]) return false;
           const ops = cfg.extraConfig.operations;
           return !ops || ops.length === 0 || ops.includes(operation);
@@ -299,14 +312,14 @@ export class AiMediaService {
     orgId: string | undefined,
     operation: MediaOperation,
   ): Promise<ResolvedMediaProvider[]> {
-    if (!orgId || !this._orgMediaProviderSettings || !this._mediaRegistry) return [];
+    if (!orgId || !this._orgMediaProviderSettings) return [];
 
     const enabled = await this._safeGetEnabledProviders(orgId);
     const capability = OPERATION_CAPABILITY[operation];
     const resolved: ResolvedMediaProvider[] = [];
 
     for (const cfg of [...enabled].sort((a, b) => a.identifier.localeCompare(b.identifier))) {
-      const adapter = this._mediaRegistry.get(cfg.identifier);
+      const adapter = this._resolveMediaAdapter(cfg.identifier);
       if (!adapter || !adapter.capabilities[capability]) continue;
 
       const ops = cfg.extraConfig.operations;
@@ -315,7 +328,16 @@ export class AiMediaService {
       const full = await this._orgMediaProviderSettings.getConfigForProvider(orgId, cfg.identifier);
       if (!full || Object.keys(full.credentials).length === 0) continue;
 
-      resolved.push({ adapter, credentials: full.credentials });
+      // Re-resolve with the config-pinned version + credentials so the kernel runs
+      // the adapter version recorded at write time.
+      const pinned =
+        this._resolveMediaAdapter(cfg.identifier, {
+          version: full.version,
+          credentials: full.credentials,
+          orgId,
+        }) ?? adapter;
+
+      resolved.push({ adapter: pinned, credentials: full.credentials });
     }
     return resolved;
   }

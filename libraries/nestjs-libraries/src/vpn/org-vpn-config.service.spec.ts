@@ -1,32 +1,57 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { OrgVpnConfigService } from './org-vpn-config.service';
-import { VpnProviderRegistry } from './vpn-provider.registry';
-import { NordvpnAdapter } from './adapters/nordvpn.adapter';
-import { ExpressvpnAdapter } from './adapters/expressvpn.adapter';
-import { SurfsharkAdapter } from './adapters/surfshark.adapter';
-import { ProtonvpnAdapter } from './adapters/protonvpn.adapter';
-import { MullvadAdapter } from './adapters/mullvad.adapter';
-import { CyberghostAdapter } from './adapters/cyberghost.adapter';
-import { PiaAdapter } from './adapters/pia.adapter';
-import { IpvanishAdapter } from './adapters/ipvanish.adapter';
-import { WindscribeAdapter } from './adapters/windscribe.adapter';
-import { TunnelbearAdapter } from './adapters/tunnelbear.adapter';
-import { HotspotshieldAdapter } from './adapters/hotspotshield.adapter';
-import { PurevpnAdapter } from './adapters/purevpn.adapter';
-import { VyprvpnAdapter } from './adapters/vyprvpn.adapter';
-import { HidemeAdapter } from './adapters/hideme.adapter';
-import { MozillavpnAdapter } from './adapters/mozillavpn.adapter';
-import { CustomProxyAdapter } from './adapters/custom-proxy.adapter';
+import { VpnProviderAdapter } from './vpn-provider.interface';
+// The adapters now live in their own workspace packages; build instances from
+// the relocated package modules (the same modules ProvidersBootstrap registers).
+import nordvpnModules from '@gitroom/provider-nordvpn';
+import expressvpnModules from '@gitroom/provider-expressvpn';
+import surfsharkModules from '@gitroom/provider-surfshark';
+import protonvpnModules from '@gitroom/provider-protonvpn';
+import mullvadModules from '@gitroom/provider-mullvad';
+import cyberghostModules from '@gitroom/provider-cyberghost';
+import piaModules from '@gitroom/provider-pia';
+import ipvanishModules from '@gitroom/provider-ipvanish';
+import windscribeModules from '@gitroom/provider-windscribe';
+import tunnelbearModules from '@gitroom/provider-tunnelbear';
+import hotspotshieldModules from '@gitroom/provider-hotspotshield';
+import purevpnModules from '@gitroom/provider-purevpn';
+import vyprvpnModules from '@gitroom/provider-vyprvpn';
+import hidemeModules from '@gitroom/provider-hideme';
+import mozillavpnModules from '@gitroom/provider-mozillavpn';
+import customproxyModules from '@gitroom/provider-custom-proxy';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
 import { VpnDispatcherService } from './vpn-dispatcher.service';
+
+// All relocated VPN package modules, mirroring providers.generated.ts.
+const ALL_VPN_MODULES = [
+  ...nordvpnModules,
+  ...expressvpnModules,
+  ...surfsharkModules,
+  ...protonvpnModules,
+  ...mullvadModules,
+  ...cyberghostModules,
+  ...piaModules,
+  ...ipvanishModules,
+  ...windscribeModules,
+  ...tunnelbearModules,
+  ...hotspotshieldModules,
+  ...purevpnModules,
+  ...vyprvpnModules,
+  ...hidemeModules,
+  ...mozillavpnModules,
+  ...customproxyModules,
+];
 
 describe('OrgVpnConfigService', () => {
   let service: OrgVpnConfigService;
   let repository: OrgVpnConfigRepository;
   let encryption: EncryptionService;
-  let registry: VpnProviderRegistry;
+  let kernel: ProviderKernel;
   let dispatcher: VpnDispatcherService;
+  let resolution: ProviderResolutionService;
 
   beforeEach(() => {
     repository = {
@@ -44,28 +69,44 @@ describe('OrgVpnConfigService', () => {
       encryptDeterministic: vi.fn(),
     } as unknown as EncryptionService;
 
-    registry = new VpnProviderRegistry(
-      new NordvpnAdapter(),
-      new ExpressvpnAdapter(),
-      new SurfsharkAdapter(),
-      new ProtonvpnAdapter(),
-      new MullvadAdapter(),
-      new CyberghostAdapter(),
-      new PiaAdapter(),
-      new IpvanishAdapter(),
-      new WindscribeAdapter(),
-      new TunnelbearAdapter(),
-      new HotspotshieldAdapter(),
-      new PurevpnAdapter(),
-      new VyprvpnAdapter(),
-      new HidemeAdapter(),
-      new MozillavpnAdapter(),
-      new CustomProxyAdapter(),
-    );
+    // Build adapter instances from the relocated package modules. The in-memory
+    // registry is gone; providers now resolve through the kernel manifests +
+    // ProviderResolutionService.resolveVpn.
+    const vpnAdapters = new Map<string, VpnProviderAdapter>();
+    for (const mod of ALL_VPN_MODULES) {
+      if (mod.manifest.domain === 'vpn') {
+        vpnAdapters.set(
+          mod.manifest.providerId,
+          mod.create({ fetch: async () => new Response() } as any) as VpnProviderAdapter,
+        );
+      }
+    }
+
+    kernel = {
+      listManifests: (domain: string) =>
+        domain === 'vpn'
+          ? [...vpnAdapters.keys()].map((providerId) => ({
+              domain: 'vpn',
+              providerId,
+              version: 'v1',
+            }))
+          : [],
+    } as unknown as ProviderKernel;
 
     dispatcher = { invalidate: vi.fn() } as unknown as VpnDispatcherService;
 
-    service = new OrgVpnConfigService(repository, encryption, registry, dispatcher);
+    resolution = {
+      resolveVpn: vi.fn((identifier: string, options?: { version?: string; credentials?: Record<string, string>; orgId?: string }) => {
+        const adapter = vpnAdapters.get(identifier);
+        if (!adapter) {
+          throw new ProviderNotFoundError({ domain: 'vpn', providerId: identifier, version: options?.version ?? 'v1' });
+        }
+        return adapter;
+      }),
+      latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    } as unknown as ProviderResolutionService;
+
+    service = new OrgVpnConfigService(repository, encryption, dispatcher, resolution, kernel);
   });
 
   it('returns provider metadata with all adapters', () => {
@@ -130,6 +171,7 @@ describe('OrgVpnConfigService', () => {
       'org-1',
       'nordvpn',
       expect.objectContaining({ enabled: true, name: 'Home NordVPN' }),
+      'v1',
     );
   });
 

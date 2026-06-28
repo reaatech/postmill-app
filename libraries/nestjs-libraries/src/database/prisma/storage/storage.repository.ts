@@ -41,8 +41,11 @@ export class StorageRepository {
     publicUrl?: string;
     quotaBytes?: bigint;
     accountFingerprint?: string;
+    version?: string;
   }) {
-    return this._storage.model.storageProviderConfig.create({ data });
+    return this._storage.model.storageProviderConfig.create({
+      data: { ...data, version: data.version ?? 'v1' },
+    });
   }
 
   update(

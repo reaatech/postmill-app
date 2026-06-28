@@ -328,7 +328,7 @@ export class AiSettingsService {
     error?: string;
     folderId?: string | null;
     model?: string | null;
-    versionId?: string | null;
+    version?: string | null;
     inputJson?: string | null;
   }) {
     return this._repository.createMediaJob(data);
@@ -344,7 +344,7 @@ export class AiSettingsService {
       error?: string | null;
       folderId?: string | null;
       model?: string | null;
-      versionId?: string | null;
+      version?: string | null;
       inputJson?: string | null;
       creditType?: string | null;
     },
