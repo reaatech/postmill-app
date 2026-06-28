@@ -8,6 +8,7 @@ import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 import { useVpnConfig, VpnProviderInfo } from './hooks/useVpnConfig';
 import { VpnProviderForm } from './vpn-provider-form';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 
 const CAPABILITY_LABELS: Record<string, string> = {
   wireguard: 'WireGuard',
@@ -32,6 +33,7 @@ export const VpnTab = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: config, isLoading, error, mutate } = useVpnConfig();
+  const { data: catalog } = useProviderCatalog('vpn');
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
@@ -77,15 +79,23 @@ export const VpnTab = () => {
 
   const shellProviders = useMemo(
     () =>
-      filteredProviders.map((p) => ({
-        id: p.identifier,
-        identifier: p.identifier,
-        name: p.name,
-        enabled: p.enabled && p.isConfigured,
-        isConfigured: p.isConfigured,
-        capabilities: capabilityChips(p),
-      })),
-    [filteredProviders]
+      filteredProviders.map((p) => {
+        const catalogEntry = catalog?.find(
+          (e) => e.providerId === p.identifier && e.version === p.version
+        );
+        return {
+          id: p.identifier,
+          identifier: p.identifier,
+          name: p.name,
+          enabled: p.enabled && p.isConfigured,
+          isConfigured: p.isConfigured,
+          capabilities: capabilityChips(p),
+          version: p.version,
+          versionStatus: catalogEntry?.status ?? 'active',
+          sunsetAt: catalogEntry?.sunsetAt,
+        };
+      }),
+    [filteredProviders, catalog]
   );
 
   return (

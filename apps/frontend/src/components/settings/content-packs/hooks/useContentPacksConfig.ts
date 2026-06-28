@@ -10,6 +10,7 @@ export interface ContentPackProviderInfo {
   capabilities: string[];
   isConfigured: boolean;
   isActive: boolean;
+  version: string;
   createdAt: string | null;
   updatedAt: string | null;
 }

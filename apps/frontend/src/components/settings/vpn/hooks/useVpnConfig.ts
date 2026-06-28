@@ -27,6 +27,7 @@ export interface VpnProviderInfo {
   name: string;
   enabled: boolean;
   isConfigured: boolean;
+  version: string;
   capabilities: VpnProviderCapabilityInfo;
   credentialFields: VpnCredentialFieldInfo[];
   proxyRegions: VpnProxyRegionInfo[];

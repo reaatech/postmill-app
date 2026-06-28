@@ -7,6 +7,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { ProviderFormModal } from '@gitroom/frontend/components/settings/storage/provider-form.modal';
 import { MigrationModal } from '@gitroom/frontend/components/settings/storage/migration.modal';
 import { AuditTab } from '@gitroom/frontend/components/settings/storage/audit.tab';
@@ -25,6 +26,7 @@ export interface StorageProviderRow {
   organizationId: string;
   type: string;
   name: string;
+  version?: string;
   region: string | null;
   bucket: string | null;
   endpoint: string | null;
@@ -132,6 +134,7 @@ export const StorageTab: React.FC = () => {
   const toaster = useToaster();
 
   const { data: providers, mutate: mutateProviders } = useStorageProviders();
+  const { data: catalog } = useProviderCatalog('storage');
   const { data: usage, mutate: mutateUsage } = useStorageUsage();
   const { data: quotaStatus, mutate: mutateQuota } = useQuotaStatus();
   const { data: usageBreakdown, mutate: mutateBreakdown } = useUsageBreakdown();
@@ -231,12 +234,20 @@ export const StorageTab: React.FC = () => {
     setShowModal(true);
   }, []);
 
+  const storageTypeToKernelId = (type: string) => type.toLowerCase().replace(/_/g, '');
+
   // A single inline list: local pinned to the very top, then configured cloud
   // instances (pinned), then one always-present "add another" row per cloud
   // provider type so the same provider can be configured again.
   const shellProviders = [
     ...(localProvider
-      ? [{ id: localProvider.id, identifier: 'postmill', name: t('postmill_storage', 'Postmill Storage'), enabled: true }]
+      ? [{
+          id: localProvider.id,
+          identifier: 'local',
+          name: t('postmill_storage', 'Postmill Storage'),
+          enabled: true,
+          version: localProvider.version ?? 'v1',
+        }]
       : []),
     ...configuredInstances.map((p) => ({
       id: p.id,
@@ -244,6 +255,7 @@ export const StorageTab: React.FC = () => {
       name: p.name,
       enabled: true,
       mounted: p.mounted,
+      version: p.version ?? 'v1',
     })),
     ...[...CLOUD_TYPES]
       .sort((a, b) =>
@@ -254,8 +266,15 @@ export const StorageTab: React.FC = () => {
         identifier: type,
         name: PROVIDER_TYPE_LABELS[type] || type,
         enabled: false,
+        version: 'v1',
       })),
-  ];
+  ].map((p) => {
+    const kernelId = storageTypeToKernelId(p.identifier);
+    const catalogEntry = catalog?.find(
+      (e) => e.providerId === kernelId && e.version === p.version
+    );
+    return { ...p, versionStatus: catalogEntry?.status ?? 'active' };
+  });
 
   const usageBar = (usageBytes: number | null, quotaBytes: number | null) => {
     const percent =

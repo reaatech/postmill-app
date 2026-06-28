@@ -8,6 +8,7 @@ import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 import { useContentPacksConfig } from './hooks/useContentPacksConfig';
 import { ContentPackForm } from './content-pack-form';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 
 // Postmill's built-in free stock pack — the default that is enabled whenever no
 // premium pack is active. It covers every capability via the free providers.
@@ -19,6 +20,7 @@ export const ContentPacksTab: React.FC = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: config, error, mutate } = useContentPacksConfig();
+  const { data: catalog } = useProviderCatalog('contentpack');
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
@@ -144,15 +146,23 @@ export const ContentPacksTab: React.FC = () => {
             ...(config?.providers || [])
               .slice()
               .sort((a, b) => a.name.localeCompare(b.name))
-              .map((p) => ({
-                id: p.identifier,
-                identifier: p.identifier,
-                name: p.name,
-                enabled: true,
-                isActive: p.isActive,
-                isConfigured: p.isConfigured,
-                capabilities: capabilityChips(p.capabilities),
-              })),
+              .map((p) => {
+                const catalogEntry = catalog?.find(
+                  (e) => e.providerId === p.identifier && e.version === p.version
+                );
+                return {
+                  id: p.identifier,
+                  identifier: p.identifier,
+                  name: p.name,
+                  enabled: true,
+                  isActive: p.isActive,
+                  isConfigured: p.isConfigured,
+                  capabilities: capabilityChips(p.capabilities),
+                  version: p.version,
+                  versionStatus: catalogEntry?.status ?? 'active',
+                  sunsetAt: catalogEntry?.sunsetAt,
+                };
+              }),
           ]}
           onConfigure={(id) => setConfiguringProvider(id)}
           onSetActive={(id) => handleSetActive(id)}

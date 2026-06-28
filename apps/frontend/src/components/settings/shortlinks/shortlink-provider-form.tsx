@@ -5,22 +5,38 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useShortlinksProviders } from './hooks/useShortlinksConfig';
+import {
+  ProviderVersionSelect,
+  useProviderVersionSelection,
+} from '@gitroom/frontend/components/settings/shared/provider-version-select';
 
 interface ShortlinkProviderFormProps {
   identifier: string;
   isConfigured: boolean;
+  /** Pinned version of the existing config (edit mode) — keeps the version select
+   *  on the stored version instead of silently defaulting to latest-active. */
+  initialVersion?: string;
   onClose: () => void;
   onSaved: () => void;
   onRemoved?: () => void;
 }
 
-export const ShortlinkProviderForm = ({ identifier, isConfigured, onClose, onSaved, onRemoved }: ShortlinkProviderFormProps) => {
+export const ShortlinkProviderForm = ({ identifier, isConfigured, initialVersion, onClose, onSaved, onRemoved }: ShortlinkProviderFormProps) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: providers } = useShortlinksProviders();
+  const {
+    versions,
+    selected: selectedVersion,
+    selectVersion,
+    showSelect,
+    credentialFields: versionFields,
+  } = useProviderVersionSelection('shortlink', identifier, initialVersion);
 
   const provider = providers?.find((p: any) => p.identifier === identifier);
+  const fields: any[] =
+    showSelect && versionFields ? versionFields : provider?.credentialFields ?? [];
   const [name, setName] = useState('');
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [customDomain, setCustomDomain] = useState('');
@@ -55,6 +71,7 @@ export const ShortlinkProviderForm = ({ identifier, isConfigured, onClose, onSav
           extraConfig: (clientId || clientSecret)
             ? { ...(clientId ? { clientId } : {}), ...(clientSecret ? { clientSecret } : {}) }
             : undefined,
+          version: selectedVersion || undefined,
         }),
       });
       if (!res.ok) {
@@ -66,7 +83,7 @@ export const ShortlinkProviderForm = ({ identifier, isConfigured, onClose, onSav
     } finally {
       setSaving(false);
     }
-  }, [provider, identifier, name, creds, customDomain, clientId, clientSecret, fetch, toaster, t, onSaved]);
+  }, [provider, identifier, name, creds, customDomain, clientId, clientSecret, selectedVersion, fetch, toaster, t, onSaved]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -157,7 +174,14 @@ export const ShortlinkProviderForm = ({ identifier, isConfigured, onClose, onSav
         />
       </div>
 
-      {provider.credentialFields.map((field: any) => (
+      <ProviderVersionSelect
+        versions={versions}
+        value={selectedVersion}
+        onChange={selectVersion}
+        label={t('provider_version', 'Provider version')}
+      />
+
+      {fields.map((field: any) => (
         <div key={field.key} className="flex flex-col gap-[4px]">
           <label className="text-[13px] text-newTableText">
             {field.label}

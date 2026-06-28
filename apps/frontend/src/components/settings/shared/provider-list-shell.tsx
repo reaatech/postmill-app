@@ -13,11 +13,22 @@ export interface ProviderConfigItem {
   mounted?: boolean;
   status?: string[];
   capabilities?: string[];
+  /** Pinned provider-framework version, e.g. "v1". */
+  version?: string;
+  /** Version lifecycle status from the public catalog. */
+  versionStatus?: 'preview' | 'active' | 'deprecated' | 'retired';
+  /** Sunset date for the pinned (deprecated) version, ISO string. */
+  sunsetAt?: string;
 }
 
 export interface ProviderListShellProps {
   providers: ProviderConfigItem[];
   onConfigure: (identifier: string) => void;
+  /**
+   * Reopen the configure modal preset to the latest active version (plan §9.3).
+   * Falls back to `onConfigure` when not provided.
+   */
+  onUpgrade?: (identifier: string) => void;
   onSetActive?: (identifier: string) => void;
   onRemove: (identifier: string) => void;
   onToggle?: (identifier: string, enabled: boolean) => void;
@@ -39,9 +50,24 @@ const STATUS_STYLES: Record<string, string> = {
   disabled: 'bg-[#3a1a1a] text-[#f87171]',
 };
 
+const VERSION_STYLES: Record<string, string> = {
+  preview: 'bg-purple-900/20 text-purple-400',
+  active: 'bg-green-900/20 text-green-400',
+  deprecated: 'bg-amber-900/20 text-amber-600',
+  retired: 'bg-red-900/20 text-red-400',
+};
+
+const VERSION_LABEL: Record<string, string> = {
+  preview: 'Preview',
+  active: 'Active',
+  deprecated: 'Deprecated',
+  retired: 'Retired',
+};
+
 const ProviderListShell: React.FC<ProviderListShellProps> = ({
   providers,
   onConfigure,
+  onUpgrade,
   onSetActive,
   onRemove,
   onToggle,
@@ -128,7 +154,57 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       Mounted
                     </span>
                   )}
+                  {provider.version && (
+                    <span
+                      className={`text-[11px] rounded-[4px] px-[8px] py-[2px] ${
+                        VERSION_STYLES[provider.versionStatus || 'active'] ||
+                        'bg-newTableHeader text-newTableText'
+                      }`}
+                      title={`Pinned to version ${provider.version}`}
+                    >
+                      {provider.version}
+                      {provider.versionStatus && provider.versionStatus !== 'active'
+                        ? ` — ${VERSION_LABEL[provider.versionStatus]}`
+                        : ''}
+                    </span>
+                  )}
                 </div>
+
+                {provider.versionStatus === 'deprecated' && (
+                  <div className="mt-[6px] flex items-center gap-[8px] flex-wrap rounded-[8px] border border-amber-500/40 bg-amber-500/10 px-[10px] py-[6px]">
+                    <span className="text-[12px] text-amber-600">
+                      Version {provider.version} is deprecated
+                      {provider.sunsetAt
+                        ? ` and will be retired on ${new Date(provider.sunsetAt).toLocaleDateString()}`
+                        : ''}
+                      . Upgrade to the latest active version to keep it working.
+                    </span>
+                    <button
+                      type="button"
+                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-amber-500/20 text-amber-600 hover:bg-amber-500/30 transition-colors whitespace-nowrap"
+                      onClick={() =>
+                        (onUpgrade ?? onConfigure)(provider.identifier)
+                      }
+                    >
+                      Upgrade
+                    </button>
+                  </div>
+                )}
+                {provider.versionStatus === 'retired' && (
+                  <div className="mt-[6px] flex items-center gap-[8px] flex-wrap rounded-[8px] border border-red-500/40 bg-red-500/10 px-[10px] py-[6px]">
+                    <span className="text-[12px] text-red-400">
+                      Version {provider.version} is retired and no longer functional.
+                      Reconfigure this provider to resume service.
+                    </span>
+                    <button
+                      type="button"
+                      className="text-[12px] font-medium rounded-[6px] px-[10px] py-[3px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors whitespace-nowrap"
+                      onClick={() => onConfigure(provider.identifier)}
+                    >
+                      Reconfigure
+                    </button>
+                  </div>
+                )}
 
                 {renderBadges ? (
                   renderBadges(provider)
@@ -149,7 +225,17 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
               </div>
 
               <div className="flex items-center gap-[8px] shrink-0">
-                {renderActions ? (
+                {provider.versionStatus === 'retired' ? (
+                  // Retired = non-functional: only allow reconfigure (banner) or remove.
+                  provider.isConfigured && (
+                    <button
+                      className="text-[12px] text-red-500 hover:underline"
+                      onClick={() => onRemove(provider.identifier)}
+                    >
+                      Remove
+                    </button>
+                  )
+                ) : renderActions ? (
                   renderActions(provider)
                 ) : (
                   <>

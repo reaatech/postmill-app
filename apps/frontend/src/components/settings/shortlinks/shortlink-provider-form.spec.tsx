@@ -68,6 +68,15 @@ const defaultProps = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockProvidersData = [...defaultProvidersData];
+  // The version-aware form also loads the provider catalog on mount; keep that
+  // call from consuming the per-test action responses (URL-aware default).
+  mockFetchFn.mockImplementation((url: string) =>
+    Promise.resolve(
+      typeof url === 'string' && url.includes('/providers/catalog')
+        ? { ok: true, json: async () => [] }
+        : { ok: true }
+    )
+  );
 });
 
 const oauthProvider = {
@@ -147,8 +156,6 @@ describe('ShortlinkProviderForm', () => {
   });
 
   it('displays success message on successful test', async () => {
-    mockFetchFn.mockResolvedValueOnce({ ok: true });
-
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
     render(<ShortlinkProviderForm {...defaultProps} />, { wrapper });
 
@@ -160,7 +167,13 @@ describe('ShortlinkProviderForm', () => {
   });
 
   it('displays failure message on failed test', async () => {
-    mockFetchFn.mockResolvedValueOnce({ ok: false });
+    mockFetchFn.mockImplementation((url: string) =>
+      Promise.resolve(
+        typeof url === 'string' && url.includes('/providers/catalog')
+          ? { ok: true, json: async () => [] }
+          : { ok: false }
+      )
+    );
 
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
     render(<ShortlinkProviderForm {...defaultProps} />, { wrapper });
@@ -173,7 +186,6 @@ describe('ShortlinkProviderForm', () => {
   });
 
   it('calls save endpoint with name when Save is clicked', async () => {
-    mockFetchFn.mockResolvedValueOnce({ ok: true });
     const onSaved = vi.fn();
 
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
@@ -197,7 +209,13 @@ describe('ShortlinkProviderForm', () => {
   });
 
   it('shows error toast on save failure', async () => {
-    mockFetchFn.mockResolvedValueOnce({ ok: false });
+    mockFetchFn.mockImplementation((url: string) =>
+      Promise.resolve(
+        typeof url === 'string' && url.includes('/providers/catalog')
+          ? { ok: true, json: async () => [] }
+          : { ok: false }
+      )
+    );
 
     const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
     render(<ShortlinkProviderForm {...defaultProps} />, { wrapper });
@@ -236,7 +254,6 @@ describe('ShortlinkProviderForm', () => {
     });
 
     it('includes extraConfig in save body when clientId/clientSecret are set', async () => {
-      mockFetchFn.mockResolvedValueOnce({ ok: true });
       mockProvidersData = [oauthProvider];
       const { ShortlinkProviderForm } = await import('./shortlink-provider-form');
       render(<ShortlinkProviderForm identifier="bitly-oauth" isConfigured={false} onClose={vi.fn()} onSaved={vi.fn()} />, { wrapper });

@@ -231,8 +231,8 @@ export const SettingsPopup: FC<{
       'Connect your social media accounts so you can publish posts from Postmill. Choose a platform, follow the steps, and you are ready to post.'
     ),
     ai: t(
-      'ai_settings_description',
-      'Choose the AI assistant that helps you write posts and create images. Pick a provider, enter your account key, and turn it on.'
+      'ai_page_description',
+      'Set up the AI that helps you create content — connect a provider for writing and images, give it brand voices, and save prompts you reuse.'
     ),
     shortlinks: t(
       'shortlinks_settings_description',
@@ -247,8 +247,8 @@ export const SettingsPopup: FC<{
       'Route your posts through a private connection for extra security or to meet location rules.'
     ),
     storage: t(
-      'storage_settings_description',
-      'Choose where Postmill saves your uploaded files. Use the built-in storage or connect your own cloud bucket.'
+      'storage_page_description',
+      'Choose where Postmill saves your uploaded files — use the built-in storage or connect your own cloud bucket — and see how much space you are using.'
     ),
     webhooks: t(
       'webhooks_description',

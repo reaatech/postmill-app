@@ -27,6 +27,10 @@ vi.mock('swr', () => ({
   useSWRConfig: () => ({ mutate: mockMutate }),
 }));
 
+vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () => ({
+  useProviderCatalog: () => ({ data: [] }),
+}));
+
 import useSWR from 'swr';
 
 const mockProviders = {

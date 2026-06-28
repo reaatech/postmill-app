@@ -4,6 +4,10 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import {
+  ProviderVersionSelect,
+  useProviderVersionSelection,
+} from '@gitroom/frontend/components/settings/shared/provider-version-select';
 
 interface CredentialField {
   key: string;
@@ -43,11 +47,14 @@ interface ProviderConfigItem {
 
 interface ProviderModalProps {
   identifier: string;
+  /** Pinned version of the existing config (edit mode) — keeps the version select
+   *  on the stored version instead of silently defaulting to latest-active. */
+  initialVersion?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalProps) => {
+export const ProviderModal = ({ identifier, initialVersion, onClose, onSaved }: ProviderModalProps) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -59,7 +66,20 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
   const [provider, setProvider] = useState<ProviderDetail | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
 
-  const fields = provider?.credentialFields?.length ? provider.credentialFields : DEFAULT_FIELDS;
+  const {
+    versions,
+    selected: selectedVersion,
+    selectVersion,
+    showSelect,
+    credentialFields: versionFields,
+  } = useProviderVersionSelection('media', identifier, initialVersion);
+
+  const fields =
+    showSelect && versionFields
+      ? (versionFields as unknown as CredentialField[])
+      : provider?.credentialFields?.length
+        ? provider.credentialFields
+        : DEFAULT_FIELDS;
   // Only send fields the admin actually filled in (avoids overwriting stored creds with blanks).
   const filledCredentials = () => {
     const out: Record<string, string> = {};
@@ -118,6 +138,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
         method: 'PUT',
         body: JSON.stringify({
           credentials: Object.keys(credentials).length ? credentials : undefined,
+          version: selectedVersion || undefined,
         }),
       });
       if (!res.ok) {
@@ -132,7 +153,7 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
     } finally {
       setSaving(false);
     }
-  }, [identifier, values, provider, fetch, toaster, t, onSaved, onClose]);
+  }, [identifier, values, provider, selectedVersion, fetch, toaster, t, onSaved, onClose]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -196,6 +217,12 @@ export const ProviderModal = ({ identifier, onClose, onSaved }: ProviderModalPro
         </div>
 
         <div className="flex flex-col gap-[16px]">
+          <ProviderVersionSelect
+            versions={versions}
+            value={selectedVersion}
+            onChange={selectVersion}
+            label={t('provider_version', 'Provider version')}
+          />
           {fields.map((field) => (
             <div key={field.key} className="flex flex-col gap-[4px]">
               <label className="text-[13px] text-newTableText">

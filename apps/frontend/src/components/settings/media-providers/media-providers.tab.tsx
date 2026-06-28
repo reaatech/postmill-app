@@ -9,6 +9,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ProviderModal } from '@gitroom/frontend/components/settings/media-providers/provider-modal';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 
 // Most media studio routes match the provider identifier (/media/<id>); these two differ.
 const ROUTE_OVERRIDES: Record<string, string> = {
@@ -32,6 +33,7 @@ interface MediaProvider {
   capabilities: string[];
   isConfigured: boolean;
   enabled: boolean;
+  version: string;
 }
 
 const OPERATION_SHORT_LABELS: Record<string, string> = {
@@ -60,6 +62,7 @@ interface MediaProviderConfig {
   identifier: string;
   isConfigured: boolean;
   enabled: boolean;
+  version?: string;
 }
 
 const useMediaProviders = () => {
@@ -91,6 +94,7 @@ const useMediaProviders = () => {
         capabilities: caps,
         isConfigured: cfg?.isConfigured || false,
         enabled: cfg?.enabled || false,
+        version: cfg?.version ?? 'v1',
       } as MediaProvider;
     });
   }, [fetch]);
@@ -105,6 +109,7 @@ export const MediaProvidersTab = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: providers, isLoading, error, mutate } = useMediaProviders();
+  const { data: catalog } = useProviderCatalog('media');
 
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
 
@@ -206,6 +211,9 @@ export const MediaProvidersTab = () => {
       {configuringProvider && (
         <ProviderModal
           identifier={configuringProvider}
+          initialVersion={
+            providers?.find((p) => p.identifier === configuringProvider)?.version
+          }
           onClose={() => setConfiguringProvider(null)}
           onSaved={handleConfigured}
         />
@@ -262,15 +270,23 @@ export const MediaProvidersTab = () => {
             </div>
           </div>
         }
-        providers={filteredProviders.map((p) => ({
-          id: p.identifier,
-          identifier: p.identifier,
-          name: p.name,
-          enabled: p.enabled && p.isConfigured,
-          isActive: p.enabled && p.isConfigured,
-          isConfigured: p.isConfigured,
-          capabilities: p.capabilities,
-        }))}
+        providers={filteredProviders.map((p) => {
+          const catalogEntry = catalog?.find(
+            (e) => e.providerId === p.identifier && e.version === p.version
+          );
+          return {
+            id: p.identifier,
+            identifier: p.identifier,
+            name: p.name,
+            enabled: p.enabled && p.isConfigured,
+            isActive: p.enabled && p.isConfigured,
+            isConfigured: p.isConfigured,
+            capabilities: p.capabilities,
+            version: p.version,
+            versionStatus: catalogEntry?.status ?? 'active',
+            sunsetAt: catalogEntry?.sunsetAt,
+          };
+        })}
         getProviderHref={(provider) => studioHref(provider.identifier)}
         onConfigure={(id) => setConfiguringProvider(id)}
         onRemove={(id) => handleToggle(id, false)}

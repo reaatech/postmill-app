@@ -5,6 +5,10 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import {
+  ProviderVersionSelect,
+  useProviderVersionSelection,
+} from '@gitroom/frontend/components/settings/shared/provider-version-select';
 
 interface CredentialField {
   key: string;
@@ -44,17 +48,30 @@ const useProviders = () => {
 
 interface ProviderFormProps {
   identifier: string;
+  /** Pinned version of the existing config (edit mode) — keeps the version select
+   *  on the stored version instead of silently defaulting to latest-active. */
+  initialVersion?: string;
   onClose: () => void;
   onSaved: () => void;
 }
 
-export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps) => {
+export const ProviderForm = ({ identifier, initialVersion, onClose, onSaved }: ProviderFormProps) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: providers } = useProviders();
+  const {
+    versions,
+    selected: selectedVersion,
+    selectVersion,
+    showSelect,
+    credentialFields: versionFields,
+  } = useProviderVersionSelection('ai', identifier, initialVersion);
 
   const provider = providers?.find((p) => p.identifier === identifier);
+  // Drive the credential form from the SELECTED version when multiple exist.
+  const fields: CredentialField[] =
+    showSelect && versionFields ? (versionFields as CredentialField[]) : provider?.credentialFields ?? [];
   const [creds, setCreds] = useState<Record<string, string>>({});
   const [defaultModel, setDefaultModel] = useState('');
   const [reasoningModel, setReasoningModel] = useState('');
@@ -100,6 +117,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
           credentials: creds,
           defaultModel: defaultModel || undefined,
           reasoningModel: reasoningModel || undefined,
+          version: selectedVersion || undefined,
         }),
       });
       if (!res.ok) {
@@ -111,7 +129,7 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
     } finally {
       setSaving(false);
     }
-  }, [provider, identifier, creds, defaultModel, reasoningModel, fetch, toaster, t, onSaved]);
+  }, [provider, identifier, creds, defaultModel, reasoningModel, selectedVersion, fetch, toaster, t, onSaved]);
 
   const handleTest = useCallback(async () => {
     setTesting(true);
@@ -155,7 +173,14 @@ export const ProviderForm = ({ identifier, onClose, onSaved }: ProviderFormProps
         </button>
       </div>
 
-      {provider.credentialFields.map((field) => (
+      <ProviderVersionSelect
+        versions={versions}
+        value={selectedVersion}
+        onChange={selectVersion}
+        label={t('provider_version', 'Provider version')}
+      />
+
+      {fields.map((field) => (
         <div key={field.key} className="flex flex-col gap-[4px]">
           <label className="text-[13px] text-newTableText">
             {field.label}

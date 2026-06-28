@@ -13,6 +13,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { ProviderForm } from '@gitroom/frontend/components/settings/ai/provider-form';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { BrandTab } from '@gitroom/frontend/components/settings/brand/brand.tab';
 
 interface AICapabilities {
@@ -31,6 +32,7 @@ interface OrgProviderInfo {
   enabled: boolean;
   isActive: boolean;
   isConfigured: boolean;
+  version: string;
   defaultModel: string;
   reasoningModel: string;
   capabilities: AICapabilities;
@@ -101,6 +103,7 @@ export const AITab = () => {
   const user = useUser();
   const toaster = useToaster();
   const { data: config, isLoading, error, mutate } = useOrgConfig();
+  const { data: catalog } = useProviderCatalog('ai');
   const [subTab, setSubTab] = useState<SubTab>('provider');
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -175,17 +178,26 @@ export const AITab = () => {
 
   const shellProviders = useMemo(
     () =>
-      filteredProviders.map((p) => ({
-        id: p.identifier,
-        identifier: p.identifier,
-        name: p.name,
-        enabled: p.enabled && p.isConfigured,
-        isActive: p.isActive,
-        isConfigured: p.isConfigured,
-        type: p.type,
-        capabilities: CAPABILITY_KEYS.filter((c) => p.capabilities?.[c]),
-      })),
-    [filteredProviders]
+      filteredProviders.map((p) => {
+        const version = p.version ?? 'v1';
+        const catalogEntry = catalog?.find(
+          (e) => e.providerId === p.identifier && e.version === version
+        );
+        return {
+          id: p.identifier,
+          identifier: p.identifier,
+          name: p.name,
+          enabled: p.enabled && p.isConfigured,
+          isActive: p.isActive,
+          isConfigured: p.isConfigured,
+          type: p.type,
+          capabilities: CAPABILITY_KEYS.filter((c) => p.capabilities?.[c]),
+          version,
+          versionStatus: catalogEntry?.status ?? 'active',
+          sunsetAt: catalogEntry?.sunsetAt,
+        };
+      }),
+    [filteredProviders, catalog]
   );
 
   return (
@@ -228,6 +240,11 @@ export const AITab = () => {
           {configuringProvider ? (
             <ProviderForm
               identifier={configuringProvider}
+              initialVersion={
+                filteredProviders.find(
+                  (p) => p.identifier === configuringProvider
+                )?.version
+              }
               onClose={() => setConfiguringProvider(null)}
               onSaved={() => {
                 setConfiguringProvider(null);

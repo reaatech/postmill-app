@@ -9,6 +9,10 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useVpnConfig } from '@gitroom/frontend/components/settings/vpn/hooks/useVpnConfig';
 import { ChannelVpnRegionSelect } from './channel-vpn-region-select';
 import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
+import {
+  ProviderVersionSelect,
+  useProviderVersionSelection,
+} from '@gitroom/frontend/components/settings/shared/provider-version-select';
 
 const PROVIDER_APP_LINKS: Record<string, { label: string; url: string | null }> = {
   linkedin: { label: 'LinkedIn Developer Portal', url: 'https://www.linkedin.com/developers/apps' },
@@ -47,6 +51,9 @@ export interface ChannelConfigInstance {
   redirectUri: string;
   setupNotes: string;
   isConfigured: boolean;
+  /** Pinned provider version of this config — keeps the version select on the
+   *  stored version instead of silently defaulting to latest-active on edit. */
+  version?: string;
   vpnSelection?: ChannelVpnSelection | null;
 }
 
@@ -81,6 +88,12 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
   const [editSetupNotes, setEditSetupNotes] = useState(config?.setupNotes || '');
   const [enabled, setEnabled] = useState(config?.enabled || false);
   const [saving, setSaving] = useState(false);
+
+  const {
+    versions,
+    selected: selectedVersion,
+    selectVersion,
+  } = useProviderVersionSelection('social', identifier, config?.version);
 
   // Optional VPN egress: built from the org's enabled VPN provider×region combos.
   const { data: vpnConfig } = useVpnConfig();
@@ -126,6 +139,7 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
       };
       if (clientId.trim()) payload.clientId = clientId.trim();
       if (clientSecret.trim()) payload.clientSecret = clientSecret.trim();
+      if (selectedVersion) payload.version = selectedVersion;
       if (editRedirectUri.trim()) payload.redirectUri = editRedirectUri.trim();
       if (editSetupNotes.trim()) payload.setupNotes = editSetupNotes.trim();
       if (vpnOptions.length) {
@@ -166,7 +180,7 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
     } finally {
       setSaving(false);
     }
-  }, [name, enabled, clientId, clientSecret, editScopes, editRedirectUri, editSetupNotes, vpnOptions, vpnEnabled, vpnValue, isConfigured, isEdit, config, identifier, fetch, toaster, t, onSaved, onClose]);
+  }, [name, enabled, clientId, clientSecret, selectedVersion, editScopes, editRedirectUri, editSetupNotes, vpnOptions, vpnEnabled, vpnValue, isConfigured, isEdit, config, identifier, fetch, toaster, t, onSaved, onClose]);
 
   const handleDelete = useCallback(async () => {
     if (!config) return;
@@ -230,6 +244,13 @@ export const ChannelConfigForm: FC<ChannelConfigFormProps> = ({
           placeholder={t('channel_name_placeholder', 'e.g. Marketing LinkedIn')}
         />
       </div>
+
+      <ProviderVersionSelect
+        versions={versions}
+        value={selectedVersion}
+        onChange={selectVersion}
+        label={t('provider_version', 'Provider version')}
+      />
 
       <div className="flex items-center gap-[8px]">
         <label className="text-[14px] font-[500]">{t('enabled', 'Enabled')}</label>

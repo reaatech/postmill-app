@@ -6,6 +6,11 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { ChannelConfigForm } from './channel-edit.modal';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import {
+  useProviderCatalog,
+  ProviderCatalogEntry,
+  latestActiveVersion,
+} from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -40,6 +45,7 @@ interface ChannelConfigItem {
   name: string;
   enabled: boolean;
   isConfigured: boolean;
+  version: string;
   scopes: string | null;
   redirectUri: string | null;
   setupNotes: string | null;
@@ -224,11 +230,32 @@ const CapabilityFilter: FC<{
 // tags and a capability filter, then configure the chosen one.
 const ProviderPicker: FC<{
   providers: ProviderCatalogItem[];
+  catalog?: ProviderCatalogEntry[];
   onPick: (provider: ProviderCatalogItem) => void;
-}> = ({ providers, onPick }) => {
+}> = ({ providers, catalog, onPick }) => {
   const t = useT();
   const [search, setSearch] = useState('');
   const [selectedCaps, setSelectedCaps] = useState<CapabilityKey[]>([]);
+
+  // Version lifecycle from the public catalog (plan §7.5.8): surface the latest
+  // selectable version + a sunset/retired pill so deprecated providers warn and
+  // retired ones cannot be added.
+  const versionInfo = useCallback(
+    (identifier: string) => {
+      const entries = (catalog || []).filter((e) => e.providerId === identifier);
+      if (!entries.length) return null;
+      const version = latestActiveVersion(catalog, identifier);
+      const status = entries.some((e) => e.status === 'active')
+        ? 'active'
+        : entries.some((e) => e.status === 'preview')
+          ? 'preview'
+          : entries.some((e) => e.status === 'deprecated')
+            ? 'deprecated'
+            : 'retired';
+      return { version, status };
+    },
+    [catalog]
+  );
 
   const toggleCap = useCallback((cap: CapabilityKey) => {
     setSelectedCaps((prev) =>
@@ -272,20 +299,37 @@ const ProviderPicker: FC<{
             {t('no_providers_match', 'No providers match your filters.')}
           </div>
         ) : (
-          filtered.map((p) => (
-            <button
-              key={p.identifier}
-              type="button"
-              onClick={() => onPick(p)}
-              className="flex items-start gap-[12px] p-[10px] rounded-[8px] border border-newTableBorder hover:bg-boxHover text-start"
-            >
-              <ChannelProviderIcon identifier={p.identifier} name={p.name} size={32} />
-              <div className="flex flex-col min-w-0">
-                <span className="text-[14px] font-[500] text-textColor">{p.name}</span>
-                <CapabilityBadges capabilities={p.capabilities} />
-              </div>
-            </button>
-          ))
+          filtered.map((p) => {
+            const vi = versionInfo(p.identifier);
+            const retired = vi?.status === 'retired';
+            return (
+              <button
+                key={p.identifier}
+                type="button"
+                disabled={retired}
+                onClick={() => !retired && onPick(p)}
+                className="flex items-start gap-[12px] p-[10px] rounded-[8px] border border-newTableBorder hover:bg-boxHover text-start disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChannelProviderIcon identifier={p.identifier} name={p.name} size={32} />
+                <div className="flex flex-col min-w-0">
+                  <span className="flex items-center gap-[6px] flex-wrap">
+                    <span className="text-[14px] font-[500] text-textColor">{p.name}</span>
+                    {vi && vi.status === 'deprecated' && (
+                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-amber-500/15 text-amber-600">
+                        {t('deprecated', 'Deprecated')}
+                      </span>
+                    )}
+                    {retired && (
+                      <span className="text-[10px] rounded-[4px] px-[6px] py-[1px] bg-red-500/15 text-red-400">
+                        {t('retired', 'Retired')}
+                      </span>
+                    )}
+                  </span>
+                  <CapabilityBadges capabilities={p.capabilities} />
+                </div>
+              </button>
+            );
+          })
         )}
       </div>
     </div>
@@ -297,6 +341,7 @@ export const ChannelsTab: FC = () => {
   const { mutate: globalMutate } = useSWRConfig();
   const { data: configs, isLoading, error } = useConfigs();
   const { data: providers } = useProviders();
+  const { data: catalog } = useProviderCatalog('social');
   const modals = useModals();
   const toaster = useToaster();
 
@@ -332,6 +377,7 @@ export const ChannelsTab: FC = () => {
                     redirectUri: config.redirectUri || '',
                     setupNotes: config.setupNotes || '',
                     isConfigured: config.isConfigured,
+                    version: config.version,
                     vpnSelection: config.vpnSelection,
                   }
                 : undefined
@@ -355,6 +401,7 @@ export const ChannelsTab: FC = () => {
       children: (close) => (
         <ProviderPicker
           providers={providers}
+          catalog={catalog}
           onPick={(p) => {
             close();
             openConfig(p.identifier);
@@ -362,7 +409,7 @@ export const ChannelsTab: FC = () => {
         />
       ),
     });
-  }, [providers, modals, t, toaster, openConfig]);
+  }, [providers, catalog, modals, t, toaster, openConfig]);
 
   const filteredConfigs = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -380,15 +427,33 @@ export const ChannelsTab: FC = () => {
 
   const shellProviders = useMemo(
     () =>
-      filteredConfigs.map((c) => ({
-        id: c.id,
-        identifier: c.identifier,
-        name: c.name,
-        enabled: c.enabled && c.isConfigured,
-        isActive: c.enabled && c.isConfigured,
-        isConfigured: c.isConfigured,
-      })),
-    [filteredConfigs]
+      filteredConfigs.map((c) => {
+        const version = c.version ?? 'v1';
+        const catalogEntry = catalog?.find(
+          (e) => e.providerId === c.identifier && e.version === version
+        );
+        return {
+          id: c.id,
+          identifier: c.identifier,
+          name: c.name,
+          enabled: c.enabled && c.isConfigured,
+          isActive: c.enabled && c.isConfigured,
+          isConfigured: c.isConfigured,
+          version,
+          versionStatus: catalogEntry?.status ?? 'active',
+          sunsetAt: catalogEntry?.sunsetAt,
+        };
+      }),
+    [filteredConfigs, catalog]
+  );
+
+  // Reopen a config from the lifecycle banner (Upgrade / Reconfigure).
+  const openConfigByIdentifier = useCallback(
+    (identifier: string) => {
+      const config = filteredConfigs.find((c) => c.identifier === identifier);
+      openConfig(identifier, config);
+    },
+    [filteredConfigs, openConfig]
   );
 
   if (error) {
@@ -413,7 +478,8 @@ export const ChannelsTab: FC = () => {
     <ProviderListShell
       title=""
       providers={shellProviders}
-      onConfigure={() => undefined}
+      onConfigure={openConfigByIdentifier}
+      onUpgrade={openConfigByIdentifier}
       onRemove={() => undefined}
       ProviderIconComponent={ChannelProviderIcon}
       toolbar={

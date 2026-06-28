@@ -97,6 +97,12 @@ vi.mock('./hooks/useShortlinksConfig', () => ({
   useShortlinksProviders: () => ({ data: mockProvidersList }),
 }));
 
+vi.mock('@gitroom/frontend/components/settings/shared/use-provider-catalog', () => ({
+  useProviderCatalog: () => ({ data: [] }),
+  selectableVersions: () => [],
+  latestActiveVersion: () => undefined,
+}));
+
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
     {children}

@@ -11,6 +11,7 @@ import {
 } from '@gitroom/frontend/components/settings/shortlinks/hooks/useShortlinksConfig';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 
 const CAPABILITY_LABELS: Record<string, string> = {
   create: 'Create links',
@@ -33,6 +34,7 @@ export const ShortlinksTab = () => {
   const fetch = useFetch();
   const toaster = useToaster();
   const { data: config, isLoading, error, mutate } = useShortlinksConfig();
+  const { data: catalog } = useProviderCatalog('shortlink');
   const [configuringProvider, setConfiguringProvider] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [oauthProcessing, setOauthProcessing] = useState(false);
@@ -133,16 +135,24 @@ export const ShortlinksTab = () => {
 
   const shellProviders = useMemo(
     () =>
-      filteredProviders.map((p) => ({
-        id: p.identifier,
-        identifier: p.identifier,
-        name: p.name,
-        enabled: p.isConfigured,
-        isActive: p.isActive,
-        isConfigured: p.isConfigured,
-        capabilities: capabilityChips(p),
-      })),
-    [filteredProviders]
+      filteredProviders.map((p) => {
+        const catalogEntry = catalog?.find(
+          (e) => e.providerId === p.identifier && e.version === p.version
+        );
+        return {
+          id: p.identifier,
+          identifier: p.identifier,
+          name: p.name,
+          enabled: p.isConfigured,
+          isActive: p.isActive,
+          isConfigured: p.isConfigured,
+          capabilities: capabilityChips(p),
+          version: p.version,
+          versionStatus: catalogEntry?.status ?? 'active',
+          sunsetAt: catalogEntry?.sunsetAt,
+        };
+      }),
+    [filteredProviders, catalog]
   );
 
   return (
@@ -165,6 +175,7 @@ export const ShortlinksTab = () => {
         <ShortlinkProviderForm
           identifier={configuringProvider}
           isConfigured={filteredProviders.find((p) => p.identifier === configuringProvider)?.isConfigured ?? false}
+          initialVersion={filteredProviders.find((p) => p.identifier === configuringProvider)?.version}
           onClose={() => setConfiguringProvider(null)}
           onSaved={() => {
             setConfiguringProvider(null);
