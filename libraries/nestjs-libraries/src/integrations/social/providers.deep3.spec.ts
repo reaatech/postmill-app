@@ -830,6 +830,11 @@ describe('devto deep', () => {
     expect(provider.handleErrors('Some other error')).toBeUndefined();
   });
 
+  it('propagates BadBodyError when post hits a canonical-url error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Canonical url has already been taken', 422));
+    await expect(provider.post('user-123', 'devto-api-key', [{ id: 'p1', message: 'Content', settings: { title: 'My Article', canonical: 'https://ex.com/orig' } }], {} as any)).rejects.toThrow(BadBodyError);
+  });
+
   it('refreshToken returns static value', async () => {
     const r = await provider.refreshToken('tok');
     expect(r.accessToken).toBe('');
@@ -1011,6 +1016,12 @@ describe('wordpress deep', () => {
 
   it('handleErrors returns undefined for other errors', () => {
     expect(provider.handleErrors('other error')).toBeUndefined();
+  });
+
+  it('propagates BadBodyError when post hits rest_cannot_create', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('rest_cannot_create', 403));
+    const accessToken = Buffer.from(JSON.stringify({ domain: 'https://example.com', username: 'admin', password: 'pass' })).toString('base64');
+    await expect(provider.post('https://example.com_42', accessToken, [{ id: 'p1', message: '<p>Hello WordPress!</p>', settings: { title: 'My Post', type: 'posts' } }], {} as any)).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken returns static value', async () => {

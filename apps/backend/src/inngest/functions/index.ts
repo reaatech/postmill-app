@@ -7,6 +7,7 @@ import { AutopostActivity } from '@gitroom/nestjs-libraries/inngest/activities/a
 import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/media-jobs.activity';
 import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/digest.activity';
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
+import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { createAnalyticsCollection } from './analytics-collection';
 import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
@@ -31,18 +32,19 @@ export interface InngestActivities {
   mediaJobsActivity: MediaJobsActivity;
   digestActivity: DigestActivity;
   campaignActivity: CampaignActivity;
+  inngestRunRepository: InngestRunRepository;
 }
 
 export const createFunctions = (activities: InngestActivities) => [
-  createAnalyticsCollection(activities.analyticsActivity),
-  createCommentsCollection(activities.commentsActivity),
+  createAnalyticsCollection(activities.analyticsActivity, activities.inngestRunRepository),
+  createCommentsCollection(activities.commentsActivity, activities.inngestRunRepository),
   createCommentsSyncOrg(activities.commentsActivity),
-  createMissingPostFinder(activities.postActivity),
-  createMediaJobsPoll(activities.mediaJobsActivity),
+  createMissingPostFinder(activities.postActivity, activities.inngestRunRepository),
+  createMediaJobsPoll(activities.mediaJobsActivity, activities.inngestRunRepository),
   createSendEmail(activities.emailActivity),
   createDigestEmailDaily(activities.digestActivity),
   createDigestEmailWeekly(activities.digestActivity),
-  createCampaignTagPurge(activities.campaignActivity),
+  createCampaignTagPurge(activities.campaignActivity, activities.inngestRunRepository),
   createAutopostProcess(activities.autopostActivity),
   createRefreshToken(activities.integrationsActivity),
   createStreakTracker(activities.emailActivity, activities.postActivity),

@@ -15,6 +15,7 @@ describe('createMissingPostFinder', () => {
   let postActivity: {
     searchForMissingThreeHoursPosts: ReturnType<typeof vi.fn>;
   };
+  let runRepo: any;
   let getHandler: () => any;
 
   beforeEach(() => {
@@ -23,9 +24,15 @@ describe('createMissingPostFinder', () => {
     postActivity = {
       searchForMissingThreeHoursPosts: vi.fn().mockResolvedValue(undefined),
     };
+    runRepo = {
+      recordStart: vi.fn().mockResolvedValue('2020-01-01T00:00:00.000Z'),
+      recordComplete: vi.fn().mockResolvedValue(undefined),
+      recordFailed: vi.fn().mockResolvedValue(undefined),
+      getAllLatest: vi.fn().mockResolvedValue([]),
+    };
 
     getHandler = captureFunctionHandler(vi.mocked(inngest.createFunction));
-    createMissingPostFinder(postActivity as any);
+    createMissingPostFinder(postActivity as any, runRepo as any);
   });
 
   it('registers an hourly UTC cron handler with concurrency 1', () => {
@@ -43,5 +50,7 @@ describe('createMissingPostFinder', () => {
 
     expect(step.run).toHaveBeenCalledWith('find-missing', expect.any(Function));
     expect(postActivity.searchForMissingThreeHoursPosts).toHaveBeenCalled();
+    expect(runRepo.recordStart).toHaveBeenCalledWith('missing-post-finder');
+    expect(runRepo.recordComplete).toHaveBeenCalled();
   });
 });

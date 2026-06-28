@@ -34,15 +34,24 @@ const makeActivity = (): CommentsActivityMock => ({
   notifyNewComments: vi.fn().mockResolvedValue(undefined),
 });
 
+const makeRunRepo = () => ({
+  recordStart: vi.fn().mockResolvedValue('2020-01-01T00:00:00.000Z'),
+  recordComplete: vi.fn().mockResolvedValue(undefined),
+  recordFailed: vi.fn().mockResolvedValue(undefined),
+  getAllLatest: vi.fn().mockResolvedValue([]),
+});
+
 describe('createCommentsCollection (cron, fan-out)', () => {
   let commentsActivity: CommentsActivityMock;
+  let runRepo: ReturnType<typeof makeRunRepo>;
   let getHandler: () => any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     commentsActivity = makeActivity();
+    runRepo = makeRunRepo();
     getHandler = captureFunctionHandler(vi.mocked(inngest.createFunction));
-    createCommentsCollection(commentsActivity as any);
+    createCommentsCollection(commentsActivity as any, runRepo as any);
   });
 
   it('registers a minutely UTC cron handler with concurrency 1', () => {
@@ -58,9 +67,20 @@ describe('createCommentsCollection (cron, fan-out)', () => {
 
     await getHandler()({ step });
 
+    // get-org-ids stays a memoized step; days-back/interval are pure env-parse reads
+    // called directly (no step.run wrapper).
     expect(step.run).toHaveBeenCalledWith('get-org-ids', expect.any(Function));
-    expect(step.run).toHaveBeenCalledWith('get-days-back', expect.any(Function));
-    expect(step.run).toHaveBeenCalledWith('get-interval', expect.any(Function));
+    expect(step.run).not.toHaveBeenCalledWith('get-days-back', expect.any(Function));
+    expect(step.run).not.toHaveBeenCalledWith('get-interval', expect.any(Function));
+    expect(commentsActivity.getDaysBack).toHaveBeenCalled();
+    expect(commentsActivity.getSweepIntervalMinutes).toHaveBeenCalled();
+
+    // Run timing is recorded around the fan-out work.
+    expect(runRepo.recordStart).toHaveBeenCalledWith('comments-collection');
+    expect(runRepo.recordComplete).toHaveBeenCalledWith(
+      'comments-collection',
+      '2020-01-01T00:00:00.000Z'
+    );
 
     // One fan-out batch: a 'comments/sync-org' event per org, carrying daysBack.
     expect(step.sendEvent).toHaveBeenCalledWith('fan-out-org-sync', [

@@ -102,6 +102,7 @@ import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-ada
 import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder';
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
+import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
@@ -215,6 +216,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     RbacSeeder,
     BackfillService,
     MigrationLedgerRepository,
+    InngestRunRepository,
     RolesRepository,
     RolesService,
     DesignRepository,

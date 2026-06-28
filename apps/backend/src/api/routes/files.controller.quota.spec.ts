@@ -31,6 +31,7 @@ function makeController() {
     fileSvcMock as any,
     storageSvcMock as any,
     {} as any,
+    {} as any,
   );
   return ctrl;
 }

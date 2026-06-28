@@ -21,7 +21,7 @@ const org: Organization = { id: 'org-1' } as any;
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
-    { resolveAI: () => undefined } as unknown as ProviderResolutionService,
+    { resolveAI: (): any => undefined } as unknown as ProviderResolutionService,
     undefined as any,
   ) as any;
 }

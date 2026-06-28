@@ -1712,3 +1712,18 @@ model MigrationLedger {
 
   @@index([appliedAt])
 }
+
+// One row per Inngest cron function (upsert on functionId), recording the latest run's
+// timing/status for the /health endpoint. Bounded — never grows with run count.
+model InngestFunctionRun {
+  id          String    @id @default(cuid())
+  functionId  String    @unique
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  status      String    @default("running") // running | completed | failed
+  error       String?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([updatedAt])
+}

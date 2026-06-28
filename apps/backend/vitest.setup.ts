@@ -21,7 +21,7 @@ setSocialFetchPorts({
   undiciFetch: ((...args: any[]) => (globalThis.fetch as any)(...args)) as any,
   RefreshTokenError,
   BadBodyError,
-  timer: (async () => undefined) as any,
+  timer: (async (): Promise<any> => undefined) as any,
   sharp: ((_buf: any) => ({
     metadata: async () => ({ width: 800, height: 600 }),
     toFormat: () => ({

@@ -23,10 +23,18 @@ describe('createAnalyticsCollection', () => {
     pruneShortLinkSnapshots: ReturnType<typeof vi.fn>;
     pruneEmailLogs: ReturnType<typeof vi.fn>;
   };
+  let runRepo: any;
   let getHandler: () => any;
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    runRepo = {
+      recordStart: vi.fn().mockResolvedValue('2020-01-01T00:00:00.000Z'),
+      recordComplete: vi.fn().mockResolvedValue(undefined),
+      recordFailed: vi.fn().mockResolvedValue(undefined),
+      getAllLatest: vi.fn().mockResolvedValue([]),
+    };
 
     analyticsActivity = {
       getAllOrganizationIds: vi.fn().mockResolvedValue(['org-1', 'org-2']),
@@ -41,7 +49,7 @@ describe('createAnalyticsCollection', () => {
     };
 
     getHandler = captureFunctionHandler(vi.mocked(inngest.createFunction));
-    createAnalyticsCollection(analyticsActivity as any);
+    createAnalyticsCollection(analyticsActivity as any, runRepo as any);
   });
 
   it('registers a daily UTC cron handler with concurrency 1', () => {
@@ -59,6 +67,12 @@ describe('createAnalyticsCollection', () => {
 
     expect(step.run).toHaveBeenCalledWith('get-org-ids', expect.any(Function));
     expect(analyticsActivity.getAllOrganizationIds).toHaveBeenCalled();
+
+    expect(runRepo.recordStart).toHaveBeenCalledWith('analytics-collection');
+    expect(runRepo.recordComplete).toHaveBeenCalledWith(
+      'analytics-collection',
+      '2020-01-01T00:00:00.000Z'
+    );
 
     for (const orgId of ['org-1', 'org-2']) {
       expect(step.run).toHaveBeenCalledWith(

@@ -2,6 +2,7 @@ import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { InngestService } from '@gitroom/nestjs-libraries/inngest/inngest.service';
+import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 const EVENT_API_TIMEOUT_MS = 5_000;
@@ -11,7 +12,10 @@ const INNGEST_DEV_BASE_URL = 'http://localhost:8288';
 @ApiTags('Health')
 @Controller('/health')
 export class HealthController {
-  constructor(private readonly inngestService: InngestService) {}
+  constructor(
+    private readonly inngestService: InngestService,
+    private readonly inngestRunRepository: InngestRunRepository
+  ) {}
 
   @Get('/')
   @SkipThrottle()
@@ -49,7 +53,10 @@ export class HealthController {
     const signingKeyRequired = !devMode;
     const signingKeyValid = signingKeyRequired ? signingKeyPresent : true;
 
-    const eventApiReachable = await this.checkEventApiReachability(devMode);
+    const { reachable: eventApiReachable, latencyMs: eventApiLatencyMs } =
+      await this.checkEventApiReachability(devMode);
+
+    const lastRuns = await this.getLastRuns();
 
     const healthy =
       serveHandlerRegistered &&
@@ -65,13 +72,28 @@ export class HealthController {
       serveHandlerRegistered,
       functionsRegistered,
       eventApiReachable,
+      eventApiLatencyMs,
+      lastRuns,
       healthy,
     };
   }
 
-  private async checkEventApiReachability(devMode: boolean): Promise<boolean> {
+  // Latest run timing/status per cron function (one row each). Never fails the health
+  // check — an unreachable DB just yields an empty list.
+  private async getLastRuns() {
+    try {
+      return await this.inngestRunRepository.getAllLatest();
+    } catch {
+      return [];
+    }
+  }
+
+  private async checkEventApiReachability(
+    devMode: boolean
+  ): Promise<{ reachable: boolean; latencyMs: number | null }> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), EVENT_API_TIMEOUT_MS);
+    const startedAt = Date.now();
 
     try {
       if (devMode) {
@@ -85,16 +107,16 @@ export class HealthController {
           method: 'HEAD',
           signal: controller.signal,
         });
-        return response.ok;
+        return { reachable: response.ok, latencyMs: Date.now() - startedAt };
       }
 
       const response = await safeFetch(INNGEST_CLOUD_EVENT_API, {
         method: 'HEAD',
         signal: controller.signal,
       });
-      return response.ok;
+      return { reachable: response.ok, latencyMs: Date.now() - startedAt };
     } catch {
-      return false;
+      return { reachable: false, latencyMs: null };
     } finally {
       clearTimeout(timeout);
     }

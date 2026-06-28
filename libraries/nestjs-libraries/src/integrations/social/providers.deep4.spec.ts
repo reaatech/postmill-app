@@ -400,6 +400,20 @@ describe('pixelfed deep', () => {
     expect(r[0].postId).toBe('post-1');
     expect(r[0].releaseURL).toBe('https://ex.com/post/1');
   });
+
+  it('propagates RefreshTokenError on 401 from fetch', async () => {
+    const integration = { id: 'int-1', customInstanceDetails: JSON.stringify({ instance: 'https://pixelfed.example', token: 'test-token' }) } as any;
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(respError('Unauthorized', 401));
+
+    await expect(provider.post('123', 'tok', [{ id: 'p1', message: 'Text only', settings: {} }], integration)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError on 400 from fetch', async () => {
+    const integration = { id: 'int-1', customInstanceDetails: JSON.stringify({ instance: 'https://pixelfed.example', token: 'test-token' }) } as any;
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(respError('Bad Request', 400));
+
+    await expect(provider.post('123', 'tok', [{ id: 'p1', message: 'Text only', settings: {} }], integration)).rejects.toThrow(BadBodyError);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────
@@ -607,5 +621,19 @@ describe('peertube deep', () => {
       .mockResolvedValueOnce({ ok: true, status: 200, json: vi.fn().mockResolvedValue({ id: '123', username: 'testuser' }) });
 
     await expect(provider.post('123', 'tok', [{ id: 'p1', message: 'Test', settings: {}, media: [{ path: 'https://ex.com/vid.mp4' }] }], integration)).rejects.toThrow('No PeerTube channel found');
+  });
+
+  it('propagates RefreshTokenError on 401 from fetch', async () => {
+    const integration = { id: 'int-1', customInstanceDetails: JSON.stringify({ instance: 'https://peertube.example', username: 'testuser', password: 'testpass' }) } as any;
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(respError('Unauthorized', 401));
+
+    await expect(provider.post('123', 'tok', [{ id: 'p1', message: 'Test', settings: {}, media: [{ path: 'https://ex.com/vid.mp4' }] }], integration)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError on 400 from fetch', async () => {
+    const integration = { id: 'int-1', customInstanceDetails: JSON.stringify({ instance: 'https://peertube.example', username: 'testuser', password: 'testpass' }) } as any;
+    (globalThis as any).fetch = vi.fn().mockResolvedValue(respError('Bad Request', 400));
+
+    await expect(provider.post('123', 'tok', [{ id: 'p1', message: 'Test', settings: {}, media: [{ path: 'https://ex.com/vid.mp4' }] }], integration)).rejects.toThrow(BadBodyError);
   });
 });
