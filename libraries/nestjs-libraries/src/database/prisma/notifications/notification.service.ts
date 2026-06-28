@@ -60,16 +60,24 @@ export class NotificationService {
     return this._notificationRepository.getNotifications(organizationId, userId);
   }
 
-  async markAsRead(notificationId: string, userId: string) {
-    return this._notificationRepository.markAsRead(notificationId, userId);
+  async markAsRead(
+    notificationId: string,
+    userId: string,
+    organizationId: string
+  ) {
+    return this._notificationRepository.markAsRead(
+      notificationId,
+      userId,
+      organizationId
+    );
   }
 
   async markAllAsRead(organizationId: string, userId: string) {
     return this._notificationRepository.markAllAsRead(organizationId, userId);
   }
 
-  async deleteNotification(id: string) {
-    return this._notificationRepository.deleteNotification(id);
+  async deleteNotification(id: string, organizationId: string) {
+    return this._notificationRepository.deleteNotification(id, organizationId);
   }
 
   private _defaultChannels(): ChannelToggles {

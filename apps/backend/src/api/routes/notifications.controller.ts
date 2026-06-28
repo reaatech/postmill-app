@@ -69,9 +69,10 @@ export class NotificationsController {
   @Patch('/:id/read')
   async markAsRead(
     @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization,
     @Param('id') id: string
   ) {
-    await this._notificationsService.markAsRead(id, user.id);
+    await this._notificationsService.markAsRead(id, user.id, organization.id);
     return { success: true };
   }
 
@@ -85,8 +86,11 @@ export class NotificationsController {
   }
 
   @Delete('/:id')
-  async deleteNotification(@Param('id') id: string) {
-    await this._notificationsService.deleteNotification(id);
+  async deleteNotification(
+    @GetOrgFromRequest() organization: Organization,
+    @Param('id') id: string
+  ) {
+    await this._notificationsService.deleteNotification(id, organization.id);
     return { success: true };
   }
 

@@ -152,7 +152,18 @@ export class NotificationsRepository {
     };
   }
 
-  async markAsRead(notificationId: string, userId: string) {
+  async markAsRead(
+    notificationId: string,
+    userId: string,
+    organizationId: string
+  ) {
+    // Only mark read a notification that belongs to the caller's org.
+    const owned = await this._notifications.model.notifications.findFirst({
+      where: { id: notificationId, organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!owned) return;
+
     await this._notificationRead.model.notificationRead.upsert({
       where: {
         notificationId_userId: {
@@ -197,9 +208,10 @@ export class NotificationsRepository {
     });
   }
 
-  async deleteNotification(id: string) {
-    await this._notifications.model.notifications.update({
-      where: { id },
+  async deleteNotification(id: string, organizationId: string) {
+    // Org-scoped soft delete — updateMany so a cross-org id is a no-op, not an IDOR.
+    await this._notifications.model.notifications.updateMany({
+      where: { id, organizationId },
       data: { deletedAt: new Date() },
     });
   }
