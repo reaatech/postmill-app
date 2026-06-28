@@ -98,7 +98,7 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
             const buffer = Buffer.from(
               await (
                 await limit(() =>
-                  fetch(
+                  safeFetch(
                     `https://api.elevenlabs.io/v1/text-to-speech/${customParams.voice}?output_format=mp3_44100_128`,
                     {
                       method: 'POST',

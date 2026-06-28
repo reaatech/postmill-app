@@ -9,7 +9,7 @@ get multiple rows). The `has-spec?` column reflects whether the **package** cont
 - **Modules:** 161  (== `providerModules.length`)
 - **Packages:** 143  (== real package dirs under `libraries/providers/`, excluding `kernel` and `node_modules`)
   - Note: `ls -d libraries/providers/*/ | grep -v kernel | wc -l` = **144** on a clean checkout because it also counts the `node_modules/` dir; **143** are real packages. (After a local `--coverage` run a gitignored `coverage/` dir also appears, making the raw count **145** — both `node_modules/` and `coverage/` are non-package artifacts.)
-- **Packages with at least one spec:** 64 / 143
+- **Packages with at least one spec:** 89 / 143  (media adapters + the magnific content pack gained recorded-fixture `*.int-spec.ts` behavioral tests via the shared `kernel/src/testing/media-int-helpers.ts`)
 
 Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=19, social=36, storage=13, vpn=16
 
