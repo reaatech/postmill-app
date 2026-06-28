@@ -1,4 +1,5 @@
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import {
   ExposeVideoFunction,
   URL,
@@ -15,6 +16,7 @@ import pLimit from 'p-limit';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { IsString } from 'class-validator';
 import { JSONSchema } from 'class-validator-jsonschema';
+import { Logger } from '@nestjs/common';
 const limit = pLimit(2);
 
 const transloadit = new Transloadit({
@@ -57,6 +59,7 @@ class ImagesSlidesParams {
     !!process.env.FAL_KEY,
 })
 export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
+  private readonly _logger = new Logger(ImagesSlides.name);
   override dto = ImagesSlidesParams;
   constructor(
     private _openaiService: OpenaiService,
@@ -168,7 +171,7 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
       { format: 'SRT' }
     );
 
-    console.log(split);
+    this._logger.debug(split);
 
     const { results } = await transloadit.createAssembly({
       uploads: {
@@ -246,7 +249,7 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
   @ExposeVideoFunction()
   async loadVoices(data: any) {
     const { voices } = await (
-      await fetch(
+      await safeFetch(
         'https://api.elevenlabs.io/v2/voices?page_size=40&category=premade',
         {
           method: 'GET',

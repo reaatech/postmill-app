@@ -1,4 +1,10 @@
-import { Global, Module } from '@nestjs/common';
+import {
+  Global,
+  Module,
+  NestModule,
+  MiddlewareConsumer,
+} from '@nestjs/common';
+import { RequestIdMiddleware } from '@gitroom/backend/api/middleware/request-id.middleware';
 import { DatabaseModule } from '@gitroom/nestjs-libraries/database/prisma/database.module';
 import { ApiModule } from '@gitroom/backend/api/api.module';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
@@ -99,4 +105,8 @@ const scheduleModule = featureFlags.isEnabled('cron')
     ChatModule,
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestIdMiddleware).forRoutes('*');
+  }
+}

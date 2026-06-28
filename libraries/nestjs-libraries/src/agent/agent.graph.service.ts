@@ -18,9 +18,11 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 
+const logger = new Logger('AgentGraphService');
+
 const tools = !process.env.TAVILY_API_KEY
   ? ((): any[] => {
-      console.warn('TAVILY_API_KEY not set — web search will be unavailable for agent');
+      logger.warn('TAVILY_API_KEY not set — web search will be unavailable for agent');
       return [];
     })()
   : [new TavilySearch({ maxResults: 3 })];

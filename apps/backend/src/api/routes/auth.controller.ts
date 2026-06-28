@@ -36,6 +36,7 @@ import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.m
 @ApiTags('Auth')
 @Controller('/auth')
 export class AuthController {
+  private readonly _logger = new Logger(AuthController.name);
   constructor(
     private _authService: AuthService,
     private _emailService: EmailService,
@@ -380,7 +381,9 @@ export class AuthController {
         success: true,
       };
     } catch (e: any) {
-      console.error('Resend activation failed:', e);
+      this._logger.error(
+        `Resend activation failed: ${(e as Error)?.message ?? String(e)}`
+      );
       return {
         success: false,
         message: 'Resend activation failed',

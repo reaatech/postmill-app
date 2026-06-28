@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 import 'reflect-metadata';
 
 // ---------------------------------------------------------------------------
@@ -717,13 +717,15 @@ describe('IntegrationManager', () => {
     });
 
     it('returns empty internalPlugs and logs warning for unknown provider', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const warnSpy = vi
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => {});
 
       const result = await manager.getInternalPlugs('nonexistent');
 
       expect(result.internalPlugs).toEqual([]);
       expect(warnSpy).toHaveBeenCalledWith(
-        "IntegrationManager: Unknown provider 'nonexistent' requested in getInternalPlugs"
+        "Unknown provider 'nonexistent' requested in getInternalPlugs"
       );
       warnSpy.mockRestore();
     });

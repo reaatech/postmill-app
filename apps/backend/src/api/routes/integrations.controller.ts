@@ -41,6 +41,7 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 @ApiTags('Integrations')
 @Controller('/integrations')
 export class IntegrationsController {
+  private readonly _logger = new Logger(IntegrationsController.name);
   constructor(
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
@@ -296,7 +297,7 @@ export class IntegrationsController {
     try {
       newList = (await this.functionIntegration(org, body)) || [];
     } catch (err) {
-      console.log(err);
+      this._logger.warn((err as Error)?.message ?? String(err));
     }
 
     if (!Array.isArray(newList) && newList?.none) {

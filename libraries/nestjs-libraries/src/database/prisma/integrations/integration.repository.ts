@@ -390,6 +390,17 @@ export class IntegrationRepository {
     return decryptIntegrationTokens(result);
   }
 
+  async getIntegrationsByIds(org: string, ids: string[]) {
+    if (!ids.length) return [];
+    const results = await this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        id: { in: ids },
+      },
+    });
+    return results.map(decryptIntegrationTokens);
+  }
+
   async updateOnCustomerName(org: string, id: string, name: string) {
     const customer = !name
       ? undefined

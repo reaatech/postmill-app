@@ -4,6 +4,8 @@ import {
   VideoAbstract,
 } from '@gitroom/nestjs-libraries/videos/video.interface';
 import { timer } from '@gitroom/helpers/utils/timer';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { Logger } from '@nestjs/common';
 import { ArrayMaxSize, IsArray, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -36,6 +38,7 @@ class Veo3Params {
   available: !!process.env.KIEAI_API_KEY,
 })
 export class Veo3 extends VideoAbstract<Veo3Params> {
+  private readonly _logger = new Logger(Veo3.name);
   override dto = Veo3Params;
   async process(
     output: 'vertical' | 'horizontal',
@@ -43,7 +46,7 @@ export class Veo3 extends VideoAbstract<Veo3Params> {
     orgId?: string
   ): Promise<URL> {
     const value = await (
-      await fetch('https://api.kie.ai/api/v1/veo/generate', {
+      await safeFetch('https://api.kie.ai/api/v1/veo/generate', {
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${process.env.KIEAI_API_KEY}`,
@@ -65,9 +68,9 @@ export class Veo3 extends VideoAbstract<Veo3Params> {
     const taskId = value.data.taskId;
     let videoUrl = [];
     while (videoUrl.length === 0) {
-      console.log('waiting for video to be ready');
+      this._logger.debug('waiting for video to be ready');
       const data = await (
-        await fetch(
+        await safeFetch(
           'https://api.kie.ai/api/v1/veo/record-info?taskId=' + taskId,
           {
             headers: {

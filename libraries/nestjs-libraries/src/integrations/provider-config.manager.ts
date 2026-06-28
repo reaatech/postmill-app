@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { replaceCredentialsMap, type CredentialEntry } from '@gitroom/nestjs-libraries/integrations/credentials';
@@ -18,6 +18,7 @@ type DecryptedConfig = {
 
 @Injectable()
 export class ProviderConfigManager implements OnModuleInit {
+  private readonly _logger = new Logger(ProviderConfigManager.name);
   private cache: Map<string, DecryptedConfig> = new Map();
   private allEnabled: string[] = [];
   private lastRefresh = 0;
@@ -30,7 +31,7 @@ export class ProviderConfigManager implements OnModuleInit {
     try {
       await this.refreshCache();
     } catch (err: any) {
-      console.error('Failed to load provider configs on startup, will retry on first access:', err?.message);
+      this._logger.error(`Failed to load provider configs on startup, will retry on first access: ${err?.message}`);
     }
   }
 
@@ -77,7 +78,7 @@ export class ProviderConfigManager implements OnModuleInit {
           try {
             parsed = JSON.parse(config.additionalConfig);
           } catch {
-            console.error(`ProviderConfigManager: Failed to parse additionalConfig for ${config.identifier}`);
+            this._logger.error(`Failed to parse additionalConfig for ${config.identifier}`);
           }
           if (parsed?.botToken) {
             token = AuthService.fixedDecryption(parsed.botToken);
@@ -96,7 +97,7 @@ export class ProviderConfigManager implements OnModuleInit {
           });
         }
       } catch (err) {
-        console.error(`ProviderConfigManager: Failed to load config for ${config.identifier}`, err);
+        this._logger.error(`Failed to load config for ${config.identifier}: ${(err as any)?.message}`);
       }
     }
 
@@ -111,7 +112,7 @@ export class ProviderConfigManager implements OnModuleInit {
       try {
         await this.refreshCache();
       } catch (err) {
-        console.error('ProviderConfigManager: Cache refresh failed, will retry on next request', err);
+        this._logger.error(`Cache refresh failed, will retry on next request: ${(err as any)?.message}`);
       }
     }
   }

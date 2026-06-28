@@ -30,6 +30,8 @@ declare module 'express' {
   }
 }
 
+const logger = new Logger('startMcp');
+
 const fixAcceptHeader = (req: Request) => {
   const value = 'application/json, text/event-stream';
   req.headers.accept = value;
@@ -855,19 +857,19 @@ export const startMcp = async (app: INestApplication) => {
             });
           });
 
-          console.log('[startMcp] Media MCP server mounted at /media-mcp');
+          logger.log('[startMcp] Media MCP server mounted at /media-mcp');
         } else {
-          console.warn(
+          logger.warn(
             '[startMcp] Media MCP server packages installed but security middleware unavailable — /media-mcp not mounted',
           );
         }
       } else {
-        console.warn(
+        logger.warn(
           '[startMcp] @reaatech/media-pipeline-mcp-server not available — /media-mcp not mounted',
         );
       }
     } catch (err) {
-      console.warn(
+      logger.warn(
         `[startMcp] Media MCP server init failed (may need package install): ${(err as Error).message}`,
       );
     }
@@ -942,21 +944,21 @@ export const startMcp = async (app: INestApplication) => {
         try {
           await a2aServer.handleRequest(req as any, res as any);
         } catch (err) {
-          console.warn(`[startMcp] A2A request failed: ${(err as Error).message}`);
+          logger.warn(`[startMcp] A2A request failed: ${(err as Error).message}`);
           if (!res.headersSent) {
             res.status(500).json({ error: 'a2a_internal_error' });
           }
         }
       });
 
-      console.log('[startMcp] A2A bridge mounted at /a2a');
+      logger.log('[startMcp] A2A bridge mounted at /a2a');
     } else {
-      console.warn(
+      logger.warn(
         '[startMcp] @reaatech/a2a-reference-mcp-bridge not available — /a2a not mounted',
       );
     }
   } catch (err) {
-    console.warn(
+    logger.warn(
       `[startMcp] A2A bridge init failed (may need package install): ${(err as Error).message}`,
     );
   }

@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpException,
+  Logger,
   Param,
   Post,
   UseFilters,
@@ -33,6 +34,7 @@ import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-ur
 @ApiTags('Integrations')
 @Controller('/integrations')
 export class NoAuthIntegrationsController {
+  private readonly _logger = new Logger(NoAuthIntegrationsController.name);
   constructor(
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
@@ -146,7 +148,7 @@ export class NoAuthIntegrationsController {
         }
 
         if (refresh && integrationProvider.reConnect) {
-          console.log('reconnect');
+          this._logger.log('reconnect');
           try {
             const newAuth = await integrationProvider.reConnect(
               auth.id,
@@ -262,7 +264,7 @@ export class NoAuthIntegrationsController {
     this._refreshIntegrationService
       .startRefreshWorkflow(org.id, createUpdate.id, integrationProvider)
       .catch((err) => {
-        console.log(err);
+        this._logger.warn((err as Error)?.message ?? String(err));
       });
 
     // Fetch pages if this is a two-step provider and not a refresh
@@ -282,7 +284,9 @@ export class NoAuthIntegrationsController {
           pages = await integrationProvider[fetchMethod](accessToken);
         }
       } catch (err) {
-        console.log('Failed to fetch pages:', err);
+        this._logger.warn(
+          `Failed to fetch pages: ${(err as Error)?.message ?? String(err)}`
+        );
       }
     }
 

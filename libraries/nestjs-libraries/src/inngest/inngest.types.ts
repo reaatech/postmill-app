@@ -61,6 +61,12 @@ export type InngestEvents = {
       organizationId: string;
     };
   };
+  'comments/sync-org': {
+    data: {
+      organizationId: string;
+      daysBack: number;
+    };
+  };
 
 };
 

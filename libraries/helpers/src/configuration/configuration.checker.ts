@@ -35,6 +35,17 @@ export class ConfigurationChecker {
     this.checkDeprecatedStorageVars();
     this.checkDeprecatedChannelVars();
     this.checkDeprecatedAiVars();
+    this.checkEncryptionKey();
+  }
+
+  checkEncryptionKey() {
+    if (!this.get('ENCRYPTION_KEY')) {
+      this.issues.push(
+        'ENCRYPTION_KEY not set — at-rest secrets are keyed from JWT_SECRET. ' +
+          'Set a dedicated 32-byte key (base64 or hex) for production so rotating ' +
+          'JWT_SECRET does not invalidate every stored ciphertext.',
+      );
+    }
   }
 
   checkInngest() {

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
 import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
@@ -420,14 +421,17 @@ export class SocialCommentsService {
         cursor,
       );
 
-      for (const post of posts) {
-        if (!post.releaseId || post.releaseId === 'missing') continue;
+      const syncable = posts.filter(
+        (post) => post.releaseId && post.releaseId !== 'missing',
+      );
+      // Bounded concurrency (5) instead of serial — provider rate limits cap the width.
+      await mapWithConcurrency(syncable, 5, async (post) => {
         try {
           await this.syncComments(orgId, post);
         } catch {
           // individual post sync errors are non-fatal
         }
-      }
+      });
 
       hasMore = posts.length === 50;
       if (hasMore) {
@@ -440,6 +444,40 @@ export class SocialCommentsService {
 
   async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
     return this._socialCommentsRepository.getInbox(orgId, userId, filters);
+  }
+
+  // ── Comment-sweep passthroughs (used by CommentsActivity, D1) ──
+
+  getPublishedPostsForSync(orgId: string, since: Date, cursor?: string) {
+    return this._socialCommentsRepository.getPublishedPostsForSync(
+      orgId,
+      since,
+      cursor,
+    );
+  }
+
+  getPostsWithRecentComments(orgId: string, since: Date, take = 50) {
+    return this._socialCommentsRepository.getPostsWithRecentComments(
+      orgId,
+      since,
+      take,
+    );
+  }
+
+  findCommentsToPrune(orgId: string, cutoff: Date, take = 1000) {
+    return this._socialCommentsRepository.findCommentsToPrune(orgId, cutoff, take);
+  }
+
+  softDeleteCommentsByIds(ids: string[]) {
+    return this._socialCommentsRepository.softDeleteCommentsByIds(ids);
+  }
+
+  getPostsForCommentDigest(orgId: string, cutoff: Date, take = 10) {
+    return this._socialCommentsRepository.getPostsForCommentDigest(
+      orgId,
+      cutoff,
+      take,
+    );
   }
 
   // Count of synced comments across all posts in a campaign — backs the campaign

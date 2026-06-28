@@ -8,7 +8,7 @@ import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/
 import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/digest.activity';
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
 import { createAnalyticsCollection } from './analytics-collection';
-import { createCommentsCollection } from './comments-collection';
+import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
 import { createMediaJobsPoll } from './media-jobs-poll';
 import { createSendEmail } from './send-email';
@@ -36,6 +36,7 @@ export interface InngestActivities {
 export const createFunctions = (activities: InngestActivities) => [
   createAnalyticsCollection(activities.analyticsActivity),
   createCommentsCollection(activities.commentsActivity),
+  createCommentsSyncOrg(activities.commentsActivity),
   createMissingPostFinder(activities.postActivity),
   createMediaJobsPoll(activities.mediaJobsActivity),
   createSendEmail(activities.emailActivity),

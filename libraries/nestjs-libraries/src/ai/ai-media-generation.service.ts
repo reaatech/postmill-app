@@ -1,4 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { Organization } from '@prisma/client';
@@ -150,7 +151,7 @@ export class AiMediaGenerationService {
   }
 
   async speechToText(org: Organization, audioUrl: string) {
-    const res = await fetch(audioUrl);
+    const res = await safeFetch(audioUrl);
     if (!res.ok) {
       throw new HttpException('Could not fetch audio for transcription', 400);
     }
@@ -160,7 +161,7 @@ export class AiMediaGenerationService {
   }
 
   async speechToTextWords(org: Organization, audioUrl: string) {
-    const res = await fetch(audioUrl);
+    const res = await safeFetch(audioUrl);
     if (!res.ok) {
       throw new HttpException('Could not fetch audio for transcription', 400);
     }

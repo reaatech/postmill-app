@@ -2,7 +2,7 @@ import {
   AgentToolInterface,
 } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import z from 'zod';
@@ -11,6 +11,7 @@ import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 @Injectable()
 export class GenerateVideoOptionsTool implements AgentToolInterface {
   constructor(private _videoManagerService: VideoManager) {}
+  private readonly _logger = new Logger(GenerateVideoOptionsTool.name);
   name = 'generateVideoOptions';
 
   run() {
@@ -52,7 +53,7 @@ export class GenerateVideoOptionsTool implements AgentToolInterface {
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         const videos = this._videoManagerService.getAllVideos();
-        console.log(
+        this._logger.debug(
           JSON.stringify(
             {
               video: videos.map((p) => {

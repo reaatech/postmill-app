@@ -1,4 +1,4 @@
-import { Global, Module, OnModuleInit } from '@nestjs/common';
+import { Global, Module, OnModuleInit, Logger } from '@nestjs/common';
 import { setSocialFetchPorts } from '@gitroom/provider-kernel';
 import { getVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
 import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
@@ -101,6 +101,7 @@ import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/email
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
 import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder';
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
+import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
 import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
@@ -213,6 +214,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     // were removed.
     RbacSeeder,
     BackfillService,
+    MigrationLedgerRepository,
     RolesRepository,
     RolesService,
     DesignRepository,
@@ -226,7 +228,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
         // Run idempotently on every app bootstrap — safe and cheap.
         seeder.seed().then(() => backfill.backfill()).catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error('RBAC seed/backfill failed:', msg);
+          new Logger('DatabaseModule').error(`RBAC seed/backfill failed: ${msg}`);
         });
         return true;
       },

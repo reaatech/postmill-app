@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Put,
   UseGuards,
@@ -22,6 +23,7 @@ import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard
 @Controller('/admin/channel-configs')
 @UseGuards(OrgRbacGuard)
 export class ChannelConfigController {
+  private readonly _logger = new Logger(ChannelConfigController.name);
   constructor(
     private _providerConfigService: ProviderConfigService,
     private _providerConfigManager: ProviderConfigManager,
@@ -42,7 +44,11 @@ export class ChannelConfigController {
               const d = this._providerConfigService.decryptConfig(dbConfig);
               return !!(d.clientId || d.clientSecret);
             } catch (err) {
-              console.warn(`Failed to decrypt config for ${p.identifier}, treating as unconfigured`, err);
+              this._logger.warn(
+                `Failed to decrypt config for ${p.identifier}, treating as unconfigured: ${
+                  (err as Error)?.message ?? String(err)
+                }`
+              );
               return false;
             }
           })()
@@ -160,7 +166,11 @@ export class ChannelConfigController {
     try {
       await this._providerConfigManager.refreshCache();
     } catch (err) {
-      console.warn('Failed to refresh cache after config upsert, stale cache will self-correct', err);
+      this._logger.warn(
+        `Failed to refresh cache after config upsert, stale cache will self-correct: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
     }
 
     const decrypted = this._providerConfigService.decryptConfig(result);
@@ -205,7 +215,11 @@ export class ChannelConfigController {
     try {
       await this._providerConfigManager.refreshCache();
     } catch (err) {
-      console.warn('Failed to refresh cache after config delete, stale cache will self-correct', err);
+      this._logger.warn(
+        `Failed to refresh cache after config delete, stale cache will self-correct: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
     }
     return { success: true };
   }

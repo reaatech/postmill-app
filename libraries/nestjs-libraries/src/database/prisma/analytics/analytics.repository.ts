@@ -289,4 +289,133 @@ export class AnalyticsRepository {
       orderBy: { date: 'asc' },
     });
   }
+
+  // ── AnalyticsActivity extraction (D2): collection-sweep data access ──
+
+  upsertChannelSnapshot(params: {
+    organizationId: string;
+    integrationId: string;
+    metric: string;
+    value: number;
+    date: Date;
+  }) {
+    return this._analyticsSnapshot.model.analyticsSnapshot.upsert({
+      where: {
+        integrationId_metric_date: {
+          integrationId: params.integrationId,
+          metric: params.metric,
+          date: params.date,
+        },
+      },
+      create: {
+        organizationId: params.organizationId,
+        integrationId: params.integrationId,
+        metric: params.metric,
+        value: params.value,
+        date: params.date,
+      },
+      update: { value: params.value },
+    });
+  }
+
+  findPostsForSnapshots(orgId: string, since: Date) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        releaseId: { not: null },
+        publishDate: { gte: since },
+      },
+      include: { integration: true },
+    });
+  }
+
+  upsertPostSnapshot(params: {
+    organizationId: string;
+    postId: string;
+    integrationId: string;
+    metric: string;
+    value: number;
+    date: Date;
+  }) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.upsert({
+      where: {
+        postId_metric_date: {
+          postId: params.postId,
+          metric: params.metric,
+          date: params.date,
+        },
+      },
+      create: {
+        organizationId: params.organizationId,
+        postId: params.postId,
+        integrationId: params.integrationId,
+        metric: params.metric,
+        value: params.value,
+        date: params.date,
+      },
+      update: { value: params.value },
+    });
+  }
+
+  getLatestPostSnapshotsForCounters(postId: string) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: {
+        postId,
+        metric: {
+          in: ['views', 'likes', 'comments', 'impressions', 'reactions', 'replies'],
+        },
+      },
+      orderBy: { date: 'desc' },
+      select: { metric: true, value: true },
+    });
+  }
+
+  updatePostCounters(
+    postId: string,
+    data: { lastViews?: number; lastLikes?: number; lastComments?: number },
+  ) {
+    return this._post.model.post.update({ where: { id: postId }, data });
+  }
+
+  deletePostSnapshotsBefore(orgId: string, cutoff: Date) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.deleteMany({
+      where: { organizationId: orgId, date: { lt: cutoff } },
+    });
+  }
+
+  findChannelSnapshotsBefore(orgId: string, cutoff: Date) {
+    return this._analyticsSnapshot.model.analyticsSnapshot.findMany({
+      where: { organizationId: orgId, date: { lt: cutoff } },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  // Atomic delete+create replacement for the daily→weekly rollup.
+  replaceRolledUpSnapshots(
+    orgId: string,
+    dailyCutoff: Date,
+    weeklyRows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[],
+  ) {
+    return this._prisma.$transaction([
+      this._prisma.analyticsSnapshot.deleteMany({
+        where: { organizationId: orgId, date: { lt: dailyCutoff } },
+      }),
+      this._prisma.analyticsSnapshot.createMany({
+        data: weeklyRows,
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
+  findIntegrationByIdRaw(integrationId: string) {
+    return this._integration.model.integration.findUnique({
+      where: { id: integrationId },
+    });
+  }
 }

@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import crypto from 'crypto';
 
 @Injectable()
@@ -261,7 +262,9 @@ export class AuthService {
   ) {
     if (email && datafast_visitor_id && process.env.DATAFAST_API_KEY) {
       try {
-        await fetch('https://datafa.st/api/v1/goals', {
+        // Fixed public host, but routed through safeFetch to align with the outbound-HTTP
+        // standard (SSRF dispatcher + per-hop redirect re-validation).
+        await safeFetch('https://datafa.st/api/v1/goals', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${process.env.DATAFAST_API_KEY}`,

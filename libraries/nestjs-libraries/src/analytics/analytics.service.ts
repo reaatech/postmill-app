@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
@@ -169,7 +170,10 @@ export class AnalyticsService {
   ) {
     const providerData: Record<string, any[]> = {};
 
-    for (const integrationId of integrationIds) {
+    // Bounded concurrency (5): this is the live-provider fan-out that caused a past prod
+    // CPU/mem incident — an unbounded Promise.all here would re-create it. Each worker
+    // writes a distinct integrationId key, so the shared record has no write race.
+    await mapWithConcurrency(integrationIds, 5, async (integrationId) => {
       try {
         const data = await this.integrationService.checkAnalytics(
           org,
@@ -180,9 +184,9 @@ export class AnalyticsService {
           providerData[integrationId] = data;
         }
       } catch {
-        continue;
+        // per-integration failures are non-fatal
       }
-    }
+    });
 
     return providerData;
   }

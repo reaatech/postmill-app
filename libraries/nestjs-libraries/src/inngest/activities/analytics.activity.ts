@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
-import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -54,7 +54,7 @@ export class AnalyticsActivity {
   private readonly logger = new Logger(AnalyticsActivity.name);
 
   constructor(
-    private readonly _prisma: PrismaService,
+    private readonly _analyticsRepository: AnalyticsRepository,
     private readonly _integrationManager: IntegrationManager,
     private readonly _orgProviderConfigManager: OrgProviderConfigManager,
     private readonly _organizationService: OrganizationService,
@@ -132,24 +132,12 @@ export class AnalyticsActivity {
             const val = parseFloat(String(point.total));
             if (isNaN(val)) continue;
 
-            await this._prisma.analyticsSnapshot.upsert({
-              where: {
-                integrationId_metric_date: {
-                  integrationId: integration.id,
-                  metric: canonical,
-                  date: dayjs(point.date).startOf('day').toDate(),
-                },
-              },
-              create: {
-                organizationId: orgId,
-                integrationId: integration.id,
-                metric: canonical,
-                value: val,
-                date: dayjs(point.date).startOf('day').toDate(),
-              },
-              update: {
-                value: val,
-              },
+            await this._analyticsRepository.upsertChannelSnapshot({
+              organizationId: orgId,
+              integrationId: integration.id,
+              metric: canonical,
+              value: val,
+              date: dayjs(point.date).startOf('day').toDate(),
             });
           }
         }
@@ -169,16 +157,9 @@ export class AnalyticsActivity {
     await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    const posts = (await this._prisma.post.findMany({
-      where: {
-        organizationId: orgId,
-        releaseId: { not: null },
-        publishDate: { gte: since },
-      },
-      include: {
-        integration: true,
-      },
-    })).map(decryptPostIntegrationTokens);
+    const posts = (
+      await this._analyticsRepository.findPostsForSnapshots(orgId, since)
+    ).map(decryptPostIntegrationTokens);
 
     for (const post of posts) {
       if (!post.releaseId || post.releaseId === 'missing') continue;
@@ -229,35 +210,22 @@ export class AnalyticsActivity {
             const val = parseFloat(String(point.total));
             if (isNaN(val)) continue;
 
-            await this._prisma.postAnalyticsSnapshot.upsert({
-              where: {
-                postId_metric_date: {
-                  postId: post.id,
-                  metric: canonical,
-                  date: dayjs(point.date).startOf('day').toDate(),
-                },
-              },
-              create: {
-                organizationId: orgId,
-                postId: post.id,
-                integrationId: post.integrationId,
-                metric: canonical,
-                value: val,
-                date: dayjs(point.date).startOf('day').toDate(),
-              },
-              update: {
-                value: val,
-              },
+            await this._analyticsRepository.upsertPostSnapshot({
+              organizationId: orgId,
+              postId: post.id,
+              integrationId: post.integrationId,
+              metric: canonical,
+              value: val,
+              date: dayjs(point.date).startOf('day').toDate(),
             });
           }
         }
 
         // Update denormalized counters on the Post record
-        const latestSnapshots = await this._prisma.postAnalyticsSnapshot.findMany({
-          where: { postId: post.id, metric: { in: ['views', 'likes', 'comments', 'impressions', 'reactions', 'replies'] } },
-          orderBy: { date: 'desc' },
-          select: { metric: true, value: true },
-        });
+        const latestSnapshots =
+          await this._analyticsRepository.getLatestPostSnapshotsForCounters(
+            post.id
+          );
 
         const latestByMetric: Record<string, number> = {};
         for (const snap of latestSnapshots) {
@@ -275,10 +243,10 @@ export class AnalyticsActivity {
         if (comments !== undefined) updateData.lastComments = comments;
 
         if (Object.keys(updateData).length > 0) {
-          await this._prisma.post.update({
-            where: { id: post.id },
-            data: updateData,
-          });
+          await this._analyticsRepository.updatePostCounters(
+            post.id,
+            updateData
+          );
         }
       } catch (err: any) {
         if (err instanceof RefreshToken) {
@@ -316,17 +284,15 @@ export class AnalyticsActivity {
 
     // 1. Prune post snapshots beyond the tracking window — per-post daily
     //    detail is not worth archiving.
-    await this._prisma.postAnalyticsSnapshot.deleteMany({
-      where: { organizationId: orgId, date: { lt: postCutoff } },
-    });
+    await this._analyticsRepository.deletePostSnapshotsBefore(orgId, postCutoff);
 
     // 2. Roll up channel snapshots older than the daily-retention window into
     //    a single weekly row per (integration, metric, ISO week): flow metrics
     //    are summed, stock metrics keep the latest value in the week.
-    const oldRows = await this._prisma.analyticsSnapshot.findMany({
-      where: { organizationId: orgId, date: { lt: dailyCutoff } },
-      orderBy: { date: 'asc' },
-    });
+    const oldRows = await this._analyticsRepository.findChannelSnapshotsBefore(
+      orgId,
+      dailyCutoff
+    );
     if (!oldRows.length) {
       return;
     }
@@ -380,15 +346,11 @@ export class AnalyticsActivity {
     // Replace the rolled-up daily rows with their weekly aggregates atomically.
     // Re-running is idempotent: a weekly row dated on its own week-start
     // collapses to itself, and newly-aged days fold into the existing weekly row.
-    await this._prisma.$transaction([
-      this._prisma.analyticsSnapshot.deleteMany({
-        where: { organizationId: orgId, date: { lt: dailyCutoff } },
-      }),
-      this._prisma.analyticsSnapshot.createMany({
-        data: weeklyRows,
-        skipDuplicates: true,
-      }),
-    ]);
+    await this._analyticsRepository.replaceRolledUpSnapshots(
+      orgId,
+      dailyCutoff,
+      weeklyRows
+    );
   }
 
   async notifySnapshotComplete(orgId: string): Promise<void> {
@@ -403,9 +365,9 @@ export class AnalyticsActivity {
   }
 
   async backfillIntegration(integrationId: string): Promise<void> {
-    const integration = decryptIntegrationTokens(await this._prisma.integration.findUnique({
-      where: { id: integrationId },
-    }));
+    const integration = decryptIntegrationTokens(
+      await this._analyticsRepository.findIntegrationByIdRaw(integrationId)
+    );
     if (!integration || integration.type !== 'social') return;
 
     await this._orgProviderConfigManager.ensureFresh(integration.organizationId);
@@ -450,24 +412,12 @@ export class AnalyticsActivity {
           const val = parseFloat(String(point.total));
           if (isNaN(val)) continue;
 
-          await this._prisma.analyticsSnapshot.upsert({
-            where: {
-              integrationId_metric_date: {
-                integrationId: integration.id,
-                metric: canonical,
-                date: dayjs(point.date).startOf('day').toDate(),
-              },
-            },
-            create: {
-              organizationId: integration.organizationId,
-              integrationId: integration.id,
-              metric: canonical,
-              value: val,
-              date: dayjs(point.date).startOf('day').toDate(),
-            },
-            update: {
-              value: val,
-            },
+          await this._analyticsRepository.upsertChannelSnapshot({
+            organizationId: integration.organizationId,
+            integrationId: integration.id,
+            metric: canonical,
+            value: val,
+            date: dayjs(point.date).startOf('day').toDate(),
           });
         }
       }

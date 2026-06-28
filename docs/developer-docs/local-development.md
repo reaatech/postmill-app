@@ -183,6 +183,21 @@ vitest run --root apps/backend            # one package
 Tests run with Vitest. The root `jest.config.ts` is vestigial — do not add
 Jest-style configuration.
 
+### Integration tests (real Postgres)
+
+Repository/data-layer tests that need a real database live in `*.int-spec.ts` files and
+run against an isolated, per-run Postgres database created on the dev container:
+
+```bash
+pnpm run test:int         # vitest *.int-spec.ts against a real DB
+```
+
+Requires the dev Postgres to be up (`docker compose -f docker-compose.dev.yaml up -d`).
+The harness reads `TEST_DATABASE_ADMIN_URL` (see `.env.example`; defaults to the dev
+container's `postgres` admin DB) and creates/drops a throwaway `postmill_test_<pid>`
+database per run, pushing the current schema into it via `pnpm exec prisma db push`.
+The `*.int-spec.ts` suffix is excluded from the normal unit run (`*.spec.ts`).
+
 ---
 
 ## 8. Lint

@@ -35,7 +35,8 @@
     "docker-build": "./var/docker/docker-build.sh",
     "docker-create": "./var/docker/docker-create.sh",
     "postinstall": "pnpm run prisma-generate",
-    "test": "vitest run --root libraries/helpers && vitest run --root libraries/providers && vitest run --root libraries/nestjs-libraries && vitest run --root apps/backend && vitest run --root apps/frontend && vitest run --root apps/commands"
+    "test": "vitest run --root libraries/helpers && vitest run --root libraries/providers && vitest run --root libraries/nestjs-libraries && vitest run --root apps/backend && vitest run --root apps/frontend && vitest run --root apps/commands",
+    "test:int": "vitest run --root libraries/nestjs-libraries --config vitest-integration.config.ts"
   },
   "dependencies": {
     "@types/bcrypt": "^5.0.2",

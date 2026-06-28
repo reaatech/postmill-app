@@ -1,7 +1,7 @@
 import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.interface';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -16,6 +16,7 @@ export class IntegrationTriggerTool implements AgentToolInterface {
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService
   ) {}
+  private readonly _logger = new Logger(IntegrationTriggerTool.name);
   name = 'triggerTool';
 
   run() {
@@ -51,7 +52,7 @@ export class IntegrationTriggerTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        console.log('triggerTool', inputData);
+        this._logger.debug(`triggerTool ${JSON.stringify(inputData)}`);
         const organizationId = JSON.parse(
           (context?.requestContext as any)?.get('organization') as string
         ).id;

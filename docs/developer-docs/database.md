@@ -44,6 +44,10 @@ This also runs automatically after `pnpm install` via a `postinstall` script.
 | Renames/drops need an **expand-contract plan** | Deploy the new column, backfill data, switch reads, then remove the old column in a follow-up |
 | Always test `prisma-generate` after edits | Prevents type mismatches between the client and the schema |
 
+> **Operator runbook.** The step-by-step backup, expand-contract, rollback, and drift-check
+> procedure for applying schema changes to a live database lives in
+> [Upgrading → Schema changes & rollback](../operations-guide/upgrading.md#schema-changes-rollback).
+
 > **Destructive pushes are exceptional.** v3.8.10 executed a single reviewed destructive push
 > (dropping the dead marketplace/stars models, the legacy `UserOrganization.role` enum column, the
 > migrated `User` profile columns, and the `imageModel` columns) — only after every reader/writer
@@ -123,6 +127,19 @@ repository.
 Secrets stored in the database (OAuth tokens, API keys, credentials) are encrypted with AES-256-GCM
 via `EncryptionService`. Encrypted values use a `v2:` prefix. The service uses a
 `ENCRYPTION_KEY` env var or falls back to deriving from `JWT_SECRET`.
+
+**Single-key model.** Encryption uses **one deployment-wide key** — `ENCRYPTION_KEY` if set,
+otherwise `sha256(JWT_SECRET)` (see `getEncryptionKey()` in
+`libraries/helpers/src/auth/auth.service.ts`). There is **no per-organization crypto key**. An
+`organizationId` column scopes where a ciphertext is *stored*, not how it is encrypted; cross-org
+isolation is enforced by **query scoping**, not cryptography. Every encrypted row in the
+deployment decrypts with the same key.
+
+`EncryptionService` (used for per-org domain rows) is a thin wrapper over
+`AuthService.fixedEncryption`/`fixedDecryption` (used for global rows). The split is an
+**implementation detail** — both paths derive the identical key and produce the identical `v2:`
+GCM envelope. Use the route that matches how a given row was written; never mix the two for the
+same row.
 
 Models with encrypted fields:
 - `Integration` — `token`, `refreshToken`

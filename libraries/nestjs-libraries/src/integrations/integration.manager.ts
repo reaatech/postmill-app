@@ -3,6 +3,7 @@ import 'reflect-metadata';
 import {
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import {
@@ -23,6 +24,8 @@ import {
 
 @Injectable()
 export class IntegrationManager {
+  private readonly _logger = new Logger(IntegrationManager.name);
+
   constructor(
     private _providerConfigManager: ProviderConfigManager,
     private _orgProviderConfigManager: OrgProviderConfigManager,
@@ -172,7 +175,7 @@ export class IntegrationManager {
   async getInternalPlugs(providerName: string, orgId?: string) {
     const p = this.getSocialIntegrationUnchecked(providerName);
     if (!p) {
-      console.warn(`IntegrationManager: Unknown provider '${providerName}' requested in getInternalPlugs`);
+      this._logger.warn(`Unknown provider '${providerName}' requested in getInternalPlugs`);
       return { internalPlugs: [] };
     }
     const enabled =

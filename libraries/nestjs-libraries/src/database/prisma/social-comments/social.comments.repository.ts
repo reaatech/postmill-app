@@ -262,4 +262,54 @@ export class SocialCommentsRepository {
     }
     return this._socialComment.model.socialComment.count({ where });
   }
+
+  // ── CommentsActivity extraction (D1): comment-sweep data access ──
+
+  // Posts that received fresh, non-own comments since `since` (id-only probe).
+  getPostsWithRecentComments(orgId: string, since: Date, take = 50) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        socialComments: {
+          some: { createdAt: { gte: since }, isOwn: false, deletedAt: null },
+        },
+      },
+      select: { id: true },
+      take,
+    });
+  }
+
+  // A page of live comments older than `cutoff` (id-only), for the prune loop.
+  findCommentsToPrune(orgId: string, cutoff: Date, take = 1000) {
+    return this._socialComment.model.socialComment.findMany({
+      where: {
+        organizationId: orgId,
+        platformCreatedAt: { lt: cutoff },
+        deletedAt: null,
+      },
+      take,
+      select: { id: true },
+    });
+  }
+
+  // Posts with their newest non-own comments since `cutoff`, for the digest notification.
+  getPostsForCommentDigest(orgId: string, cutoff: Date, take = 10) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        socialComments: {
+          some: { createdAt: { gte: cutoff }, isOwn: false, deletedAt: null },
+        },
+      },
+      include: {
+        socialComments: {
+          where: { createdAt: { gte: cutoff }, isOwn: false, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        integration: true,
+      },
+      take,
+    });
+  }
 }

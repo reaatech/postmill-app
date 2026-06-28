@@ -1160,12 +1160,19 @@ export class PostsService {
   ) {
     const results = await this.validatePosts(orgId, body.posts || []);
 
-    const enhanced = await Promise.all(
-      results.map(async (result) => {
+    // Batch the integration lookups into one query, then map by id (was one query per
+    // result inside Promise.all — N parallel queries collapsed to 1).
+    const integrations = await this._integrationService.getIntegrationsByIds(
+      orgId,
+      results.map((r) => r.id),
+    );
+    const integrationById = new Map(integrations.map((i) => [i.id, i]));
+
+    const enhanced = results.map((result) => {
         const warnings: string[] = [];
         const blocks: string[] = [];
 
-        const integration = await this._integrationService.getIntegrationById(orgId, result.id);
+        const integration = integrationById.get(result.id) || null;
         const provider = integration
           ? this._integrationManager.getSocialIntegrationUnchecked(integration.providerIdentifier)
           : null;
@@ -1233,8 +1240,7 @@ export class PostsService {
           blocks,
           maximumCharacters: result.maximumCharacters,
         };
-      })
-    );
+      });
 
     return {
       passed: enhanced.every((r) => r.valid && r.warnings.length === 0),

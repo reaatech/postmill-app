@@ -4,6 +4,7 @@ import {
   HttpStatus,
   Inject,
   Injectable,
+  Logger,
 } from '@nestjs/common';
 import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
@@ -30,6 +31,8 @@ dayjs.extend(utc);
 
 @Injectable()
 export class IntegrationService {
+  private readonly _logger = new Logger(IntegrationService.name);
+
   constructor(
     private _integrationRepository: IntegrationRepository,
     private _autopostsRepository: AutopostRepository,
@@ -158,6 +161,10 @@ export class IntegrationService {
 
   getIntegrationById(org: string, id: string) {
     return this._integrationRepository.getIntegrationById(org, id);
+  }
+
+  getIntegrationsByIds(org: string, ids: string[]) {
+    return this._integrationRepository.getIntegrationsByIds(org, ids);
   }
 
   async refreshToken(provider: SocialProvider, refresh: string, orgId?: string) {
@@ -431,9 +438,10 @@ export class IntegrationService {
         if (e instanceof RefreshToken) {
           return this.checkAnalytics(org, integration, date, true);
         }
-        console.warn(
-          `checkAnalytics failed for integration ${integration}:`,
-          (e as any)?.message
+        this._logger.warn(
+          `checkAnalytics failed for integration ${integration}: ${
+            (e as any)?.message
+          }`
         );
         // Negative cache: the analytics live fallback calls this per dashboard
         // view, so without it a persistently failing integration re-fires the

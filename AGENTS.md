@@ -162,6 +162,9 @@ Controller → Manager → Service → Repository   (when a manager is involved)
   Prisma. Controllers/services must not call Prisma directly.
 - A service should go through another domain's **service**, not reach into its repository.
 - The backend app is mostly controllers + wiring that import from `nestjs-libraries`.
+- **Sanctioned exception:** seeders/migration steps under `database/seeds/**` — notably
+  `BackfillService` and `RbacSeeder` — intentionally use `PrismaService` + `$transaction` directly
+  (cross-table backfills/seeds), and are exempt from the repository-only rule by design.
 
 ## Frontend conventions (Next.js App Router)
 
@@ -618,6 +621,11 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 - **Secrets at rest are encrypted via `EncryptionService`** (AES-GCM, `v2:` prefix, expand-contract
   read-fallback) — integration OAuth tokens (1I), Nostr keys (3AN), and other at-rest secrets (3U).
   `ENCRYPTION_KEY` is optional and falls back to deriving from `JWT_SECRET`. Never store secrets plaintext.
+  **Single-key model:** one deployment-wide key encrypts every secret — there is **no per-org crypto
+  key**. "Org-scoped" means DB-column-scoped (storage), not cryptographically isolated; cross-org
+  isolation is enforced by query scoping. `EncryptionService` (per-org domain rows) and
+  `AuthService.fixedEncryption` (global rows) are the same key behind two routes — never mix the
+  decrypt route for a given row.
 - **JWT** verification pins `algorithms: ['HS256']`; new tokens carry `exp` with sliding renewal
   (legacy exp-less tokens still verify — no forced re-auth) (1E). IDs/secrets use CSPRNG (1F).
 - **CSRF** is required on cookie-authenticated mutating routes (3Z); header/API-key clients are

@@ -1,4 +1,5 @@
 import { NewsletterInterface } from '@gitroom/nestjs-libraries/newsletter/newsletter.interface';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class BeehiivProvider implements NewsletterInterface {
   name = 'beehiiv';
@@ -10,7 +11,7 @@ export class BeehiivProvider implements NewsletterInterface {
       utm_source: 'gitroom_platform',
     };
 
-    await fetch(
+    await safeFetch(
       `https://api.beehiiv.com/v2/publications/${process.env.BEEHIIVE_PUBLICATION_ID}/subscriptions`,
       {
         method: 'POST',

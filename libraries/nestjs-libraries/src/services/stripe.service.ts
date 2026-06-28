@@ -16,6 +16,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
 @Injectable()
 export class StripeService {
+  private readonly _logger = new Logger(StripeService.name);
   constructor(
     private _subscriptionService: SubscriptionService,
     private _organizationService: OrganizationService,
@@ -44,7 +45,7 @@ export class StripeService {
       return true;
     }
 
-    console.log('Checking card');
+    this._logger.log('Checking card');
 
     const paymentMethods = await stripe.paymentMethods.list({
       customer: event.data.object.customer as string,
@@ -77,7 +78,7 @@ export class StripeService {
       });
 
       if (paymentIntent.status !== 'requires_capture') {
-        console.error('Cant charge');
+        this._logger.error('Cant charge');
         await stripe.paymentMethods.detach(paymentMethods.data[0].id);
         await stripe.subscriptions.cancel(event.data.object.id as string);
         return false;
@@ -428,7 +429,11 @@ export class StripeService {
 
       return null;
     } catch (err) {
-      console.error('Error finding auto-apply promotion code:', err);
+      this._logger.error(
+        `Error finding auto-apply promotion code: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
       return null;
     }
   }
@@ -992,7 +997,7 @@ export class StripeService {
         success: true,
       };
     } catch (err) {
-      console.log(err);
+      this._logger.warn((err as Error)?.message ?? String(err));
       return {
         success: false,
       };

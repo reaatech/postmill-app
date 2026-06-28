@@ -10,6 +10,21 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postmill-local
+          POSTGRES_PASSWORD: postmill-local-pwd
+          POSTGRES_DB: postmill-db-local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postmill-local"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     strategy:
       matrix:
         node-version: ['22.12.0']
@@ -35,3 +50,25 @@ jobs:
 
       - name: Run tests (Vitest)
         run: pnpm run test
+
+      - name: Run integration tests (Vitest + Postgres)
+        env:
+          TEST_DATABASE_ADMIN_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postgres
+          DATABASE_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postmill-db-local
+        run: pnpm run test:int
+
+      - name: Schema drift check
+        env:
+          DATABASE_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postmill-db-local
+        run: |
+          # mastra_* noise approach: this DB has ONLY had `db push` applied (the app never
+          # boots in CI), so the runtime-created mastra_* tables — which live outside the
+          # Prisma schema — are absent and cannot show up as drift.
+          pnpm exec prisma db push --skip-generate \
+            --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
+          # `migrate diff --exit-code` returns 2 when the schema and DB diverge, 0 when in
+          # sync. Any non-zero exit fails the job (CI run uses bash -e).
+          pnpm exec prisma migrate diff \
+            --from-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
+            --to-url "$DATABASE_URL" \
+            --exit-code

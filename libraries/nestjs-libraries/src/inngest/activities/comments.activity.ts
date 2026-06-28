@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
-import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
@@ -11,7 +11,7 @@ export class CommentsActivity {
   private readonly logger = new Logger(CommentsActivity.name);
 
   constructor(
-    private _prisma: PrismaService,
+    private _organizationService: OrganizationService,
     private _orgProviderConfigManager: OrgProviderConfigManager,
     private _socialCommentsService: SocialCommentsService,
     private _webhooksService: WebhooksService,
@@ -25,17 +25,11 @@ export class CommentsActivity {
     let cursor: string | undefined;
     let hasMore = true;
     while (hasMore) {
-      const posts = await this._prisma.post.findMany({
-        where: {
-          organizationId: orgId,
-          releaseId: { not: null },
-          publishDate: { gte: since },
-        },
-        include: { integration: true },
-        take: 50,
-        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
-        orderBy: { id: 'asc' },
-      });
+      const posts = await this._socialCommentsService.getPublishedPostsForSync(
+        orgId,
+        since,
+        cursor
+      );
 
       for (const post of posts) {
         if (!post.releaseId || post.releaseId === 'missing') continue;
@@ -65,20 +59,11 @@ export class CommentsActivity {
   async dispatchWebhookForComments(orgId: string, daysBack: number): Promise<void> {
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    const posts = await this._prisma.post.findMany({
-      where: {
-        organizationId: orgId,
-        socialComments: {
-          some: {
-            createdAt: { gte: since },
-            isOwn: false,
-            deletedAt: null,
-          },
-        },
-      },
-      select: { id: true },
-      take: 50,
-    });
+    const posts = await this._socialCommentsService.getPostsWithRecentComments(
+      orgId,
+      since,
+      50
+    );
 
     if (posts.length === 0) return;
 
@@ -98,8 +83,8 @@ export class CommentsActivity {
   }
 
   async getAllOrganizationIds(): Promise<string[]> {
-    const orgs = await this._prisma.organization.findMany({ select: { id: true } });
-    return orgs.map(o => o.id);
+    const orgs = await this._organizationService.getAllIds();
+    return orgs.map((o) => o.id);
   }
 
   async pruneComments(orgId: string): Promise<void> {
@@ -107,50 +92,32 @@ export class CommentsActivity {
     const validatedDays = Number.isFinite(days) && days > 0 ? days : 90;
     const cutoff = dayjs().subtract(validatedDays, 'day').toDate();
 
-    let batch = await this._prisma.socialComment.findMany({
-      where: { organizationId: orgId, platformCreatedAt: { lt: cutoff }, deletedAt: null },
-      take: 1000,
-      select: { id: true },
-    });
+    let batch = await this._socialCommentsService.findCommentsToPrune(
+      orgId,
+      cutoff,
+      1000
+    );
 
     while (batch.length > 0) {
-      await this._prisma.socialComment.updateMany({
-        where: { id: { in: batch.map(r => r.id) } },
-        data: { deletedAt: new Date() },
-      });
+      await this._socialCommentsService.softDeleteCommentsByIds(
+        batch.map((r) => r.id)
+      );
 
-      batch = await this._prisma.socialComment.findMany({
-        where: { organizationId: orgId, platformCreatedAt: { lt: cutoff }, deletedAt: null },
-        take: 1000,
-        select: { id: true },
-      });
+      batch = await this._socialCommentsService.findCommentsToPrune(
+        orgId,
+        cutoff,
+        1000
+      );
     }
   }
 
   async notifyNewComments(orgId: string): Promise<void> {
     const cutoff = dayjs().subtract(6, 'hour').toDate();
 
-    const posts = await this._prisma.post.findMany({
-      where: {
-        organizationId: orgId,
-        socialComments: {
-          some: {
-            createdAt: { gte: cutoff },
-            isOwn: false,
-            deletedAt: null,
-          },
-        },
-      },
-      include: {
-        socialComments: {
-          where: { createdAt: { gte: cutoff }, isOwn: false, deletedAt: null },
-          orderBy: { createdAt: 'desc' },
-          take: 5,
-        },
-        integration: true,
-      },
-      take: 10,
-    });
+    const posts = await this._socialCommentsService.getPostsForCommentDigest(
+      orgId,
+      cutoff
+    );
 
     if (!posts.length) return;
 

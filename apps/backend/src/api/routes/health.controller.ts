@@ -75,6 +75,11 @@ export class HealthController {
 
     try {
       if (devMode) {
+        // Dev-only: targets the operator's local Inngest dev server (INNGEST_BASE_URL,
+        // e.g. http://localhost:8288). Intentionally a bare fetch — safeFetch enforces
+        // isSafePublicHttpsUrl and would reject this private/non-HTTPS localhost URL by
+        // design. Only reachable when devMode (INNGEST_DEV) is set. The production branch
+        // below uses safeFetch.
         const baseUrl = process.env.INNGEST_BASE_URL || INNGEST_DEV_BASE_URL;
         const response = await fetch(baseUrl, {
           method: 'HEAD',

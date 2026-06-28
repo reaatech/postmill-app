@@ -68,10 +68,6 @@ export class AiSettingsService {
     }
   }
 
-  decryptOrgProviderConfig(config: { credentials?: string | null }) {
-    return this.decryptProviderConfig(config);
-  }
-
   async deleteProviderConfig(identifier: string) {
     return this._repository.deleteProviderConfig(identifier);
   }

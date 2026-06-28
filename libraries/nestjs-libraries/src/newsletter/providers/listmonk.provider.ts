@@ -18,6 +18,10 @@ export class ListmonkProvider implements NewsletterInterface {
       'Basic ' + Buffer.from(authString).toString('base64')
     );
 
+    // Intentionally a bare fetch, NOT safeFetch: LISTMONK_DOMAIN is an operator-set
+    // env var pointing at the operator's own (often self-hosted, private-network)
+    // Listmonk instance — not per-request user input. safeFetch's public-only check
+    // would reject those private hosts and break self-hosted deployments.
     try {
       const {
         data: { id },

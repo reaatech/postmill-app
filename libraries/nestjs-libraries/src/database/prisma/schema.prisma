@@ -294,6 +294,7 @@ model Integration {
   @@index([refreshNeeded])
   @@index([disabled])
   @@index([providerConfigId])
+  @@index([organizationId, providerIdentifier, disabled])
 }
 
 model AnalyticsSnapshot {
@@ -447,6 +448,7 @@ model Post {
   @@index([releaseURL])
   @@index([integrationId])
   @@index([commentCount])
+  @@index([organizationId, state, publishDate])
 }
 
 model SocialComment {
@@ -487,6 +489,7 @@ model SocialComment {
   @@index([postId, deletedAt, isOwn, platformCreatedAt])
   @@index([status])
   @@index([assigneeId])
+  @@index([organizationId, platformCreatedAt])
 }
 
 model PostCommentRead {
@@ -1698,4 +1701,14 @@ model EmailLog {
   @@index([provider, providerMessageId])
   @@index([sentAt])
   @@index([status])
+}
+
+model MigrationLedger {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  appliedAt  DateTime @default(now())
+  durationMs Int?
+  note       String?
+
+  @@index([appliedAt])
 }
