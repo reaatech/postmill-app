@@ -1,0 +1,11 @@
+{
+  "name": "@gitroom/provider-smtp",
+  "version": "1.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@gitroom/provider-kernel": "workspace:*",
+    "nodemailer": "^8.0.10"
+  }
+}
