@@ -1,3 +1,4 @@
+import type { ProviderManifest } from '@gitroom/provider-kernel';
 import { ContentPackCapability } from './content-pack.interface';
 
 export interface ContentPackCredentialField {
@@ -13,41 +14,24 @@ export interface ContentPackMeta {
   credentialFields: ContentPackCredentialField[];
 }
 
-// Single source of truth for the content-pack metadata catalog. Adding a pack
-// here surfaces it in the settings list, the credential form, and the
-// per-capability resolution — no other wiring needed. Capabilities a pack omits
-// fall back to the free provider for that capability (handled in
-// StockMediaService.resolveSearch). The runtime adapter is built from the
-// matching relocated package module.
-export const CONTENT_PACK_REGISTRY: Record<string, ContentPackMeta> = {
-  magnific: {
-    identifier: 'magnific',
-    name: 'Magnific',
-    capabilities: ['photos', 'vectors', 'icons', 'videos'],
-    credentialFields: [{ key: 'apiKey', label: 'API Key', required: true }],
-  },
-  vecteezy: {
-    identifier: 'vecteezy',
-    name: 'Vecteezy',
-    capabilities: ['photos', 'vectors', 'videos'],
-    credentialFields: [{ key: 'apiKey', label: 'API Key', required: true }],
-  },
-  'adobe-stock': {
-    identifier: 'adobe-stock',
-    name: 'Adobe Stock',
-    capabilities: ['photos', 'vectors', 'videos'],
-    credentialFields: [{ key: 'apiKey', label: 'API Key', required: true }],
-  },
-  envato: {
-    identifier: 'envato',
-    name: 'Envato Elements',
-    capabilities: ['photos', 'vectors', 'videos', 'audio'],
-    credentialFields: [{ key: 'apiKey', label: 'API Token', required: true }],
-  },
-};
-
-export const CONTENT_PACK_IDENTIFIERS = Object.keys(CONTENT_PACK_REGISTRY);
-
-export function contentPackMeta(identifier: string): ContentPackMeta | undefined {
-  return CONTENT_PACK_REGISTRY[identifier];
+// The content-pack metadata catalog is no longer a hardcoded object — the
+// provider kernel is the single source of truth. The 4 packs are workspace
+// provider packages (libraries/providers/{magnific,vecteezy,adobe-stock,envato})
+// registered with the kernel at bootstrap; their manifests carry displayName,
+// capabilities, and credentialFields. Consumers resolve the live catalog via
+// `ProviderResolutionService.listManifests('contentpack')` and project each
+// manifest into the legacy `ContentPackMeta` shape with the helper below.
+export function manifestToContentPackMeta(
+  manifest: ProviderManifest
+): ContentPackMeta {
+  return {
+    identifier: manifest.providerId,
+    name: manifest.displayName,
+    capabilities: (manifest.capabilities as ContentPackCapability[]) ?? [],
+    credentialFields: (manifest.credentialFields ?? []).map((field) => ({
+      key: field.key,
+      label: field.label,
+      required: field.required,
+    })),
+  };
 }

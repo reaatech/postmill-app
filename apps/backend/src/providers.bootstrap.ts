@@ -14,7 +14,7 @@ export class ProvidersBootstrap implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    const domainFlag = (domain: string): boolean => {
+    const domainFlag = (domain: string, providerId: string): boolean => {
       switch (domain) {
         case 'ai':
           return this._featureFlags.isEnabled('ai');
@@ -22,11 +22,15 @@ export class ProvidersBootstrap implements OnModuleInit {
           return this._featureFlags.isEnabled('media');
         case 'shortlink':
           return this._featureFlags.isEnabled('shortlinks');
+        case 'email':
+          // The 'empty' email provider is the always-on fallback and must
+          // register regardless of DEV_DISABLE_EMAIL; everything else honours
+          // the flag.
+          return providerId === 'empty' || this._featureFlags.isEnabled('email');
         case 'social':
         case 'storage':
         case 'vpn':
         case 'contentpack':
-        case 'email':
         case 'auth':
           return true;
         default:
@@ -40,8 +44,8 @@ export class ProvidersBootstrap implements OnModuleInit {
     // in-memory registries and the PROVIDER_KERNEL=legacy kill switch were
     // removed — the kernel is no longer optional.)
     for (const mod of providerModules) {
-      const { domain } = mod.manifest;
-      if (!domainFlag(domain)) {
+      const { domain, providerId } = mod.manifest;
+      if (!domainFlag(domain, providerId)) {
         continue;
       }
       try {

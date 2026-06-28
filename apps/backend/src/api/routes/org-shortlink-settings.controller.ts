@@ -42,9 +42,12 @@ export class OrgShortLinkSettingsController {
 
   // Resolve a short-link adapter through the kernel, throwing a 400 when the
   // provider id is unknown/retired.
-  private _requireAdapter(identifier: string): ShortLinkAdapter {
+  private _requireAdapter(identifier: string, version?: string): ShortLinkAdapter {
     try {
-      return this._resolution.resolveShortLink(identifier);
+      return this._resolution.resolveShortLink(
+        identifier,
+        ...(version ? [{ version }] as const : []),
+      );
     } catch {
       throw new BadRequestException('Unknown short-link provider');
     }
@@ -160,7 +163,9 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: OAuthUrlDto,
   ) {
-    const adapter = this._requireAdapter(identifier);
+    // Resolve the same pinned version the org's config uses.
+    const version = await this._orgShortLinkSettings.getPinnedVersion(org.id, identifier);
+    const adapter = this._requireAdapter(identifier, version);
     if (!adapter.oauth) throw new BadRequestException('Provider does not support OAuth');
 
     if (!isAllowedReturnUrl(body.redirectUri)) {
@@ -201,7 +206,9 @@ export class OrgShortLinkSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: OAuthCallbackDto,
   ) {
-    const adapter = this._requireAdapter(identifier);
+    // Resolve the same pinned version the org's config uses.
+    const version = await this._orgShortLinkSettings.getPinnedVersion(org.id, identifier);
+    const adapter = this._requireAdapter(identifier, version);
     if (!adapter.oauth) throw new BadRequestException('Provider does not support OAuth');
 
     if (!isAllowedReturnUrl(body.redirectUri)) {
@@ -233,6 +240,7 @@ export class OrgShortLinkSettingsController {
     await this._orgShortLinkSettings.upsert(org.id, identifier, {
       enabled: true,
       credentials,
+      version,
     });
 
     return { identifier, success: true };

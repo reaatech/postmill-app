@@ -186,6 +186,19 @@ export class OrgShortLinkSettingsService {
     return this._repository.getAggregatedClicks(orgId, from, to);
   }
 
+  // Resolve the version pinned for this org+identifier (the same way upsert /
+  // set-active do): the stored config's version, else the latest active version,
+  // else v1. Used by the OAuth subroutes so authorize/callback resolve the same
+  // pinned version as the config.
+  async getPinnedVersion(orgId: string, identifier: string): Promise<string> {
+    const config = await this._repository.getByIdentifier(orgId, identifier);
+    return (
+      config?.version ??
+      this._resolution.latestActiveVersion('shortlink', identifier) ??
+      'v1'
+    );
+  }
+
   async getConfigForProvider(orgId: string, identifier: string) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config) return null;

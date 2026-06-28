@@ -23,7 +23,7 @@ import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custo
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import { ContentPackDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
-import { CONTENT_PACK_IDENTIFIERS } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { CreateFolderDto } from '@gitroom/nestjs-libraries/dtos/file/create.folder.dto';
@@ -49,7 +49,8 @@ export class FilesController {
   constructor(
     private _fileService: FileService,
     private _storageService: StorageService,
-    private _stockMediaService: StockMediaService
+    private _stockMediaService: StockMediaService,
+    private _resolution: ProviderResolutionService
   ) {}
 
   // ── File CRUD ────────────────────────────────────────────
@@ -363,7 +364,10 @@ export class FilesController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: { url: string; name: string; folderId?: string; source?: string; downloadLocation?: string; attribution?: Record<string, unknown>; type?: string }
   ) {
-    if (body.source && CONTENT_PACK_IDENTIFIERS.includes(body.source) && body.downloadLocation) {
+    const contentPackIdentifiers = this._resolution
+      .listManifests('contentpack')
+      .map((m) => m.providerId);
+    if (body.source && contentPackIdentifiers.includes(body.source) && body.downloadLocation) {
       try {
         const licensedUrl = await this._stockMediaService.resolveContentPackDownload(
           org.id,

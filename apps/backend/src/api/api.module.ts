@@ -65,11 +65,6 @@ import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jo
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
-import { GithubProvider } from '@gitroom/backend/services/auth/providers/github.provider';
-import { GoogleProvider } from '@gitroom/backend/services/auth/providers/google.provider';
-import { FarcasterProvider } from '@gitroom/backend/services/auth/providers/farcaster.provider';
-import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.provider';
-import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
@@ -167,11 +162,6 @@ const authenticatedController = [
     TrackService,
     ShortLinkService,
     AuthProviderManager,
-    GithubProvider,
-    GoogleProvider,
-    FarcasterProvider,
-    WalletProvider,
-    OauthProvider,
     AnalyticsService,
     StockMediaService,
     AiGuardMiddleware,

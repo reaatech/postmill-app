@@ -54,6 +54,16 @@ export function validateManifest<Caps>(manifest: ProviderManifest<Caps>): void {
   if (!manifest.version || typeof manifest.version !== 'string') {
     throw new Error('Manifest missing version');
   }
+  // Identity helpers qualify()/keyString()/parseQualified() use '@' and '/' as
+  // separators; a version containing either (or wrapped in whitespace) breaks
+  // round-tripping. Versions are otherwise free-form (date-style, channel ids, …).
+  if (
+    manifest.version.includes('@') ||
+    manifest.version.includes('/') ||
+    manifest.version !== manifest.version.trim()
+  ) {
+    throw new Error(`Manifest invalid version format: ${JSON.stringify(manifest.version)}`);
+  }
   if (!manifest.displayName || typeof manifest.displayName !== 'string') {
     throw new Error('Manifest missing displayName');
   }

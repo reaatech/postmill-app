@@ -8,9 +8,8 @@ import {
   DEFAULT_VERSION,
 } from '@gitroom/provider-kernel';
 import {
-  CONTENT_PACK_IDENTIFIERS,
-  CONTENT_PACK_REGISTRY,
-  contentPackMeta,
+  ContentPackMeta,
+  manifestToContentPackMeta,
 } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.registry';
 
 @Injectable()
@@ -28,15 +27,14 @@ export class OrgContentPackSettingsService {
     const pointer = await this._repository.getActivePointer(orgId);
     const active = this.#parseActivePointer(pointer?.activeContentPackIdentifier);
 
-    return CONTENT_PACK_IDENTIFIERS.map((identifier) => {
-      const config = configs.find((c) => c.identifier === identifier);
-      const meta = CONTENT_PACK_REGISTRY[identifier];
+    return this.#listMeta().map((meta) => {
+      const config = configs.find((c) => c.identifier === meta.identifier);
       return {
-        identifier,
+        identifier: meta.identifier,
         name: meta.name,
         capabilities: meta.capabilities,
         isConfigured: !!config?.credentials,
-        isActive: active?.identifier === identifier,
+        isActive: active?.identifier === meta.identifier,
         version: config?.version ?? 'v1',
         createdAt: config?.createdAt || null,
         updatedAt: config?.updatedAt || null,
@@ -159,13 +157,23 @@ export class OrgContentPackSettingsService {
       credentials,
       orgId,
     });
-    const capabilityName = contentPackMeta(providerId)?.capabilities[0] || 'photos';
+    const capabilityName = this.#meta(providerId)?.capabilities[0] || 'photos';
     try {
       const result = await capability.search(capabilityName, 'test', 1);
       return { ok: true, message: 'Connection successful', result };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }
+  }
+
+  #listMeta(): ContentPackMeta[] {
+    return this._resolution
+      .listManifests('contentpack')
+      .map(manifestToContentPackMeta);
+  }
+
+  #meta(identifier: string): ContentPackMeta | undefined {
+    return this.#listMeta().find((m) => m.identifier === identifier);
   }
 
   #parseActivePointer(

@@ -12,6 +12,7 @@ const mockSetActive = vi.fn();
 const mockDelete = vi.fn();
 const mockTestConnection = vi.fn();
 const mockGetConfigForProvider = vi.fn();
+const mockGetPinnedVersion = vi.fn();
 
 vi.mock(
   '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service',
@@ -26,6 +27,7 @@ vi.mock(
       deleteById = mockDelete;
       testConnection = mockTestConnection;
       getConfigForProvider = mockGetConfigForProvider;
+      getPinnedVersion = mockGetPinnedVersion;
     },
   }),
 );
@@ -93,6 +95,7 @@ describe('OrgShortLinkSettingsController', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetPinnedVersion.mockResolvedValue('v1');
 
     controller = new OrgShortLinkSettingsController(
       new (OrgShortLinkSettingsService as any)(),
@@ -649,6 +652,7 @@ describe('OrgShortLinkSettingsController', () => {
       expect(mockUpsert).toHaveBeenCalledWith('org-1', 'bitly', {
         enabled: true,
         credentials: { accessToken: 'oauth-token' },
+        version: 'v1',
       });
       expect(result).toEqual({ identifier: 'bitly', success: true });
     });

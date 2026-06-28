@@ -8,6 +8,7 @@ import {
   DEFAULT_VERSION,
   ProviderDomain,
   ContentPackCapability,
+  ProviderManifest,
 } from '@gitroom/provider-kernel';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
@@ -110,9 +111,8 @@ export class ProviderResolutionService {
 
   /**
    * Resolve a kernel-registered provider into a cached, telemetry-wrapped
-   * capability plus its module/version (7.0.4 + 7.0.6). Only the kernel
-   * (non-legacy) path uses this — legacy branches resolve from the in-memory
-   * registries directly and are intentionally never cached.
+   * capability plus its module/version (7.0.4 + 7.0.6). The kernel is the sole
+   * resolution path — the legacy in-memory registries have been removed.
    */
   private _resolveKernel<C>(
     domain: ProviderDomain,
@@ -144,9 +144,7 @@ export class ProviderResolutionService {
   /**
    * Public resolution variant returning the full {@link ResolvedProvider}
    * (module + capability + version) for callers that need the manifest/version
-   * alongside the capability. Falls back to the legacy registries via the
-   * domain-specific resolve* methods is not provided here — use this only in
-   * kernel mode.
+   * alongside the capability. Resolves exclusively through the kernel.
    */
   resolveProvider<C>(
     domain: ProviderDomain,
@@ -255,6 +253,16 @@ export class ProviderResolutionService {
       providerId,
       options,
     ).capability;
+  }
+
+  /**
+   * Public manifest catalog for a domain (or all domains). The kernel is the
+   * single source of truth for provider metadata (displayName, capabilities,
+   * credentialFields, status/version) — settings surfaces project these instead
+   * of holding their own hardcoded catalog object.
+   */
+  listManifests(domain?: ProviderDomain): ProviderManifest[] {
+    return this._kernel.listManifests(domain);
   }
 
   latestActiveVersion(domain: ProviderDomain, providerId: string): string | undefined {
