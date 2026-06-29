@@ -1,9 +1,43 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 
+/**
+ * Build an optional `datasourceUrl` override that appends Prisma connection-pool
+ * params (`connection_limit` / `pool_timeout`) when the matching env vars are set.
+ * Returns `undefined` when neither is set so PrismaClient is constructed exactly as
+ * before (byte-for-byte unchanged default behaviour).
+ */
+function buildPooledDatasourceUrl(): string | undefined {
+  const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT;
+  const poolTimeout = process.env.DATABASE_POOL_TIMEOUT;
+  if (!connectionLimit && !poolTimeout) {
+    return undefined;
+  }
+
+  const baseUrl = process.env.DATABASE_URL;
+  if (!baseUrl) {
+    return undefined;
+  }
+
+  try {
+    const url = new URL(baseUrl);
+    if (connectionLimit) {
+      url.searchParams.set('connection_limit', connectionLimit);
+    }
+    if (poolTimeout) {
+      url.searchParams.set('pool_timeout', poolTimeout);
+    }
+    return url.toString();
+  } catch {
+    // Malformed DATABASE_URL — leave it untouched and let Prisma surface the error.
+    return undefined;
+  }
+}
+
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   constructor() {
+    const datasourceUrl = buildPooledDatasourceUrl();
     super({
       log: [
         {
@@ -11,6 +45,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
           level: 'query',
         },
       ],
+      ...(datasourceUrl ? { datasourceUrl } : {}),
     });
   }
   async onModuleInit() {

@@ -1,8 +1,6 @@
-import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
+import { BaseShortLinkAdapter, ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
-export class BlinkAdapter implements ShortLinkCapability {
-  constructor(private readonly _fetch: SafeFetchPort) {}
-
+export class BlinkAdapter extends BaseShortLinkAdapter {
   readonly identifier = 'blink';
   readonly name = 'BL.INK';
   readonly authType = 'apiKey' as const;
@@ -24,27 +22,29 @@ export class BlinkAdapter implements ShortLinkCapability {
     return ctx.customDomain || this.defaultDomain;
   }
 
-  private headers(ctx: ShortLinkContext): Record<string, string> {
+  protected _headers(ctx: ShortLinkContext): Record<string, string> {
     return {
       'Content-Type': 'application/json',
       'X-API-Key': ctx.credentials.apiKey,
     };
   }
 
-  async validateCredentials(ctx: ShortLinkContext): Promise<{ ok: boolean; error?: string }> {
-    try {
-      const response = await this._fetch(`${this.apiBase}/api/v1/links?limit=1`, {
-        method: 'GET',
-        headers: this.headers(ctx),
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        return { ok: false, error: `BL.INK API error (${response.status}): ${body}` };
-      }
-      return { ok: true };
-    } catch (err: any) {
-      return { ok: false, error: err?.message || 'Failed to validate BL.INK credentials' };
-    }
+  // Endpoint whose 2xx proves the credentials (base validateCredentials).
+  protected _validateUrl(ctx: ShortLinkContext): string {
+    return `${this.apiBase}/api/v1/links?limit=1`;
+  }
+
+  // Canonical per-link click count (base linkStatistics contract). BL.INK keeps its own
+  // linkStatistics override below to preserve skip-on-non-ok semantics and the `original` field.
+  protected async _clicksFor(ctx: ShortLinkContext, shortUrl: string): Promise<number> {
+    const slug = shortUrl.replace(/https?:\/\//, '').split('/').pop() || '';
+    const response = await this._fetch(`${this.apiBase}/api/v1/link/${encodeURIComponent(slug)}/analytics`, {
+      method: 'GET',
+      headers: this._headers(ctx),
+    });
+    if (!response.ok) throw new Error(`BL.INK analytics failed (${response.status})`);
+    const data = (await response.json()) as any;
+    return Number(data.clicks || data.total_clicks || 0);
   }
 
   async createShortLink(ctx: ShortLinkContext, originalUrl: string): Promise<{ shortUrl: string; providerLinkId?: string }> {
@@ -55,7 +55,7 @@ export class BlinkAdapter implements ShortLinkCapability {
     }
     const response = await this._fetch(`${this.apiBase}/api/v1/links`, {
       method: 'POST',
-      headers: this.headers(ctx),
+      headers: this._headers(ctx),
       body: JSON.stringify(body),
     });
     if (!response.ok) {
@@ -70,7 +70,7 @@ export class BlinkAdapter implements ShortLinkCapability {
     const slug = shortUrl.replace(/https?:\/\//, '').split('/').pop() || '';
     const response = await this._fetch(`${this.apiBase}/api/v1/link/${encodeURIComponent(slug)}`, {
       method: 'GET',
-      headers: this.headers(ctx),
+      headers: this._headers(ctx),
     });
     if (!response.ok) {
       const text = await response.text();
@@ -87,7 +87,7 @@ export class BlinkAdapter implements ShortLinkCapability {
         const slug = link.replace(/https?:\/\//, '').split('/').pop() || '';
         const response = await this._fetch(`${this.apiBase}/api/v1/link/${encodeURIComponent(slug)}/analytics`, {
           method: 'GET',
-          headers: this.headers(ctx),
+          headers: this._headers(ctx),
         });
         if (response.ok) {
           const data = (await response.json()) as any;
@@ -103,7 +103,7 @@ export class BlinkAdapter implements ShortLinkCapability {
   async listLinks(ctx: ShortLinkContext, page: number): Promise<ShortLinkStat[]> {
     const response = await this._fetch(`${this.apiBase}/api/v1/links?limit=50&offset=${(page - 1) * 50}`, {
       method: 'GET',
-      headers: this.headers(ctx),
+      headers: this._headers(ctx),
     });
     if (!response.ok) {
       const text = await response.text();

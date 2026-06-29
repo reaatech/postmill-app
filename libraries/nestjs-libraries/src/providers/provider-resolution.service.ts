@@ -20,6 +20,7 @@ import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interfa
 import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
 import { PROVIDER_KERNEL } from './provider-kernel.token';
 import { RuntimeContextFactory } from './runtime-context.factory';
+import { trace } from '@opentelemetry/api';
 
 export interface ResolutionOptions {
   version?: string;
@@ -41,29 +42,41 @@ function makeTelemetryProxy<T extends object>(
         return value;
       }
       const operation = String(prop);
+      const keyStr = `${key.domain}/${key.providerId}@${key.version}`;
       return function (...args: unknown[]) {
         const start = performance.now();
-        logger.debug(`provider-call ${key.domain}/${key.providerId}@${key.version}.${operation}`, {
-          keyString: `${key.domain}/${key.providerId}@${key.version}`,
+        logger.debug(`provider-call ${keyStr}.${operation}`, {
+          keyString: keyStr,
           operation,
         });
+        // G4: provider-call span. `trace.getTracer` is a no-op when no OTel SDK is
+        // started, so this is zero-cost and behaviour-neutral on the production default.
+        const span = trace
+          .getTracer('postmill')
+          .startSpan(`provider.${key.domain}.${key.providerId}`);
+        span.setAttribute('keyString', keyStr);
+        span.setAttribute('provider.operation', operation);
         try {
           const result = (value as (...args: unknown[]) => unknown).apply(obj, args);
           if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
             return (result as Promise<unknown>)
               .then((res) => {
                 kernel.recordSuccess(key);
+                span.end();
                 return res;
               })
               .catch((err: Error) => {
                 kernel.recordError(key, err.message);
+                span.end();
                 throw err;
               });
           }
           kernel.recordSuccess(key);
+          span.end();
           return result;
         } catch (err) {
           kernel.recordError(key, (err as Error).message);
+          span.end();
           throw err;
         }
       };

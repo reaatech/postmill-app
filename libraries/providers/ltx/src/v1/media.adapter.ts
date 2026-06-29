@@ -1,13 +1,11 @@
 import {
-  MediaProviderAdapter,
+  BearerTokenMediaAdapter,
   MediaProviderCapabilities,
   MediaGenerationResult,
   MediaGenerateOptions,
   MediaCredentialOptions,
   MediaJobSubmission,
   MediaPollResult,
-  MediaInputValue,
-  resolveApiKey,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -40,8 +38,7 @@ interface LtxStatusResponse {
   detail?: unknown;
 }
 
-export class LtxAdapter implements MediaProviderAdapter {
-  constructor(private readonly _fetch: SafeFetchPort) {}
+export class LtxAdapter extends BearerTokenMediaAdapter {
   readonly identifier = 'ltx';
   readonly name = 'LTX Studio';
   readonly capabilities: MediaProviderCapabilities = {
@@ -55,24 +52,6 @@ export class LtxAdapter implements MediaProviderAdapter {
     bgRemove: false,
     inpaint: false,
   };
-
-  private _headers(options?: MediaCredentialOptions): Record<string, string> {
-    const apiKey = resolveApiKey(options);
-    if (!apiKey) throw new Error('LTX Studio API key is required');
-    return {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    };
-  }
-
-  // Drop empty/undefined values; everything else is a native LTX param that rides straight into the body.
-  private _clean(raw?: Record<string, MediaInputValue>): Record<string, MediaInputValue> {
-    const out: Record<string, MediaInputValue> = {};
-    for (const [k, v] of Object.entries(raw || {})) {
-      if (v !== undefined && v !== '') out[k] = v;
-    }
-    return out;
-  }
 
   async generateImage(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     throw new Error('LTX Studio does not support image generation');

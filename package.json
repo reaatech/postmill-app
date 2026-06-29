@@ -31,11 +31,14 @@
     "prisma-generate": "pnpm dlx prisma@6.5.0 generate --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma",
     "prisma-db-push": "pnpm dlx prisma@6.5.0 db push --accept-data-loss --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma",
     "prisma-db-pull": "pnpm dlx prisma@6.5.0 db pull --schema ./libraries/nestjs-libraries/src/database/prisma/schema.prisma",
+    "prisma-schema-diff": "pnpm dlx prisma@6.5.0 migrate diff --from-url $DATABASE_URL --to-schema-datamodel ./libraries/nestjs-libraries/src/database/prisma/schema.prisma --script",
+    "prisma-schema-check": "node scripts/schema-destructive-guard.mjs",
     "prisma-reset": "cd ./libraries/nestjs-libraries/src/database/prisma && pnpm dlx prisma@6.5.0 db push --force-reset && pnpx prisma@6.5.0 db push",
     "docker-build": "./var/docker/docker-build.sh",
     "docker-create": "./var/docker/docker-create.sh",
     "postinstall": "pnpm run prisma-generate",
     "test": "vitest run --root libraries/helpers && vitest run --root libraries/providers && vitest run --root libraries/nestjs-libraries && vitest run --root apps/backend && vitest run --root apps/frontend && vitest run --root apps/commands",
+    "test:coverage": "vitest run --root libraries/nestjs-libraries --coverage && vitest run --root apps/backend --coverage && vitest run --root apps/frontend --coverage && vitest run --root libraries/providers --coverage",
     "test:int": "vitest run --root libraries/nestjs-libraries --config vitest-integration.config.ts"
   },
   "dependencies": {

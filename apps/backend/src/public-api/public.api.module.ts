@@ -1,4 +1,10 @@
-import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
+import {
+  MiddlewareConsumer,
+  Module,
+  NestModule,
+  RequestMethod,
+} from '@nestjs/common';
+import type { Request, Response, NextFunction } from 'express';
 import { AuthService } from '@gitroom/backend/services/auth/auth.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
@@ -12,6 +18,7 @@ import { PublicIntegrationsController } from '@gitroom/backend/public-api/routes
 import { PublicCampaignController } from '@gitroom/backend/public-api/routes/public.campaign.controller';
 import { PublicAuthMiddleware } from '@gitroom/backend/services/auth/public.auth.middleware';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { IdempotencyFactory } from '@gitroom/nestjs-libraries/ai/governance/idempotency.factory';
 
 const authenticatedController = [PublicIntegrationsController];
 const publicController = [PublicCampaignController];
@@ -28,14 +35,60 @@ const publicController = [PublicCampaignController];
     CodesService,
     IntegrationManager,
     AnalyticsService,
+    IdempotencyFactory,
   ],
   get exports() {
     return [...this.imports, ...this.providers];
   },
 })
 export class PublicApiModule implements NestModule {
+  constructor(private _idempotencyFactory: IdempotencyFactory) {}
+
+  // J4 — Idempotency-Key on public mutations. Reuses the Redis-backed MCP
+  // IdempotencyFactory: a repeat with the same key within the TTL replays the
+  // first response instead of re-running the mutation.
+  private _idempotency = (req: Request, res: Response, next: NextFunction) => {
+    const mw = this._idempotencyFactory.getMiddleware();
+    if (!mw) return next();
+
+    const rawKey = req.headers['idempotency-key'];
+    if (!rawKey || typeof rawKey !== 'string') return next();
+
+    // Namespace the key per-org (set by PublicAuthMiddleware, which runs first)
+    // so one tenant can't replay another tenant's cached response by reusing the
+    // same key string.
+    const orgId = (req as any).org?.id;
+    if (orgId) {
+      req.headers['idempotency-key'] = `${orgId}:${rawKey}`;
+    }
+
+    // The factory middleware only processes POST/PUT/PATCH. Public DELETEs also
+    // accept the key, so present them under a covered verb for keying, then
+    // restore the real verb so the route still matches on a cache miss.
+    if (req.method === 'DELETE') {
+      const realMethod = req.method;
+      req.method = 'POST';
+      return mw(req, res, (err?: any) => {
+        req.method = realMethod;
+        next(err);
+      });
+    }
+
+    return mw(req, res, next);
+  };
+
   configure(consumer: MiddlewareConsumer) {
     consumer.apply(PublicAuthMiddleware).forRoutes(...authenticatedController);
+
+    // Auth is applied first (above) so the org is resolved before idempotency
+    // keys are namespaced. Scope to the mutating public routes only.
+    consumer.apply(this._idempotency).forRoutes(
+      { path: 'public/v1/upload', method: RequestMethod.POST },
+      { path: 'public/v1/upload-from-url', method: RequestMethod.POST },
+      { path: 'public/v1/posts', method: RequestMethod.POST },
+      { path: 'public/v1/posts/:id', method: RequestMethod.DELETE },
+      { path: 'public/v1/posts/group/:group', method: RequestMethod.DELETE },
+      { path: 'public/v1/integrations/:id', method: RequestMethod.DELETE }
+    );
   }
 }
-

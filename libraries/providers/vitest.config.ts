@@ -26,6 +26,9 @@ export default defineConfig({
       all: false,
       include: [
         'kernel/src/**',
+        // Consolidated base classes the migrated adapters now extend (H5) — coverage-gated.
+        'kernel/src/domains/media-helpers.ts',
+        'kernel/src/domains/shortlink.ts',
         // Adapters with B4 recorded-fixture integration tests.
         'wan/src/v1/media.adapter.ts',
         'higgsfield/src/v1/media.adapter.ts',
@@ -53,9 +56,9 @@ export default defineConfig({
         'kernel/src/domains/social-rules-decorator.ts',
         'kernel/src/domains/social-tool-decorator.ts',
         'kernel/src/domains/social-make-id.ts',
-        // Legacy media/storage base-and-bridge modules (AI-SDK media bridge, storage base) — large
-        // relocated helper classes the kit adapters do not extend; same backlog rationale.
-        'kernel/src/domains/media-helpers.ts',
+        // Legacy storage base-and-bridge module (storage base) — large relocated helper class the
+        // kit adapters do not extend; same backlog rationale. (media-helpers.ts is now coverage-gated
+        // since the migrated media adapters extend BearerTokenMediaAdapter — see include above.)
         'kernel/src/domains/storage-helpers.ts',
       ],
       thresholds: {

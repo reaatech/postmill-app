@@ -22,11 +22,16 @@ export class PostValidationExceptionFilter implements ExceptionFilter {
     const { provider, name, error } =
       exception.getResponse() as PostValidationError;
 
+    // Unified error envelope: { statusCode, error, message, ...context }.
+    // `provider`/`name` (which channel/post failed) are preserved as extra
+    // context fields. `error` here is the HTTP reason phrase; the validation
+    // detail rides in `message`.
     response.status(status).json({
       statusCode: status,
+      error: 'Bad Request',
+      message: error,
       provider,
       name,
-      message: error,
     });
   }
 }

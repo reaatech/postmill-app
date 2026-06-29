@@ -9,6 +9,7 @@ import { AutopostActivity } from './activities/autopost.activity';
 import { MediaJobsActivity } from './activities/media-jobs.activity';
 import { DigestActivity } from './activities/digest.activity';
 import { CampaignActivity } from './activities/campaign.activity';
+import { RetentionActivity } from './activities/retention.activity';
 import { InngestService } from './inngest.service';
 
 @Module({
@@ -23,6 +24,7 @@ import { InngestService } from './inngest.service';
     MediaJobsActivity,
     DigestActivity,
     CampaignActivity,
+    RetentionActivity,
     InngestService,
   ],
   exports: [
@@ -35,6 +37,7 @@ import { InngestService } from './inngest.service';
     MediaJobsActivity,
     DigestActivity,
     CampaignActivity,
+    RetentionActivity,
     InngestService,
   ],
 })

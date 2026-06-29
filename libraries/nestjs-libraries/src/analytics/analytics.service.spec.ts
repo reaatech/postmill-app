@@ -237,6 +237,31 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getOverview (single-flight, G5)', () => {
+    it('collapses two concurrent same-key cache-miss calls into one compute', async () => {
+      // Hold the first compute open at its first awaited DB call so the second
+      // concurrent call attaches to the in-flight promise instead of recomputing.
+      let releaseCompute!: (value: any[]) => void;
+      const gate = new Promise<any[]>((resolve) => {
+        releaseCompute = resolve;
+      });
+      (analyticsRepository.getIntegrations as any).mockReturnValue(gate);
+
+      const p1 = service.getOverview(mockOrg as any, '2024-03-01', '2024-03-07', ['i1'], false);
+      const p2 = service.getOverview(mockOrg as any, '2024-03-01', '2024-03-07', ['i1'], false);
+
+      // Drain microtasks so both calls pass the Redis miss and reach singleFlight.
+      await new Promise((r) => setTimeout(r, 0));
+      releaseCompute([]); // no integrations -> deterministic short compute
+
+      const [r1, r2] = await Promise.all([p1, p2]);
+
+      // One compute: getIntegrations invoked once, and both callers share the result.
+      expect((analyticsRepository.getIntegrations as any)).toHaveBeenCalledTimes(1);
+      expect(r1).toBe(r2);
+    });
+  });
+
   // ============ NEW PRIVATE METHOD TESTS ============
 
   describe('escapeCSVField', () => {

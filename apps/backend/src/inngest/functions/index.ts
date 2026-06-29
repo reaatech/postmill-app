@@ -7,6 +7,7 @@ import { AutopostActivity } from '@gitroom/nestjs-libraries/inngest/activities/a
 import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/media-jobs.activity';
 import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/digest.activity';
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
+import { RetentionActivity } from '@gitroom/nestjs-libraries/inngest/activities/retention.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { createAnalyticsCollection } from './analytics-collection';
 import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
@@ -17,6 +18,7 @@ import { createSendEmail } from './send-email';
 import { createDigestEmailDaily } from './digest-email-daily';
 import { createDigestEmailWeekly } from './digest-email-weekly';
 import { createCampaignTagPurge } from './campaign-tag-purge';
+import { createRetentionPurge } from './retention-purge';
 import { createAutopostProcess } from './autopost-process';
 import { createRefreshToken } from './refresh-token';
 import { createStreakTracker } from './streak-tracker';
@@ -33,6 +35,7 @@ export interface InngestActivities {
   mediaJobsActivity: MediaJobsActivity;
   digestActivity: DigestActivity;
   campaignActivity: CampaignActivity;
+  retentionActivity: RetentionActivity;
   inngestRunRepository: InngestRunRepository;
 }
 
@@ -47,6 +50,7 @@ export const createFunctions = (activities: InngestActivities) => [
   createDigestEmailDaily(activities.digestActivity),
   createDigestEmailWeekly(activities.digestActivity),
   createCampaignTagPurge(activities.campaignActivity, activities.inngestRunRepository),
+  createRetentionPurge(activities.retentionActivity, activities.inngestRunRepository),
   createAutopostProcess(activities.autopostActivity),
   createRefreshToken(activities.integrationsActivity),
   createStreakTracker(activities.emailActivity, activities.postActivity),

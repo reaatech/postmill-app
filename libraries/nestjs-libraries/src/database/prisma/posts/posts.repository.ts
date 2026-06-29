@@ -685,6 +685,7 @@ export class PostsRepository {
           const tagsList = await this._tags.model.tags.findMany({
             where: {
               orgId: orgId,
+              deletedAt: null,
               name: {
                 in: tags.map((tag) => tag.label).filter((f) => f),
               },

@@ -12,6 +12,33 @@ All endpoints are gated by an **API key** passed in the `Authorization` header
 Rate-limited by `API_LIMIT` env var (default 600 requests/hour per org).
 Specific sensitive endpoints have tighter `@Throttle` overrides.
 
+## Pagination
+
+`GET /public/v1/posts` is bounded. It returns at most **100** posts per call
+(also the default page size) and an offset `cursor` for the next page:
+
+- `?limit=` — max items to return (1–100; defaults to 100, hard-capped at 100).
+- `?cursor=` — opaque offset returned by the previous page. The response shape is
+  `{ posts: [...], cursor: <next-offset|null> }`; `cursor` is `null` on the last page.
+
+Omitting both keeps the previous behaviour, just capped at 100 instead of the
+whole date window.
+
+## Idempotency
+
+Mutating public endpoints accept an optional **`Idempotency-Key`** request header.
+A repeat carrying the same key within **24 hours** replays the first response
+instead of re-running the mutation (Redis-backed). Keys are scoped per-org, so the
+same key string from a different org is independent. Supported on:
+
+- `POST /public/v1/posts`
+- `POST /public/v1/upload` and `POST /public/v1/upload-from-url`
+- `DELETE /public/v1/posts/:id`, `DELETE /public/v1/posts/group/:group`,
+  `DELETE /public/v1/integrations/:id`
+
+If Redis is unavailable the header is ignored (requests proceed normally). A
+concurrent in-flight duplicate returns `409`.
+
 ---
 
 ## Posts

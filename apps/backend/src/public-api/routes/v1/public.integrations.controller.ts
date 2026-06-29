@@ -13,7 +13,14 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
-import { ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiQuery,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
 import { parseQualified } from '@gitroom/provider-kernel';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
@@ -41,6 +48,9 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { fromBuffer } = require('file-type');
 
+// J2 — hard cap for the public `/posts` list (default page size == max).
+const PUBLIC_POSTS_MAX_LIMIT = 100;
+
 const PUBLIC_API_ALLOWED_MIME = new Set<string>([
   'image/jpeg',
   'image/png',
@@ -61,6 +71,8 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 
 @ApiTags('Public API')
+@ApiSecurity('api-key')
+@ApiBearerAuth('bearer')
 @Controller('/public/v1')
 export class PublicIntegrationsController {
   constructor(
@@ -76,6 +88,13 @@ export class PublicIntegrationsController {
   ) {}
 
   @Post('/upload')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response instead of re-uploading.',
+  })
+  @ApiResponse({ status: 201, description: 'The saved file record.' })
   @UseInterceptors(FileInterceptor('file'))
   @UsePipes(new CustomFileValidationPipe())
   async uploadSimple(
@@ -145,19 +164,43 @@ export class PublicIntegrationsController {
   }
 
   @Get('/posts')
+  @ApiResponse({
+    status: 200,
+    description:
+      'Posts in the requested publish-date window, capped at `limit` (default/max 100). ' +
+      '`cursor` is the offset for the next page; it is null when the last page is reached.',
+  })
   async getPosts(
     @GetOrgFromRequest() org: Organization,
     @Query() query: GetPostsDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    const posts = await this._postsService.getPosts(org.id, query);
+    const all = await this._postsService.getPosts(org.id, query);
+
+    // J2 — bound the previously-unbounded array. Back-compat: when no paging
+    // param is sent we still return `{ posts }`, just capped at the hard max
+    // rather than the whole window.
+    const offset = query.cursor ?? 0;
+    const limit = query.limit ?? PUBLIC_POSTS_MAX_LIMIT;
+    const posts = all.slice(offset, offset + limit);
+    const nextOffset = offset + limit;
+    const cursor = nextOffset < all.length ? nextOffset : null;
+
     return {
       posts,
+      cursor,
       // comments,
     };
   }
 
   @Post('/posts')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response instead of creating a duplicate post.',
+  })
+  @ApiResponse({ status: 201, description: 'The created post group.' })
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
@@ -179,6 +222,12 @@ export class PublicIntegrationsController {
   }
 
   @Delete('/posts/:id')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response.',
+  })
   async deletePost(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string

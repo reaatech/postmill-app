@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import { getRequestId } from '@gitroom/nestjs-libraries/chat/async.storage';
 
 // OpenTelemetry bootstrap. No-ops unless `OTEL_EXPORTER_OTLP_ENDPOINT` is set and
 // `DEV_DISABLE_OPENTELEMETRY` is unset. When configured, starts a NodeSDK with auto
@@ -33,10 +34,40 @@ export function initializeOtel(): void {
     const {
       OTLPTraceExporter,
     } = require('@opentelemetry/exporter-trace-otlp-http');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { BatchSpanProcessor } = require('@opentelemetry/sdk-trace-base');
+
+    // G4: stamp the per-request correlation id (set by the request-context ALS in
+    // async.storage.ts) onto every span as `request.id`. onStart runs in the caller's
+    // async context, so the ALS store is still active. This processor only exists once
+    // the SDK is started — when OTel is off (the production default) initializeOtel()
+    // returns above and nothing here runs.
+    const requestIdProcessor = {
+      onStart(span: { setAttribute(key: string, value: string): void }) {
+        const requestId = getRequestId();
+        if (requestId) {
+          span.setAttribute('request.id', requestId);
+        }
+      },
+      onEnd() {
+        /* no-op */
+      },
+      shutdown() {
+        return Promise.resolve();
+      },
+      forceFlush() {
+        return Promise.resolve();
+      },
+    };
 
     sdk = new NodeSDK({
       serviceName: process.env.OTEL_SERVICE_NAME || 'postmill-backend',
-      traceExporter: new OTLPTraceExporter({ url: endpoint }),
+      // Passing `spanProcessors` supersedes `traceExporter`, so export via an explicit
+      // BatchSpanProcessor alongside the request-id processor.
+      spanProcessors: [
+        requestIdProcessor,
+        new BatchSpanProcessor(new OTLPTraceExporter({ url: endpoint })),
+      ],
       instrumentations: [getNodeAutoInstrumentations()],
     });
 

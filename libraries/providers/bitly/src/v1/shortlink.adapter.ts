@@ -1,8 +1,6 @@
-import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
+import { BaseShortLinkAdapter, ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
-export class BitlyAdapter implements ShortLinkCapability {
-  constructor(private readonly _fetch: SafeFetchPort) {}
-
+export class BitlyAdapter extends BaseShortLinkAdapter {
   readonly identifier = 'bitly';
   readonly name = 'Bitly';
   readonly authType = 'oauth2' as const;
@@ -67,23 +65,30 @@ export class BitlyAdapter implements ShortLinkCapability {
     return ctx.customDomain || this.defaultDomain;
   }
 
-  async validateCredentials(ctx: ShortLinkContext): Promise<{ ok: boolean; error?: string }> {
-    try {
-      const response = await this._fetch(`${this.apiBase}/user`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${ctx.credentials.accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!response.ok) {
-        const body = await response.text();
-        return { ok: false, error: `Bitly API error (${response.status}): ${body}` };
-      }
-      return { ok: true };
-    } catch (err: any) {
-      return { ok: false, error: err?.message || 'Failed to validate Bitly credentials' };
-    }
+  // Hooks for the base's concrete validateCredentials.
+  protected _headers(ctx: ShortLinkContext): Record<string, string> {
+    return {
+      'Authorization': `Bearer ${ctx.credentials.accessToken}`,
+      'Content-Type': 'application/json',
+    };
+  }
+
+  protected _validateUrl(ctx: ShortLinkContext): string {
+    return `${this.apiBase}/user`;
+  }
+
+  // Canonical per-link click count (base linkStatistics contract). Bitly keeps its own
+  // linkStatistics override below to preserve skip-on-non-ok semantics, so this is the
+  // single-link helper used when the base's loop is in play.
+  protected async _clicksFor(ctx: ShortLinkContext, shortUrl: string): Promise<number> {
+    const linkId = shortUrl.replace('https://', '');
+    const response = await this._fetch(`${this.apiBase}/bitlinks/${linkId}/clicks/summary`, {
+      method: 'GET',
+      headers: this._headers(ctx),
+    });
+    if (!response.ok) throw new Error(`Bitly clicks failed (${response.status})`);
+    const data = await response.json() as any;
+    return Number(data.total_clicks || 0);
   }
 
   async createShortLink(ctx: ShortLinkContext, originalUrl: string): Promise<{ shortUrl: string; providerLinkId?: string }> {

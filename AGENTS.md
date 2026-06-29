@@ -211,6 +211,13 @@ source of truth. Because pushes can force destructive diffs against the live pro
 - Renames/drops are destructive under `db push` — provide a manual backfill / expand-contract plan.
 - Run `pnpm run prisma-generate` after schema edits to keep the client in sync.
 
+**Schema-change workflow:** edit schema → `pnpm run prisma-schema-diff` (commit the SQL under
+`dev/schema-changes/`) → `pnpm run prisma-schema-check` (destructive guard) → `pnpm run prisma-db-push`.
+Destructive changes (`DROP`, in-place rename, new required column) need an expand/contract plan and an
+explicit `ALLOW_DESTRUCTIVE_SCHEMA=true` to pass the guard; CI re-runs the guard against `origin/main`.
+Connection-pool size is env-tunable via `DATABASE_CONNECTION_LIMIT` / `DATABASE_POOL_TIMEOUT` (unset =
+default behaviour, byte-for-byte). Full details in `docs/developer-docs/database.md`.
+
 ---
 
 ## Channel credentials

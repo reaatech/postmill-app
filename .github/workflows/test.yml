@@ -51,6 +51,9 @@ jobs:
       - name: Run tests (Vitest)
         run: pnpm run test
 
+      - name: Coverage gates (Vitest --coverage)
+        run: pnpm run test:coverage
+
       - name: Run integration tests (Vitest + Postgres)
         env:
           TEST_DATABASE_ADMIN_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postgres
@@ -72,3 +75,20 @@ jobs:
             --from-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
             --to-url "$DATABASE_URL" \
             --exit-code
+
+      - name: Destructive schema guard (vs origin/main)
+        run: |
+          # Ensure origin/main is available even on shallow forks.
+          git fetch --no-tags --depth=1 origin main || true
+          # Extract main's schema (the baseline) into a temp file; on the very first
+          # commit to main (no origin/main yet) there is nothing to diff against.
+          if git show origin/main:libraries/nestjs-libraries/src/database/prisma/schema.prisma \
+              > /tmp/main-schema.prisma 2>/dev/null; then
+            pnpm exec prisma migrate diff \
+              --from-schema-datamodel /tmp/main-schema.prisma \
+              --to-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
+              --script > /tmp/pending.sql
+            node scripts/schema-destructive-guard.mjs --file /tmp/pending.sql
+          else
+            echo "origin/main schema not found — skipping destructive guard (first push to main)."
+          fi

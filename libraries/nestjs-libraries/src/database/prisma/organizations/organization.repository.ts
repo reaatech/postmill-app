@@ -5,6 +5,10 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
+// Terms-of-Service version recorded at account creation (I4 — consent tracking).
+// Bump when the ToS materially changes so re-acceptance can be detected.
+export const TOS_VERSION = '1.0';
+
 @Injectable()
 export class OrganizationRepository {
   constructor(
@@ -298,6 +302,8 @@ export class OrganizationRepository {
                 providerId: body.providerId || '',
                 ip,
                 agent: userAgent,
+                tosAcceptedAt: new Date(),
+                tosVersion: TOS_VERSION,
                 profile: {
                   create: {
                     name: body.name || null,

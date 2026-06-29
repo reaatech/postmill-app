@@ -16,6 +16,8 @@ import { PrismaRepository, PrismaService, PrismaTransaction } from './prisma.ser
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { DeletionService } from '@gitroom/nestjs-libraries/database/prisma/users/deletion.service';
+import { DataExportService } from '@gitroom/nestjs-libraries/database/prisma/users/data-export.service';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
@@ -125,6 +127,8 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     PrismaTransaction,
     UsersService,
     UsersRepository,
+    DeletionService,
+    DataExportService,
     OrganizationService,
     OrganizationRepository,
     SubscriptionService,

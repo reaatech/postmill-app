@@ -1,6 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
+import { mapWithConcurrency, singleFlight } from '@gitroom/nestjs-libraries/utils/concurrency';
+import { trace } from '@opentelemetry/api';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
@@ -479,195 +480,227 @@ export class AnalyticsService {
     integrations: string[],
     compare: boolean
   ): Promise<AnalyticsOverviewResponse> {
-    const fromDate = dayjs(from).startOf('day').toDate();
-    const toDate = dayjs(to).endOf('day').toDate();
+    // G4: hot-path span. `trace.getTracer` returns a no-op tracer when no OTel SDK
+    // is started, so the whole wrapper is zero-cost and behaviour-neutral on the
+    // production default (spans/attributes are dropped).
+    const tracer = trace.getTracer('postmill');
+    return tracer.startActiveSpan('analytics.getOverview', async (span) => {
+      span.setAttribute('orgId', org.id);
+      try {
+        const fromDate = dayjs(from).startOf('day').toDate();
+        const toDate = dayjs(to).endOf('day').toDate();
 
-    // 60s Redis cache. Today-ending windows (the dashboard default) are cached
-    // too: snapshots only change via the daily sweep, and recomputing the
-    // overview — including its potential live provider fan-out — on every view
-    // is the dashboard's dominant CPU/memory cost. getChannel/getPosts/
-    // recommendations all funnel through here, so one uncached view recomputed
-    // everything several times over.
-    const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
-    try {
-      const cached = await this._redisService.get(cacheKey);
-      if (cached) {
-        return JSON.parse(cached) as AnalyticsOverviewResponse;
-      }
-    } catch { /* cache miss — continue */ }
-
-    const dbIntegrations = await this.getIntegrations(org.id, integrations);
-
-    if (dbIntegrations.length === 0) {
-      return {
-        range: { from, to },
-        kpis: [],
-        series: {},
-        byChannel: [],
-        breakdown: { byPlatform: [] },
-      };
-    }
-
-    const integrationIds = dbIntegrations.map((i) => i.id);
-
-    let snapshots = await this.getSnapshots(
-      org.id,
-      integrationIds,
-      fromDate,
-      toDate
-    );
-
-    snapshots = await this._applyLiveFallbackIfNeeded(
-      org, integrationIds, dbIntegrations, fromDate, toDate, snapshots
-    );
-
-    const metrics = [...new Set(snapshots.map((s) => s.metric))].filter(
-      isKnownMetric
-    );
-
-    const windowSize = dayjs(toDate).diff(dayjs(fromDate), 'day');
-
-    let previousSnapshots: any[] = [];
-    if (compare) {
-      const prevToDate = dayjs(fromDate)
-        .subtract(1, 'day')
-        .endOf('day')
-        .toDate();
-      const prevFromDate = dayjs(prevToDate)
-        .subtract(windowSize, 'day')
-        .startOf('day')
-        .toDate();
-
-      previousSnapshots = await this.getSnapshots(
-        org.id,
-        integrationIds,
-        prevFromDate,
-        prevToDate
-      );
-
-      previousSnapshots = await this._applyLiveFallbackIfNeeded(
-        org, integrationIds, dbIntegrations, prevFromDate, prevToDate, previousSnapshots
-      );
-    }
-
-    const kpis: KpiItem[] = metrics.map((metric) => {
-      const def = this.getMetricDef(metric);
-      const total = this.aggregateSnapshots(snapshots, metric);
-      const previousTotal = compare
-        ? this.aggregateSnapshots(previousSnapshots, metric)
-        : null;
-      const percentageChange = this.computePercentageChange(
-        total,
-        previousTotal,
-        def.format
-      );
-
-      return {
-        metric,
-        label: def.label,
-        format: def.format,
-        total,
-        previousTotal,
-        percentageChange,
-        sparkline: this.buildSparkline(snapshots, metric, fromDate, toDate),
-      };
-    });
-
-    const byChannel: ByChannelItem[] = await Promise.all(
-      dbIntegrations.map(async (int) => {
-        const channelSnapshots = snapshots.filter(
-          (s) => s.integrationId === int.id
-        );
-        const channelKpis = metrics.map((metric) => {
-          const def = this.getMetricDef(metric);
-          const total = this.aggregateSnapshots(channelSnapshots, metric);
-          const previousTotal = compare
-            ? this.aggregateSnapshots(
-                previousSnapshots.filter((s) => s.integrationId === int.id),
-                metric
-              )
-            : null;
-          const percentageChange = this.computePercentageChange(
-            total,
-            previousTotal,
-            def.format
-          );
-          return {
-            metric,
-            label: def.label,
-            format: def.format,
-            total,
-            previousTotal,
-            percentageChange,
-          };
-        });
-
-        return {
-          integrationId: int.id,
-          name: int.name,
-          identifier: int.providerIdentifier,
-          picture: int.picture,
-          kpis: channelKpis,
-        };
-      })
-    );
-
-    const primaryMetric = metrics[0] || 'impressions';
-    const platformBreakup: Record<string, number> = {};
-    for (const int of dbIntegrations) {
-      const intSnapshots = snapshots.filter((s) => s.integrationId === int.id);
-      const total = this.aggregateSnapshots(intSnapshots, primaryMetric);
-      if (total > 0) {
-        platformBreakup[int.providerIdentifier] =
-          (platformBreakup[int.providerIdentifier] || 0) + total;
-      }
-    }
-
-    const result: AnalyticsOverviewResponse = {
-      range: { from, to },
-      kpis,
-      series: (() => {
-        const s = this.buildSeries(snapshots, fromDate, toDate);
-        if (compare && previousSnapshots.length > 0) {
-          const prevToDate = dayjs(fromDate)
-            .subtract(1, 'day')
-            .endOf('day')
-            .toDate();
-          const prevFromDate = dayjs(prevToDate)
-            .subtract(windowSize, 'day')
-            .startOf('day')
-            .toDate();
-          const dateOffset = windowSize + 1;
-          const prevMap = this.buildPrevMap(
-            previousSnapshots,
-            prevFromDate,
-            prevToDate,
-            dateOffset
-          );
-          for (const [metric, points] of Object.entries(s)) {
-            const prevMetric = prevMap[metric];
-            if (!prevMetric) continue;
-            for (const point of points) {
-              point.previousValue = prevMetric[point.date] || 0;
-            }
+        // 60s Redis cache. Today-ending windows (the dashboard default) are cached
+        // too: snapshots only change via the daily sweep, and recomputing the
+        // overview — including its potential live provider fan-out — on every view
+        // is the dashboard's dominant CPU/memory cost. getChannel/getPosts/
+        // recommendations all funnel through here, so one uncached view recomputed
+        // everything several times over.
+        const cacheKey = `analytics:overview:${org.id}:${createHash('sha256').update(JSON.stringify({ from, to, integrations, compare })).digest('hex')}`;
+        try {
+          const cached = await this._redisService.get(cacheKey);
+          if (cached) {
+            span.setAttribute('cacheHit', true);
+            span.setAttribute('liveFallback', false);
+            return JSON.parse(cached) as AnalyticsOverviewResponse;
           }
-        }
-        return s;
-      })(),
-      byChannel,
-      breakdown: {
-        byPlatform: Object.entries(platformBreakup).map(
-          ([identifier, value]) => ({
-            identifier,
-            value,
-          })
-        ),
-      },
-    };
+        } catch { /* cache miss — continue */ }
+        span.setAttribute('cacheHit', false);
 
-    this._redisService.set(cacheKey, JSON.stringify(result), 60).catch(() => {});
+        // G5: single-flight the cache-miss compute. Concurrent same-key misses await
+        // ONE computation keyed by the Redis cache key, then the entry is dropped.
+        // Per-instance only (in-process Map in `singleFlight`) — NOT cross-replica;
+        // Redis remains the cross-replica cache layer. `liveFallback` reflects the
+        // originating compute only (piggyback callers report false — telemetry-only).
+        let liveFallback = false;
+        const overview = await singleFlight<AnalyticsOverviewResponse>(
+          cacheKey,
+          async () => {
+            const dbIntegrations = await this.getIntegrations(org.id, integrations);
 
-    return result;
+            if (dbIntegrations.length === 0) {
+              return {
+                range: { from, to },
+                kpis: [],
+                series: {},
+                byChannel: [],
+                breakdown: { byPlatform: [] },
+              };
+            }
+
+            const integrationIds = dbIntegrations.map((i) => i.id);
+
+            let snapshots = await this.getSnapshots(
+              org.id,
+              integrationIds,
+              fromDate,
+              toDate
+            );
+
+            const snapshotsBefore = snapshots;
+            snapshots = await this._applyLiveFallbackIfNeeded(
+              org, integrationIds, dbIntegrations, fromDate, toDate, snapshots
+            );
+            if (snapshots !== snapshotsBefore) liveFallback = true;
+
+            const metrics = [...new Set(snapshots.map((s) => s.metric))].filter(
+              isKnownMetric
+            );
+
+            const windowSize = dayjs(toDate).diff(dayjs(fromDate), 'day');
+
+            let previousSnapshots: any[] = [];
+            if (compare) {
+              const prevToDate = dayjs(fromDate)
+                .subtract(1, 'day')
+                .endOf('day')
+                .toDate();
+              const prevFromDate = dayjs(prevToDate)
+                .subtract(windowSize, 'day')
+                .startOf('day')
+                .toDate();
+
+              previousSnapshots = await this.getSnapshots(
+                org.id,
+                integrationIds,
+                prevFromDate,
+                prevToDate
+              );
+
+              const previousBefore = previousSnapshots;
+              previousSnapshots = await this._applyLiveFallbackIfNeeded(
+                org, integrationIds, dbIntegrations, prevFromDate, prevToDate, previousSnapshots
+              );
+              if (previousSnapshots !== previousBefore) liveFallback = true;
+            }
+
+            const kpis: KpiItem[] = metrics.map((metric) => {
+              const def = this.getMetricDef(metric);
+              const total = this.aggregateSnapshots(snapshots, metric);
+              const previousTotal = compare
+                ? this.aggregateSnapshots(previousSnapshots, metric)
+                : null;
+              const percentageChange = this.computePercentageChange(
+                total,
+                previousTotal,
+                def.format
+              );
+
+              return {
+                metric,
+                label: def.label,
+                format: def.format,
+                total,
+                previousTotal,
+                percentageChange,
+                sparkline: this.buildSparkline(snapshots, metric, fromDate, toDate),
+              };
+            });
+
+            const byChannel: ByChannelItem[] = await Promise.all(
+              dbIntegrations.map(async (int) => {
+                const channelSnapshots = snapshots.filter(
+                  (s) => s.integrationId === int.id
+                );
+                const channelKpis = metrics.map((metric) => {
+                  const def = this.getMetricDef(metric);
+                  const total = this.aggregateSnapshots(channelSnapshots, metric);
+                  const previousTotal = compare
+                    ? this.aggregateSnapshots(
+                        previousSnapshots.filter((s) => s.integrationId === int.id),
+                        metric
+                      )
+                    : null;
+                  const percentageChange = this.computePercentageChange(
+                    total,
+                    previousTotal,
+                    def.format
+                  );
+                  return {
+                    metric,
+                    label: def.label,
+                    format: def.format,
+                    total,
+                    previousTotal,
+                    percentageChange,
+                  };
+                });
+
+                return {
+                  integrationId: int.id,
+                  name: int.name,
+                  identifier: int.providerIdentifier,
+                  picture: int.picture,
+                  kpis: channelKpis,
+                };
+              })
+            );
+
+            const primaryMetric = metrics[0] || 'impressions';
+            const platformBreakup: Record<string, number> = {};
+            for (const int of dbIntegrations) {
+              const intSnapshots = snapshots.filter((s) => s.integrationId === int.id);
+              const total = this.aggregateSnapshots(intSnapshots, primaryMetric);
+              if (total > 0) {
+                platformBreakup[int.providerIdentifier] =
+                  (platformBreakup[int.providerIdentifier] || 0) + total;
+              }
+            }
+
+            const result: AnalyticsOverviewResponse = {
+              range: { from, to },
+              kpis,
+              series: (() => {
+                const s = this.buildSeries(snapshots, fromDate, toDate);
+                if (compare && previousSnapshots.length > 0) {
+                  const prevToDate = dayjs(fromDate)
+                    .subtract(1, 'day')
+                    .endOf('day')
+                    .toDate();
+                  const prevFromDate = dayjs(prevToDate)
+                    .subtract(windowSize, 'day')
+                    .startOf('day')
+                    .toDate();
+                  const dateOffset = windowSize + 1;
+                  const prevMap = this.buildPrevMap(
+                    previousSnapshots,
+                    prevFromDate,
+                    prevToDate,
+                    dateOffset
+                  );
+                  for (const [metric, points] of Object.entries(s)) {
+                    const prevMetric = prevMap[metric];
+                    if (!prevMetric) continue;
+                    for (const point of points) {
+                      point.previousValue = prevMetric[point.date] || 0;
+                    }
+                  }
+                }
+                return s;
+              })(),
+              byChannel,
+              breakdown: {
+                byPlatform: Object.entries(platformBreakup).map(
+                  ([identifier, value]) => ({
+                    identifier,
+                    value,
+                  })
+                ),
+              },
+            };
+
+            this._redisService.set(cacheKey, JSON.stringify(result), 60).catch(() => {});
+
+            return result;
+          }
+        );
+
+        span.setAttribute('liveFallback', liveFallback);
+        return overview;
+      } finally {
+        span.end();
+      }
+    });
   }
 
   async getChannel(

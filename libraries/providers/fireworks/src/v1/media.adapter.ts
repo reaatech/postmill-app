@@ -1,5 +1,5 @@
 import {
-  MediaProviderAdapter,
+  BearerTokenMediaAdapter,
   MediaProviderCapabilities,
   MediaGenerationResult,
   MediaGenerateOptions,
@@ -22,8 +22,7 @@ interface FireworksImageResponse {
   finishReason?: string;
 }
 
-export class FireworksMediaAdapter implements MediaProviderAdapter {
-  constructor(private readonly _fetch: SafeFetchPort) {}
+export class FireworksMediaAdapter extends BearerTokenMediaAdapter {
   readonly identifier = 'fireworks';
   readonly name = 'Fireworks AI';
   readonly capabilities: MediaProviderCapabilities = {
@@ -39,21 +38,11 @@ export class FireworksMediaAdapter implements MediaProviderAdapter {
   };
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
-    const apiKey = resolveApiKey(options);
-    if (!apiKey) throw new Error('Fireworks API key is required');
     const model = options?.model || 'flux-1-schnell-fp8';
-    const input: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(options?.input || {})) {
-      if (v !== undefined && v !== '') input[k] = v;
-    }
     const res = await this._fetch(`${BASE}/${model}/text_to_image`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ prompt, ...input }),
+      headers: { ...this._headers(options), Accept: 'application/json' },
+      body: JSON.stringify({ prompt, ...this._clean(options?.input) }),
     });
     if (!res.ok) throw new Error(`Fireworks image generation failed: ${await res.text()}`);
     const data = (await res.json()) as FireworksImageResponse;

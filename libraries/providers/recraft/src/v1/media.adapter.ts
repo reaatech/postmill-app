@@ -1,11 +1,9 @@
 import {
-  MediaProviderAdapter,
+  BearerTokenMediaAdapter,
   MediaProviderCapabilities,
   MediaGenerationResult,
   MediaGenerateOptions,
-  MediaCredentialOptions,
   MediaJobSubmission,
-  resolveApiKey,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -19,8 +17,7 @@ interface RecraftResponse {
   data?: { url?: string; image_id?: string }[];
 }
 
-export class RecraftMediaAdapter implements MediaProviderAdapter {
-  constructor(private readonly _fetch: SafeFetchPort) {}
+export class RecraftMediaAdapter extends BearerTokenMediaAdapter {
   readonly identifier = 'recraft';
   readonly name = 'Recraft';
   readonly capabilities: MediaProviderCapabilities = {
@@ -34,12 +31,6 @@ export class RecraftMediaAdapter implements MediaProviderAdapter {
     bgRemove: false,
     inpaint: false,
   };
-
-  private _headers(options?: MediaCredentialOptions): Record<string, string> {
-    const apiKey = resolveApiKey(options);
-    if (!apiKey) throw new Error('Recraft API key is required');
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
-  }
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     const model = options?.model || 'recraftv3';

@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpException,
   Logger,
@@ -27,6 +28,8 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { DeletionService } from '@gitroom/nestjs-libraries/database/prisma/users/deletion.service';
+import { DataExportService } from '@gitroom/nestjs-libraries/database/prisma/users/data-export.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
 
 import { ChangePasswordDto } from '@gitroom/nestjs-libraries/dtos/users/change-password.dto';
@@ -50,7 +53,9 @@ export class UsersController {
     private _orgService: OrganizationService,
     private _userService: UsersService,
     private _trackService: TrackService,
-    private _auditRepository: AuditRepository
+    private _auditRepository: AuditRepository,
+    private _deletionService: DeletionService,
+    private _dataExportService: DataExportService
   ) {}
   @Get('/agent-media-sso')
   async getAgentMediaSsoUrl(
@@ -397,5 +402,53 @@ export class UsersController {
     res.status(200).json({
       track: uniqueId,
     });
+  }
+
+  // GDPR data-access export (I2): the requesting user's own identity/profile + their
+  // current org's posts/comments/files metadata. Auth-only + throttled.
+  @Get('/me/export')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async exportMyData(
+    @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    if (!organization) {
+      throw new HttpForbiddenException();
+    }
+    const data = await this._dataExportService.exportUserData(
+      user.id,
+      organization.id
+    );
+    res.header(
+      'Content-Disposition',
+      `attachment; filename="postmill-export-${user.id}.json"`
+    );
+    return data;
+  }
+
+  // GDPR erasure (I1): self-service account deletion. Deletes the user, the orgs they
+  // solely own, and all owned children. Auth-only (self) + tight throttle.
+  @Delete('/me')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async deleteMe(
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    await this._deletionService.deleteUser(user.id);
+
+    // Clear the auth/session cookies — the account no longer exists.
+    for (const name of ['auth', 'showorg', 'impersonate', 'refresh_token']) {
+      response.cookie(name, '', {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? { secure: true, httpOnly: true, sameSite: 'none' }
+          : {}),
+        maxAge: -1,
+        expires: new Date(0),
+      });
+    }
+    response.header('logout', 'true');
+    return { success: true };
   }
 }

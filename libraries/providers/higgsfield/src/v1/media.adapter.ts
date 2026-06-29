@@ -1,11 +1,11 @@
 import {
-  MediaProviderAdapter,
+  BearerTokenMediaAdapter,
+  pollMediaJob,
   MediaProviderCapabilities,
   MediaCredentialField,
   MediaGenerationResult,
   MediaGenerateOptions,
   MediaCredentialOptions,
-  MediaInputValue,
   MediaJobSubmission,
   MediaPollResult,
   SafeFetchPort,
@@ -38,10 +38,7 @@ interface HiggsfieldResponse {
   detail?: unknown;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export class HiggsfieldAdapter implements MediaProviderAdapter {
-  constructor(private readonly _fetch: SafeFetchPort) {}
+export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
   readonly identifier = 'higgsfield';
   readonly name = 'Higgsfield';
   readonly capabilities: MediaProviderCapabilities = {
@@ -63,7 +60,8 @@ export class HiggsfieldAdapter implements MediaProviderAdapter {
     { key: 'keySecret', label: 'API Key Secret', type: 'password', required: true, placeholder: 'Higgsfield key secret' },
   ];
 
-  private _headers(options?: MediaCredentialOptions): Record<string, string> {
+  // Override the base's bearer header with Higgsfield's two-part Key scheme.
+  protected _headers(options?: MediaCredentialOptions): Record<string, string> {
     const creds = options?.credentials || {};
     let id = creds.keyId;
     let secret = creds.keySecret;
@@ -77,15 +75,6 @@ export class HiggsfieldAdapter implements MediaProviderAdapter {
       'Content-Type': 'application/json',
       Authorization: `Key ${id}:${secret}`,
     };
-  }
-
-  // Drop empty/undefined values; the rest are native Higgsfield params.
-  private _clean(raw?: Record<string, MediaInputValue>): Record<string, MediaInputValue> {
-    const out: Record<string, MediaInputValue> = {};
-    for (const [k, v] of Object.entries(raw || {})) {
-      if (v !== undefined && v !== '') out[k] = v;
-    }
-    return out;
   }
 
   private async _submit(endpoint: string, body: Record<string, unknown>, options?: MediaCredentialOptions): Promise<string> {
@@ -111,23 +100,32 @@ export class HiggsfieldAdapter implements MediaProviderAdapter {
     }
     const requestId = await this._submit(SOUL_ENDPOINT, body, options);
 
-    for (let attempt = 0; attempt < 60; attempt++) {
-      await sleep(2000);
-      const poll = await this.pollJob(requestId, options);
-      if (poll.status === 'completed' && poll.artifactUrl) {
-        const urls = (poll.metadata?.source ? JSON.parse(poll.metadata.source) : [poll.artifactUrl]) as string[];
-        return {
-          multi: urls.length > 1,
-          image: urls[0],
-          images: urls,
-          metadata: { provider: this.identifier, model: 'soul', prompt },
-        };
-      }
-      if (poll.status === 'failed') {
-        throw new Error(`Higgsfield image generation failed: ${poll.error || 'unknown error'}`);
-      }
-    }
-    throw new Error('Higgsfield image generation timed out');
+    const urls = await pollMediaJob<string[]>({
+      fetch: this._fetch,
+      url: `${BASE}/requests/${requestId}/status`,
+      headers: this._headers(options),
+      attempts: 60,
+      intervalMs: 2000,
+      parse: (raw) => {
+        const data = raw as HiggsfieldResponse;
+        if (data.status === 'completed') {
+          const imgs = (data.images || []).map((i) => i.url).filter((u): u is string => !!u);
+          const artifactUrl = data.video?.url || imgs[0];
+          if (!artifactUrl) return { status: 'failed', error: 'Higgsfield completed without output' };
+          return { status: 'completed', result: imgs.length ? imgs : [artifactUrl] };
+        }
+        if (data.status === 'failed' || data.status === 'nsfw') {
+          return { status: 'failed', error: data.status === 'nsfw' ? 'Blocked by NSFW filter' : 'Higgsfield generation failed' };
+        }
+        return { status: 'pending' };
+      },
+    });
+    return {
+      multi: urls.length > 1,
+      image: urls[0],
+      images: urls,
+      metadata: { provider: this.identifier, model: 'soul', prompt },
+    };
   }
 
   // Video: DoP image-to-video, or Speak (audio-driven talking video) when model === 'speak'.

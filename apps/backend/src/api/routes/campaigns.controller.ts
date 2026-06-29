@@ -100,6 +100,9 @@ class UpdateCampaignDto {
   goals?: CampaignGoalDto[];
 }
 
+// J2 — hard cap for the campaigns list (default page size == max).
+const CAMPAIGNS_MAX_LIMIT = 100;
+
 @ApiTags('Campaigns')
 @Controller('/campaigns')
 export class CampaignsController {
@@ -129,8 +132,21 @@ export class CampaignsController {
 
   @Get('/')
   @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
-  async list(@GetOrgFromRequest() org: Organization) {
-    return this._campaignsService.list(org.id);
+  async list(
+    @GetOrgFromRequest() org: Organization,
+    @Query('limit') limit?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    // J2 — bound the previously-unbounded campaigns list. Back-compat: the
+    // response is still a plain array; absent paging params we cap at the hard
+    // max rather than returning everything.
+    const all = await this._campaignsService.list(org.id);
+    const offset = Math.max(0, parseInt(cursor ?? '0', 10) || 0);
+    const size = Math.min(
+      CAMPAIGNS_MAX_LIMIT,
+      Math.max(1, parseInt(limit ?? '', 10) || CAMPAIGNS_MAX_LIMIT),
+    );
+    return all.slice(offset, offset + size);
   }
 
   @Get('/:id')

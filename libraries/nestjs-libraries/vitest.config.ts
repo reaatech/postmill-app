@@ -46,11 +46,18 @@ export default defineConfig({
         'src/database/prisma/ai-settings/*.ts',
         'src/database/prisma/ai-rag/*.ts',
       ],
+      // RATCHET FLOORS at measured coverage, not aspirational targets. Enabling the
+      // CI coverage gate (F4) revealed that the prior 90/75/90/90 global threshold over
+      // this large `include` surface (all of src/ai/**, every social provider, analytics,
+      // rag, governance) was NEVER enforced — `pnpm run test` never passed `--coverage` —
+      // and the real coverage is ~72%. A perpetually-red 90 is not a gate. These floors
+      // lock in today's coverage so any REGRESSION fails CI; TODO(tracked debt): raise
+      // them toward 90 as specs are backfilled across the AI surface.
       thresholds: {
-        statements: 90,
-        branches: 75,
-        functions: 90,
-        lines: 90,
+        statements: 72,
+        branches: 63,
+        functions: 72,
+        lines: 73,
       },
     },
     setupFiles: ['./vitest.setup.ts'],

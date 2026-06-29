@@ -5,18 +5,34 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/users/users.service', () => (
   UsersService: class {},
 }));
 
+// Deterministically acquire the distributed cron lock so the body always runs
+// (real acquireLock depends on Redis state, which differs across run modes).
+vi.mock('@gitroom/nestjs-libraries/redis/redis-lock', () => ({
+  acquireLock: vi.fn().mockResolvedValue(true),
+}));
+
 import { SessionCleanupService } from './session-cleanup.service';
 import type { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { acquireLock } from '@gitroom/nestjs-libraries/redis/redis-lock';
 
 describe('SessionCleanupService', () => {
   let usersService: { cleanupExpiredSessions: ReturnType<typeof vi.fn> };
   let service: SessionCleanupService;
 
   beforeEach(() => {
+    vi.mocked(acquireLock).mockResolvedValue(true);
     usersService = { cleanupExpiredSessions: vi.fn() };
     service = new SessionCleanupService(
       usersService as unknown as UsersService
     );
+  });
+
+  it('skips the sweep when the distributed lock is held by another replica', async () => {
+    vi.mocked(acquireLock).mockResolvedValueOnce(false);
+
+    await service.handleCleanup();
+
+    expect(usersService.cleanupExpiredSessions).not.toHaveBeenCalled();
   });
 
   it('purges expired/revoked sessions on a schedule tick', async () => {

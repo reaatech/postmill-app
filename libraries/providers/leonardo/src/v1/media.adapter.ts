@@ -1,11 +1,10 @@
 import {
-  MediaProviderAdapter,
+  BearerTokenMediaAdapter,
+  pollMediaJob,
   MediaProviderCapabilities,
   MediaGenerationResult,
   MediaGenerateOptions,
-  MediaCredentialOptions,
   MediaJobSubmission,
-  resolveApiKey,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -29,10 +28,7 @@ interface LeonardoGetResponse {
   };
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-export class LeonardoMediaAdapter implements MediaProviderAdapter {
-  constructor(private readonly _fetch: SafeFetchPort) {}
+export class LeonardoMediaAdapter extends BearerTokenMediaAdapter {
   readonly identifier = 'leonardo';
   readonly name = 'Leonardo.ai';
   readonly capabilities: MediaProviderCapabilities = {
@@ -46,12 +42,6 @@ export class LeonardoMediaAdapter implements MediaProviderAdapter {
     bgRemove: false,
     inpaint: false,
   };
-
-  private _headers(options?: MediaCredentialOptions): Record<string, string> {
-    const apiKey = resolveApiKey(options);
-    if (!apiKey) throw new Error('Leonardo.ai API key is required');
-    return { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` };
-  }
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     const headers = this._headers(options);
@@ -74,27 +64,32 @@ export class LeonardoMediaAdapter implements MediaProviderAdapter {
     const generationId = created.sdGenerationJob?.generationId;
     if (!generationId) throw new Error('Leonardo.ai returned no generation id');
 
-    for (let attempt = 0; attempt < 40; attempt++) {
-      await sleep(2000);
-      const pollRes = await this._fetch(`${BASE}/generations/${generationId}`, { headers });
-      if (!pollRes.ok) throw new Error(`Leonardo.ai polling failed: ${await pollRes.text()}`);
-      const data = (await pollRes.json()) as LeonardoGetResponse;
-      const status = data.generations_by_pk?.status;
-      if (status === 'COMPLETE') {
-        const images = (data.generations_by_pk?.generated_images || [])
-          .map((i) => i.url)
-          .filter((u): u is string => !!u);
-        if (images.length === 0) throw new Error('Leonardo.ai returned no images');
-        return {
-          multi: images.length > 1,
-          image: images[0],
-          images,
-          metadata: { provider: this.identifier, model: modelId },
-        };
-      }
-      if (status === 'FAILED') throw new Error('Leonardo.ai image generation failed');
-    }
-    throw new Error('Leonardo.ai image generation timed out');
+    const images = await pollMediaJob<string[]>({
+      fetch: this._fetch,
+      url: `${BASE}/generations/${generationId}`,
+      headers,
+      attempts: 40,
+      intervalMs: 2000,
+      parse: (raw) => {
+        const data = raw as LeonardoGetResponse;
+        const status = data.generations_by_pk?.status;
+        if (status === 'COMPLETE') {
+          const imgs = (data.generations_by_pk?.generated_images || [])
+            .map((i) => i.url)
+            .filter((u): u is string => !!u);
+          if (imgs.length === 0) return { status: 'failed', error: 'Leonardo.ai returned no images' };
+          return { status: 'completed', result: imgs };
+        }
+        if (status === 'FAILED') return { status: 'failed', error: 'Leonardo.ai image generation failed' };
+        return { status: 'pending' };
+      },
+    });
+    return {
+      multi: images.length > 1,
+      image: images[0],
+      images,
+      metadata: { provider: this.identifier, model: modelId },
+    };
   }
 
   async generateVideo(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {

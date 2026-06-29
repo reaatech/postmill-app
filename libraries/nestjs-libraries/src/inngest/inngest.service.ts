@@ -9,6 +9,7 @@ import { AutopostActivity } from './activities/autopost.activity';
 import { MediaJobsActivity } from './activities/media-jobs.activity';
 import { DigestActivity } from './activities/digest.activity';
 import { CampaignActivity } from './activities/campaign.activity';
+import { RetentionActivity } from './activities/retention.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { createFunctions } from '@gitroom/backend/inngest/functions';
 import { InngestFunction } from 'inngest';
@@ -27,6 +28,7 @@ export class InngestService {
     mediaJobsActivity: MediaJobsActivity,
     digestActivity: DigestActivity,
     campaignActivity: CampaignActivity,
+    retentionActivity: RetentionActivity,
     inngestRunRepository: InngestRunRepository
   ) {
     // Built in the constructor (not onModuleInit) so consumers that read
@@ -43,6 +45,7 @@ export class InngestService {
       mediaJobsActivity,
       digestActivity,
       campaignActivity,
+      retentionActivity,
       inngestRunRepository,
     });
   }
