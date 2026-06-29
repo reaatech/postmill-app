@@ -27,6 +27,7 @@ export const BETA_PROVIDER_KEYS: ReadonlySet<string> = new Set<string>([
   'media/did',
   'media/hedra',
   'media/tavus',
+  'media/suno', // sunoapi.org music — built without a live key
   'media/fal', // Pika tabs
   // Media — AI-hub aggregators serving media via reused AI keys
   'media/togetherai',

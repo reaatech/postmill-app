@@ -210,6 +210,14 @@ export class MediaJobLifecycleService {
     }
     if (poll.status === 'completed' && poll.artifactUrl) {
       const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
+      // Land any additional artifacts from the SAME generation (e.g. Suno returns 2 clips) as
+      // sibling completed jobs. Done after the primary completes: once the primary flips to
+      // `completed`, processJob short-circuits to 'skipped' on later sweeps, so siblings are
+      // created exactly once. (Primary-first ordering means a mid-fan-out crash loses an extra
+      // clip rather than duplicating the set on the next retry.)
+      if (ok && poll.extraArtifactUrls?.length) {
+        await this._landExtraArtifacts(job, poll.extraArtifactUrls, poll.metadata);
+      }
       return ok ? 'completed' : 'failed';
     }
 
@@ -217,6 +225,36 @@ export class MediaJobLifecycleService {
       await this._aiSettings.updateMediaJob(job.id, { status: 'processing' });
     }
     return 'pending';
+  }
+
+  // Land extra artifacts from a single provider job (e.g. a music provider returning multiple
+  // takes) as independent sibling jobs, each already completed, so every clip becomes its own
+  // File row + render-queue card. Best-effort: a failed sibling is logged and never fails the
+  // primary job's completion.
+  private async _landExtraArtifacts(
+    primary: AIMediaJob,
+    urls: string[],
+    metadata?: MediaArtifactMetadata,
+  ): Promise<void> {
+    for (const url of urls) {
+      try {
+        const sibling = await this.createPendingJob({
+          organizationId: primary.organizationId,
+          userId: primary.userId ?? undefined,
+          provider: primary.provider,
+          operation: primary.operation as AsyncOperation,
+          folderId: primary.folderId,
+          model: primary.model,
+          version: primary.version,
+          inputJson: primary.inputJson,
+        });
+        await this.completeJob(sibling, url, metadata, primary.folderId);
+      } catch (err) {
+        this._logger.warn(
+          `Failed to land extra artifact for job ${primary.id}: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 
   // Download the artifact (provider URLs expire), land it in tenant storage under the

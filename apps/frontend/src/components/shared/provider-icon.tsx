@@ -44,6 +44,7 @@ const ICONS: Record<string, Entry> = {
   elevenlabs: { viewBox: '0 0 24 24', color: '#4A154B', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2Zm-2 7v6l5-3-5-3Z" />) },
   heygen: { viewBox: '0 0 24 24', color: '#6C47FF', node: (<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2ZM8 8h8v8H8V8Zm2 2v4h4v-4h-4Z" />) },
   runway: { viewBox: '0 0 24 24', color: '#000000', node: (<path d="M12 2 2 7v10l10 5 10-5V7Zm0 3 6 3v5l-6 3-6-3V8Z" />) },
+  suno: { viewBox: '0 0 24 24', color: '#000000', node: (<path d="M9 18V6l10-2v12h-2V6.56l-6 1.2V18a3 3 0 1 1-2-2.83V18Zm10 0a3 3 0 1 1-2-2.83V18Z" />) },
   'black-forest-labs': { viewBox: '0 0 24 24', color: '#1F2937', node: (<path d="M3 3h7v7H3V3Zm11 0h7v7h-7V3ZM3 14h7v7H3v-7Zm11 0h7v7h-7v-7Z" />) },
   replicate: { viewBox: '0 0 24 24', color: '#5C3A29', node: (<path d="M4 4h4v16H4V4Zm6 8h4v8h-4v-8Zm6 4h4v4h-4v-4Z" />) },
   'stability-ai': { viewBox: '0 0 24 24', color: '#7B2FF7', node: (<path d="M12 2 2 12l10 10 10-10L12 2Zm0 4 6 6-6 6-6-6 6-6Z" />) },
@@ -189,7 +190,7 @@ const LABEL_MAP: Record<string, string> = {
   S3_COMPATIBLE: 'S3',
   fal: 'Fa', elevenlabs: 'EL', heygen: 'HY', runway: 'RW',
   'black-forest-labs': 'BF', replicate: 'Rp', 'stability-ai': 'SA',
-  tavus: 'Ta', did: 'DI', hedra: 'He', higgsfield: 'Hi', wan: 'Wa', ltx: 'LT',
+  tavus: 'Ta', did: 'DI', hedra: 'He', higgsfield: 'Hi', wan: 'Wa', ltx: 'LT', suno: 'Su',
 };
 
 const ProviderIcon: FC<{

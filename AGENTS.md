@@ -978,6 +978,18 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
   live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
   vs. named-preset formatting may need a live smoke test.
+- **Suno** (`api.sunoapi.org`) is an **own-key** AI-**music** kit studio (`/media/suno`) configured at
+  Settings → Media — single Bearer key, **audio-only**. Two tabs (**Song** / **Instrumental**), both
+  `operation: 'audio'`. **Async submit-and-poll**: `POST /api/v1/generate` → `{ data: { taskId } }`, then
+  poll `GET /api/v1/generate/record-info?taskId=` until `data.status === 'SUCCESS'`, reading
+  `data.response.sunoData[].audioUrl` (public MP3s, re-downloadable; no webhook → poll-cron like
+  Runway/LTX). The adapter sets `customMode` only when both `style` **and** `title` are filled (else a
+  non-custom prompt-only generation) and always sends `callBackUrl: ''` (polling-only). **Two clips per
+  generation:** Suno returns 2 takes, so `pollJob` returns the first as the artifact and the rest via the
+  generic **`extraArtifactUrls`** field on `MediaPollResult` — `MediaJobLifecycleService.processJob` lands
+  each extra as a **sibling completed job** (one render-queue card / audio file per take; provider-agnostic,
+  no Suno branch). **Built without a live key** — endpoints/status strings grounded in the `docs.sunoapi.org`
+  reference; the status set + `sunoData[].audioUrl` path + 2-clip array need a live smoke test.
 - **Reel.Farm** (`reel.farm`) and **Genviral** (`genviral.io`) are two **own-key** faceless/short-form
   **video** kit studios configured at Settings → Media — each a `<provider>.adapter.ts` + descriptor +
   3-line studio + route + nav entry (`/media/reelfarm`, `/media/genviral`), `operation: 'video'`, single

@@ -128,6 +128,7 @@
     "@gitroom/provider-sniply": "workspace:*",
     "@gitroom/provider-stability": "workspace:*",
     "@gitroom/provider-storj": "workspace:*",
+    "@gitroom/provider-suno": "workspace:*",
     "@gitroom/provider-surfshark": "workspace:*",
     "@gitroom/provider-switchy": "workspace:*",
     "@gitroom/provider-t2m": "workspace:*",

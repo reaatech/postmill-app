@@ -111,6 +111,7 @@ import smtpModules from '@gitroom/provider-smtp';
 import sniplyModules from '@gitroom/provider-sniply';
 import stabilityModules from '@gitroom/provider-stability';
 import storjModules from '@gitroom/provider-storj';
+import sunoModules from '@gitroom/provider-suno';
 import surfsharkModules from '@gitroom/provider-surfshark';
 import switchyModules from '@gitroom/provider-switchy';
 import t2mModules from '@gitroom/provider-t2m';
@@ -257,6 +258,7 @@ export const providerModules: ProviderModule<any, any>[] = [
   ...sniplyModules,
   ...stabilityModules,
   ...storjModules,
+  ...sunoModules,
   ...surfsharkModules,
   ...switchyModules,
   ...t2mModules,

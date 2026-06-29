@@ -95,6 +95,11 @@ export interface MediaJobSubmission {
 export interface MediaPollResult {
   status: 'pending' | 'completed' | 'failed';
   artifactUrl?: string;
+  // Additional finished artifacts from the SAME generation (e.g. Suno returns 2 clips). The
+  // primary lands as the job's artifact; each extra is landed by the lifecycle as its own
+  // sibling completed job (one render-queue card / File row per clip). Generic — any adapter
+  // that produces multiple artifacts per job may populate this.
+  extraArtifactUrls?: string[];
   error?: string;
   metadata?: MediaArtifactMetadata;
 }

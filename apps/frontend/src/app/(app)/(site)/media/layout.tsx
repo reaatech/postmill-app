@@ -196,6 +196,18 @@ const tabs = [
     ),
   },
   {
+    href: '/media/suno',
+    label: 'Suno',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18V6l10-2v12" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="16" cy="16" r="3" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/wan',
     label: 'Wan',
     section: 'Providers',

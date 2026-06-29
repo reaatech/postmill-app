@@ -329,6 +329,61 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
     });
   });
 
+  describe('processJob multi-artifact (extraArtifactUrls)', () => {
+    function audioCompleteWithExtras() {
+      const ctx = makeService();
+      ctx.jobs.set('job-1', makeJob({ provider: 'suno', operation: 'audio' }));
+      ctx.orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'suno-key' },
+        storageProviderId: null,
+        storageRootFolderId: 'root-1',
+        version: 'v1',
+      });
+      ctx.pollJob.mockResolvedValue({
+        status: 'completed',
+        artifactUrl: 'https://cdn.suno/a.mp3',
+        extraArtifactUrls: ['https://cdn.suno/b.mp3'],
+        metadata: { mime: 'audio/mpeg' },
+      });
+      mockSafeFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'audio/mpeg', 'content-length': '3' }),
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      });
+      return ctx;
+    }
+
+    it('lands the primary artifact AND a sibling completed job per extra URL', async () => {
+      const { service, aiSettings, mediaRepository } = audioCompleteWithExtras();
+
+      expect(await service.processJob('job-1')).toBe('completed');
+
+      // one sibling job created for the single extra clip, same provider/operation as the primary
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+      expect(aiSettings.createMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'suno', operation: 'audio', status: 'pending' }),
+      );
+      // both clips stored (primary + sibling)
+      expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledTimes(2);
+      // the sibling was completed with the stored tenant path
+      expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(
+        'created-1',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+
+    it('is idempotent: a second sweep on the now-completed primary creates no more siblings', async () => {
+      const { service, aiSettings } = audioCompleteWithExtras();
+
+      expect(await service.processJob('job-1')).toBe('completed');
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+
+      // primary is now `completed` → processJob short-circuits to 'skipped', no new siblings
+      expect(await service.processJob('job-1')).toBe('skipped');
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('failJob notify option', () => {
     it('suppresses the notification when notify=false', async () => {
       const { service, jobs, notificationService } = makeService();

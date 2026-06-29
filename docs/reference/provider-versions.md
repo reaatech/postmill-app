@@ -63,6 +63,7 @@ Use `GET /admin/providers/health?domain=` (super-admin) for per-version health c
 | LTX Studio | `ltx` | video | Studio-kit. |
 | Reel.Farm | `reelfarm` | video | Studio-kit. |
 | Genviral | `genviral` | video | Studio-kit. |
+| Suno | `suno` | audio (music) | Studio-kit. Async, 2 clips/gen via `extraArtifactUrls`. Beta. |
 | Sora | *(via `openai`)* | video | Branded studio riding the `openai` adapter. |
 | Deepgram | `deepgram` | STT | Bespoke transcription studio. |
 | ElevenLabs | `elevenlabs` | TTS | Studio-kit audio tab. |
