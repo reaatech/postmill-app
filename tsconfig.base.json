@@ -736,6 +736,12 @@
       "@gitroom/provider-storj/*": [
         "libraries/providers/storj/src/*"
       ],
+      "@gitroom/provider-suno": [
+        "libraries/providers/suno/src"
+      ],
+      "@gitroom/provider-suno/*": [
+        "libraries/providers/suno/src/*"
+      ],
       "@gitroom/provider-surfshark": [
         "libraries/providers/surfshark/src"
       ],
