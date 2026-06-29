@@ -359,10 +359,12 @@ export class UsersController {
       org.id,
       userId
     );
+    // NOTE: email is deliberately omitted — unlike the policy-gated team list,
+    // this route is available to any org member (via the "Created by" link), so
+    // it must not broaden PII (email) visibility past the team-list role boundary.
     return {
       id: member.user.id,
       name: fullName || member.user.email,
-      email: member.user.email,
       bio: profile?.bio || null,
       avatarUrl: profile?.avatarUrl || profile?.picture?.path || null,
       role: member.roleRef?.name || member.roleRef?.key || null,

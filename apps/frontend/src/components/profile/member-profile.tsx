@@ -10,7 +10,6 @@ import dayjs from 'dayjs';
 interface MemberProfileData {
   id: string;
   name: string;
-  email: string;
   bio: string | null;
   avatarUrl: string | null;
   role: string | null;
@@ -46,7 +45,7 @@ export const MemberProfile: FC = () => {
     return <div className="p-[24px] text-center text-newTableText">{t('loading', 'Loading…')}</div>;
   }
 
-  const initials = (data.name || data.email || '?').charAt(0).toUpperCase();
+  const initials = (data.name || '?').charAt(0).toUpperCase();
 
   return (
     <div className="p-[24px]">
@@ -66,7 +65,6 @@ export const MemberProfile: FC = () => {
           )}
           <div className="flex flex-col gap-[4px] min-w-0">
             <h1 className="text-[22px] font-semibold text-textColor truncate">{data.name}</h1>
-            <span className="text-[13px] text-newTableText truncate">{data.email}</span>
             <div className="flex flex-wrap items-center gap-[8px] mt-[4px]">
               {data.role && (
                 <span className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[11px] capitalize">
