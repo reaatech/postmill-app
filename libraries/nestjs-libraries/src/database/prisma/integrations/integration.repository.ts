@@ -113,10 +113,14 @@ export class IntegrationRepository {
     });
   }
 
-  getPlug(plugId: string) {
+  getPlug(plugId: string, orgId?: string) {
     return this._plugs.model.plugs.findFirst({
       where: {
         id: plugId,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        // Optional because the current Inngest caller (processPlugs) carries no orgId
+        // in its event payload; org is still enforced upstream by the plug flow.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       include: {
         integration: true,

@@ -1,4 +1,5 @@
 import { NewsletterInterface } from '@gitroom/nestjs-libraries/newsletter/newsletter.interface';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 export class ListmonkProvider implements NewsletterInterface {
   name = 'listmonk';
@@ -18,15 +19,15 @@ export class ListmonkProvider implements NewsletterInterface {
       'Basic ' + Buffer.from(authString).toString('base64')
     );
 
-    // Intentionally a bare fetch, NOT safeFetch: LISTMONK_DOMAIN is an operator-set
-    // env var pointing at the operator's own (often self-hosted, private-network)
-    // Listmonk instance — not per-request user input. safeFetch's public-only check
-    // would reject those private hosts and break self-hosted deployments.
+    // D5: routed through safeFetch for SSRF-safe dispatch consistency.
+    // LISTMONK_DOMAIN is an operator-set env var; self-hosted instances on a
+    // private network must allow their host via SSRF_ALLOWED_PRIVATE_CIDRS,
+    // otherwise safeFetch's public-only check rejects it.
     try {
       const {
         data: { id },
       } = await (
-        await fetch(`${process.env.LISTMONK_DOMAIN}/api/subscribers`, {
+        await safeFetch(`${process.env.LISTMONK_DOMAIN}/api/subscribers`, {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
@@ -39,7 +40,7 @@ export class ListmonkProvider implements NewsletterInterface {
         subject: 'Welcome to Postmill 🚀',
       };
 
-      await fetch(`${process.env.LISTMONK_DOMAIN}/api/tx`, {
+      await safeFetch(`${process.env.LISTMONK_DOMAIN}/api/tx`, {
         method: 'POST',
         headers,
         body: JSON.stringify(welcomeEmail),

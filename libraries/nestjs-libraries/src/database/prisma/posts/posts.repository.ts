@@ -136,10 +136,14 @@ export class PostsRepository {
     });
   }
 
-  updateImages(id: string, images: string) {
+  updateImages(id: string, images: string, orgId?: string) {
     return this._post.model.post.update({
       where: {
         id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId
+        // (mirrors updateReleaseId). Optional so existing callers stay behaviour-identical;
+        // org is already enforced upstream.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       data: {
         image: images,
@@ -444,10 +448,12 @@ export class PostsRepository {
     return decryptPostIntegrationTokens(post);
   }
 
-  updatePost(id: string, postId: string, releaseURL: string) {
+  updatePost(id: string, postId: string, releaseURL: string, orgId?: string) {
     return this._post.model.post.update({
       where: {
         id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       data: {
         state: 'PUBLISHED',
@@ -457,9 +463,13 @@ export class PostsRepository {
     });
   }
 
-  updatePostSettings(id: string, settings: string) {
+  updatePostSettings(id: string, settings: string, orgId?: string) {
     return this._post.model.post.update({
-      where: { id },
+      where: {
+        id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        ...(orgId ? { organizationId: orgId } : {}),
+      },
       data: { settings },
     });
   }

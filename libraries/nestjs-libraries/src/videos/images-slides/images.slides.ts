@@ -95,11 +95,17 @@ export class ImagesSlides extends VideoAbstract<ImagesSlidesParams> {
 
         all.push(
           new Promise(async (res) => {
+            // D5: the voice id is user-influenced and rides in the URL path —
+            // restrict to safe id chars and URL-encode before interpolation so
+            // it can't inject path/query segments into the ElevenLabs URL.
+            const safeVoice = encodeURIComponent(
+              String(customParams.voice ?? '').replace(/[^a-zA-Z0-9_-]/g, '')
+            );
             const buffer = Buffer.from(
               await (
                 await limit(() =>
                   safeFetch(
-                    `https://api.elevenlabs.io/v1/text-to-speech/${customParams.voice}?output_format=mp3_44100_128`,
+                    `https://api.elevenlabs.io/v1/text-to-speech/${safeVoice}?output_format=mp3_44100_128`,
                     {
                       method: 'POST',
                       headers: {

@@ -18,7 +18,7 @@ import {
   OnlyURL, SendWebhookDto, UpdateDto, WebhooksDto
 } from '@gitroom/nestjs-libraries/dtos/webhooks/webhooks.dto';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { safeFetch, webhookSignature, webhookTimeoutMs } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 @ApiTags('Webhooks')
 @Controller('/webhooks')
@@ -60,14 +60,19 @@ export class WebhookController {
     }
 
     try {
+      const body = JSON.stringify({
+        event: 'ping',
+        timestamp: new Date().toISOString(),
+        data: { message: 'This is a test ping from Postmill' },
+      });
       const response = await safeFetch(webhook.url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event: 'ping',
-          timestamp: new Date().toISOString(),
-          message: 'This is a test ping from Postmill',
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Postmill-Signature': webhookSignature(body),
+        },
+        body,
+        signal: AbortSignal.timeout(webhookTimeoutMs()),
       });
       return { success: true, status: response.status };
     } catch (err: any) {
@@ -86,10 +91,19 @@ export class WebhookController {
   @Post('/send')
   async sendWebhook(@Body() body: SendWebhookDto, @Query() query: OnlyURL) {
     try {
+      const serialized = JSON.stringify({
+        event: 'webhook.send',
+        timestamp: new Date().toISOString(),
+        data: body,
+      });
       await safeFetch(query.url, {
         method: 'POST',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json' },
+        body: serialized,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Postmill-Signature': webhookSignature(serialized),
+        },
+        signal: AbortSignal.timeout(webhookTimeoutMs()),
       });
     } catch (err) {
       /** sent **/

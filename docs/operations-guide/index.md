@@ -34,6 +34,7 @@ through Inngest, and media can live on local disk or cloud object storage.
 |------|-------------|
 | [Requirements](./requirements.md) | Hardware, software, and network prerequisites |
 | [Docker Deployment](./docker.md) | Running the full stack with Docker Compose |
+| [Scaling & Deployment](./scaling.md) | Production image, horizontal scaling, health probes, graceful shutdown, OpenTelemetry |
 | [Configuration](./configuration.md) | Every environment variable, organised by category |
 | [Inngest & Cron](./inngest-and-cron.md) | Background job inventory and scheduling |
 | [Storage Setup](./storage.md) | Local and cloud storage providers, quotas, per-org routing |

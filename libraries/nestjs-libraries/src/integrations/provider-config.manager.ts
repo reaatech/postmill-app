@@ -1,8 +1,15 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import type { Redis } from 'ioredis';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { replaceCredentialsMap, type CredentialEntry } from '@gitroom/nestjs-libraries/integrations/credentials';
 import { ProviderConfiguration } from '@prisma/client';
+
+// Cross-replica cache invalidation channel (A3). Other replicas clear/refresh
+// their in-memory cache when a config write publishes here.
+const PROVIDER_INVALIDATE_CHANNEL = 'config:invalidate:providers';
 
 type DecryptedConfig = {
   clientId?: string;
@@ -17,25 +24,89 @@ type DecryptedConfig = {
 };
 
 @Injectable()
-export class ProviderConfigManager implements OnModuleInit {
+export class ProviderConfigManager implements OnModuleInit, OnModuleDestroy {
   private readonly _logger = new Logger(ProviderConfigManager.name);
   private cache: Map<string, DecryptedConfig> = new Map();
   private allEnabled: string[] = [];
   private lastRefresh = 0;
   private refreshIntervalMs = 60_000;
   private refreshPromise: Promise<void> | null = null;
+  // A3 — cross-replica invalidation. Unique per process so we skip our own publishes.
+  private readonly _instanceId = randomUUID();
+  private _subscriber: Redis | null = null;
 
   constructor(private _providerConfigService: ProviderConfigService) {}
 
   async onModuleInit() {
+    this.#setupInvalidationSubscriber();
     try {
-      await this.refreshCache();
+      // Internal refresh — no publish (boot must not broadcast to every replica).
+      await this.#refreshInternal();
     } catch (err: any) {
       this._logger.error(`Failed to load provider configs on startup, will retry on first access: ${err?.message}`);
     }
   }
 
-  async refreshCache() {
+  async onModuleDestroy() {
+    if (this._subscriber) {
+      try {
+        await this._subscriber.unsubscribe(PROVIDER_INVALIDATE_CHANNEL);
+        await this._subscriber.quit();
+      } catch {
+        // best-effort teardown
+      }
+      this._subscriber = null;
+    }
+  }
+
+  // Subscribes (on a DUPLICATED connection — never the shared client) to the
+  // invalidation channel. No-op on MockRedis / no Redis: the 60s TTL refresh
+  // remains the single-instance fallback and behaviour is unchanged.
+  #setupInvalidationSubscriber() {
+    if (this._subscriber) return; // guard double-subscribe
+    const client = ioRedis as any;
+    if (!client || typeof client.duplicate !== 'function') {
+      return; // MockRedis (no REDIS_URL) — TTL fallback only
+    }
+    try {
+      const sub: Redis = client.duplicate();
+      this._subscriber = sub;
+      sub.on('message', (channel: string, message: string) => {
+        if (channel !== PROVIDER_INVALIDATE_CHANNEL) return;
+        if (message === this._instanceId) return; // ignore our own publish
+        // Clear + force a refresh so the next read serves fresh config.
+        this.lastRefresh = 0;
+        this.#refreshInternal().catch((err: any) =>
+          this._logger.error(`Invalidation refresh failed: ${err?.message}`),
+        );
+      });
+      sub.subscribe(PROVIDER_INVALIDATE_CHANNEL).catch((err: any) => {
+        this._subscriber = null;
+        this._logger.error(`Failed to subscribe to ${PROVIDER_INVALIDATE_CHANNEL}: ${err?.message}`);
+      });
+    } catch (err: any) {
+      this._subscriber = null;
+      this._logger.error(`Failed to set up invalidation subscriber: ${err?.message}`);
+    }
+  }
+
+  // PUBLISH on the shared client (non-blocking command — safe per the Redis
+  // invariant; only SUBSCRIBE/blocking calls are forbidden on the shared client).
+  async publishInvalidate() {
+    const client = ioRedis as any;
+    if (!client || typeof client.publish !== 'function') {
+      return; // MockRedis / no Redis — single instance, nothing to invalidate
+    }
+    try {
+      await client.publish(PROVIDER_INVALIDATE_CHANNEL, this._instanceId);
+    } catch (err: any) {
+      this._logger.error(`Failed to publish cache invalidation: ${err?.message}`);
+    }
+  }
+
+  // Local reload only (no broadcast) — used by boot, the TTL path, and inbound
+  // invalidation messages.
+  async #refreshInternal() {
     if (this.refreshPromise) {
       return this.refreshPromise;
     }
@@ -45,6 +116,14 @@ export class ProviderConfigManager implements OnModuleInit {
     } finally {
       this.refreshPromise = null;
     }
+  }
+
+  // Public write-path refresh: reloads the local cache AND notifies other
+  // replicas to bust theirs immediately. Every external caller is a config
+  // write path, so the invalidation rides along automatically.
+  async refreshCache() {
+    await this.#refreshInternal();
+    await this.publishInvalidate();
   }
 
   async #doRefresh() {
@@ -110,7 +189,8 @@ export class ProviderConfigManager implements OnModuleInit {
   async ensureFresh() {
     if (Date.now() - this.lastRefresh > this.refreshIntervalMs) {
       try {
-        await this.refreshCache();
+        // TTL reload is local-only — never publish (would storm across replicas).
+        await this.#refreshInternal();
       } catch (err) {
         this._logger.error(`Cache refresh failed, will retry on next request: ${(err as any)?.message}`);
       }

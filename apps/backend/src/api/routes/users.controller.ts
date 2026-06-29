@@ -3,12 +3,15 @@ import {
   Controller,
   Get,
   HttpException,
+  Logger,
   Param,
   Post,
   Query,
   Req,
   Res,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { sign } from 'jsonwebtoken';
 import { Organization, User } from '@prisma/client';
@@ -39,13 +42,15 @@ import crypto from 'crypto';
 @ApiTags('User')
 @Controller('/user')
 export class UsersController {
+  private readonly _logger = new Logger(UsersController.name);
   constructor(
     private _subscriptionService: SubscriptionService,
     private _stripeService: StripeService,
     private _authService: AuthService,
     private _orgService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _trackService: TrackService,
+    private _auditRepository: AuditRepository
   ) {}
   @Get('/agent-media-sso')
   async getAgentMediaSsoUrl(
@@ -126,8 +131,10 @@ export class UsersController {
   }
 
   @Post('/impersonate')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async setImpersonate(
     @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization,
     @Body('id') id: string,
     @Res({ passthrough: true }) response: Response
   ) {
@@ -144,8 +151,23 @@ export class UsersController {
             sameSite: 'none',
           }
         : {}),
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      // Short-lived impersonation session (B5): 24h, not the 365-day cookie.
+      expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
     });
+
+    // Audit the privileged action (B4): actor super-admin + impersonated target + org.
+    try {
+      await this._auditRepository.create({
+        organizationId: organization.id,
+        userId: user.id,
+        action: 'user.impersonate',
+        entity: 'user',
+        entityId: id,
+        details: JSON.stringify({ targetUserId: id, actorUserId: user.id }),
+      });
+    } catch (err) {
+      this._logger.warn(`Failed to audit impersonation: ${(err as any)?.message}`);
+    }
 
     if (process.env.NODE_ENV === 'development' && process.env.NOT_SECURED) {
       response.header('impersonate', id);

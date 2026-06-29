@@ -37,6 +37,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { uniqBy } from 'lodash';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
@@ -50,6 +51,7 @@ export class IntegrationsController {
   ) {}
 
   @Post('/provider/:id/connect')
+  @RequirePermission('channels', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
   @UsePipes(new ValidationPipe({ whitelist: false }))
   async saveProviderPage(
@@ -74,6 +76,7 @@ export class IntegrationsController {
   }
 
   @Put('/:id/group')
+  @RequirePermission('channels', 'update')
   async updateIntegrationGroup(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -87,6 +90,7 @@ export class IntegrationsController {
   }
 
   @Put('/:id/customer-name')
+  @RequirePermission('channels', 'update')
   async updateOnCustomerName(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -141,6 +145,7 @@ export class IntegrationsController {
   }
 
   @Post('/:id/settings')
+  @RequirePermission('channels', 'update')
   async updateProviderSettings(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -153,6 +158,7 @@ export class IntegrationsController {
     await this._integrationService.updateProviderSettings(org.id, id, body);
   }
   @Post('/:id/nickname')
+  @RequirePermission('channels', 'update')
   async setNickname(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -272,6 +278,7 @@ export class IntegrationsController {
   }
 
   @Post('/:id/time')
+  @RequirePermission('channels', 'update')
   async setTime(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -281,6 +288,7 @@ export class IntegrationsController {
   }
 
   @Post('/mentions')
+  @RequirePermission('channels', 'update')
   async mentions(
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
@@ -337,6 +345,7 @@ export class IntegrationsController {
   }
 
   @Post('/function')
+  @RequirePermission('channels', 'update')
   async functionIntegration(
     @GetOrgFromRequest() org: Organization,
     @Body() body: IntegrationFunctionDto
@@ -397,6 +406,7 @@ export class IntegrationsController {
   }
 
   @Post('/disable')
+  @RequirePermission('channels', 'update')
   disableChannel(
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
@@ -405,6 +415,7 @@ export class IntegrationsController {
   }
 
   @Post('/enable')
+  @RequirePermission('channels', 'update')
   enableChannel(
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
@@ -418,6 +429,7 @@ export class IntegrationsController {
   }
 
   @Delete('/')
+  @RequirePermission('channels', 'delete')
   async deleteChannel(
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
@@ -449,6 +461,7 @@ export class IntegrationsController {
   }
 
   @Post('/:id/plugs')
+  @RequirePermission('channels', 'create')
   async postPlugsByIntegrationId(
     @Param('id') id: string,
     @GetOrgFromRequest() org: Organization,
@@ -458,6 +471,7 @@ export class IntegrationsController {
   }
 
   @Put('/plugs/:id/activate')
+  @RequirePermission('channels', 'update')
   async changePlugActivation(
     @Param('id') id: string,
     @GetOrgFromRequest() org: Organization,

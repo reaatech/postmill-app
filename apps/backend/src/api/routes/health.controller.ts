@@ -1,8 +1,14 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { InngestService } from '@gitroom/nestjs-libraries/inngest/inngest.service';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { HealthRepository } from '@gitroom/nestjs-libraries/database/prisma/health/health.repository';
+import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 const EVENT_API_TIMEOUT_MS = 5_000;
@@ -14,8 +20,62 @@ const INNGEST_DEV_BASE_URL = 'http://localhost:8288';
 export class HealthController {
   constructor(
     private readonly inngestService: InngestService,
-    private readonly inngestRunRepository: InngestRunRepository
+    private readonly inngestRunRepository: InngestRunRepository,
+    // Optional in the type signature only so the existing 2-arg unit test still compiles;
+    // Nest always injects them at runtime (both are registered providers).
+    private readonly healthRepository?: HealthRepository,
+    private readonly redisService?: RedisService
   ) {}
+
+  // Liveness: cheap, dependency-free, always 200. Used by the container HEALTHCHECK and
+  // orchestrator liveness probe — answering it only proves the process is up and serving.
+  @Get('/live')
+  @SkipThrottle()
+  getLive() {
+    return { status: 'ok', timestamp: new Date().toISOString() };
+  }
+
+  // Readiness: verifies the hard dependencies (DB + Redis) before the instance should
+  // receive traffic. Any failure → 503 with per-dependency status.
+  @Get('/ready')
+  @SkipThrottle()
+  async getReady() {
+    const [database, redis] = await Promise.all([
+      this.checkDependency(() => this.healthRepository!.ping()),
+      this.checkDependency(async () => {
+        await this.redisService!.ping();
+        return true;
+      }),
+    ]);
+
+    const dependencies = { database, redis };
+    const ready = database.ok && redis.ok;
+
+    if (!ready) {
+      throw new ServiceUnavailableException({
+        status: 'unavailable',
+        timestamp: new Date().toISOString(),
+        dependencies,
+      });
+    }
+
+    return {
+      status: 'ok',
+      timestamp: new Date().toISOString(),
+      dependencies,
+    };
+  }
+
+  private async checkDependency(
+    fn: () => Promise<unknown>
+  ): Promise<{ ok: boolean; error?: string }> {
+    try {
+      await fn();
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: (err as Error).message };
+    }
+  }
 
   @Get('/')
   @SkipThrottle()

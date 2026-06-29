@@ -11,6 +11,7 @@ import {
   MediaOperation,
   MediaInputValue,
   MediaCredentialField,
+  MediaPollResult,
   resolveApiKey,
 } from './media';
 
@@ -327,4 +328,102 @@ export abstract class OpenAiCompatibleMediaAdapter implements MediaProviderAdapt
       return { ok: false, message: (err as Error).message };
     }
   }
+}
+
+// ── Bearer-token media base ───────────────────────────────────────────────────
+// Minimal base for the many single-key media adapters whose auth is a plain
+// `Authorization: Bearer <key>` header (DeepInfra, LTX, Higgsfield, Leonardo, Recraft,
+// Fireworks, …). It factors out the two pieces every one of them hand-rolls — the bearer
+// `_headers` (resolved through the shared `resolveApiKey`) and `_clean` (drop empty input
+// values so the provider's own defaults apply). Everything provider-specific —
+// `identifier`/`name`/`capabilities`, request shapes, and the generate/poll bodies — stays
+// abstract for the subclass. `_fetch` is injected so the adapter routes through `safeFetch`.
+export abstract class BearerTokenMediaAdapter implements MediaProviderAdapter {
+  constructor(protected readonly _fetch: SafeFetchPort) {}
+
+  abstract readonly identifier: string;
+  abstract readonly name: string;
+  abstract readonly capabilities: MediaProviderCapabilities;
+  readonly credentialFields?: MediaCredentialField[];
+
+  // Resolve the single API key, raising a consistent error when it is missing.
+  protected _key(options?: MediaCredentialOptions): string {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) throw new Error(`${this.name} API key is required`);
+    return apiKey;
+  }
+
+  protected _headers(options?: MediaCredentialOptions): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${this._key(options)}`,
+    };
+  }
+
+  // Drop undefined / empty-string values so the provider's own defaults apply.
+  protected _clean(raw?: Record<string, MediaInputValue>): Record<string, MediaInputValue> {
+    const out: Record<string, MediaInputValue> = {};
+    for (const [k, v] of Object.entries(raw || {})) {
+      if (v === undefined || v === '') continue;
+      out[k] = v;
+    }
+    return out;
+  }
+
+  abstract generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult>;
+  abstract generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
+  abstract generateAudio(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
+  abstract generateAvatar(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
+}
+
+// ── Shared async-job poll loop ────────────────────────────────────────────────
+// Runs the GET-poll-until-terminal loop that every submit-and-poll media adapter copies
+// (Runway/LTX/Wan/Leonardo/…). The per-provider response shape is the one thing that
+// differs, so it is decoded by `parse` into `{ status, result?, error? }`:
+//   - 'completed' → resolves with `result` (throws if a completed job carries no result),
+//   - 'failed'    → throws `error`,
+//   - 'pending'   → sleeps `intervalMs` and polls again.
+// Exhausting `attempts` while still pending throws a timeout. The first poll fires
+// immediately (no leading sleep) so an already-done job resolves without delay.
+export interface PollMediaJobParse<T> {
+  status: MediaPollResult['status'];
+  result?: T;
+  error?: string;
+}
+
+export interface PollMediaJobOptions<T> {
+  fetch: SafeFetchPort;
+  url: string;
+  headers?: Record<string, string>;
+  attempts: number;
+  intervalMs: number;
+  parse: (body: unknown) => PollMediaJobParse<T>;
+}
+
+export async function pollMediaJob<T>(options: PollMediaJobOptions<T>): Promise<T> {
+  const { fetch, url, headers, attempts, intervalMs, parse } = options;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      throw new Error(`Media job poll failed (${res.status}): ${await res.text()}`);
+    }
+
+    const decoded = parse(await res.json());
+    if (decoded.status === 'completed') {
+      if (decoded.result === undefined) {
+        throw new Error('Media job completed without a result');
+      }
+      return decoded.result;
+    }
+    if (decoded.status === 'failed') {
+      throw new Error(decoded.error || 'Media job failed');
+    }
+  }
+
+  throw new Error(`Media job did not complete after ${attempts} attempts`);
 }

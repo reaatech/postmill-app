@@ -19,6 +19,8 @@ import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-confi
 import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
 import { runWithVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { CircuitBreakerService } from '@gitroom/nestjs-libraries/ai/governance/circuit-breaker.service';
+import { webhookSignature, webhookTimeoutMs } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import type { Dispatcher } from 'undici';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
@@ -44,6 +46,16 @@ function slimPost(post: any) {
 @Injectable()
 export class PostActivity {
   private readonly logger = new Logger(PostActivity.name);
+
+  // D2: per-(provider, org) circuit breaker around the social post() path. The
+  // breaker is process-local and conservative — `SocialAbstract.fetch` already
+  // retries transient 429/5xx internally, so a thrown post() error is post-retry
+  // ("hard"). Opens only after several consecutive hard failures, then fast-fails
+  // during cooldown and half-opens with a single probe.
+  private readonly _socialBreaker = new CircuitBreakerService({
+    failureThreshold: 5,
+    cooldownMs: 60_000,
+  });
 
   constructor(
     private _postService: PostsService,
@@ -359,15 +371,30 @@ export class PostActivity {
       })
     );
 
-    const postNow = await runWithVpnDispatcher(vpnDispatcher, () =>
-      getIntegration.post(
-        integration.internalId,
-        integration.token,
-        postPayload,
-        integration,
-        clientInformation
-      )
-    );
+    // D2: short-circuit when this provider×org breaker is OPEN.
+    const breakerKey = `${integration.providerIdentifier}:${integration.organizationId}`;
+    if (!this._socialBreaker.canAttempt(breakerKey)) {
+      throw new Error(
+        `Provider ${integration.providerIdentifier} temporarily unavailable (circuit open) — skipping to retry later`
+      );
+    }
+
+    let postNow;
+    try {
+      postNow = await runWithVpnDispatcher(vpnDispatcher, () =>
+        getIntegration.post(
+          integration.internalId,
+          integration.token,
+          postPayload,
+          integration,
+          clientInformation
+        )
+      );
+      this._socialBreaker.recordSuccess(breakerKey);
+    } catch (err) {
+      this._socialBreaker.recordFailure(breakerKey);
+      throw err;
+    }
 
     await inngest.send({
       name: 'streak/start',
@@ -488,18 +515,54 @@ export class PostActivity {
     );
 
     const post = await this._postService.getPostByForWebhookId(postId);
+    const root = Array.isArray(post) ? post[0] : post;
+
+    // D4: stable, documented minimal subset — never ship the raw Prisma row.
+    const envelope = {
+      event: 'post.published',
+      timestamp: new Date().toISOString(),
+      data: {
+        postId: root?.id ?? postId,
+        integrationId,
+        providerIdentifier: root?.integration?.providerIdentifier ?? null,
+        integrationName: root?.integration?.name ?? null,
+        content: root?.content ?? null,
+        url: root?.releaseURL ?? null,
+        state: root?.state ?? null,
+        publishDate: root?.publishDate
+          ? new Date(root.publishDate).toISOString()
+          : null,
+      },
+    };
+    const body = JSON.stringify(envelope);
+    const signature = webhookSignature(body);
+
+    // D4: bounded per-delivery retry (3 attempts, backoff). A flaky receiver is
+    // retried without failing the others; final failure is swallowed so a bad
+    // webhook never fails the publish. The whole call already runs inside a
+    // durable Inngest `step.run('send-webhooks')`.
     await Promise.all(
       webhooks.map(async (webhook) => {
-        try {
-          await safeFetch(webhook.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(post),
-          });
-        } catch (e) {
-          /**empty**/
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const res = await safeFetch(webhook.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Postmill-Signature': signature,
+              },
+              body,
+              signal: AbortSignal.timeout(webhookTimeoutMs()),
+            });
+            if (res.status >= 200 && res.status < 300) {
+              return;
+            }
+          } catch (e) {
+            /** retry below **/
+          }
+          if (attempt < 2) {
+            await timer(1000 * (attempt + 1));
+          }
         }
       })
     );

@@ -11,6 +11,7 @@ import { Organization, User } from '@prisma/client';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { isISO8601, isUUID } from 'class-validator';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 @Controller('/posts')
 export class SocialCommentsController {
@@ -54,6 +55,7 @@ export class SocialCommentsController {
   }
 
   @Post('/inbox/bulk-read')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async bulkMarkRead(
     @GetOrgFromRequest() org: Organization,
@@ -75,6 +77,7 @@ export class SocialCommentsController {
   }
 
   @Post('/inbox/sync')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async syncInbox(
     @GetOrgFromRequest() org: Organization,
@@ -94,6 +97,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments')
+  @RequirePermission('comments', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async addComment(
     @Param('id', ParseCuidPipe) id: string,
@@ -105,6 +109,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments/:commentId/reply')
+  @RequirePermission('comments', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async replyToComment(
     @Param('id', ParseCuidPipe) id: string,
@@ -117,6 +122,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments/:commentId/like')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async likeComment(
     @Param('id', ParseCuidPipe) id: string,
@@ -129,6 +135,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments/read')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async markAsRead(
     @Param('id', ParseCuidPipe) id: string,
@@ -139,6 +146,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments/:commentId/status')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async updateCommentStatus(
     @Param('id', ParseCuidPipe) id: string,
@@ -154,6 +162,7 @@ export class SocialCommentsController {
   }
 
   @Post('/:id/social-comments/:commentId/assign')
+  @RequirePermission('comments', 'update')
   @CheckPolicies([AuthorizationActions.Create, Sections.COMMUNITY_FEATURES])
   async assignComment(
     @Param('id', ParseCuidPipe) id: string,

@@ -12,12 +12,6 @@ export class SocialCommentsRepository {
     private _post: PrismaRepository<'post'>,
   ) {}
 
-  getCommentByPlatformId(integrationId: string, platformCommentId: string) {
-    return this._socialComment.model.socialComment.findUnique({
-      where: { integrationId_platformCommentId: { integrationId, platformCommentId } },
-    });
-  }
-
   async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
     const where: any = {
       organizationId: orgId,

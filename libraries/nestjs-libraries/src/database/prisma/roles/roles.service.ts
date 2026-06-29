@@ -1,9 +1,30 @@
-import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { RolesRepository } from './roles.repository';
+import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 
 @Injectable()
 export class RolesService {
-  constructor(private _repository: RolesRepository) {}
+  private readonly _logger = new Logger(RolesService.name);
+  constructor(
+    private _repository: RolesRepository,
+    private _audit: AuditRepository
+  ) {}
+
+  // Best-effort audit (B4): a logging failure must never break the role mutation.
+  private async _audited(entry: {
+    organizationId: string;
+    action: string;
+    entity: string;
+    entityId?: string;
+    entityName?: string;
+    details?: string;
+  }) {
+    try {
+      await this._audit.create(entry);
+    } catch (err) {
+      this._logger.warn(`Failed to audit ${entry.action}: ${(err as any)?.message}`);
+    }
+  }
 
   getRoles(orgId: string) {
     return this._repository.getRoles(orgId);
@@ -31,7 +52,16 @@ export class RolesService {
       );
     }
 
-    return this._repository.createRole(orgId, data);
+    const created = await this._repository.createRole(orgId, data);
+    await this._audited({
+      organizationId: orgId,
+      action: 'role.create',
+      entity: 'role',
+      entityId: created?.id,
+      entityName: data.name,
+      details: JSON.stringify({ key: data.key, permissionIds: data.permissionIds }),
+    });
+    return created;
   }
 
   async updateRole(
@@ -61,7 +91,16 @@ export class RolesService {
       throw new HttpException('Cannot modify system roles', HttpStatus.FORBIDDEN);
     }
 
-    return this._repository.updateRole(orgId, roleId, data);
+    const updated = await this._repository.updateRole(orgId, roleId, data);
+    await this._audited({
+      organizationId: orgId,
+      action: 'role.update',
+      entity: 'role',
+      entityId: roleId,
+      entityName: data.name ?? role.name,
+      details: JSON.stringify(data),
+    });
+    return updated;
   }
 
   async deleteRole(orgId: string, roleId: string) {
@@ -71,7 +110,15 @@ export class RolesService {
       throw new HttpException('Cannot delete system roles', HttpStatus.FORBIDDEN);
     }
 
-    return this._repository.deleteRole(orgId, roleId);
+    const deleted = await this._repository.deleteRole(orgId, roleId);
+    await this._audited({
+      organizationId: orgId,
+      action: 'role.delete',
+      entity: 'role',
+      entityId: roleId,
+      entityName: role.name,
+    });
+    return deleted;
   }
 
   async assignRoleToMember(orgId: string, userId: string, roleId: string) {
@@ -85,6 +132,14 @@ export class RolesService {
       throw new HttpException('Member not found in organization', HttpStatus.NOT_FOUND);
     }
 
+    await this._audited({
+      organizationId: orgId,
+      action: 'member.role.assign',
+      entity: 'member',
+      entityId: userId,
+      entityName: role.name,
+      details: JSON.stringify({ memberUserId: userId, roleId }),
+    });
     return result;
   }
 

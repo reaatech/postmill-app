@@ -61,14 +61,13 @@ describe('ProviderConfigManager', () => {
   });
 
   describe('onModuleInit', () => {
-    it('calls refreshCache', async () => {
-      const spy = vi.spyOn(manager, 'refreshCache');
+    it('loads configs on init (internal refresh, no cross-replica broadcast)', async () => {
       await manager.onModuleInit();
-      expect(spy).toHaveBeenCalledOnce();
+      expect(mockProviderConfigService.getAll).toHaveBeenCalledOnce();
     });
 
     it('handles errors gracefully', async () => {
-      vi.spyOn(manager, 'refreshCache').mockRejectedValue(new Error('fail'));
+      mockProviderConfigService.getAll.mockRejectedValueOnce(new Error('fail'));
       await expect(manager.onModuleInit()).resolves.toBeUndefined();
       expect(consoleErrorSpy).toHaveBeenCalled();
     });

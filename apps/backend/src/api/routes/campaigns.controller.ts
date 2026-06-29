@@ -31,6 +31,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 class CreateCampaignDto {
   @IsString()
@@ -142,6 +143,7 @@ export class CampaignsController {
   }
 
   @Post('/')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async create(
     @GetOrgFromRequest() org: Organization,
@@ -165,6 +167,7 @@ export class CampaignsController {
   }
 
   @Put('/:id')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async update(
     @GetOrgFromRequest() org: Organization,
@@ -228,6 +231,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/copy')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async copy(
     @GetOrgFromRequest() org: Organization,
@@ -248,6 +252,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/drafts')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createDraft(
     @GetOrgFromRequest() org: Organization,
@@ -262,6 +267,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/drafts/:postId/approve')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async approveDraft(
     @GetOrgFromRequest() org: Organization,
@@ -272,6 +278,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/drafts/:postId/reject')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async rejectDraft(
     @GetOrgFromRequest() org: Organization,
@@ -282,6 +289,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/promote')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async promoteDrafts(
     @GetOrgFromRequest() org: Organization,
@@ -294,6 +302,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/share')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async enableShare(
     @GetOrgFromRequest() org: Organization,
@@ -303,6 +312,7 @@ export class CampaignsController {
   }
 
   @Delete('/:id/share')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async disableShare(
     @GetOrgFromRequest() org: Organization,
@@ -313,6 +323,7 @@ export class CampaignsController {
   }
 
   @Delete('/:id')
+  @RequirePermission('posts', 'delete')
   @CheckPolicies([AuthorizationActions.Delete, Sections.POSTS_PER_MONTH])
   async delete(
     @GetOrgFromRequest() org: Organization,
@@ -333,6 +344,7 @@ export class CampaignsController {
   }
 
   @Post('/:id/items')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async tagItem(
     @GetOrgFromRequest() org: Organization,
@@ -344,6 +356,7 @@ export class CampaignsController {
   }
 
   @Delete('/:id/items/:entityType/:entityId')
+  @RequirePermission('posts', 'update')
   @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
   async untagItem(
     @GetOrgFromRequest() org: Organization,

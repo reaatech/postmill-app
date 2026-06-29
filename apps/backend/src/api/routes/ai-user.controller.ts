@@ -21,6 +21,7 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { CapabilityNotAvailable } from '@gitroom/nestjs-libraries/ai/governance/errors';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
@@ -248,6 +249,7 @@ export class AiUserController {
   }
 
   @Put('/brand-profile')
+  @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertBrandProfile(
@@ -273,6 +275,7 @@ export class AiUserController {
   }
 
   @Put('/prompt-templates')
+  @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async upsertPromptTemplate(
@@ -287,6 +290,7 @@ export class AiUserController {
   }
 
   @Delete('/prompt-templates/:key')
+  @RequirePermission('ai-config', 'delete')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptTemplate(
@@ -305,6 +309,7 @@ export class AiUserController {
   }
 
   @Post('/prompt-library')
+  @RequirePermission('ai-config', 'create')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async createPromptLibraryItem(
@@ -319,6 +324,7 @@ export class AiUserController {
   }
 
   @Delete('/prompt-library/:id')
+  @RequirePermission('ai-config', 'delete')
   @Throttle({ default: { limit: 30, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Delete, Sections.AI])
   async deletePromptLibraryItem(
@@ -835,6 +841,7 @@ For each locale, provide an accurate translation that preserves the meaning, ton
   }
 
   @Post('/brand-memory/index')
+  @RequirePermission('ai-config', 'update')
   @Throttle({ default: { limit: 10, ttl: 60000 } })
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async indexBrandMemory(

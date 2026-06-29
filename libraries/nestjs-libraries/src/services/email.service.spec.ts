@@ -105,6 +105,7 @@ describe('EmailService', () => {
 
     expect(inngest.send).toHaveBeenCalledWith({
       name: 'email/send',
+      id: expect.stringMatching(/^email_/),
       data: {
         to: 'a@b.com',
         subject: 'Subject',

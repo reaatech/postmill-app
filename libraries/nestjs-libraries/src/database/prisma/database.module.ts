@@ -19,6 +19,7 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
+import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
@@ -103,6 +104,7 @@ import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { HealthRepository } from '@gitroom/nestjs-libraries/database/prisma/health/health.repository';
 import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
@@ -127,6 +129,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     OrganizationRepository,
     SubscriptionService,
     SubscriptionRepository,
+    StripeEventRepository,
     NotificationService,
     NotificationsRepository,
     NotificationPreferenceService,
@@ -217,6 +220,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     BackfillService,
     MigrationLedgerRepository,
     InngestRunRepository,
+    HealthRepository,
     RolesRepository,
     RolesService,
     DesignRepository,

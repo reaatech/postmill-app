@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpException,
+  HttpStatus,
   Param,
   Post,
   Req,
@@ -30,6 +32,7 @@ import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BadRequestException } from '@nestjs/common';
 import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 
 @ApiTags('Media')
 @Controller('/media')
@@ -40,8 +43,21 @@ export class MediaController {
     private _subscriptionService: SubscriptionService,
     private _storageService: StorageService,
     private _stockMediaService: StockMediaService,
-    private _brandsService: BrandsService
+    private _brandsService: BrandsService,
+    private _budgetService: BudgetService
   ) {}
+
+  // Spend-budget gate (C3): in addition to the tier-credit check, deny generation
+  // when the org/global AI spend cap is exhausted. No-op when no caps are configured.
+  private async _assertBudget(orgId: string) {
+    const budgetCheck = await this._budgetService.checkBudget('media', orgId);
+    if (!budgetCheck.allowed) {
+      throw new HttpException(
+        { error: 'AI budget exceeded', detail: budgetCheck.reason },
+        HttpStatus.TOO_MANY_REQUESTS
+      );
+    }
+  }
 
   @Post('/generate-video')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
@@ -60,6 +76,7 @@ export class MediaController {
     @Body('prompt') prompt: string,
     isPicturePrompt = false
   ) {
+    await this._assertBudget(org.id);
     const total = await this._subscriptionService.checkCredits(org);
     if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
       return false;
@@ -120,6 +137,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: RemoveBackgroundDto
   ) {
+    await this._assertBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return { url: await this._aiGeneration.removeBackground(org, body.imageUrl) };
   }
@@ -131,6 +149,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: InpaintImageDto
   ) {
+    await this._assertBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return {
       url: await this._aiGeneration.inpaintImage(
@@ -149,6 +168,7 @@ export class MediaController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: UpscaleImageDto
   ) {
+    await this._assertBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return { url: await this._aiGeneration.upscaleImage(org, body.imageUrl, body.scale) };
   }

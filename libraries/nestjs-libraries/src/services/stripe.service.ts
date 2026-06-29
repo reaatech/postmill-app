@@ -11,17 +11,24 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
+import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
 @Injectable()
 export class StripeService {
   private readonly _logger = new Logger(StripeService.name);
+  // Dunning grace window (C2): how long after a payment failure we keep channels live
+  // before the terminal subscription.deleted teardown.
+  private readonly GRACE_PERIOD_DAYS = 7;
   constructor(
     private _subscriptionService: SubscriptionService,
     private _organizationService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _trackService: TrackService,
+    private _stripeEventRepository: StripeEventRepository,
+    private _notificationService: NotificationService
   ) {}
   validateRequest(rawBody: Buffer, signature: string, endpointSecret: string) {
     return stripe.webhooks.constructEvent(rawBody, signature, endpointSecret);
@@ -127,7 +134,57 @@ export class StripeService {
       event.data.object.cancel_at
     );
   }
+  // Dunning (C2): a past-due subscription enters a grace window + notifies the org
+  // instead of tearing down channels. The terminal `subscription.deleted` still downgrades.
+  private async _enterGracePeriod(customerId: string) {
+    if (!customerId) {
+      return { ok: true };
+    }
+
+    const now = new Date();
+    const existing = await this._stripeEventRepository.getGracePeriod(customerId);
+    // Already inside an unexpired grace window — keep it; don't re-notify or tear down.
+    if (existing && existing.getTime() > now.getTime()) {
+      return { ok: true, grace: true };
+    }
+
+    const until = new Date(
+      now.getTime() + this.GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    );
+    await this._stripeEventRepository.setGracePeriod(customerId, until);
+
+    const org = await this._organizationService.getOrgByCustomerId(customerId);
+    if (org?.id) {
+      try {
+        await this._notificationService.notify({
+          orgId: org.id,
+          category: 'budget',
+          title: 'Payment failed — action needed',
+          message: `We couldn't process your latest payment. Please update your billing details before ${until.toDateString()} to keep your channels active.`,
+          link: (process.env.FRONTEND_URL || '') + '/billing',
+        });
+      } catch (err) {
+        this._logger.warn(
+          `Failed to send dunning notification for customer ${customerId}: ${
+            (err as Error)?.message ?? String(err)
+          }`
+        );
+      }
+    }
+
+    return { ok: true, grace: true };
+  }
+
+  async paymentFailed(event: Stripe.InvoicePaymentFailedEvent) {
+    return this._enterGracePeriod(event.data.object.customer as string);
+  }
+
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
+    // Past-due: grant grace + notify rather than re-running the tier transition/teardown.
+    if (event.data.object.status === 'past_due') {
+      return this._enterGracePeriod(event.data.object.customer as string);
+    }
+
     const {
       uniqueId,
       billing,

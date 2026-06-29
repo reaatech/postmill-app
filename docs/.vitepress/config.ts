@@ -66,6 +66,7 @@ export default defineConfig({
             { text: 'Introduction', link: '/operations-guide/' },
             { text: 'Requirements', link: '/operations-guide/requirements' },
             { text: 'Docker Deployment', link: '/operations-guide/docker' },
+            { text: 'Scaling & Deployment', link: '/operations-guide/scaling' },
             { text: 'Configuration', link: '/operations-guide/configuration' },
             { text: 'Inngest & Cron', link: '/operations-guide/inngest-and-cron' },
             { text: 'Storage Setup', link: '/operations-guide/storage' },

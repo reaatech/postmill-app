@@ -5,6 +5,11 @@ import { resolve } from 'path';
 export class ConfigurationChecker {
   cfg: dotenv.DotenvParseOutput;
   issues: string[] = [];
+  // Fatal issues are a strict subset of misconfigurations that should refuse a
+  // production boot (see main.ts). They are ALSO mirrored into `issues` so the
+  // existing warning surface still lists them; `getFatalIssues()`/`hasFatalIssues()`
+  // expose just the boot-blocking set.
+  fatalIssues: string[] = [];
 
   readEnvFromFile() {
     const envFile = resolve(__dirname, '../../../.env');
@@ -36,6 +41,50 @@ export class ConfigurationChecker {
     this.checkDeprecatedChannelVars();
     this.checkDeprecatedAiVars();
     this.checkEncryptionKey();
+    this.checkFatal();
+  }
+
+  // The boot-blocking subset. A missing/invalid value here should stop a production
+  // start (main.ts exits non-zero). Each fatal is also pushed to `issues` so it shows
+  // in the normal warning list too.
+  checkFatal() {
+    const jwt = this.get('JWT_SECRET');
+    if (!jwt) {
+      this.pushFatal('JWT_SECRET is not set — required to sign/verify auth tokens.');
+    } else if (jwt.length < 32) {
+      this.pushFatal(
+        'JWT_SECRET is too short — use at least 32 characters for a secure signing key.'
+      );
+    }
+
+    if (!this.get('DATABASE_URL')) {
+      this.pushFatal('DATABASE_URL is not set — the backend cannot reach its database.');
+    }
+
+    // FRONTEND_URL is the canonical public URL (MAIN_URL is an optional alias used for an
+    // extra CORS origin). Require at least one to be present.
+    if (!this.get('FRONTEND_URL') && !this.get('MAIN_URL')) {
+      this.pushFatal('Neither FRONTEND_URL nor MAIN_URL is set — set the public app URL.');
+    }
+
+    // Inngest keys are mandatory once we are not pointed at a local dev server.
+    if (this.get('INNGEST_DEV') !== '1') {
+      if (!this.get('INNGEST_EVENT_KEY')) {
+        this.pushFatal(
+          'INNGEST_EVENT_KEY is not set — required when INNGEST_DEV is not "1".'
+        );
+      }
+      if (!this.get('INNGEST_SIGNING_KEY')) {
+        this.pushFatal(
+          'INNGEST_SIGNING_KEY is not set — required when INNGEST_DEV is not "1".'
+        );
+      }
+    }
+  }
+
+  pushFatal(message: string) {
+    this.fatalIssues.push(message);
+    this.issues.push(message);
   }
 
   checkEncryptionKey() {
@@ -200,6 +249,14 @@ export class ConfigurationChecker {
 
   hasIssues() {
     return this.issues.length > 0;
+  }
+
+  hasFatalIssues() {
+    return this.fatalIssues.length > 0;
+  }
+
+  getFatalIssues() {
+    return this.fatalIssues;
   }
 
   getIssues() {

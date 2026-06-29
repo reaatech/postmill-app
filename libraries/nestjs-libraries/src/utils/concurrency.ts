@@ -23,3 +23,25 @@ export async function mapWithConcurrency<T, R>(
   await Promise.all(workers);
   return results;
 }
+
+// Collapse concurrent same-key async calls into one in-flight computation (a stampede guard).
+// The first caller for a key runs `fn`; any caller arriving while it is still pending awaits the
+// same promise; the entry is dropped once it settles, so the next call recomputes. Per-instance
+// only — backed by an in-process Map, NOT cross-replica.
+const _inFlight = new Map<string, Promise<unknown>>();
+
+export function singleFlight<T>(key: string, fn: () => Promise<T>): Promise<T> {
+  const existing = _inFlight.get(key) as Promise<T> | undefined;
+  if (existing) {
+    return existing;
+  }
+
+  const promise = Promise.resolve()
+    .then(fn)
+    .finally(() => {
+      _inFlight.delete(key);
+    });
+
+  _inFlight.set(key, promise);
+  return promise;
+}

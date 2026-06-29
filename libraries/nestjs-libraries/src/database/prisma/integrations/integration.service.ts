@@ -26,6 +26,7 @@ import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
 
 dayjs.extend(utc);
 
@@ -40,8 +41,27 @@ export class IntegrationService {
     private _notificationService: NotificationService,
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _storageService: StorageService
+    private _storageService: StorageService,
+    private _auditRepository: AuditRepository
   ) {}
+
+  // Best-effort audit (B4): a logging failure must never break the channel action.
+  private async _audited(entry: {
+    organizationId: string;
+    action: string;
+    entity: string;
+    entityId?: string;
+    entityName?: string;
+    details?: string;
+  }) {
+    try {
+      await this._auditRepository.create(entry);
+    } catch (err) {
+      this._logger.warn(
+        `Failed to audit ${entry.action}: ${(err as any)?.message}`
+      );
+    }
+  }
 
   async changeActiveCron(orgId: string) {
     const data = await this._autopostsRepository.getAutoposts(orgId);
@@ -77,12 +97,23 @@ export class IntegrationService {
     return this._integrationRepository.setTimes(orgId, integrationId, times);
   }
 
-  updateProviderSettings(org: string, id: string, additionalSettings: string) {
-    return this._integrationRepository.updateProviderSettings(
+  async updateProviderSettings(
+    org: string,
+    id: string,
+    additionalSettings: string
+  ) {
+    const result = await this._integrationRepository.updateProviderSettings(
       org,
       id,
       additionalSettings
     );
+    await this._audited({
+      organizationId: org,
+      action: 'integration.settings.update',
+      entity: 'integration',
+      entityId: id,
+    });
+    return result;
   }
 
   checkPreviousConnections(org: string, id: string) {
@@ -121,7 +152,7 @@ export class IntegrationService {
       ? await (await this._storageService.getLocalAdapterForOrg(org, true)).uploadSimple(picture)
       : undefined;
 
-    return this._integrationRepository.createOrUpdateIntegration(
+    const result = await this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
       oneTimeToken,
       org,
@@ -141,6 +172,23 @@ export class IntegrationService {
       providerConfigId,
       providerVersion
     );
+
+    // Audit genuine channel connects (B4). Token-refresh / cookie-reauth callers
+    // (refreshTokens, RefreshIntegrationService, the custom re-auth route) do not
+    // pass a `username`, so this gate records only user-initiated OAuth connects
+    // and skips periodic refreshes.
+    if (username) {
+      await this._audited({
+        organizationId: org,
+        action: 'integration.connect',
+        entity: 'integration',
+        entityId: result?.id,
+        entityName: name,
+        details: JSON.stringify({ provider, internalId }),
+      });
+    }
+
+    return result;
   }
 
   updateIntegrationGroup(org: string, id: string, group: string) {
@@ -262,7 +310,14 @@ export class IntegrationService {
   }
 
   async disableChannel(org: string, id: string) {
-    return this._integrationRepository.disableChannel(org, id);
+    const result = await this._integrationRepository.disableChannel(org, id);
+    await this._audited({
+      organizationId: org,
+      action: 'integration.disable',
+      entity: 'integration',
+      entityId: id,
+    });
+    return result;
   }
 
   async enableChannel(org: string, totalChannels: number, id: string) {
@@ -276,7 +331,14 @@ export class IntegrationService {
       throw new Error('You have reached the maximum number of channels');
     }
 
-    return this._integrationRepository.enableChannel(org, id);
+    const result = await this._integrationRepository.enableChannel(org, id);
+    await this._audited({
+      organizationId: org,
+      action: 'integration.enable',
+      entity: 'integration',
+      entityId: id,
+    });
+    return result;
   }
 
   async getPostsForChannel(org: string, id: string) {
@@ -284,7 +346,14 @@ export class IntegrationService {
   }
 
   async deleteChannel(org: string, id: string) {
-    return this._integrationRepository.deleteChannel(org, id);
+    const result = await this._integrationRepository.deleteChannel(org, id);
+    await this._audited({
+      organizationId: org,
+      action: 'integration.delete',
+      entity: 'integration',
+      entityId: id,
+    });
+    return result;
   }
 
   async disableIntegrations(org: string, totalChannels: number) {

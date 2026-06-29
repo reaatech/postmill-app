@@ -30,10 +30,19 @@ ENV NODE_ENV=production
 
 RUN npm --no-update-notifier --no-fund --global install pnpm@10.6.1
 
+# Unprivileged user — Chromium/FFmpeg renders must NOT run as root. /work is the per-render
+# mount (job.json in, artifact out); it's owned by the render user.
+RUN addgroup --system render \
+ && adduser --system --ingroup render --home /app --shell /usr/sbin/nologin render \
+ && mkdir -p /work \
+ && chown -R render:render /work
+
 WORKDIR /app
-COPY . /app
+COPY --chown=render:render . /app
 
 RUN pnpm install
 RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm run build:backend
+
+USER render
 
 ENTRYPOINT ["node", "/app/dist/apps/backend/src/media-render-worker.js"]

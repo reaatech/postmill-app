@@ -1,3 +1,7 @@
+import { initializeOtel } from '@gitroom/nestjs-libraries/otel/initialize.otel';
+// Start OpenTelemetry first — before Sentry init and before the Nest app is created — so
+// auto-instrumentations can patch modules as they load. No-ops unless configured (G3).
+initializeOtel();
 import { initializeSentry } from '@gitroom/nestjs-libraries/sentry/initialize.sentry';
 initializeSentry('backend', true);
 import compression from 'compression';
@@ -73,6 +77,26 @@ async function start() {
     },
   });
 
+  // Graceful shutdown (G1): drain Redis/Prisma (via onModuleDestroy) on SIGTERM/SIGINT.
+  // Enabled before listen; the handler runs app.close() exactly once. This is additive to
+  // the dev `ppid===1` watcher above (which handles the nest-watch orphan case separately).
+  app.enableShutdownHooks();
+  let shuttingDown = false;
+  const gracefulShutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    new Logger('Bootstrap').log(`Received ${signal}, shutting down gracefully...`);
+    try {
+      await app.close();
+    } catch (e) {
+      new Logger('Bootstrap').error('Error during graceful shutdown', e as Error);
+    } finally {
+      process.exit(0);
+    }
+  };
+  process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+  process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+
   await startMcp(app);
 
   app.useGlobalPipes(
@@ -128,11 +152,28 @@ async function start() {
 
   const port = process.env.PORT || 3000;
 
+  // Fail-fast config validation BEFORE accepting traffic (A1). In production (or when
+  // CONFIG_CHECK_STRICT is set) a fatal-missing secret exits non-zero before listen.
+  checkConfiguration();
+
+  // Multi-replica collaboration hazard (A4): the websocket holds a live Y.Doc per room
+  // in-process. Warn loudly if the operator opted out of single-instance without wiring a
+  // Redis adapter (not yet implemented — tracked follow-up).
+  if (
+    process.env.COLLAB_SINGLE_INSTANCE === 'false' &&
+    !process.env.COLLAB_REDIS_ADAPTER
+  ) {
+    new Logger('Bootstrap').warn(
+      'COLLAB_SINGLE_INSTANCE=false but COLLAB_REDIS_ADAPTER is not set. The collaboration ' +
+        'websocket keeps per-room state in memory; running multiple replicas without a shared ' +
+        'Redis adapter will silently diverge and lose edits. Pin collaboration to one replica ' +
+        '(sticky sessions) or configure a Redis adapter. See docs/operations-guide/scaling.md.'
+    );
+  }
+
   try {
     await app.listen(port);
     new Logger('Bootstrap').log('Backend started successfully on port ' + port);
-
-    checkConfiguration(); // Do this last, so that users will see obvious issues at the end of the startup log without having to scroll up.
 
     const server = app.getHttpServer();
     const collabGateway = app.get(CollaborationGateway);
@@ -162,6 +203,27 @@ function checkConfiguration() {
   const checker = new ConfigurationChecker();
   checker.readEnvFromProcess();
   checker.check();
+
+  // Fail-fast (A1): refuse to boot on a fatal-missing secret in production, or anywhere
+  // CONFIG_CHECK_STRICT is set. NOT_SECURED (the universal dev toggle) bypasses the exit.
+  if (checker.hasFatalIssues()) {
+    const failFast =
+      !!process.env.CONFIG_CHECK_STRICT ||
+      (process.env.NODE_ENV === 'production' && !process.env.NOT_SECURED);
+
+    for (const issue of checker.getFatalIssues()) {
+      Logger.error(issue, 'Fatal configuration issue');
+    }
+
+    if (failFast) {
+      Logger.error(
+        'Refusing to start: ' +
+          checker.getFatalIssues().length +
+          ' fatal configuration issue(s). Fix them or set NOT_SECURED for local dev.'
+      );
+      process.exit(1);
+    }
+  }
 
   if (checker.hasIssues()) {
     for (const issue of checker.getIssues()) {

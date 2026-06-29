@@ -209,11 +209,31 @@ export abstract class SocialAbstract {
     if (vpnDispatcher && !(await _ports!.isSafePublicHttpsUrl(url))) {
       throw new _ports!.BadBodyError(identifier, '{}', options.body || '{}', 'Blocked non-public destination over VPN');
     }
-    const request = (await _ports!.undiciFetch(url, {
-      ...(options as any),
-      // dispatcher is an undici-only RequestInit option, absorbed by the cast below
-      dispatcher: (options as any).dispatcher ?? vpnDispatcher ?? _ports!.ssrfSafeDispatcher,
-    } as any)) as unknown as Response;
+    // D1: bound every outbound provider call by a timeout so one slow platform
+    // can't hang the publish concurrency pool. Default OUTBOUND_HTTP_TIMEOUT_MS
+    // (30s), merged with any caller-supplied signal.
+    const timeoutMs = Number(process.env.OUTBOUND_HTTP_TIMEOUT_MS) > 0
+      ? Number(process.env.OUTBOUND_HTTP_TIMEOUT_MS)
+      : 30_000;
+    const timeoutSignal = AbortSignal.timeout(timeoutMs);
+    const callerSignal = (options as any).signal as AbortSignal | undefined;
+    const signal = callerSignal
+      ? AbortSignal.any([callerSignal, timeoutSignal])
+      : timeoutSignal;
+    let request: Response;
+    try {
+      request = (await _ports!.undiciFetch(url, {
+        ...(options as any),
+        signal,
+        // dispatcher is an undici-only RequestInit option, absorbed by the cast below
+        dispatcher: (options as any).dispatcher ?? vpnDispatcher ?? _ports!.ssrfSafeDispatcher,
+      } as any)) as unknown as Response;
+    } catch (err: any) {
+      if (timeoutSignal.aborted || err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        throw new Error(`Outbound request to ${identifier || url} timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    }
 
     if (request.status === 200 || request.status === 201) {
       return request;

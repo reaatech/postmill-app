@@ -115,6 +115,8 @@ model User {
   lastOnline            DateTime             @default(now())
   ip                    String?
   agent                 String?
+  tosAcceptedAt         DateTime?
+  tosVersion            String?
   comments              Comments[]
   organizations         UserOrganization[]
   oauthAuthorizations   OAuthAuthorization[]
@@ -224,6 +226,7 @@ model Subscription {
   period           String          @default("MONTHLY")
   totalChannels    Int
   isLifetime       Boolean          @default(false)
+  gracePeriodEnd   DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
@@ -231,6 +234,12 @@ model Subscription {
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+model StripeEvent {
+  id          String   @id // the Stripe event.id
+  type        String
+  processedAt DateTime @default(now())
 }
 
 model Customer {
