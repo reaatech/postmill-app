@@ -20,6 +20,11 @@ export interface ProviderConfigItem {
   /** Sunset date for the pinned (deprecated) version, ISO string. */
   sunsetAt?: string;
   /**
+   * Live-key verification from the catalog. When explicitly `false`, the provider
+   * was built without a live key and renders a "Beta" badge (plan E24).
+   */
+  verified?: boolean;
+  /**
    * Passthrough of the full original provider object so `renderBadges`/
    * `renderActions` receive it directly via `provider.meta` — kills the
    * `filteredProviders.find(...)` re-find anti-pattern (plan §1.1/§0.3.4).
@@ -140,6 +145,14 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       </span>
                     );
                   })()}
+                  {provider.verified === false && (
+                    <span
+                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-900/20 text-amber-600"
+                      title="Built without a live key — request shape unverified."
+                    >
+                      Beta
+                    </span>
+                  )}
                   {(provider.status || []).map((s) => (
                     <span
                       key={s}

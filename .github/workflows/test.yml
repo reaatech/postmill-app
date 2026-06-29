@@ -60,20 +60,22 @@ jobs:
           DATABASE_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postmill-db-local
         run: pnpm run test:int
 
-      - name: Schema drift check
+      - name: Migration drift check (committed migrations fully represent the schema)
         env:
           DATABASE_URL: postgresql://postmill-local:postmill-local-pwd@localhost:5432/postmill-db-local
         run: |
-          # mastra_* noise approach: this DB has ONLY had `db push` applied (the app never
-          # boots in CI), so the runtime-created mastra_* tables — which live outside the
-          # Prisma schema — are absent and cannot show up as drift.
-          pnpm exec prisma db push --skip-generate \
-            --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
-          # `migrate diff --exit-code` returns 2 when the schema and DB diverge, 0 when in
-          # sync. Any non-zero exit fails the job (CI run uses bash -e).
+          # Apply the committed migrations (0_init + any new ones) to the empty CI DB.
+          # The deployed migrations must reconstruct the full schema — a schema.prisma
+          # edit committed WITHOUT a matching migration leaves the DB behind and is caught
+          # by the drift diff below. (Runtime-only mastra_* tables live outside the Prisma
+          # schema and the app never boots in CI, so they cannot show up as drift.)
+          pnpm run prisma-migrate-deploy-safe
+          # `migrate diff --exit-code` returns 2 when the deployed DB and the schema diverge,
+          # 0 when in sync. A migration-less schema edit makes this exit 2. Any non-zero exit
+          # fails the job (CI run uses bash -e).
           pnpm exec prisma migrate diff \
-            --from-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
-            --to-url "$DATABASE_URL" \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
             --exit-code
 
       - name: Destructive schema guard (vs origin/main)

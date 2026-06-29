@@ -3,6 +3,7 @@ import { OrgProviderConfigRepository } from './org-provider-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { randomBytes } from 'crypto';
 
 // Optional VPN egress selection stored (as JSON) on the channel config. Not a
@@ -35,7 +36,8 @@ export class OrgProviderConfigService {
     private _repository: OrgProviderConfigRepository,
     private _encryption: EncryptionService,
     private _vpn: OrgVpnConfigService,
-    private _resolution: ProviderResolutionService
+    private _resolution: ProviderResolutionService,
+    private _audit: AuditService
   ) {}
 
   // No secrets — orgId/userId/action/provider identity only (#59).
@@ -43,6 +45,30 @@ export class OrgProviderConfigService {
     this._logger.log(
       `channel-config.${action} org=${orgId} user=${userId || 'n/a'} provider=${identifier}`
     );
+  }
+
+  // F2(c): credential create/rotate audit event. Non-fatal; metadata carries ONLY the
+  // provider identifier + config id — never the client id/secret.
+  #recordCredentialRotated(
+    orgId: string,
+    identifier: string,
+    configId: string,
+    userId?: string
+  ) {
+    try {
+      Promise.resolve(
+        this._audit.record({
+          orgId,
+          userId,
+          action: 'credential.rotated',
+          resource: 'channel-credential',
+          resourceId: configId,
+          metadata: { provider: identifier, configId },
+        })
+      ).catch(() => {});
+    } catch {
+      /* non-fatal: auditing must never break the credential write */
+    }
   }
 
   // Pin a new or existing config to the latest active social-provider version unless
@@ -130,6 +156,7 @@ export class OrgProviderConfigService {
     });
 
     this.#audit('create', orgId, data.identifier, userId);
+    this.#recordCredentialRotated(orgId, data.identifier, result.id, userId);
     return this.#maskSensitive(result);
   }
 
@@ -171,6 +198,7 @@ export class OrgProviderConfigService {
 
     const result = await this._repository.updateById(id, update as any);
     this.#audit('update', orgId, existing.identifier, userId);
+    this.#recordCredentialRotated(orgId, existing.identifier, id, userId);
     return this.#maskSensitive(result);
   }
 

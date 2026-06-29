@@ -12,7 +12,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { sign } from 'jsonwebtoken';
 import { Organization, User } from '@prisma/client';
@@ -53,7 +53,7 @@ export class UsersController {
     private _orgService: OrganizationService,
     private _userService: UsersService,
     private _trackService: TrackService,
-    private _auditRepository: AuditRepository,
+    private _auditService: AuditService,
     private _deletionService: DeletionService,
     private _dataExportService: DataExportService
   ) {}
@@ -162,7 +162,7 @@ export class UsersController {
 
     // Audit the privileged action (B4): actor super-admin + impersonated target + org.
     try {
-      await this._auditRepository.create({
+      await this._auditService.create({
         organizationId: organization.id,
         userId: user.id,
         action: 'user.impersonate',

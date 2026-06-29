@@ -1,5 +1,6 @@
 export * from './identity';
 export * from './manifest';
+export * from './verification';
 export * from './module';
 export * from './ports';
 export * from './errors';

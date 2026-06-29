@@ -9,6 +9,10 @@ interface MockRolesService {
   getEffectivePermissions: ReturnType<typeof vi.fn>;
 }
 
+interface MockAuditService {
+  record: ReturnType<typeof vi.fn>;
+}
+
 const buildContext = (request: Record<string, unknown>): ExecutionContext =>
   ({
     getHandler: () => ({}),
@@ -21,6 +25,7 @@ const buildContext = (request: Record<string, unknown>): ExecutionContext =>
 describe('OrgRbacGuard', () => {
   let reflector: Reflector;
   let rolesService: MockRolesService;
+  let audit: MockAuditService;
   let guard: OrgRbacGuard;
   let metadata: RequirePermissionMetadata | undefined;
 
@@ -32,7 +37,8 @@ describe('OrgRbacGuard', () => {
     rolesService = {
       getEffectivePermissions: vi.fn(),
     };
-    guard = new OrgRbacGuard(reflector, rolesService as never);
+    audit = { record: vi.fn().mockResolvedValue(undefined) };
+    guard = new OrgRbacGuard(reflector, rolesService as never, audit as never);
   });
 
   it('allows routes without @RequirePermission metadata', async () => {
@@ -149,6 +155,47 @@ describe('OrgRbacGuard', () => {
   });
 
   it('403s when the role lacks the permission', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'member',
+      permissions: ['posts:read'],
+    });
+    await expect(
+      guard.canActivate(buildContext({ user: { id: 'u1' }, orgId: 'o1' }))
+    ).rejects.toThrow('Insufficient permissions');
+  });
+
+  // F2(a): an insufficient-permission 403 must emit a non-fatal `rbac.denied` audit
+  // event carrying the attempted (resource, action) and no secret.
+  it('records a rbac.denied audit event on insufficient permissions', async () => {
+    metadata = { resource: 'posts', action: 'create' };
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'member',
+      permissions: ['posts:read'],
+    });
+    await expect(
+      guard.canActivate(buildContext({ user: { id: 'u1' }, orgId: 'o1' }))
+    ).rejects.toThrow('Insufficient permissions');
+
+    expect(audit.record).toHaveBeenCalledTimes(1);
+    const arg = audit.record.mock.calls[0][0];
+    expect(arg.action).toBe('rbac.denied');
+    expect(arg.resource).toBe('posts:create');
+    expect(arg.orgId).toBe('o1');
+    expect(arg.userId).toBe('u1');
+    expect(JSON.stringify(arg)).not.toMatch(/secret|password|token/i);
+  });
+
+  it('does not record an audit event when permission is granted', async () => {
+    rolesService.getEffectivePermissions.mockResolvedValue({
+      role: 'admin',
+      permissions: ['settings:read'],
+    });
+    await guard.canActivate(buildContext({ user: { id: 'u1' }, orgId: 'o1' }));
+    expect(audit.record).not.toHaveBeenCalled();
+  });
+
+  it('stays non-fatal if the audit write rejects', async () => {
+    audit.record.mockRejectedValue(new Error('audit down'));
     rolesService.getEffectivePermissions.mockResolvedValue({
       role: 'member',
       permissions: ['posts:read'],

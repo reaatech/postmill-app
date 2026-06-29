@@ -103,6 +103,8 @@ export function ProviderSettingsPanel<Meta = any>({
           capabilities: p.capabilities,
           version: p.version,
           versionStatus: p.versionStatus ?? catalogEntry?.status ?? 'active',
+          // Beta badge (workstream E24): false = built without a live key.
+          verified: catalogEntry?.verified,
           sunsetAt: p.sunsetAt ?? catalogEntry?.sunsetAt,
           meta: p,
         };

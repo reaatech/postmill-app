@@ -3,7 +3,7 @@ import { CampaignEntityType } from '@prisma/client';
 import { CampaignItemRepository } from './campaign-item.repository';
 import { CampaignItemResolverRepository } from './campaign-item.resolver';
 import { CampaignsRepository } from './campaigns.repository';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import {
   ENTITY_ENUM_TO_SLUG,
   ResolvedCampaignItem,
@@ -16,7 +16,7 @@ export class CampaignTagService {
     private _items: CampaignItemRepository,
     private _resolver: CampaignItemResolverRepository,
     private _campaigns: CampaignsRepository,
-    private _audit: AuditRepository
+    private _audit: AuditService
   ) {}
 
   private _toEnum(slug: string): CampaignEntityType {

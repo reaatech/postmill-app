@@ -109,7 +109,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
       const {
         data: { name, id, imageUrl, username },
       } = await (
-        await fetch('https://api.medium.com/v1/me', {
+        await this.fetch('https://api.medium.com/v1/me', {
           headers: {
             Authorization: `Bearer ${body.apiKey}`,
           },
@@ -133,7 +133,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   @Tool({ description: 'List of publications', dataSchema: [] })
   async publications(accessToken: string, _: any, id: string) {
     const { data } = await (
-      await fetch(`https://api.medium.com/v1/users/${id}/publications`, {
+      await this.fetch(`https://api.medium.com/v1/users/${id}/publications`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -151,7 +151,7 @@ export class MediumProvider extends SocialAbstract implements SocialProvider {
   ): Promise<PostResponse[]> {
     const { settings } = postDetails?.[0] || { settings: {} };
     const { data } = await (
-      await fetch(
+      await this.fetch(
         settings?.publication
           ? `https://api.medium.com/v1/publications/${settings?.publication}/posts`
           : `https://api.medium.com/v1/users/${id}/posts`,

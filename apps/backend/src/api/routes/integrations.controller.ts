@@ -23,7 +23,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import { SaveProviderPageDto } from '@gitroom/nestjs-libraries/dtos/integrations/provider-page.dto';
+import { ConnectProviderDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect-provider.dto';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
@@ -50,19 +50,39 @@ export class IntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService
   ) {}
 
+  // Drop the cached integrations list after a mutation that changes it.
+  private async _invalidateIntegrationsList(orgId: string) {
+    try {
+      await ioRedis.del(`integrations:list:${orgId}`);
+    } catch {
+      /* redis down — the 60s TTL still bounds staleness */
+    }
+  }
+
   @Post('/provider/:id/connect')
   @RequirePermission('channels', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
-  @UsePipes(new ValidationPipe({ whitelist: false }))
+  // The frontend spreads the OAuth-callback query params (provider-specific —
+  // `code`, `refresh`, `device_id`, …) into this body alongside the validated
+  // page-selection fields. Strip (don't reject) those extras so the global
+  // `forbidNonWhitelisted: true` pipe can't 400 a legitimate connect, while
+  // still bounding/validating the fields `saveProviderPage` actually reads.
+  @UsePipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: false }))
   async saveProviderPage(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: SaveProviderPageDto
+    @Body() body: ConnectProviderDto
   ) {
     if (!body || typeof body !== 'object' || Array.isArray(body)) {
       throw new Error('Invalid body');
     }
-    return this._integrationService.saveProviderPage(org.id, id, body);
+    const result = await this._integrationService.saveProviderPage(
+      org.id,
+      id,
+      body
+    );
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Get('/:identifier/internal-plugs')
@@ -82,11 +102,13 @@ export class IntegrationsController {
     @Param('id') id: string,
     @Body() body: { group: string }
   ) {
-    return this._integrationService.updateIntegrationGroup(
+    const result = await this._integrationService.updateIntegrationGroup(
       org.id,
       id,
       body.group
     );
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Put('/:id/customer-name')
@@ -96,12 +118,30 @@ export class IntegrationsController {
     @Param('id') id: string,
     @Body() body: { name: string }
   ) {
-    return this._integrationService.updateOnCustomerName(org.id, id, body.name);
+    const result = await this._integrationService.updateOnCustomerName(
+      org.id,
+      id,
+      body.name
+    );
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Get('/list')
   async getIntegrationList(@GetOrgFromRequest() org: Organization) {
-    return {
+    // Hit on every composer/calendar render — cache for 60s (non-blocking
+    // ioRedis get/set EX, never blocking commands; mutations below del the key).
+    const cacheKey = `integrations:list:${org.id}`;
+    try {
+      const cached = await ioRedis.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      /* cache miss / redis down — fall through to recompute */
+    }
+
+    const result = {
       integrations: (await Promise.all(
         (
           await this._integrationService.getIntegrationsList(org.id)
@@ -142,6 +182,14 @@ export class IntegrationsController {
         })
       )).filter(Boolean),
     };
+
+    try {
+      await ioRedis.set(cacheKey, JSON.stringify(result), 'EX', 60);
+    } catch {
+      /* redis down — serve uncached */
+    }
+
+    return result;
   }
 
   @Post('/:id/settings')
@@ -156,6 +204,7 @@ export class IntegrationsController {
     }
 
     await this._integrationService.updateProviderSettings(org.id, id, body);
+    await this._invalidateIntegrationsList(org.id);
   }
   @Post('/:id/nickname')
   @RequirePermission('channels', 'update')
@@ -195,7 +244,13 @@ export class IntegrationsController {
         )
       : { name: '' };
 
-    return this._integrationService.updateNameAndUrl(id, name, url);
+    const result = await this._integrationService.updateNameAndUrl(
+      id,
+      name,
+      url
+    );
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Get('/social/:integration')
@@ -407,25 +462,29 @@ export class IntegrationsController {
 
   @Post('/disable')
   @RequirePermission('channels', 'update')
-  disableChannel(
+  async disableChannel(
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
   ) {
-    return this._integrationService.disableChannel(org.id, id);
+    const result = await this._integrationService.disableChannel(org.id, id);
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Post('/enable')
   @RequirePermission('channels', 'update')
-  enableChannel(
+  async enableChannel(
     @GetOrgFromRequest() org: Organization,
     @Body('id') id: string
   ) {
-    return this._integrationService.enableChannel(
+    const result = await this._integrationService.enableChannel(
       org.id,
       // @ts-ignore
       org?.subscription?.totalChannels || pricing.FREE.channel,
       id
     );
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Delete('/')
@@ -444,7 +503,9 @@ export class IntegrationsController {
       }
     }
 
-    return this._integrationService.deleteChannel(org.id, id);
+    const result = await this._integrationService.deleteChannel(org.id, id);
+    await this._invalidateIntegrationsList(org.id);
+    return result;
   }
 
   @Get('/plug/list')

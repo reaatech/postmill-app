@@ -6,7 +6,7 @@ import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/p
 import { MediaArtifactMetadata } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-token';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
@@ -73,7 +73,7 @@ export class MediaJobLifecycleService {
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
     private _resolution: ProviderResolutionService,
     private _storageService: StorageService,
-    private _fileRepository: FileRepository,
+    private _fileService: FileService,
     private _notificationService: NotificationService,
   ) {}
 
@@ -277,7 +277,7 @@ export class MediaJobLifecycleService {
       });
 
       if (thumbnailPath) {
-        await this._fileRepository.saveMediaInformation(job.organizationId, {
+        await this._fileService.saveMediaInformation(job.organizationId, {
           id: stored.mediaId,
           thumbnail: thumbnailPath,
           alt: '',
@@ -486,7 +486,7 @@ export class MediaJobLifecycleService {
         : null);
 
     const ext = MIME_EXT[params.mime] || 'bin';
-    const media = await this._fileRepository.saveGeneratedMedia(params.organizationId, {
+    const media = await this._fileService.saveGeneratedMedia(params.organizationId, {
       name: `${params.baseName}.${ext}`,
       path,
       type: OPERATION_MEDIA_TYPE[params.operation] || 'other',

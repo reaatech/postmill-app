@@ -6,7 +6,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
-import { ProviderKernel, ProviderDomain } from '@gitroom/provider-kernel';
+import {
+  ProviderKernel,
+  ProviderDomain,
+  isProviderVerified,
+} from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import {
@@ -50,6 +54,8 @@ export class ProvidersController {
       version: m.version,
       displayName: m.displayName,
       status: m.status,
+      // Live-key verification: false = "built without a live key" (Beta badge).
+      verified: isProviderVerified(m.domain, m.providerId),
       capabilities: m.capabilities,
       authType: m.authType,
       defaultDomain: m.defaultDomain,

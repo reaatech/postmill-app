@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 /**
  * DeletionService (ENHANCEMENTS_2 I1) — GDPR erasure of an organization or a user
@@ -33,7 +33,7 @@ export class DeletionService {
 
   constructor(
     private readonly _prisma: PrismaService,
-    private readonly _audit: AuditRepository
+    private readonly _audit: AuditService
   ) {}
 
   /**

@@ -4,7 +4,7 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel } from '@gitroom/provider-kernel';
-import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 
@@ -50,9 +50,11 @@ export class OrgMediaProviderSettingsService {
     private _repository: OrgMediaProviderSettingsRepository,
     private _encryption: EncryptionService,
     private _resolution: ProviderResolutionService,
-    private _fileRepository: FileRepository,
+    private _fileService: FileService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
+    // layering: sanctioned leaf-read of OrgAiSettingsRepository (OrgAiSettingsService
+    // imports ProviderCredentialLinkService from media-providers → routing up would cycle)
     @Optional() private _orgAiRepository?: OrgAiSettingsRepository,
   ) {}
 
@@ -316,13 +318,13 @@ export class OrgMediaProviderSettingsService {
   // Ensure the provider root's typed 5-folder tree (§11.5). Public so the async-job
   // completion path can lazily (re)create it before landing an artifact.
   async ensureStandardFolders(orgId: string, rootFolderId: string) {
-    const existing = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
+    const existing = await this._fileService.findFoldersByParent(orgId, rootFolderId);
     const existingNames = new Set(existing.map((f) => f.name.toLowerCase()));
 
     for (const folderName of STANDARD_FOLDERS) {
       if (!existingNames.has(folderName)) {
         try {
-          await this._fileRepository.createFolder(orgId, {
+          await this._fileService.createFolder(orgId, {
             name: folderName,
             parentId: rootFolderId,
           });
@@ -337,7 +339,7 @@ export class OrgMediaProviderSettingsService {
   async getStandardFolderId(orgId: string, rootFolderId: string, folderName: string): Promise<string | null> {
     if (!STANDARD_FOLDERS.includes(folderName)) return null;
     await this.ensureStandardFolders(orgId, rootFolderId);
-    const folders = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
+    const folders = await this._fileService.findFoldersByParent(orgId, rootFolderId);
     const match = folders.find((f) => f.name.toLowerCase() === folderName);
     return match?.id ?? null;
   }

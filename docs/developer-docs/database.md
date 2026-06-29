@@ -1,7 +1,9 @@
 # Database
 
-Postmill uses PostgreSQL with Prisma 6.5.0 as the ORM. The schema is the single source of truth —
-there are **no SQL migration files**.
+Postmill uses PostgreSQL with Prisma 6.5.0 as the ORM. The schema (`schema.prisma`) is authored in
+Prisma, and changes are applied through **committed SQL migrations** (`prisma migrate`). A baseline
+migration (`migrations/0_init`) captures the full pre-migrate schema; every later change ships its
+own reviewable migration directory.
 
 ---
 
@@ -15,14 +17,26 @@ libraries/nestjs-libraries/src/database/prisma/schema.prisma
 
 ## Schema Application
 
-Schema changes are applied with:
+Schema changes are applied through **committed migrations**:
 
 ```bash
-pnpm run prisma-db-push
+# Author a migration from a schema edit (creates migrations/<timestamp>_<name>/migration.sql)
+pnpm run prisma-migrate-dev
+
+# Apply committed migrations to a target DB (CI, boot, production)
+pnpm run prisma-migrate-deploy
 ```
 
-This runs `prisma db push --accept-data-loss`. Because the push can force destructive diffs
-against the live production DB, every schema change must be reviewed for safety.
+`migrate deploy` is the canonical apply path — it runs the committed `migrations/` in order and is
+what CI, the backend boot (`pm2-run`), and production use. It is **forward-only**; to undo an applied
+migration you author a new contract/down migration (see
+[Schema rollback](../operations-guide/schema-rollback.md)).
+
+`prisma db push --accept-data-loss` (`pnpm run prisma-db-push`) is now for **local prototyping / a
+quick reset only** — it diffs the schema straight onto a scratch DB without producing a migration, so
+it must **never** be the apply path for a shared/production database. `pnpm run prisma-reset`
+force-resets a local DB the same way. Anything you intend to ship must be captured as a migration via
+`prisma-migrate-dev`.
 
 After editing the schema, always regenerate the Prisma client:
 
@@ -31,6 +45,27 @@ pnpm run prisma-generate
 ```
 
 This also runs automatically after `pnpm install` via a `postinstall` script.
+
+### Baselining an existing database
+
+A database that was created **before migrations existed** (any older local dev DB, or the first
+production DB stood up via `db push`) already has every table from `migrations/0_init`. A bare
+`migrate deploy` against it aborts with **P3005 "database schema is not empty"**.
+
+**You normally don't need to do anything** — the canonical apply path used by `pm2-run` and CI is
+`pnpm run prisma-migrate-deploy-safe` (`scripts/migrate-deploy-safe.mjs`), which detects P3005,
+auto-baselines `0_init` as already-applied, and re-deploys. It is idempotent and a no-op on a
+fresh/already-baselined DB.
+
+To baseline manually (e.g. before switching a long-lived DB over by hand):
+
+```bash
+pnpm run prisma-migrate-resolve --applied 0_init   # marks 0_init as already-applied
+```
+
+Run this **once** per such database, then `pnpm run prisma-migrate-deploy` applies only the migrations
+authored after the baseline. A fresh/empty DB needs no baseline — `migrate deploy` runs `0_init`
+itself.
 
 ---
 
@@ -52,47 +87,60 @@ This also runs automatically after `pnpm install` via a `postinstall` script.
 
 ## Schema-Change Workflow
 
-Because `db push` applies the diff with `--accept-data-loss` and there are no reviewable SQL
-migration files, every schema edit is run through a **reviewable diff + destructive guard** before it
-is pushed:
+Every schema edit is captured as a **committed migration** and run through a **reviewable diff +
+destructive guard**:
 
 ```bash
 # 1. Edit the schema
 $EDITOR libraries/nestjs-libraries/src/database/prisma/schema.prisma
 
-# 2. Generate the exact forward SQL the push will run, and commit it for review.
+# 2. Author the migration. Creates migrations/<timestamp>_<name>/migration.sql, applies it to
+#    your local DB, and regenerates the client. Commit the new migration directory.
+pnpm run prisma-migrate-dev
+
+# 3. (Review aid) Generate the exact forward SQL for the destructive guard, and commit it.
 #    (Requires DATABASE_URL pointing at a DB that reflects the current/pre-change state.)
 pnpm run prisma-schema-diff > dev/schema-changes/<short-description>.sql
 
-# 3. Guard the diff — blocks DROP TABLE / DROP COLUMN / DROP CONSTRAINT and
+# 4. Guard the diff — blocks DROP TABLE / DROP COLUMN / DROP CONSTRAINT and
 #    ADD COLUMN ... NOT NULL without DEFAULT.
 pnpm run prisma-schema-check --file dev/schema-changes/<short-description>.sql
 
-# 4. Apply locally + regenerate the client.
-pnpm run prisma-db-push
-pnpm run prisma-generate
+# 5. Apply on shared/production DBs via the committed migrations.
+pnpm run prisma-migrate-deploy
 ```
 
+- **`prisma-migrate-dev`** authors and applies the migration locally; the committed migration is the
+  source of truth for what every other environment applies via `prisma-migrate-deploy`.
 - **`prisma-schema-diff`** = `prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel
-  <schema> --script` — the forward SQL only (no rollback).
+  <schema> --script` — the forward SQL only (no rollback); used to feed the destructive guard.
 - **`prisma-schema-check`** runs `scripts/schema-destructive-guard.mjs` (Node, no deps). It reads SQL
   from `--file <path>` (or stdin) and **exits 1** if it finds `DROP TABLE`/`DROP COLUMN`/`DROP
   CONSTRAINT` or `ADD COLUMN ... NOT NULL` without a `DEFAULT`.
 - **Destructive changes** (drops, in-place renames, a new required column) must follow an
   **expand/contract** plan — add the new shape, backfill, switch reads/writes, then drop the old
-  shape in a follow-up — and the guard must be explicitly overridden with
+  shape in a follow-up migration — and the guard must be explicitly overridden with
   `ALLOW_DESTRUCTIVE_SCHEMA=true` to acknowledge the data-loss risk:
 
   ```bash
   ALLOW_DESTRUCTIVE_SCHEMA=true pnpm run prisma-schema-check --file dev/schema-changes/<drop>.sql
   ```
 
+  The full forward-only [Schema rollback](../operations-guide/schema-rollback.md) playbook covers the
+  expand → migrate → contract sequence and how to recover a half-applied migration.
+
 ### CI enforcement
 
-`.github/workflows/test.yml` re-runs the guard on every PR: after the **Schema drift check** it diffs
-the PR schema against `origin/main`'s schema and runs `schema-destructive-guard.mjs --file` on the
-result, so a destructive schema change cannot merge unreviewed. The guard is also wired to fail
-without the `ALLOW_DESTRUCTIVE_SCHEMA` override in CI.
+`.github/workflows/test.yml` enforces two gates on every PR:
+
+1. **Migration drift check** — applies the committed migrations to an empty CI Postgres with
+   `prisma-migrate-deploy`, then runs `prisma migrate diff --from-url "$DATABASE_URL"
+   --to-schema-datamodel <schema> --exit-code`. It exits 0 only when the deployed migrations fully
+   represent the schema; a schema edit committed **without** a matching migration makes it exit 2 and
+   fails the job.
+2. **Destructive schema guard** — diffs the PR schema against `origin/main`'s schema and runs
+   `schema-destructive-guard.mjs --file` on the result, so a destructive change cannot merge without
+   the `ALLOW_DESTRUCTIVE_SCHEMA` override.
 
 > **Destructive pushes are exceptional.** v3.8.10 executed a single reviewed destructive push
 > (dropping the dead marketplace/stars models, the legacy `UserOrganization.role` enum column, the
@@ -240,4 +288,4 @@ A reasonable start for a small/medium deployment: `DATABASE_CONNECTION_LIMIT=10`
 pgBouncer pool) has room across **all** backend replicas plus the Inngest worker. When fronted by
 pgBouncer in transaction mode, set a low per-process limit and let the bouncer pool.
 
-> Verified against v3.8.11
+> Verified against v3.8.12

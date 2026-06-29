@@ -26,7 +26,7 @@ import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 dayjs.extend(utc);
 
@@ -42,7 +42,7 @@ export class IntegrationService {
     @Inject(forwardRef(() => RefreshIntegrationService))
     private _refreshIntegrationService: RefreshIntegrationService,
     private _storageService: StorageService,
-    private _auditRepository: AuditRepository
+    private _auditService: AuditService
   ) {}
 
   // Best-effort audit (B4): a logging failure must never break the channel action.
@@ -55,7 +55,7 @@ export class IntegrationService {
     details?: string;
   }) {
     try {
-      await this._auditRepository.create(entry);
+      await this._auditService.create(entry);
     } catch (err) {
       this._logger.warn(
         `Failed to audit ${entry.action}: ${(err as any)?.message}`

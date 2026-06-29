@@ -56,11 +56,19 @@ const runStyleToCss = (run: TextRun, el: DesignerElement): React.CSSProperties =
   return css;
 };
 
-const runsToHtml = (runs: TextRun[], el: DesignerElement): string => {
+const escapeHtml = (s: string): string =>
+  s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+export const runsToHtml = (runs: TextRun[], el: DesignerElement): string => {
   if (!runs.length) return '';
   return runs
     .map((run) => {
-      const text = (run.text || '').replace(/\n/g, '<br>');
+      const text = escapeHtml(run.text || '').replace(/\n/g, '<br>');
       const css = runStyleToCss(run, el);
       const style = Object.entries(css)
         .map(([k, v]) => `${k}:${v}`)

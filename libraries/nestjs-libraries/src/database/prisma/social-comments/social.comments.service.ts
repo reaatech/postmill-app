@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { SocialCommentsRepository } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.repository';
-import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -37,7 +37,7 @@ export interface InboxFilterOptions {
 export class SocialCommentsService {
   constructor(
     private _socialCommentsRepository: SocialCommentsRepository,
-    private _postsRepository: PostsRepository,
+    private _postsService: PostsService,
     private _integrationManager: IntegrationManager,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _integrationService: IntegrationService,
@@ -65,7 +65,7 @@ export class SocialCommentsService {
   }
 
   async getComments(orgId: string, userId: string, postId: string, cursor?: string) {
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post) throw new BadRequestException('Post not found');
     if (!post.releaseId || post.releaseId === 'missing') {
       return { comments: [], nextCursor: undefined, unreadCount: 0 };
@@ -88,7 +88,7 @@ export class SocialCommentsService {
       throw new BadRequestException('Comment not found');
     }
 
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');
     }
@@ -160,7 +160,7 @@ export class SocialCommentsService {
       throw new BadRequestException('Comment not found');
     }
 
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');
     }
@@ -216,7 +216,7 @@ export class SocialCommentsService {
   }
 
   async markAsRead(orgId: string, userId: string, postId: string) {
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post) {
       throw new BadRequestException('Post not found');
     }
@@ -225,7 +225,7 @@ export class SocialCommentsService {
   }
 
   async getUnreadCount(orgId: string, userId: string, postId: string) {
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post) {
       throw new BadRequestException('Post not found');
     }
@@ -246,7 +246,7 @@ export class SocialCommentsService {
       throw new BadRequestException('Invalid comment status');
     }
 
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post) throw new BadRequestException('Post not found');
 
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
@@ -264,7 +264,7 @@ export class SocialCommentsService {
     commentId: string,
     assigneeId: string | null,
   ) {
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post) throw new BadRequestException('Post not found');
 
     const comment = await this._socialCommentsRepository.getCommentById(commentId);
@@ -405,7 +405,7 @@ export class SocialCommentsService {
     }
 
     const count = await this._socialCommentsRepository.countComments(post.id);
-    await this._postsRepository.updateCommentCount(post.id, count);
+    await this._postsService.updateCommentCount(post.id, count);
   }
 
   async syncInbox(orgId: string): Promise<{ synced: boolean; timestamp: string }> {
@@ -496,7 +496,7 @@ export class SocialCommentsService {
   }
 
   async replyToPost(orgId: string, userId: string, postId: string, message: string, retried = false): Promise<SocialCommentDTO> {
-    const post = await this._postsRepository.getPostById(postId, orgId);
+    const post = await this._postsService.getPostById(postId, orgId);
     if (!post || !post.releaseId || post.releaseId === 'missing') {
       throw new BadRequestException('Post not found or missing release ID');
     }

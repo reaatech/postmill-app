@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 /**
  * DataExportService (ENHANCEMENTS_2 I2) — GDPR data-access export.
@@ -19,7 +19,7 @@ export class DataExportService {
 
   constructor(
     private readonly _prisma: PrismaService,
-    private readonly _audit: AuditRepository
+    private readonly _audit: AuditService
   ) {}
 
   /**

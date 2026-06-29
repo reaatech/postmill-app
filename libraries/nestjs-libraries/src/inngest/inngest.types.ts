@@ -67,6 +67,11 @@ export type InngestEvents = {
       daysBack: number;
     };
   };
+  'analytics/sync-org': {
+    data: {
+      organizationId: string;
+    };
+  };
   'media/render': {
     data: {
       jobId: string;

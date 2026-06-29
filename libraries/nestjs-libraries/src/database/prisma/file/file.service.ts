@@ -56,6 +56,20 @@ export class FileService {
     return this._fileRepository.saveMediaInformation(org, data);
   }
 
+  saveGeneratedMedia(
+    org: string,
+    data: {
+      name: string;
+      path: string;
+      type: string;
+      folderId?: string | null;
+      fileSize?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    return this._fileRepository.saveGeneratedMedia(org, data);
+  }
+
   // ── Folder Operations ────────────────────────────────────────
 
   async createFolder(org: string, data: {
@@ -107,6 +121,10 @@ export class FileService {
 
   async getFolderTree(org: string) {
     return this._fileRepository.getFolderTree(org);
+  }
+
+  findFoldersByParent(org: string, parentId: string) {
+    return this._fileRepository.findFoldersByParent(org, parentId);
   }
 
   // ── File Operations ────────────────────────────────────

@@ -177,15 +177,31 @@ Modules per domain: ai=25, auth=6, contentpack=4, email=7, media=35, shortlink=1
 | vyprvpn | vpn | vyprvpn | v1 | active | yes |
 | windscribe | vpn | windscribe | v1 | active | yes |
 
-## B4 backlog — adapters built without a live key, still unverified
+## B4 backlog — adapters built without a live key
 
-The following high-risk adapters were verified by B4 recorded-fixture integration specs (request-shape + poll-parse):
+**Two distinct notions of "verified" — do not conflate them:**
 
-- `wan`, `higgsfield`, `ltx`, `reelfarm`, `genviral`, `openai` (Sora media path), `google-ai`, `leonardo`
+- **Request-shape int-spec coverage (this section):** a recorded-fixture `*.int-spec.ts` asserts the
+  submit URL/method/headers/body + the completion/poll parse against a canned response (no network).
+  This is a *regression guard* for the shape the adapter builds.
+- **Live-key `verified` (catalog field / "Beta" badge):** the `verified` flag on
+  `GET /providers/catalog` (from `kernel/src/verification.ts` `BETA_PROVIDER_KEYS`) means the shape was
+  **validated against a real API key**. The whole "built without a live key" cohort below is still
+  `verified: false` and surfaces a **Beta** badge in Settings → Media — *even now that they have
+  request-shape int-specs*. An int-spec proves the shape is stable, **not** that it matches the live
+  endpoint; only a live smoke test flips `verified` to true.
 
-Remaining "built without a live key" adapters from AGENTS.md that still lack integration-level (request/response) verification and are tracked as backlog:
+The following "built without a live key" adapters now have B4 recorded-fixture integration specs
+(request-shape + poll-parse / search + resolveDownload). They remain `verified: false` (Beta) until
+live-smoke-tested:
 
-- Media: `recraft`, `ideogram`, `vertex` (Veo/Imagen), `qwen` (DashScope), `did`, `hedra`, `tavus`, `fal` (Pika), the AI-hub media adapters (`togetherai`, `siliconflow`, `groq`, `openrouter`, `fireworks`, `deepinfra`, `gateway`, `bedrock`, `azure`)
+- Media (own-key studios): `wan`, `higgsfield`, `ltx`, `reelfarm`, `genviral`, `openai` (Sora media
+  path), `google-ai`, `leonardo`, `recraft`, `ideogram`, `vertex` (Veo/Imagen), `qwen` (DashScope),
+  `did`, `hedra`, `tavus`, `fal` (Pika)
+- Media (AI-hub aggregators): `togetherai`, `siliconflow`, `groq`, `openrouter`, `fireworks`,
+  `deepinfra`, `gateway`, `bedrock`, `azure`
 - Content packs: `vecteezy`, `envato`, `adobe-stock`, `magnific`
 
-These have manifest + required-method conformance coverage (B2/B3) but not behavioural request-shape coverage.
+No "built without a live key" adapters remain without behavioural request-shape coverage. Each spec
+carries `// UNVERIFIED vs live key:` comments at the points a real key is most likely to disagree
+(see e.g. the three content-pack `contentpack.int-spec.ts` files).

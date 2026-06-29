@@ -97,6 +97,7 @@ import { CampaignReportService } from '@gitroom/nestjs-libraries/database/prisma
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { ApiKeysRepository } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.repository';
 import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
 import { EmailLogRepository } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.repository';
@@ -199,6 +200,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     OrgProviderConfigRepository,
     OrgProviderConfigManager,
     AuditRepository,
+    AuditService,
     ApiKeysRepository,
     ApiKeysService,
     EmailLogRepository,

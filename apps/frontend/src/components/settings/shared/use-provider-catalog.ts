@@ -22,6 +22,8 @@ export interface ProviderCatalogEntry {
   version: string;
   displayName: string;
   status: ProviderVersionStatus;
+  /** Live-key verification: false = built without a live key (Beta badge). */
+  verified?: boolean;
   capabilities?: unknown;
   authType?: string;
   defaultDomain?: string;

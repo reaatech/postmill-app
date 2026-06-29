@@ -1,7 +1,7 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { StorageProviderType } from '@prisma/client';
 import { StorageRepository } from './storage.repository';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
@@ -30,7 +30,7 @@ export class StorageService {
 
   constructor(
     private _storageRepository: StorageRepository,
-    private _auditRepository: AuditRepository,
+    private _auditService: AuditService,
     private _encryptionService: EncryptionService,
     private _resolution: ProviderResolutionService
   ) {}
@@ -49,7 +49,7 @@ export class StorageService {
     userId?: string
   ) {
     // Persist to DB: no secrets in details (#59, DB-backed audit)
-    await this._auditRepository.create({
+    await this._auditService.create({
       organizationId: orgId,
       userId,
       action: `storage.${action}`,

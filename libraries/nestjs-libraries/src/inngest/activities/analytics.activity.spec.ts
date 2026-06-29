@@ -672,7 +672,9 @@ describe('AnalyticsActivity', () => {
 
       expect(analyticsRepository.findPostsForSnapshots).toHaveBeenCalledWith(
         orgId,
-        expect.any(Date)
+        expect.any(Date),
+        expect.any(Number),
+        undefined
       );
     });
 

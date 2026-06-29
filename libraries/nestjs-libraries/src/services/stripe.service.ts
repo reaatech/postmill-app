@@ -13,6 +13,7 @@ import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/us
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
 import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
@@ -28,10 +29,30 @@ export class StripeService {
     private _userService: UsersService,
     private _trackService: TrackService,
     private _stripeEventRepository: StripeEventRepository,
-    private _notificationService: NotificationService
+    private _notificationService: NotificationService,
+    private _audit: AuditService
   ) {}
   validateRequest(rawBody: Buffer, signature: string, endpointSecret: string) {
     return stripe.webhooks.constructEvent(rawBody, signature, endpointSecret);
+  }
+
+  // F2(b): record a subscription state transition as a non-fatal audit event. Resolves
+  // the org from the Stripe customer id; metadata carries only the new status (no secret).
+  private async _auditSubscriptionChanged(customerId: string, status: string) {
+    try {
+      const org = await this._organizationService.getOrgByCustomerId(customerId);
+      if (!org?.id) {
+        return;
+      }
+      await this._audit.record({
+        orgId: org.id,
+        action: 'billing.subscription.changed',
+        resource: 'subscription',
+        metadata: { status },
+      });
+    } catch {
+      /* non-fatal: auditing must never break webhook processing */
+    }
   }
 
   async checkValidCard(
@@ -124,6 +145,11 @@ export class StripeService {
       return { ok: false };
     }
 
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      event.data.object.status
+    );
+
     return this._subscriptionService.createOrUpdateSubscription(
       event.data.object.status !== 'active',
       uniqueId,
@@ -200,6 +226,11 @@ export class StripeService {
       return { ok: false };
     }
 
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      event.data.object.status
+    );
+
     return this._subscriptionService.createOrUpdateSubscription(
       event.data.object.status !== 'active',
       uniqueId,
@@ -214,6 +245,10 @@ export class StripeService {
   async deleteSubscription(event: Stripe.CustomerSubscriptionDeletedEvent) {
     await this._subscriptionService.deleteSubscription(
       event.data.object.customer as string
+    );
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      'deleted'
     );
   }
 

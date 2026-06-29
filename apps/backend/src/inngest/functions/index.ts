@@ -9,7 +9,10 @@ import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/dig
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
 import { RetentionActivity } from '@gitroom/nestjs-libraries/inngest/activities/retention.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
-import { createAnalyticsCollection } from './analytics-collection';
+import {
+  createAnalyticsCollection,
+  createAnalyticsSyncOrg,
+} from './analytics-collection';
 import { createCommentsCollection, createCommentsSyncOrg } from './comments-collection';
 import { createMissingPostFinder } from './missing-post-finder';
 import { createMediaJobsPoll } from './media-jobs-poll';
@@ -41,6 +44,7 @@ export interface InngestActivities {
 
 export const createFunctions = (activities: InngestActivities) => [
   createAnalyticsCollection(activities.analyticsActivity, activities.inngestRunRepository),
+  createAnalyticsSyncOrg(activities.analyticsActivity),
   createCommentsCollection(activities.commentsActivity, activities.inngestRunRepository),
   createCommentsSyncOrg(activities.commentsActivity),
   createMissingPostFinder(activities.postActivity, activities.inngestRunRepository),

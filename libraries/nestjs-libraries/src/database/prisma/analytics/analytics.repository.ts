@@ -318,7 +318,12 @@ export class AnalyticsRepository {
     });
   }
 
-  findPostsForSnapshots(orgId: string, since: Date) {
+  findPostsForSnapshots(
+    orgId: string,
+    since: Date,
+    take = 500,
+    cursor?: string,
+  ) {
     return this._post.model.post.findMany({
       where: {
         organizationId: orgId,
@@ -326,6 +331,9 @@ export class AnalyticsRepository {
         publishDate: { gte: since },
       },
       include: { integration: true },
+      orderBy: { id: 'asc' },
+      take,
+      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
   }
 

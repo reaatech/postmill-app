@@ -13,6 +13,17 @@ export function initializeOtel(): void {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
   if (!endpoint || process.env.DEV_DISABLE_OPENTELEMETRY) {
+    // F3: make the production blind spot loud — tracing is off and no exporter is
+    // configured, but the operator hasn't explicitly opted out. Dev stays silent.
+    if (
+      process.env.NODE_ENV === 'production' &&
+      !endpoint &&
+      !process.env.DEV_DISABLE_OPENTELEMETRY
+    ) {
+      new Logger('OpenTelemetry').warn(
+        'Production tracing disabled — set OTEL_EXPORTER_OTLP_ENDPOINT'
+      );
+    }
     return;
   }
 

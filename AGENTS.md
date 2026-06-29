@@ -165,6 +165,15 @@ Controller → Manager → Service → Repository   (when a manager is involved)
 - **Sanctioned exception:** seeders/migration steps under `database/seeds/**` — notably
   `BackfillService` and `RbacSeeder` — intentionally use `PrismaService` + `$transaction` directly
   (cross-table backfills/seeds), and are exempt from the repository-only rule by design.
+- **Sanctioned exception (cross-domain leaf-reads):** a service may read another domain's
+  **repository** directly where the owning service depends back on the caller, so routing "up"
+  through the service would create a Nest DI cycle. These are deliberate, behaviour-neutral
+  leaf-reads — keep them and do **not** "fix" them into a service call: `PostsService` →
+  `AnalyticsRepository` / `CampaignsRepository` (the analytics/campaigns services depend on
+  `PostsService`), and `OrgMediaProviderSettingsService` → `@Optional() OrgAiSettingsRepository` (the
+  Qwen/Google universal-credential read; `OrgAiSettingsService` depends on this package's
+  `ProviderCredentialLinkService`). Each carries a `// layering: sanctioned leaf-read` comment at the
+  call site.
 
 ## Frontend conventions (Next.js App Router)
 
@@ -239,18 +248,31 @@ All `--color-custom*` variables are **deprecated** — do not use them.
 
 ## Database
 
-The single schema is `libraries/nestjs-libraries/src/database/prisma/schema.prisma`, applied with
-**`prisma db push --accept-data-loss`** — there are **no SQL migration files**, and the schema is the
-source of truth. Because pushes can force destructive diffs against the live production DB:
+The schema is authored in `libraries/nestjs-libraries/src/database/prisma/schema.prisma`, and changes
+are applied through **committed Prisma migrations** (`migrations/` next to the schema, starting from
+the `0_init` baseline). The canonical apply path is **`prisma migrate deploy`** — what CI, the backend
+boot (`pm2-run`), and production use; `db push` is **local-prototyping/reset only** (a quick scratch
+diff that produces no migration — never the apply path for a shared/production DB). Because migrations
+still run against the live production DB:
 
-- Add columns as **nullable or defaulted**; a new required column without a default breaks the push.
-- Renames/drops are destructive under `db push` — provide a manual backfill / expand-contract plan.
-- Run `pnpm run prisma-generate` after schema edits to keep the client in sync.
+- Add columns as **nullable or defaulted**; a new required column without a default breaks the apply.
+- Renames/drops are destructive — provide a manual backfill / expand-contract plan (contract step in a
+  later migration).
+- Run `pnpm run prisma-generate` after schema edits to keep the client in sync (`migrate dev` does
+  this for you).
 
-**Schema-change workflow:** edit schema → `pnpm run prisma-schema-diff` (commit the SQL under
-`dev/schema-changes/`) → `pnpm run prisma-schema-check` (destructive guard) → `pnpm run prisma-db-push`.
-Destructive changes (`DROP`, in-place rename, new required column) need an expand/contract plan and an
-explicit `ALLOW_DESTRUCTIVE_SCHEMA=true` to pass the guard; CI re-runs the guard against `origin/main`.
+**Schema-change workflow:** edit schema → `pnpm run prisma-migrate-dev` (authors + commits the
+migration under `migrations/`) → `pnpm run prisma-schema-diff` (forward SQL under `dev/schema-changes/`
+for review) → `pnpm run prisma-schema-check` (destructive guard) → apply elsewhere via
+`pnpm run prisma-migrate-deploy`. Destructive changes (`DROP`, in-place rename, new required column)
+need an expand/contract plan and an explicit `ALLOW_DESTRUCTIVE_SCHEMA=true` to pass the guard.
+**CI drift gate (`test.yml`):** `migrate deploy` applies the committed migrations to an empty CI DB,
+then `prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel <schema> --exit-code` must
+exit 0 — a schema edit committed **without** a matching migration fails the job; CI also re-runs the
+destructive guard against `origin/main`. To onboard a DB created before migrations, baseline it once
+with `pnpm run prisma-migrate-resolve --applied 0_init`. Rolling back is forward-only — author a new
+contract/down migration (see `docs/operations-guide/schema-rollback.md`). For a quick local reset use
+`pnpm run prisma-db-push` / `pnpm run prisma-reset` (`db push --accept-data-loss` / `--force-reset`).
 Connection-pool size is env-tunable via `DATABASE_CONNECTION_LIMIT` / `DATABASE_POOL_TIMEOUT` (unset =
 default behaviour, byte-for-byte). Full details in `docs/developer-docs/database.md`.
 

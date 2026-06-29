@@ -1,13 +1,13 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { RolesRepository } from './roles.repository';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 @Injectable()
 export class RolesService {
   private readonly _logger = new Logger(RolesService.name);
   constructor(
     private _repository: RolesRepository,
-    private _audit: AuditRepository
+    private _audit: AuditService
   ) {}
 
   // Best-effort audit (B4): a logging failure must never break the role mutation.

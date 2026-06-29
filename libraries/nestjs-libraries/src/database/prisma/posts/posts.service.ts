@@ -15,7 +15,7 @@ import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -68,6 +68,7 @@ type PostWithConditionals = Post & {
 export class PostsService {
   constructor(
     private _postRepository: PostsRepository,
+    // layering: sanctioned leaf-read of AnalyticsRepository (AnalyticsService → PostsService, routing up would cycle)
     private _analyticsRepository: AnalyticsRepository,
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
@@ -77,8 +78,9 @@ export class PostsService {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _ragService: RagService,
     private _storageService: StorageService,
+    // layering: sanctioned leaf-read of CampaignsRepository (CampaignsService → PostsService, routing up would cycle)
     private _campaignsRepository: CampaignsRepository,
-    private _auditRepository: AuditRepository,
+    private _auditService: AuditService,
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -159,6 +161,10 @@ export class PostsService {
 
   async getPostById(postId: string, orgId: string) {
     return this._postRepository.getPostById(postId, orgId);
+  }
+
+  updateCommentCount(postId: string, count: number) {
+    return this._postRepository.updateCommentCount(postId, count);
   }
 
   async updateReleaseId(orgId: string, postId: string, releaseId: string) {
@@ -676,8 +682,12 @@ export class PostsService {
     return list;
   }
 
-  async getOldPosts(orgId: string, date: string) {
-    return this._postRepository.getOldPosts(orgId, date);
+  async getOldPosts(
+    orgId: string,
+    date: string,
+    options?: { take?: number; page?: number }
+  ) {
+    return this._postRepository.getOldPosts(orgId, date, options);
   }
 
   public async updateTags(orgId: string, post: Post[]): Promise<Post[]> {
@@ -1314,7 +1324,7 @@ export class PostsService {
 
     if (post.campaignId) {
       const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
-      await this._auditRepository.create({
+      await this._auditService.create({
         organizationId: orgId,
         userId: approvedById,
         action: 'campaign.draft.approve',
@@ -1337,7 +1347,7 @@ export class PostsService {
 
     if (post.campaignId) {
       const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
-      await this._auditRepository.create({
+      await this._auditService.create({
         organizationId: orgId,
         userId: rejectedById,
         action: 'campaign.draft.reject',
@@ -1379,7 +1389,7 @@ export class PostsService {
     const promotedCount = results.filter((r) => r.status === 'promoted').length;
     if (promotedCount > 0) {
       const campaign = await this._campaignsRepository.findById(campaignId, orgId);
-      await this._auditRepository.create({
+      await this._auditService.create({
         organizationId: orgId,
         userId: promotedById,
         action: 'campaign.promote',

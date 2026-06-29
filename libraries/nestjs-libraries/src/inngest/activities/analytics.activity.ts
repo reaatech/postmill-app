@@ -157,11 +157,25 @@ export class AnalyticsActivity {
     await this._orgProviderConfigManager.ensureFresh(orgId);
     const since = dayjs().subtract(daysBack, 'day').startOf('day').toDate();
 
-    const posts = (
-      await this._analyticsRepository.findPostsForSnapshots(orgId, since)
-    ).map(decryptPostIntegrationTokens);
+    // Keyset-paginate through eligible posts in bounded batches (ordered by id) so a busy org
+    // never loads its entire post history into memory in a single unbounded findMany.
+    const BATCH_SIZE = 500;
+    let cursor: string | undefined;
 
-    for (const post of posts) {
+    // eslint-disable-next-line no-constant-condition
+    while (true) {
+      const posts = (
+        await this._analyticsRepository.findPostsForSnapshots(
+          orgId,
+          since,
+          BATCH_SIZE,
+          cursor
+        )
+      ).map(decryptPostIntegrationTokens);
+
+      if (posts.length === 0) break;
+
+      for (const post of posts) {
       if (!post.releaseId || post.releaseId === 'missing') continue;
 
       try {
@@ -257,6 +271,10 @@ export class AnalyticsActivity {
           { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
         );
       }
+    }
+
+      cursor = posts[posts.length - 1].id;
+      if (posts.length < BATCH_SIZE) break;
     }
   }
 

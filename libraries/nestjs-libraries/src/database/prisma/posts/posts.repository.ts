@@ -99,7 +99,13 @@ export class PostsRepository {
     });
   }
 
-  getOldPosts(orgId: string, date: string) {
+  getOldPosts(
+    orgId: string,
+    date: string,
+    options?: { take?: number; page?: number }
+  ) {
+    const take = options?.take && options.take > 0 ? options.take : 100;
+    const page = options?.page && options.page > 0 ? options.page : 1;
     return this._post.model.post.findMany({
       where: {
         integration: {
@@ -117,6 +123,8 @@ export class PostsRepository {
       orderBy: {
         publishDate: 'desc',
       },
+      take,
+      skip: (page - 1) * take,
       select: {
         id: true,
         content: true,
@@ -401,6 +409,10 @@ export class PostsRepository {
     });
   }
 
+  // No pagination/cap here on purpose: the `where: { group }` already bounds this to a single
+  // group's posts, which feeds arrangePostsByGroup() to reconstruct the parent/child thread tree.
+  // A page cap would silently truncate that tree. The unbounded per-org scan that D3 bounds is
+  // getOldPosts (above), not this group-scoped read.
   getPostsByGroup(orgId: string, group: string) {
     return this._post.model.post.findMany({
       where: {

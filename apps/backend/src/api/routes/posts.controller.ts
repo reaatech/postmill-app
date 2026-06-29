@@ -152,9 +152,10 @@ export class PostsController {
   @Get('/old')
   oldPosts(
     @GetOrgFromRequest() org: Organization,
-    @Query('date') date: string
+    @Query('date') date: string,
+    @Query('page') page?: string
   ) {
-    return this._postsService.getOldPosts(org.id, date);
+    return this._postsService.getOldPosts(org.id, date, this.parsePage(page));
   }
 
   @Get('/group/:group/debug-export')
@@ -169,6 +170,17 @@ export class PostsController {
   @Get('/group/:group')
   getPostsByGroup(@GetOrgFromRequest() org: Organization, @Param('group') group: string) {
     return this._postsService.getPostsByGroup(org.id, group);
+  }
+
+  // Parse + clamp an optional `page` query param (1..1000) into the options shape getOldPosts
+  // accepts, so `/posts/old` (an unbounded per-org scan) can never be driven past a sane
+  // ceiling. Returns `undefined` when absent so the service / repository fall back to page 1
+  // with the default page size.
+  private parsePage(page?: string): { page: number } | undefined {
+    if (page === undefined) return undefined;
+    const parsed = Number.parseInt(page, 10);
+    if (Number.isNaN(parsed) || parsed < 1) return { page: 1 };
+    return { page: Math.min(parsed, 1000) };
   }
 
   @Get('/:id')

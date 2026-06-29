@@ -36,7 +36,10 @@ import { safeFetch } from '@gitroom/provider-kernel';
 
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
-    // Fetch the image from the URL
+    // Known proxy gap: module-scope helper (no `this`), so it cannot route
+    // through SocialAbstract.fetch() — this image download gets neither the
+    // ssrfSafeDispatcher nor per-channel VPN egress. Fetches a post media URL
+    // (not a provider API host). See README "Known proxy gap".
     const response = await axios.get(url, { responseType: 'arraybuffer' });
     let imageBuffer = Buffer.from(response.data);
 
@@ -80,6 +83,10 @@ async function uploadVideo(
   async function downloadVideo(
     url: string
   ): Promise<{ video: Buffer; size: number }> {
+    // Known proxy gap: VPN egress not applied (module-scope helper, no `this`).
+    // SSRF is still covered — this uses safeFetch (isSafePublicHttpsUrl +
+    // per-hop re-validation) — but the per-channel VPN dispatcher is skipped.
+    // This is a post media (video) download, not a provider API call.
     const response = await safeFetch(url);
     if (!response.ok) {
       throw new Error(`Failed to fetch video: ${response.statusText}`);
@@ -100,6 +107,10 @@ async function uploadVideo(
   uploadUrl.searchParams.append('did', agent.session!.did);
   uploadUrl.searchParams.append('name', videoPath.split('/').pop()!);
 
+  // Known proxy gap: bare fetch to the fixed provider host video.bsky.app from a
+  // module-scope helper (no `this`), so it gets neither ssrfSafeDispatcher nor
+  // per-channel VPN egress. Fixed first-party host (low SSRF risk), but the VPN
+  // selection does not apply to the Bluesky video upload. See README.
   const uploadResponse = await fetch(uploadUrl, {
     method: 'POST',
     headers: {
@@ -236,6 +247,10 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     const body = JSON.parse(Buffer.from(params.code, 'base64').toString());
 
     try {
+      // Known proxy gap: the @atproto/api BskyAgent owns its own HTTP client and
+      // cannot accept a custom undici dispatcher, so all agent traffic (login,
+      // getProfile, post, comments) bypasses both ssrfSafeDispatcher and
+      // per-channel VPN egress. Not faked. See README "Known proxy gap".
       const agent = new BskyAgent({
         service: body.service,
       });
@@ -270,6 +285,10 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
     const body = JSON.parse(
       AuthService.fixedDecryption(integration.customInstanceDetails!)
     );
+    // Known proxy gap: this is the shared chokepoint for the BskyAgent used by
+    // every posting path. @atproto/api cannot accept a custom undici dispatcher,
+    // so all of its traffic bypasses ssrfSafeDispatcher + per-channel VPN egress.
+    // Not faked. See README "Known proxy gap".
     const agent = new BskyAgent({
       service: body.service,
     });
