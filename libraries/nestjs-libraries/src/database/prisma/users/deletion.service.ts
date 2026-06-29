@@ -75,9 +75,12 @@ export class DeletionService {
    * memberships of shared orgs, remove their personal rows, then delete the user.
    */
   async deleteUser(userId: string): Promise<{ id: string }> {
-    // 1. Erase organizations this user solely owns (full teardown each).
-    const soleOwnedOrgIds = await this._soleOwnedOrgIds(userId);
-    for (const orgId of soleOwnedOrgIds) {
+    // 1. Erase only organizations where this user is the SOLE MEMBER (no co-tenants).
+    // An org where the user is the sole *owner* but other members still exist is NOT torn
+    // down — that would destroy those members' content/access. For those, step 2 just
+    // removes this user's membership (ownership reassignment is a separate product flow).
+    const soleMemberOrgIds = await this._soleMemberOrgIds(userId);
+    for (const orgId of soleMemberOrgIds) {
       await this.deleteOrganization(orgId, { userId });
     }
 
@@ -106,28 +109,25 @@ export class DeletionService {
     return { id: userId };
   }
 
-  /** Organizations where `userId` is the only member holding the owner role. */
-  private async _soleOwnedOrgIds(userId: string): Promise<string[]> {
+  /**
+   * Organizations where `userId` is the ONLY member (no other members of any role).
+   * Only these are safe to fully erase on user deletion — an org with co-tenants is left
+   * intact (the user's membership is removed separately) so we never destroy other users'
+   * data when one member deletes their account.
+   */
+  private async _soleMemberOrgIds(userId: string): Promise<string[]> {
     const memberships = await this._prisma.userOrganization.findMany({
       where: { userId },
-      select: { organizationId: true, roleRef: { select: { key: true } } },
+      select: { organizationId: true },
     });
 
-    const ownerOrgIds = memberships
-      .filter((m) => m.roleRef?.key === 'owner')
-      .map((m) => m.organizationId);
-
     const sole: string[] = [];
-    for (const orgId of ownerOrgIds) {
-      const otherOwners = await this._prisma.userOrganization.count({
-        where: {
-          organizationId: orgId,
-          userId: { not: userId },
-          roleRef: { key: 'owner' },
-        },
+    for (const { organizationId } of memberships) {
+      const otherMembers = await this._prisma.userOrganization.count({
+        where: { organizationId, userId: { not: userId } },
       });
-      if (otherOwners === 0) {
-        sole.push(orgId);
+      if (otherMembers === 0) {
+        sole.push(organizationId);
       }
     }
     return sole;

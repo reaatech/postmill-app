@@ -50,17 +50,22 @@ describe('DeletionService', () => {
     );
   });
 
-  it('deleteUser erases solely-owned orgs then deletes the user', async () => {
+  it('erases only orgs the user is the SOLE MEMBER of, leaving shared orgs intact', async () => {
     const memberships = [
-      { organizationId: 'org-solo', roleRef: { key: 'owner' } },
-      { organizationId: 'org-shared', roleRef: { key: 'member' } },
+      { organizationId: 'org-solo' },
+      { organizationId: 'org-shared' },
     ];
     const userDelete = vi.fn().mockResolvedValue({ id: 'u-1' });
 
     const prisma = {
       userOrganization: {
         findMany: vi.fn().mockResolvedValue(memberships),
-        count: vi.fn().mockResolvedValue(0), // no other owners → solo
+        // org-shared still has another member → must NOT be torn down; org-solo has none.
+        count: vi
+          .fn()
+          .mockImplementation(({ where }: any) =>
+            Promise.resolve(where?.organizationId === 'org-shared' ? 1 : 0)
+          ),
       },
       $transaction: vi.fn(async (cb: any) => {
         if (typeof cb === 'function') {

@@ -52,8 +52,13 @@ export class ConfigurationChecker {
     if (!jwt) {
       this.pushFatal('JWT_SECRET is not set — required to sign/verify auth tokens.');
     } else if (jwt.length < 32) {
-      this.pushFatal(
-        'JWT_SECRET is too short — use at least 32 characters for a secure signing key.'
+      // Non-fatal WARNING only: a short secret is weaker but functional, and existing
+      // deployments boot with it today. Making it fatal would (a) take down a healthy
+      // deployment on upgrade and (b) force lengthening JWT_SECRET, which rotates the
+      // ENCRYPTION_KEY derived from it and breaks decryption of at-rest secrets. Warn,
+      // don't kill boot.
+      this.issues.push(
+        'JWT_SECRET is shorter than 32 characters — consider a longer signing key (note: changing it rotates the derived ENCRYPTION_KEY).'
       );
     }
 
@@ -67,16 +72,19 @@ export class ConfigurationChecker {
       this.pushFatal('Neither FRONTEND_URL nor MAIN_URL is set — set the public app URL.');
     }
 
-    // Inngest keys are mandatory once we are not pointed at a local dev server.
-    if (this.get('INNGEST_DEV') !== '1') {
+    // Inngest keys are mandatory ONLY when Inngest is actually enabled (USE_INNGEST=true)
+    // AND we are not pointed at a local dev server (INNGEST_DEV=1). Deployments that don't
+    // use Inngest (USE_INNGEST unset/false) are fully supported and must still boot — gating
+    // on INNGEST_DEV alone would wrongly down every non-Inngest production deployment.
+    if (this.get('USE_INNGEST') === 'true' && this.get('INNGEST_DEV') !== '1') {
       if (!this.get('INNGEST_EVENT_KEY')) {
         this.pushFatal(
-          'INNGEST_EVENT_KEY is not set — required when INNGEST_DEV is not "1".'
+          'INNGEST_EVENT_KEY is not set — required when USE_INNGEST=true and INNGEST_DEV is not "1".'
         );
       }
       if (!this.get('INNGEST_SIGNING_KEY')) {
         this.pushFatal(
-          'INNGEST_SIGNING_KEY is not set — required when INNGEST_DEV is not "1".'
+          'INNGEST_SIGNING_KEY is not set — required when USE_INNGEST=true and INNGEST_DEV is not "1".'
         );
       }
     }

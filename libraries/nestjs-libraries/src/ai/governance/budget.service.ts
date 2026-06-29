@@ -135,16 +135,20 @@ export class BudgetService {
   private async _batchTotals(
     startOfMonth: Date,
     startOfDay: Date,
+    organizationId?: string,
   ): Promise<{ monthly: Record<string, number>; daily: Record<string, number> }> {
+    // When an org is given, scope the aggregation to that org (cheap, indexed) instead of
+    // scanning the whole ledger. Callers that need true cross-org global totals pass no org.
+    const orgFilter = organizationId ? { organizationId } : {};
     const [monthlyRows, dailyRows] = await Promise.all([
       this._spendLogRepo.model.aISpendLog.groupBy({
         by: ['organizationId', 'scope'],
-        where: { createdAt: { gte: startOfMonth } },
+        where: { ...orgFilter, createdAt: { gte: startOfMonth } },
         _sum: { costUsd: true },
       }),
       this._spendLogRepo.model.aISpendLog.groupBy({
         by: ['organizationId', 'scope'],
-        where: { createdAt: { gte: startOfDay } },
+        where: { ...orgFilter, createdAt: { gte: startOfDay } },
         _sum: { costUsd: true },
       }),
     ]);
@@ -183,14 +187,24 @@ export class BudgetService {
 
     await this._ensureAccum();
 
-    // DB-authoritative read: the persisted AISpendLog is the source of truth for the
-    // cap decision, so a stale/lost in-memory accumulator can't let an org overspend.
+    // DB-authoritative read: the persisted AISpendLog is the source of truth for the cap
+    // decision, so a stale/lost in-memory accumulator can't let spend drift under-counted.
     // The accumulator stays a fast-path floor (never under-count) via Math.max below.
+    // NOTE: this does NOT make the cap a hard transactional limit — two concurrent checks
+    // can still each pass just under the cap and both proceed (check-then-act). It closes
+    // the stale-accumulator gap, not the concurrent-overshoot one. Caps are a soft guardrail.
+    // Perf: when no GLOBAL cap is configured we only need this org's totals, so scope the
+    // aggregation to the org (indexed) rather than scanning the whole ledger per request.
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const needsGlobal = !!(caps.monthlyCap || caps.dailyCap);
     const db = this._computeMaps(
-      await this._batchTotals(startOfMonth, startOfDay)
+      await this._batchTotals(
+        startOfMonth,
+        startOfDay,
+        needsGlobal ? undefined : organizationId,
+      )
     );
 
     const globalMonthly = Math.max(this._spendAccum!.globalMonthly, db.globalMonthly);

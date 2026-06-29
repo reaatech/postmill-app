@@ -14,6 +14,7 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors/bad-body.error';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
 import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
@@ -392,7 +393,13 @@ export class PostActivity {
       );
       this._socialBreaker.recordSuccess(breakerKey);
     } catch (err) {
-      this._socialBreaker.recordFailure(breakerKey);
+      // Only count infra-class failures (timeouts, 5xx, network) toward the breaker.
+      // A BadBodyError is a permanent per-post content/4xx rejection (NonRetriableError) —
+      // it does NOT mean the provider is down, so a batch of legitimately-bad posts must
+      // not open the breaker and delay this org's good posts. Leave the breaker untouched.
+      if (!(err instanceof BadBodyError)) {
+        this._socialBreaker.recordFailure(breakerKey);
+      }
       throw err;
     }
 
