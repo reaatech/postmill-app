@@ -390,6 +390,34 @@ export class OrganizationRepository {
     return { id: user.id, email: user.email, role: appRole?.key ?? roleKey };
   }
 
+  // Tenant-guarded member profile: returns null when the user is not a member of
+  // this org (the findFirst scope is the access check), so callers cannot look up
+  // an arbitrary user across orgs.
+  async getMemberProfile(orgId: string, userId: string) {
+    return this._userOrg.model.userOrganization.findFirst({
+      where: { organizationId: orgId, userId, disabled: false },
+      select: {
+        createdAt: true,
+        roleRef: { select: { key: true, name: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                name: true,
+                lastName: true,
+                bio: true,
+                avatarUrl: true,
+                picture: { select: { path: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async getTeam(orgId: string) {
     return this._organization.model.organization.findUnique({
       where: {

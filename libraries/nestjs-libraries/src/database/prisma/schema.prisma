@@ -1598,6 +1598,9 @@ model Campaign {
   endDate        DateTime?
   archived       Boolean  @default(false)
   createdById    String?              // user who created the campaign
+  client         String?              // optional: which client this campaign is for
+  project        String?              // optional: which project this campaign belongs to
+  tags           Json?                // optional: string[] of free-form tags
   goals          Json?                // [{ metric, target }] targets shown vs progress on the dashboard
   shareToken     String?  @unique     // CSPRNG token for the public read-only client report link
   shareEnabled   Boolean  @default(false)

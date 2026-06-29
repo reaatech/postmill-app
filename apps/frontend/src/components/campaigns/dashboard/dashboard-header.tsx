@@ -7,6 +7,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { Button } from '@gitroom/react/form/button';
+import Link from 'next/link';
 import dayjs from 'dayjs';
 import { ChevronDownIcon } from '@gitroom/frontend/components/ui/icons';
 import { CreateEditCampaignModal } from '@gitroom/frontend/components/campaigns/index/create-edit-campaign.modal';
@@ -15,7 +16,7 @@ import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-t
 
 interface DashboardHeaderProps {
   campaign: Campaign & {
-    createdBy?: { name?: string | null; email?: string | null } | null;
+    createdBy?: { id?: string | null; name?: string | null; email?: string | null } | null;
     shareToken?: string | null;
     shareEnabled?: boolean;
   };
@@ -131,6 +132,16 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
   const exportUrl = useCallback((format: string) => `/campaigns/${campaign.id}/report?format=${format}`, [campaign.id]);
 
   const createdByName = campaign.createdBy?.name || campaign.createdBy?.email || t('unknown', 'Unknown');
+  const createdByElement = campaign.createdBy?.id ? (
+    <Link
+      href={`/profile/${campaign.createdBy.id}`}
+      className="text-btnPrimary hover:underline"
+    >
+      {createdByName}
+    </Link>
+  ) : (
+    createdByName
+  );
 
   return (
     <div className="flex flex-col gap-[16px] p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor">
@@ -155,9 +166,27 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
                 {campaign.endDate ? dayjs(campaign.endDate).format('MMM D, YYYY') : t('ongoing', 'Ongoing')}
               </span>
             )}
-            <span>{t('created_by', 'Created by')} {createdByName}</span>
+            {campaign.client && (
+              <span>{t('client', 'Client')}: {campaign.client}</span>
+            )}
+            {campaign.project && (
+              <span>{t('project', 'Project')}: {campaign.project}</span>
+            )}
+            <span>{t('created_by', 'Created by')} {createdByElement}</span>
             <span>{t('created_on', 'Created on')} {dayjs(campaign.createdAt).format('MMM D, YYYY')}</span>
           </div>
+          {!!campaign.tags?.length && (
+            <div className="flex flex-wrap items-center gap-[6px]">
+              {campaign.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[11px]"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-[8px]">

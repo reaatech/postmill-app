@@ -28,6 +28,7 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 
@@ -39,7 +40,8 @@ export class NoAuthIntegrationsController {
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _campaignTagService: CampaignTagService
   ) {}
 
   @Get('/')
@@ -266,6 +268,27 @@ export class NoAuthIntegrationsController {
       .catch((err) => {
         this._logger.warn((err as Error)?.message ?? String(err));
       });
+
+    // Campaign-scoped connect/invite: if this connection was initiated from a
+    // campaign, auto-tag the new channel onto it. Non-fatal — a tagging failure
+    // must never break the channel connect.
+    const campaignId = await ioRedis.get(`campaign:${body.state}`);
+    if (campaignId) {
+      await ioRedis.del(`campaign:${body.state}`);
+      try {
+        await this._campaignTagService.tagItem(
+          org.id,
+          campaignId,
+          undefined,
+          'channel',
+          createUpdate.id
+        );
+      } catch (err) {
+        this._logger.warn(
+          `Failed to tag channel to campaign: ${(err as Error)?.message ?? String(err)}`
+        );
+      }
+    }
 
     // Fetch pages if this is a two-step provider and not a refresh
     let pages: any[] = [];

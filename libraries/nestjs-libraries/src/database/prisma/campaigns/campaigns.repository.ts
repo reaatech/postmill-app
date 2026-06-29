@@ -56,6 +56,9 @@ export class CampaignsRepository {
     createdById?: string;
     goals?: any;
     utmEnabled?: boolean;
+    client?: string;
+    project?: string;
+    tags?: any;
   }) {
     return this._prisma.campaign.create({ data });
   }
@@ -74,9 +77,18 @@ export class CampaignsRepository {
       shareToken?: string;
       shareEnabled?: boolean;
       utmEnabled?: boolean;
+      client?: string;
+      project?: string;
+      tags?: any;
     },
   ) {
     return this._prisma.campaign.update({ where: { id, organizationId }, data });
+  }
+
+  countCreatedBy(organizationId: string, userId: string) {
+    return this._prisma.campaign.count({
+      where: { organizationId, createdById: userId, deletedAt: null },
+    });
   }
 
   softDelete(id: string, organizationId: string) {

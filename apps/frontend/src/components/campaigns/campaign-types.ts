@@ -19,6 +19,9 @@ export interface Campaign {
   endDate: string | null;
   archived: boolean;
   utmEnabled: boolean;
+  client?: string | null;
+  project?: string | null;
+  tags?: string[] | null;
   goals?: Array<{ metric: string; target: number }>;
   createdAt: string;
   _count?: { posts: number };

@@ -18,7 +18,11 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import clsx from 'clsx';
 import copy from 'copy-to-clipboard';
 import { capitalize } from 'lodash';
-export const useAddProvider = (update?: () => void, invite?: boolean) => {
+export const useAddProvider = (
+  update?: () => void,
+  invite?: boolean,
+  campaignId?: string
+) => {
   const modal = useModals();
   const fetch = useFetch();
   return useCallback(async () => {
@@ -27,10 +31,15 @@ export const useAddProvider = (update?: () => void, invite?: boolean) => {
       title: 'Add Channel',
       withCloseButton: true,
       children: (
-        <AddProviderComponent invite={!!invite} update={update} {...data} />
+        <AddProviderComponent
+          invite={!!invite}
+          update={update}
+          campaignId={campaignId}
+          {...data}
+        />
       ),
     });
-  }, [update, invite]);
+  }, [update, invite, campaignId, fetch, modal]);
 };
 export const AddProviderButton: FC<{
   update?: () => void;
@@ -148,8 +157,9 @@ export const CustomVariables: FC<{
   gotoUrl(url: string): void;
   onboarding?: boolean;
   config?: string;
+  campaign?: string;
 }> = (props) => {
-  const { close, gotoUrl, identifier, variables, onboarding, config } = props;
+  const { close, gotoUrl, identifier, variables, onboarding, config, campaign } = props;
   const fetch = useFetch();
   const modals = useModals();
   const toaster = useToaster();
@@ -191,6 +201,7 @@ export const CustomVariables: FC<{
         const query = [
           onboarding ? 'onboarding=true' : '',
           config ? `config=${config}` : '',
+          campaign ? `campaign=${campaign}` : '',
         ]
           .filter(Boolean)
           .join('&');
@@ -209,7 +220,7 @@ export const CustomVariables: FC<{
         toaster.show('Failed to connect to provider', 'warning');
       }
     },
-    [variables, onboarding, config, gotoUrl, identifier, fetch, modals, toaster]
+    [variables, onboarding, config, campaign, gotoUrl, identifier, fetch, modals, toaster]
   );
 
   const t = useT();
@@ -415,8 +426,9 @@ export const AddProviderComponent: FC<{
   update?: () => void;
   onboarding?: boolean;
   isMobile?: boolean;
+  campaignId?: string;
 }> = (props) => {
-  const { update, social, onboarding, isMobile } = props;
+  const { update, social, onboarding, isMobile, campaignId } = props;
   const t = useT();
   const { isGeneral, extensionId } = useVariables();
   const toaster = useToaster();
@@ -485,8 +497,11 @@ export const AddProviderComponent: FC<{
           configId = sets[0].id;
         }
         const configParam = configId ? `config=${configId}` : '';
+        // Campaign-scoped connect/invite: bind the campaign so the OAuth callback
+        // auto-tags the new channel onto it (covers both direct connect and invite).
+        const campaignParam = campaignId ? `campaign=${campaignId}` : '';
         const socialUrl = () => {
-          const q = [onboarding ? 'onboarding=true' : '', configParam]
+          const q = [onboarding ? 'onboarding=true' : '', configParam, campaignParam]
             .filter(Boolean)
             .join('&');
           return `/integrations/social/${identifier}${q ? `?${q}` : ''}`;
@@ -543,6 +558,7 @@ export const AddProviderComponent: FC<{
             ...(externalUrl ? [`externalUrl=${encodeURIComponent(externalUrl)}`] : []),
             onboardingParam,
             configParam,
+            campaignParam,
             isMobile
               ? `redirectUrl=${encodeURIComponent('postmill://integrations')}`
               : '',
@@ -744,6 +760,7 @@ export const AddProviderComponent: FC<{
                   variables={customFields}
                   onboarding={onboarding}
                   config={configId}
+                  campaign={campaignId}
                 />
               </div>
             ),
@@ -752,7 +769,7 @@ export const AddProviderComponent: FC<{
         }
         await gotoIntegration();
       },
-    [onboarding, t, isMobile, fetch, toaster, modal, router, extensionId, configsByIdentifier]
+    [onboarding, t, isMobile, fetch, toaster, modal, router, extensionId, configsByIdentifier, campaignId]
   );
 
   const showSetupInstructions = useCallback(

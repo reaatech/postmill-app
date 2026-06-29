@@ -23,6 +23,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 import { ApiTags } from '@nestjs/swagger';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 import { ConnectProviderDto } from '@gitroom/nestjs-libraries/dtos/integrations/connect-provider.dto';
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
@@ -47,7 +48,8 @@ export class IntegrationsController {
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _postService: PostsService,
-    private _refreshIntegrationService: RefreshIntegrationService
+    private _refreshIntegrationService: RefreshIntegrationService,
+    private _campaignsService: CampaignsService
   ) {}
 
   // Drop the cached integrations list after a mutation that changes it.
@@ -262,6 +264,7 @@ export class IntegrationsController {
     @Query('redirectUrl') redirectUrl: string,
     @Query('onboarding') onboarding: string,
     @Query('config') config: string,
+    @Query('campaign') campaign: string,
     @GetOrgFromRequest() org: Organization
   ) {
     if (
@@ -308,6 +311,15 @@ export class IntegrationsController {
 
       if (onboarding === 'true') {
         await ioRedis.set(`onboarding:${state}`, 'true', 'EX', 3600);
+      }
+
+      // Campaign-scoped connect/invite: bind the campaign so the callback auto-tags
+      // the new channel onto it. Verify ownership before trusting the id.
+      if (campaign) {
+        const owned = await this._campaignsService.get(campaign, org.id);
+        if (owned) {
+          await ioRedis.set(`campaign:${state}`, campaign, 'EX', 3600);
+        }
       }
 
       if (redirectUrl) {

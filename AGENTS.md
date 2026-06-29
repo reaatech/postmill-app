@@ -570,6 +570,10 @@ and a dashboard of KPIs.
 ### Data model
 - `Campaign` — org-scoped folder; `shareToken` / `shareEnabled` control public reports; `utmEnabled`
   toggles automatic UTM query-string append; `goals` stores a JSON array of `{ metric, target }`.
+  Optional metadata: `client` / `project` (free-text) and `tags` (JSON `string[]`) — collected in the
+  create/edit modal, shown read-only on the dashboard header. **Internal-only:** these (and the
+  resolved `createdBy`) are **not** in `CampaignReportService.toPublicJson`'s whitelist, so they never
+  leak on the public client report.
 - `CampaignEntityType` enum — `POST`, `INTEGRATION`, `ORG_VPN_CONFIG`, `AI_ORG_PROVIDER_CONFIG`,
   `AI_BRAND_PROFILE`, `STORAGE_PROVIDER_CONFIG`, `FILE`, `SETS`, `SIGNATURES`.
 - `CampaignItem` — polymorphic tag table (`campaignId`, `entityType`, `entityId`) for the 8 non-post
@@ -600,6 +604,21 @@ and a dashboard of KPIs.
   platform-reported `lastComments` sum — `CampaignsService.getDashboard` and
   `CampaignReportService.buildReport` both override `engagement.totalComments` with that count, so the
   KPI, goal, section, and public report all agree.
+- **Channels section** (`dashboard/campaign-channels-section.tsx`): the dashboard's
+  `getDashboard` returns a `channels` array = **union of** channels the campaign's posts publish to
+  **and** explicitly-tagged `INTEGRATION` items, deduped by integration id with a `postCount`
+  (rendered with the shared `ProviderIcon`). Because this dedicated section owns channels, `channel`
+  was removed from `tagged-items-panels.tsx` (`ENTITY_ORDER` + default add-type) to avoid a double
+  render. Its **Add Channel** / **Invite Client** buttons reuse `useAddProvider(update, invite,
+  campaignId)` — an optional `campaignId` now threads through `AddProviderComponent` →
+  `GET /integrations/social/:integration?campaign=` → `ioRedis` `campaign:<state>`; the OAuth callback
+  (`no.auth.integrations.controller.ts`) reads it and auto-tags the new channel onto the campaign
+  (non-fatal; covers both direct connect and the invite link).
+- **Creator + profile**: `getDashboard` resolves `campaign.createdById` into
+  `createdBy { id, name, email, avatarUrl }` (via `UsersService.getPublicProfilesByIds`); the header
+  links "Created by" to a read-only, tenant-guarded member-profile page at `/profile/[id]`
+  (`GET /user/profile/:userId` → `OrganizationService.getMemberProfile`, which returns null for a
+  non-member so cross-org lookup is blocked).
 
 ### Public share
 `GET /public/campaign-report/:token` returns a read-only, stripped JSON report when `shareEnabled`

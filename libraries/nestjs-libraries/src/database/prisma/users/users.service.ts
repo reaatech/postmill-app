@@ -24,6 +24,10 @@ export class UsersService {
     return this._usersRepository.getNamesByIds(ids);
   }
 
+  getPublicProfilesByIds(ids: string[]) {
+    return this._usersRepository.getPublicProfilesByIds(ids);
+  }
+
   getImpersonateUser(name: string) {
     return this._organizationRepository.getImpersonateUser(name);
   }

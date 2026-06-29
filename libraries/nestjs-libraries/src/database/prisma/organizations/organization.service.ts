@@ -72,6 +72,10 @@ export class OrganizationService {
     return this._organizationRepository.getTeam(orgId);
   }
 
+  getMemberProfile(orgId: string, userId: string) {
+    return this._organizationRepository.getMemberProfile(orgId, userId);
+  }
+
   async createTeamUser(orgId: string, email: string, password: string, userRole: string, roleId?: string) {
     const roleKey = userRole === 'ADMIN' ? 'admin' : 'member';
     return this._organizationRepository.createTeamUser(orgId, email, password, roleKey, roleId);

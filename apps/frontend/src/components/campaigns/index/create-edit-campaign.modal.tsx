@@ -7,6 +7,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
 import dayjs from 'dayjs';
 import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
+import { TagsInput } from '@gitroom/frontend/components/campaigns/index/tags-input';
 
 const GOAL_METRICS = ['impressions', 'likes', 'comments', 'clicks', 'posts', 'followers'] as const;
 
@@ -25,6 +26,9 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
   const [startDate, setStartDate] = useState(editing?.startDate ? dayjs(editing.startDate).format('YYYY-MM-DD') : '');
   const [endDate, setEndDate] = useState(editing?.endDate ? dayjs(editing.endDate).format('YYYY-MM-DD') : '');
   const [utmEnabled, setUtmEnabled] = useState(editing?.utmEnabled ?? false);
+  const [client, setClient] = useState(editing?.client || '');
+  const [project, setProject] = useState(editing?.project || '');
+  const [tags, setTags] = useState<string[]>(editing?.tags || []);
   const [goals, setGoals] = useState<Array<{ metric: string; target: string }>>(
     (editing?.goals || []).map((g) => ({ metric: g.metric, target: String(g.target) }))
   );
@@ -51,6 +55,11 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       utmEnabled,
+      // Sent unconditionally (not `|| undefined`) so emptying a field on edit
+      // actually clears it — the backend update omits only undefined fields.
+      client: client.trim(),
+      project: project.trim(),
+      tags,
       goals: goals.length
         ? goals
             .filter((g) => g.target && !Number.isNaN(Number(g.target)))
@@ -77,7 +86,7 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
       'success'
     );
     onDone();
-  }, [name, color, description, startDate, endDate, utmEnabled, goals, editing, fetch, toast, t, onDone]);
+  }, [name, color, description, startDate, endDate, utmEnabled, client, project, tags, goals, editing, fetch, toast, t, onDone]);
 
   return (
     <div className="flex flex-col gap-[16px] p-[16px] min-w-[400px]">
@@ -119,6 +128,36 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
           onChange={(e) => setDescription(e.target.value)}
           className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none resize-none min-h-[60px]"
           placeholder={t('campaign_desc_placeholder', 'Optional description')}
+        />
+      </div>
+      <div className="flex gap-[8px]">
+        <div className="flex flex-col gap-[4px] flex-1">
+          <label className="text-[12px] text-newTableText">{t('client', 'Client')}</label>
+          <input
+            type="text"
+            value={client}
+            onChange={(e) => setClient(e.target.value)}
+            className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
+            placeholder={t('campaign_client_placeholder', 'Which client is this for?')}
+          />
+        </div>
+        <div className="flex flex-col gap-[4px] flex-1">
+          <label className="text-[12px] text-newTableText">{t('project', 'Project')}</label>
+          <input
+            type="text"
+            value={project}
+            onChange={(e) => setProject(e.target.value)}
+            className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
+            placeholder={t('campaign_project_placeholder', 'Which project?')}
+          />
+        </div>
+      </div>
+      <div className="flex flex-col gap-[4px]">
+        <label className="text-[12px] text-newTableText">{t('tags', 'Tags')}</label>
+        <TagsInput
+          value={tags}
+          onChange={setTags}
+          placeholder={t('campaign_tags_placeholder', 'tag1, tag2, tag3')}
         />
       </div>
       <div className="flex gap-[8px]">

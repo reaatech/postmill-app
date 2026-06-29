@@ -38,6 +38,9 @@ export class CampaignsService {
     startDate?: Date;
     endDate?: Date;
     utmEnabled?: boolean;
+    client?: string;
+    project?: string;
+    tags?: string[];
     goals?: any;
     createdById?: string;
   }) {
@@ -52,6 +55,9 @@ export class CampaignsService {
     endDate?: Date;
     archived?: boolean;
     utmEnabled?: boolean;
+    client?: string;
+    project?: string;
+    tags?: string[];
     goals?: any;
   }) {
     return this._campaignsRepository.update(id, organizationId, data);
@@ -59,6 +65,10 @@ export class CampaignsService {
 
   remove(id: string, organizationId: string) {
     return this._campaignsRepository.softDelete(id, organizationId);
+  }
+
+  countCreatedBy(organizationId: string, userId: string) {
+    return this._campaignsRepository.countCreatedBy(organizationId, userId);
   }
 
   getEngagement(id: string, organizationId: string) {
@@ -126,13 +136,60 @@ export class CampaignsService {
 
     const goals = computeGoalProgress(campaign.goals, engagement, stateCounts, clickTotal);
 
+    // Channels the campaign actually uses = union of (a) channels its posts publish
+    // to and (b) explicitly-tagged INTEGRATION items. Deduped by integration id; the
+    // dedicated Channels section renders this (the tagged-items panel no longer shows
+    // channels). postCount comes from the already-loaded posts (no extra query).
+    const channelMap = new Map<
+      string,
+      { id: string; name: string; picture: string | null; providerIdentifier: string; postCount: number }
+    >();
+    for (const p of posts as any[]) {
+      const integ = p.integration;
+      if (!integ?.id) continue;
+      const existing = channelMap.get(integ.id);
+      if (existing) {
+        existing.postCount += 1;
+      } else {
+        channelMap.set(integ.id, {
+          id: integ.id,
+          name: integ.name,
+          picture: integ.picture || null,
+          providerIdentifier: integ.providerIdentifier,
+          postCount: 1,
+        });
+      }
+    }
+    for (const tagged of itemPanels['channel'] || []) {
+      if (!channelMap.has(tagged.id)) {
+        channelMap.set(tagged.id, {
+          id: tagged.id,
+          name: tagged.name,
+          picture: null,
+          providerIdentifier: tagged.icon || tagged.subtitle || '',
+          postCount: 0,
+        });
+      }
+    }
+    const channels = [...channelMap.values()].sort((a, b) => b.postCount - a.postCount);
+
+    // Resolve the creator into a display object the header can link to.
+    let createdBy:
+      | { id: string; name: string; email: string; avatarUrl: string | null }
+      | null = null;
+    if (campaign.createdById) {
+      const profiles = await this._usersService.getPublicProfilesByIds([campaign.createdById]);
+      createdBy = profiles.get(campaign.createdById) || null;
+    }
+
     return {
-      campaign,
+      campaign: { ...campaign, createdBy },
       engagement,
       stateCounts,
       upcoming,
       posts,
       itemPanels,
+      channels,
       recentChangelog: changelog,
       clickTotal,
       goals,

@@ -6,6 +6,7 @@ import { useCampaignDashboard } from '@gitroom/frontend/components/campaigns/hoo
 import { DashboardHeader } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-header';
 import { DashboardKpis } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-kpis';
 import { TaggedItemsPanels } from '@gitroom/frontend/components/campaigns/dashboard/tagged-items-panels';
+import { CampaignChannelsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-channels-section';
 import { CampaignPostsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-posts-section';
 import { PlanningWorkspace } from '@gitroom/frontend/components/campaigns/dashboard/planning-workspace';
 import { ChangelogPanel } from '@gitroom/frontend/components/campaigns/dashboard/changelog-panel';
@@ -47,6 +48,7 @@ export const CampaignDashboardPage: FC = () => {
     <div className="flex flex-col gap-[24px] p-[24px]">
       <DashboardHeader campaign={data.campaign} onMutate={mutate} />
       <DashboardKpis dashboard={data} />
+      <CampaignChannelsSection campaignId={id} channels={data.channels || []} onMutate={mutate} />
       <TaggedItemsPanels campaignId={id} items={data.itemPanels} posts={data.posts} onMutate={mutate} />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-[24px]">
         <CampaignPostsSection campaignId={id} posts={data.posts} />

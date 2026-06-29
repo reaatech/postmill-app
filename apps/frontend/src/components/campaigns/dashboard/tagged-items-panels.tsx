@@ -28,8 +28,9 @@ const ENTITY_LABELS: Record<CampaignEntitySlug, string> = {
   signature: 'Signatures',
 };
 
+// 'channel' is intentionally omitted — the dedicated Channels section owns
+// displaying and adding channels, so this panel covers the other entity types.
 const ENTITY_ORDER: CampaignEntitySlug[] = [
-  'channel',
   'brand',
   'file',
   'signature',
@@ -85,7 +86,7 @@ const AddItemsModal: FC<{
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const [selectedType, setSelectedType] = useState<CampaignEntitySlug>('channel');
+  const [selectedType, setSelectedType] = useState<CampaignEntitySlug>('brand');
   const [query, setQuery] = useState('');
   const [taggingId, setTaggingId] = useState<string | null>(null);
   const { data: entities, isLoading, error } = useOrgEntities(selectedType);

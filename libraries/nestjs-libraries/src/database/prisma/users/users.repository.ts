@@ -22,6 +22,46 @@ export class UsersRepository {
     );
   }
 
+  // NOTE: not org-scoped — resolves users by id alone. Only call with ids already
+  // obtained from an org-scoped row (e.g. a campaign's createdById). Do not pass
+  // client-supplied ids, or it becomes a cross-org profile lookup.
+  async getPublicProfilesByIds(
+    ids: string[]
+  ): Promise<Map<string, { id: string; name: string; email: string; avatarUrl: string | null }>> {
+    const rows = await this._user.model.user.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        email: true,
+        profile: {
+          select: {
+            name: true,
+            lastName: true,
+            avatarUrl: true,
+            picture: { select: { path: true } },
+          },
+        },
+      },
+    });
+    return new Map(
+      rows.map((r) => {
+        const fullName = [r.profile?.name, r.profile?.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        return [
+          r.id,
+          {
+            id: r.id,
+            name: fullName || r.email,
+            email: r.email,
+            avatarUrl: r.profile?.avatarUrl || r.profile?.picture?.path || null,
+          },
+        ];
+      })
+    );
+  }
+
   getImpersonateUser(name: string) {
     return this._user.model.user.findMany({
       where: {

@@ -29,7 +29,7 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested, ArrayMaxSize, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
@@ -56,6 +56,21 @@ class CreateCampaignDto {
   @IsOptional()
   @IsBoolean()
   utmEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  client?: string;
+
+  @IsOptional()
+  @IsString()
+  project?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  tags?: string[];
 
   @IsOptional()
   @IsArray()
@@ -92,6 +107,21 @@ class UpdateCampaignDto {
   @IsOptional()
   @IsBoolean()
   utmEnabled?: boolean;
+
+  @IsOptional()
+  @IsString()
+  client?: string;
+
+  @IsOptional()
+  @IsString()
+  project?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(30)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  tags?: string[];
 
   @IsOptional()
   @IsArray()
@@ -177,6 +207,9 @@ export class CampaignsController {
       startDate: body.startDate ? new Date(body.startDate) : undefined,
       endDate: body.endDate ? new Date(body.endDate) : undefined,
       utmEnabled: body.utmEnabled,
+      client: body.client,
+      project: body.project,
+      tags: body.tags,
       goals: this._parseGoals(body.goals),
       createdById: user?.id,
     });
@@ -201,6 +234,9 @@ export class CampaignsController {
       endDate: body.endDate ? new Date(body.endDate) : undefined,
       archived: body.archived,
       utmEnabled: body.utmEnabled,
+      client: body.client,
+      project: body.project,
+      tags: body.tags,
       goals: this._parseGoals(body.goals),
     });
   }

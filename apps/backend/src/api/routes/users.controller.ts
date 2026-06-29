@@ -5,6 +5,7 @@ import {
   Get,
   HttpException,
   Logger,
+  NotFoundException,
   Param,
   Post,
   Query,
@@ -28,6 +29,7 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
 import { DeletionService } from '@gitroom/nestjs-libraries/database/prisma/users/deletion.service';
 import { DataExportService } from '@gitroom/nestjs-libraries/database/prisma/users/data-export.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
@@ -52,6 +54,7 @@ export class UsersController {
     private _authService: AuthService,
     private _orgService: OrganizationService,
     private _userService: UsersService,
+    private _campaignsService: CampaignsService,
     private _trackService: TrackService,
     private _auditService: AuditService,
     private _deletionService: DeletionService,
@@ -334,6 +337,38 @@ export class UsersController {
     });
 
     response.status(200).send();
+  }
+
+  // Read-only team-member profile. Tenant-guarded: only resolves a user who is a
+  // member of the requester's org (getMemberProfile returns null otherwise).
+  @Get('/profile/:userId')
+  async memberProfile(
+    @GetOrgFromRequest() org: Organization,
+    @Param('userId') userId: string
+  ) {
+    const member = await this._orgService.getMemberProfile(org.id, userId);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+    const profile = member.user.profile;
+    const fullName = [profile?.name, profile?.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const campaignsCreated = await this._campaignsService.countCreatedBy(
+      org.id,
+      userId
+    );
+    return {
+      id: member.user.id,
+      name: fullName || member.user.email,
+      email: member.user.email,
+      bio: profile?.bio || null,
+      avatarUrl: profile?.avatarUrl || profile?.picture?.path || null,
+      role: member.roleRef?.name || member.roleRef?.key || null,
+      joinedAt: member.createdAt,
+      campaignsCreated,
+    };
   }
 
   @Get('/sessions')
