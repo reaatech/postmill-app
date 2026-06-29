@@ -643,6 +643,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       ref={timelineRef}
       className="shrink-0 border-t border-newBorder bg-newBgColorInner flex flex-col"
       tabIndex={0}
+      role="application"
+      aria-label="Video timeline"
       onKeyDown={handleKeyDown}
     >
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-newBorder">

@@ -9,6 +9,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
 import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
+import { StudioErrorBoundary } from '@gitroom/frontend/components/media-tools/studio-error-boundary';
 
 const tabs = [
   {
@@ -696,7 +697,9 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
             active: pathname.startsWith(t.href),
           }))}
         />
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible">{children}</div>
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible">
+          <StudioErrorBoundary>{children}</StudioErrorBoundary>
+        </div>
       </div>
     </div>
   );

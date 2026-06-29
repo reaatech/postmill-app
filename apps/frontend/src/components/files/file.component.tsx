@@ -164,14 +164,15 @@ export const Pagination: FC<{
           current + 1 === totalPages && 'opacity-20 pointer-events-none'
         )}
       >
-        <a
+        <button
+          type="button"
           className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-boxHover"
           aria-label="Go to next page"
           onClick={() => setPage(current + 1)}
         >
           <span>{t('next', 'Next')}</span>
           <ChevronRightIcon className="lucide lucide-chevron-right h-4 w-4" />
-        </a>
+        </button>
       </li>
     </ul>
   );
@@ -839,6 +840,7 @@ export const MultiFileComponent: FC<{
                         </div>
                       ) : (
                         <img
+                          alt="Media"
                           className="w-full h-full object-cover rounded-[4px]"
                           src={mediaDirectory.set(media?.path)}
                         />
@@ -1028,11 +1030,18 @@ export const FileComponent: FC<{
               src={mediaDirectory.set(currentMedia.path)}
             />
           ) : (
-            <img
-              className="w-full h-full object-cover cursor-pointer"
-              src={currentMedia.path}
+            <button
+              type="button"
+              aria-label="Open media preview"
+              className="w-full h-full cursor-pointer"
               onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
-            />
+            >
+              <img
+                alt="Media preview"
+                className="w-full h-full object-cover"
+                src={currentMedia.path}
+              />
+            </button>
           )}
         </div>
       )}

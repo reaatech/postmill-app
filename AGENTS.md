@@ -171,7 +171,43 @@ Controller → Manager → Service → Repository   (when a manager is involved)
 - UI components live in `apps/frontend/src/components/ui`; other components in
   `apps/frontend/src/components`. Routing/pages are in `apps/frontend/src/app`.
 - **Check existing components before building a new one** to match the established design.
-- **Native components only** — never install a UI component from npmjs; write it natively.
+
+### Component / design-system policy
+
+The real policy (reconciled with what's installed — the older "native components only, never install a
+UI component from npmjs" rule was aspirational and contradicted by reality):
+
+- **Default to the shared bespoke primitives.** They are the canonical building blocks — use them
+  rather than re-rolling or pulling a new npm widget:
+  - **Button** → `Button` from `@gitroom/react/form/button` (~70 call sites). Native, supports
+    `secondary`/`danger`/`loading`.
+  - **Input / form fields** → `Input` from `@gitroom/react/form/input` (~40 call sites). Native,
+    `react-hook-form`-integrated.
+  - **Modals** → the bespoke `useModals()` / `ModalManager` from
+    `@gitroom/frontend/components/layout/new-modal` (~80 call sites). This — **not** `@mantine/modals`
+    — is the canonical modal system; `@mantine/modals` is a vestigial dependency that is no longer
+    imported in `src/` (tracked follow-up: drop the unused dep).
+- **Mantine is the sanctioned base for the few primitives where bespoke would be wasteful**, and stays:
+  `@mantine/core` (e.g. `Autocomplete` — 2 files), `@mantine/dates` (the date picker — 1 file), and
+  `@mantine/hooks` (utility hooks like `useClickOutside` — a handful of files). Reach for an existing
+  Mantine primitive before hand-rolling one of these; do **not** rip Mantine out.
+- **Write bespoke (native) only when no shared or Mantine primitive fits.** Match the design tokens
+  (`colors.scss` / `tailwind.config.cjs`); don't introduce a new npm UI kit (shadcn, MUI, Chakra, etc.).
+- **Deprecate ad-hoc duplicates.** Don't add a new one-off button/input/modal that overlaps the
+  canonical ones — consolidate onto them. (Larger de-duplication of existing one-offs is a tracked
+  follow-up.)
+
+### Error boundaries
+
+- App Router segment boundaries: each main route group ships `error.tsx` + `not-found.tsx`
+  (`(app)`, `(app)/(site)`, `(app)/(site)/media`, `(provider)`), rendering the shared
+  `RouteError` / `RouteNotFound` (`components/errors/`). `error.tsx` is a `'use client'` component
+  receiving `{ error, reset }`.
+- The `/media/*` canvas studios (Designer, HeyGen, Replicate, Deepgram, every Studio Kit `StudioShell`)
+  are wrapped at the **media layout** level in `StudioErrorBoundary`
+  (`components/media-tools/studio-error-boundary.tsx`) so a studio crash shows a themed fallback with a
+  reset instead of a blank screen. Reuse this pattern (mirrors the analytics-v2 `ErrorBoundary`) for
+  new canvas tools rather than adding ad-hoc try/catch.
 
 ### Data fetching — SWR via `useFetch`
 Always fetch with **SWR** through the `useFetch` hook from

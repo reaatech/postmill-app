@@ -187,7 +187,9 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50"
-      onClick={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
       role="presentation"
     >
       <div
@@ -196,7 +198,6 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
         aria-modal="true"
         aria-label="Select media"
         className="bg-[#1a1a2e] border border-[#2a2a4a] rounded-xl w-[720px] max-h-[600px] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-5 py-3 border-b border-[#2a2a4a]">
           <div className="flex gap-1" role="tablist" aria-label="Media source">

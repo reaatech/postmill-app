@@ -8,6 +8,7 @@ import { Rulers } from './rulers';
 import { ContextMenu } from './context-menu';
 import { fitWithin } from './panels/fit-within';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { DesignerElement, DesignerOutput } from './designer.store';
 import { VideoCanvasOverlay } from './video-canvas-overlay';
 import { sharedStageRef } from './stage-ref';
@@ -64,6 +65,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   const reduceMotion = typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const toaster = useToaster();
+  const fetch = useFetch();
 
   const doc = store((s) => s.doc);
   const selectedIds = store((s) => s.selectedIds);
@@ -611,7 +613,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
           toaster.show('Failed to upload file', 'warning');
         });
     },
-    [addElement, viewportX, viewportY, zoom, store, output, toaster]
+    [addElement, viewportX, viewportY, zoom, store, output, toaster, fetch]
   );
 
   const bg = output?.bg;
@@ -625,7 +627,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         isPanning ? 'cursor-grabbing' : isSpacePressed ? 'cursor-grab' : 'cursor-default'
       }`}
       tabIndex={0}
-      role="region"
+      role="application"
       aria-label="Design canvas"
       onKeyDown={handleKeyDown}
       onMouseMove={(e) => {

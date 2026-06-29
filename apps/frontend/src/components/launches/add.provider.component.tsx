@@ -830,9 +830,10 @@ export const AddProviderComponent: FC<{
               >
                 <div>
                   {item.identifier === 'youtube' ? (
-                    <img src={`/icons/platforms/youtube.svg`} />
+                    <img alt="YouTube" src={`/icons/platforms/youtube.svg`} />
                   ) : (
                     <img
+                      alt=""
                       className={clsx(
                         'w-[32px] h-[32px]',
                         item.identifier !== 'google_my_business' &&

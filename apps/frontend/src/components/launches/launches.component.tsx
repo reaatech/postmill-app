@@ -297,6 +297,7 @@ export const MenuComponent: FC<
         />
         {integration.identifier === 'youtube' ? (
           <img
+            alt="YouTube"
             src="/icons/platforms/youtube.svg"
             className="absolute z-10 bottom-[5px] -end-[5px]"
             width={20}

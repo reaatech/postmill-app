@@ -326,7 +326,7 @@ export const DeveloperComponent: FC = () => {
                 {picturePath ? (
                   <img
                     src={picturePath}
-                    alt="App picture"
+                    alt="App logo"
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
@@ -450,7 +450,7 @@ export const DeveloperComponent: FC = () => {
                 {picturePath ? (
                   <img
                     src={picturePath}
-                    alt="App picture"
+                    alt="App logo"
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (

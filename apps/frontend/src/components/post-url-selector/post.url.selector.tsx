@@ -177,10 +177,12 @@ export const PostSelector: FC<{
                         <div className="flex gap-[10px] items-center">
                           <div className="relative">
                             <img
+                              alt=""
                               src={p.integration.picture}
                               className="w-[32px] h-[32px] rounded-full"
                             />
                             <img
+                              alt=""
                               className="w-[20px] h-[20px] rounded-full absolute z-10 -bottom-[5px] -end-[5px] border border-newTableBorder"
                               src={
                                 `/icons/platforms/` +

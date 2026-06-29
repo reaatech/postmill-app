@@ -241,6 +241,7 @@ export const PickPlatforms: FC<{
                         />
                         {integration.identifier === 'youtube' ? (
                           <img
+                            alt="YouTube"
                             src="/icons/platforms/youtube.svg"
                             className="absolute z-10 bottom-0 -end-[5px]"
                             width={20}
