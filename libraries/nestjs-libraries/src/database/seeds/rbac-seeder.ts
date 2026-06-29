@@ -13,7 +13,7 @@ const ACTIONS = ['create', 'read', 'update', 'delete', 'manage'] as const;
 const ROLES = [
   { key: 'owner', name: 'Owner', description: 'Full access to all resources and settings' },
   { key: 'admin', name: 'Admin', description: 'Full access except billing management and organization deletion' },
-  { key: 'editor', name: 'Editor', description: 'Create and manage posts, media, and comments; read analytics and channels' },
+  { key: 'editor', name: 'Editor', description: 'Create and manage posts, media, channels, and comments; read analytics' },
   { key: 'member', name: 'Member', description: 'Create and edit posts; read media, analytics, and comments' },
   { key: 'viewer', name: 'Viewer', description: 'Read-only access to all resources' },
 ] as const;
@@ -27,10 +27,9 @@ const ROLE_PERMISSIONS: Record<string, { resource: string; action: string }[]> =
       .map(a => ({ resource: r, action: a }))
   ),
   editor: [
-    ...(['posts', 'media', 'comments'] as const).flatMap(r =>
+    ...(['posts', 'media', 'channels', 'comments'] as const).flatMap(r =>
       ACTIONS.map(a => ({ resource: r, action: a }))
     ),
-    { resource: 'channels', action: 'read' },
     { resource: 'analytics', action: 'read' },
     { resource: 'brands', action: 'read' },
   ],
