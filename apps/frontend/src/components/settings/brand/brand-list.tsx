@@ -1,58 +1,21 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import useSWR, { useSWRConfig } from 'swr';
+import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { BrandVoice } from '@gitroom/frontend/components/settings/brand/brand-voice';
-import { BrandAssets } from '@gitroom/frontend/components/settings/brand/brand-assets';
-import { KnowledgeBase } from '@gitroom/frontend/components/settings/brand/knowledge-base';
-import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { useBrands, type Brand } from '@gitroom/frontend/components/settings/brand/use-brands';
 
-interface BrandAsset {
-  fileId?: string;
-  url: string;
-  caption?: string;
-}
-
-interface Brand {
-  id: string;
-  name: string;
-  instructions?: string;
-  language?: string;
-  platformInstructions?: Record<string, string>;
-  enabled: boolean;
-  isDefault: boolean;
-  createdAt: string;
-  palette?: string[];
-  assets?: BrandAsset[];
-  enforcement?: { enabled?: boolean } & Record<string, any>;
-}
-
-const useBrands = () => {
-  const fetch = useFetch();
-  const load = useCallback(async () => {
-    const res = await fetch('/brands');
-    if (!res.ok) return [];
-    return res.json();
-  }, [fetch]);
-  return useSWR<Brand[]>('brands-list', load, {
-    revalidateOnFocus: false,
-  });
-};
-
-export const BrandTab = () => {
+// The Brands list (former BrandTab list view). "Edit" now navigates to the brand-edit route
+// (/settings/ai/brands/[id]/voice) instead of flipping in-page state.
+export const BrandList = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const { mutate } = useSWRConfig();
+  const router = useRouter();
   const { data: brands, isLoading, mutate: refetchBrands } = useBrands();
-  const [subtab, setSubtab] = useState<'list' | 'edit' | 'knowledge'>('list');
-  const [editTab, setEditTab] = useState<'voice' | 'kit' | 'knowledge'>('voice');
-  const [editingBrand, setEditingBrand] = useState<Brand | null>(null);
-  const [isCreating, setIsCreating] = useState(false);
 
   const [newName, setNewName] = useState('');
   const [showCreate, setShowCreate] = useState(false);
@@ -76,94 +39,37 @@ export const BrandTab = () => {
     toaster.show(t('brand_created', 'Brand created'), 'success');
   }, [newName, fetch, toaster, t, refetchBrands]);
 
-  const handleDelete = useCallback(async (brand: Brand) => {
-    if (!(await deleteDialog(t('confirm_delete_brand', `Delete "${brand.name}"?`)))) return;
-    const res = await fetch(`/brands/${brand.id}`, { method: 'DELETE' });
-    if (!res.ok) {
-      toaster.show(t('delete_failed', 'Failed to delete brand'), 'warning');
-      return;
-    }
-    refetchBrands();
-    toaster.show(t('brand_deleted', 'Brand deleted'), 'success');
-  }, [fetch, toaster, t, refetchBrands]);
+  const handleDelete = useCallback(
+    async (brand: Brand) => {
+      if (!(await deleteDialog(t('confirm_delete_brand', `Delete "${brand.name}"?`)))) return;
+      const res = await fetch(`/brands/${brand.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        toaster.show(t('delete_failed', 'Failed to delete brand'), 'warning');
+        return;
+      }
+      refetchBrands();
+      toaster.show(t('brand_deleted', 'Brand deleted'), 'success');
+    },
+    [fetch, toaster, t, refetchBrands]
+  );
 
-  const handleSetDefault = useCallback(async (brand: Brand) => {
-    const res = await fetch(`/brands/${brand.id}/default`, { method: 'POST' });
-    if (!res.ok) {
-      toaster.show(t('set_default_failed', 'Failed to set default'), 'warning');
-      return;
-    }
-    refetchBrands();
-    toaster.show(t('default_set', 'Default brand updated'), 'success');
-  }, [fetch, toaster, t, refetchBrands]);
+  const handleSetDefault = useCallback(
+    async (brand: Brand) => {
+      const res = await fetch(`/brands/${brand.id}/default`, { method: 'POST' });
+      if (!res.ok) {
+        toaster.show(t('set_default_failed', 'Failed to set default'), 'warning');
+        return;
+      }
+      refetchBrands();
+      toaster.show(t('default_set', 'Default brand updated'), 'success');
+    },
+    [fetch, toaster, t, refetchBrands]
+  );
 
   if (isLoading) {
     return (
       <div className="my-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         <div className="animate-pulse">{t('loading', 'Loading...')}</div>
-      </div>
-    );
-  }
-
-  if (subtab === 'edit' && editingBrand) {
-    const editTabs: { key: 'voice' | 'kit' | 'knowledge'; label: string; hint: string }[] = [
-      { key: 'voice', label: t('tab_voice', 'Voice & Tone'), hint: t('tab_voice_hint', 'How the AI writes for you') },
-      { key: 'kit', label: t('tab_kit', 'Brand Kit'), hint: t('tab_kit_hint', 'Your logo & colours') },
-      { key: 'knowledge', label: t('tab_knowledge', 'Knowledge'), hint: t('tab_knowledge_hint', 'What the AI knows about you') },
-    ];
-    return (
-      <div className="flex flex-col">
-        <div className="flex items-center gap-[12px] mb-[8px]">
-          <button
-            onClick={() => { setSubtab('list'); setEditingBrand(null); setIsCreating(false); }}
-            className="text-[13px] text-newTableText hover:text-textColor"
-          >
-            ← {t('back_to_brands', 'Back to Brands')}
-          </button>
-          <h3 className="text-[20px]">{editingBrand.name}</h3>
-        </div>
-        <p className="text-[13px] text-newTableText mb-[16px] max-w-[640px] leading-relaxed">
-          {t('brand_editor_intro', "A “brand” is a personality for the AI. Set up how it should write, what your brand looks like, and what it knows about your business — then it'll create on-brand posts for you. Pick a section below to get started.")}
-        </p>
-
-        <div className="mb-[16px] max-w-[640px]">
-          <CampaignSelector entityType="brand" entityId={editingBrand.id} />
-        </div>
-
-        <div className="flex gap-[8px] flex-wrap mb-[16px]">
-          {editTabs.map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setEditTab(tab.key)}
-              className={`flex flex-col items-start text-start px-[16px] py-[10px] rounded-[10px] border transition-colors ${
-                editTab === tab.key
-                  ? 'border-btnPrimary bg-btnPrimary/10'
-                  : 'border-newTableBorder hover:bg-boxHover'
-              }`}
-            >
-              <span className="text-[14px] text-textColor">{tab.label}</span>
-              <span className="text-[11px] text-newTableText">{tab.hint}</span>
-            </button>
-          ))}
-        </div>
-
-        {editTab === 'voice' && (
-          <BrandVoice
-            key={editingBrand.id}
-            brandId={editingBrand.id}
-            initial={editingBrand}
-            onSaved={() => refetchBrands()}
-          />
-        )}
-        {editTab === 'kit' && (
-          <BrandAssets
-            key={`assets-${editingBrand.id}`}
-            brandId={editingBrand.id}
-            initial={editingBrand}
-            onSaved={() => refetchBrands()}
-          />
-        )}
-        {editTab === 'knowledge' && <KnowledgeBase />}
       </div>
     );
   }
@@ -232,7 +138,7 @@ export const BrandTab = () => {
                   </div>
                 )}
               </div>
-              {(brand.palette?.length || brand.assets?.length) ? (
+              {brand.palette?.length || brand.assets?.length ? (
                 <div className="flex items-center gap-[10px] mt-[6px]">
                   {!!brand.palette?.length && (
                     <div className="flex items-center -space-x-[4px]">
@@ -248,7 +154,8 @@ export const BrandTab = () => {
                   )}
                   {!!brand.assets?.length && (
                     <span className="text-[11px] text-newTableText">
-                      {brand.assets.length} {brand.assets.length === 1 ? t('asset', 'asset') : t('assets_lower', 'assets')}
+                      {brand.assets.length}{' '}
+                      {brand.assets.length === 1 ? t('asset', 'asset') : t('assets_lower', 'assets')}
                     </span>
                   )}
                 </div>
@@ -264,7 +171,7 @@ export const BrandTab = () => {
                 </button>
               )}
               <button
-                onClick={() => { setEditingBrand(brand); setEditTab('voice'); setSubtab('edit'); }}
+                onClick={() => router.push(`/settings/ai/brands/${brand.id}/voice`)}
                 className="text-btnPrimary text-[12px] hover:underline"
               >
                 {t('edit', 'Edit')}
@@ -279,12 +186,6 @@ export const BrandTab = () => {
           </div>
         ))}
       </div>
-
-      {subtab === 'knowledge' && (
-        <div className="mt-[16px]">
-          <KnowledgeBase />
-        </div>
-      )}
     </div>
   );
 };

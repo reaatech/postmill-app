@@ -59,4 +59,4 @@ export const useMediaToolsStatus = () => {
 };
 
 /** Canonical deep-link to the media provider setup page. */
-export const MEDIA_SETUP_HREF = '/settings?tab=media_providers';
+export const MEDIA_SETUP_HREF = '/settings/content/ai-media';

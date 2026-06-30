@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // dependency, no password needed — and point at the host dev frontend.
 export default defineConfig({
   testDir: './tests',
-  testMatch: '**/90-media-suite.spec.ts',
+  testMatch: ['**/90-media-suite.spec.ts', '**/91-settings-routes.spec.ts'],
   timeout: 45_000,
   expect: { timeout: 12_000 },
   fullyParallel: false,

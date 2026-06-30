@@ -33,7 +33,7 @@ export default defineConfig({
       'src/components/settings/shortlinks/**/*.spec.{ts,tsx}',
       'src/components/settings/vpn/**/*.spec.{ts,tsx}',
       'src/components/settings/storage/**/*.spec.{ts,tsx}',
-      'src/components/layout/settings.component.spec.{ts,tsx}',
+      'src/components/settings/*.spec.{ts,tsx}',
       'src/components/layout/use-permissions.spec.{ts,tsx}',
       'src/components/layout/top.menu.spec.{ts,tsx}',
       'src/components/settings/roles/**/*.spec.{ts,tsx}',

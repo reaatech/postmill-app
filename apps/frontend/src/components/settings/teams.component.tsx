@@ -19,6 +19,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { DataTable, StatusPill, AvatarCell } from '@gitroom/frontend/components/ui/data-table';
 import { useRoles, RoleItem } from '@gitroom/frontend/components/settings/roles/hooks/use-roles';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+import { ManageRolesModal } from '@gitroom/frontend/components/settings/roles/manage-roles.modal';
 
 const PAGE_SIZE = 25;
 
@@ -121,6 +122,8 @@ export const TeamsComponent = () => {
   const { hasPermission, isOwner } = usePermissions();
   const { data: rolesList } = useRoles();
   const canManageMembers = hasPermission('members', 'manage');
+  const canManageRoles =
+    hasPermission('members', 'manage') || hasPermission('settings', 'update');
 
   const roleById = useMemo(() => {
     const map = new Map<string, RoleItem>();
@@ -193,6 +196,15 @@ export const TeamsComponent = () => {
     });
   }, [modals, t, mutate]);
 
+  const openManageRoles = useCallback(() => {
+    modals.openModal({
+      title: t('manage_roles', 'Manage roles'),
+      withCloseButton: true,
+      size: '760px',
+      children: <ManageRolesModal />,
+    });
+  }, [modals, t]);
+
   const remove = useCallback((toRemove: { user: { id: string } }) => async () => {
     if (!(await deleteDialog(t('are_you_sure_remove_team_member', 'Are you sure you want to remove this team member?')))) return;
     await fetch(`/settings/team/${toRemove.user.id}`, { method: 'DELETE' });
@@ -236,6 +248,7 @@ export const TeamsComponent = () => {
       <div className="flex items-center justify-end gap-[8px] mb-[16px]">
         <Button onClick={openInvite}>{t('invite_member', 'Invite Member')}</Button>
         {canManageMembers && <Button secondary onClick={openCreateUser}>{t('create_user', 'Create User')}</Button>}
+        {canManageRoles && <Button secondary onClick={openManageRoles}>{t('manage_roles', 'Manage roles')}</Button>}
       </div>
 
       <div className="flex items-center gap-[12px] mb-[16px]">

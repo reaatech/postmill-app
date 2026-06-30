@@ -128,7 +128,9 @@ const CLOUD_TYPES = [
   'S3_COMPATIBLE',
 ];
 
-export const StorageTab: React.FC = () => {
+export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
+  activeSubTab = 'providers',
+}) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -139,7 +141,9 @@ export const StorageTab: React.FC = () => {
   const { data: quotaStatus, mutate: mutateQuota } = useQuotaStatus();
   const { data: usageBreakdown, mutate: mutateBreakdown } = useUsageBreakdown();
 
-  const [subTab, setSubTab] = useState<SubTab>('providers');
+  // The sub-tab is driven by the route (/settings/storage/{providers,audit,usage}); the nav
+  // strip lives in the storage layout, not here.
+  const subTab = activeSubTab;
   const [showModal, setShowModal] = useState(false);
   const [editProvider, setEditProvider] = useState<StorageProviderRow | null>(null);
   const [presetType, setPresetType] = useState<string | undefined>(undefined);
@@ -304,30 +308,8 @@ export const StorageTab: React.FC = () => {
     );
   };
 
-  const subTabs: { key: SubTab; label: string }[] = [
-    { key: 'providers', label: t('providers', 'Providers') },
-    { key: 'audit', label: t('audit_log', 'Audit Log') },
-    { key: 'breakdown', label: t('usage_breakdown', 'Usage Breakdown') },
-  ];
-
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
-        {subTabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`text-[13px] px-[16px] py-[8px] rounded-t-[4px] transition-colors ${
-              subTab === tab.key
-                ? 'bg-newBgColorInner border border-newTableBorder border-b-transparent text-textColor'
-                : 'text-newTableText hover:text-textColor'
-            }`}
-            onClick={() => setSubTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* Quota warning banner */}
       {quotaStatus?.warning && (
         <div className="px-[16px] py-[12px] rounded-[8px] bg-[#2a2a1a] border border-[#f59e0b] text-[#f59e0b] text-[13px]">

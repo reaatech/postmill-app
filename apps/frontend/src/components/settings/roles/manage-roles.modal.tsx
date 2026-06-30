@@ -10,7 +10,6 @@ import {
   RoleItem,
   useRoles,
   usePermissionsCatalog,
-  useTeamMembers,
 } from '@gitroom/frontend/components/settings/roles/hooks/use-roles';
 import { RoleEditor } from '@gitroom/frontend/components/settings/roles/role-editor';
 
@@ -22,7 +21,7 @@ interface EditorState {
   permissionIds?: string[];
 }
 
-export const RolesTab: React.FC = () => {
+export const ManageRolesModal: React.FC = () => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -33,7 +32,6 @@ export const RolesTab: React.FC = () => {
     mutate: mutateRoles,
   } = useRoles();
   const { data: catalog } = usePermissionsCatalog();
-  const { data: members, mutate: mutateMembers } = useTeamMembers();
   const [editor, setEditor] = useState<EditorState | null>(null);
 
   const openCreate = useCallback(() => {
@@ -87,29 +85,9 @@ export const RolesTab: React.FC = () => {
     [fetch, toaster, t, mutateRoles]
   );
 
-  const assignRole = useCallback(
-    async (userId: string, roleId: string) => {
-      const res = await fetch(`/settings/roles/team/${userId}/role`, {
-        method: 'PUT',
-        body: JSON.stringify({ roleId }),
-      });
-      if (!res.ok) {
-        toaster.show(
-          t('role_assign_failed', 'Failed to assign role'),
-          'warning'
-        );
-        return;
-      }
-      toaster.show(t('role_assigned', 'Role assigned'), 'success');
-      mutateMembers();
-    },
-    [fetch, toaster, t, mutateMembers]
-  );
-
   if (editor) {
     return (
-      <div className="flex flex-col gap-[16px]">
-        <h3 className="text-[20px]">{t('roles', 'Roles')}</h3>
+      <div className="flex flex-col gap-[16px] max-h-[70vh] overflow-y-auto">
         <RoleEditor
           mode={editor.mode}
           roleId={editor.roleId}
@@ -128,7 +106,7 @@ export const RolesTab: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col gap-[16px]">
+    <div className="flex flex-col gap-[16px] max-h-[70vh] overflow-y-auto">
       <div className="flex items-center justify-end">
         <Button onClick={openCreate}>{t('create_role', 'Create Role')}</Button>
       </div>
@@ -209,54 +187,6 @@ export const RolesTab: React.FC = () => {
           ))}
         </div>
       )}
-
-      <div className="flex flex-col gap-[8px] mt-[8px]">
-        <h4 className="text-[16px] font-semibold">
-          {t('member_roles', 'Team member roles')}
-        </h4>
-        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex flex-col gap-[8px]">
-          {(members || []).length === 0 ? (
-            <span className="text-[13px] text-newTableText">
-              {t('no_team_members', 'No team members yet')}
-            </span>
-          ) : (
-            (members || []).map((member) => (
-              <div
-                key={member.user.id}
-                className="flex items-center justify-between gap-[12px] border-b border-newTableBorder/50 last:border-b-0 pb-[8px] last:pb-0"
-              >
-                <div className="flex flex-col min-w-0">
-                  <span className="text-[13px] truncate">
-                    {member.user.profile?.name || member.user.email}
-                  </span>
-                  <span className="text-[11px] text-newTableText truncate">
-                    {member.user.email}
-                  </span>
-                </div>
-                <select
-                  aria-label={`role-${member.user.email}`}
-                  value={member.roleId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      assignRole(member.user.id, e.target.value);
-                    }
-                  }}
-                  className="bg-newBgColor border border-newTableBorder rounded-[8px] px-[8px] py-[4px] text-[13px] outline-none"
-                >
-                  <option value="" disabled>
-                    {t('select_role', 'Select Role')}
-                  </option>
-                  {(roles || []).map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {role.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
     </div>
   );
 };
