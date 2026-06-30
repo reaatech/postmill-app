@@ -16,7 +16,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -34,7 +34,7 @@ import { MantineWrapper } from '@gitroom/react/helpers/mantine.wrapper';
 import { AnnouncementBanner } from '@gitroom/frontend/components/layout/announcement.banner';
 import { Title } from '@gitroom/frontend/components/layout/title';
 import { TopMenu } from '@gitroom/frontend/components/layout/top.menu';
-import { LanguageComponent } from '@gitroom/frontend/components/layout/language.component';
+import { LanguageMenuRow } from '@gitroom/frontend/components/layout/language.component';
 import { ChromeExtensionComponent } from '@gitroom/frontend/components/layout/chrome.extension.component';
 import NotificationComponent from '@gitroom/frontend/components/notifications/notification.component';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -47,6 +47,18 @@ import { TrialTracker } from '@gitroom/frontend/components/layout/gtm.component'
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { BottomTabBar } from '@gitroom/frontend/components/new-layout/bottom-tab-bar';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useAddProvider } from '@gitroom/frontend/components/launches/add.provider.component';
+
+// Lazy — only loaded when "New Campaign" is actually chosen (keeps the campaign-modal
+// dependency graph out of the global layout bundle).
+const CreateEditCampaignModal = dynamic(
+  () =>
+    import(
+      '@gitroom/frontend/components/campaigns/index/create-edit-campaign.modal'
+    ).then((m) => m.CreateEditCampaignModal),
+  { ssr: false }
+);
 
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
@@ -141,10 +153,6 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                             <div className="hover:text-newTextColor flex items-center justify-center w-[36px] h-[36px]">
                               <ModeComponent />
                             </div>
-                            <div className="w-[1px] h-[20px] bg-blockSeparator" />
-                            <div className="flex items-center justify-center w-[36px] h-[36px]">
-                              <LanguageComponent />
-                            </div>
                             <div className="flex items-center justify-center w-[36px] h-[36px] empty:hidden">
                               <ChromeExtensionComponent />
                             </div>
@@ -153,6 +161,7 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                               <AttachToFeedbackIcon />
                             </div>
                           </div>
+                          <CreateMenu />
                           <div className="flex items-center justify-center w-[36px] h-[36px]">
                             <NotificationComponent />
                           </div>
@@ -172,6 +181,232 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
         </MantineWrapper>
       </CopilotProvider>
     </ContextWrapper>
+  );
+};
+
+// GitHub-style "create" control. The desktop header shows a bordered "+" button (with a caret)
+// that opens a dropdown of these actions; on mobile — where the header "+" is hidden — the same
+// rows live in the avatar menu. New Post / New Design are plain navigations; New Campaign opens
+// the shared campaign modal; New Channel (admin-only) opens the add-channel flow.
+const createMenuRow =
+  'w-full flex items-center gap-[10px] px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover text-start';
+
+const useCreateActions = () => {
+  const t = useT();
+  const modals = useModals();
+  const { mutate } = useSWRConfig();
+  const addChannel = useAddProvider(() => mutate('/integrations'), false);
+
+  const openCampaign = useCallback(() => {
+    modals.openModal({
+      title: t('new_campaign', 'New Campaign'),
+      withCloseButton: true,
+      children: (
+        <CreateEditCampaignModal
+          editing={null}
+          onDone={() => {
+            modals.closeAll();
+            mutate('/campaigns');
+          }}
+        />
+      ),
+    });
+  }, [modals, mutate, t]);
+
+  return { openCampaign, openChannel: addChannel };
+};
+
+// The create actions as a list of menu rows, shared by the desktop "+" dropdown and the mobile
+// avatar menu. `onSelect` closes the host menu; `showChannel` gates the admin-only channel row.
+const CreateMenuItems: React.FC<{ onSelect?: () => void; showChannel: boolean }> = ({
+  onSelect,
+  showChannel,
+}) => {
+  const t = useT();
+  const { openCampaign, openChannel } = useCreateActions();
+  return (
+    <>
+      <a
+        href="/schedule/post"
+        role="menuitem"
+        onClick={onSelect}
+        className={createMenuRow}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+        {t('new_post', 'New Post')}
+      </a>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          onSelect?.();
+          openCampaign();
+        }}
+        className={createMenuRow}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m3 11 18-5v12L3 14v-3Z" />
+          <path d="M11.6 16.8a3 3 0 1 1-5.8-1.6" />
+        </svg>
+        {t('new_campaign', 'New Campaign')}
+      </button>
+      <a
+        href="/media/designer"
+        role="menuitem"
+        onClick={onSelect}
+        className={createMenuRow}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="2" />
+          <path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21" />
+        </svg>
+        {t('new_design', 'New Design')}
+      </a>
+      {showChannel && (
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => {
+            onSelect?.();
+            openChannel();
+          }}
+          className={createMenuRow}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="16" />
+            <line x1="8" y1="12" x2="16" y2="12" />
+          </svg>
+          {t('new_channel', 'New Channel')}
+        </button>
+      )}
+    </>
+  );
+};
+
+const CreateMenu = () => {
+  const t = useT();
+  const permissions = usePermissions();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    if (open) {
+      document.addEventListener('keydown', handleKeyDown);
+      return () => document.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-haspopup={true}
+        aria-label={t('create_new', 'Create new')}
+        title={t('create_new', 'Create new')}
+        className="flex items-center gap-[4px] h-[32px] px-[8px] rounded-[8px] border border-newTableBorder hover:text-newTextColor hover:bg-boxHover"
+      >
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <line x1="12" y1="5" x2="12" y2="19" />
+          <line x1="5" y1="12" x2="19" y2="12" />
+        </svg>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-[40px] w-[210px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg z-[300] py-[4px]"
+          role="menu"
+        >
+          <CreateMenuItems
+            onSelect={() => setOpen(false)}
+            showChannel={permissions.isAdmin}
+          />
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -217,6 +452,7 @@ const UserAvatarMenu = () => {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup={true}
+        aria-label={t('account_menu', 'Account menu')}
         className="flex items-center gap-[8px] hover:text-newTextColor"
       >
         {user.profile?.avatarUrl || user.profile?.picture?.path ? (
@@ -251,9 +487,6 @@ const UserAvatarMenu = () => {
               <div className="hover:text-newTextColor flex items-center justify-center">
                 <ModeComponent />
               </div>
-              <div className="flex items-center justify-center">
-                <LanguageComponent />
-              </div>
               <div className="flex items-center justify-center empty:hidden">
                 <AttachToFeedbackIcon />
               </div>
@@ -281,6 +514,7 @@ const UserAvatarMenu = () => {
               {t('settings', 'Settings')}
             </a>
           )}
+          <LanguageMenuRow onOpen={() => setOpen(false)} />
           <a
             href="/logout"
             role="menuitem"

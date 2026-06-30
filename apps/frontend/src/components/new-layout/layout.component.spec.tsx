@@ -74,10 +74,30 @@ vi.mock('../layout/top.menu', () => ({
 
 vi.mock('../layout/language.component', () => ({
   LanguageComponent: () => <div data-testid="language">Lang</div>,
+  // Language now lives as a row inside the avatar dropdown (not in the header).
+  LanguageMenuRow: ({ onOpen }: any) => (
+    <button
+      type="button"
+      role="menuitem"
+      data-testid="language-menu"
+      onClick={onOpen}
+    >
+      Language
+    </button>
+  ),
 }));
 
 vi.mock('../layout/chrome.extension.component', () => ({
   ChromeExtensionComponent: () => <div data-testid="chrome-ext">Chrome</div>,
+}));
+
+// CreateMenu ("+" dropdown) deps — kept inert; the dropdown is closed in these tests.
+vi.mock('../layout/new-modal', () => ({
+  useModals: () => ({ openModal: vi.fn(), closeAll: vi.fn() }),
+}));
+
+vi.mock('../launches/add.provider.component', () => ({
+  useAddProvider: () => vi.fn(),
 }));
 
 vi.mock('../layout/mode.component', () => ({
@@ -207,10 +227,16 @@ describe('LayoutComponent header', () => {
     );
 
     expect(screen.getByTestId('streak')).toBeDefined();
-    expect(screen.getByTestId('language')).toBeDefined();
     expect(screen.getByTestId('chrome-ext')).toBeDefined();
     expect(screen.getByTestId('feedback')).toBeDefined();
     expect(screen.getByTestId('notifications')).toBeDefined();
+
+    // "+" create menu sits in the header (left of the dark/light toggle); its items
+    // (New Post, etc.) live in the dropdown, which is closed here.
+    expect(screen.getByRole('button', { name: 'Create new' })).toBeDefined();
+    expect(container.querySelector('a[href="/schedule/post"]')).toBeNull();
+    // Language moved out of the header into the avatar dropdown (closed here).
+    expect(screen.queryByTestId('language')).toBeNull();
 
     const settingSvg = container.querySelector('svg[width="40"][height="40"]');
     expect(settingSvg).toBeNull();
@@ -223,7 +249,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
 
     const menuItems = screen.getAllByRole('menuitem');
@@ -248,7 +274,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
 
     expect(mockT).toHaveBeenCalledWith('profile', 'Profile');
@@ -263,7 +289,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     expect(avatarButton.getAttribute('aria-haspopup')).toBe('true');
 
     expect(avatarButton.getAttribute('aria-expanded')).toBe('false');
@@ -278,14 +304,15 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
 
     const menu = document.querySelector('[role="menu"]');
     expect(menu).toBeDefined();
 
+    // Profile, Settings, Language, Logout.
     const menuItems = document.querySelectorAll('[role="menuitem"]');
-    expect(menuItems.length).toBe(3);
+    expect(menuItems.length).toBe(4);
   });
 
   it('R5: hides the Settings menu item for members lacking settings:read', () => {
@@ -300,7 +327,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
 
     const menuItems = screen.getAllByRole('menuitem');
@@ -308,7 +335,8 @@ describe('LayoutComponent header', () => {
       (l) => l.getAttribute('href') === '/settings'
     );
     expect(settingsLink).toBeUndefined();
-    expect(menuItems.length).toBe(2);
+    // Profile, Language, Logout (Settings hidden).
+    expect(menuItems.length).toBe(3);
   });
 
   it('R5: keeps Settings visible while permissions load (no flash)', () => {
@@ -322,7 +350,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
 
     const menuItems = screen.getAllByRole('menuitem');
@@ -339,7 +367,7 @@ describe('LayoutComponent header', () => {
       </LayoutComponent>
     );
 
-    const avatarButton = document.querySelector('button')!;
+    const avatarButton = screen.getByRole('button', { name: 'Account menu' });
     fireEvent.click(avatarButton);
     expect(avatarButton.getAttribute('aria-expanded')).toBe('true');
 
