@@ -38,6 +38,10 @@ function makeService() {
     resolveMedia: vi.fn().mockReturnValue(adapter),
   };
 
+  const kernel = {
+    getMetadata: vi.fn().mockReturnValue(undefined),
+  };
+
   const storage = {
     resolveAdapterForFolder: vi.fn(),
     getLocalAdapterForOrg: vi.fn(),
@@ -58,6 +62,7 @@ function makeService() {
     lifecycle as never,
     aiSettings as never,
     resolution as never,
+    kernel as never,
     storage as never,
     fileService as never,
     redis as never,
@@ -70,6 +75,7 @@ function makeService() {
     aiSettings,
     adapter,
     resolution,
+    kernel,
     storage,
     fileService,
     redis,
@@ -124,6 +130,48 @@ describe('MediaStudioService', () => {
       const models = await service.listModels('org-1', 'test-provider', 'image');
       expect(models).toEqual([]);
       expect(resolution.resolveMedia).not.toHaveBeenCalled();
+    });
+
+    it('falls back to static metadata models when the live catalog is empty', async () => {
+      const { service, kernel, adapter, redis } = makeService();
+      adapter.listModels.mockResolvedValue([]);
+      kernel.getMetadata.mockReturnValue({
+        mediaModels: {
+          'text-to-image': [
+            { id: 'model-a', label: 'Model A', fields: [] },
+            { id: 'model-b', label: 'Model B', fields: [] },
+          ],
+        },
+      });
+
+      const models = await service.listModels('org-1', 'test-provider', 'image');
+
+      expect(models).toEqual([
+        { id: 'model-a', label: 'Model A' },
+        { id: 'model-b', label: 'Model B' },
+      ]);
+      expect(redis.set).toHaveBeenCalledWith(
+        'studio:models:test-provider:image:org-1:default',
+        JSON.stringify([
+          { id: 'model-a', label: 'Model A' },
+          { id: 'model-b', label: 'Model B' },
+        ]),
+        60,
+      );
+    });
+
+    it('falls back to static metadata models when the adapter has no listModels', async () => {
+      const { service, kernel, adapter } = makeService();
+      adapter.listModels = undefined;
+      kernel.getMetadata.mockReturnValue({
+        mediaModels: {
+          'text-to-video': [{ id: 'vid-1', label: 'Vid 1', fields: [] }],
+        },
+      });
+
+      const models = await service.listModels('org-1', 'test-provider', 'video');
+
+      expect(models).toEqual([{ id: 'vid-1', label: 'Vid 1' }]);
     });
   });
 

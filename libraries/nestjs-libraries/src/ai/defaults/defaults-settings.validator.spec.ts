@@ -1,11 +1,24 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DefaultsSettingsValidator } from './defaults-settings.validator';
+
+function makeValidator(metadata?: Record<string, unknown>) {
+  const kernel = {
+    getMetadata: vi.fn().mockImplementation((domain: string, providerId: string, version: string) => {
+      return metadata?.[`${domain}:${providerId}:${version}`];
+    }),
+    latestActiveVersion: vi.fn().mockReturnValue('v1'),
+  };
+  return {
+    validator: new DefaultsSettingsValidator(kernel as never),
+    kernel,
+  };
+}
 
 describe('DefaultsSettingsValidator', () => {
   let validator: DefaultsSettingsValidator;
 
   beforeEach(() => {
-    validator = new DefaultsSettingsValidator();
+    ({ validator } = makeValidator());
   });
 
   describe('ai domain', () => {
@@ -146,6 +159,44 @@ describe('DefaultsSettingsValidator', () => {
           { providerId: 'luma' },
         ),
       ).toThrowError(/Unknown media default setting key for category 'image-to-video'/);
+    });
+
+    it('validates against metadata model fields when no descriptor exists', () => {
+      const { validator: v } = makeValidator({
+        'media:replicate:v1': {
+          mediaModels: {
+            'text-to-image': [
+              {
+                id: 'black-forest-labs/flux-schnell',
+                label: 'FLUX Schnell',
+                fields: [
+                  { name: 'aspect_ratio', type: 'select' },
+                  { name: 'num_outputs', type: 'number' },
+                  { name: 'seed', type: 'number' },
+                ],
+              },
+            ],
+          },
+        },
+      });
+
+      expect(
+        v.validate(
+          'media',
+          'text-to-image',
+          { aspect_ratio: '1:1', seed: 42 },
+          { providerId: 'replicate', model: 'black-forest-labs/flux-schnell' },
+        ),
+      ).toEqual({ aspect_ratio: '1:1', seed: 42 });
+
+      expect(() =>
+        v.validate(
+          'media',
+          'text-to-image',
+          { cfg_scale: 7 },
+          { providerId: 'replicate', model: 'black-forest-labs/flux-schnell' },
+        ),
+      ).toThrowError(/Unknown media default setting key for category 'text-to-image'/);
     });
   });
 });

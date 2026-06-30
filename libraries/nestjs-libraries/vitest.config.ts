@@ -13,6 +13,8 @@ export default defineConfig({
       { find: '@gitroom/backend', replacement: path.resolve(__dirname, '../../apps/backend/src') },
       { find: '@gitroom/provider-kernel', replacement: path.resolve(__dirname, '../providers/kernel/src') },
       { find: /^@gitroom\/provider-(.+)$/, replacement: path.resolve(__dirname, '../providers/$1/src') },
+      { find: '@gitroom/react-shared-libraries', replacement: path.resolve(__dirname, '../react-shared-libraries/src') },
+      { find: /^@gitroom\/react-shared-libraries\/(.*)$/, replacement: path.resolve(__dirname, '../react-shared-libraries/src/$1') },
     ],
   },
   test: {

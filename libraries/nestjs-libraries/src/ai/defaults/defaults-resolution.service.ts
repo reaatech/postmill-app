@@ -171,7 +171,7 @@ export class DefaultsResolutionService {
     category: string,
     orgId: string,
   ): Promise<string | undefined> {
-    if (candidate.metadata.kind === 'action' || !candidate.metadata.hasModelList) {
+    if (candidate.metadata.kind === 'action') {
       return undefined;
     }
 
@@ -197,7 +197,7 @@ export class DefaultsResolutionService {
     category: string,
     orgId: string,
   ): Promise<boolean> {
-    if (candidate.metadata.kind === 'action' || !candidate.metadata.hasModelList) {
+    if (candidate.metadata.kind === 'action') {
       return true;
     }
     if (!model) {
@@ -210,6 +210,15 @@ export class DefaultsResolutionService {
       return true;
     }
     return models.some((m: { id: string }) => m.id === model);
+  }
+
+  private _staticMediaModels(
+    candidate: CandidateProvider,
+    category: string,
+  ): Array<{ id: string }> | undefined {
+    const list = candidate.metadata.mediaModels?.[category];
+    if (!Array.isArray(list) || list.length === 0) return undefined;
+    return list.map((m) => ({ id: m.id }));
   }
 
   private async _listModels(
@@ -230,17 +239,27 @@ export class DefaultsResolutionService {
       const capability: any = mod?.create(ctx);
 
       if (!capability?.listModels) {
-        return undefined;
+        // No live catalog: fall back to the committed static model list (direct
+        // providers and non-live hubs ship these in metadata.ts).
+        return isMediaCandidate
+          ? this._staticMediaModels(candidate, category)
+          : undefined;
       }
 
-      return isMediaCandidate
+      const live = isMediaCandidate
         ? await capability.listModels(this._categoryToOperation(category), ctx)
         : await capability.listModels(ctx);
+
+      // A transient empty live catalog should not hide a static fallback.
+      if (!live || live.length === 0) {
+        return (isMediaCandidate && this._staticMediaModels(candidate, category)) || live;
+      }
+      return live;
     } catch (err) {
       this._logger.warn(
         `listModels failed for ${candidate.providerId}@${candidate.version} category ${category}: ${(err as Error).message}`,
       );
-      return undefined;
+      return this._staticMediaModels(candidate, category);
     }
   }
 

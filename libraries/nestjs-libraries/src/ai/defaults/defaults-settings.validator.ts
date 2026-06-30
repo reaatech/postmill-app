@@ -1,10 +1,12 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { MEDIA_CATEGORY_OPERATION } from './default-categories';
 import {
   STUDIO_DESCRIPTOR_REGISTRY,
   StudioDescriptorSchema,
   StudioTabSchema,
 } from './studio-descriptor-fields.generated';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel } from '@gitroom/provider-kernel';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // P7.3 — per-provider+operation settings validation
@@ -234,10 +236,15 @@ function descriptorAllowedKeys(
 export interface SettingsValidationContext {
   providerId?: string;
   model?: string;
+  version?: string;
 }
 
 @Injectable()
 export class DefaultsSettingsValidator {
+  constructor(
+    @Inject(PROVIDER_KERNEL) private readonly _kernel: ProviderKernel,
+  ) {}
+
   validate(
     domain: 'ai' | 'media',
     category: string,
@@ -283,8 +290,53 @@ export class DefaultsSettingsValidator {
           return keys;
         }
       }
+
+      // No descriptor (bespoke/snapshot providers such as Replicate): validate
+      // against the committed per-model fields in provider metadata.
+      const metadataKeys = this._metadataAllowedKeys(
+        context.providerId,
+        context.version,
+        category,
+        context.model,
+      );
+      if (metadataKeys && metadataKeys.size > 0) {
+        return metadataKeys;
+      }
     }
 
     return MEDIA_BUCKET_KEYS[mediaBucketForCategory(category)];
+  }
+
+  private _metadataAllowedKeys(
+    providerId: string,
+    version: string | undefined,
+    category: string,
+    model?: string,
+  ): Set<string> | undefined {
+    const metadata = this._kernel.getMetadata('media', providerId, version ?? 'v1')
+      ?? this._kernel.getMetadata(
+        'media',
+        providerId,
+        this._kernel.latestActive('media', providerId)?.manifest.version ?? 'v1',
+      );
+    if (!metadata?.mediaModels) return undefined;
+
+    const list = metadata.mediaModels[category];
+    if (!Array.isArray(list) || list.length === 0) return undefined;
+
+    const targets = model
+      ? (list.find((m) => m.id === model) ? [list.find((m) => m.id === model)!] : list)
+      : list;
+
+    const keys = new Set<string>();
+    for (const target of targets) {
+      if (!Array.isArray(target.fields)) continue;
+      for (const field of target.fields) {
+        if (isMediaInputField(field)) continue;
+        if (field.name === 'model') continue;
+        keys.add(field.name);
+      }
+    }
+    return keys.size > 0 ? keys : undefined;
   }
 }

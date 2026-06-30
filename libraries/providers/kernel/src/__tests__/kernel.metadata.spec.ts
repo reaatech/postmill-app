@@ -5,6 +5,7 @@ import {
   AI_MODEL_CATEGORIES,
   AI_MEDIA_CATEGORIES,
 } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
+import { LANGUAGE_CODES } from '../domains/languages';
 
 describe('ProviderKernel metadata conformance', () => {
   const kernel = new ProviderKernel();
@@ -58,6 +59,53 @@ describe('ProviderKernel metadata conformance', () => {
             AI_MEDIA_CATEGORIES,
             `unknown media category: ${cat}`,
           ).toContain(cat);
+        }
+      });
+
+      it('backs every declared media category with a model catalog', () => {
+        const declared = mod.metadata?.mediaCategories ?? [];
+        for (const cat of declared) {
+          const hasStaticModels = (mod.metadata?.mediaModels?.[cat]?.length ?? 0) > 0;
+          const canEnumerate =
+            mod.metadata?.hasModelList === true ||
+            mod.metadata?.kind === 'action';
+          expect(
+            hasStaticModels || canEnumerate,
+            `media category '${cat}' is declared but has no static models and no live enumeration`,
+          ).toBe(true);
+        }
+      });
+
+      it('has well-formed mediaModels when present', () => {
+        const models = mod.metadata?.mediaModels ?? {};
+        const allowedFieldTypes = new Set(['select', 'number', 'toggle', 'text']);
+        for (const [category, list] of Object.entries(models)) {
+          expect(Array.isArray(list), `mediaModels[${category}] must be an array`).toBe(true);
+          for (const m of list) {
+            expect(typeof m.id, 'model id must be a string').toBe('string');
+            expect(m.id.length, 'model id must be non-empty').toBeGreaterThan(0);
+            expect(typeof m.label, 'model label must be a string').toBe('string');
+            const fields = m.fields ?? [];
+            expect(Array.isArray(fields), 'model fields must be an array').toBe(true);
+            for (const f of fields) {
+              expect(typeof f.name, 'field name must be a string').toBe('string');
+              expect(allowedFieldTypes.has(f.type), `unknown field type: ${f.type}`).toBe(true);
+              if (f.type === 'select') {
+                expect(Array.isArray(f.options), 'select field must have options array').toBe(true);
+                expect(f.options.length, 'select field options must not be empty').toBeGreaterThan(0);
+              }
+            }
+          }
+        }
+      });
+
+      it('uses known language codes for localized description', () => {
+        const description = mod.metadata?.description ?? {};
+        for (const code of Object.keys(description)) {
+          expect(
+            LANGUAGE_CODES,
+            `unknown language code in description: ${code}`,
+          ).toContain(code);
         }
       });
     },

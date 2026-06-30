@@ -170,7 +170,7 @@ describe('MediaDefaultsController', () => {
         prompt: 'ignore',
         resolution: '1024x1024',
       },
-      { providerId: 'openai', model: undefined },
+      { providerId: 'openai', model: undefined, version: 'v1' },
     );
   });
 
@@ -221,6 +221,14 @@ describe('MediaDefaultsController', () => {
       version: 'v1',
       model: 'dall-e-3',
       label: 'openai: DALL·E 3',
+      fields: [],
+    });
+    expect(result.options).toContainEqual({
+      providerId: 'openai',
+      version: 'v1',
+      model: 'gpt-image-1',
+      label: 'openai: GPT Image',
+      fields: [],
     });
     expect(mockRedisSet).toHaveBeenCalledWith(
       'settings:content:media-defaults:catalog:org-1:text-to-image',

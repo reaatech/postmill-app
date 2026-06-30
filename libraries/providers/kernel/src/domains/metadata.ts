@@ -1,3 +1,5 @@
+import { LanguageCode } from './languages';
+
 /**
  * Declarative metadata for a provider package.
  *
@@ -10,6 +12,29 @@
  * declared categories are subsets of the known `AI_MODEL_CATEGORIES` and
  * `AI_MEDIA_CATEGORIES` unions.
  */
+
+/** One tunable setting for a media model. */
+export interface ModelField {
+  type: 'select' | 'number' | 'toggle' | 'text';
+  name: string;
+  label?: string;
+  placeholder?: string;
+  default?: string | number | boolean;
+  options?: { value: string; label: string }[];
+  min?: number;
+  max?: number;
+  step?: number;
+  required?: boolean;
+  help?: string;
+}
+
+/** One selectable model within a media category. */
+export interface MediaModelDef {
+  id: string;
+  label: string;
+  fields?: ModelField[];
+}
+
 export interface ProviderMetadata {
   /** Matches `manifest.providerId`. */
   id: string;
@@ -53,4 +78,23 @@ export interface ProviderMetadata {
 
   /** Link to provider docs. */
   docsUrl?: string;
+
+  /**
+   * Static model catalog per media category.
+   *
+   * This is the source of truth for Settings → Content → Media Defaults and for
+   * the studio-kit's `source: 'models'` fallback. Providers that expose a live
+   * `listModels` may still populate this with curated fallbacks + per-model
+   * settings schemas.
+   */
+  mediaModels?: Partial<Record<string /* AiMediaCategory */, MediaModelDef[]>>;
+
+  /** Official provider homepage (for the settings UI). */
+  website?: string;
+
+  /**
+   * Localized provider pitch. `en` is required; missing languages fall back to
+   * `en`. Populated from the studio-kit descriptor `landing.description`.
+   */
+  description?: Partial<Record<LanguageCode, string>>;
 }

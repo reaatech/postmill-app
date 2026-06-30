@@ -9,9 +9,12 @@ export const socialMetadata: ProviderMetadata = {
 };
 
 export const metadata: ProviderMetadata = {
-  id: 'farcaster',
-  displayName: 'farcaster',
-  kind: 'action',
-  domains: ['media'],
-  hasModelList: false,
+  "id": "farcaster",
+  "displayName": "farcaster",
+  "kind": "action",
+  "domains": [
+    "media"
+  ],
+  "hasModelList": false,
+  "mediaCategories": []
 };

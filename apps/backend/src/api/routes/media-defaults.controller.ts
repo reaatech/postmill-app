@@ -106,6 +106,7 @@ export class MediaDefaultsController {
     const cleaned = this._settingsValidator.validate(domain, category, body.settings, {
       providerId: body.providerId,
       model: body.model,
+      version: body.version,
     });
     return { ...body, settings: cleaned };
   }
@@ -138,37 +139,75 @@ export class MediaDefaultsController {
     }
 
     const candidates = await this._defaultsResolution.candidates('media', category, org.id);
-    const options: { providerId: string; version: string; model?: string; label: string }[] = [];
+    const options: {
+      providerId: string;
+      version: string;
+      model?: string;
+      label: string;
+      fields?: any[];
+    }[] = [];
     for (const c of candidates) {
       const providerLabel = this._providerLabel(c);
-      if (!c.metadata.hasModelList || c.metadata.kind === 'action') {
+      const staticModels = this._staticModelsForCandidate(c, category);
+
+      if (c.metadata.kind === 'action') {
         options.push({
           providerId: c.providerId,
           version: c.version,
           label: providerLabel,
         });
-      } else {
+      } else if (c.metadata.hasModelList) {
         const models = await this._listModelsForCandidate(c, category, org.id);
-        if (models.length === 0) {
+        if (!models || models.length === 0) {
           // Configured model-list provider whose catalog couldn't be enumerated
           // (transient API failure / empty list). Still offer a provider-level option
           // (no model) so a working provider stays selectable — mirrors the resolver's
-          // undefined-model auto-pick. Without this, removing free-text entry would make
-          // the default un-settable. After this fix, "catalog empty" ⇔ "no candidate".
-          options.push({
-            providerId: c.providerId,
-            version: c.version,
-            label: providerLabel,
-          });
+          // undefined-model auto-pick. If a static fallback catalog exists, expose it.
+          if (staticModels.length > 0) {
+            for (const m of staticModels) {
+              options.push({
+                providerId: c.providerId,
+                version: c.version,
+                model: m.id,
+                label: `${providerLabel}: ${m.label || m.id}`,
+                fields: m.fields,
+              });
+            }
+          } else {
+            options.push({
+              providerId: c.providerId,
+              version: c.version,
+              label: providerLabel,
+            });
+          }
+        } else {
+          const fieldsById = new Map(staticModels.map((m) => [m.id, m.fields]));
+          for (const m of models) {
+            options.push({
+              providerId: c.providerId,
+              version: c.version,
+              model: m.id,
+              label: `${providerLabel}: ${m.label || m.id}`,
+              fields: fieldsById.get(m.id) ?? [],
+            });
+          }
         }
-        for (const m of models) {
+      } else if (staticModels.length > 0) {
+        for (const m of staticModels) {
           options.push({
             providerId: c.providerId,
             version: c.version,
             model: m.id,
             label: `${providerLabel}: ${m.label || m.id}`,
+            fields: m.fields,
           });
         }
+      } else {
+        options.push({
+          providerId: c.providerId,
+          version: c.version,
+          label: providerLabel,
+        });
       }
     }
     const result = { category, options };
@@ -199,6 +238,19 @@ export class MediaDefaultsController {
       default:
         return 'image';
     }
+  }
+
+  private _staticModelsForCandidate(
+    candidate: { providerId: string; version: string; metadata: any },
+    category: string,
+  ): Array<{ id: string; label: string; fields: any[] }> {
+    const categoryModels = candidate.metadata?.mediaModels?.[category];
+    if (!Array.isArray(categoryModels)) return [];
+    return categoryModels.map((m) => ({
+      id: m.id,
+      label: m.label || m.id,
+      fields: Array.isArray(m.fields) ? m.fields : [],
+    }));
   }
 
   private async _listModelsForCandidate(

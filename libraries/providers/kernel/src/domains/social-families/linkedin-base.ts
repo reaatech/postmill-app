@@ -18,7 +18,7 @@ import {
   SocialAbstract,
   ValidityMedia,
 } from '../social-base';
-import { Integration } from '@prisma/client';
+import type { Integration } from '@prisma/client';
 import { PostPlug } from '@gitroom/helpers/decorators/post.plug';
 import { Logger } from '@nestjs/common';
 import { LinkedinDto } from '../social-dtos';

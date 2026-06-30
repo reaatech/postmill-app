@@ -23,6 +23,7 @@ export const CATEGORIES: CategoryDefinition[] = [
   { key: 'image-to-video', medium: 'video', label: 'Image to Video', collectionSlug: 'image-to-video', execution: 'async' },
   { key: 'video-to-video', medium: 'video', label: 'Video to Video', execution: 'async' },
   { key: 'video-upscale', medium: 'video', label: 'Video Upscale', collectionSlug: 'ai-enhance-videos', execution: 'async' },
+  { key: 'video-background', medium: 'video', label: 'Video Background', execution: 'async' },
   { key: 'caption', medium: 'video', label: 'Caption Video', execution: 'async' },
   { key: 'merge', medium: 'video', label: 'Merge Videos', execution: 'local' },
   // AUDIO
@@ -82,6 +83,9 @@ export const MODEL_ALLOWLIST: Record<string, string[]> = {
   'video-upscale': [
     'topazlabs/video-upscale',
     'lucataco/real-esrgan-video',
+  ],
+  'video-background': [
+    'arielreplicate/robust_video_matting',
   ],
   'caption': [
     'fictions-ai/autocaption',

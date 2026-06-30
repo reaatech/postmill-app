@@ -9,6 +9,7 @@ export * from './testing/conformance';
 
 export * from './domains/ai';
 export * from './domains/ai-helpers';
+export * from './domains/languages';
 export * from './domains/media';
 export * from './domains/media-helpers';
 export * from './domains/metadata';

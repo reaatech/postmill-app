@@ -21,6 +21,7 @@ import type {
   StudioField,
   StudioFieldValue,
 } from '@gitroom/frontend/components/media-tools/studio-kit/types';
+import i18next from '@gitroom/react/translation/i18next';
 
 interface MediaDefaultRow {
   category: AiMediaCategory;
@@ -106,6 +107,32 @@ const CATEGORY_HELP: Record<AiMediaCategory, string> = {
 };
 
 const NO_SETTINGS_CATEGORIES: AiMediaCategory[] = ['image-focal-point'];
+
+interface ProviderCatalogItem {
+  providerId: string;
+  version: string;
+  displayName: string;
+  description?: Record<string, string>;
+  website?: string;
+}
+
+const useMediaProviderCatalog = () => {
+  const fetch = useFetch();
+  const load = useCallback(
+    async () =>
+      (await (
+        await fetch('/providers/catalog?domain=media')
+      ).json()) as ProviderCatalogItem[],
+    [fetch]
+  );
+  return useSWR('/providers/catalog?domain=media', load, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    revalidateIfStale: false,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+  });
+};
 
 const useMediaDefaults = () => {
   const fetch = useFetch();
@@ -203,12 +230,33 @@ async function loadDescriptor(
   return loader();
 }
 
+// StudioTab.operation is only image|video|audio; MEDIA_CATEGORY_OPERATION is the finer
+// MediaOperation. Collapse to the coarse tab operation (mirrors the backend
+// `_listOperationForCategory`) so descriptor tabs can be matched to a category.
+function coarseOperation(category: AiMediaCategory): 'image' | 'video' | 'audio' {
+  const op = MEDIA_CATEGORY_OPERATION[category];
+  switch (op) {
+    case 'video':
+    case 'avatar':
+    case 'video-bg':
+    case 'video-upscale':
+      return 'video';
+    case 'tts':
+    case 'stt':
+    case 'caption':
+    case 'audio':
+      return 'audio';
+    default:
+      return 'image';
+  }
+}
+
 function descriptorFieldsForCategory(
   descriptor: StudioDescriptor,
   category: AiMediaCategory,
   model?: string
 ): StudioField[] | null {
-  const operation = MEDIA_CATEGORY_OPERATION[category];
+  const operation = coarseOperation(category);
   const tabs = descriptor.tabs.filter(
     (t) => t.operation === operation && !t.custom
   );
@@ -229,8 +277,11 @@ function descriptorFieldsForCategory(
   }
   if (!tab) tab = tabs[0];
 
-  // Persist only non-runtime tunables: drop the prompt input and media file refs.
-  return tab.fields.filter((f) => f.type !== 'prompt' && f.type !== 'media');
+  // Persist only non-runtime tunables: drop the prompt input, media file refs, and the
+  // model field (the model is chosen in the main dropdown, not the settings form).
+  return tab.fields.filter(
+    (f) => f.type !== 'prompt' && f.type !== 'media' && f.name !== 'model'
+  );
 }
 
 function initialFormValues(
@@ -264,12 +315,13 @@ function initialFormValues(
 const MediaCategoryRow: React.FC<{
   row: MediaDefaultRow;
   saving: boolean;
+  catalog: ProviderCatalogItem[] | undefined;
   onSave: (
     category: AiMediaCategory,
     value: { providerId: string; version: string; model?: string } | null,
     settings?: Record<string, unknown> | null
   ) => void;
-}> = ({ row, saving, onSave }) => {
+}> = ({ row, saving, catalog, onSave }) => {
   const t = useT();
   const category = row.category;
   const { data: catalogData, isLoading: catalogLoading } = useDefaultCatalog(
@@ -277,17 +329,23 @@ const MediaCategoryRow: React.FC<{
     category
   );
 
-  // The dropdown is driven purely by the catalog (the actual list of selectable models for
-  // this org). `empty` = no provider can serve this category → the field is disabled. The
-  // backend already returns a provider-level option for action providers / un-enumerable
-  // model lists, so a configured provider always yields at least one option here.
-  const options = catalogData?.options ?? [];
-  const empty = !catalogLoading && options.length === 0;
+  // The backend catalog is the single source of truth: it already enumerates each provider's
+  // models (with their per-model settings `fields`) from metadata. Render its options
+  // directly — no frontend descriptor scraping, no live `/media/studio/:provider/models` fan-out.
+  const options = useMemo(() => catalogData?.options ?? [], [catalogData]);
+  const optionsLoading = catalogLoading;
+  // `empty` = no provider can serve this category → the field is disabled with an honest
+  // message (never a fake "Auto" / free-text). A provider with no enumerable models still
+  // yields a provider-level option, so a configured provider is always selectable.
+  const empty = !optionsLoading && options.length === 0;
 
-  const value =
-    row.providerId && row.version
-      ? { providerId: row.providerId, version: row.version, model: row.model }
-      : null;
+  const value = useMemo(
+    () =>
+      row.providerId && row.version
+        ? { providerId: row.providerId, version: row.version, model: row.model }
+        : null,
+    [row.providerId, row.version, row.model]
+  );
   const isAuto = row.source === 'auto' || row.source === null;
   const showSettings = !NO_SETTINGS_CATEGORIES.includes(category);
 
@@ -295,6 +353,19 @@ const MediaCategoryRow: React.FC<{
   const [fields, setFields] = useState<StudioField[] | null>(null);
   const [draft, setDraft] = useState<Record<string, StudioFieldValue>>({});
   const sigRef = useRef<string | null>(null);
+
+  const selectedOption = useMemo(
+    () =>
+      value
+        ? options.find(
+            (o) =>
+              o.providerId === value.providerId &&
+              o.version === value.version &&
+              o.model === value.model
+          ) ?? null
+        : null,
+    [options, value]
+  );
 
   // Async-only state updates (inside .then) — never call setState synchronously in the
   // effect body. When there is no provider the settings block isn't rendered (see below),
@@ -306,25 +377,51 @@ const MediaCategoryRow: React.FC<{
     const operation = MEDIA_CATEGORY_OPERATION[category];
     const sig = `${row.providerId}::${row.model ?? ''}::${operation}`;
     if (sigRef.current === sig) return;
-    loadDescriptor(row.providerId, category, row.model).then((descriptor) => {
-      if (cancelled) return;
+
+    const applyFields = (f: StudioField[] | null) => {
       sigRef.current = sig;
-      const f = descriptor
-        ? descriptorFieldsForCategory(descriptor, category, row.model)
-        : null;
       if (!f || f.length === 0) {
         setFields(null);
         return;
       }
       setFields(f);
       setDraft(initialFormValues(f, row.settings));
+    };
+
+    // Prefer the fields shipped with the selected catalog option (snapshot/direct
+    // providers and kit providers now emit them from metadata). Fall back to the
+    // on-demand descriptor loader for dynamic hubs and legacy paths.
+    if (selectedOption?.fields && selectedOption.fields.length > 0) {
+      applyFields(selectedOption.fields);
+      return;
+    }
+
+    loadDescriptor(row.providerId, category, row.model).then((descriptor) => {
+      if (cancelled) return;
+      const f = descriptor
+        ? descriptorFieldsForCategory(descriptor, category, row.model)
+        : null;
+      applyFields(f);
     });
     return () => {
       cancelled = true;
     };
-  }, [canShowSettings, row.providerId, row.model, row.settings, category]);
+  }, [canShowSettings, row.providerId, row.model, row.settings, category, selectedOption]);
 
   const hasForm = canShowSettings && !!fields && fields.length > 0;
+
+  const providerInfo = useMemo(
+    () =>
+      catalog?.find(
+        (p) => p.providerId === row.providerId && p.version === row.version
+      ),
+    [catalog, row.providerId, row.version]
+  );
+  // resolvedLanguage collapses a region-suffixed locale (e.g. `es-ES`) to the base code our
+  // description map is keyed by (`es`); fall back to `language`, then to the required `en`.
+  const lang = i18next.resolvedLanguage || i18next.language;
+  const description =
+    providerInfo?.description?.[lang] || providerInfo?.description?.en;
 
   return (
     <div className="flex flex-col gap-[10px] p-[16px] rounded-[8px] border border-newTableBorder bg-newBgColorInner">
@@ -349,7 +446,7 @@ const MediaCategoryRow: React.FC<{
 
       <DefaultModelSelect
         options={options}
-        isLoading={catalogLoading}
+        isLoading={optionsLoading}
         disabled={empty}
         value={value}
         onChange={(newValue) => {
@@ -357,6 +454,25 @@ const MediaCategoryRow: React.FC<{
           onSave(category, newValue);
         }}
       />
+
+      {description && (
+        <div className="text-[11px] text-newTextColor/55 leading-[1.4]">
+          {description}
+          {providerInfo?.website && (
+            <>
+              {' '}
+              <a
+                href={providerInfo.website}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-textColor"
+              >
+                {t('learn_more', 'Learn more')}
+              </a>
+            </>
+          )}
+        </div>
+      )}
 
       {!empty && showSettings && (
         <div className="flex flex-col gap-[6px]">
@@ -425,6 +541,7 @@ export const MediaDefaultsTab: React.FC = () => {
   const t = useT();
   const toaster = useToaster();
   const { data, mutate, isLoading } = useMediaDefaults();
+  const { data: providerCatalog } = useMediaProviderCatalog();
   const fetch = useFetch();
   const [saving, setSaving] = useState<Record<string, boolean>>({});
 
@@ -506,6 +623,7 @@ export const MediaDefaultsTab: React.FC = () => {
                   key={category}
                   row={row}
                   saving={!!saving[category]}
+                  catalog={providerCatalog}
                   onSave={saveDefault}
                 />
               );

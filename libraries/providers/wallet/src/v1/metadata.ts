@@ -1,9 +1,12 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
-  id: 'wallet',
-  displayName: 'wallet',
-  kind: 'action',
-  domains: ['media'],
-  hasModelList: false,
+  "id": "wallet",
+  "displayName": "wallet",
+  "kind": "action",
+  "domains": [
+    "media"
+  ],
+  "hasModelList": false,
+  "mediaCategories": []
 };

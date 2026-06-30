@@ -94,3 +94,6 @@ jobs:
           else
             echo "origin/main schema not found — skipping destructive guard (first push to main)."
           fi
+
+      - name: Studio descriptor metadata drift gate
+        run: node scripts/generate-studio-descriptor-registry.mjs --check

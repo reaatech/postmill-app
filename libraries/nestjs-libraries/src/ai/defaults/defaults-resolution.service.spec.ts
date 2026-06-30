@@ -270,6 +270,41 @@ describe('DefaultsResolutionService', () => {
     expect(result?.model).toBeUndefined();
   });
 
+  it('auto-picks a concrete model from static mediaModels for direct providers', async () => {
+    const repository = makeRepository();
+    const aiSettings = makeAiSettings([
+      { identifier: 'replicate', enabled: true, isConfigured: true, version: 'v1' },
+    ]);
+    const kernel = makeKernel({
+      getMetadata: vi.fn().mockReturnValue({
+        id: 'replicate',
+        displayName: 'Replicate',
+        kind: 'direct',
+        domains: ['media'],
+        mediaCategories: ['text-to-image'],
+        hasModelList: false,
+        mediaModels: {
+          'text-to-image': [
+            { id: 'black-forest-labs/flux-schnell', label: 'FLUX Schnell', fields: [] },
+          ],
+        },
+      }),
+    });
+    service = new DefaultsResolutionService(
+      repository as any,
+      aiSettings as any,
+      makeMediaSettings() as any,
+      kernel as any,
+      makeRuntimeContextFactory() as any,
+    );
+
+    const result = await service.resolve('media', 'text-to-image', 'org-1');
+
+    expect(result?.source).toBe('auto');
+    expect(result?.providerId).toBe('replicate');
+    expect(result?.model).toBe('black-forest-labs/flux-schnell');
+  });
+
   it('returns null when no candidates are available', async () => {
     const repository = makeRepository();
     const aiSettings = makeAiSettings([]);

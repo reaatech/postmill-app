@@ -1,9 +1,12 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
-  id: 'cuttly',
-  displayName: 'cuttly',
-  kind: 'action',
-  domains: ['media'],
-  hasModelList: false,
+  "id": "cuttly",
+  "displayName": "cuttly",
+  "kind": "action",
+  "domains": [
+    "media"
+  ],
+  "hasModelList": false,
+  "mediaCategories": []
 };

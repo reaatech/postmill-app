@@ -68,6 +68,10 @@ export class ProvidersController {
       credentialFields: m.credentialFields,
       deprecatedAt: m.deprecatedAt,
       sunsetAt: m.sunsetAt,
+      // Localized provider description + website for the media-defaults surface.
+      description: m.metadata?.description,
+      website: m.metadata?.website,
+      mediaCategories: m.metadata?.mediaCategories,
     }));
   }
 }
