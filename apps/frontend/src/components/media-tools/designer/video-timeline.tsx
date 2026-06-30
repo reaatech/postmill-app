@@ -6,6 +6,7 @@ import { VideoPreviewEngine } from './video-preview';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { VoiceoverDialog } from './voiceover-dialog';
 
 interface VideoTimelineProps {
@@ -133,6 +134,12 @@ const WaveformBars: FC<{ src: string | undefined; width: number }> = ({ src, wid
 };
 
 export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAwareness }) => {
+  // Voiceover (TTS) and Captions (STT) hit media-provider endpoints — gate them on the
+  // shared status so we don't offer a generation the org has no provider for (it would
+  // 409). Optimistic while loading / fail-open on error.
+  const { operationAvailable } = useMediaToolsStatus();
+  const ttsAvailable = operationAvailable('tts');
+  const sttAvailable = operationAvailable('stt');
   const doc = store((s) => s.doc);
   const currentOutput = store((s) => s.currentOutput);
   const playheadMs = store((s) => s.playheadMs);
@@ -704,15 +711,25 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         </button>
         <button
           onClick={handleGenerateVoiceover}
-          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor"
-          title="Generate AI voiceover"
+          disabled={!ttsAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            ttsAvailable
+              ? 'Generate AI voiceover'
+              : 'Configure a text-to-speech provider in Settings → Media'
+          }
         >
           Voiceover
         </button>
         <button
           onClick={handleGenerateCaptions}
-          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor"
-          title="Auto-generate captions from audio"
+          disabled={!sttAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            sttAvailable
+              ? 'Auto-generate captions from audio'
+              : 'Configure a speech-to-text provider (e.g. Deepgram) in Settings → Media'
+          }
         >
           Captions
         </button>

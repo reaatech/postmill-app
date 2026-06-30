@@ -9,7 +9,10 @@ import {
   AI_MODEL_CATEGORIES,
   type AiModelCategory,
 } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
-import { DefaultModelSelect } from '@gitroom/frontend/components/settings/shared/default-model-select';
+import {
+  DefaultModelSelect,
+  useDefaultCatalog,
+} from '@gitroom/frontend/components/settings/shared/default-model-select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 
 interface ModelDefaultRow {
@@ -52,6 +55,79 @@ const useModelDefaults = () => {
     refreshWhenHidden: false,
     refreshWhenOffline: false,
   });
+};
+
+// One row = one catalog hook (rules-of-hooks: hooks can't live inside the parent's
+// `.map`). The row owns availability: when the org has no provider that can serve this
+// category the catalog is empty → the field is DISABLED with an honest message. There is
+// no "Auto picks a model" pretence when there is nothing to pick.
+const AiDefaultRow: React.FC<{
+  row: ModelDefaultRow;
+  saving: boolean;
+  onSave: (
+    category: AiModelCategory,
+    value: { providerId: string; version: string; model?: string } | null
+  ) => void;
+}> = ({ row, saving, onSave }) => {
+  const t = useT();
+  const { data, isLoading } = useDefaultCatalog('ai', row.category);
+  const options = data?.options ?? [];
+  const empty = !isLoading && options.length === 0;
+
+  const value =
+    row.providerId && row.version
+      ? { providerId: row.providerId, version: row.version, model: row.model }
+      : null;
+  const isAuto = row.source === 'auto' || row.source === null;
+
+  return (
+    <div className="flex flex-col gap-[8px] p-[16px] rounded-[8px] border border-newTableBorder bg-newBgColorInner">
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="text-[14px] font-[600] text-textColor">
+            {CATEGORY_LABELS[row.category]}
+          </div>
+          <div className="text-[12px] text-newTextColor/60">
+            {CATEGORY_HELP[row.category]}
+          </div>
+        </div>
+        {!empty && row.source === 'stored' && (
+          <Button
+            type="button"
+            secondary
+            onClick={() => onSave(row.category, null)}
+            loading={saving}
+          >
+            {t('reset_to_auto', 'Reset to Auto')}
+          </Button>
+        )}
+      </div>
+      <DefaultModelSelect
+        options={options}
+        isLoading={isLoading}
+        disabled={empty}
+        value={value}
+        onChange={(newValue) => {
+          if (!newValue) return;
+          onSave(row.category, newValue);
+        }}
+      />
+      {empty ? (
+        <div className="text-[11px] text-newTextColor/45">
+          {t(
+            'no_ai_providers_enabled',
+            'No AI providers enabled — enable one in Settings → AI to set a default.'
+          )}
+        </div>
+      ) : (
+        isAuto && (
+          <div className="text-[11px] text-newTextColor/45">
+            {t('auto_default', 'Auto — picks a model from your enabled providers.')}
+          </div>
+        )
+      )}
+    </div>
+  );
 };
 
 export const ModelDefaultsTab: React.FC = () => {
@@ -114,54 +190,14 @@ export const ModelDefaultsTab: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-[20px]">
-      {rows.map((row) => {
-        const value =
-          row.providerId && row.version
-            ? { providerId: row.providerId, version: row.version, model: row.model }
-            : null;
-        const isAuto = row.source === 'auto' || row.source === null;
-        return (
-          <div
-            key={row.category}
-            className="flex flex-col gap-[8px] p-[16px] rounded-[8px] border border-newTableBorder bg-newBgColorInner"
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <div className="text-[14px] font-[600] text-textColor">
-                  {CATEGORY_LABELS[row.category]}
-                </div>
-                <div className="text-[12px] text-newTextColor/60">
-                  {CATEGORY_HELP[row.category]}
-                </div>
-              </div>
-              {row.source === 'stored' && (
-                <Button
-                  type="button"
-                  secondary
-                  onClick={() => saveDefault(row.category, null)}
-                  loading={saving[row.category]}
-                >
-                  {t('reset_to_auto', 'Reset to Auto')}
-                </Button>
-              )}
-            </div>
-            <DefaultModelSelect
-              domain="ai"
-              category={row.category}
-              value={value}
-              onChange={(newValue) => {
-                if (!newValue) return;
-                saveDefault(row.category, newValue);
-              }}
-            />
-            {isAuto && (
-              <div className="text-[11px] text-newTextColor/45">
-                {t('auto_default', 'Auto — picks a model from your enabled providers.')}
-              </div>
-            )}
-          </div>
-        );
-      })}
+      {rows.map((row) => (
+        <AiDefaultRow
+          key={row.category}
+          row={row}
+          saving={!!saving[row.category]}
+          onSave={saveDefault}
+        />
+      ))}
     </div>
   );
 };

@@ -367,6 +367,18 @@ export class OrgAiSettingsController {
         });
       } else {
         const models = await this._listModelsForCandidate(c, category, org.id);
+        if (models.length === 0) {
+          // Configured model-list provider whose catalog couldn't be enumerated
+          // (transient API failure / empty list). Still offer a provider-level option
+          // (no model) so a working provider stays selectable — mirrors the resolver's
+          // undefined-model auto-pick. Without this, removing free-text entry would make
+          // the default un-settable. After this fix, "catalog empty" ⇔ "no candidate".
+          options.push({
+            providerId: c.providerId,
+            version: c.version,
+            label: providerLabel,
+          });
+        }
         for (const m of models) {
           options.push({
             providerId: c.providerId,

@@ -12,6 +12,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDebounce } from 'use-debounce';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { TemplatesPanel } from './panels/templates-panel';
 import { MyDesignsPanel } from './panels/my-designs-panel';
 import { TextPanel } from './panels/text-panel';
@@ -183,6 +184,15 @@ export const Designer: FC<DesignerProps> = ({
     () => !initialAsset && !initialAssets?.length && !initialCaptionVideo && !designId && !(width && height)
   );
   const aiActive = useAiActive();
+  // Per-operation media-tool availability gates the AI generation actions (remove-bg,
+  // upscale, inpaint, generate). `status` is a stable SWR ref so the accessor (and the
+  // action ctx) stay memo-stable; optimistic while loading, fail-open on error.
+  const { status: mediaToolsStatus } = useMediaToolsStatus();
+  const mediaOperationAvailable = useCallback(
+    (operation: string): boolean =>
+      mediaToolsStatus ? !!mediaToolsStatus.operations?.[operation]?.available : true,
+    [mediaToolsStatus]
+  );
   const user = useUser();
   const brandColors = useBrandColors();
   const brandFonts = useBrandFonts();
@@ -666,6 +676,7 @@ export const Designer: FC<DesignerProps> = ({
       showSafeZones,
       showRulers,
       aiActive,
+      mediaOperationAvailable,
       canShare: !!currentDesignId,
       collabEnabled,
       inModal: !!(setMedia || closeModal),
@@ -759,6 +770,7 @@ export const Designer: FC<DesignerProps> = ({
       showSafeZones,
       showRulers,
       aiActive,
+      mediaOperationAvailable,
       currentDesignId,
       collabEnabled,
       setMedia,

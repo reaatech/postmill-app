@@ -10,7 +10,10 @@ import {
   MEDIA_CATEGORY_OPERATION,
   type AiMediaCategory,
 } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
-import { DefaultModelSelect } from '@gitroom/frontend/components/settings/shared/default-model-select';
+import {
+  DefaultModelSelect,
+  useDefaultCatalog,
+} from '@gitroom/frontend/components/settings/shared/default-model-select';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { StudioForm } from '@gitroom/frontend/components/media-tools/studio-kit/studio-form';
 import type {
@@ -119,25 +122,6 @@ const useMediaDefaults = () => {
     refreshWhenOffline: false,
   });
 };
-
-function safeJsonStringify(value: unknown): string {
-  if (value === undefined || value === null) return '';
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return '';
-  }
-}
-
-function safeJsonParse(text: string): Record<string, unknown> | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
 
 // Dynamic loaders for descriptor-driven kit studios. Each loader is isolated so
 // webpack can code-split the descriptor modules.
@@ -271,23 +255,178 @@ function initialFormValues(
   return out;
 }
 
+// One category = one row component. It owns the catalog hook (rules-of-hooks: can't live in
+// the parent's `.map`) and its own descriptor/draft state. The model field is a native
+// dropdown of the org's selectable models for this category (from the catalog); when the
+// catalog is empty the field is DISABLED with an honest message (no fake "Auto"). Settings
+// are the structured StudioForm only; when the provider/model has no tunables the settings
+// area shows a disabled placeholder — never a raw JSON box.
+const MediaCategoryRow: React.FC<{
+  row: MediaDefaultRow;
+  saving: boolean;
+  onSave: (
+    category: AiMediaCategory,
+    value: { providerId: string; version: string; model?: string } | null,
+    settings?: Record<string, unknown> | null
+  ) => void;
+}> = ({ row, saving, onSave }) => {
+  const t = useT();
+  const category = row.category;
+  const { data: catalogData, isLoading: catalogLoading } = useDefaultCatalog(
+    'media',
+    category
+  );
+
+  // The dropdown is driven purely by the catalog (the actual list of selectable models for
+  // this org). `empty` = no provider can serve this category → the field is disabled. The
+  // backend already returns a provider-level option for action providers / un-enumerable
+  // model lists, so a configured provider always yields at least one option here.
+  const options = catalogData?.options ?? [];
+  const empty = !catalogLoading && options.length === 0;
+
+  const value =
+    row.providerId && row.version
+      ? { providerId: row.providerId, version: row.version, model: row.model }
+      : null;
+  const isAuto = row.source === 'auto' || row.source === null;
+  const showSettings = !NO_SETTINGS_CATEGORIES.includes(category);
+
+  // Per-row descriptor fields + draft, re-derived when the resolved provider/model changes.
+  const [fields, setFields] = useState<StudioField[] | null>(null);
+  const [draft, setDraft] = useState<Record<string, StudioFieldValue>>({});
+  const sigRef = useRef<string | null>(null);
+
+  // Async-only state updates (inside .then) — never call setState synchronously in the
+  // effect body. When there is no provider the settings block isn't rendered (see below),
+  // so stale `fields` can't leak into the UI.
+  const canShowSettings = !empty && showSettings && !!row.providerId;
+  useEffect(() => {
+    if (!canShowSettings || !row.providerId) return;
+    let cancelled = false;
+    const operation = MEDIA_CATEGORY_OPERATION[category];
+    const sig = `${row.providerId}::${row.model ?? ''}::${operation}`;
+    if (sigRef.current === sig) return;
+    loadDescriptor(row.providerId, category, row.model).then((descriptor) => {
+      if (cancelled) return;
+      sigRef.current = sig;
+      const f = descriptor
+        ? descriptorFieldsForCategory(descriptor, category, row.model)
+        : null;
+      if (!f || f.length === 0) {
+        setFields(null);
+        return;
+      }
+      setFields(f);
+      setDraft(initialFormValues(f, row.settings));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [canShowSettings, row.providerId, row.model, row.settings, category]);
+
+  const hasForm = canShowSettings && !!fields && fields.length > 0;
+
+  return (
+    <div className="flex flex-col gap-[10px] p-[16px] rounded-[8px] border border-newTableBorder bg-newBgColorInner">
+      <div className="flex justify-between items-start">
+        <div>
+          <div className="text-[14px] font-[600] text-textColor">
+            {CATEGORY_LABELS[category]}
+          </div>
+          <div className="text-[12px] text-newTextColor/60">{CATEGORY_HELP[category]}</div>
+        </div>
+        {!empty && row.source === 'stored' && (
+          <Button
+            type="button"
+            secondary
+            onClick={() => onSave(category, null)}
+            loading={saving}
+          >
+            {t('reset_to_auto', 'Reset to Auto')}
+          </Button>
+        )}
+      </div>
+
+      <DefaultModelSelect
+        options={options}
+        isLoading={catalogLoading}
+        disabled={empty}
+        value={value}
+        onChange={(newValue) => {
+          if (!newValue) return;
+          onSave(category, newValue);
+        }}
+      />
+
+      {!empty && showSettings && (
+        <div className="flex flex-col gap-[6px]">
+          {hasForm ? (
+            <>
+              <div className="text-[12px] text-newTextColor/70">
+                {t('default_settings', 'Default settings')}
+              </div>
+              <StudioForm
+                fields={fields!}
+                values={draft}
+                onChange={(name, val) =>
+                  setDraft((prev) => ({ ...prev, [name]: val }))
+                }
+                provider={row.providerId ?? ''}
+                operation={MEDIA_CATEGORY_OPERATION[category]}
+              />
+              <Button
+                type="button"
+                onClick={() => {
+                  const cleaned: Record<string, unknown> = {};
+                  for (const f of fields!) {
+                    const v = draft?.[f.name];
+                    if (v !== undefined && v !== '' && v !== null) {
+                      cleaned[f.name] = v;
+                    }
+                  }
+                  onSave(category, value, cleaned);
+                }}
+                loading={saving}
+                className="self-start"
+              >
+                {t('save_settings', 'Save settings')}
+              </Button>
+            </>
+          ) : (
+            <div className="px-[12px] py-[9px] rounded-[8px] border border-newTableBorder bg-newBgColorInner text-[12px] text-newTextColor/40 select-none">
+              {t('no_settings_for_provider', 'No settings for this provider/model.')}
+            </div>
+          )}
+        </div>
+      )}
+
+      {empty ? (
+        <div className="text-[11px] text-newTextColor/45">
+          {t(
+            'no_media_providers_enabled',
+            'No media providers enabled — enable one in Settings → Media.'
+          )}
+        </div>
+      ) : (
+        isAuto && (
+          <div className="text-[11px] text-newTextColor/45">
+            {t(
+              'auto_default_media',
+              'Auto — picks a provider from your enabled media providers.'
+            )}
+          </div>
+        )
+      )}
+    </div>
+  );
+};
+
 export const MediaDefaultsTab: React.FC = () => {
   const t = useT();
   const toaster = useToaster();
   const { data, mutate, isLoading } = useMediaDefaults();
   const fetch = useFetch();
   const [saving, setSaving] = useState<Record<string, boolean>>({});
-  const [draftJson, setDraftJson] = useState<Record<string, string>>({});
-  const [draftFormValues, setDraftFormValues] = useState<
-    Record<string, Record<string, StudioFieldValue>>
-  >({});
-  const [descriptorFields, setDescriptorFields] = useState<
-    Record<string, StudioField[]>
-  >({});
-  // Tracks the (providerId/model/operation) signature each category's descriptor
-  // fields + draft values were derived from, so we re-derive (and reset stale
-  // drafts) when the resolved provider changes — even if the field count coincides.
-  const descriptorSigRef = useRef<Record<string, string>>({});
 
   const rows = useMemo<MediaDefaultRow[]>(() => {
     return (
@@ -303,40 +442,6 @@ export const MediaDefaultsTab: React.FC = () => {
     const map = new Map<string, MediaDefaultRow>();
     for (const row of rows) map.set(row.category, row);
     return map;
-  }, [rows]);
-
-  // Load descriptor fields when a row has a resolved provider/model. Re-derives the
-  // field set AND resets stale draft values whenever the resolved provider/model
-  // changes for a category (keyed on the signature, not the field count).
-  useEffect(() => {
-    let cancelled = false;
-    for (const row of rows) {
-      if (!row.providerId || NO_SETTINGS_CATEGORIES.includes(row.category)) {
-        continue;
-      }
-      const operation = MEDIA_CATEGORY_OPERATION[row.category];
-      const sig = `${row.providerId}::${row.model ?? ''}::${operation}`;
-      loadDescriptor(row.providerId, row.category, row.model).then((descriptor) => {
-        if (cancelled || !descriptor) return;
-        const fields = descriptorFieldsForCategory(
-          descriptor,
-          row.category,
-          row.model
-        );
-        if (!fields || fields.length === 0) return;
-        // Already derived for this provider/model — keep the user's in-progress draft.
-        if (descriptorSigRef.current[row.category] === sig) return;
-        descriptorSigRef.current[row.category] = sig;
-        setDescriptorFields((prev) => ({ ...prev, [row.category]: fields }));
-        setDraftFormValues((prev) => ({
-          ...prev,
-          [row.category]: initialFormValues(fields, row.settings),
-        }));
-      });
-    }
-    return () => {
-      cancelled = true;
-    };
   }, [rows]);
 
   const saveDefault = useCallback(
@@ -393,144 +498,16 @@ export const MediaDefaultsTab: React.FC = () => {
           <div className="text-[16px] font-[600] text-textColor mb-[12px]">{group.title}</div>
           <div className="flex flex-col gap-[12px]">
             {group.categories.map((category) => {
-              const row = rowsByCategory.get(category);
-              const value =
-                row?.providerId && row?.version
-                  ? {
-                      providerId: row.providerId,
-                      version: row.version,
-                      model: row.model,
-                    }
-                  : null;
-              const isAuto = row?.source === 'auto' || row?.source === null;
-              const showSettings = !NO_SETTINGS_CATEGORIES.includes(category);
-              const fields = descriptorFields[category];
-              const hasDescriptorForm = showSettings && !!fields && fields.length > 0;
-              const settingsDraft =
-                draftJson[category] ?? safeJsonStringify(row?.settings);
-              const parsedSettings = safeJsonParse(settingsDraft);
-
+              const row =
+                rowsByCategory.get(category) ??
+                ({ category, source: null } as MediaDefaultRow);
               return (
-                <div
+                <MediaCategoryRow
                   key={category}
-                  className="flex flex-col gap-[10px] p-[16px] rounded-[8px] border border-newTableBorder bg-newBgColorInner"
-                >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-[14px] font-[600] text-textColor">
-                        {CATEGORY_LABELS[category]}
-                      </div>
-                      <div className="text-[12px] text-newTextColor/60">
-                        {CATEGORY_HELP[category]}
-                      </div>
-                    </div>
-                    {row?.source === 'stored' && (
-                      <Button
-                        type="button"
-                        secondary
-                        onClick={() => saveDefault(category, null)}
-                        loading={saving[category]}
-                      >
-                        {t('reset_to_auto', 'Reset to Auto')}
-                      </Button>
-                    )}
-                  </div>
-
-                  <DefaultModelSelect
-                    domain="media"
-                    category={category}
-                    value={value}
-                    onChange={(newValue) => {
-                      if (!newValue) return;
-                      saveDefault(category, newValue);
-                    }}
-                  />
-
-                  {showSettings && (
-                    <div className="flex flex-col gap-[6px]">
-                      {hasDescriptorForm ? (
-                        <>
-                          <div className="text-[12px] text-newTextColor/70">
-                            {t('default_settings', 'Default settings')}
-                          </div>
-                          <StudioForm
-                            fields={fields}
-                            values={draftFormValues[category] ?? {}}
-                            onChange={(name, val) =>
-                              setDraftFormValues((prev) => ({
-                                ...prev,
-                                [category]: { ...(prev[category] ?? {}), [name]: val },
-                              }))
-                            }
-                            provider={row?.providerId ?? ''}
-                            operation={MEDIA_CATEGORY_OPERATION[category]}
-                          />
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              const values = draftFormValues[category];
-                              const cleaned: Record<string, unknown> = {};
-                              for (const f of fields) {
-                                const v = values?.[f.name];
-                                if (v !== undefined && v !== '' && v !== null) {
-                                  cleaned[f.name] = v;
-                                }
-                              }
-                              saveDefault(category, value, cleaned);
-                            }}
-                            loading={saving[category]}
-                            className="self-start"
-                          >
-                            {t('save_settings', 'Save settings')}
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <div className="text-[12px] text-newTextColor/70">
-                            {t('default_settings', 'Default settings (JSON)')}
-                          </div>
-                          <textarea
-                            value={settingsDraft}
-                            onChange={(e) =>
-                              setDraftJson((prev) => ({
-                                ...prev,
-                                [category]: e.target.value,
-                              }))
-                            }
-                            placeholder='{"resolution": "1024x1024"}'
-                            rows={4}
-                            className="w-full px-[12px] py-[9px] rounded-[8px] bg-newBgColorInner border border-newTableBorder text-[13px] text-textColor outline-none focus:border-[#2B5CD3] transition-colors resize-y min-h-[88px] font-mono"
-                          />
-                          {parsedSettings === null && settingsDraft.trim() !== '' && (
-                            <div className="text-[11px] text-amber-600">
-                              {t('invalid_json', 'Invalid JSON')}
-                            </div>
-                          )}
-                          <Button
-                            type="button"
-                            onClick={() => {
-                              if (parsedSettings === null && settingsDraft.trim() !== '') {
-                                toaster.show(t('invalid_json', 'Invalid JSON'), 'warning');
-                                return;
-                              }
-                              saveDefault(category, value, parsedSettings);
-                            }}
-                            loading={saving[category]}
-                            className="self-start"
-                          >
-                            {t('save_settings', 'Save settings')}
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {isAuto && (
-                    <div className="text-[11px] text-newTextColor/45">
-                      {t('auto_default', 'Auto — picks a provider from your enabled media providers.')}
-                    </div>
-                  )}
-                </div>
+                  row={row}
+                  saving={!!saving[category]}
+                  onSave={saveDefault}
+                />
               );
             })}
           </div>

@@ -24,6 +24,11 @@ import type { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.s
 import type { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
 import { CapabilityNotAvailable } from './errors';
 import type { MediaOperation } from '@gitroom/nestjs-libraries/ai/governance/media-operation.types';
+import {
+  AI_MEDIA_CATEGORIES,
+  MEDIA_CATEGORY_OPERATION,
+  type AiMediaCategory,
+} from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
 
 // Read-only, credential-free view of which media providers are active per operation.
 // Surfaced to non-admin users (4F) so they can see what media capabilities the org
@@ -32,6 +37,24 @@ export interface MediaProviderSummaryEntry {
   operation: MediaOperation;
   available: boolean;
   providers: { id: string; enabled: boolean; c2paAvailable: boolean }[];
+}
+
+// Single, honest "can this media tool run?" signal — keyed off the SAME predicate the
+// generation path uses (`_resolveForOperation`, incl. the image AI-fallback), so the
+// Settings disable-state, the composer/Designer gating, and the actual generate endpoints
+// can never disagree. `operations` is the authoritative availability (what consumers gate
+// on); `tools` projects it onto the 16 user-facing categories with best-effort
+// provider/model detail for display.
+export interface MediaToolStatusEntry {
+  available: boolean;
+  provider?: string;
+  version?: string;
+  model?: string;
+  reason?: string;
+}
+export interface MediaToolStatus {
+  operations: Record<MediaOperation, { available: boolean; provider?: string }>;
+  tools: Record<AiMediaCategory, MediaToolStatusEntry>;
 }
 
 const ALL_MEDIA_OPERATIONS: MediaOperation[] = [
@@ -441,6 +464,72 @@ export class AiMediaService {
         }));
       return { operation, available: providers.length > 0, providers };
     });
+  }
+
+  // The single source of truth for media-tool availability. Availability is computed with
+  // the EXACT predicate the generate path uses (`_resolveForOperation` + the image
+  // AI-fallback), so `/media/tools/status` cannot say "available" while a generate call
+  // 409s (or vice-versa). provider/model on the per-category `tools` map are best-effort
+  // display detail (the resolved default); they never affect the `available` decision.
+  async getToolStatus(orgId?: string): Promise<MediaToolStatus> {
+    const operations = {} as MediaToolStatus['operations'];
+
+    for (const op of ALL_MEDIA_OPERATIONS) {
+      let candidates: ResolvedMediaProvider[] = [];
+      try {
+        candidates = await this._resolveForOperation(orgId, op);
+      } catch {
+        candidates = [];
+      }
+      let available = candidates.length > 0;
+      let provider = candidates[0]?.adapter.identifier;
+
+      // Image generation has a behaviour-preserving fallback onto the AI facade's
+      // imageModel() (see generateImageResult), so image is "available" even with no
+      // image-capable media provider when the org has an AI image model.
+      if (!available && op === 'image' && orgId) {
+        try {
+          const model = await this._aiModelProvider.imageModel('utility', orgId);
+          if (model) {
+            available = true;
+            provider = 'ai-media';
+          }
+        } catch {
+          // no AI image model → stays unavailable
+        }
+      }
+
+      operations[op] = { available, provider };
+    }
+
+    const tools = {} as MediaToolStatus['tools'];
+    for (const category of AI_MEDIA_CATEGORIES) {
+      const op = MEDIA_CATEGORY_OPERATION[category];
+      const opStatus = operations[op];
+      const entry: MediaToolStatusEntry = {
+        available: opStatus.available,
+        provider: opStatus.provider,
+      };
+      if (!opStatus.available) {
+        entry.reason = 'No provider configured — enable one in Settings → Media.';
+      } else if (orgId && this._defaultsResolution) {
+        // Best-effort: surface the resolved default provider/version/model for display
+        // and so Settings can offer a provider-level option. Never gates availability.
+        try {
+          const resolved = await this._defaultsResolution.resolve('media', category, orgId);
+          if (resolved) {
+            entry.provider = resolved.providerId;
+            entry.version = resolved.version;
+            entry.model = resolved.model;
+          }
+        } catch {
+          // keep the operation-level provider
+        }
+      }
+      tools[category] = entry;
+    }
+
+    return { operations, tools };
   }
 
   private async _safeGetEnabledProviders(orgId: string) {

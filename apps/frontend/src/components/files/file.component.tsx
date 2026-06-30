@@ -27,6 +27,7 @@ import dynamic from 'next/dynamic';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { AiImage } from '@gitroom/frontend/components/launches/ai.image';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { DropFiles } from '@gitroom/frontend/components/layout/drop.files';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -702,6 +703,10 @@ export const MultiFileComponent: FC<{
   const permissions = usePermissions();
   const modals = useModals();
   const t = useT();
+  // Per-tool media availability — optimistic while loading, fail-open on error (a status
+  // outage must not silently kill the AI buttons). Gates AI Image / AI Video so we don't
+  // offer a generation the org has no provider for (it would 409 server-side).
+  const { operationAvailable } = useMediaToolsStatus();
   const [currentMedia, setCurrentMedia] = useState(value);
   useEffect(() => {
     if (value) {
@@ -889,8 +894,16 @@ export const MultiFileComponent: FC<{
 
               {!!user?.tier?.ai && (
                 <>
-                  <AiImage value={text} onChange={changeMedia} />
-                  <AiVideo value={text} onChange={changeMedia} />
+                  <AiImage
+                    value={text}
+                    onChange={changeMedia}
+                    disabled={!operationAvailable('image')}
+                  />
+                  <AiVideo
+                    value={text}
+                    onChange={changeMedia}
+                    disabled={!operationAvailable('video')}
+                  />
                   <AiContentTools />
                   <AiBestTime />
                   <AiPromptLibraryInsert />

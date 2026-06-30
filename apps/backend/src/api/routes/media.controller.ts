@@ -36,9 +36,12 @@ import { AiDefaultsService, DefaultNotConfiguredError } from '@gitroom/nestjs-li
 import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { UseFilters } from '@nestjs/common';
+import { MediaCapabilityFilter } from '@gitroom/backend/api/routes/media-capability.filter';
 
 @ApiTags('Media')
 @Controller('/media')
+@UseFilters(MediaCapabilityFilter)
 export class MediaController {
   constructor(
     private _aiDefaults: AiDefaultsService,
@@ -161,6 +164,16 @@ export class MediaController {
       }
     }
     return options;
+  }
+
+  // Single source of truth for "which media tools can this org actually use". Consumed by
+  // Settings (disable), the composer, and the Designer. Guarded with READ/MEDIA only (no
+  // @RequirePermission) so it is never stricter than the generate endpoints it gates —
+  // Sections.MEDIA is not paywalled, so this won't 402 a user who can otherwise generate.
+  @Get('/tools/status')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  async getToolStatus(@GetOrgFromRequest() org: Organization) {
+    return this._aiMediaService.getToolStatus(org.id);
   }
 
   @Post('/video/function')

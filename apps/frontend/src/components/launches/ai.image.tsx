@@ -126,14 +126,15 @@ ${style}
 export const AiImage: FC<{
   value: string;
   onChange: (params: { id: string; path: string }) => void;
+  disabled?: boolean;
 }> = (props) => {
   const t = useT();
-  const { onChange } = props;
+  const { onChange, disabled } = props;
   const [loading, setLoading] = useState(false);
   const modals = useModals();
 
   const openImageModal = useCallback(() => {
-    if (loading) {
+    if (loading || disabled) {
       return;
     }
     modals.openModal({
@@ -146,14 +147,23 @@ export const AiImage: FC<{
         />
       ),
     });
-  }, [loading, onChange, modals, t]);
+  }, [loading, disabled, onChange, modals, t]);
 
   return (
     <div className="relative">
       <div
         onClick={openImageModal}
+        title={
+          disabled
+            ? t(
+                'configure_image_provider',
+                'Configure an image provider in Settings → Media'
+              )
+            : undefined
+        }
         className={clsx(
-          'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
+          'h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]',
+          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
         )}
       >
         {loading && (
