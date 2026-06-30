@@ -15,8 +15,13 @@ import {
   MediaProviderCapabilities,
   MediaGenerationResult,
 } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
-import { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.service';
-import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
+// Type-only imports: SlideService/CaptionService both inject back into this AI module
+// (slide -> AiDefaultsService -> AiMediaService; caption -> AiMediaService), so a runtime
+// value-import here closes a circular `require` that leaves AiMediaService `undefined` at
+// decorator-metadata time (boot-time DI failure). They are only ever resolved lazily via
+// `moduleRef.get(...)` at call-time, so the runtime class is `require`d inside the methods.
+import type { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.service';
+import type { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
 import { CapabilityNotAvailable } from './errors';
 import type { MediaOperation } from '@gitroom/nestjs-libraries/ai/governance/media-operation.types';
 
@@ -1162,7 +1167,11 @@ export class AiMediaService {
         'video',
       );
     }
-    const slideService = this._moduleRef.get(SlideService, { strict: false });
+    // Lazy require (not a top-level import) to avoid the circular boot-time require — see note at imports.
+    const { SlideService } = require('@gitroom/nestjs-libraries/media/slide/slide.service');
+    const slideService = this._moduleRef.get<SlideService>(SlideService, {
+      strict: false,
+    });
     return slideService.generateSlide({
       orgId,
       userId: options?.userId,
@@ -1184,7 +1193,11 @@ export class AiMediaService {
         'speech',
       );
     }
-    const captionService = this._moduleRef.get(CaptionService, { strict: false });
+    // Lazy require (not a top-level import) to avoid the circular boot-time require — see note at imports.
+    const { CaptionService } = require('@gitroom/nestjs-libraries/media/caption/caption.service');
+    const captionService = this._moduleRef.get<CaptionService>(CaptionService, {
+      strict: false,
+    });
     return captionService.captionVideo({
       orgId,
       userId: options?.userId,
