@@ -1,5 +1,6 @@
 import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class TlyAdapter implements ShortLinkCapability {
   constructor(private readonly _fetch: SafeFetchPort) {}
 
@@ -129,6 +130,7 @@ export class TlyAdapter implements ShortLinkCapability {
 const _meta: ShortLinkCapability = new TlyAdapter(undefined as unknown as SafeFetchPort);
 
 export const tlyShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

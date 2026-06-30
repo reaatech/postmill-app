@@ -1,5 +1,6 @@
 import { createGateway, experimental_generateVideo as generateVideo } from 'ai';
 import { Agent } from 'undici';
+import { metadata as providerMetadata } from './metadata';
 import {
   AiSdkMediaAdapter,
   MediaProviderCapabilities,
@@ -104,6 +105,7 @@ export class GatewayMediaAdapter extends AiSdkMediaAdapter {
 const _meta = new GatewayMediaAdapter();
 
 export const gatewayMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

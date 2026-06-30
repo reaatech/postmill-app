@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   OpenAiCompatibleMediaAdapter,
   MediaProviderCapabilities,
@@ -119,6 +120,7 @@ export class SiliconFlowMediaAdapter extends OpenAiCompatibleMediaAdapter {
 const _meta = new SiliconFlowMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const siliconflowMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

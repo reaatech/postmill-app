@@ -1,5 +1,6 @@
 import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class IsgdAdapter implements ShortLinkCapability {
   constructor(private readonly _fetch: SafeFetchPort) {}
 
@@ -56,6 +57,7 @@ export class IsgdAdapter implements ShortLinkCapability {
 const _meta: ShortLinkCapability = new IsgdAdapter(undefined as unknown as SafeFetchPort);
 
 export const isgdShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

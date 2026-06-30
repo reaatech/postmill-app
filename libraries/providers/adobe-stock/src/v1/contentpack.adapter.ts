@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ContentPackCapability as ContentPackCapabilityContract,
   ContentPackCapabilityName as ContentPackCapability,
@@ -195,6 +196,7 @@ export class AdobeStockContentPack implements ContentPackCapabilityContract {
 }
 
 export const adobestockContentPackModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'contentpack',
     providerId: 'adobe-stock',

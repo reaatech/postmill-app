@@ -13,6 +13,7 @@ import { Integration } from '@prisma/client';
 import { SlackDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class SlackProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Slack has moderate API limits
   identifier = 'slack';
@@ -416,6 +417,7 @@ import {
 const __adapter = new SlackProvider();
 
 export const slackSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

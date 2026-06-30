@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import { makeS3StorageModule } from '@gitroom/provider-kernel';
 
 export const s3StorageModule = makeS3StorageModule({
@@ -8,3 +9,5 @@ export const s3StorageModule = makeS3StorageModule({
     { key: 'secretAccessKey', label: 'Secret Access Key', type: 'password', required: true },
   ],
 });
+
+s3StorageModule.metadata = providerMetadata;

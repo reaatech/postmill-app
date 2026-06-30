@@ -529,6 +529,33 @@ Settings → AI (`/settings?tab=ai`). **Preserve this — do not reintroduce an 
 `AIOrgProviderConfig`, `AIBrandProfile`, `AIPromptTemplate`, `AISettingsAudit`, `AIMediaJob`,
 `AIPromptLibraryItem`, `AIContentIndex`.
 
+## AI Model Defaults & Media Defaults
+
+Default model resolution is now **per-organization and category-driven** instead of the legacy
+scope/model hardcoding.
+
+- **Model categories (AI):** `low-reasoning`, `high-reasoning`, `vision`, `workflow`. The legacy AI
+  scopes `utility`, `generator`, `agent`, `mcp` map to these categories (`utility` → `low-reasoning`;
+  the rest → `high-reasoning`). `reasoning:true` now resolves the `high-reasoning` category.
+- **Media categories (Content):** 16 categories covering image, video, audio, and slide/caption
+  operations (e.g. `text-to-image`, `text-to-video`, `image-upscale`, `video-caption`). Each maps to
+  a base media operation (`image`, `video`, `audio`, `tts`, `upscale`, etc.).
+- **Storage:** `OrgDefaultModel` rows (`domain`, `category`, `providerId`, `version`, `model`,
+  `settings`) keyed by `(organizationId, domain, category)`.
+- **Resolution:** `DefaultsResolutionService` reads the stored row; if none, it auto-picks from the
+  org's enabled providers using provider `metadata.ts` category/capability flags and a hint list that
+  targets the historical default models. Auto-picks are deterministic but **may differ** from the old
+  hardcoded defaults when the active provider is not the historical one.
+- **API:** `GET /settings/ai/defaults`, `PUT/DELETE /settings/ai/defaults/:category`,
+  `GET /settings/ai/defaults/catalog?category=`. Media mirror under `/settings/content/media-defaults`.
+- **UI:** Settings → AI → **Model Defaults**; Settings → Content → **Media Defaults**.
+- **Kill switch:** `AI_MODEL_DEFAULTS_ENABLED=false` (default `true`) reverts AI model resolution to
+  the legacy `orgActive`/`SURFACE_DEFAULTS` chain. Media defaults have no kill switch — they are new
+  functionality, not a behavior change.
+- **Legacy deleted:** `VideoManager`, `@Video` registry, `ImagesSlides`, `Veo3`,
+  `AiMediaGenerationService`, and the `generate.video.options` chat tool. All media/text callers now
+  route through `AiDefaultsService` / `AiMediaService`.
+
 ## Short-link providers (v3.8.0)
 
 The short-link system is a pluggable, per-org configurable multi-provider system replacing the old

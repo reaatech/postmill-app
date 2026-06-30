@@ -8,6 +8,16 @@ domain. All current providers are at version `v1`.
 Use `GET /providers/catalog?domain=` to fetch this catalog live from the running backend.
 Use `GET /admin/providers/health?domain=` (super-admin) for per-version health counters.
 
+The catalog is metadata-driven: each provider package exports `src/v1/metadata.ts` with `modelCategories`, `mediaCategories`, `hasModelList`, and `modelHints`. The public `/providers/catalog` endpoint and the Settings → AI *Model Defaults* / Settings → Content *Media Defaults* tabs use this metadata to build candidate sets, format labels such as `<provider>[-<ui-name>]: <model>`, and auto-rank models when no stored default exists.
+
+The media domain also exposes three new capability flags:
+
+| Flag | Operation | Meaning |
+|---|---|---|
+| `videoBg` | `removeVideoBackground` | Remove the background from a video. |
+| `videoUpscale` | `upscaleVideo` | Upscale a video's resolution. |
+| `videoToVideo` | `generateVideo` with source video | Transform an existing video (restyle/v2v). |
+
 ## AI (`ai`)
 
 | Provider | ID | Status | Notes |

@@ -6,6 +6,7 @@ import {
 } from '@gitroom/provider-kernel';
 import { NeynarAPIClient } from '@neynar/nodejs-sdk';
 
+import { metadata as providerMetadata } from './metadata';
 // Self-contained kernel auth module for Farcaster (Neynar) login. Lives in the
 // `wrapcast` package (which also ships the Farcaster social adapter) but the auth
 // providerId is `farcaster` to match the Prisma Provider enum. The legacy
@@ -103,6 +104,7 @@ class FarcasterAuthCapability implements AuthCapability {
 }
 
 export const wrapcastAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'farcaster',

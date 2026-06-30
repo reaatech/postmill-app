@@ -10,6 +10,7 @@ import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import axios from 'axios';
 
+import { metadata as providerMetadata } from './metadata';
 const MOLTBOOK_API_BASE = 'https://www.moltbook.com/api/v1';
 
 export class MoltbookProvider extends SocialAbstract implements SocialProvider {
@@ -204,6 +205,7 @@ import {
 const __adapter = new MoltbookProvider();
 
 export const moltbookSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

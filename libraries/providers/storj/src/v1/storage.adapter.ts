@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import { makeS3StorageModule } from '@gitroom/provider-kernel';
 
 export const storjStorageModule = makeS3StorageModule({
@@ -13,3 +14,5 @@ export const storjStorageModule = makeS3StorageModule({
   resolveEndpoint: (_region, endpoint) =>
     endpoint || 'https://gateway.storjshare.io',
 });
+
+storjStorageModule.metadata = providerMetadata;

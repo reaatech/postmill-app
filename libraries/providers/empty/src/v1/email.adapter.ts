@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -27,6 +28,7 @@ export class EmptyAdapter implements EmailCapability {
 const _meta: EmailCapability = new EmptyAdapter();
 
 export const emptyEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

@@ -1,5 +1,6 @@
 import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class RebrandlyAdapter implements ShortLinkCapability {
   constructor(private readonly _fetch: SafeFetchPort) {}
 
@@ -130,6 +131,7 @@ export class RebrandlyAdapter implements ShortLinkCapability {
 const _meta: ShortLinkCapability = new RebrandlyAdapter(undefined as unknown as SafeFetchPort);
 
 export const rebrandlyShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

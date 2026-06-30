@@ -1,5 +1,6 @@
 import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class DubAdapter implements ShortLinkCapability {
   constructor(private readonly _fetch: SafeFetchPort) {}
 
@@ -120,6 +121,7 @@ export class DubAdapter implements ShortLinkCapability {
 const _meta: ShortLinkCapability = new DubAdapter(undefined as unknown as SafeFetchPort);
 
 export const dubShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

@@ -21,6 +21,7 @@ import { timer } from '@gitroom/helpers/utils/timer';
 import { Rules } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 @Rules(
   "Facebook posts can be text only, or include photos or a video. If it's a story, it must have at least one attachment (photo or video), and each media is published as a separate story."
 )
@@ -937,6 +938,7 @@ import {
 const __adapter = new FacebookProvider();
 
 export const facebookSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

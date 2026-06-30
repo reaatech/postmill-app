@@ -18,6 +18,7 @@ import mime from 'mime-types';
 import { DiscordDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class DribbbleProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Dribbble has moderate API limits
   identifier = 'dribbble';
@@ -238,6 +239,7 @@ import {
 const __adapter = new DribbbleProvider();
 
 export const dribbbleSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

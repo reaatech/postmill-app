@@ -17,6 +17,7 @@ import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 export class LemmyProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(LemmyProvider.name);
   override maxConcurrentJob = 3; // Lemmy instances typically have moderate limits
@@ -325,6 +326,7 @@ import {
 const __adapter = new LemmyProvider();
 
 export const lemmySocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

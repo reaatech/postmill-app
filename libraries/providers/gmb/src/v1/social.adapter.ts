@@ -17,6 +17,7 @@ import dayjs from 'dayjs';
 import { Rules } from '@gitroom/provider-kernel';
 import { GmbSettingsDto } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 let _clientAndGmb: {
   client: OAuth2Client;
   oauth2: (newClient: OAuth2Client) => ReturnType<typeof google.oauth2>;
@@ -673,6 +674,7 @@ import {
 const __adapter = new GmbProvider();
 
 export const gmbSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

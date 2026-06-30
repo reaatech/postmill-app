@@ -5,10 +5,12 @@ const mockImageModelGenerate = vi.fn().mockResolvedValue('https://cdn.example.co
 const mockImageModel = vi.fn().mockResolvedValue({
   generate: mockImageModelGenerate,
 });
+const mockGenerateTextWithModel = vi.fn().mockResolvedValue('{"x":0.5,"y":0.5}');
 
 vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
   AIModelProvider: class MockProvider {
     imageModel = mockImageModel;
+    generateTextWithModel = mockGenerateTextWithModel;
   },
 }));
 
@@ -104,7 +106,11 @@ interface TestSetup {
   };
 }
 
-function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]): TestSetup & { service: AiMediaService } {
+function setup(
+  adapters: MediaProviderAdapter[],
+  enabledIdentifiers?: string[],
+  defaultsResolution?: { resolve: ReturnType<typeof vi.fn> },
+): TestSetup & { service: AiMediaService } {
   const map = new Map(adapters.map((a) => [a.identifier, a]));
   const enabled = (enabledIdentifiers ?? adapters.map((a) => a.identifier)).map((identifier) => ({
     identifier,
@@ -137,6 +143,7 @@ function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]):
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
     resolution as never,
+    defaultsResolution as never,
     orgSettings as never,
     lifecycle as never,
   );
@@ -150,6 +157,7 @@ function bareService() {
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
     { resolveMedia: () => undefined } as never,
+    undefined,
   );
 }
 
@@ -158,6 +166,7 @@ describe('AiMediaService', () => {
     vi.clearAllMocks();
     mockImageModelGenerate.mockResolvedValue('https://cdn.example.com/image.png');
     mockImageModel.mockResolvedValue({ generate: mockImageModelGenerate });
+    mockGenerateTextWithModel.mockResolvedValue('{"x":0.5,"y":0.5}');
     mockGetSettings.mockResolvedValue(null);
     mockCreateMediaJob.mockResolvedValue({ id: 'job-1' });
   });
@@ -600,6 +609,45 @@ describe('AiMediaService', () => {
     });
   });
 
+  // ── Focal point ──
+
+  describe('detectFocalPoint', () => {
+    it('returns clamped coordinates from the vision default model', async () => {
+      mockGenerateTextWithModel.mockResolvedValueOnce('{"x":1.5,"y":-0.2}');
+      const defaultsResolution = {
+        resolve: vi.fn().mockResolvedValue({
+          providerId: 'openai',
+          version: 'v1',
+          model: 'gpt-4o',
+          source: 'auto',
+        }),
+      };
+      const { service } = setup([], [], defaultsResolution);
+
+      const result = await service.detectFocalPoint('https://cdn.example.com/photo.jpg', { orgId: 'org-1' });
+
+      expect(result).toEqual({ x: 1, y: 0, source: 'provider' });
+      expect(defaultsResolution.resolve).toHaveBeenCalledWith('ai', 'vision', 'org-1');
+      expect(mockGenerateTextWithModel).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        'v1',
+        'gpt-4o',
+        expect.objectContaining({ imageUrl: 'https://cdn.example.com/photo.jpg' }),
+      );
+    });
+
+    it('falls back to center when no vision default is configured', async () => {
+      const defaultsResolution = { resolve: vi.fn().mockResolvedValue(null) };
+      const { service } = setup([], [], defaultsResolution);
+
+      const result = await service.detectFocalPoint('https://cdn.example.com/photo.jpg', { orgId: 'org-1' });
+
+      expect(result).toEqual({ x: 0.5, y: 0.5, source: 'fallback' });
+      expect(mockGenerateTextWithModel).not.toHaveBeenCalled();
+    });
+  });
+
   // ── 4F summary ──
 
   describe('getMediaProviderSummary (4F)', () => {
@@ -617,6 +665,11 @@ describe('AiMediaService', () => {
         'upscale',
         'bg-remove',
         'inpaint',
+        'focal-point',
+        'slide',
+        'caption',
+        'video-bg',
+        'video-upscale',
       ]);
       expect(summary.every((e) => e.available === false)).toBe(true);
       expect(summary.every((e) => e.providers.length === 0)).toBe(true);
@@ -691,6 +744,7 @@ describe('AiMediaService', () => {
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
         { resolveMedia: (id: string) => map.get(id) } as never,
+        undefined as never,
         orgSettings as never,
         // no lifecycle
       );

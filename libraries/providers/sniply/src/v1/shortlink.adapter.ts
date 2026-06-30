@@ -1,5 +1,6 @@
 import { ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class SniplyAdapter implements ShortLinkCapability {
   constructor(private readonly _fetch: SafeFetchPort) {}
 
@@ -68,6 +69,7 @@ export class SniplyAdapter implements ShortLinkCapability {
 const _meta: ShortLinkCapability = new SniplyAdapter(undefined as unknown as SafeFetchPort);
 
 export const sniplyShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

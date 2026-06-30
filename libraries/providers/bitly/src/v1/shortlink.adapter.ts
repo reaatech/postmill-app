@@ -1,5 +1,6 @@
 import { BaseShortLinkAdapter, ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class BitlyAdapter extends BaseShortLinkAdapter {
   readonly identifier = 'bitly';
   readonly name = 'Bitly';
@@ -177,6 +178,7 @@ export class BitlyAdapter extends BaseShortLinkAdapter {
 const _meta: ShortLinkCapability = new BitlyAdapter(undefined as unknown as SafeFetchPort);
 
 export const bitlyShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

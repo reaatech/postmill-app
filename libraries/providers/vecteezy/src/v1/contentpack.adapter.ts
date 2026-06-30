@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ContentPackCapability as ContentPackCapabilityContract,
   ContentPackCapabilityName as ContentPackCapability,
@@ -158,6 +159,7 @@ export class VecteezyContentPack implements ContentPackCapabilityContract {
 }
 
 export const vecteezyContentPackModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'contentpack',
     providerId: 'vecteezy',

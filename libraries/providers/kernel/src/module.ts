@@ -1,4 +1,5 @@
 import { ProviderManifest, ProviderHealth } from './manifest';
+import { ProviderMetadata } from './domains/metadata';
 import {
   EncryptionPort,
   LoggerPort,
@@ -25,6 +26,7 @@ export interface CredentialValidationResult {
 
 export interface ProviderModule<Caps = unknown, Capability = unknown> {
   manifest: ProviderManifest<Caps>;
+  metadata?: ProviderMetadata;
   create(ctx: ProviderRuntimeContext): Capability;
   validateCredentials?(
     ctx: ProviderRuntimeContext,

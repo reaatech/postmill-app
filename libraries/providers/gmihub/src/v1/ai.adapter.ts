@@ -1,8 +1,10 @@
 import { OpenAICompatibleAdapter, type ProviderModule } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 const adapter = new OpenAICompatibleAdapter('gmihub', 'GMI Cloud', 'https://api.gmihub.ai/v1', undefined, undefined, 'hub');
 
 export const gmihubAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

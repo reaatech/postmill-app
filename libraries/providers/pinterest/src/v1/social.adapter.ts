@@ -21,6 +21,7 @@ import { Tool } from '@gitroom/provider-kernel';
 import { Rules } from '@gitroom/provider-kernel';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
+import { metadata as providerMetadata } from './metadata';
 @Rules(
   'Pinterest requires at least one media, if posting a video, you must have two attachment, one for video, one for the cover picture, When posting a video, there can be only one, if posting images, there can be maximum 5'
 )
@@ -526,6 +527,7 @@ import {
 const __adapter = new PinterestProvider();
 
 export const pinterestSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

@@ -16,6 +16,7 @@ import striptags from 'striptags';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 import { ClientInformation } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class TelegramProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Telegram has moderate bot API limits
   identifier = 'telegram';
@@ -471,6 +472,7 @@ import {
 const __adapter = new TelegramProvider();
 
 export const telegramSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

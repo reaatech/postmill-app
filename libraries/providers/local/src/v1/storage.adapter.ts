@@ -9,6 +9,7 @@ import {
 } from 'fs';
 import { randomBytes } from 'crypto';
 import path from 'path';
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   ProviderRuntimeContext,
@@ -365,6 +366,7 @@ export const localStorageModule: ProviderModule<
   Record<string, never>,
   StorageCapability
 > = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'storage',
     providerId: TYPE.toLowerCase(),

@@ -10,18 +10,22 @@ import {
   Param,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
+import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
+
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 
 @ApiTags('Org Media Provider Settings')
@@ -29,9 +33,23 @@ import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-prov
 export class MediaProviderController {
   constructor(
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
+    private _defaultsSeed: DefaultsSeedService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     private _resolution: ProviderResolutionService,
   ) {}
+
+  private _bustDefaultsCatalogCache(orgId: string): void {
+    // Best-effort cache invalidation; never fail the request if Redis is down.
+    try {
+      const prefix = `settings:content:media-defaults:catalog:${orgId}:`;
+      ioRedis
+        .keys(`${prefix}*`)
+        .then((keys) => {
+          if (keys.length) ioRedis.del(...keys);
+        })
+        .catch(() => undefined);
+    } catch {}
+  }
 
   // Resolve a media adapter through the kernel; null for an unknown provider
   // (mirrors the old in-memory registry get).
@@ -100,6 +118,10 @@ export class MediaProviderController {
       version: body.version,
     });
 
+    // Eagerly seed any unset model/media defaults now that a media provider is available.
+    this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
+    this._bustDefaultsCatalogCache(org.id);
+
     return { identifier, success: true };
   }
 
@@ -123,6 +145,7 @@ export class MediaProviderController {
       storageRootFolderId: body.storageRootFolderId,
     });
 
+    this._bustDefaultsCatalogCache(org.id);
     return { identifier, success: true };
   }
 
@@ -145,6 +168,11 @@ export class MediaProviderController {
         identifier,
         body.version,
       );
+
+      // Eagerly seed any unset model/media defaults now that the primary media provider changed.
+      this._defaultsSeed.seedUnset(org.id).catch(() => undefined);
+      this._bustDefaultsCatalogCache(org.id);
+
       return { identifier, success: true, isActive: result.isActive };
     } catch (err) {
       throw new BadRequestException((err as Error).message);
@@ -190,6 +218,8 @@ export class MediaProviderController {
     @Param('identifier') identifier: string,
   ) {
     await this._orgMediaProviderSettings.delete(org.id, identifier);
+    this._bustDefaultsCatalogCache(org.id);
     return { success: true };
   }
+
 }

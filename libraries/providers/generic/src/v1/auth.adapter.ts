@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   ProviderRuntimeContext,
@@ -187,6 +188,7 @@ class OidcAuthCapability implements AuthCapability {
 }
 
 export const genericAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'generic',

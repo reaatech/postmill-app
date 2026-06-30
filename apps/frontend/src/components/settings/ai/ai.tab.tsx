@@ -10,8 +10,9 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { ProviderSettingsPanel } from '@gitroom/frontend/components/settings/shared/kit/provider-settings-panel';
 import { aiDescriptor } from '@gitroom/frontend/components/settings/shared/kit/descriptors/ai.descriptor';
 import { BrandTab } from '@gitroom/frontend/components/settings/brand/brand.tab';
+import { ModelDefaultsTab } from '@gitroom/frontend/components/settings/ai/model-defaults.tab';
 
-type SubTab = 'provider' | 'brands' | 'templates' | 'library';
+type SubTab = 'provider' | 'model-defaults' | 'brands' | 'templates' | 'library';
 
 export const AITab = () => {
   const t = useT();
@@ -20,6 +21,7 @@ export const AITab = () => {
 
   const subTabs: { key: SubTab; label: string }[] = [
     { key: 'provider', label: t('llm_providers', 'LLM Providers') },
+    { key: 'model-defaults', label: t('model_defaults', 'Model Defaults') },
     ...(user?.tier?.current !== 'FREE'
       ? [{ key: 'brands' as SubTab, label: t('brands', 'Brands') }]
       : []),
@@ -50,6 +52,8 @@ export const AITab = () => {
       {subTab === 'brands' && <BrandTab />}
 
       {subTab === 'provider' && <ProviderSettingsPanel descriptor={aiDescriptor} />}
+
+      {subTab === 'model-defaults' && <ModelDefaultsTab />}
 
       {subTab === 'templates' && <PromptTemplatesSection />}
 

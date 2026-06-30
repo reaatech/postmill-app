@@ -25,6 +25,7 @@ import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
 
+import { metadata as providerMetadata } from './metadata';
 // @ts-ignore
 if (!global.WebSocket) global.WebSocket = WebSocket;
 
@@ -695,6 +696,7 @@ import {
 const __adapter = new RedditProvider();
 
 export const redditSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

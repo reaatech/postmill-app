@@ -14,6 +14,7 @@ import { Tool } from '@gitroom/provider-kernel';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 5; // Discord has generous rate limits for webhook posting
   identifier = 'discord';
@@ -554,6 +555,7 @@ import {
 const __adapter = new DiscordProvider();
 
 export const discordSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

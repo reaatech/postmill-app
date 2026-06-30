@@ -1,5 +1,6 @@
 import sgMail from '@sendgrid/mail';
 import { EventWebhook, EventWebhookHeader } from '@sendgrid/eventwebhook';
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -82,6 +83,7 @@ export class SendGridAdapter implements EmailCapability {
 const _meta: EmailCapability = new SendGridAdapter();
 
 export const sendgridEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

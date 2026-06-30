@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -110,6 +111,7 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
 const _meta = new BlackForestLabsAdapter(undefined as unknown as SafeFetchPort);
 
 export const blackforestlabsMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

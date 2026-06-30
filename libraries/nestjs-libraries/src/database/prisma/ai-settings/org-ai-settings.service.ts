@@ -82,8 +82,35 @@ export class OrgAiSettingsService {
       name: adapter.name,
       type: adapter.type,
       capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields,
+      enabled: config.enabled,
+      isActive: config.isActive,
       defaultModel: config.defaultModel,
       reasoningModel: config.reasoningModel,
+      credentials: decrypted,
+    };
+  }
+
+  async getByIdentifier(orgId: string, identifier: string, version?: string) {
+    const resolvedVersion = this._resolveVersion(identifier, version);
+    const config = await this._repository.getByIdentifier(orgId, identifier, resolvedVersion);
+    if (!config) return null;
+
+    const adapter = this._resolveAdapter(identifier, resolvedVersion);
+    if (!adapter) return null;
+
+    const decrypted = this._decryptCredentials(config.credentials);
+    return {
+      identifier: config.identifier,
+      version: config.version ?? 'v1',
+      name: adapter.name,
+      type: adapter.type,
+      capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields,
+      enabled: config.enabled,
+      isActive: config.isActive,
+      defaultModel: config.defaultModel || '',
+      reasoningModel: config.reasoningModel || '',
       credentials: decrypted,
     };
   }

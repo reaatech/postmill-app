@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   MediaProviderCapabilities,
@@ -67,6 +68,7 @@ export class RecraftMediaAdapter extends BearerTokenMediaAdapter {
 const _meta = new RecraftMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const recraftMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

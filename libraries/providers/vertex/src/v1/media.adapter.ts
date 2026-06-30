@@ -13,6 +13,7 @@ import {
 } from '@gitroom/provider-kernel';
 import { GoogleAuth } from 'google-auth-library';
 
+import { metadata as providerMetadata } from './metadata';
 interface VertexPredictResponse {
   predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
 }
@@ -230,6 +231,7 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
 const _meta = new VertexMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const vertexMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

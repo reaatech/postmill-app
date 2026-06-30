@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   AiSdkMediaAdapter,
   MediaProviderCapabilities,
@@ -31,6 +32,7 @@ export class AzureMediaAdapter extends AiSdkMediaAdapter {
 const _meta = new AzureMediaAdapter();
 
 export const azureMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

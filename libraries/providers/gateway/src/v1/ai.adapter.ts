@@ -1,6 +1,7 @@
 import { createGateway } from '@ai-sdk/gateway';
 import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { metadata as providerMetadata } from './metadata';
 import {
   type AiCapability as AIProviderAdapter,
   type AiCredentialField as CredentialField,
@@ -111,6 +112,7 @@ export class GatewayAdapter implements AIProviderAdapter {
 const adapter = new GatewayAdapter();
 
 export const gatewayAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

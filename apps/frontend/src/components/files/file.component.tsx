@@ -33,7 +33,6 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ReactSortable } from 'react-sortablejs';
 import { MediaComponentInner } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { AiVideo } from '@gitroom/frontend/components/launches/ai.video';
-import { AiMediaOperations } from '@gitroom/frontend/components/launches/ai.media.operations';
 import { AiBestTime } from '@gitroom/frontend/components/launches/ai.best-time';
 import { AiContentTools } from '@gitroom/frontend/components/launches/ai.content.tools';
 import { AiPromptLibraryInsert } from '@gitroom/frontend/components/launches/ai.prompt-library.insert';
@@ -892,7 +891,6 @@ export const MultiFileComponent: FC<{
                 <>
                   <AiImage value={text} onChange={changeMedia} />
                   <AiVideo value={text} onChange={changeMedia} />
-                  <AiMediaOperations />
                   <AiContentTools />
                   <AiBestTime />
                   <AiPromptLibraryInsert />

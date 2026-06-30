@@ -1,5 +1,6 @@
 import { BaseShortLinkAdapter, ShortLinkCapability, ShortLinkCredentialField, ShortLinkCapabilities, ShortLinkContext, ShortLinkStat, ProviderModule, SafeFetchPort } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class BlinkAdapter extends BaseShortLinkAdapter {
   readonly identifier = 'blink';
   readonly name = 'BL.INK';
@@ -122,6 +123,7 @@ export class BlinkAdapter extends BaseShortLinkAdapter {
 const _meta: ShortLinkCapability = new BlinkAdapter(undefined as unknown as SafeFetchPort);
 
 export const blinkShortlinkModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'shortlink',
     providerId: _meta.identifier,

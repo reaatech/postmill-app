@@ -2,6 +2,7 @@ import { createGroq } from '@ai-sdk/groq';
 import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { LanguageModelV2, EmbeddingModelV2 } from '@ai-sdk/provider-v5';
+import { metadata as providerMetadata } from './metadata';
 import {
   type AiCapability as AIProviderAdapter,
   type AiCredentialField as CredentialField,
@@ -99,6 +100,7 @@ export class GroqAdapter implements AIProviderAdapter {
 const adapter = new GroqAdapter();
 
 export const groqAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

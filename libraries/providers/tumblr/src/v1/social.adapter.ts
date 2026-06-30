@@ -5,6 +5,7 @@ import { SocialAbstract } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class TumblrProvider extends SocialAbstract implements SocialProvider {
   identifier = 'tumblr';
   name = 'Tumblr';
@@ -163,6 +164,7 @@ import {
 const __adapter = new TumblrProvider();
 
 export const tumblrSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

@@ -5,6 +5,8 @@ import type { VideoClip, VideoTrack, VideoOutput } from './designer.store';
 import { VideoPreviewEngine } from './video-preview';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { VoiceoverDialog } from './voiceover-dialog';
 
 interface VideoTimelineProps {
   store: ReturnType<typeof import('./designer.store').createDesignerStore>;
@@ -174,6 +176,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
 
   const fetch = useFetch();
   const toaster = useToaster();
+  const modals = useModals();
 
   const vo = doc.outputs[currentOutput] as VideoOutput | undefined;
   const isVideo = doc.mode === 'video' && !!vo;
@@ -509,44 +512,57 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     [store, currentOutput],
   );
 
-  const handleGenerateVoiceover = useCallback(async () => {
-    if (!vo) return;
-    const text = window.prompt('Enter the voiceover text:');
-    if (!text?.trim()) return;
-    try {
-      const res = await fetch('/media/text-to-speech', {
-        method: 'POST',
-        body: JSON.stringify({ text, voice: 'alloy' }),
-      });
-      if (!res.ok) {
+  const generateVoiceover = useCallback(
+    async (text: string, voiceId: string) => {
+      if (!vo) return;
+      try {
+        const res = await fetch('/media/text-to-speech', {
+          method: 'POST',
+          body: JSON.stringify({ text, voice: voiceId }),
+        });
+        if (!res.ok) {
+          toaster.show('Voiceover generation failed', 'warning');
+          return;
+        }
+        const { id, path } = await res.json();
+        const state = store.getState();
+        const currentVo = state.doc.outputs[currentOutput] as VideoOutput;
+        let audioTrack = currentVo.tracks.find((t) => t.type === 'audio');
+        if (!audioTrack) {
+          state.addTrack(currentOutput, 'audio');
+          audioTrack = (store.getState().doc.outputs[currentOutput] as VideoOutput).tracks.find((t) => t.type === 'audio');
+        }
+        if (!audioTrack) return;
+        const durationMs = 5000;
+        const clip: VideoClip = {
+          id: `clip-${Date.now()}`,
+          startMs: playheadMs,
+          endMs: Math.min(playheadMs + durationMs, vo.durationMs),
+          src: path,
+          fileId: id,
+          volume: 1,
+        } as VideoClip;
+        store.getState().addClip(currentOutput, audioTrack.id, clip);
+        store.getState().pushHistory();
+        toaster.show('Voiceover added to timeline', 'success');
+      } catch {
         toaster.show('Voiceover generation failed', 'warning');
-        return;
       }
-      const { id, path, name } = await res.json();
-      const state = store.getState();
-      const currentVo = state.doc.outputs[currentOutput] as VideoOutput;
-      let audioTrack = currentVo.tracks.find((t) => t.type === 'audio');
-      if (!audioTrack) {
-        state.addTrack(currentOutput, 'audio');
-        audioTrack = (store.getState().doc.outputs[currentOutput] as VideoOutput).tracks.find((t) => t.type === 'audio');
-      }
-      if (!audioTrack) return;
-      const durationMs = 5000;
-      const clip: VideoClip = {
-        id: `clip-${Date.now()}`,
-        startMs: playheadMs,
-        endMs: Math.min(playheadMs + durationMs, vo.durationMs),
-        src: path,
-        fileId: id,
-        volume: 1,
-      } as VideoClip;
-      store.getState().addClip(currentOutput, audioTrack.id, clip);
-      store.getState().pushHistory();
-      toaster.show('Voiceover added to timeline', 'success');
-    } catch {
-      toaster.show('Voiceover generation failed', 'warning');
-    }
-  }, [vo, playheadMs, currentOutput, store, fetch, toaster]);
+    },
+    [vo, playheadMs, currentOutput, store, fetch, toaster]
+  );
+
+  const handleGenerateVoiceover = useCallback(() => {
+    if (!vo) return;
+    modals.openModal({
+      children: (
+        <VoiceoverDialog
+          onClose={() => modals.closeAll()}
+          onGenerate={generateVoiceover}
+        />
+      ),
+    });
+  }, [vo, modals, generateVoiceover]);
 
   const handleGenerateCaptions = useCallback(async () => {
     if (!vo) return;

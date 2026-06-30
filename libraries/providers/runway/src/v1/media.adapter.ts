@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -152,6 +153,7 @@ export class RunwayAdapter implements MediaProviderAdapter {
 const _meta = new RunwayAdapter(undefined as unknown as SafeFetchPort);
 
 export const runwayMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

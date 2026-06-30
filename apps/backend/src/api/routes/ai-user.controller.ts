@@ -30,6 +30,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { PROMPT_CONSTANTS } from '@gitroom/nestjs-libraries/ai/prompt-constants.const';
 import dayjs from 'dayjs';
 
@@ -187,6 +188,7 @@ export class AiUserController {
     private _guardrails: GuardrailService,
     private _budget: BudgetService,
     private _analyticsService: AnalyticsService,
+    private _aiDefaults: AiDefaultsService,
   ) {}
 
   @Get('/usage')
@@ -412,6 +414,13 @@ export class AiUserController {
             { orgId, userId },
           );
           return { text };
+        }
+        case 'alt-text': {
+          const { altText } = await this._aiDefaults.altText(
+            orgId,
+            body.imageUrl || '',
+          );
+          return { altText };
         }
         default:
           throw new HttpException(

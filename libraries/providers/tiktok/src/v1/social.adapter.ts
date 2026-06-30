@@ -21,6 +21,7 @@ import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/provider-kernel';
 
 
+import { metadata as providerMetadata } from './metadata';
 @Rules(
   'TikTok can have one video or one picture or multiple pictures, it cannot be without an attachment'
 )
@@ -997,6 +998,7 @@ import {
 const __adapter = new TiktokProvider();
 
 export const tiktokSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

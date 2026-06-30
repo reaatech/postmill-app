@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
+import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 
 // Pre-drop User rows still carry the profile columns that moved to UserProfile;
 // the current Prisma client no longer types them, so model the legacy shape here.
@@ -47,7 +48,8 @@ export class BackfillService {
 
   constructor(
     private prisma: PrismaService,
-    private _ledger: MigrationLedgerRepository
+    private _ledger: MigrationLedgerRepository,
+    private _defaultsSeed?: DefaultsSeedService,
   ) {}
 
   async backfill() {
@@ -87,6 +89,11 @@ export class BackfillService {
     await this._runStep(
       'RAG media providers',
       (tx) => this.migrateRagSettingsMediaProviders(tx),
+      true,
+    );
+    await this._runStep(
+      'AI/media default models',
+      () => this.backfillDefaultModels(),
       true,
     );
   }
@@ -313,6 +320,25 @@ export class BackfillService {
           where: { id: config.id },
           data: updates,
         });
+      }
+    }
+  }
+
+  private async backfillDefaultModels() {
+    if (!this._defaultsSeed) {
+      this._logger.warn('DefaultsSeedService not available; skipping default-model backfill');
+      return;
+    }
+    const orgs = await this.prisma.organization.findMany({
+      select: { id: true },
+    });
+    for (const org of orgs) {
+      try {
+        await this._defaultsSeed.seedUnset(org.id);
+      } catch (err) {
+        this._logger.warn(
+          `Default-model backfill failed for org ${org.id}: ${(err as Error).message}`,
+        );
       }
     }
   }

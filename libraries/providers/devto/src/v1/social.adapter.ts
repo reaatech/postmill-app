@@ -12,6 +12,7 @@ import { makeId } from '@gitroom/provider-kernel';
 import { DevToSettingsDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class DevToProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Dev.to has moderate publishing limits
   identifier = 'devto';
@@ -316,6 +317,7 @@ import {
 const __adapter = new DevToProvider();
 
 export const devtoSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

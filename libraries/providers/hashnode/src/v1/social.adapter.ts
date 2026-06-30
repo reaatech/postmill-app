@@ -14,6 +14,7 @@ import { Integration } from '@prisma/client';
 import { makeId } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class HashnodeProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Hashnode has lenient publishing limits
   identifier = 'hashnode';
@@ -400,6 +401,7 @@ import {
 const __adapter = new HashnodeProvider();
 
 export const hashnodeSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

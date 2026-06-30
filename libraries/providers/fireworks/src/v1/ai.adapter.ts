@@ -2,6 +2,7 @@ import { createFireworks } from '@ai-sdk/fireworks';
 import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { LanguageModelV2, ImageModelV2, EmbeddingModelV2 } from '@ai-sdk/provider-v5';
+import { metadata as providerMetadata } from './metadata';
 import {
   type AiCapability as AIProviderAdapter,
   type AiCredentialField as CredentialField,
@@ -104,6 +105,7 @@ export class FireworksAdapter implements AIProviderAdapter {
 const adapter = new FireworksAdapter();
 
 export const fireworksAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

@@ -15,6 +15,13 @@ import { ToolFirewallService } from './governance/tool-firewall.service';
 import { IdempotencyFactory } from './governance/idempotency.factory';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
+import { OrgDefaultModelRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-default-model.repository';
+import { DefaultsResolutionService } from './defaults/defaults-resolution.service';
+import { DefaultsSeedService } from './defaults/defaults-seed.service';
+import { AiDefaultsService } from './defaults/ai-defaults.service';
+import { DefaultsSettingsValidator } from './defaults/defaults-settings.validator';
+import { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.service';
+import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
 
 @Global()
 @Module({
@@ -35,6 +42,13 @@ import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/pris
     IdempotencyFactory,
     OrgAiSettingsService,
     OrgAiSettingsRepository,
+    OrgDefaultModelRepository,
+    DefaultsResolutionService,
+    DefaultsSeedService,
+    AiDefaultsService,
+    DefaultsSettingsValidator,
+    SlideService,
+    CaptionService,
   ],
   exports: [
     AIModelProvider,
@@ -52,6 +66,13 @@ import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/pris
     IdempotencyFactory,
     OrgAiSettingsService,
     OrgAiSettingsRepository,
+    OrgDefaultModelRepository,
+    DefaultsResolutionService,
+    DefaultsSeedService,
+    AiDefaultsService,
+    DefaultsSettingsValidator,
+    SlideService,
+    CaptionService,
   ],
 })
 export class AiModule implements OnModuleInit, NestModule {

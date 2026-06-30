@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { Webhook } from 'svix';
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -87,6 +88,7 @@ export class ResendAdapter implements EmailCapability {
 const _meta: EmailCapability = new ResendAdapter();
 
 export const resendEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

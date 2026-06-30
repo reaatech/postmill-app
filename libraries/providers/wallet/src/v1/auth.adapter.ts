@@ -8,6 +8,7 @@ import { randomBytes } from 'crypto';
 import bs58 from 'bs58';
 import nacl from 'tweetnacl';
 
+import { metadata as providerMetadata } from './metadata';
 // Minimal structural type for the ioRedis client the wallet nonce store needs.
 // The real client is threaded in via ctx.extras.redis by the auth provider
 // manager, so this package never imports nestjs-libraries.
@@ -97,6 +98,7 @@ class WalletAuthCapability implements AuthCapability {
 }
 
 export const walletAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'wallet',

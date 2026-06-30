@@ -17,6 +17,7 @@ import { FarcasterDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 import { Rules } from '@gitroom/provider-kernel';
 
+import { socialMetadata as providerMetadata } from './metadata';
 @Rules(
   'Farcaster/Warpcast can only accept pictures'
 )
@@ -213,6 +214,7 @@ import {
 const __adapter = new FarcasterProvider();
 
 export const wrapcastSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

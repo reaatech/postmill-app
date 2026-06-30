@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ContentPackCapability as ContentPackCapabilityContract,
   ContentPackCapabilityName as ContentPackCapability,
@@ -198,6 +199,7 @@ export class EnvatoContentPack implements ContentPackCapabilityContract {
 }
 
 export const envatoContentPackModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'contentpack',
     providerId: 'envato',

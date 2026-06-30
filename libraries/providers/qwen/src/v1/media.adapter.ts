@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -176,6 +177,7 @@ export class QwenMediaAdapter implements MediaProviderAdapter {
 const _meta = new QwenMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const qwenMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

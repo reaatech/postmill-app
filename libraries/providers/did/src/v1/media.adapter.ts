@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -115,6 +116,7 @@ export class DIDAdapter implements MediaProviderAdapter {
 const _meta = new DIDAdapter(undefined as unknown as SafeFetchPort);
 
 export const didMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

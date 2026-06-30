@@ -15,6 +15,7 @@ import { Integration } from '@prisma/client';
 import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class WhopProvider extends SocialAbstract implements SocialProvider {
   identifier = 'whop';
   name = 'Whop';
@@ -389,6 +390,7 @@ import {
 const __adapter = new WhopProvider();
 
 export const whopSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

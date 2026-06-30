@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   AiSdkMediaAdapter,
   MediaProviderCapabilities,
@@ -33,6 +34,7 @@ export class BedrockMediaAdapter extends AiSdkMediaAdapter {
 const _meta = new BedrockMediaAdapter();
 
 export const bedrockMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

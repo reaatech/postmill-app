@@ -25,6 +25,7 @@ import { Rules } from '@gitroom/provider-kernel';
 import { Integration } from '@prisma/client';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 let _clientAndYoutube: {
   client: OAuth2Client;
   youtube: (newClient: OAuth2Client) => ReturnType<typeof google.youtube>;
@@ -784,6 +785,7 @@ import {
 const __adapter = new YoutubeProvider();
 
 export const youtubeSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

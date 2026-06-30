@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ContentPackCapability as ContentPackCapabilityContract,
   ContentPackCapabilityName as ContentPackCapability,
@@ -230,6 +231,7 @@ export class MagnificContentPack implements ContentPackCapabilityContract {
 }
 
 export const magnificContentPackModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'contentpack',
     providerId: 'magnific',

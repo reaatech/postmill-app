@@ -8,6 +8,11 @@ export interface MediaProviderCapabilities {
   upscale: boolean;
   bgRemove: boolean;
   inpaint: boolean;
+
+  // Extended operation taxonomy for tenant media defaults.
+  videoBg?: boolean;
+  videoUpscale?: boolean;
+  videoToVideo?: boolean;
 }
 
 export interface MediaArtifactMetadata {
@@ -137,6 +142,10 @@ export interface MediaCapability {
   upscaleImage?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   removeBackground?(imageUrl: string, options?: MediaGenerateOptions): Promise<string>;
   inpaintImage?(imageUrl: string, maskUrl: string, prompt: string, options?: MediaGenerateOptions): Promise<string>;
+
+  listVoices?(options?: MediaCredentialOptions): Promise<Array<{ id: string; label: string; previewUrl?: string }>>;
+  upscaleVideo?(videoUrl: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
+  removeVideoBackground?(videoUrl: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission>;
 }
 
 // Legacy alias: the per-org media-generation provider contract was historically named

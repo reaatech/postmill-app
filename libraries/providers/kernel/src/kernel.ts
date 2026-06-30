@@ -1,5 +1,6 @@
 import { ProviderDomain, ProviderKey, keyString, DEFAULT_VERSION } from './identity';
-import { ProviderManifest, ProviderVersionStatus, validateManifest, manifestKeyString } from './manifest';
+import { ProviderManifest, validateManifest, manifestKeyString } from './manifest';
+import { ProviderMetadata } from './domains/metadata';
 import { ProviderModule, ProviderRuntimeContext } from './module';
 import { TelemetryPort } from './ports';
 import {
@@ -167,13 +168,38 @@ export class ProviderKernel {
     return Array.from(providerMap.values()).map((m) => m.manifest);
   }
 
-  listManifests(domain?: ProviderDomain): ProviderManifest[] {
-    const out: ProviderManifest[] = [];
+  listManifests(
+    domain?: ProviderDomain,
+  ): Array<ProviderManifest & { metadata?: ProviderMetadata }> {
+    const out: Array<ProviderManifest & { metadata?: ProviderMetadata }> = [];
     for (const [d, domainMap] of this._store) {
       if (domain && d !== domain) continue;
       for (const providerMap of domainMap.values()) {
         for (const mod of providerMap.values()) {
-          out.push(mod.manifest);
+          out.push({ ...mod.manifest, metadata: mod.metadata });
+        }
+      }
+    }
+    return out;
+  }
+
+  getMetadata(
+    domain: ProviderDomain,
+    providerId: string,
+    version: string,
+  ): ProviderMetadata | undefined {
+    return this._store.get(domain)?.get(providerId)?.get(version)?.metadata;
+  }
+
+  listMetadata(domain?: ProviderDomain): ProviderMetadata[] {
+    const out: ProviderMetadata[] = [];
+    for (const [d, domainMap] of this._store) {
+      if (domain && d !== domain) continue;
+      for (const providerMap of domainMap.values()) {
+        for (const mod of providerMap.values()) {
+          if (mod.metadata) {
+            out.push(mod.metadata);
+          }
         }
       }
     }

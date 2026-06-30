@@ -1,6 +1,7 @@
 import Mailgun from 'mailgun.js';
 import formData from 'form-data';
 import { createHmac, timingSafeEqual } from 'crypto';
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -105,6 +106,7 @@ export class MailgunAdapter implements EmailCapability {
 const _meta: EmailCapability = new MailgunAdapter();
 
 export const mailgunEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

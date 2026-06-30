@@ -11,6 +11,7 @@ export * from './domains/ai';
 export * from './domains/ai-helpers';
 export * from './domains/media';
 export * from './domains/media-helpers';
+export * from './domains/metadata';
 export * from './domains/storage';
 export * from './domains/storage-helpers';
 export * from './domains/shortlink';

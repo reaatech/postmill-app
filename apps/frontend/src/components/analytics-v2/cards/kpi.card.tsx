@@ -94,7 +94,7 @@ export const KpiCard: FC<{ label: string; value: string; color?: string }> = ({
     <span className="relative text-[13px] font-medium text-newTableText uppercase tracking-wide">
       {label}
     </span>
-    <span className="relative text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
+    <span className="relative text-[32px] mobile:text-[24px] xs:text-[20px] leading-[40px] mobile:leading-[32px] xs:leading-[28px] font-semibold tracking-tight tabular-nums">
       {value}
     </span>
   </div>

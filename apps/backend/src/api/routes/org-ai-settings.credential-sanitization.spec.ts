@@ -21,7 +21,11 @@ const org: Organization = { id: 'org-1' } as any;
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
+    { seedUnset: vi.fn() } as any,
+    { resolve: vi.fn(), resolveAll: vi.fn(), candidates: vi.fn() } as any,
+    { get: vi.fn(), upsert: vi.fn(), getAll: vi.fn(), remove: vi.fn() } as any,
     { resolveAI: (): any => undefined } as unknown as ProviderResolutionService,
+    { validate: (_domain: any, _category: any, settings: any) => settings } as any,
     undefined as any,
   ) as any;
 }

@@ -12,6 +12,7 @@ import { Integration } from '@prisma/client';
 import { KickDto } from '@gitroom/provider-kernel';
 import { createHash, randomBytes } from 'crypto';
 
+import { metadata as providerMetadata } from './metadata';
 export class KickProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3;
   identifier = 'kick';
@@ -242,6 +243,7 @@ import {
 const __adapter = new KickProvider();
 
 export const kickSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

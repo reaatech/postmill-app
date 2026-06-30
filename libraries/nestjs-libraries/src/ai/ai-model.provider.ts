@@ -13,6 +13,8 @@ import { AiSettingsManager } from './ai-settings.manager';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import type { ImageModel, LanguageModel } from './ai-provider.interface';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { DefaultsResolutionService } from './defaults/defaults-resolution.service';
+import { SCOPE_TO_CATEGORY } from './defaults/default-categories';
 
 import { CapabilityNotAvailable, BudgetExceeded, GuardrailViolation } from './governance/errors';
 import { TelemetryService } from './governance/telemetry.service';
@@ -66,6 +68,8 @@ export interface ResolvedConfig {
 
 const MAX_RETRIES = 3;
 
+const AI_MODEL_DEFAULTS_ENABLED = process.env.AI_MODEL_DEFAULTS_ENABLED !== 'false';
+
 const CONTEXT_WINDOW_LIMITS: Record<string, number> = {
   'gpt-4.1': 32000,
   'gpt-5.2': 32000,
@@ -107,6 +111,7 @@ export class AIModelProvider {
     private readonly _guardrails: GuardrailService,
     private readonly _brands: BrandsService,
     private readonly _resolution: ProviderResolutionService,
+    private readonly _defaultsResolution: DefaultsResolutionService,
     @Inject(PROVIDER_KERNEL) private readonly _kernel: ProviderKernel,
     private readonly _semanticCache?: SemanticCacheService,
     private readonly _modelRouter?: ModelRouterService,
@@ -148,6 +153,15 @@ export class AIModelProvider {
     }
   }
 
+  private async _credentialsForProvider(
+    orgId: string,
+    providerId: string,
+    version = 'v1',
+  ): Promise<Record<string, string> | null> {
+    const config = await this._orgAiSettings.getByIdentifier(orgId, providerId, version);
+    return config?.credentials ?? null;
+  }
+
   private _parseProviderRef(ref: string): { providerId: string; version?: string } {
     const at = ref.lastIndexOf('@');
     if (at === -1) return { providerId: ref, version: 'v1' };
@@ -184,6 +198,42 @@ export class AIModelProvider {
     this._ensureTelemetryConfigured(settings);
 
     const orgId = _orgId;
+
+    // Try the new per-org category default first (kill-switchable).
+    if (AI_MODEL_DEFAULTS_ENABLED && orgId) {
+      const category = options?.reasoning ? 'high-reasoning' : SCOPE_TO_CATEGORY[scope];
+      const defaultModel = await this._defaultsResolution.resolve('ai', category, orgId);
+      if (defaultModel) {
+        const adapter = this._resolveAI(defaultModel.providerId, {
+          version: defaultModel.version,
+          credentials: {},
+          orgId,
+        });
+        if (adapter) {
+          const aiSettings = await this._orgAiSettings.getActiveProvider(orgId);
+          const creds =
+            aiSettings?.identifier === defaultModel.providerId
+              ? aiSettings.credentials
+              : await this._credentialsForProvider(orgId, defaultModel.providerId, defaultModel.version);
+
+          if (creds) {
+            const resolvedConfig = {
+              adapter,
+              modelId: await this._routeModel(scope, orgId, defaultModel.model || SURFACE_DEFAULTS[scope].textModel),
+              creds,
+              providerId: defaultModel.providerId,
+              version: defaultModel.version,
+              defaultSurface: SURFACE_DEFAULTS[scope],
+              settings,
+            };
+            if (this._hasRequiredCredentials(resolvedConfig)) {
+              return resolvedConfig;
+            }
+          }
+        }
+      }
+    }
+
     const orgActive = orgId
       ? await this._orgAiSettings.getActiveProvider(orgId)
       : null;
@@ -210,7 +260,9 @@ export class AIModelProvider {
       );
     }
 
-    const rawScopedModels = settings?.scopeModels;
+    // Legacy scoped-models read: only used when the new category defaults are
+    // kill-switched off, preserving the exact pre-defaults resolution behaviour.
+    const rawScopedModels = !AI_MODEL_DEFAULTS_ENABLED ? settings?.scopeModels : undefined;
     const scopedModels = this._isValidScopedModels(rawScopedModels) ? rawScopedModels : undefined;
     const scopeConfig = scopedModels?.[scope];
 
@@ -310,7 +362,9 @@ export class AIModelProvider {
 
           const fallbackCreds = fallbackOrgActive?.credentials || {};
 
-          const fallbackRawModels = globalSettings.scopeModels;
+          // Legacy scoped-models read: only consulted for the fallback provider when
+          // the new category defaults are kill-switched off.
+          const fallbackRawModels = !AI_MODEL_DEFAULTS_ENABLED ? globalSettings.scopeModels : undefined;
           const fallbackScopedModels = this._isValidScopedModels(fallbackRawModels) ? fallbackRawModels : undefined;
           const fallbackScopeConfig = fallbackScopedModels?.[scope];
           const fallbackScopedModel =
@@ -824,6 +878,129 @@ export class AIModelProvider {
       },
       scope,
       options?.orgId,
+    );
+  }
+
+  async generateTextWithModel(
+    orgId: string | undefined,
+    providerId: string,
+    version: string,
+    modelId: string | undefined,
+    args: { prompt?: string; messages?: any[]; system?: string; temperature?: number; maxTokens?: number; imageUrl?: string } = {},
+  ): Promise<string> {
+    const creds = orgId ? await this._credentialsForProvider(orgId, providerId, version) : null;
+    if (!creds) {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
+    }
+
+    const adapter = this._resolveAI(providerId, { version, credentials: creds, orgId });
+    if (!adapter) {
+      throw new Error(`AI provider adapter "${providerId}" is not registered.`);
+    }
+
+    const effectiveModel = modelId || adapter.defaultModelId || 'gpt-4.1';
+
+    return this._telemetry.startSpan(
+      'ai.generateTextWithModel',
+      async (span) => {
+        span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, providerId);
+        span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, effectiveModel);
+        if (orgId) span.setAttribute('ai.organizationId', orgId);
+
+        await this._budget.checkBudget('utility', orgId);
+
+        const model = adapter.createLanguageModel(creds, effectiveModel, {
+          temperature: args.temperature,
+        });
+
+        let promptPayload = args.messages;
+        if (!promptPayload) {
+          const content: any[] = [{ type: 'text', text: args.prompt || '' }];
+          if (args.imageUrl) {
+            content.push({ type: 'image', image: args.imageUrl });
+          }
+          promptPayload = [{ role: 'user', content }];
+        }
+        const result = await (model as any).doGenerate({ prompt: promptPayload });
+        const outputText = this._extractText(result);
+        const checkedOutput = await this._guardrails.checkOutput(outputText, { orgId });
+
+        this._health.recordSuccess(providerId);
+        await this._recordUsage({
+          usage: result.usage,
+          span,
+          orgId,
+          providerId,
+          modelId: effectiveModel,
+          scope: 'utility',
+        });
+
+        return checkedOutput;
+      },
+      { 'ai.provider': providerId, 'ai.model': effectiveModel },
+    );
+  }
+
+  async generateObjectWithModel<T>(
+    orgId: string | undefined,
+    providerId: string,
+    version: string,
+    modelId: string | undefined,
+    args: { prompt?: string; messages?: any[]; system?: string; schema?: any; temperature?: number } = {},
+  ): Promise<T> {
+    const creds = orgId ? await this._credentialsForProvider(orgId, providerId, version) : null;
+    if (!creds) {
+      throw new Error(AI_NOT_CONFIGURED_MESSAGE);
+    }
+
+    const adapter = this._resolveAI(providerId, { version, credentials: creds, orgId });
+    if (!adapter) {
+      throw new Error(`AI provider adapter "${providerId}" is not registered.`);
+    }
+
+    const effectiveModel = modelId || adapter.defaultModelId || 'gpt-4.1';
+
+    return this._telemetry.startSpan(
+      'ai.generateObjectWithModel',
+      async (span) => {
+        span.setAttribute(TelemetryService.ATTR_GEN_AI_SYSTEM, providerId);
+        span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, effectiveModel);
+        if (orgId) span.setAttribute('ai.organizationId', orgId);
+
+        await this._budget.checkBudget('utility', orgId);
+
+        const model = adapter.createLanguageModel(creds, effectiveModel, {
+          temperature: args.temperature,
+        });
+
+        const promptPayload = args.messages || [{ role: 'user', content: args.prompt || '' }];
+        const result = await (model as any).doGenerate({
+          prompt: promptPayload,
+          responseFormat: { type: 'json' },
+        });
+        const outputText = this._extractText(result);
+        const checkedOutput = await this._guardrails.checkOutput(outputText, { orgId });
+
+        this._health.recordSuccess(providerId);
+        await this._recordUsage({
+          usage: result.usage,
+          span,
+          orgId,
+          providerId,
+          modelId: effectiveModel,
+          scope: 'utility',
+        });
+
+        if (!checkedOutput) {
+          throw new Error('AI returned empty response for structured output');
+        }
+        const parsed = JSON.parse(checkedOutput);
+        if (args.schema && typeof args.schema.parse === 'function') {
+          return args.schema.parse(parsed) as T;
+        }
+        return parsed as T;
+      },
+      { 'ai.provider': providerId, 'ai.model': effectiveModel },
     );
   }
 

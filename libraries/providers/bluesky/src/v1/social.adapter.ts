@@ -34,6 +34,7 @@ import { Rules } from '@gitroom/provider-kernel';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
     // Known proxy gap: module-scope helper (no `this`), so it cannot route
@@ -855,6 +856,7 @@ import {
 const __adapter = new BlueskyProvider();
 
 export const blueskySocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

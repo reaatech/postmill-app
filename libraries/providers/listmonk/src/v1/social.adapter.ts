@@ -15,6 +15,7 @@ import { Tool } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 export class ListmonkProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(ListmonkProvider.name);
   override maxConcurrentJob = 100; // ListMonk has moderate rate limits
@@ -288,6 +289,7 @@ import {
 const __adapter = new ListmonkProvider();
 
 export const listmonkSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

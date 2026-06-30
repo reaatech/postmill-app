@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   MediaProviderCapabilities,
@@ -135,6 +136,7 @@ export class LtxAdapter extends BearerTokenMediaAdapter {
 const _meta = new LtxAdapter(undefined as unknown as SafeFetchPort);
 
 export const ltxMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

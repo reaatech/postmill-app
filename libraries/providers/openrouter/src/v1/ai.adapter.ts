@@ -1,6 +1,7 @@
 import { createOpenRouter } from '@openrouter/ai-sdk-provider';
 import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { metadata as providerMetadata } from './metadata';
 import {
   type AiCapability as AIProviderAdapter,
   type AiCredentialField as CredentialField,
@@ -105,6 +106,7 @@ export class OpenRouterAdapter implements AIProviderAdapter {
 const adapter = new OpenRouterAdapter();
 
 export const openrouterAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

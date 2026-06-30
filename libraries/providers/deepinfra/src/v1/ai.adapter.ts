@@ -1,8 +1,10 @@
 import { OpenAICompatibleAdapter, type ProviderModule } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 const adapter = new OpenAICompatibleAdapter('deepinfra', 'DeepInfra', 'https://api.deepinfra.com/v1/openai', {"embeddings":true}, undefined, 'hub');
 
 export const deepinfraAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

@@ -15,6 +15,7 @@ import mime from 'mime-types';
 import { Integration } from '@prisma/client';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 
+import { metadata as providerMetadata } from './metadata';
 export class VkProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 2; // VK has moderate API limits
   identifier = 'vk';
@@ -329,6 +330,7 @@ import {
 const __adapter = new VkProvider();
 
 export const vkSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

@@ -72,12 +72,12 @@ export const DashboardComponent = () => {
   const hasOverview = !!overviewData && (series.length > 0 || channelBarData.labels.length > 0);
 
   return (
-    <div className="p-[24px]">
+    <div className="p-[16px] mobile:p-[24px] overflow-x-hidden">
       <PageHeader title={greeting} description="Overview of your social presence" />
 
       <DashboardSetup />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-[16px] mb-[24px]">
+      <div className="grid grid-cols-2 xs:grid-cols-1 md:grid-cols-4 gap-[16px] mb-[24px]">
         <KpiCard label="Total Posts" value={summaryLoading ? '...' : String(summary?.totalPosts ?? 0)} color="var(--chart-1, #2b5cd3)" />
         <KpiCard label="Scheduled" value={summaryLoading ? '...' : String(summary?.scheduledPosts ?? 0)} color="var(--chart-5, #ffac30)" />
         <KpiCard label="Published (7d)" value={summaryLoading ? '...' : String(summary?.publishedNext7 ?? 0)} color="var(--chart-2, #32d583)" />
@@ -86,17 +86,17 @@ export const DashboardComponent = () => {
 
       {overviewLoading ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px] mb-[24px]">
-          <div className="h-[300px] bg-newTableHeader rounded-[12px] animate-pulse" />
-          <div className="h-[300px] bg-newTableHeader rounded-[12px] animate-pulse" />
+          <div className="h-[300px] bg-newTableHeader rounded-[12px] animate-pulse min-w-0 overflow-hidden" />
+          <div className="h-[300px] bg-newTableHeader rounded-[12px] animate-pulse min-w-0 overflow-hidden" />
         </div>
       ) : hasOverview ? (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-[16px] mb-[24px]">
           {series.length > 0 && (
-            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px]">
+            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] min-w-0 overflow-hidden">
               <h3 className="text-[13px] font-medium text-newTableText mb-[12px]">
                 {mainKPI?.label || 'Engagement'} Over Time
               </h3>
-              <div className="h-[280px]">
+              <div className="h-[280px] relative w-full min-w-0">
                 <LineChart
                   series={series}
                   height={280}
@@ -106,11 +106,11 @@ export const DashboardComponent = () => {
             </div>
           )}
           {channelBarData.labels.length > 0 && (
-            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px]">
+            <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] min-w-0 overflow-hidden">
               <h3 className="text-[13px] font-medium text-newTableText mb-[12px]">
                 Posts by Channel
               </h3>
-              <div className="h-[280px]">
+              <div className="h-[280px] relative w-full min-w-0">
                 <BarChart
                   labels={channelBarData.labels}
                   values={channelBarData.values}
@@ -127,14 +127,14 @@ export const DashboardComponent = () => {
         </div>
       ) : null}
 
-      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] mb-[24px]">
+      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[20px] mb-[24px]">
         <h2 className="text-[18px] font-[600] mb-[12px]">Upcoming Posts</h2>
         {summary?.upcomingPosts?.length > 0 ? (
           <div className="flex flex-col gap-[8px]">
             {summary.upcomingPosts.map((post: any) => (
-              <div key={post.id} className="font-playwrite flex items-center gap-[12px] text-[13px] text-newTableText py-[8px] border-b border-newTableBorder last:border-b-0">
-                <span className="flex-1 truncate">{post.content}</span>
-                <span className="text-newTableText">{new Date(post.publishDate).toLocaleDateString()}</span>
+              <div key={post.id} className="font-playwrite flex items-center gap-[12px] text-[13px] text-newTableText py-[8px] border-b border-newTableBorder last:border-b-0 min-w-0">
+                <span className="flex-1 min-w-0 truncate">{post.content}</span>
+                <span className="text-newTableText shrink-0">{new Date(post.publishDate).toLocaleDateString()}</span>
               </div>
             ))}
           </div>
@@ -146,7 +146,7 @@ export const DashboardComponent = () => {
       </div>
 
       {recsLoading ? (
-        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px]">
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[20px]">
           <h2 className="text-[18px] font-[600] mb-[12px]">Recommendations</h2>
           <div className="animate-pulse h-[100px] bg-newTableHeader rounded-[4px]" />
         </div>
@@ -157,7 +157,7 @@ export const DashboardComponent = () => {
             {recItems.map((item: RecommendationItem, index: number) => (
               <div
                 key={`rec-${index}`}
-                className="bg-newBgColorInner rounded-[12px] border border-newTableBorder p-[20px] flex flex-col gap-[12px]"
+                className="bg-newBgColorInner rounded-[12px] border border-newTableBorder p-[16px] mobile:p-[20px] flex flex-col gap-[12px]"
               >
                 <div className="flex items-center gap-[8px]">
                   <span className={`text-[11px] font-semibold px-[8px] py-[2px] rounded-full border ${

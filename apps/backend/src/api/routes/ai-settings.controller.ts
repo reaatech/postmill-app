@@ -23,7 +23,6 @@ import {
   AiSettingsManager,
   normalizeProviderId,
   qualifyProviderId,
-  ensureScopeModelsVersion,
 } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SaveGovernanceDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/governance.dto';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
@@ -32,7 +31,6 @@ import { ProviderHealthService } from '@gitroom/nestjs-libraries/ai/governance/p
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
-import { AIScope } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -43,7 +41,6 @@ import { ProviderKernel, DEFAULT_VERSION, parseQualified, qualify } from '@gitro
 @Controller('/admin/ai-settings')
 @UseGuards(OrgRbacGuard)
 export class AiSettingsController {
-  private readonly VALID_SCOPES: AIScope[] = ['utility', 'generator', 'agent', 'mcp'];
   private readonly SENSITIVE_KEY_PATTERNS = [
     'apikey',
     'api_key',
@@ -113,10 +110,6 @@ export class AiSettingsController {
       })),
       credentialFields: target?.credentialFields,
     };
-  }
-
-  private _normalizeScopeModels(scopeModels: any): any {
-    return ensureScopeModelsVersion(scopeModels);
   }
 
   private _isSensitiveKey(key: string) {
@@ -393,7 +386,6 @@ export class AiSettingsController {
       observability: safeParse(settings.observability),
       mcpSettings: safeParse(settings.mcpSettings),
       ragSettings: safeParse(settings.ragSettings),
-      scopeModels: this._normalizeScopeModels(safeParse(settings.scopeModels)),
       fallbackProvider: normalizeProviderId(settings.fallbackProvider),
       fallbackImageProvider: normalizeProviderId(settings.fallbackImageProvider),
     };
@@ -412,7 +404,6 @@ export class AiSettingsController {
       observability: body.observability,
       mcpSettings: body.mcpSettings,
       ragSettings: body.ragSettings,
-      scopeModels: this._normalizeScopeModels(body.scopeModels),
       fallbackProvider: qualifyProviderId(body.fallbackProvider),
       fallbackImageProvider: qualifyProviderId(body.fallbackImageProvider),
     });
@@ -501,44 +492,6 @@ export class AiSettingsController {
     });
 
     return { text: checked };
-  }
-
-  @Put('/scope-models')
-  @RequirePermission('ai-config', 'manage')
-  async setScopeModels(
-    @GetUserFromRequest() user: User,
-    @Body() body: { scopeModels: Record<string, { provider?: string; model?: string }> },
-  ) {
-    const scopes = Object.keys(body.scopeModels);
-    for (const scope of scopes) {
-      if (!(this.VALID_SCOPES as string[]).includes(scope)) {
-        throw new BadRequestException(`Invalid scope: ${scope}. Valid scopes: ${this.VALID_SCOPES.join(', ')}`);
-      }
-    }
-
-    await this._aiSettingsService.upsertSystemSettings({ scopeModels: this._normalizeScopeModels(body.scopeModels) });
-    await this._aiSettingsService.createAuditLog({
-      userId: user.id,
-      action: 'set-scope-models',
-      detail: JSON.stringify({ scopeModels: body.scopeModels }),
-    });
-    await this._aiSettingsManager.refreshCache();
-
-    return { success: true };
-  }
-
-  @Get('/scope-models')
-  @RequirePermission('ai-config', 'manage')
-  async getScopeModels(@GetUserFromRequest() user: User) {
-    const settings = await this._aiSettingsService.getSystemSettings();
-    if (!settings?.scopeModels) return {};
-    let parsed: any;
-    if (typeof settings.scopeModels === 'string') {
-      try { parsed = JSON.parse(settings.scopeModels); } catch { return {}; }
-    } else {
-      parsed = settings.scopeModels;
-    }
-    return this._normalizeScopeModels(parsed);
   }
 
   @Get('/rag')

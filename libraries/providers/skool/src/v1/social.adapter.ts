@@ -14,6 +14,7 @@ import { SkoolDto } from '@gitroom/provider-kernel';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class SkoolProvider extends SocialAbstract implements SocialProvider {
   identifier = 'skool';
   name = 'Skool';
@@ -355,6 +356,7 @@ import {
 const __adapter = new SkoolProvider();
 
 export const skoolSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

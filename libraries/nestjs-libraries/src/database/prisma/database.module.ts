@@ -30,7 +30,6 @@ import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { PushNotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service';
@@ -59,7 +58,6 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { SetsService } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.service';
 import { SetsRepository } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.repository';
-import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OAuthRepository } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.repository';
@@ -153,7 +151,6 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     SignatureService,
     FileService,
     FileRepository,
-    AiMediaGenerationService,
     IntegrationManager,
     RefreshIntegrationService,
     ExtractContentService,
@@ -166,7 +163,6 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     SetsRepository,
     OAuthRepository,
     OAuthService,
-    VideoManager,
     AnnouncementsRepository,
     AnnouncementsService,
     ProviderConfigManager,

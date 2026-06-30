@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   AuthCapability,
@@ -28,6 +29,7 @@ class LocalAuthCapability implements AuthCapability {
 }
 
 export const localAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'local',

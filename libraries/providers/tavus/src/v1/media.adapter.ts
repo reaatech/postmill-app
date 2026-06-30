@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -104,6 +105,7 @@ export class TavusAdapter implements MediaProviderAdapter {
 const _meta = new TavusAdapter(undefined as unknown as SafeFetchPort);
 
 export const tavusMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

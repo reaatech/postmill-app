@@ -3,12 +3,39 @@ import path from 'path';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@gitroom/provider-kernel': path.resolve(__dirname, './kernel/src'),
-      '@gitroom/nestjs-libraries': path.resolve(__dirname, '../nestjs-libraries/src'),
-      '@gitroom/helpers': path.resolve(__dirname, '../helpers/src'),
-      '@gitroom/backend': path.resolve(__dirname, '../../apps/backend/src'),
-    },
+    alias: [
+      // Keep exact workspace aliases first so non-provider packages resolve to source.
+      {
+        find: '@gitroom/provider-kernel',
+        replacement: path.resolve(__dirname, './kernel/src'),
+      },
+      {
+        find: '@gitroom/provider-kernel/*',
+        replacement: path.resolve(__dirname, './kernel/src/*'),
+      },
+      {
+        find: '@gitroom/nestjs-libraries',
+        replacement: path.resolve(__dirname, '../nestjs-libraries/src'),
+      },
+      {
+        find: '@gitroom/helpers',
+        replacement: path.resolve(__dirname, '../helpers/src'),
+      },
+      {
+        find: '@gitroom/backend',
+        replacement: path.resolve(__dirname, '../../apps/backend/src'),
+      },
+      // Redirect every @gitroom/provider-* workspace package to its src directory so tests
+      // use the current source files instead of stale node_modules copies (e.g. missing metadata.ts).
+      {
+        find: /^@gitroom\/provider-([^/]+)$/,
+        replacement: path.resolve(__dirname, './$1/src'),
+      },
+      {
+        find: /^@gitroom\/provider-([^/]+)\/(.*)$/,
+        replacement: path.resolve(__dirname, './$1/src/$2'),
+      },
+    ],
   },
   test: {
     globals: true,

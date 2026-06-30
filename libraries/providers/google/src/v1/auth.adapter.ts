@@ -6,6 +6,7 @@ import {
 } from '@gitroom/provider-kernel';
 import { google } from 'googleapis';
 
+import { metadata as providerMetadata } from './metadata';
 // Self-contained kernel auth module for Google (YouTube) OAuth login. Mirrors
 // the legacy apps/backend google.provider.ts DB-first → env-fallback precedence;
 // the legacy class is kept for the PROVIDER_KERNEL=legacy decorator path. DB
@@ -104,6 +105,7 @@ class GoogleAuthCapability implements AuthCapability {
 }
 
 export const googleAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'google',

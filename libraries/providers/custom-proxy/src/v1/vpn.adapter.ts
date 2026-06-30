@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   VpnCapability,
@@ -134,6 +135,7 @@ export class CustomProxyAdapter implements VpnCapability {
 const _meta: VpnCapability = new CustomProxyAdapter();
 
 export const customproxyVpnModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'vpn',
     providerId: _meta.identifier,

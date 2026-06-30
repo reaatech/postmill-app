@@ -1,11 +1,14 @@
 import {
   Controller,
   Get,
+  HttpException,
   Inject,
   Query,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { User } from '@prisma/client';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import {
   ProviderKernel,
   ProviderDomain,
@@ -79,7 +82,15 @@ export class AdminProvidersController {
 
   @Get('/health')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
-  health(@Query('domain') domain?: string) {
+  health(@GetUserFromRequest() user: User, @Query('domain') domain?: string) {
+    // Platform-wide provider health is super-admin-only. The @CheckPolicies ADMIN gate
+    // above is the org billing-admin capability (PoliciesGuard → 402), NOT a super-admin
+    // gate, so it must be backed by an explicit isSuperAdmin check (the same pattern as
+    // AnnouncementsController / StorageController / AdminDefaultsController).
+    if (!user.isSuperAdmin) {
+      throw new HttpException('Unauthorized', 403);
+    }
+
     const manifests = this._kernel.listManifests(
       domain && isProviderDomain(domain) ? domain : undefined,
     );

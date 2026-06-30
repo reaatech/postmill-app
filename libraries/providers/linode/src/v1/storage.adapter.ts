@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import { makeS3StorageModule } from '@gitroom/provider-kernel';
 
 export const linodeStorageModule = makeS3StorageModule({
@@ -11,3 +12,5 @@ export const linodeStorageModule = makeS3StorageModule({
   resolveEndpoint: (region, endpoint) =>
     endpoint || `https://${region}.linodeobjects.com`,
 });
+
+linodeStorageModule.metadata = providerMetadata;

@@ -18,6 +18,7 @@ import { string } from 'yup';
 import { safeFetch } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 export class WordpressProvider
   extends SocialAbstract
   implements SocialProvider
@@ -392,6 +393,7 @@ import {
 const __adapter = new WordpressProvider();
 
 export const wordpressSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

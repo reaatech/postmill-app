@@ -8,6 +8,7 @@ import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class PixelfedProvider extends SocialAbstract implements SocialProvider {
   identifier = 'pixelfed';
   name = 'Pixelfed';
@@ -173,6 +174,7 @@ import {
 const __adapter = new PixelfedProvider();
 
 export const pixelfedSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

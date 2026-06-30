@@ -187,3 +187,60 @@ describe('BackfillService — notifications V2 email opt-out carry-forward', () 
     expect(tx.notificationPreference.update).not.toHaveBeenCalled();
   });
 });
+
+describe('BackfillService — AI/media default models', () => {
+  let tx: Tx;
+  const mockSeedUnset = vi.fn();
+  const mockWasApplied = vi.fn().mockResolvedValue(false);
+  const mockMarkApplied = vi.fn().mockResolvedValue(undefined);
+
+  beforeEach(() => {
+    tx = makeTx();
+    mockSeedUnset.mockReset();
+    mockWasApplied.mockReset().mockResolvedValue(false);
+    mockMarkApplied.mockReset().mockResolvedValue(undefined);
+  });
+
+  function makeServiceWithSeed() {
+    const prisma = {
+      $transaction: vi.fn(async (fn: (tx: Tx) => Promise<void>) => fn(tx)),
+      organization: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'org-1' },
+          { id: 'org-2' },
+        ]),
+      },
+    };
+    const ledger = {
+      wasApplied: mockWasApplied,
+      markApplied: mockMarkApplied,
+    };
+    const seedService = {
+      seedUnset: mockSeedUnset,
+      seedAllOrgs: vi.fn(),
+    };
+    return new BackfillService(prisma as never, ledger as never, seedService as never);
+  }
+
+  it('calls seedUnset for every org with an enabled provider', async () => {
+    await makeServiceWithSeed().backfill();
+
+    expect(mockSeedUnset).toHaveBeenCalledTimes(2);
+    expect(mockSeedUnset).toHaveBeenCalledWith('org-1');
+    expect(mockSeedUnset).toHaveBeenCalledWith('org-2');
+  });
+
+  it('is idempotent via the migration ledger', async () => {
+    mockWasApplied.mockResolvedValue(true);
+
+    await makeServiceWithSeed().backfill();
+
+    expect(mockSeedUnset).not.toHaveBeenCalled();
+  });
+
+  it('marks the step applied after success', async () => {
+    await makeServiceWithSeed().backfill();
+
+    expect(mockMarkApplied).toHaveBeenCalledWith('backfill:AI/media default models');
+  });
+});

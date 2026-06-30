@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   ProviderRuntimeContext,
@@ -113,6 +114,7 @@ class GithubAuthCapability implements AuthCapability {
 }
 
 export const githubAuthModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'auth',
     providerId: 'github',

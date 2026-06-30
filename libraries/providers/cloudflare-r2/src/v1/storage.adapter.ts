@@ -13,6 +13,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomBytes } from 'crypto';
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   ProviderRuntimeContext,
@@ -464,6 +465,7 @@ export const cloudflarer2StorageModule: ProviderModule<
   Record<string, never>,
   StorageCapability
 > = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'storage',
     providerId: TYPE.toLowerCase(),

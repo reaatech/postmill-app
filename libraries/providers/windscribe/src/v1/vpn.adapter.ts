@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   VpnCapability,
@@ -64,6 +65,7 @@ export class WindscribeAdapter implements VpnCapability {
 const _meta: VpnCapability = new WindscribeAdapter();
 
 export const windscribeVpnModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'vpn',
     providerId: _meta.identifier,

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   MediaProviderCapabilities,
@@ -94,6 +95,7 @@ export class FireworksMediaAdapter extends BearerTokenMediaAdapter {
 const _meta = new FireworksMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const fireworksMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

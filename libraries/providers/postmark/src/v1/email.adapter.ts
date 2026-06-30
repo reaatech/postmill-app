@@ -1,4 +1,5 @@
 import { ServerClient } from 'postmark';
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -76,6 +77,7 @@ export class PostmarkAdapter implements EmailCapability {
 const _meta: EmailCapability = new PostmarkAdapter();
 
 export const postmarkEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

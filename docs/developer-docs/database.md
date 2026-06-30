@@ -20,7 +20,7 @@ libraries/nestjs-libraries/src/database/prisma/schema.prisma
 Schema changes are applied through **committed migrations**:
 
 ```bash
-# Author a migration from a schema edit (creates migrations/<timestamp>_<name>/migration.sql)
+# Author a migration from a schema edit (creates migrations/[timestamp]_[name]/migration.sql)
 pnpm run prisma-migrate-dev
 
 # Apply committed migrations to a target DB (CI, boot, production)
@@ -94,17 +94,17 @@ destructive guard**:
 # 1. Edit the schema
 $EDITOR libraries/nestjs-libraries/src/database/prisma/schema.prisma
 
-# 2. Author the migration. Creates migrations/<timestamp>_<name>/migration.sql, applies it to
+# 2. Author the migration. Creates migrations/[timestamp]_[name]/migration.sql, applies it to
 #    your local DB, and regenerates the client. Commit the new migration directory.
 pnpm run prisma-migrate-dev
 
 # 3. (Review aid) Generate the exact forward SQL for the destructive guard, and commit it.
 #    (Requires DATABASE_URL pointing at a DB that reflects the current/pre-change state.)
-pnpm run prisma-schema-diff > dev/schema-changes/<short-description>.sql
+pnpm run prisma-schema-diff > dev/schema-changes/[short-description].sql
 
 # 4. Guard the diff — blocks DROP TABLE / DROP COLUMN / DROP CONSTRAINT and
 #    ADD COLUMN ... NOT NULL without DEFAULT.
-pnpm run prisma-schema-check --file dev/schema-changes/<short-description>.sql
+pnpm run prisma-schema-check --file dev/schema-changes/[short-description].sql
 
 # 5. Apply on shared/production DBs via the committed migrations.
 pnpm run prisma-migrate-deploy
@@ -113,9 +113,9 @@ pnpm run prisma-migrate-deploy
 - **`prisma-migrate-dev`** authors and applies the migration locally; the committed migration is the
   source of truth for what every other environment applies via `prisma-migrate-deploy`.
 - **`prisma-schema-diff`** = `prisma migrate diff --from-url $DATABASE_URL --to-schema-datamodel
-  <schema> --script` — the forward SQL only (no rollback); used to feed the destructive guard.
+  [schema] --script` — the forward SQL only (no rollback); used to feed the destructive guard.
 - **`prisma-schema-check`** runs `scripts/schema-destructive-guard.mjs` (Node, no deps). It reads SQL
-  from `--file <path>` (or stdin) and **exits 1** if it finds `DROP TABLE`/`DROP COLUMN`/`DROP
+  from `--file [path]` (or stdin) and **exits 1** if it finds `DROP TABLE`/`DROP COLUMN`/`DROP
   CONSTRAINT` or `ADD COLUMN ... NOT NULL` without a `DEFAULT`.
 - **Destructive changes** (drops, in-place renames, a new required column) must follow an
   **expand/contract** plan — add the new shape, backfill, switch reads/writes, then drop the old
@@ -123,7 +123,7 @@ pnpm run prisma-migrate-deploy
   `ALLOW_DESTRUCTIVE_SCHEMA=true` to acknowledge the data-loss risk:
 
   ```bash
-  ALLOW_DESTRUCTIVE_SCHEMA=true pnpm run prisma-schema-check --file dev/schema-changes/<drop>.sql
+  ALLOW_DESTRUCTIVE_SCHEMA=true pnpm run prisma-schema-check --file dev/schema-changes/[drop].sql
   ```
 
   The full forward-only [Schema rollback](../operations-guide/schema-rollback.md) playbook covers the
@@ -135,7 +135,7 @@ pnpm run prisma-migrate-deploy
 
 1. **Migration drift check** — applies the committed migrations to an empty CI Postgres with
    `prisma-migrate-deploy`, then runs `prisma migrate diff --from-url "$DATABASE_URL"
-   --to-schema-datamodel <schema> --exit-code`. It exits 0 only when the deployed migrations fully
+   --to-schema-datamodel [schema] --exit-code`. It exits 0 only when the deployed migrations fully
    represent the schema; a schema edit committed **without** a matching migration makes it exit 2 and
    fails the job.
 2. **Destructive schema guard** — diffs the PR schema against `origin/main`'s schema and runs
@@ -156,7 +156,7 @@ pnpm run prisma-migrate-deploy
 **Only repositories** may call Prisma directly. Repositories live under:
 
 ```
-libraries/nestjs-libraries/src/database/prisma/<domain>/
+libraries/nestjs-libraries/src/database/prisma/[domain]/
 ```
 
 Each domain has its own repository directory. Repositories extend `PrismaRepository`:

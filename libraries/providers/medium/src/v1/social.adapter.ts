@@ -12,6 +12,7 @@ import { makeId } from '@gitroom/provider-kernel';
 import { MediumSettingsDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class MediumProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 3; // Medium has lenient publishing limits
   identifier = 'medium';
@@ -196,6 +197,7 @@ import {
 const __adapter = new MediumProvider();
 
 export const mediumSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

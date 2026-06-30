@@ -1,4 +1,4 @@
-import { IsString } from 'class-validator';
+import { IsObject, IsOptional, IsString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class VideoFunctionDto {
@@ -15,5 +15,7 @@ export class VideoFunctionDto {
     required: false,
     type: Object,
   })
-  params: any;
+  @IsOptional()
+  @IsObject()
+  params?: Record<string, any>;
 }

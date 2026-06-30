@@ -18,6 +18,7 @@ import { Integration } from '@prisma/client';
 import { Rules } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 
+import { metadata as providerMetadata } from './metadata';
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
 )
@@ -318,6 +319,7 @@ import {
 const __adapter = new InstagramStandaloneProvider();
 
 export const instagramstandaloneSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

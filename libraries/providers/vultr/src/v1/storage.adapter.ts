@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import { makeS3StorageModule } from '@gitroom/provider-kernel';
 
 export const vultrStorageModule = makeS3StorageModule({
@@ -11,3 +12,5 @@ export const vultrStorageModule = makeS3StorageModule({
   resolveEndpoint: (region, endpoint) =>
     endpoint || `https://${region}.vultrobjects.com`,
 });
+
+vultrStorageModule.metadata = providerMetadata;

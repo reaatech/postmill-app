@@ -84,6 +84,43 @@ Resolution services read the pinned version and ask the kernel for that exact
 5. Add a conformance test under `libraries/providers/<id>/src/__tests__/`.
 6. Update `docs/reference/provider-versions.md` and bump the "Verified against" note.
 
+## Provider metadata (`src/v1/metadata.ts`)
+
+Every provider package must ship `src/v1/metadata.ts` that exports a `ProviderMetadata` object. This is the static declaration the defaults resolver, catalog endpoints, and settings UI read instead of inferring behaviour from adapter capabilities.
+
+Fields:
+
+| Field | Type | Purpose |
+|---|---|---|
+| `id` | `string` | Stable provider id; must match `manifest.providerId`. |
+| `displayName` | `string` | Human-readable brand name. |
+| `uiName` | `string` (optional) | Suffix used when a provider has multiple surfaces; labels become `<provider>[-<ui-name>]: <model>`. |
+| `kind` | `'direct' \| 'hub' \| 'action'` | `direct` = single-brand provider with its own models; `hub` = aggregator exposing many third-party models; `action` = action-only, no model list. |
+| `domains` | `Array<'ai' \| 'media'>` | Which default surfaces this provider may serve. |
+| `modelCategories` | `string[]` (optional) | AI model categories this provider supports (e.g. `low-reasoning`, `high-reasoning`, `vision`, `workflow`). |
+| `mediaCategories` | `string[]` (optional) | Media categories this provider supports (e.g. `text-to-image`, `text-to-video`, `video-avatar`). |
+| `hasModelList` | `boolean` | Whether the adapter implements `listModels` for its domain(s). |
+| `modelHints` | `Record<string, string[]>` (optional) | Per-category preferred model-id substrings used to rank `listModels` output when auto-selecting a default. |
+| `docsUrl` | `string` (optional) | Link to provider docs. |
+
+The declared `modelCategories` and `mediaCategories` must be subsets of the known `AI_MODEL_CATEGORIES` and `AI_MEDIA_CATEGORIES` unions respectively; the kernel conformance test asserts this.
+
+Usage:
+
+- `DefaultsResolutionService` builds candidate sets from metadata (`modelCategories`/`mediaCategories`) and ranks auto-picks using `modelHints[category]`.
+- Catalog endpoints use `displayName`/`uiName` to format labels such as `<provider>[-<ui-name>]: <model>`.
+- `action` providers (e.g. HeyGen, Deepgram, Suno) are selectable with `model: null` in media defaults.
+
+### Media capability flags
+
+`MediaProviderCapabilities` was extended with three video-editing flags:
+
+- `videoBg` — adapter implements `removeVideoBackground` (e.g. Replicate `arielreplicate/robust_video_matting`).
+- `videoUpscale` — adapter implements `upscaleVideo` (e.g. Replicate `lucataco/real-esrgan-video`).
+- `videoToVideo` — adapter's `generateVideo` accepts a source video and routes to a v2v/restyle model (e.g. Replicate `stability-ai/stable-video-diffusion-img2vid-turbo`).
+
+Adapters declare the flags in `capabilities`; the defaults resolver maps media categories such as `video-background`, `video-upscale`, and `video-to-video` to adapters that expose them.
+
 ## Shipping a v2 adapter
 
 1. Create `libraries/providers/<id>/src/v2/<domain>.adapter.ts` with the new adapter.

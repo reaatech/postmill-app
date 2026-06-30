@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -162,6 +163,7 @@ export class ReelFarmAdapter implements MediaProviderAdapter {
 const _meta = new ReelFarmAdapter(undefined as unknown as SafeFetchPort);
 
 export const reelfarmMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 // InstagramProvider lives in the kernel as a shared family base (step 7.5.1) so the
 // dependent package can extend it without a cross-provider import. This package
 // wraps it as the provider-kernel module and exposes the legacy singleton.
@@ -13,6 +14,7 @@ export { InstagramProvider };
 const __adapter = new InstagramProvider();
 
 export const instagramSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

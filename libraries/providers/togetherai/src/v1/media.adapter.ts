@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   OpenAiCompatibleMediaAdapter,
   MediaProviderCapabilities,
@@ -111,6 +112,7 @@ export class TogetherAiMediaAdapter extends OpenAiCompatibleMediaAdapter {
 const _meta = new TogetherAiMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const togetheraiMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

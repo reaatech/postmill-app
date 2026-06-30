@@ -48,7 +48,7 @@ export const DashboardSetup: FC = () => {
   if (dismissed || allComplete) return null;
 
   return (
-    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] mb-[24px]">
+    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[20px] mb-[24px]">
       <div className="flex items-center justify-between mb-[16px]">
         <div>
           <h2 className="text-[16px] font-[600]">Welcome to Postmill</h2>

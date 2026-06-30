@@ -1,8 +1,10 @@
 import { OpenAICompatibleAdapter, type ProviderModule } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 const adapter = new OpenAICompatibleAdapter('meta-llama', 'Llama', 'https://api.llama-api.com', undefined, undefined, 'direct');
 
 export const metallamaAiModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'ai',
     providerId: adapter.identifier,

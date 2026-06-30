@@ -58,4 +58,98 @@ describe('replicate media adapter (async predictions)', () => {
     await expect(adapter.generateVideo('x', {})).rejects.toThrow('API key is required');
     await expect(adapter.generateImage('x', {})).rejects.toThrow('API key is required');
   });
+
+  // NEEDS-LIVE-SMOKE-TEST
+  it('routes sourceUrl to video-to-video and includes video_url in the input', async () => {
+    const { recs, ctx } = makeCtx(() => res({ id: 'pred-v2v', status: 'starting' }));
+    const adapter: any = replicateMediaModule.create(ctx as any);
+
+    const sub = await adapter.generateVideo('restyle this', {
+      apiKey: 'replicate-key',
+      version: 'owner/video-to-video-model',
+      sourceUrl: 'https://cdn.example.com/input.mp4',
+    });
+
+    expect(sub.jobId).toBe('pred-v2v');
+    const r = recs[0];
+    expect(r.url).toBe('https://api.replicate.com/v1/predictions');
+    const body = JSON.parse(r.body);
+    expect(body.version).toBe('owner/video-to-video-model');
+    expect(body.input).toEqual({
+      prompt: 'restyle this',
+      video_url: 'https://cdn.example.com/input.mp4',
+    });
+  });
+
+  // NEEDS-LIVE-SMOKE-TEST
+  it('routes options.input.video_url to video-to-video and preserves the field', async () => {
+    const { recs, ctx } = makeCtx(() => res({ id: 'pred-v2v-input', status: 'starting' }));
+    const adapter: any = replicateMediaModule.create(ctx as any);
+
+    const sub = await adapter.generateVideo('restyle this', {
+      apiKey: 'replicate-key',
+      model: 'owner/video-to-video-model',
+      input: { video_url: 'https://cdn.example.com/from-input.mp4', num_frames: 24 },
+    });
+
+    expect(sub.jobId).toBe('pred-v2v-input');
+    const r = recs[0];
+    expect(r.url).toBe('https://api.replicate.com/v1/predictions');
+    const body = JSON.parse(r.body);
+    expect(body.version).toBe('owner/video-to-video-model');
+    expect(body.input).toEqual({
+      prompt: 'restyle this',
+      video_url: 'https://cdn.example.com/from-input.mp4',
+      num_frames: 24,
+    });
+  });
+
+  it('rejects video-to-video without an explicit model/version', async () => {
+    const { ctx } = makeCtx(() => res({ id: 'pred-v2v', status: 'starting' }));
+    const adapter: any = replicateMediaModule.create(ctx as any);
+
+    await expect(
+      adapter.generateVideo('restyle this', {
+        apiKey: 'replicate-key',
+        sourceUrl: 'https://cdn.example.com/input.mp4',
+      }),
+    ).rejects.toThrow('Replicate video-to-video requires an explicit model/version');
+  });
+
+  // NEEDS-LIVE-SMOKE-TEST
+  it('submits video upscale with the expected model/version and video input', async () => {
+    const { recs, ctx } = makeCtx(() => res({ id: 'pred-upscale', status: 'starting' }));
+    const adapter: any = replicateMediaModule.create(ctx as any);
+
+    const sub = await adapter.upscaleVideo('https://cdn.example.com/low.mp4', {
+      apiKey: 'replicate-key',
+    });
+
+    expect(sub.jobId).toBe('pred-upscale');
+    const r = recs[0];
+    const body = JSON.parse(r.body);
+    expect(body.version).toBe('lucataco/real-esrgan-video');
+    expect(body.input).toEqual({
+      video: 'https://cdn.example.com/low.mp4',
+      scale: 4,
+    });
+  });
+
+  // NEEDS-LIVE-SMOKE-TEST
+  it('submits video background removal with the expected model and video input', async () => {
+    const { recs, ctx } = makeCtx(() => res({ id: 'pred-bg', status: 'starting' }));
+    const adapter: any = replicateMediaModule.create(ctx as any);
+
+    const sub = await adapter.removeVideoBackground('https://cdn.example.com/with-bg.mp4', {
+      apiKey: 'replicate-key',
+    });
+
+    expect(sub.jobId).toBe('pred-bg');
+    const r = recs[0];
+    const body = JSON.parse(r.body);
+    expect(body.version).toBe('arielreplicate/robust_video_matting');
+    expect(body.input).toEqual({
+      video: 'https://cdn.example.com/with-bg.mp4',
+    });
+  });
 });

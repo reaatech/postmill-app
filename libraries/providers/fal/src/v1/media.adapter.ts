@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -170,6 +171,7 @@ export class FalAdapter implements MediaProviderAdapter {
 const _meta = new FalAdapter(undefined as unknown as SafeFetchPort);
 
 export const falMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

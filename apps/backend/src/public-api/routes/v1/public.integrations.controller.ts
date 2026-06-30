@@ -38,8 +38,6 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
-import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
 import { UploadDto } from '@gitroom/nestjs-libraries/dtos/file/upload.dto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
@@ -68,7 +66,14 @@ import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integration
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import {
+  AiDefaultsService,
+  DefaultNotConfiguredError,
+} from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
+import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
+import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
 
 @ApiTags('Public API')
 @ApiSecurity('api-key')
@@ -84,7 +89,9 @@ export class PublicIntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _analyticsService: AnalyticsService,
     private _storageService: StorageService,
-    private _aiGeneration: AiMediaGenerationService
+    private _subscriptionService: SubscriptionService,
+    private _aiDefaults: AiDefaultsService,
+    private _aiMediaService: AiMediaService
   ) {}
 
   @Post('/upload')
@@ -384,22 +391,151 @@ export class PublicIntegrationsController {
   }
 
   @Post('/generate-video')
-  generateVideo(
+  async generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._aiGeneration.generateVideo(org, body);
+
+    const totalCredits = await this._subscriptionService.checkCredits(org, 'ai_videos');
+    if (totalCredits.credits <= 0) {
+      throw new HttpException('Not enough AI video credits', 402);
+    }
+
+    const params = body.customParams || {};
+    const prompt = typeof params.prompt === 'string' ? params.prompt : '';
+
+    // Consume one `ai_videos` credit on successful generation — restores the legacy
+    // billing semantics (the pre-async route wrapped generation in `useCredit`). The
+    // credit is spent only if the callback resolves; a provider error / 409 does not bill.
+    let artifact: string;
+    try {
+      artifact = await this._subscriptionService.useCredit(
+        org,
+        'ai_videos',
+        async () => {
+          if (body.type === 'image-to-video' || params.imageUrl) {
+            return this._aiDefaults.imageToVideo(
+              org.id,
+              prompt,
+              params.imageUrl as string,
+            );
+          }
+          if (body.type === 'video-to-video' || params.videoUrl) {
+            return this._aiDefaults.videoToVideo(
+              org.id,
+              prompt,
+              params.videoUrl as string,
+            );
+          }
+          return this._aiDefaults.textToVideo(org.id, prompt);
+        },
+      );
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException(
+          { error: err.message, category: err.category },
+          409,
+        );
+      }
+      throw err;
+    }
+
+    // FROZEN PUBLIC CONTRACT — do not change field names/semantics without a new
+    // versioned route. Legacy n8n/Zapier clients read `response.path` as the finished
+    // video URL. This endpoint used to be synchronous (always a URL); it is now async,
+    // so the response is self-describing and back-compatible:
+    //   - `id`     : back-compat — '' when completed, the AIMediaJob id when pending
+    //                (matches the historical { id, path, name } File-like shape).
+    //   - `status` : 'completed' when a finished URL is available synchronously
+    //                (image / data: / url fallback), 'pending' when a job was queued.
+    //   - `jobId`  : the AIMediaJob id when pending, '' otherwise.
+    //   - `path`   : the finished media URL when completed; '' when pending (poll instead).
+    //   - `name`   : preserved from the historical shape (always '').
+    //   - `pollUrl`: when pending, the public route to GET (with the same API key) to poll
+    //                job completion — `GET /public/v1/generate-video/:id` below; '' when completed.
+    const looksLikeUrl =
+      typeof artifact === 'string' &&
+      (artifact.startsWith('http') || artifact.startsWith('data:'));
+
+    if (looksLikeUrl) {
+      return {
+        id: '',
+        status: 'completed',
+        jobId: '',
+        path: artifact,
+        name: '',
+        pollUrl: '',
+      };
+    }
+
+    return {
+      id: artifact,
+      status: 'pending',
+      jobId: artifact,
+      path: '',
+      name: '',
+      pollUrl: `/public/v1/generate-video/${artifact}`,
+    };
+  }
+
+  // Public, API-key-reachable poll route for the async /generate-video job above.
+  // FROZEN PUBLIC CONTRACT — mirrors the generate-video response keys so a legacy client
+  // can GET this with the same API key until it reaches a terminal state and read `path`.
+  // `status` is one of 'pending' | 'completed' | 'failed'. `completed` and `failed` are
+  // BOTH terminal — `pollUrl` is '' for either so a client looping `while (pollUrl)` (or
+  // `while (status === 'pending')`) stops on failure instead of polling a dead job forever.
+  // `error` carries the failure reason on a failed job ('' otherwise).
+  @Get('/generate-video/:id')
+  async getGenerateVideoJob(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+
+    const job = await this._aiMediaService.getJob(id);
+    if (!job || job.organizationId !== org.id) {
+      throw new HttpException('Job not found', 404);
+    }
+
+    const completed = job.status === 'completed';
+    const failed = job.status === 'failed';
+    const terminal = completed || failed;
+    return {
+      id: job.id,
+      status: completed ? 'completed' : failed ? 'failed' : 'pending',
+      jobId: job.id,
+      path: completed ? job.artifactUrl || '' : '',
+      name: '',
+      pollUrl: terminal ? '' : `/public/v1/generate-video/${job.id}`,
+      error: job.error || '',
+    };
   }
 
   @Post('/video/function')
-  videoFunction(@Body() body: VideoFunctionDto) {
+  async videoFunction(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: VideoFunctionDto
+  ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._aiGeneration.videoFunction(
-      body.identifier,
-      body.functionName,
-      body.params
-    );
+
+    if (body.functionName !== 'loadVoices') {
+      throw new HttpException(
+        `Function ${body.functionName} not supported`,
+        400,
+      );
+    }
+
+    const voices = await this._aiMediaService.listVoices(org.id, {
+      provider: body.identifier,
+    });
+    return {
+      voices: voices.map((v) => ({
+        id: v.id,
+        name: v.label,
+        preview_url: v.previewUrl,
+      })),
+    };
   }
 
   @Delete('/integrations/:id')

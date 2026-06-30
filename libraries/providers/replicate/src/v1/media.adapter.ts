@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -41,6 +42,9 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     upscale: true,
     bgRemove: true,
     inpaint: true,
+    videoToVideo: true,
+    videoUpscale: true,
+    videoBg: true,
   };
 
   private _headers(options?: MediaCredentialOptions, preferWait?: number): Record<string, string> {
@@ -94,7 +98,26 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
   }
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
-    const data = await this._createPrediction(options, { prompt });
+    // video-to-video: when a source video is supplied, route to a v2v/restyle model.
+    // Accept options.input.video_url per the contract; fall back to options.sourceUrl for compat.
+    // NEEDS-LIVE-SMOKE-TEST: confirm the chosen model/version accepts video_url.
+    const sourceVideoUrl = options?.input?.video_url ?? options?.sourceUrl;
+    const isVideoToVideo = !!sourceVideoUrl;
+    const input: Record<string, string | number | boolean | undefined> = isVideoToVideo
+      ? { prompt, video_url: sourceVideoUrl }
+      : { prompt };
+
+    const modelId = options?.version || options?.model;
+    if (isVideoToVideo && !modelId) {
+      throw new Error(
+        'Replicate video-to-video requires an explicit model/version; no default v2v model is configured',
+      );
+    }
+
+    const opts: MediaGenerateOptions = isVideoToVideo
+      ? { ...options, version: modelId }
+      : options;
+    const data = await this._createPrediction(opts, input);
     if (!data.id) throw new Error('Replicate returned no prediction id');
     return { jobId: data.id };
   }
@@ -156,6 +179,26 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     return firstOutputUrl(data.output) || '';
   }
 
+  async upscaleVideo(videoUrl: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    // NEEDS-LIVE-SMOKE-TEST: verify model id and input field names against a real Replicate key.
+    const data = await this._createPrediction(
+      { ...options, version: options?.version || 'lucataco/real-esrgan-video' },
+      { video: videoUrl, scale: options?.scale || 4 },
+    );
+    if (!data.id) throw new Error('Replicate returned no prediction id');
+    return { jobId: data.id };
+  }
+
+  async removeVideoBackground(videoUrl: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
+    // NEEDS-LIVE-SMOKE-TEST: verify model id and input field names against a real Replicate key.
+    const data = await this._createPrediction(
+      { ...options, version: options?.version || 'arielreplicate/robust_video_matting' },
+      { video: videoUrl },
+    );
+    if (!data.id) throw new Error('Replicate returned no prediction id');
+    return { jobId: data.id };
+  }
+
   async runOfficial(
     modelId: string,
     input: Record<string, unknown>,
@@ -199,6 +242,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
 const _meta = new ReplicateMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const replicateMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

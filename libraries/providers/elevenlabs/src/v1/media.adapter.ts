@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -47,6 +48,23 @@ export class ElevenLabsAdapter implements MediaProviderAdapter {
 
   async generateAvatar(_prompt: string, _options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
     throw new Error('ElevenLabs does not support avatar generation');
+  }
+
+  async listVoices(options?: MediaGenerateOptions): Promise<Array<{ id: string; label: string; previewUrl?: string }>> {
+    const apiKey = resolveApiKey(options);
+    if (!apiKey) throw new Error('ElevenLabs API key is required');
+    const res = await this._fetch('https://api.elevenlabs.io/v1/voices', {
+      headers: { 'xi-api-key': apiKey },
+    });
+    if (!res.ok) throw new Error(`ElevenLabs voices failed: ${await res.text()}`);
+    const data = (await res.json()) as {
+      voices?: Array<{ voice_id?: string; name?: string; preview_url?: string }>;
+    };
+    return (data.voices || []).map((v) => ({
+      id: v.voice_id || '',
+      label: v.name || v.voice_id || '',
+      previewUrl: v.preview_url,
+    }));
   }
 
   async textToSpeech(text: string, options?: MediaGenerateOptions): Promise<Buffer | string> {
@@ -99,6 +117,7 @@ export class ElevenLabsAdapter implements MediaProviderAdapter {
 const _meta = new ElevenLabsAdapter(undefined as unknown as SafeFetchPort);
 
 export const elevenlabsMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -199,6 +200,20 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
     throw new Error('OpenAI does not support avatar generation');
   }
 
+  async listVoices(_options?: MediaGenerateOptions): Promise<Array<{ id: string; label: string; previewUrl?: string }>> {
+    // OpenAI TTS voices are a fixed catalog; no list endpoint exists.
+    return [
+      { id: 'alloy', label: 'Alloy' },
+      { id: 'echo', label: 'Echo' },
+      { id: 'fable', label: 'Fable' },
+      { id: 'onyx', label: 'Onyx' },
+      { id: 'nova', label: 'Nova' },
+      { id: 'shimmer', label: 'Shimmer' },
+      { id: 'sage', label: 'Sage' },
+      { id: 'ash', label: 'Ash' },
+    ];
+  }
+
   async textToSpeech(text: string, options?: MediaGenerateOptions): Promise<Buffer | string> {
     const apiKey = this._apiKey(options);
 
@@ -250,6 +265,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
 const _meta = new OpenaiMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const openaiMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

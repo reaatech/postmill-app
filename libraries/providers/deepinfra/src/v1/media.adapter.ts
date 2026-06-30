@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   MediaProviderCapabilities,
@@ -120,6 +121,7 @@ export class DeepInfraMediaAdapter extends BearerTokenMediaAdapter {
 const _meta = new DeepInfraMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const deepinfraMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

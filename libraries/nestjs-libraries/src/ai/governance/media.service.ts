@@ -1,9 +1,13 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { randomBytes } from 'crypto';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
+import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
+import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import {
@@ -11,18 +15,10 @@ import {
   MediaProviderCapabilities,
   MediaGenerationResult,
 } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
+import { SlideService } from '@gitroom/nestjs-libraries/media/slide/slide.service';
+import { CaptionService } from '@gitroom/nestjs-libraries/media/caption/caption.service';
 import { CapabilityNotAvailable } from './errors';
-
-export type MediaOperation =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'avatar'
-  | 'tts'
-  | 'stt'
-  | 'upscale'
-  | 'bg-remove'
-  | 'inpaint';
+import type { MediaOperation } from '@gitroom/nestjs-libraries/ai/governance/media-operation.types';
 
 // Read-only, credential-free view of which media providers are active per operation.
 // Surfaced to non-admin users (4F) so they can see what media capabilities the org
@@ -43,6 +39,11 @@ const ALL_MEDIA_OPERATIONS: MediaOperation[] = [
   'upscale',
   'bg-remove',
   'inpaint',
+  'focal-point',
+  'slide',
+  'caption',
+  'video-bg',
+  'video-upscale',
 ];
 
 // Capability-driven resolution (§11.2): each media operation maps onto the adapter
@@ -57,6 +58,11 @@ const OPERATION_CAPABILITY: Record<MediaOperation, keyof MediaProviderCapabiliti
   upscale: 'upscale',
   'bg-remove': 'bgRemove',
   inpaint: 'inpaint',
+  'focal-point': 'image',
+  slide: 'image',
+  caption: 'stt',
+  'video-bg': 'videoBg',
+  'video-upscale': 'videoUpscale',
 };
 
 // §6.4 reconciliation — map each media operation back onto the legacy ai_images /
@@ -72,6 +78,11 @@ const OPERATION_CREDIT_TYPE: Record<MediaOperation, 'ai_images' | 'ai_videos' | 
   audio: undefined,
   tts: undefined,
   stt: undefined,
+  'focal-point': undefined,
+  slide: 'ai_videos',
+  caption: undefined,
+  'video-bg': 'ai_videos',
+  'video-upscale': 'ai_videos',
 };
 
 // Rough default per-operation USD cost. The @reaatech/media-pipeline-mcp-cost ledger
@@ -88,11 +99,27 @@ const OPERATION_COST_USD: Record<MediaOperation, number> = {
   inpaint: 0.02,
   tts: 0.015,
   stt: 0.01,
+  'focal-point': 0.005,
+  slide: 0.5,
+  caption: 0.05,
+  'video-bg': 0.5,
+  'video-upscale': 0.5,
 };
 
 // Operations whose output is freshly generated/edited visual media — eligible for
 // C2PA provenance signing (§3.5.20). TTS/STT audio + transcription are excluded.
-const PROVENANCE_OPERATIONS = new Set<MediaOperation>(['image', 'video', 'avatar', 'upscale', 'inpaint', 'bg-remove']);
+const PROVENANCE_OPERATIONS = new Set<MediaOperation>([
+  'image',
+  'video',
+  'avatar',
+  'upscale',
+  'inpaint',
+  'bg-remove',
+  'slide',
+  'caption',
+  'video-bg',
+  'video-upscale',
+]);
 
 interface ProvenanceSettings {
   enabled?: boolean;
@@ -150,9 +177,17 @@ export class AiMediaService {
     private _aiModelProvider: AIModelProvider,
     private _aiSettingsManager: AiSettingsManager,
     private _resolution: ProviderResolutionService,
+    @Optional() private _defaultsResolution?: DefaultsResolutionService,
     @Optional() private _orgMediaProviderSettings?: OrgMediaProviderSettingsService,
     @Optional() private _lifecycle?: MediaJobLifecycleService,
+    @Optional() private _orgAiSettingsRepository?: OrgAiSettingsRepository,
+    @Optional() private _encryptionService?: EncryptionService,
+    @Optional() private _moduleRef?: ModuleRef,
   ) {}
+
+  async getJob(id: string) {
+    return this._lifecycle?.getJob(id) ?? null;
+  }
 
   // Resolve a media adapter through the ProviderKernel; returns null for an
   // unknown/unregistered provider (mirrors the old registry.get semantics).
@@ -162,6 +197,115 @@ export class AiMediaService {
   ): MediaProviderAdapter | null {
     try {
       return this._resolution.resolveMedia(identifier, options);
+    } catch {
+      return null;
+    }
+  }
+
+  // Map a runtime media operation onto the default-model categories that can
+  // satisfy it. `sourceUrl` hints at image-to-image / image-to-video variants.
+  private _defaultCategoriesForOperation(
+    operation: MediaOperation,
+    sourceUrl?: string,
+  ): string[] {
+    switch (operation) {
+      case 'image':
+        return sourceUrl ? ['image-to-image'] : ['text-to-image'];
+      case 'video':
+        return sourceUrl ? ['image-to-video', 'video-to-video'] : ['text-to-video'];
+      case 'audio':
+        return ['text-to-music'];
+      case 'tts':
+        return ['text-to-speech'];
+      case 'stt':
+        return ['video-caption'];
+      case 'upscale':
+        return ['image-upscale'];
+      case 'bg-remove':
+        return ['image-bg-remove'];
+      case 'inpaint':
+        return ['image-inpaint'];
+      case 'avatar':
+        return ['video-avatar'];
+      case 'video-bg':
+        return ['video-background'];
+      case 'video-upscale':
+        return ['video-upscale'];
+      default:
+        return [];
+    }
+  }
+
+  // Resolve the org's configured default for a media operation, if any.
+  // Falls back to the org's AI provider credentials when the default is an
+  // AI-registered media adapter without a dedicated MediaProviderConfig row.
+  // When the caller passes an explicit `category` (e.g. 'video-to-video'),
+  // resolve that category directly instead of falling through the operation-based
+  // category list. This prevents a configured video-to-video default from being
+  // shadowed by an image-to-video default when the source is a video.
+  private async _resolveDefaultForOperation(
+    operation: MediaOperation,
+    orgId?: string,
+    sourceUrl?: string,
+    category?: string,
+  ): Promise<ResolvedMediaProvider | null> {
+    if (!orgId || !this._defaultsResolution || !this._orgMediaProviderSettings) {
+      return null;
+    }
+
+    const capability = OPERATION_CAPABILITY[operation];
+    const categories = category
+      ? [category]
+      : this._defaultCategoriesForOperation(operation, sourceUrl);
+
+    for (const category of categories) {
+      const resolved = await this._defaultsResolution.resolve('media', category, orgId);
+      if (!resolved) continue;
+
+      const credentials = await this._credentialsForMediaProvider(
+        orgId,
+        resolved.providerId,
+        resolved.version,
+      );
+      if (!credentials || Object.keys(credentials).length === 0) continue;
+
+      const adapter = this._resolveMediaAdapter(resolved.providerId, {
+        version: resolved.version,
+        credentials,
+        orgId,
+      });
+      if (!adapter || !adapter.capabilities[capability]) continue;
+
+      return { adapter, credentials };
+    }
+
+    return null;
+  }
+
+  private async _credentialsForMediaProvider(
+    orgId: string,
+    providerId: string,
+    version = 'v1',
+  ): Promise<Record<string, string> | null> {
+    // 1) Dedicated media provider config (also handles OpenAI/MiniMax mirror and
+    // universal AI-credential providers such as Qwen).
+    const mediaConfig = await this._orgMediaProviderSettings
+      ?.getConfigForProvider(orgId, providerId, version)
+      .catch(() => null);
+    if (mediaConfig && Object.keys(mediaConfig.credentials).length > 0) {
+      return mediaConfig.credentials;
+    }
+
+    // 2) Fall back to a plain AIOrgProviderConfig for AI providers that expose a
+    // media adapter but have no media-side row.
+    if (!this._orgAiSettingsRepository || !this._encryptionService) return null;
+    const aiConfig = await this._orgAiSettingsRepository
+      .getByIdentifier(orgId, providerId, version)
+      .catch(() => null);
+    if (!aiConfig?.credentials) return null;
+    try {
+      const decrypted = this._encryptionService.decrypt(aiConfig.credentials);
+      return JSON.parse(decrypted) as Record<string, string>;
     } catch {
       return null;
     }
@@ -180,71 +324,69 @@ export class AiMediaService {
   // Detect a normalized focal point for an image using the org's vision-capable AI
   // provider when available. Falls back to center (0.5, 0.5) non-fatally when AI is
   // off, the model lacks vision, or the call fails.
+  async listVoices(
+    orgId: string,
+    options?: { provider?: string },
+  ): Promise<Array<{ id: string; label: string; previewUrl?: string }>> {
+    const enabled = await this._safeGetEnabledProviders(orgId);
+    const candidates = options?.provider
+      ? enabled.filter((cfg) => cfg.identifier === options.provider)
+      : enabled.filter((cfg) => {
+          const adapter = this._resolveMediaAdapter(cfg.identifier);
+          return !!adapter?.capabilities.tts && typeof adapter.listVoices === 'function';
+        });
+
+    for (const cfg of candidates) {
+      const adapter = this._resolveMediaAdapter(cfg.identifier);
+      if (!adapter?.listVoices) continue;
+      try {
+        const full = await this._orgMediaProviderSettings!.getConfigForProvider(orgId, cfg.identifier);
+        if (!full || Object.keys(full.credentials).length === 0) continue;
+        return await adapter.listVoices({ credentials: full.credentials });
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${cfg.identifier} voice list failed: ${(err as Error).message} — trying next`,
+        );
+      }
+    }
+
+    throw new CapabilityNotAvailable(
+      'Voice list is not available. Configure a TTS-capable media provider (ElevenLabs or OpenAI) in Settings > Media.',
+      'speech',
+    );
+  }
+
   async detectFocalPoint(
     imageUrl: string,
     options?: { orgId?: string },
   ): Promise<{ x: number; y: number; source: 'provider' | 'fallback' }> {
     const fallback = { x: 0.5, y: 0.5, source: 'fallback' as const };
-    if (!options?.orgId) {
+    if (!options?.orgId || !this._defaultsResolution) {
       return fallback;
     }
 
     try {
-      const config = await this._aiModelProvider.resolveConfigForScope(
-        'utility',
-        options.orgId,
-      );
-      if (!config) {
-        return fallback;
-      }
-
-      const hasVision = await this._aiModelProvider.modelHasCapability(
-        config.providerId,
-        config.modelId,
+      const visionDefault = await this._defaultsResolution.resolve(
+        'ai',
         'vision',
-        config.creds,
+        options.orgId,
       );
-      if (!hasVision) {
+      if (!visionDefault) {
         return fallback;
       }
 
-      const model = await this._aiModelProvider.languageModel(
-        'utility',
+      const text = await this._aiModelProvider.generateTextWithModel(
         options.orgId,
+        visionDefault.providerId,
+        visionDefault.version,
+        visionDefault.model,
+        {
+          imageUrl,
+          prompt:
+            'You are an image-composition assistant. Given an image, identify the main subject or area of interest and return its normalized center coordinates as JSON: {"x": number, "y": number} where each value is between 0 and 1. Return only the JSON object, no markdown or explanation.',
+        },
       );
-      const result = await (model as any).doGenerate({
-        prompt: [
-          {
-            role: 'system',
-            content: [
-              {
-                type: 'text',
-                text:
-                  'You are an image-composition assistant. Given an image, identify the main subject or area of interest and return its normalized center coordinates as JSON: {"x": number, "y": number} where each value is between 0 and 1. Return only the JSON object, no markdown or explanation.',
-              },
-            ],
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Return the focal point for this image.' },
-              { type: 'image', image: imageUrl },
-            ],
-          },
-        ],
-      });
 
-      const extractText = (r: any): string =>
-        typeof r?.text === 'string'
-          ? r.text
-          : (Array.isArray(r?.content) ? r.content : [])
-              .filter(
-                (p: any) => p?.type === 'text' && typeof p.text === 'string',
-              )
-              .map((p: any) => p.text)
-              .join('');
-
-      const text = extractText(result).trim();
       const cleaned = text.replace(/^```json\s*|\s*```$/g, '').trim();
       const parsed = JSON.parse(cleaned);
 
@@ -305,12 +447,14 @@ export class AiMediaService {
     }
   }
 
-  // Capability-driven, deterministic (alphabetical) resolution over the org's enabled +
-  // credentialed `MediaProviderConfig` rows. Per-org rows are the single source of
-  // truth — the legacy `ragSettings.mediaProviders` blob is gone (plan step 6).
+  // Capability-driven resolution over the org's enabled + credentialed
+  // `MediaProviderConfig` rows. The org's explicit media default (if set) is tried
+  // first; otherwise we fall back to the previous alphabetical candidate list.
   private async _resolveForOperation(
     orgId: string | undefined,
     operation: MediaOperation,
+    sourceUrl?: string,
+    category?: string,
   ): Promise<ResolvedMediaProvider[]> {
     if (!orgId || !this._orgMediaProviderSettings) return [];
 
@@ -318,7 +462,19 @@ export class AiMediaService {
     const capability = OPERATION_CAPABILITY[operation];
     const resolved: ResolvedMediaProvider[] = [];
 
+    const defaultProvider = await this._resolveDefaultForOperation(
+      operation,
+      orgId,
+      sourceUrl,
+      category,
+    );
+    if (defaultProvider) {
+      resolved.push(defaultProvider);
+    }
+
     for (const cfg of [...enabled].sort((a, b) => a.identifier.localeCompare(b.identifier))) {
+      if (defaultProvider && cfg.identifier === defaultProvider.adapter.identifier) continue;
+
       const adapter = this._resolveMediaAdapter(cfg.identifier);
       if (!adapter || !adapter.capabilities[capability]) continue;
 
@@ -493,16 +649,17 @@ export class AiMediaService {
   // behaviour-preserving fallback for orgs with no image-capable media provider.
   async generateImageResult(
     prompt: string,
-    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean },
+    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean; sourceUrl?: string },
   ): Promise<MediaGenerationResult> {
     const size = options?.size || (options?.isVertical ? '1024x1536' : undefined);
-    const candidates = await this._resolveForOperation(options?.orgId, 'image');
+    const candidates = await this._resolveForOperation(options?.orgId, 'image', options?.sourceUrl);
 
     for (const candidate of candidates) {
       try {
         const result = await candidate.adapter.generateImage(prompt, {
           credentials: candidate.credentials,
           size,
+          sourceUrl: options?.sourceUrl,
         });
         const first = result.image || result.images?.[0];
         if (!first) throw new Error('adapter returned no image');
@@ -547,7 +704,7 @@ export class AiMediaService {
 
   async generateImage(
     prompt: string,
-    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean },
+    options?: { size?: string; orgId?: string; userId?: string; isVertical?: boolean; sourceUrl?: string },
   ): Promise<string> {
     const result = await this.generateImageResult(prompt, options);
     return result.image || '';
@@ -560,9 +717,20 @@ export class AiMediaService {
   private async _startAsyncJob(
     operation: AsyncOperation,
     prompt: string,
-    options?: { orgId?: string; userId?: string; sourceUrl?: string; voice?: string },
+    options?: {
+      orgId?: string;
+      userId?: string;
+      sourceUrl?: string;
+      voice?: string;
+      category?: string;
+    },
   ): Promise<string> {
-    const candidates = await this._resolveForOperation(options?.orgId, operation);
+    const candidates = await this._resolveForOperation(
+      options?.orgId,
+      operation,
+      options?.sourceUrl,
+      options?.category,
+    );
     if (candidates.length === 0) {
       throw new CapabilityNotAvailable(
         `No media provider with ${operation} capability is configured. Configure one in Settings > Media.`,
@@ -653,7 +821,7 @@ export class AiMediaService {
 
   async generateVideo(
     prompt: string,
-    options?: { orgId?: string; userId?: string; sourceUrl?: string },
+    options?: { orgId?: string; userId?: string; sourceUrl?: string; category?: string },
   ): Promise<string> {
     try {
       return await this._startAsyncJob('video', prompt, options);
@@ -895,5 +1063,133 @@ export class AiMediaService {
       'Inpainting is not available. Configure a media provider with image-edit support (Replicate) in Settings > Media.',
       'image_edit',
     );
+  }
+
+  // ── Video edits (async) ──
+
+  async upscaleVideo(videoUrl: string, options?: { orgId?: string; scale?: number }): Promise<string> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'video-upscale');
+
+    for (const candidate of candidates) {
+      if (!candidate.adapter.upscaleVideo) continue;
+      try {
+        const submission = await candidate.adapter.upscaleVideo(videoUrl, {
+          credentials: candidate.credentials,
+          scale: options?.scale,
+        });
+        if (options?.orgId && this._lifecycle) {
+          const costUsd = await this._chargeCost('video-upscale', candidate.adapter.identifier, candidate.adapter.identifier, options.orgId);
+          const job = await this._lifecycle.createPendingJob({
+            organizationId: options.orgId,
+            provider: candidate.adapter.identifier,
+            operation: 'video-upscale',
+            costUsd,
+            creditType: OPERATION_CREDIT_TYPE['video-upscale'],
+          });
+          if (submission.artifactUrl) {
+            await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
+            const finished = await this._lifecycle.getJob(job.id);
+            return finished?.artifactUrl || job.id;
+          }
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          return job.id;
+        }
+        return submission.artifactUrl || submission.jobId;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} video upscale failed: ${(err as Error).message} — trying next`,
+        );
+      }
+    }
+
+    throw new CapabilityNotAvailable(
+      'Video upscaling is not available. Configure a media provider with video-upscale support (Replicate) in Settings > Media.',
+      'video',
+    );
+  }
+
+  async removeVideoBackground(videoUrl: string, options?: { orgId?: string }): Promise<string> {
+    const candidates = await this._resolveForOperation(options?.orgId, 'video-bg');
+
+    for (const candidate of candidates) {
+      if (!candidate.adapter.removeVideoBackground) continue;
+      try {
+        const submission = await candidate.adapter.removeVideoBackground(videoUrl, {
+          credentials: candidate.credentials,
+        });
+        if (options?.orgId && this._lifecycle) {
+          const costUsd = await this._chargeCost('video-bg', candidate.adapter.identifier, candidate.adapter.identifier, options.orgId);
+          const job = await this._lifecycle.createPendingJob({
+            organizationId: options.orgId,
+            provider: candidate.adapter.identifier,
+            operation: 'video-bg',
+            costUsd,
+            creditType: OPERATION_CREDIT_TYPE['video-bg'],
+          });
+          if (submission.artifactUrl) {
+            await this._lifecycle.completeJob(job, submission.artifactUrl, submission.metadata);
+            const finished = await this._lifecycle.getJob(job.id);
+            return finished?.artifactUrl || job.id;
+          }
+          await this._lifecycle.attachProviderJob(job.id, submission.jobId);
+          return job.id;
+        }
+        return submission.artifactUrl || submission.jobId;
+      } catch (err) {
+        this._logger.warn(
+          `Media provider ${candidate.adapter.identifier} video background removal failed: ${(err as Error).message} — trying next`,
+        );
+      }
+    }
+
+    throw new CapabilityNotAvailable(
+      'Video background removal is not available. Configure a media provider with video-bg support (Replicate) in Settings > Media.',
+      'video',
+    );
+  }
+
+  // ── Orchestrated pipelines (slide / caption) ──
+
+  async generateSlide(
+    orgId: string,
+    prompt: string,
+    imageUrls?: string[],
+    options?: { userId?: string; slides?: number; durationPerSlideSeconds?: number },
+  ): Promise<string> {
+    if (!this._moduleRef) {
+      throw new CapabilityNotAvailable(
+        'Slide generation is not available. Configure a media provider with image capability in Settings > Media.',
+        'video',
+      );
+    }
+    const slideService = this._moduleRef.get(SlideService, { strict: false });
+    return slideService.generateSlide({
+      orgId,
+      userId: options?.userId,
+      prompt,
+      imageUrls,
+      slides: options?.slides,
+      durationPerSlideSeconds: options?.durationPerSlideSeconds,
+    });
+  }
+
+  async captionVideo(
+    orgId: string,
+    videoUrl: string,
+    options?: { userId?: string; style?: 'srt' | 'ass' },
+  ): Promise<string> {
+    if (!this._moduleRef) {
+      throw new CapabilityNotAvailable(
+        'Video captioning is not available. Configure an STT-capable provider in Settings > Media.',
+        'speech',
+      );
+    }
+    const captionService = this._moduleRef.get(CaptionService, { strict: false });
+    return captionService.captionVideo({
+      orgId,
+      userId: options?.userId,
+      videoUrl,
+      style: options?.style,
+    });
   }
 }

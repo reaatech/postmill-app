@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { metadata as providerMetadata } from './metadata';
 import {
   EmailCapability,
   EmailAdapterCapabilities,
@@ -213,6 +214,7 @@ const _meta: EmailCapability = new SesAdapter(
 );
 
 export const sesEmailModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'email',
     providerId: _meta.name,

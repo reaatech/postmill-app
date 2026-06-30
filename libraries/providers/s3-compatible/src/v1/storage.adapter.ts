@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import { makeS3StorageModule } from '@gitroom/provider-kernel';
 
 export const s3compatibleStorageModule = makeS3StorageModule({
@@ -18,3 +19,5 @@ export const s3compatibleStorageModule = makeS3StorageModule({
     return endpoint;
   },
 });
+
+s3compatibleStorageModule.metadata = providerMetadata;

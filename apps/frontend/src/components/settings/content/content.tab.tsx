@@ -6,8 +6,9 @@ import { MediaProvidersTab } from '@gitroom/frontend/components/settings/media-p
 import { ContentPacksTab } from '@gitroom/frontend/components/settings/content-packs/content-packs.tab';
 import { Sets } from '@gitroom/frontend/components/sets/sets';
 import { SignaturesComponent } from '@gitroom/frontend/components/settings/signatures.component';
+import { MediaDefaultsTab } from '@gitroom/frontend/components/settings/content/media-defaults.tab';
 
-type ContentSubTab = 'media' | 'packs' | 'sets' | 'signatures';
+type ContentSubTab = 'media' | 'media-defaults' | 'packs' | 'sets' | 'signatures';
 
 // Unifies the content-authoring surfaces under one "Content" page: AI Media
 // providers, Content Packs, Sets and Signatures. Content Packs is gated on
@@ -22,6 +23,7 @@ export const ContentTab: React.FC<{
 
   const subTabs: { key: ContentSubTab; label: string }[] = [
     { key: 'media', label: t('ai_media', 'AI Media') },
+    { key: 'media-defaults', label: t('media_defaults', 'Media Defaults') },
     ...(canManagePacks
       ? [{ key: 'packs' as ContentSubTab, label: t('content_packs', 'Content Packs') }]
       : []),
@@ -56,6 +58,7 @@ export const ContentTab: React.FC<{
       </div>
 
       {subTab === 'media' && <MediaProvidersTab />}
+      {subTab === 'media-defaults' && <MediaDefaultsTab />}
       {subTab === 'packs' && canManagePacks && <ContentPacksTab />}
       {subTab === 'sets' && canManageTemplates && <Sets />}
       {subTab === 'signatures' && canManageTemplates && <SignaturesComponent />}

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   pollMediaJob,
@@ -108,6 +109,7 @@ export class LeonardoMediaAdapter extends BearerTokenMediaAdapter {
 const _meta = new LeonardoMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const leonardoMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

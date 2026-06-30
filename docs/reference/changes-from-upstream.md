@@ -26,6 +26,37 @@ Social, VPN, Content Packs, Email, and Auth — now resolve through a single `Pr
 See [Provider Framework](../developer-docs/provider-framework.md) and
 [Provider Versions](../reference/provider-versions.md).
 
+### v3.9.1 (June 2026)
+
+**Per-organization AI Model Defaults and Media Defaults.** Default model resolution is now
+category-driven and tenant-scoped instead of relying on the legacy scope/model hardcoding.
+
+- **AI Model Defaults** — four categories (`low-reasoning`, `high-reasoning`, `vision`, `workflow`)
+  configured under Settings → AI → Model Defaults. The legacy AI scopes (`utility`, `generator`,
+  `agent`, `mcp`) collapse onto these categories, and `reasoning:true` now resolves the
+  `high-reasoning` default.
+- **Media Defaults** — 16 categories covering image, video, audio, slide, and caption operations,
+  configured under Settings → Content → Media Defaults. Each category maps to a base media operation
+  (`image`, `video`, `audio`, `tts`, `upscale`, `bg-remove`, `inpaint`, `slide`, `caption`, `avatar`,
+  `video-bg`, `video-upscale`). AI-tab providers (e.g. OpenAI) now also appear under **Media
+  Defaults** via the AI+Media candidate union.
+- Defaults are stored in `OrgDefaultModel` (`domain`, `category`, `providerId`, `version`, `model`,
+  `settings`) and resolved lazily by `DefaultsResolutionService`. When no default is stored, the
+  resolver auto-picks from the org's enabled providers using provider `metadata.ts` category/capability
+  flags. Auto-picks are deterministic but may differ from the old hardcoded defaults when the active
+  provider is not the historical one.
+- New endpoints: `GET /settings/ai/defaults`, `PUT/DELETE /settings/ai/defaults/:category`,
+  `GET /settings/ai/defaults/catalog?category=`; media mirror under `/settings/content/media-defaults`.
+- Kill switch: `AI_MODEL_DEFAULTS_ENABLED=false` (default `true`) reverts AI model resolution to the
+  legacy `orgActive`/`SURFACE_DEFAULTS` chain.
+- Legacy deleted: `VideoManager`, the `@Video` registry, `ImagesSlides`, `Veo3`,
+  `AiMediaGenerationService`, and the `generate.video.options` chat tool. Composer AI media tools,
+  Designer media operations, and the video generator now route through `AiDefaultsService`/
+  `AiMediaService`.
+- Removed env vars: `KIEAI_API_KEY` (Veo3), `TRANSLOADIT_AUTH`, `TRANSLOADIT_SECRET`, and the legacy
+  `ELEVENSLABS_API_KEY` path (configure ElevenLabs as an AI Media provider instead). `FAL_KEY` remains
+  in use by the short-link adapter.
+
 ### v3.9.0 (June 2026)
 
 Temporal → Inngest migration — background jobs now run through Inngest Cloud (or the local dev

@@ -14,6 +14,7 @@ import WebSocket from 'ws';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { Integration } from '@prisma/client';
 
+import { metadata as providerMetadata } from './metadata';
 // @ts-ignore
 if (!global.WebSocket) global.WebSocket = WebSocket;
 
@@ -254,6 +255,7 @@ import {
 const __adapter = new NostrProvider();
 
 export const nostrSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

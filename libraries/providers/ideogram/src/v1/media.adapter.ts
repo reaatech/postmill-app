@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -86,6 +87,7 @@ export class IdeogramMediaAdapter implements MediaProviderAdapter {
 const _meta = new IdeogramMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const ideogramMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

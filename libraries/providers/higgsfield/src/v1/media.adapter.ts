@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   BearerTokenMediaAdapter,
   pollMediaJob,
@@ -211,6 +212,7 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
 const _meta = new HiggsfieldAdapter(undefined as unknown as SafeFetchPort);
 
 export const higgsfieldMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

@@ -44,6 +44,7 @@ import { ChannelConfigController } from '@gitroom/backend/api/routes/channel.con
 import { ChannelConfigPerTenantController } from '@gitroom/backend/api/routes/channel-config.per-tenant.controller';
 import { SocialCommentsController } from '@gitroom/backend/api/routes/social-comments.controller';
 import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
+import { AdminDefaultsController } from '@gitroom/backend/api/routes/admin-defaults.controller';
 import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
 import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
 import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
@@ -54,6 +55,7 @@ import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-
 import { OrgVpnSettingsController } from '@gitroom/backend/api/routes/org-vpn-settings.controller';
 import { ContentPackController } from '@gitroom/backend/api/routes/content-pack.controller';
 import { MediaProviderController } from '@gitroom/backend/api/routes/media-provider.controller';
+import { MediaDefaultsController } from '@gitroom/backend/api/routes/media-defaults.controller';
 import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
@@ -108,6 +110,7 @@ const authenticatedController = [
   ChannelConfigController,
   AnalyticsV2Controller,
   AiSettingsController,
+  AdminDefaultsController,
   AiModerateController,
   AiUserController,
   StorageController,
@@ -118,6 +121,7 @@ const authenticatedController = [
   OrgVpnSettingsController,
   ContentPackController,
   MediaProviderController,
+  MediaDefaultsController,
   ApiKeysController,
   DashboardController,
   BrandsController,

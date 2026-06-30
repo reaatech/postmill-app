@@ -8,6 +8,7 @@ import { Integration } from '@prisma/client';
 import dayjs from 'dayjs';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class PeerTubeProvider extends SocialAbstract implements SocialProvider {
   identifier = 'peertube';
   name = 'PeerTube';
@@ -194,6 +195,7 @@ import {
 const __adapter = new PeerTubeProvider();
 
 export const peertubeSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

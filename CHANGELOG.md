@@ -10,7 +10,34 @@
 
 ## Unreleased
 
+### Added
+- **Per-organization AI Model Defaults and Media Defaults.** Settings → AI gains a **Model Defaults**
+  sub-tab where admins pick the default model for each category (`low-reasoning`, `high-reasoning`,
+  `vision`, `workflow`). Settings → Content gains a **Media Defaults** sub-tab for all 16 media
+  categories (image/video/audio generation, speech, captions, slides, etc.). Defaults are stored in
+  the new `OrgDefaultModel` table and resolved lazily from enabled providers' live catalogs. The
+  legacy `scopeModels` admin endpoints are removed; `generator`/`agent`/`mcp` now share the
+  `high-reasoning` default, and `reasoning:true` resolves through it. AI-tab providers (e.g. OpenAI)
+  now also appear under **Media Defaults** via the AI+Media candidate union. A kill switch
+  `AI_MODEL_DEFAULTS_ENABLED=false` reverts AI model resolution to the legacy chain. The legacy
+  `VideoManager`, `@Video` registry, `ImagesSlides`, `Veo3`, `AiMediaGenerationService`, and the
+  `generate.video.options` chat tool were deleted; the video generator, composer AI media tools, and
+  Designer media operations now route through the defaults-resolved utility facade. Removed env vars:
+  `KIEAI_API_KEY`, `TRANSLOADIT_AUTH`, `TRANSLOADIT_SECRET`, and the legacy `ELEVENSLABS_API_KEY`
+  path (configure ElevenLabs as an AI Media provider instead). `FAL_KEY` remains in use by the
+  short-link adapter. Run `pnpm run prisma-generate` after pulling; `BackfillService` seeds defaults
+  for existing orgs on deploy.
+
 ### Changed
+- **Public API `POST /public/v1/generate-video` is now asynchronous (response shape changed).**
+  Video generation moved from a synchronous call (which returned the finished video at `response.path`)
+  to the queued media-job pipeline. The response is now a self-describing, back-compatible object:
+  `{ id, status, jobId, path, name, pollUrl }`. When a finished URL is available synchronously
+  (image/url fallback) `status` is `completed` and `path` is the URL (legacy clients reading `.path`
+  still work). When a job is queued, `status` is `pending`, `path` is empty, and the client polls the
+  **new** API-key-reachable route `GET /public/v1/generate-video/:id` (returned in `pollUrl`) until
+  `status === 'completed'`, then reads `path`. n8n/Zapier integrations that assumed a synchronous
+  `path` must add the poll step. `POST /public/v1/video/function` (`loadVoices`) is unchanged.
 - **Notifications v2 is now the single surface for all email + in-app/push notifications.** The
   placeholder category set was replaced with eight categories derived from the app's real triggers —
   `post_published`, `post_failed`, `channels`, `comments`, `budget`, `media`, `announcements`,

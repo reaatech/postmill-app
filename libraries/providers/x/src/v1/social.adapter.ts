@@ -27,6 +27,7 @@ import { Rules } from '@gitroom/provider-kernel';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 @Rules(
   `X can have maximum 4 pictures, or maximum one video, it can also be without attachments ${
     process.env.STRIP_LINKS_FROM_X_POSTS
@@ -1051,6 +1052,7 @@ import {
 const __adapter = new XProvider();
 
 export const xSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

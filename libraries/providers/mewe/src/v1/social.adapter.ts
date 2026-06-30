@@ -16,6 +16,7 @@ import { getOrgCredential } from '@gitroom/provider-kernel';
 import { Logger } from '@nestjs/common';
 import { safeFetch } from '@gitroom/provider-kernel';
 
+import { metadata as providerMetadata } from './metadata';
 export class MeweProvider extends SocialAbstract implements SocialProvider {
   private readonly logger = new Logger(MeweProvider.name);
   identifier = 'mewe';
@@ -324,6 +325,7 @@ import {
 const __adapter = new MeweProvider();
 
 export const meweSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
   VpnCapability,
@@ -64,6 +65,7 @@ export class HotspotshieldAdapter implements VpnCapability {
 const _meta: VpnCapability = new HotspotshieldAdapter();
 
 export const hotspotshieldVpnModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'vpn',
     providerId: _meta.identifier,

@@ -1,3 +1,4 @@
+import { metadata as providerMetadata } from './metadata';
 import {
   OpenAiCompatibleMediaAdapter,
   MediaProviderCapabilities,
@@ -44,6 +45,7 @@ export class GroqMediaAdapter extends OpenAiCompatibleMediaAdapter {
 const _meta = new GroqMediaAdapter(undefined as unknown as SafeFetchPort);
 
 export const groqMediaModule: ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'media',
     providerId: _meta.identifier,

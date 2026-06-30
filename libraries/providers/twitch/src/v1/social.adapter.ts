@@ -11,6 +11,7 @@ import { Integration } from '@prisma/client';
 import { TwitchDto } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 
+import { metadata as providerMetadata } from './metadata';
 export class TwitchProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 1;
   identifier = 'twitch';
@@ -317,6 +318,7 @@ import {
 const __adapter = new TwitchProvider();
 
 export const twitchSocialModule: __ProviderModule<any, any> = {
+  metadata: providerMetadata,
   manifest: {
     domain: 'social',
     providerId: __adapter.identifier,

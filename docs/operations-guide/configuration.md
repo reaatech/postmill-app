@@ -114,6 +114,22 @@ globally disabled when these variables are unset.
 | `POST_DAYS_BACK` | `30` | Days back to look for posts when fetching comments |
 | `SOCIAL_COMMENT_RETENTION_DAYS` | `90` | Days before social comments are soft-deleted |
 
+## AI Model Defaults (v3.9.0+)
+
+Model defaults re-point AI model resolution from the legacy scope/model chain to
+category-driven defaults (`low-reasoning`, `high-reasoning`, `vision`, `workflow`)
+and the corresponding Media Defaults categories.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `AI_MODEL_DEFAULTS_ENABLED` | `true` (unset = on) | Kill switch for the model-category re-point and Model/Media Defaults feature. Set to `false` to revert AI model resolution to the legacy `scopeModels` / `orgActive` chain. |
+
+Example:
+
+```bash
+AI_MODEL_DEFAULTS_ENABLED=false
+```
+
 ## API
 
 | Variable | Default | Purpose |
