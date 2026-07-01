@@ -13,6 +13,7 @@ import { Integrations } from '@gitroom/frontend/components/launches/calendar.con
 import { Button } from '@gitroom/react/form/button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { DataTable, StatusPill } from '@gitroom/frontend/components/ui/data-table';
+import { PlatformAvatar } from '@gitroom/frontend/components/shared/platform-avatar';
 
 interface CampaignPost {
   id: string;
@@ -179,14 +180,11 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
         header: t('channel', 'Channel'),
         render: (post: CampaignPost) => (
           <div className="flex items-center gap-[8px]">
-            {post.integration?.picture ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={post.integration.picture}
-                alt=""
-                className="w-[24px] h-[24px] rounded-full object-cover"
-              />
-            ) : null}
+            <PlatformAvatar
+              picture={post.integration?.picture}
+              identifier={post.integration?.providerIdentifier}
+              size={24}
+            />
             <span className="text-[13px] text-textColor">
               {post.integration?.name || '—'}
             </span>
@@ -357,16 +355,11 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
               >
                 <div className="flex items-center justify-between gap-[8px]">
                   <div className="flex items-center gap-[8px] min-w-0">
-                    {post.integration?.picture ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={post.integration.picture}
-                        alt=""
-                        className="w-[24px] h-[24px] rounded-full object-cover shrink-0"
-                      />
-                    ) : (
-                      <div className="w-[24px] h-[24px] rounded-full bg-newTableBorder shrink-0" />
-                    )}
+                    <PlatformAvatar
+              picture={post.integration?.picture}
+              identifier={post.integration?.providerIdentifier}
+              size={24}
+            />
                     <span className="text-[13px] text-textColor truncate">
                       {post.integration?.name || '—'}
                     </span>

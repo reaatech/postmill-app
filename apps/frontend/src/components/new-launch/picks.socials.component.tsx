@@ -6,7 +6,7 @@ import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 import { useShallow } from 'zustand/react/shallow';
 import { useExistingData } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
-import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
+import { PlatformAvatar as SharedPlatformAvatar } from '@gitroom/frontend/components/shared/platform-avatar';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
 
@@ -16,45 +16,14 @@ const PlatformAvatar: FC<{
   integration: Integrations;
   selected: boolean;
   size?: number;
-}> = ({ integration, selected, size = 42 }) => {
-  return (
-    <div
-      className={clsx(
-        'relative rounded-full flex justify-center items-center bg-newTableHeader filter transition-all duration-500',
-        selected ? 'border-[2px] border-[#622FF6]' : 'border-[2px] border-transparent'
-      )}
-    >
-      <ImageWithFallback
-        fallbackSrc="/no-picture.jpg"
-        src={integration.picture || '/no-picture.jpg'}
-        className={clsx(
-          'rounded-full transition-all border-[1.5px]',
-          selected ? 'border-[#000]' : 'border-transparent'
-        )}
-        style={{ minWidth: size, minHeight: size, width: size, height: size }}
-        alt={integration.identifier}
-        width={size}
-        height={size}
-      />
-      {integration.identifier === 'youtube' ? (
-        <img
-          alt="YouTube"
-          src="/icons/platforms/youtube.svg"
-          className="absolute z-10 bottom-0 -end-[5px] min-w-[16px]"
-          width={16}
-        />
-      ) : (
-        <SafeImage
-          src={`/icons/platforms/${integration.identifier}.png`}
-          className="rounded-[4px] absolute z-10 bottom-0 -end-[5px] min-w-[16px] min-h-[16px]"
-          alt={integration.identifier}
-          width={16}
-          height={16}
-        />
-      )}
-    </div>
-  );
-};
+}> = ({ integration, selected, size = 42 }) => (
+  <SharedPlatformAvatar
+    picture={integration.picture}
+    identifier={integration.identifier}
+    selected={selected}
+    size={size}
+  />
+);
 
 export const PicksSocialsComponent: FC<{ toolTip?: boolean }> = ({
   toolTip,
