@@ -768,12 +768,12 @@ export const Filters = () => {
         </div>
       )}
 
-      {/* Right-side filter drawer. z-[100] sits above app chrome, below modals.
+      {/* Right-side filter drawer. z-[210] sits above the mobile bottom tab bar.
           Always mounted so it can slide in/out; pointer-events off when closed. */}
       <div
         aria-hidden={!drawerOpen}
         className={clsx(
-          'fixed inset-0 z-[100] flex justify-end',
+          'fixed inset-0 z-[210] flex justify-end',
           !drawerOpen && 'pointer-events-none'
         )}
       >
@@ -1225,7 +1225,7 @@ export const Filters = () => {
           </div>
 
           {/* Sticky footer — reset everything / dismiss. */}
-          <div className="shrink-0 bg-studioBg border-t border-studioBorder p-[14px] flex items-center gap-[10px]">
+          <div className="shrink-0 bg-studioBg border-t border-studioBorder p-[14px] pb-[calc(env(safe-area-inset-bottom)+14px)] flex items-center gap-[10px]">
             <button
               type="button"
               onClick={clearAll}

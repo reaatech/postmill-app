@@ -198,7 +198,7 @@ export const CampaignsPage: FC = () => {
       )}
 
       {!isLoading && campaigns && results.length > 0 && (
-        <div className="grid gap-[12px]">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[12px]">
           {filtered.map((campaign) => (
             <CampaignCard
               key={campaign.id}
