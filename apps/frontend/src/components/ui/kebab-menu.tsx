@@ -25,6 +25,8 @@ interface KebabMenuProps {
   /** When the trigger sits inside a clickable parent (e.g. a card <Link>),
    *  cancel that parent's click/navigation. */
   insideLink?: boolean;
+  /** Highlight the trigger in the accent colour (e.g. when a hidden item is "active"). */
+  active?: boolean;
   className?: string;
 }
 
@@ -45,6 +47,7 @@ export const KebabMenu: FC<KebabMenuProps> = ({
   align = 'right',
   width = 176,
   insideLink = false,
+  active = false,
   className,
 }) => {
   const [open, setOpen] = useState(false);
@@ -84,7 +87,10 @@ export const KebabMenu: FC<KebabMenuProps> = ({
           cancel(e);
           setOpen((v) => !v);
         }}
-        className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-newTableText hover:text-textColor hover:bg-newTableBorder/40 transition-colors"
+        className={clsx(
+          'flex items-center justify-center w-[28px] h-[28px] rounded-[6px] hover:bg-newTableBorder/40 transition-colors',
+          active ? 'text-btnPrimary' : 'text-newTableText hover:text-textColor'
+        )}
       >
         {KebabIcon}
       </button>
