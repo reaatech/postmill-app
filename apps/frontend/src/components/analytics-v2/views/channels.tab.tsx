@@ -97,9 +97,9 @@ export const ChannelsTab: FC<ChannelsTabProps> = ({
             {mainKpi && (
               <div className="text-right">
                 <div className="text-[16px] font-semibold tabular-nums">
-                  {new Intl.NumberFormat().format(Math.round(mainKpi.total))}
+                  {new Intl.NumberFormat().format(Math.round(mainKpi.total ?? 0))}
                 </div>
-                {mainKpi.percentageChange !== 0 && (
+                {mainKpi.percentageChange != null && mainKpi.percentageChange !== 0 && (
                   <div
                     className={`text-[12px] tabular-nums ${
                       mainKpi.percentageChange >= 0

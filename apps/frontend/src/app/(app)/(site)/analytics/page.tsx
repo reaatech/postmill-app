@@ -1,5 +1,12 @@
-import { redirect } from 'next/navigation';
+export const dynamic = 'force-dynamic';
+import { Metadata } from 'next';
+import { AnalyticsDashboard } from '@gitroom/frontend/components/analytics-v2/analytics.dashboard';
 
-export default async function Index() {
-  redirect('/analytics/v2');
+export const metadata: Metadata = {
+  title: `Analytics`,
+  description: '',
+};
+
+export default function AnalyticsPage() {
+  return <AnalyticsDashboard />;
 }

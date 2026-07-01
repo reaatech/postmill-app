@@ -13,7 +13,12 @@ export class CampaignsRepository {
     return this._prisma.campaign.findMany({
       where: { organizationId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { posts: true } } },
+      include: {
+        _count: { select: { posts: true } },
+        // Distinct channels the campaign publishes to — lets the analytics
+        // campaign filter scope by channel without an extra request per campaign.
+        posts: { select: { integrationId: true }, distinct: ['integrationId'] },
+      },
     });
   }
 

@@ -1,12 +1,16 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import clsx from 'clsx';
 import dayjs from 'dayjs';
+import useSWR from 'swr';
+import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useOverview } from './hooks/useOverview';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
-import { DateRangePicker } from './filters/date.range.picker';
-import { ChannelMultiSelect } from './filters/channel.multiselect';
+import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { AnalyticsFilterBar } from './filters/filter.bar';
 import { OverviewTab } from './views/overview.tab';
 import { ChannelsTab } from './views/channels.tab';
 import { PostsTab } from './views/posts.tab';
@@ -52,46 +56,71 @@ export const AnalyticsDashboard: FC = () => {
   const focusPost = searchParams.get('focusPost') || undefined;
 
   const { data: integrationsData } = useIntegrationList();
-
-  const channels = useMemo(() => {
-    if (!integrationsData?.length) return [];
-    return (
-      integrationsData as Array<{
-        id: string;
-        name: string;
-        identifier: string;
-        picture: string;
-      }>
-    ).map((i) => ({
-      integrationId: i.id,
-      name: i.name,
-      identifier: i.identifier,
-      picture: i.picture,
-    }));
-  }, [integrationsData]);
-
-  const urlIntegrations = searchParams.get('integrations');
+  const integrations = useMemo(
+    () => (integrationsData || []) as Integrations[],
+    [integrationsData]
+  );
   const allIntegrationIds = useMemo(
-    () => channels.map((c: { integrationId: string }) => c.integrationId),
-    [channels]
+    () => integrations.map((i) => i.id),
+    [integrations]
+  );
+  // Display shape consumed by ChannelsTab (name/picture lookup).
+  const channels = useMemo(
+    () =>
+      integrations.map((i) => ({
+        integrationId: i.id,
+        name: i.name,
+        identifier: i.identifier,
+        picture: i.picture,
+      })),
+    [integrations]
   );
 
-  const [selected, setSelected] = useState<string[]>(() => {
-    if (urlIntegrations) return urlIntegrations.split(',');
-    return allIntegrationIds;
-  });
+  // Channels & campaigns are URL-driven; empty selection means "all".
+  const urlIntegrations = searchParams.get('integrations');
+  const selectedChannels = useMemo(
+    () => (urlIntegrations ? urlIntegrations.split(',') : []),
+    [urlIntegrations]
+  );
 
-  useEffect(() => {
-    if (
-      !urlIntegrations &&
-      allIntegrationIds.length > 0 &&
-      selected.length === 0
-    ) {
-      setSelected(allIntegrationIds);
+  const urlCampaigns = searchParams.get('campaigns');
+  const selectedCampaigns = useMemo(
+    () => (urlCampaigns ? urlCampaigns.split(',') : []),
+    [urlCampaigns]
+  );
+
+  const fetch = useFetch();
+  const { data: campaignData } = useSWR('/campaigns', (url: string) =>
+    fetch(url).then((r: Response) => r.json())
+  );
+  const campaignList = useMemo(
+    () =>
+      (campaignData as Array<{
+        id: string;
+        name: string;
+        integrationIds?: string[];
+      }>) || [],
+    [campaignData]
+  );
+  const campaigns = useMemo(
+    () => campaignList.map((c) => ({ id: c.id, name: c.name })),
+    [campaignList]
+  );
+
+  // Selected campaigns narrow the channel set to the channels they publish to,
+  // so every tab (which already reads `activeIntegrations`) respects the filter.
+  const activeIntegrations = useMemo(() => {
+    let base = selectedChannels.length ? selectedChannels : allIntegrationIds;
+    if (selectedCampaigns.length) {
+      const campaignChannels = new Set(
+        campaignList
+          .filter((c) => selectedCampaigns.includes(c.id))
+          .flatMap((c) => c.integrationIds || [])
+      );
+      base = base.filter((id) => campaignChannels.has(id));
     }
-  }, [allIntegrationIds, urlIntegrations]);
-
-  const activeIntegrations = selected.length > 0 ? selected : allIntegrationIds;
+    return base;
+  }, [selectedChannels, allIntegrationIds, selectedCampaigns, campaignList]);
 
   const {
     data: overviewData,
@@ -132,24 +161,28 @@ export const AnalyticsDashboard: FC = () => {
           params.set(key, value);
         }
       });
-      router.replace(`/analytics/v2?${params.toString()}`);
+      router.replace(`/analytics?${params.toString()}`);
     },
     [router, searchParams]
   );
 
   const handleChannelChange = useCallback(
-    (newSelected: string[]) => {
-      setSelected(newSelected);
-      if (
-        newSelected.length === 0 ||
-        newSelected.length >= allIntegrationIds.length
-      ) {
-        updateParams({ integrations: undefined });
-      } else {
-        updateParams({ integrations: newSelected.join(',') });
-      }
+    (ids: string[]) => {
+      updateParams({
+        integrations:
+          ids.length && ids.length < allIntegrationIds.length
+            ? ids.join(',')
+            : undefined,
+      });
     },
     [allIntegrationIds, updateParams]
+  );
+
+  const handleCampaignsChange = useCallback(
+    (ids: string[]) => {
+      updateParams({ campaigns: ids.length ? ids.join(',') : undefined });
+    },
+    [updateParams]
   );
 
   const handleRangeChange = useCallback(
@@ -239,33 +272,71 @@ export const AnalyticsDashboard: FC = () => {
     shortlinks: t('analytics_tab_shortlinks', 'Links'),
   };
 
+  // Tabs — first 3 inline; the rest fold into a right-aligned kebab on mobile
+  // (inline on desktop). The kebab sits OUTSIDE the scrolling track so its menu
+  // isn't clipped. Mirrors the /campaigns dashboard pattern.
+  const tabItems = (
+    [
+      'overview',
+      'channels',
+      'posts',
+      'best-time',
+      'recommendations',
+      'watchlist',
+      'shortlinks',
+    ] as const
+  ).map((key) => ({ key, label: tabLabels[key] }));
+  const primaryTabs = tabItems.slice(0, 3);
+  const overflowTabs = tabItems.slice(3);
+  const overflowActive = overflowTabs.some((o) => o.key === tab);
+
+  const renderTab = (item: { key: string; label: string }, extra = '') => (
+    <button
+      key={item.key}
+      type="button"
+      onClick={() => handleTabChange(item.key)}
+      aria-current={tab === item.key ? 'page' : undefined}
+      className={clsx(
+        'px-[16px] py-[10px] text-[14px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors',
+        extra,
+        tab === item.key
+          ? 'border-btnPrimary text-textColor'
+          : 'border-transparent text-newTableText hover:text-textColor'
+      )}
+    >
+      {item.label}
+    </button>
+  );
+
   return (
     <ErrorBoundary>
       <div
-        className="flex-1 flex flex-col min-h-0"
+        className="flex-1 flex flex-col min-h-0 min-w-0"
       >
-        <div className="sticky top-0 z-40 bg-newBgColor border-b border-newTableBorder px-[24px] py-[12px] flex items-center gap-[12px] flex-wrap">
-          <DateRangePicker
+        <div className="sticky top-0 z-40 bg-newBgColor border-b border-newTableBorder px-[24px] py-[12px] mobile:px-[16px]">
+          <AnalyticsFilterBar
             from={from}
             to={to}
             compare={compare}
-            onChange={handleRangeChange}
-          />
-          <div className="flex-1" />
-          <ChannelMultiSelect
-            channels={channels}
-            selected={selected}
-            onChange={handleChannelChange}
-          />
-          <ExportButton
-            from={from}
-            to={to}
-            integrations={activeIntegrations}
-            compare={compare}
+            onRangeChange={handleRangeChange}
+            integrations={integrations}
+            selectedChannels={selectedChannels}
+            onChannelsChange={handleChannelChange}
+            campaigns={campaigns}
+            selectedCampaigns={selectedCampaigns}
+            onCampaignsChange={handleCampaignsChange}
+            exportSlot={
+              <ExportButton
+                from={from}
+                to={to}
+                integrations={activeIntegrations}
+                compare={compare}
+              />
+            }
           />
         </div>
 
-        <div className="flex-1 overflow-y-auto px-[24px] py-[16px]">
+        <div className="flex-1 min-w-0 overflow-y-auto px-[24px] py-[16px] mobile:px-[16px]">
           <DrillBreadcrumb
             drill={drill}
             onReset={handleReset}
@@ -274,21 +345,29 @@ export const AnalyticsDashboard: FC = () => {
             }
           />
 
-          <div className="flex gap-[8px] mb-[16px]">
-            {(['overview', 'channels', 'posts', 'best-time', 'recommendations', 'watchlist', 'shortlinks'] as const).map((tabName) => (
-              <button
-                key={tabName}
-                onClick={() => handleTabChange(tabName)}
-                className={`px-[14px] py-[6px] text-[13px] font-medium rounded-[8px] transition-colors capitalize ${
-                  tab === tabName
-                    ? 'bg-btnPrimary text-white'
-                    : 'text-newTableText hover:text-btnText'
-                }`}
-                aria-pressed={tab === tabName}
-              >
-                {tabLabels[tabName]}
-              </button>
-            ))}
+          <div className="flex items-stretch border-b border-newTableBorder mb-[16px]">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+              <div className="flex items-center gap-[2px] min-w-max">
+                {primaryTabs.map((item) => renderTab(item))}
+                {overflowTabs.map((item) => renderTab(item, 'hidden lg:block'))}
+              </div>
+            </div>
+            <div className="lg:hidden flex items-center shrink-0 ps-[8px]">
+              <KebabMenu
+                ariaLabel={t('more_tabs', 'More tabs')}
+                active={overflowActive}
+                align="right"
+                items={overflowTabs.map((item) => ({
+                  label:
+                    tab === item.key ? (
+                      <span className="text-btnPrimary">{item.label}</span>
+                    ) : (
+                      item.label
+                    ),
+                  onClick: () => handleTabChange(item.key),
+                }))}
+              />
+            </div>
           </div>
 
           {!overviewLoading && !overviewError && (tab === 'overview' || tab === 'channels') && isDataEmpty(overviewData) && (

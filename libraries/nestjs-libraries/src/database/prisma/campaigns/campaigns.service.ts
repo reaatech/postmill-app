@@ -45,8 +45,18 @@ export class CampaignsService {
     return ids.map((fid) => byId.get(fid)).filter(Boolean);
   }
 
-  list(organizationId: string) {
-    return this._campaignsRepository.findByOrg(organizationId);
+  async list(organizationId: string) {
+    const rows = await this._campaignsRepository.findByOrg(organizationId);
+    // Expose each campaign's distinct channel ids (from its posts) as
+    // `integrationIds`; strip the raw posts join from the response.
+    return rows.map(({ posts, ...campaign }) => ({
+      ...campaign,
+      integrationIds: [
+        ...new Set(
+          (posts as { integrationId: string }[]).map((p) => p.integrationId)
+        ),
+      ],
+    }));
   }
 
   get(id: string, organizationId: string) {
