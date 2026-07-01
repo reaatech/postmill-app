@@ -14,6 +14,7 @@ import { Button } from '@gitroom/react/form/button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { DataTable, StatusPill } from '@gitroom/frontend/components/ui/data-table';
 import { PlatformAvatar } from '@gitroom/frontend/components/shared/platform-avatar';
+import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 
 interface CampaignPost {
   id: string;
@@ -143,22 +144,29 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
 
   const openNewDraft = useCallback(() => {
     setCampaignId(campaignId);
+    const close = () => {
+      useLaunchStore.getState().setCampaignId(null);
+      modal.closeAll();
+    };
     modal.openModal({
-      title: t('new_draft', 'New Draft'),
-      withCloseButton: true,
+      withCloseButton: false,
       fullScreen: true,
+      removeLayout: true,
+      size: '100%',
+      height: '100%',
       children: (
-        <AddEditModal
-          date={newDayjs()}
-          integrations={integrations || []}
-          allIntegrations={integrations || []}
-          reopenModal={() => undefined}
-          mutate={refreshDashboard}
-          customClose={() => {
-            useLaunchStore.getState().setCampaignId(null);
-            modal.closeAll();
-          }}
-        />
+        <div className="relative w-full h-full">
+          <CloseModalButton onClick={close} />
+          <AddEditModal
+            date={newDayjs()}
+            integrations={integrations || []}
+            allIntegrations={integrations || []}
+            reopenModal={() => undefined}
+            mutate={refreshDashboard}
+            customClose={close}
+            padding="p-0"
+          />
+        </div>
       ),
     });
   }, [campaignId, integrations, modal, refreshDashboard, setCampaignId, t]);

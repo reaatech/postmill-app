@@ -7,6 +7,12 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import clsx from 'clsx';
+import useSWR from 'swr';
+import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
+import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import {
   CampaignEntitySlug,
   ResolvedCampaignItem,
@@ -24,7 +30,7 @@ const ENTITY_LABELS: Record<CampaignEntitySlug, string> = {
   brand: 'Brands',
   storage: 'Storage',
   file: 'Files',
-  set: 'Sets',
+  set: 'Post Templates',
   signature: 'Signatures',
 };
 
@@ -44,26 +50,40 @@ const PanelItem: FC<{
   item: ResolvedCampaignItem;
   onRemove: (entityType: CampaignEntitySlug, entityId: string) => void;
   busy: boolean;
-}> = ({ item, onRemove, busy }) => {
+  onOpen?: () => void;
+}> = ({ item, onRemove, busy, onOpen }) => {
   const iconSrc = item.icon || undefined;
+  const inner = (
+    <>
+      {iconSrc ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={iconSrc} alt="" className="w-[24px] h-[24px] rounded-[4px] object-cover shrink-0" />
+      ) : (
+        <div className="w-[24px] h-[24px] rounded-[4px] bg-btnPrimary/10 text-btnPrimary flex items-center justify-center text-[10px] font-medium shrink-0">
+          {(item.name || '?').charAt(0).toUpperCase()}
+        </div>
+      )}
+      <div className="flex flex-col min-w-0 text-left">
+        <span className="text-[13px] text-textColor truncate">{item.name}</span>
+        {item.subtitle && (
+          <span className="text-[11px] text-newTableText truncate">{item.subtitle}</span>
+        )}
+      </div>
+    </>
+  );
   return (
     <div className="flex items-center justify-between gap-[8px] px-[12px] py-[8px] rounded-[8px] bg-newBgColorInner border border-newTableBorder hover:border-newTableText/30 transition-colors">
-      <div className="flex items-center gap-[8px] min-w-0">
-        {iconSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={iconSrc} alt="" className="w-[24px] h-[24px] rounded-[4px] object-cover shrink-0" />
-        ) : (
-          <div className="w-[24px] h-[24px] rounded-[4px] bg-btnPrimary/10 text-btnPrimary flex items-center justify-center text-[10px] font-medium shrink-0">
-            {(item.name || '?').charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div className="flex flex-col min-w-0">
-          <span className="text-[13px] text-textColor truncate">{item.name}</span>
-          {item.subtitle && (
-            <span className="text-[11px] text-newTableText truncate">{item.subtitle}</span>
-          )}
-        </div>
-      </div>
+      {onOpen ? (
+        <button
+          type="button"
+          onClick={onOpen}
+          className="flex items-center gap-[8px] min-w-0 flex-1 hover:text-btnPrimary transition-colors"
+        >
+          {inner}
+        </button>
+      ) : (
+        <div className="flex items-center gap-[8px] min-w-0">{inner}</div>
+      )}
       <button
         type="button"
         disabled={busy}
@@ -222,6 +242,62 @@ export const TaggedItemsPanels: FC<{
   const modal = useModals();
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<CampaignEntitySlug | null>(null);
+  const setLaunchCampaignId = useLaunchStore((state) => state.setCampaignId);
+
+  const { data: integrations } = useSWR<Integrations[]>(
+    '/integrations/list',
+    async () => {
+      const r = await fetch('/integrations/list');
+      if (!r.ok) throw new Error('Failed to load channels');
+      return (await r.json()).integrations;
+    },
+    { revalidateOnFocus: false }
+  );
+
+  // Open a tagged Post Template (Set) in the planner, pre-applied as a new post.
+  const openTemplate = useCallback(
+    async (setId: string, name: string) => {
+      let parsed: any = null;
+      try {
+        const r = await fetch('/sets');
+        if (!r.ok) throw new Error();
+        const data = await r.json();
+        const list = Array.isArray(data) ? data : data.sets || [];
+        const found = list.find((s: any) => s.id === setId);
+        if (found) parsed = JSON.parse(found.content);
+      } catch {
+        /* fall through to an empty template */
+      }
+      setLaunchCampaignId(campaignId);
+      const close = () => {
+        useLaunchStore.getState().setCampaignId(null);
+        modal.closeAll();
+      };
+      modal.openModal({
+        withCloseButton: false,
+        fullScreen: true,
+        removeLayout: true,
+        size: '100%',
+        height: '100%',
+        children: (
+          <div className="relative w-full h-full">
+            <CloseModalButton onClick={close} />
+            <AddEditModal
+              date={newDayjs()}
+              set={parsed || undefined}
+              integrations={integrations || []}
+              allIntegrations={integrations || []}
+              reopenModal={() => undefined}
+              mutate={onMutate}
+              customClose={close}
+              padding="p-0"
+            />
+          </div>
+        ),
+      });
+    },
+    [campaignId, fetch, integrations, modal, onMutate, setLaunchCampaignId, t]
+  );
 
   // Only entity types that actually have tagged items become tabs.
   const availableTypes = useMemo(
@@ -317,6 +393,11 @@ export const TaggedItemsPanels: FC<{
                 item={item}
                 onRemove={remove}
                 busy={removingKey === `${item.entityType}:${item.id}`}
+                onOpen={
+                  active === 'set'
+                    ? () => openTemplate(item.id, item.name)
+                    : undefined
+                }
               />
             ))}
           </div>

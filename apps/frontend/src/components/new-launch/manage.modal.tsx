@@ -670,7 +670,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   );
 
   return (
-    <div className="w-full h-full flex-1 p-[16px] lg:p-[40px] flex relative">
+    <div className={clsx('w-full h-full flex-1 flex relative', props.padding ?? 'p-[16px] lg:p-[40px]')}>
       <div className="flex flex-1 bg-newBgColorInner rounded-[20px] flex-col overflow-hidden">
         <div className="lg:hidden flex items-center justify-center p-[12px] border-b border-newBorder bg-newBgColor">
           <div className="flex bg-newBgColorInner border border-newBorder rounded-[8px] overflow-hidden">

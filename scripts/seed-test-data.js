@@ -540,9 +540,19 @@ async function main() {
       const sig = await prisma.signatures.create({ data: { organizationId: orgId, name: s.name, content: s.content, autoAdd: false }, select: { id: true } });
       sigIds.push(sig.id);
     }
+    const tplContent = (text) =>
+      JSON.stringify({
+        posts: firstChannel
+          ? [{ integration: { id: firstChannel.id }, settings: {}, value: [{ content: text, delay: 0, image: [] }] }]
+          : [],
+      });
     const setIds = [];
-    for (const name of ['Product Launch Template', 'Weekly Tip Template', 'Case Study Template']) {
-      const st = await prisma.sets.create({ data: { organizationId: orgId, name, content: JSON.stringify({ posts: [] }) }, select: { id: true } });
+    for (const s of [
+      { name: 'Product Launch Template', text: '🚀 Big news — [product] is here! Here is what is new and why it matters. Try it free → acme.com/launch' },
+      { name: 'Weekly Tip Template', text: '💡 Tip of the week: [one quick, actionable tip your audience can use today].' },
+      { name: 'Case Study Template', text: '📈 How [customer] achieved [result] with Acme — a short case study. 1/' },
+    ]) {
+      const st = await prisma.sets.create({ data: { organizationId: orgId, name: s.name, content: tplContent(s.text) }, select: { id: true } });
       setIds.push(st.id);
     }
 

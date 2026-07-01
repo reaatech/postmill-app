@@ -8,6 +8,7 @@ import { useMenuItem } from '@gitroom/frontend/components/layout/top.menu';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useHasOpenModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MenuItemRow } from './menu-item-row';
 
 // Primary destinations pinned to the bottom bar (rendered alphabetically → Analytics,
@@ -31,6 +32,7 @@ export const BottomTabBar: FC = () => {
   const user = useUser();
   const t = useT();
   const pathname = usePathname();
+  const hasOpenModals = useHasOpenModals();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the sheet whenever the route changes (derived-state-during-render —
@@ -40,6 +42,9 @@ export const BottomTabBar: FC = () => {
     setLastPath(pathname);
     if (moreOpen) setMoreOpen(false);
   }
+
+  // Hide the bar while a modal is open so a full-screen modal's footer isn't covered.
+  if (hasOpenModals) return null;
 
   const visible = (f: { hide?: boolean; requireBilling?: boolean }) =>
     !f.hide && !(f.requireBilling && !billingEnabled);

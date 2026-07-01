@@ -66,6 +66,11 @@ const useModalStore = create<State>((set) => ({
   closeAll: () => set({ modalManager: [] }),
 }));
 
+// True while any modal is open — used e.g. to hide the mobile bottom nav so a
+// full-screen modal's footer isn't covered by it.
+export const useHasOpenModals = () =>
+  useModalStore((state) => state.modalManager.length > 0);
+
 const CurrentModalContext = createContext({ id: '' });
 
 interface ModalManagerInterface extends ModalManagerStoreInterface {

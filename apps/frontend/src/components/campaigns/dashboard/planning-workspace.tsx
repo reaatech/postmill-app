@@ -15,6 +15,7 @@ import {
 } from '@gitroom/frontend/components/ui/data-table';
 import { useCampaignDrafts } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 
 interface DraftPost {
@@ -151,25 +152,32 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
     useLaunchStore.getState().setCampaignId(campaignId);
     const dayjs = (await import('dayjs')).default;
 
+    const close = () => {
+      useLaunchStore.getState().setCampaignId(null);
+      modals.closeAll();
+    };
     modals.openModal({
       fullScreen: true,
       removeLayout: true,
+      size: '100%',
+      height: '100%',
       withCloseButton: false,
       children: (
-        <AddEditModal
-          date={dayjs()}
-          integrations={integrations}
-          allIntegrations={integrations}
-          mutate={() => {
-            mutate();
-            onMutate();
-          }}
-          reopenModal={() => {}}
-          customClose={() => {
-            useLaunchStore.getState().setCampaignId(null);
-            modals.closeAll();
-          }}
-        />
+        <div className="relative w-full h-full">
+          <CloseModalButton onClick={close} />
+          <AddEditModal
+            date={dayjs()}
+            integrations={integrations}
+            allIntegrations={integrations}
+            mutate={() => {
+              mutate();
+              onMutate();
+            }}
+            reopenModal={() => {}}
+            customClose={close}
+            padding="p-0"
+          />
+        </div>
       ),
     });
   }, [campaignId, fetch, modals, mutate, onMutate, t, toast]);
