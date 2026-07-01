@@ -18,7 +18,13 @@ export const getTimezone = () => {
 };
 
 export const newDayjs = (config?: ConfigType) => {
-  const d = dayjs(config).tz(getTimezone());
+  // A bare date-only string (YYYY-MM-DD) denotes a calendar date, so parse it as
+  // midnight in the user's timezone — not the runtime's local time, which would
+  // shift the day (and every hour column) when the two timezones differ.
+  const d =
+    typeof config === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(config)
+      ? dayjs.tz(config, getTimezone())
+      : dayjs(config).tz(getTimezone());
   (d as any).local = () => d;
   return d;
 };

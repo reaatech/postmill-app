@@ -229,6 +229,9 @@ export class PostsRepository {
         intervalInDays: true,
         group: true,
         creationMethod: true,
+        campaignId: true,
+        approvalStatus: true,
+        image: true,
         lastViews: true,
         lastLikes: true,
         lastComments: true,
@@ -275,7 +278,26 @@ export class PostsRepository {
       await this._enrichWithUnreadComments(posts, userId);
     }
 
-    return posts;
+    // Derive a compact media type from the (heavy) image JSON, then strip the raw
+    // `image` so the calendar payload stays lean — the frontend media filter only
+    // needs none/image/video.
+    return posts.map((post) => {
+      const { image, ...rest } = post;
+      return { ...rest, mediaType: this._computeMediaType(image) };
+    });
+  }
+
+  private _computeMediaType(imageJson?: string | null): 'none' | 'image' | 'video' {
+    if (!imageJson) return 'none';
+    try {
+      const arr = JSON.parse(imageJson);
+      if (!Array.isArray(arr) || arr.length === 0) return 'none';
+      const isVideo = (m: any) =>
+        typeof m?.path === 'string' && /(mp4|mov|webm|m4v|avi|mkv)(\?|#|$)/i.test(m.path);
+      return arr.some(isVideo) ? 'video' : 'image';
+    } catch {
+      return 'none';
+    }
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {

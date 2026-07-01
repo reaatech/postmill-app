@@ -29,6 +29,7 @@ import { DayView } from './day.view';
 import { WeekView } from './week.view';
 import { MonthView } from './month.view';
 import { ListView } from './list.view';
+import { RangeView } from './range.view';
 
 extend(isSameOrAfter);
 extend(isSameOrBefore);
@@ -46,7 +47,12 @@ i18next.on('languageChanged', () => {
 updateDayjsLocale();
 
 export const Calendar = () => {
-  const { display } = useCalendar();
+  const { display, customRange } = useCalendar();
+  // A custom date range renders as its own range grid (exact selected days),
+  // except in the list view which paginates any range itself.
+  if (customRange && display !== 'list') {
+    return <RangeView />;
+  }
   return (
     <>
       {display === 'list' ? (

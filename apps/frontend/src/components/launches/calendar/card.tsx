@@ -226,7 +226,7 @@ export const CalendarItem: FC<{
             src={`/icons/platforms/${post.integration?.providerIdentifier}.png`}
           />
         </div>
-        <div className="w-full flex-1 flex flex-col min-h-[90px] gap-[2px]">
+        <div className="w-full flex-1 flex flex-col min-h-[40px] gap-[2px]">
           <div className="flex items-center gap-[6px] flex-wrap">
             <div className="text-start text-[12px]">
               {state === 'DRAFT' ? t('draft', 'Draft') + ': ' : ''}
