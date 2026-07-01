@@ -102,7 +102,7 @@ describe('CommentThread', () => {
       />
     );
     expect(
-      screen.getByText("Comments aren't available for this channel yet")
+      screen.getByText("Replies aren't available for this channel yet")
     ).toBeTruthy();
   });
 
@@ -117,11 +117,11 @@ describe('CommentThread', () => {
       />
     );
     expect(
-      screen.getByText("Comments aren't available for this channel yet")
+      screen.getByText("Replies aren't available for this channel yet")
     ).toBeTruthy();
   });
 
-  it('shows "No comments yet" when comments array is empty', () => {
+  it('shows "No replies yet" when comments array is empty', () => {
     stubSwr({ data: { comments: [] } });
     render(
       <CommentThread
@@ -131,7 +131,7 @@ describe('CommentThread', () => {
         integrationName="Twitter"
       />
     );
-    expect(screen.getByText('No comments yet')).toBeTruthy();
+    expect(screen.getByText('No replies yet')).toBeTruthy();
   });
 
   it('renders top-level comments (parentPlatformCommentId is null)', () => {

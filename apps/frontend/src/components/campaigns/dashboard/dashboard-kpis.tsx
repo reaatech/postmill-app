@@ -26,7 +26,7 @@ interface DashboardKpisProps {
 const MetricLabel: Record<string, string> = {
   impressions: 'Impressions',
   likes: 'Likes',
-  comments: 'Comments',
+  comments: 'Replies',
   clicks: 'Clicks',
   posts: 'Posts',
   followers: 'Followers',
@@ -78,7 +78,7 @@ export const DashboardKpis: FC<DashboardKpisProps> = ({ dashboard }) => {
   const kpis = [
     { label: t('views', 'Views'), value: Math.round(engagement.totalViews || 0).toLocaleString() },
     { label: t('likes', 'Likes'), value: Math.round(engagement.totalLikes || 0).toLocaleString() },
-    { label: t('comments', 'Comments'), value: Math.round(engagement.totalComments || 0).toLocaleString() },
+    { label: t('replies', 'Replies'), value: Math.round(engagement.totalComments || 0).toLocaleString() },
     { label: t('clicks', 'Clicks'), value: Math.round(clickTotal || 0).toLocaleString() },
   ];
 

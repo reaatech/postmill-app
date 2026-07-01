@@ -210,7 +210,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
     () => [
       { label: t('views', 'Views'), value: engagement.totalViews },
       { label: t('likes', 'Likes'), value: engagement.totalLikes },
-      { label: t('comments', 'Comments'), value: engagement.totalComments },
+      { label: t('replies', 'Replies'), value: engagement.totalComments },
       { label: t('clicks', 'Clicks'), value: engagement.clickTotal },
     ],
     [engagement, t]
@@ -350,7 +350,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
                   <th className="text-left py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('date', 'Date')}</th>
                   <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('views', 'Views')}</th>
                   <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('likes', 'Likes')}</th>
-                  <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('comments', 'Comments')}</th>
+                  <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('replies', 'Replies')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -390,7 +390,7 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
                   <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('posts', 'Posts')}</th>
                   <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('views', 'Views')}</th>
                   <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('likes', 'Likes')}</th>
-                  <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('comments', 'Comments')}</th>
+                  <th className="text-right py-[12px] px-[16px] text-[12px] font-medium text-newTableText uppercase tracking-wide">{t('replies', 'Replies')}</th>
                 </tr>
               </thead>
               <tbody>

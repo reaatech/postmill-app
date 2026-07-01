@@ -262,7 +262,7 @@ export const Filters = () => {
 
   const engagementFilterOptions: { value: EngagementFilter; label: string }[] = [
     { value: 'all', label: 'All posts' },
-    { value: 'has_comments', label: 'Has comments' },
+    { value: 'has_comments', label: 'Has replies' },
     { value: 'errors', label: 'Errors' },
     { value: 'top_performers', label: 'Top performers' },
   ];
@@ -556,7 +556,7 @@ export const Filters = () => {
   if (calendar.unreadOnly) {
     appliedChips.push({
       key: 'unread',
-      label: t('unread_comments_only', 'Unread comments only'),
+      label: t('unread_comments_only', 'Unread replies only'),
       onClear: () => calendar.setUnreadOnly(false),
     });
   }
@@ -1146,7 +1146,7 @@ export const Filters = () => {
                     onChange={(e) => calendar.setUnreadOnly(e.target.checked)}
                     className="w-[16px] h-[16px] accent-[#2B5CD3]"
                   />
-                  {t('unread_comments_only', 'Unread comments only')}
+                  {t('unread_comments_only', 'Unread replies only')}
                 </label>
               </>
             )}

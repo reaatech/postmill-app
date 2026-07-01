@@ -157,7 +157,7 @@ export const CalendarItem: FC<{
         <div
           className="absolute -top-[6px] -end-[6px] z-20 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1"
           data-tooltip-id="tooltip"
-          data-tooltip-content={`${post.unreadComments} ${t('unread_comments', 'unread comments')}`}
+          data-tooltip-content={`${post.unreadComments} ${t('unread_comments', 'unread replies')}`}
         >
           {post.unreadComments > 99 ? '99+' : post.unreadComments}
         </div>
@@ -259,11 +259,11 @@ export const CalendarItem: FC<{
                 </span>
               )}
               {post.lastComments !== undefined && post.lastComments !== null ? (
-                <span className="flex items-center gap-1" title={t('comments', 'Comments')} aria-label={t('comments', 'Comments')}>
+                <span className="flex items-center gap-1" title={t('replies', 'Replies')} aria-label={t('replies', 'Replies')}>
                   <CommentsIcon /> {formatCompactNumber(post.lastComments)}
                 </span>
               ) : post.commentCount ? (
-                <span className="flex items-center gap-1" title={t('comments', 'Comments')} aria-label={t('comments', 'Comments')}>
+                <span className="flex items-center gap-1" title={t('replies', 'Replies')} aria-label={t('replies', 'Replies')}>
                   <CommentsIcon /> {formatCompactNumber(post.commentCount)}
                 </span>
               ) : null}

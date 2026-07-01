@@ -225,7 +225,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
           <div className="flex items-center gap-[12px] text-[12px] text-newTableText">
             <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'views')}</span>
             <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'likes')}</span>
-            <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('comments', 'comments')}</span>
+            <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'replies')}</span>
           </div>
         ),
       },
@@ -324,7 +324,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
             <option value="oldest">{t('sort_oldest', 'Oldest')}</option>
             <option value="views">{t('sort_most_views', 'Most views')}</option>
             <option value="likes">{t('sort_most_likes', 'Most likes')}</option>
-            <option value="comments">{t('sort_most_comments', 'Most comments')}</option>
+            <option value="comments">{t('sort_most_comments', 'Most replies')}</option>
           </select>
           {viewToggle('hidden lg:flex')}
         </div>
@@ -386,7 +386,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
                   <div className="flex items-center gap-[10px]">
                     <span>{Math.round(post.lastViews || 0).toLocaleString()} {t('views', 'views')}</span>
                     <span>{Math.round(post.lastLikes || 0).toLocaleString()} {t('likes', 'likes')}</span>
-                    <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('comments', 'comments')}</span>
+                    <span>{Math.round(post.lastComments || 0).toLocaleString()} {t('replies', 'replies')}</span>
                   </div>
                 </div>
               </div>

@@ -112,7 +112,7 @@ export const CampaignDashboardPage: FC = () => {
     { key: 'drafts', label: t('post_drafts', 'Post Drafts') },
     { key: 'items', label: t('tagged_items', 'Tagged Items') },
     { key: 'planning', label: t('planning', 'Planning') },
-    { key: 'comments', label: t('comments', 'Comments') },
+    { key: 'comments', label: t('replies', 'Replies') },
     { key: 'activity', label: t('activity', 'Activity') },
   ];
   // On mobile only the first three are shown inline; the rest fold into a menu.

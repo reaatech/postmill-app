@@ -28,12 +28,12 @@ export class SocialCommentsRepository {
       where.assigneeId = filters.assigneeId;
     }
 
-    if (filters.integrationId) {
-      where.integrationId = filters.integrationId;
+    if (filters.integrationIds?.length) {
+      where.integrationId = { in: filters.integrationIds };
     }
 
-    if (filters.campaignId) {
-      where.post = { campaignId: filters.campaignId, deletedAt: null };
+    if (filters.campaignIds?.length) {
+      where.post = { campaignId: { in: filters.campaignIds }, deletedAt: null };
     }
 
     if (filters.unreadOnly) {

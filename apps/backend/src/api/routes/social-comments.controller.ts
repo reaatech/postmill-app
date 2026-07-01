@@ -35,11 +35,15 @@ export class SocialCommentsController {
     if (assigneeId && !isCuid(assigneeId)) {
       throw new BadRequestException('Invalid assigneeId');
     }
-    if (campaignId && !isUUID(campaignId)) {
-      throw new BadRequestException('Invalid campaignId');
+    // integrationId/campaignId accept a single id or a comma-separated list (multi-select
+    // filter). A lone value stays byte-for-byte compatible (splits to a 1-element array).
+    const campaignIds = campaignId ? campaignId.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    for (const id of campaignIds) {
+      if (!isUUID(id)) throw new BadRequestException('Invalid campaignId');
     }
-    if (integrationId && !isCuid(integrationId)) {
-      throw new BadRequestException('Invalid integrationId');
+    const integrationIds = integrationId ? integrationId.split(',').map((s) => s.trim()).filter(Boolean) : [];
+    for (const id of integrationIds) {
+      if (!isCuid(id)) throw new BadRequestException('Invalid integrationId');
     }
     if (cursor && !isISO8601(cursor)) {
       throw new BadRequestException('Invalid cursor: must be a valid ISO 8601 date string');
@@ -49,8 +53,8 @@ export class SocialCommentsController {
       assigneeId,
       cursor,
       unreadOnly: unreadOnly === 'true',
-      campaignId,
-      integrationId,
+      campaignIds,
+      integrationIds,
     });
   }
 

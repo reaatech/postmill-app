@@ -93,13 +93,14 @@ export const CommentInboxFilters: FC<CommentInboxFiltersProps> = ({
           ))}
         </select>
       )}
-      <label className="flex items-center gap-[6px] text-[13px] text-newTableText cursor-pointer">
+      <label className="flex items-center gap-[8px] text-[13px] text-newTableText cursor-pointer select-none">
         <input
           type="checkbox"
+          className="sr-only peer"
           checked={filters.unreadOnly}
           onChange={toggleUnreadOnly}
-          className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary [&:checked]:bg-btnPrimary"
         />
+        <div className="relative w-[36px] h-[20px] shrink-0 bg-newTableBorder rounded-full peer-checked:bg-btnPrimary after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:rounded-full after:h-[16px] after:w-[16px] after:transition-all peer-checked:after:translate-x-full" />
         {t('comment_inbox.filter_unread_only', 'Unread only')}
       </label>
     </div>

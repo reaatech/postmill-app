@@ -29,8 +29,9 @@ export interface InboxFilterOptions {
   assigneeId?: string;
   cursor?: string;
   unreadOnly?: boolean;
-  campaignId?: string;
-  integrationId?: string;
+  // Multi-select: empty/absent = no filter; one or more ids = `where … { in: [...] }`.
+  campaignIds?: string[];
+  integrationIds?: string[];
 }
 
 @Injectable()

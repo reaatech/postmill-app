@@ -49,7 +49,7 @@ const CATEGORY_LABEL_KEYS: Record<NotificationCategory, [string, string]> = {
   post_published: ['notification_cat_post_published', 'Post published'],
   post_failed: ['notification_cat_post_failed', 'Post failed'],
   channels: ['notification_cat_channels', 'Channel issues'],
-  comments: ['notification_cat_comments', 'Comments'],
+  comments: ['notification_cat_comments', 'Replies'],
   budget: ['notification_cat_budget', 'AI budget'],
   media: ['notification_cat_media', 'Media jobs'],
   announcements: ['notification_cat_announcements', 'Announcements'],

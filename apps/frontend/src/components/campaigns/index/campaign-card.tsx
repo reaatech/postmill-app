@@ -128,7 +128,7 @@ export const CampaignCard: FC<CampaignCardProps> = ({
             )}
             {engagement.totalComments > 0 && (
               <span className="text-newTableText">
-                {t('comments', 'Comments')}: {Math.round(engagement.totalComments).toLocaleString()}
+                {t('replies', 'Replies')}: {Math.round(engagement.totalComments).toLocaleString()}
               </span>
             )}
           </div>

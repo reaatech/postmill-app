@@ -19,7 +19,7 @@ export const MetricFilter: FC<{
   const rows: { key: MetricKey; label: string }[] = [
     { key: 'views', label: t('views', 'Views') },
     { key: 'likes', label: t('likes', 'Likes') },
-    { key: 'comments', label: t('comments', 'Comments') },
+    { key: 'comments', label: t('replies', 'Replies') },
   ];
 
   const ops: { value: MetricOp; label: string }[] = [

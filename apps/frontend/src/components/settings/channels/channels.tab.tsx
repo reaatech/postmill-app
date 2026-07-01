@@ -72,7 +72,7 @@ const CAPABILITY_KEYS: CapabilityKey[] = [
 
 const CAPABILITY_FILTERS: { key: CapabilityKey; label: string }[] = [
   { key: 'analytics', label: 'Analytics' },
-  { key: 'comments', label: 'Comments' },
+  { key: 'comments', label: 'Replies' },
   { key: 'firstComment', label: 'First Comment' },
   { key: 'poll', label: 'Polls' },
   { key: 'video', label: 'Video' },

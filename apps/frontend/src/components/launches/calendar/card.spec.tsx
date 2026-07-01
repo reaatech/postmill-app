@@ -171,7 +171,7 @@ describe('CalendarItem card layout (C2)', () => {
 
       expect(container.querySelector('span[title="Views"]')).toBeTruthy();
       expect(container.querySelector('span[title="Likes"]')).toBeTruthy();
-      expect(container.querySelector('span[title="Comments"]')).toBeTruthy();
+      expect(container.querySelector('span[title="Replies"]')).toBeTruthy();
     });
   });
 
@@ -191,7 +191,7 @@ describe('CalendarItem card layout (C2)', () => {
 
       expect(container.querySelector('span[title="Views"]')).toBeNull();
       expect(container.querySelector('span[title="Likes"]')).toBeNull();
-      expect(container.querySelector('span[title="Comments"]')).toBeNull();
+      expect(container.querySelector('span[title="Replies"]')).toBeNull();
 
       // Content still renders in normal flow
       const content = screen.getByText('Hello card content');

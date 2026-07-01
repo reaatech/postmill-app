@@ -117,7 +117,7 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
   return (
     <div className="p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor flex flex-col gap-[16px]">
       <div className="flex items-center gap-[8px]">
-        <h3 className="text-[14px] font-semibold text-textColor">{t('comments', 'Comments')}</h3>
+        <h3 className="text-[14px] font-semibold text-textColor">{t('replies', 'Replies')}</h3>
         <span className="text-[12px] text-newTableText">({comments.length})</span>
       </div>
 
@@ -142,13 +142,13 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
 
       {error && (error as Error).message === 'UPGRADE_REQUIRED' && (
         <div className="text-[13px] text-newTableText py-[24px] text-center">
-          {t('comment_inbox.upgrade_required', 'Comments not available on your current plan')}
+          {t('comment_inbox.upgrade_required', 'Replies not available on your current plan')}
         </div>
       )}
 
       {error && (error as Error).message !== 'UPGRADE_REQUIRED' && (
         <div className="text-[13px] text-red-500 py-[24px] text-center">
-          {t('comment_inbox.failed_to_load', 'Failed to load comments')}
+          {t('comment_inbox.failed_to_load', 'Failed to load replies')}
         </div>
       )}
 
@@ -158,7 +158,7 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
 
       {!error && !isLoading && comments.length === 0 && (
         <div className="text-[13px] text-newTableText py-[24px] text-center">
-          {t('campaign_comments_empty', 'No comments for this campaign yet')}
+          {t('campaign_comments_empty', 'No replies for this campaign yet')}
         </div>
       )}
 
