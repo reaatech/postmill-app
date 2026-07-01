@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -13,13 +14,29 @@ import {
   StatusPill,
   AvatarCell,
 } from '@gitroom/frontend/components/ui/data-table';
+import { PlatformAvatar } from '@gitroom/frontend/components/shared/platform-avatar';
+import { KebabMenu, KebabMenuItem } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useCampaignDrafts } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
 import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
 
+const ListIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+    <line x1="8" y1="6" x2="21" y2="6" /><line x1="8" y1="12" x2="21" y2="12" /><line x1="8" y1="18" x2="21" y2="18" />
+    <circle cx="3.5" cy="6" r="1" fill="currentColor" stroke="none" /><circle cx="3.5" cy="12" r="1" fill="currentColor" stroke="none" /><circle cx="3.5" cy="18" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
+const GridIcon = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+    <rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" />
+    <rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" />
+  </svg>
+);
+
 interface DraftPost {
   id: string;
+  group?: string;
   content?: string;
   publishDate?: string;
   approvalStatus?: 'pending' | 'approved' | 'rejected' | null;
@@ -44,14 +61,27 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
   const fetch = useFetch();
   const toast = useToaster();
   const modals = useModals();
+  const router = useRouter();
   const { data, error, mutate } = useCampaignDrafts(campaignId);
 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [actingId, setActingId] = useState<string | null>(null);
   const [promoting, setPromoting] = useState(false);
   const [blockedResults, setBlockedResults] = useState<
     Array<{ id: string; status: 'blocked' | 'not_found'; reason?: string }>
   >([]);
+
+  // View mode: card is the default on mobile, list on desktop; a manual toggle overrides.
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 1023px)').matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const onChange = () => setIsMobile(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+  const [viewOverride, setViewOverride] = useState<'list' | 'card' | null>(null);
+  const view = viewOverride ?? (isMobile ? 'card' : 'list');
 
   const groups = useMemo(() => Object.entries(data || {}), [data]);
   const flatPosts = useMemo(
@@ -66,11 +96,9 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
 
   const handleApprove = useCallback(
     async (postId: string) => {
-      setActingId(postId);
       const res = await fetch(`/campaigns/${campaignId}/drafts/${postId}/approve`, {
         method: 'POST',
       });
-      setActingId(null);
       if (!res.ok) {
         toast.show(t('approve_failed', 'Failed to approve draft'), 'warning');
         return;
@@ -84,11 +112,9 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
 
   const handleReject = useCallback(
     async (postId: string) => {
-      setActingId(postId);
       const res = await fetch(`/campaigns/${campaignId}/drafts/${postId}/reject`, {
         method: 'POST',
       });
-      setActingId(null);
       if (!res.ok) {
         toast.show(t('reject_failed', 'Failed to reject draft'), 'warning');
         return;
@@ -125,7 +151,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
 
     if (promoted.length) {
       toast.show(
-        t('promoted_n_drafts', 'Promoted {count} drafts', { count: promoted.length }),
+        t('promoted_n_drafts', 'Promoted {{count}} drafts', { count: promoted.length }),
         'success'
       );
     }
@@ -190,14 +216,153 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
         id: r.id,
         text:
           r.status === 'not_found'
-            ? t('draft_not_found', '"{label}" was not found', { label })
-            : t('draft_blocked', '"{label}" blocked: {reason}', {
+            ? t('draft_not_found', '"{{label}}" was not found', { label })
+            : t('draft_blocked', '"{{label}}" blocked: {{reason}}', {
                 label,
                 reason: r.reason || t('unknown_reason', 'Unknown reason'),
               }),
       };
     });
   }, [blockedResults, flatPosts, t]);
+
+  const toggleSelect = (id: string) =>
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
+  // Bulk action shown when drafts are selected. Rendered inline in the header on
+  // desktop and on its own row on mobile. (Open-in-composer is per-draft only —
+  // it lives in each row/card's kebab, since it can't act on a multi-selection.)
+  const renderSelectionActions = () => (
+    <Button type="button" onClick={handlePromote} loading={promoting}>
+      {t('promote_selected', 'Promote {{count}}', { count: selectedIds.length })}
+    </Button>
+  );
+
+  const viewToggle = (visibility: string) => (
+    <div
+      className={clsx(
+        'rounded-[8px] border border-newTableBorder overflow-hidden shrink-0',
+        visibility
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setViewOverride('list')}
+        aria-label={t('list_view', 'List view')}
+        aria-pressed={view === 'list'}
+        className={clsx(
+          'px-[10px] py-[8px] transition-colors',
+          view === 'list' ? 'bg-btnPrimary text-white' : 'text-newTableText hover:text-textColor'
+        )}
+      >
+        {ListIcon}
+      </button>
+      <button
+        type="button"
+        onClick={() => setViewOverride('card')}
+        aria-label={t('card_view', 'Card view')}
+        aria-pressed={view === 'card'}
+        className={clsx(
+          'px-[10px] py-[8px] transition-colors',
+          view === 'card' ? 'bg-btnPrimary text-white' : 'text-newTableText hover:text-textColor'
+        )}
+      >
+        {GridIcon}
+      </button>
+    </div>
+  );
+
+  // Shared between the table's approval column and the card view.
+  const approvalPill = (post: DraftPost) => {
+    const status = post.approvalStatus || 'pending';
+    const map: Record<string, { color: 'amber' | 'green' | 'red'; label: string }> = {
+      pending: { color: 'amber', label: t('pending', 'Pending') },
+      approved: { color: 'green', label: t('approved', 'Approved') },
+      rejected: { color: 'red', label: t('rejected', 'Rejected') },
+    };
+    const pill = map[status] || map.pending;
+    return <StatusPill status={pill.color} label={pill.label} />;
+  };
+
+  // Per-draft actions as a kebab menu (shared by the table's actions column and
+  // the card view). Items are included by approval state instead of disabled.
+  const renderActions = (post: DraftPost) => {
+    const status = post.approvalStatus || 'pending';
+    const items: KebabMenuItem[] = [];
+    if (post.group) {
+      items.push({
+        label: t('open_in_composer', 'Open in composer'),
+        onClick: () => router.push(`/schedule/post/${post.group}`),
+      });
+    }
+    const approvalItems: KebabMenuItem[] = [];
+    if (status !== 'approved') {
+      approvalItems.push({ label: t('approve', 'Approve'), onClick: () => handleApprove(post.id) });
+    }
+    if (status !== 'rejected') {
+      approvalItems.push({ label: t('reject', 'Reject'), onClick: () => handleReject(post.id), danger: true });
+    }
+    approvalItems.push({ label: t('promote', 'Promote'), onClick: () => runPromote([post.id]) });
+    if (items.length && approvalItems.length) items.push({ divider: true });
+    items.push(...approvalItems);
+    if (!items.length) return null;
+    return <KebabMenu ariaLabel={t('draft_actions', 'Draft actions')} items={items} />;
+  };
+
+  const renderCards = (posts: DraftPost[]) => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[12px]">
+      {posts.map((post) => {
+        const selected = selectedIds.includes(post.id);
+        return (
+          <div
+            key={post.id}
+            className={clsx(
+              'p-[12px] border rounded-[10px] bg-newBgColorInner flex flex-col gap-[8px] transition-colors',
+              selected ? 'border-btnPrimary' : 'border-newTableBorder'
+            )}
+          >
+            <div className="flex items-center justify-between gap-[8px]">
+              <label className="flex items-center gap-[8px] min-w-0 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selected}
+                  onChange={() => toggleSelect(post.id)}
+                  className="shrink-0 accent-btnPrimary w-[15px] h-[15px]"
+                />
+                {post.integration ? (
+                  <>
+                    <PlatformAvatar
+                      picture={post.integration.picture || undefined}
+                      identifier={post.integration.providerIdentifier}
+                      size={22}
+                    />
+                    <span className="text-[13px] text-textColor truncate">
+                      {post.integration.name}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-[13px] text-newTableText">—</span>
+                )}
+              </label>
+              <div className="flex items-center gap-[4px] shrink-0">
+                {approvalPill(post)}
+                {renderActions(post)}
+              </div>
+            </div>
+            <div className="text-[13px] text-textColor line-clamp-2 min-h-[36px]">
+              {stripHtml(post.content) || t('no_content', 'No content')}
+            </div>
+            <div className="text-[12px] text-newTableText">
+              {post.publishDate
+                ? dayjs(post.publishDate).format('MMM D, YYYY h:mm A')
+                : t('unscheduled', 'Unscheduled')}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
 
   const renderTable = (group: string, posts: DraftPost[]) => {
     const groupIds = posts.map((p) => p.id);
@@ -249,61 +414,13 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
           {
             key: 'approval',
             header: t('approval', 'Approval'),
-            render: (post) => {
-              const status = post.approvalStatus || 'pending';
-              const map: Record<string, { color: 'amber' | 'green' | 'red'; label: string }> = {
-                pending: { color: 'amber', label: t('pending', 'Pending') },
-                approved: { color: 'green', label: t('approved', 'Approved') },
-                rejected: { color: 'red', label: t('rejected', 'Rejected') },
-              };
-              const pill = map[status] || map.pending;
-              return <StatusPill status={pill.color} label={pill.label} />;
-            },
+            render: (post) => approvalPill(post),
           },
           {
             key: 'actions',
             header: '',
-            width: '160px',
-            render: (post) => {
-              const busy = actingId === post.id;
-              return (
-                <div className="flex items-center gap-[6px]" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    onClick={() => handleApprove(post.id)}
-                    disabled={busy || post.approvalStatus === 'approved'}
-                    className={clsx(
-                      'px-[8px] py-[4px] text-[11px] rounded-[6px] font-medium',
-                      post.approvalStatus === 'approved'
-                        ? 'bg-green-500/10 text-green-500 cursor-default'
-                        : 'bg-btnPrimary text-white hover:bg-btnPrimary/90'
-                    )}
-                  >
-                    {t('approve', 'Approve')}
-                  </button>
-                  <button
-                    onClick={() => handleReject(post.id)}
-                    disabled={busy || post.approvalStatus === 'rejected'}
-                    className={clsx(
-                      'px-[8px] py-[4px] text-[11px] rounded-[6px] font-medium',
-                      post.approvalStatus === 'rejected'
-                        ? 'bg-red-500/10 text-red-400 cursor-default'
-                        : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'
-                    )}
-                  >
-                    {t('reject', 'Reject')}
-                  </button>
-                  {post.approvalStatus === 'approved' && (
-                    <button
-                      onClick={() => runPromote([post.id])}
-                      disabled={promoting}
-                      className="px-[8px] py-[4px] text-[11px] rounded-[6px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20"
-                    >
-                      {t('promote', 'Promote')}
-                    </button>
-                  )}
-                </div>
-              );
-            },
+            width: '48px',
+            render: (post) => renderActions(post),
           },
         ]}
         data={posts}
@@ -311,7 +428,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
         selectedIds={selectedIds}
         onSelectionChange={handleGroupSelectionChange}
         emptyState={{
-          title: t('no_drafts_in_group', 'No drafts in {group}', { group }),
+          title: t('no_drafts_in_group', 'No drafts in {{group}}', { group }),
           action: (
             <Button type="button" onClick={openNewDraft}>
               {t('new_draft', 'New Draft')}
@@ -329,16 +446,26 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
           {t('planning_workspace', 'Planning Workspace')}
         </h3>
         <div className="flex items-center gap-[8px]">
+          {/* Desktop: selection actions inline. On mobile they move to their own
+              row below (see the mobile bar), so they don't crowd the header. */}
           {selectedIds.length > 0 && (
-            <Button type="button" onClick={handlePromote} loading={promoting}>
-              {t('promote_selected', 'Promote {count}', { count: selectedIds.length })}
-            </Button>
+            <div className="hidden lg:flex items-center gap-[8px]">
+              {renderSelectionActions()}
+            </div>
           )}
           <Button type="button" onClick={openNewDraft}>
             {t('new_draft', 'New Draft')}
           </Button>
+          {groups.length > 0 && viewToggle('flex')}
         </div>
       </div>
+
+      {/* Mobile: selection actions on their own row, kept together. */}
+      {selectedIds.length > 0 && (
+        <div className="flex lg:hidden items-center gap-[8px] flex-wrap">
+          {renderSelectionActions()}
+        </div>
+      )}
 
       {blockedMessages.length > 0 && (
         <div className="rounded-[8px] border border-red-500/30 bg-red-500/10 p-[12px] flex flex-col gap-[6px]">
@@ -380,10 +507,9 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
         data &&
         groups.map(([group, posts]) => (
           <div key={group} className="flex flex-col gap-[8px]">
-            <div className="text-[13px] font-medium text-newTableText px-[4px]">
-              {group}
-            </div>
-            {renderTable(group, posts as DraftPost[])}
+            {view === 'card'
+              ? renderCards(posts as DraftPost[])
+              : renderTable(group, posts as DraftPost[])}
           </div>
         ))}
     </div>
