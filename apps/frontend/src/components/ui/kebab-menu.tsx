@@ -28,6 +28,10 @@ interface KebabMenuProps {
   /** Highlight the trigger in the accent colour (e.g. when a hidden item is "active"). */
   active?: boolean;
   className?: string;
+  /** Trigger button size in px (square). Default 28. */
+  size?: number;
+  /** Extra classes for the trigger button (e.g. `!text-white` on a coloured bar). */
+  triggerClassName?: string;
 }
 
 const KebabIcon = (
@@ -49,6 +53,8 @@ export const KebabMenu: FC<KebabMenuProps> = ({
   insideLink = false,
   active = false,
   className,
+  size = 28,
+  triggerClassName,
 }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -87,9 +93,11 @@ export const KebabMenu: FC<KebabMenuProps> = ({
           cancel(e);
           setOpen((v) => !v);
         }}
+        style={{ width: size, height: size }}
         className={clsx(
-          'flex items-center justify-center w-[28px] h-[28px] rounded-[6px] hover:bg-newTableBorder/40 transition-colors',
-          active ? 'text-btnPrimary' : 'text-newTableText hover:text-textColor'
+          'flex items-center justify-center rounded-[6px] hover:bg-newTableBorder/40 transition-colors',
+          active ? 'text-btnPrimary' : 'text-newTableText hover:text-textColor',
+          triggerClassName
         )}
       >
         {KebabIcon}

@@ -28,6 +28,7 @@ import { Response } from 'express';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
+import { SetPostColorDto } from '@gitroom/nestjs-libraries/dtos/posts/set.post.color.dto';
 import {
   AuthorizationActions,
   Sections,
@@ -238,6 +239,16 @@ export class PostsController {
     @Param('group') group: string
   ) {
     return this._postsService.deletePost(org.id, group);
+  }
+
+  @Put('/group/:group/color')
+  @RequirePermission('posts', 'update')
+  setGroupColor(
+    @GetOrgFromRequest() org: Organization,
+    @Param('group') group: string,
+    @Body() body: SetPostColorDto
+  ) {
+    return this._postsService.setGroupColor(org.id, group, body.color || null);
   }
 
   @Put('/:id/date')

@@ -34,6 +34,10 @@ import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { DummyCodeComponent } from '@gitroom/frontend/components/new-launch/dummy.code.component';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
 import {
+  ColorPicker,
+  DEFAULT_POST_COLOR,
+} from '@gitroom/frontend/components/ui/color-picker';
+import {
   SettingsIcon,
   ChevronDownIcon,
   TrashIcon,
@@ -49,6 +53,20 @@ import { Button } from '@gitroom/react/form/button';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useRouter } from 'next/navigation';
 import { ComposerLibraryModal } from '@gitroom/frontend/components/new-launch/composer-library.modal';
+
+const ColorPick: FC<{
+  initial: string | null;
+  onApply: (color: string | null) => void;
+}> = ({ initial, onApply }) => {
+  const t = useT();
+  const [value, setValue] = useState<string | null>(initial);
+  return (
+    <div className="flex flex-col gap-[18px] min-w-[280px]">
+      <ColorPicker value={value} onChange={setValue} />
+      <Button onClick={() => onApply(value)}>{t('apply', 'Apply')}</Button>
+    </div>
+  );
+};
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -74,6 +92,30 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const [shortLinkEnabled, setShortLinkEnabled] = useState(false);
   const shortlinkUserToggled = useRef(false);
   const { runPreflight, loading: preflightLoading, reset: resetPreflight } = usePreflight();
+
+  // Per-post heading colour (stored in each post's `settings`). null = default
+  // primary blue. A ref keeps the submit callbacks reading the latest value.
+  const readInitialColor = (): string | null => {
+    const raw = (existingData as any)?.posts?.[0]?.settings;
+    let parsed: any = raw;
+    if (typeof raw === 'string') {
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        parsed = {};
+      }
+    }
+    return parsed?.color ?? null;
+  };
+  const [groupColor, setGroupColor] = useState<string | null>(readInitialColor);
+  const groupColorRef = useRef<string | null>(groupColor);
+  groupColorRef.current = groupColor;
+  const colorize = (settings: any) => {
+    const next = { ...(settings || {}) };
+    if (groupColorRef.current) next.color = groupColorRef.current;
+    else delete next.color;
+    return next;
+  };
 
   const { addEditSets, mutate, customClose, dummy } = props;
 
@@ -315,7 +357,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     const allValues = await ref.current.getAllValues();
     const posts = allValues.map((post: any) => ({
       integration: { id: post.id },
-      settings: { ...(post.settings || {}) },
+      settings: colorize(post.settings),
       value: post.values.map((value: any) => ({
         content: value.content,
         delay: value.delay || 0,
@@ -447,7 +489,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         const posts = allValues.map((post: any) => ({
           integration: { id: post.id },
           group,
-          settings: { ...(post.settings || {}) },
+          settings: colorize(post.settings),
           value: post.values.map((value: any) => ({
             ...(value.id ? { id: value.id } : {}),
             content: value.content,
@@ -488,7 +530,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           id: post.id,
         },
         group,
-        settings: { ...(post.settings || {}) },
+        settings: colorize(post.settings),
         value: post.values.map((value: any) => ({
           ...(value.id ? { id: value.id } : {}),
           content: value.content,
@@ -855,6 +897,34 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               <RepeatComponent repeat={repeater} onChange={setRepeater} />
             )}
             {!dummy && <BrandPicker />}
+            {!dummy && (
+              <button
+                type="button"
+                aria-label={t('post_color', 'Post color')}
+                onClick={() =>
+                  modal.openModal({
+                    title: t('post_color', 'Post color'),
+                    withCloseButton: true,
+                    children: (
+                      <ColorPick
+                        initial={groupColor}
+                        onApply={(color) => {
+                          setGroupColor(color);
+                          modal.closeAll();
+                        }}
+                      />
+                    ),
+                  })
+                }
+                className="flex items-center gap-[8px] border border-newTableBorder bg-btnSimple text-textColor rounded-[8px] px-[12px] h-[40px] text-[13px] font-[500] hover:bg-boxHover"
+              >
+                <span
+                  className="w-[16px] h-[16px] rounded-full border border-newTableBorder"
+                  style={{ backgroundColor: groupColor || DEFAULT_POST_COLOR }}
+                />
+                {t('color', 'Color')}
+              </button>
+            )}
           </div>
           <div className="pe-[20px] flex items-center justify-start lg:justify-end gap-[8px] flex-wrap w-full lg:w-auto">
             {!dummy && !addEditSets && shortlinkInfo && (

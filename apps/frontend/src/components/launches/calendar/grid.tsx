@@ -84,7 +84,7 @@ export const CalendarColumn: FC<{
   const modal = useModals();
   const fetch = useFetch();
 
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor } = usePostActions();
   const postList = useMemo(() => {
     return posts.filter((post) => {
       const pList = newDayjs(post.publishDate);
@@ -332,6 +332,7 @@ export const CalendarColumn: FC<{
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
                   openPostDetail={openPostDetail(post)}
+                  changeColor={changeColor(post)}
                   post={post}
                   integrations={integrations}
                   deletePost={deletePost(post)}

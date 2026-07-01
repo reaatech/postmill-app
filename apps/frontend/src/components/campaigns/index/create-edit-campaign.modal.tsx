@@ -8,6 +8,7 @@ import { Button } from '@gitroom/react/form/button';
 import dayjs from 'dayjs';
 import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
 import { TagsInput } from '@gitroom/frontend/components/campaigns/index/tags-input';
+import { ColorPicker } from '@gitroom/frontend/components/ui/color-picker';
 
 const GOAL_METRICS = ['impressions', 'likes', 'comments', 'clicks', 'posts', 'followers'] as const;
 
@@ -101,26 +102,10 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
           autoFocus
         />
       </div>
-      <div className="flex gap-[8px]">
-        <div className="flex flex-col gap-[4px] flex-1">
-          <label className="text-[12px] text-newTableText">{t('color', 'Color')}</label>
-          <div className="flex gap-[8px] items-center">
-            <input
-              type="color"
-              value={color || '#2b5cd3'}
-              onChange={(e) => setColor(e.target.value)}
-              className="w-[36px] h-[36px] rounded-[4px] cursor-pointer bg-transparent border-0"
-            />
-            <input
-              type="text"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-              className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none w-[100px]"
-              placeholder="#2b5cd3"
-            />
-          </div>
-        </div>
-      </div>
+      <ColorPicker
+        value={color || null}
+        onChange={(c) => setColor(c || '')}
+      />
       <div className="flex flex-col gap-[4px]">
         <label className="text-[12px] text-newTableText">{t('description', 'Description')}</label>
         <textarea

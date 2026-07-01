@@ -232,6 +232,7 @@ export class PostsRepository {
         campaignId: true,
         approvalStatus: true,
         image: true,
+        settings: true,
         lastViews: true,
         lastLikes: true,
         lastComments: true,
@@ -278,12 +279,20 @@ export class PostsRepository {
       await this._enrichWithUnreadComments(posts, userId);
     }
 
-    // Derive a compact media type from the (heavy) image JSON, then strip the raw
-    // `image` so the calendar payload stays lean — the frontend media filter only
-    // needs none/image/video.
+    // Derive a compact media type from the (heavy) image JSON and the per-post
+    // heading colour from `settings`, then strip the raw `image`/`settings` so the
+    // calendar payload stays lean.
     return posts.map((post) => {
-      const { image, ...rest } = post;
-      return { ...rest, mediaType: this._computeMediaType(image) };
+      const { image, settings, ...rest } = post;
+      let color: string | null = null;
+      if (settings) {
+        try {
+          color = JSON.parse(settings)?.color ?? null;
+        } catch {
+          color = null;
+        }
+      }
+      return { ...rest, mediaType: this._computeMediaType(image), color };
     });
   }
 
@@ -298,6 +307,30 @@ export class PostsRepository {
     } catch {
       return 'none';
     }
+  }
+
+  // Sets the heading colour on every post in a group (stored in `settings` JSON).
+  // A null/empty colour clears it (reverts to the default primary blue).
+  async setGroupColor(orgId: string, group: string, color: string | null) {
+    const posts = await this._post.model.post.findMany({
+      where: { organizationId: orgId, group, deletedAt: null },
+      select: { id: true, settings: true },
+    });
+    for (const post of posts) {
+      let settings: any = {};
+      try {
+        settings = post.settings ? JSON.parse(post.settings) : {};
+      } catch {
+        settings = {};
+      }
+      if (color) settings.color = color;
+      else delete settings.color;
+      await this._post.model.post.update({
+        where: { id: post.id },
+        data: { settings: JSON.stringify(settings) },
+      });
+    }
+    return { color: color || null };
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {

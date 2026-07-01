@@ -24,7 +24,7 @@ export const ListView = () => {
       ? t('no_published_posts', 'No published posts')
       : t('no_posts', 'No posts');
 
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor } = usePostActions();
 
   // The list renders the same date-range window as the calendar. Both the state
   // filter (Scheduled/Draft/Published) and engagement filter are already applied
@@ -90,6 +90,7 @@ export const ListView = () => {
                       duplicatePost={editPost(post, true)}
                       copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
                       openPostDetail={openPostDetail(post)}
+                      changeColor={changeColor(post)}
                       post={post}
                       integrations={integrations}
                       deletePost={deletePost(post)}

@@ -472,6 +472,10 @@ export class PostsService {
     );
   }
 
+  async setGroupColor(orgId: string, group: string, color: string | null) {
+    return this._postRepository.setGroupColor(orgId, group, color);
+  }
+
   async updateMedia(id: string, imagesList: any[], convertToJPEG = false, orgId: string) {
     try {
       let imageUpdateNeeded = false;

@@ -13,18 +13,15 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
 import {
-  IconButton,
-  EditSettings,
-  CopyDebug,
-  Duplicate,
-  Preview,
-  Statistics,
-  DeletePost,
   formatCompactNumber,
   ViewsIcon,
   LikesIcon,
   CommentsIcon,
 } from './helpers';
+import {
+  KebabMenu,
+  KebabMenuItem,
+} from '@gitroom/frontend/components/ui/kebab-menu';
 import dayjs from 'dayjs';
 
 export const CalendarItem: FC<{
@@ -37,12 +34,14 @@ export const CalendarItem: FC<{
   statistics: () => void;
   missingRelease?: () => void;
   openPostDetail: (e: React.MouseEvent) => void;
+  changeColor: () => void;
   integrations: Integrations[];
   state: State;
   display: 'day' | 'week' | 'month';
   showTime?: boolean;
   post: Post & {
     integration: Integration;
+    color?: string | null;
     tags: {
       tag: Tags;
     }[];
@@ -68,7 +67,10 @@ export const CalendarItem: FC<{
     showTime,
     missingRelease,
     openPostDetail,
+    changeColor,
   } = props;
+  // Per-post heading colour (falls back to a tag colour, then the default primary blue).
+  const headerColor = post.color || post?.tags?.[0]?.tag?.color;
   const { disableXAnalytics } = useVariables();
   const user = useUser();
   const showCreationMethodBadge =
@@ -92,6 +94,43 @@ export const CalendarItem: FC<{
     }),
     [post.id, post.intervalInDays, date]
   );
+
+  // Card actions — a visible kebab menu (was hover-only icons, unusable on touch).
+  const actionItems: KebabMenuItem[] = [
+    { label: t('edit_post', 'Edit Post'), onClick: editPost },
+    { label: t('duplicate_post', 'Duplicate Post'), onClick: duplicatePost },
+    { label: t('preview_post', 'Preview Post'), onClick: preview },
+  ];
+  const analyticsHidden =
+    (post.integration.providerIdentifier === 'x' && disableXAnalytics) ||
+    !post.releaseId;
+  if (!analyticsHidden) {
+    if (post.releaseId === 'missing' && missingRelease) {
+      actionItems.push({
+        label: t('link_release', 'Link to published post'),
+        onClick: missingRelease,
+      });
+    } else if (post.releaseId !== 'missing') {
+      actionItems.push({ label: t('statistics', 'Statistics'), onClick: statistics });
+    }
+  }
+  if (copyDebugJson) {
+    actionItems.push({
+      label: t('copy_debug_json', 'Copy debug JSON'),
+      onClick: copyDebugJson,
+    });
+  }
+  actionItems.push({
+    label: t('change_color', 'Change color'),
+    onClick: changeColor,
+  });
+  actionItems.push({ divider: true });
+  actionItems.push({
+    label: t('delete_post', 'Delete Post'),
+    onClick: deletePost,
+    danger: true,
+  });
+
   return (
     <div
       // @ts-ignore
@@ -133,78 +172,28 @@ export const CalendarItem: FC<{
       )}
       <div
         className={clsx(
-          'text-white text-[11px] max-h-[24px] h-[24px] min-h-[24px] w-full rounded-tr-[10px] rounded-tl-[10px] flex items-center justify-center gap-[10px] px-[5px] bg-btnPrimary'
+          'text-white text-[11px] max-h-[24px] h-[24px] min-h-[24px] w-full rounded-tr-[10px] rounded-tl-[10px] flex items-center justify-between gap-[4px] ps-[8px] pe-[3px] bg-btnPrimary'
         )}
         style={{
-          backgroundColor: post?.tags?.[0]?.tag?.color,
+          backgroundColor: headerColor,
         }}
       >
         <div
-          className={clsx(
-            post?.tags?.[0]?.tag?.color ? 'mix-blend-difference' : '',
-            'group-hover:hidden cursor-pointer'
-          )}
+          className={clsx(headerColor ? 'mix-blend-difference' : '', 'truncate')}
         >
           {post.tags.map((p) => p.tag.name).join(', ')}
         </div>
-        <IconButton
-          label={t('edit_post', 'Edit Post')}
-          onClick={editPost}
-          colored={!!post?.tags?.[0]?.tag?.color}
-        >
-          <EditSettings />
-        </IconButton>
-        {copyDebugJson && (
-          <IconButton
-            label={t('copy_debug_json', 'Copy debug JSON')}
-            onClick={copyDebugJson}
-            colored={!!post?.tags?.[0]?.tag?.color}
-          >
-            <CopyDebug />
-          </IconButton>
-        )}
-        <IconButton
-          label={t('duplicate_post', 'Duplicate Post')}
-          onClick={duplicatePost}
-          colored={!!post?.tags?.[0]?.tag?.color}
-        >
-          <Duplicate />
-        </IconButton>
-        <IconButton
-          label={t('preview_post', 'Preview Post')}
-          onClick={preview}
-          colored={!!post?.tags?.[0]?.tag?.color}
-        >
-          <Preview />
-        </IconButton>{' '}
-        {((post.integration.providerIdentifier === 'x' && disableXAnalytics) || !post.releaseId) ? (
-          <></>
-        ) : post.releaseId === 'missing' && missingRelease ? (
-          <IconButton
-            label={t('link_release', 'Link to published post')}
-            onClick={missingRelease}
-            colored={!!post?.tags?.[0]?.tag?.color}
-          >
-            <Statistics />
-          </IconButton>
-        ) : post.releaseId !== 'missing' ? (
-          <IconButton
-            label={t('statistics', 'Statistics')}
-            onClick={statistics}
-            colored={!!post?.tags?.[0]?.tag?.color}
-          >
-            <Statistics />
-          </IconButton>
-        ) : (
-          <></>
-        )}{' '}
-        <IconButton
-          label={t('delete_post', 'Delete Post')}
-          onClick={deletePost}
-          colored={!!post?.tags?.[0]?.tag?.color}
-        >
-          <DeletePost />
-        </IconButton>
+        <KebabMenu
+          ariaLabel={t('post_actions', 'Post actions')}
+          align="right"
+          size={20}
+          width={188}
+          items={actionItems}
+          triggerClassName={clsx(
+            '!text-white hover:!bg-white/25',
+            headerColor && 'mix-blend-difference'
+          )}
+        />
       </div>
       <div
         onClick={openPostDetail}

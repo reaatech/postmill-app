@@ -192,6 +192,7 @@ function baseProps(overrides?: Partial<CalendarItemProps>): CalendarItemProps {
     statistics: vi.fn(),
     missingRelease: undefined,
     openPostDetail: vi.fn(),
+    changeColor: vi.fn(),
     integrations: [],
     state: 'PUBLISHED',
     display: 'day',
@@ -206,9 +207,9 @@ describe('CalendarItem', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the EditSettings icon in the hover strip', () => {
+  it('renders a visible actions kebab menu in the header', () => {
     render(<CalendarItem {...baseProps()} />);
-    expect(screen.getByLabelText('Edit Post')).toBeTruthy();
+    expect(screen.getByLabelText('Post actions')).toBeTruthy();
   });
 
   describe('stats footer', () => {

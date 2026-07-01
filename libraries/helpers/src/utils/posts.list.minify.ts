@@ -24,6 +24,7 @@ const POST_ITEM_KEYS: Record<string, string> = {
   campaignId: 'ci',
   approvalStatus: 'as',
   mediaType: 'mt',
+  color: 'cl',
   tags: 'tg',
   integration: 'n',
   intervalInDays: 'iv',
