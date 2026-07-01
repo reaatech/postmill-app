@@ -215,7 +215,7 @@ export const CampaignsPage: FC = () => {
       {totalPages > 1 && (
         <div className="flex items-center justify-between mt-[16px]">
           <div className="text-[12px] text-newTableText">
-            {t('page_of', 'Page {page} of {total}', { page: String(page + 1), total: String(totalPages) })}
+            {t('page_of', 'Page {{page}} of {{total}}', { page: String(page + 1), total: String(totalPages) })}
           </div>
           <div className="flex gap-[8px]">
             <button
