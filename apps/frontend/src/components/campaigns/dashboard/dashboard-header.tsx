@@ -9,7 +9,7 @@ import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { Button } from '@gitroom/react/form/button';
 import Link from 'next/link';
 import dayjs from 'dayjs';
-import { ChevronDownIcon } from '@gitroom/frontend/components/ui/icons';
+import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import { CreateEditCampaignModal } from '@gitroom/frontend/components/campaigns/index/create-edit-campaign.modal';
 import { CopyCampaignModal } from '@gitroom/frontend/components/campaigns/index/copy-campaign.modal';
 import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
@@ -144,10 +144,35 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
   );
 
   return (
-    <div className="flex flex-col gap-[16px] p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-[12px]">
+    <div className="relative flex flex-col gap-[16px] p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor">
+      {/* Pinned to the card's top-right so it never stacks below the content on mobile. */}
+      <div className="absolute top-[16px] right-[16px] z-[10]">
+        <KebabMenu
+          ariaLabel={t('campaign_actions', 'Campaign actions')}
+          width={190}
+          items={[
+            { label: t('edit', 'Edit'), onClick: openEditModal },
+            { label: t('copy', 'Copy'), onClick: openCopyModal },
+            {
+              label: campaign.archived
+                ? t('unarchive', 'Unarchive')
+                : t('archive', 'Archive'),
+              onClick: archiveCampaign,
+            },
+            shareEnabled && publicUrl
+              ? { label: t('delete_share', 'Delete Share'), onClick: deleteShare }
+              : { label: t('share', 'Share'), onClick: shareCampaign },
+            { divider: true },
+            { label: t('download_csv', 'Download CSV'), href: exportUrl('csv'), download: true },
+            { label: t('download_pdf', 'Download PDF'), href: exportUrl('pdf'), download: true },
+            { divider: true },
+            { label: t('delete', 'Delete'), onClick: removeCampaign, danger: true },
+          ]}
+        />
+      </div>
+      <div className="flex flex-col gap-[12px]">
         <div className="flex flex-col gap-[8px]">
-          <div className="flex items-center gap-[12px]">
+          <div className="flex items-center gap-[12px] pe-[40px]">
             <div
               className="w-[16px] h-[16px] rounded-full border border-newTableBorder"
               style={{ backgroundColor: campaign.color || '#2b5cd3' }}
@@ -186,46 +211,6 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({ campaign, onMutate }
                 </span>
               ))}
             </div>
-          )}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-[8px]">
-          <Button onClick={openEditModal}>{t('edit', 'Edit')}</Button>
-          <Button secondary onClick={openCopyModal}>{t('copy', 'Copy')}</Button>
-          <Button secondary onClick={archiveCampaign}>
-            {campaign.archived ? t('unarchive', 'Unarchive') : t('archive', 'Archive')}
-          </Button>
-          <Button danger onClick={removeCampaign}>{t('delete', 'Delete')}</Button>
-
-          <details className="relative group">
-            <summary className="list-none cursor-pointer">
-              <Button secondary className="gap-[8px]">
-                {t('export', 'Export')}
-                <ChevronDownIcon size={16} />
-              </Button>
-            </summary>
-            <div className="absolute right-0 mt-[8px] min-w-[160px] bg-newBgColor border border-newTableBorder rounded-[8px] shadow-lg overflow-hidden z-[20]">
-              <a
-                href={exportUrl('csv')}
-                download
-                className="block px-[12px] py-[8px] text-[13px] text-textColor hover:bg-newBgColor/80"
-              >
-                {t('download_csv', 'Download CSV')}
-              </a>
-              <a
-                href={exportUrl('pdf')}
-                download
-                className="block px-[12px] py-[8px] text-[13px] text-textColor hover:bg-newBgColor/80"
-              >
-                {t('download_pdf', 'Download PDF')}
-              </a>
-            </div>
-          </details>
-
-          {shareEnabled && publicUrl ? (
-            <Button danger onClick={deleteShare}>{t('delete_share', 'Delete Share')}</Button>
-          ) : (
-            <Button onClick={shareCampaign}>{t('share', 'Share')}</Button>
           )}
         </div>
       </div>

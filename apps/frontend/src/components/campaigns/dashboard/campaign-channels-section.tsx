@@ -4,6 +4,7 @@ import { FC } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import { useAddProvider } from '@gitroom/frontend/components/launches/add.provider.component';
+import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 
 interface CampaignChannel {
   id: string;
@@ -33,25 +34,13 @@ export const CampaignChannelsSection: FC<{
             {t('campaign_channels_hint', 'Channels this campaign publishes to')}
           </span>
         </div>
-        <div className="flex items-center gap-[8px]">
-          <button
-            onClick={addChannel}
-            className="h-[36px] px-[14px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-medium"
-          >
-            {t('add_channel', 'Add Channel')}
-          </button>
-          <button
-            onClick={inviteClient}
-            data-tooltip-id="tooltip"
-            data-tooltip-content={t(
-              'invite_client_channel',
-              'Send an invite link so a client can connect a channel to this campaign'
-            )}
-            className="h-[36px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newTableBorder text-textColor text-[13px] font-medium"
-          >
-            {t('invite_client', 'Invite Client')}
-          </button>
-        </div>
+        <KebabMenu
+          ariaLabel={t('channel_actions', 'Channel actions')}
+          items={[
+            { label: t('add_channel', 'Add Channel'), onClick: addChannel },
+            { label: t('invite_client', 'Invite Client'), onClick: inviteClient },
+          ]}
+        />
       </div>
 
       {channels.length === 0 ? (

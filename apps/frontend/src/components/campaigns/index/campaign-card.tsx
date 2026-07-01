@@ -1,12 +1,12 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import Link from 'next/link';
-import clsx from 'clsx';
+import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
 
 interface CampaignEngagement {
@@ -26,14 +26,6 @@ interface CampaignEngagement {
   } | null;
 }
 
-const KebabIcon = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-    <circle cx="12" cy="5" r="1.6" />
-    <circle cx="12" cy="12" r="1.6" />
-    <circle cx="12" cy="19" r="1.6" />
-  </svg>
-);
-
 interface CampaignCardProps {
   campaign: Campaign;
   onEdit: () => void;
@@ -51,26 +43,6 @@ export const CampaignCard: FC<CampaignCardProps> = ({
 }) => {
   const t = useT();
   const fetch = useFetch();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [menuOpen]);
 
   const { data: engagement } = useSWR<CampaignEngagement>(
     `campaign-engagement-${campaign.id}`,
@@ -81,14 +53,6 @@ export const CampaignCard: FC<CampaignCardProps> = ({
     },
     { revalidateOnFocus: false },
   );
-
-  // Menu actions live inside the card <Link>, so every handler must cancel navigation.
-  const runAction = (fn: () => void) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setMenuOpen(false);
-    fn();
-  };
 
   return (
     <Link
@@ -106,41 +70,22 @@ export const CampaignCard: FC<CampaignCardProps> = ({
               </span>
             )}
           </div>
-          <div className="relative shrink-0" ref={menuRef}>
-            <button
-              type="button"
-              aria-label={t('campaign_actions', 'Campaign actions')}
-              aria-haspopup="menu"
-              aria-expanded={menuOpen}
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setMenuOpen((v) => !v);
-              }}
-              className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-newTableText hover:text-textColor hover:bg-newTableBorder/40 transition-colors"
-            >
-              {KebabIcon}
-            </button>
-            {menuOpen && (
-              <div
-                role="menu"
-                className="absolute right-0 top-[calc(100%+4px)] z-[50] w-[168px] py-[4px] bg-newBgColorInner border border-newTableBorder rounded-[8px] shadow-lg"
-              >
-                <button role="menuitem" onClick={runAction(onEdit)} className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-newTableBorder/40">
-                  {t('edit', 'Edit')}
-                </button>
-                <button role="menuitem" onClick={runAction(onCopy)} className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-newTableBorder/40">
-                  {t('copy', 'Copy')}
-                </button>
-                <button role="menuitem" onClick={runAction(onArchive)} className="w-full text-left px-[12px] py-[8px] text-[13px] text-textColor hover:bg-newTableBorder/40">
-                  {campaign.archived ? t('unarchive', 'Unarchive') : t('archive', 'Archive')}
-                </button>
-                <button role="menuitem" onClick={runAction(onDelete)} className={clsx('w-full text-left px-[12px] py-[8px] text-[13px] text-red-500 hover:bg-red-500/10')}>
-                  {t('delete', 'Delete')}
-                </button>
-              </div>
-            )}
-          </div>
+          <KebabMenu
+            ariaLabel={t('campaign_actions', 'Campaign actions')}
+            insideLink
+            items={[
+              { label: t('edit', 'Edit'), onClick: onEdit },
+              { label: t('copy', 'Copy'), onClick: onCopy },
+              {
+                label: campaign.archived
+                  ? t('unarchive', 'Unarchive')
+                  : t('archive', 'Archive'),
+                onClick: onArchive,
+              },
+              { divider: true },
+              { label: t('delete', 'Delete'), onClick: onDelete, danger: true },
+            ]}
+          />
         </div>
         {campaign.description && (
           <p className="text-[12px] text-newTableText">{campaign.description}</p>
