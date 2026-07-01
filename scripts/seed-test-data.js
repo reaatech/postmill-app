@@ -114,6 +114,10 @@ async function cleanup() {
     await prisma.campaign.deleteMany({ where: { organizationId: orgId } });
     await prisma.integration.deleteMany({ where: { organizationId: orgId } });
     await prisma.orgProviderConfiguration.deleteMany({ where: { organizationId: orgId } });
+    await prisma.aIBrandProfile.deleteMany({ where: { organizationId: orgId } });
+    await prisma.signatures.deleteMany({ where: { organizationId: orgId } });
+    await prisma.sets.deleteMany({ where: { organizationId: orgId } });
+    await prisma.file.deleteMany({ where: { organizationId: orgId } });
     await prisma.subscription.deleteMany({ where: { organizationId: orgId } });
     await prisma.userOrganization.deleteMany({ where: { organizationId: orgId } });
     await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
@@ -506,18 +510,56 @@ async function main() {
     }
   }
 
-  // Tag the first campaign onto a brand, channel, and file for the dashboard demo.
+  // Seed taggable entities (brands, files, signatures, sets) and tag a rotating spread
+  // onto every campaign so the Tagged Items tabs fill for the dashboard demo.
   if (firstCampaignId) {
-    const firstBrand = await prisma.aIBrandProfile.findFirst({ where: { organizationId: orgId } });
     const firstChannel = await prisma.integration.findFirst({ where: { organizationId: orgId } });
-    const firstFile = await prisma.file.findFirst({ where: { organizationId: orgId } });
-    const tags = [];
-    if (firstBrand) tags.push({ entityType: 'AI_BRAND_PROFILE', entityId: firstBrand.id });
-    if (firstChannel) tags.push({ entityType: 'INTEGRATION', entityId: firstChannel.id });
-    if (firstFile) tags.push({ entityType: 'FILE', entityId: firstFile.id });
-    if (tags.length) {
+
+    const brandIds = [];
+    for (const name of ['Acme Master Brand', 'Northwind Sub-brand', 'Globex Seasonal']) {
+      const b = await prisma.aIBrandProfile.create({ data: { organizationId: orgId, name }, select: { id: true } });
+      brandIds.push(b.id);
+    }
+    const fileIds = [];
+    for (const f of [
+      { name: 'launch-hero.jpg', path: 'seed/launch-hero.jpg' },
+      { name: 'promo-teaser.mp4', path: 'seed/promo-teaser.mp4', type: 'video' },
+      { name: 'brand-logo.png', path: 'seed/brand-logo.png' },
+      { name: 'case-study.pdf', path: 'seed/case-study.pdf' },
+      { name: 'holiday-banner.jpg', path: 'seed/holiday-banner.jpg' },
+    ]) {
+      const file = await prisma.file.create({ data: { organizationId: orgId, name: f.name, path: f.path, type: f.type || 'image' }, select: { id: true } });
+      fileIds.push(file.id);
+    }
+    const sigIds = [];
+    for (const s of [
+      { name: 'Acme Standard', content: '— The Acme Team' },
+      { name: 'Support Sign-off', content: 'Questions? support@acme.com' },
+      { name: 'Launch CTA', content: 'Try it free → acme.com/launch' },
+    ]) {
+      const sig = await prisma.signatures.create({ data: { organizationId: orgId, name: s.name, content: s.content, autoAdd: false }, select: { id: true } });
+      sigIds.push(sig.id);
+    }
+    const setIds = [];
+    for (const name of ['Product Launch Template', 'Weekly Tip Template', 'Case Study Template']) {
+      const st = await prisma.sets.create({ data: { organizationId: orgId, name, content: JSON.stringify({ posts: [] }) }, select: { id: true } });
+      setIds.push(st.id);
+    }
+
+    const rotate = (arr, start, n) =>
+      arr.length ? arr.concat(arr).slice(start % arr.length, (start % arr.length) + n) : [];
+    for (let i = 0; i < campaignRows.length; i++) {
+      const cid = campaignRows[i];
+      const rows = [
+        ...rotate(brandIds, i, 2).map((id) => ({ entityType: 'AI_BRAND_PROFILE', entityId: id })),
+        ...rotate(fileIds, i, 3).map((id) => ({ entityType: 'FILE', entityId: id })),
+        ...rotate(sigIds, i, 2).map((id) => ({ entityType: 'SIGNATURES', entityId: id })),
+        ...rotate(setIds, i, 2).map((id) => ({ entityType: 'SETS', entityId: id })),
+      ];
+      if (i === 0 && firstChannel) rows.push({ entityType: 'INTEGRATION', entityId: firstChannel.id });
       await prisma.campaignItem.createMany({
-        data: tags.map((t) => ({ campaignId: firstCampaignId, organizationId: orgId, entityType: t.entityType, entityId: t.entityId })),
+        data: rows.map((r) => ({ campaignId: cid, organizationId: orgId, entityType: r.entityType, entityId: r.entityId })),
+        skipDuplicates: true,
       });
     }
 

@@ -55,7 +55,11 @@ export const useCampaignDashboard = (id?: string) => {
   const fetch = useFetch();
   const loader = useCallback(async () => {
     const r = await fetch(`/campaigns/${id}/dashboard`);
-    if (!r.ok) throw new Error('Failed to load dashboard');
+    if (!r.ok) {
+      const err = new Error('Failed to load dashboard') as Error & { status?: number };
+      err.status = r.status;
+      throw err;
+    }
     return r.json();
   }, [fetch, id]);
   return useSWR<any>(id ? `campaign-dashboard-${id}` : null, loader, { revalidateOnFocus: false });

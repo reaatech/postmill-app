@@ -2,7 +2,9 @@
 
 import { FC, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import Link from 'next/link';
 import clsx from 'clsx';
+import { Button } from '@gitroom/react/form/button';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useCampaignDashboard } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 import { DashboardHeader } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-header';
@@ -47,9 +49,47 @@ export const CampaignDashboardPage: FC = () => {
   }, [data]);
 
   if (error) {
+    const notFound = (error as { status?: number })?.status === 404;
     return (
-      <div className="p-[24px] text-center text-red-500">
-        Failed to load campaign dashboard.
+      <div className="w-full flex flex-col items-center justify-center gap-[14px] py-[80px] px-[24px] text-center">
+        <div className="w-[56px] h-[56px] rounded-full bg-newBgColorInner border border-newTableBorder flex items-center justify-center text-newTableText">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+            {notFound ? (
+              <path d="m9.5 11.5 5 5m0-5-5 5" />
+            ) : (
+              <path d="M12 10v4m0 3h.01" />
+            )}
+          </svg>
+        </div>
+        <div className="flex flex-col gap-[4px]">
+          <h2 className="text-[18px] font-semibold text-textColor">
+            {notFound
+              ? t('campaign_not_found', 'Campaign not found')
+              : t('campaign_load_failed_title', "We couldn't load this campaign")}
+          </h2>
+          <p className="text-[13px] text-newTableText max-w-[380px]">
+            {notFound
+              ? t(
+                  'campaign_not_found_hint',
+                  'This campaign may have been deleted or moved. Head back to pick another one.'
+                )
+              : t(
+                  'campaign_load_failed_hint',
+                  'Something went wrong loading this campaign. Try again, or head back to your campaigns.'
+                )}
+          </p>
+        </div>
+        <div className="flex items-center gap-[8px]">
+          {!notFound && (
+            <Button secondary onClick={() => mutate()}>
+              {t('retry', 'Retry')}
+            </Button>
+          )}
+          <Link href="/campaigns">
+            <Button>{t('back_to_campaigns', 'Back to campaigns')}</Button>
+          </Link>
+        </div>
       </div>
     );
   }
@@ -134,7 +174,6 @@ export const CampaignDashboardPage: FC = () => {
         <TaggedItemsPanels
           campaignId={id}
           items={data.itemPanels}
-          posts={data.posts}
           onMutate={mutate}
         />
       )}

@@ -6,7 +6,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
-import dayjs from 'dayjs';
+import clsx from 'clsx';
 import {
   CampaignEntitySlug,
   ResolvedCampaignItem,
@@ -38,7 +38,6 @@ const ENTITY_ORDER: CampaignEntitySlug[] = [
   'vpn',
   'llm',
   'storage',
-  'post',
 ];
 
 const PanelItem: FC<{
@@ -215,41 +214,24 @@ const AddItemsModal: FC<{
 export const TaggedItemsPanels: FC<{
   campaignId: string;
   items: Record<string, ResolvedCampaignItem[]>;
-  posts?: Array<{
-    id: string;
-    title?: string;
-    content?: string;
-    publishDate?: string;
-    state?: string;
-    integration?: { picture?: string; name?: string };
-  }>;
   onMutate: () => void;
-}> = ({ campaignId, items, posts, onMutate }) => {
+}> = ({ campaignId, items, onMutate }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
   const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<CampaignEntitySlug | null>(null);
 
-  const mergedItems = useMemo<Record<string, ResolvedCampaignItem[]>>(() => {
-    const postItems: ResolvedCampaignItem[] = (posts || []).map((post) => ({
-      id: post.id,
-      name:
-        post.title ||
-        post.content?.replace(/<[^>]+>/g, ' ').trim().slice(0, 60) ||
-        'Untitled post',
-      icon: post.integration?.picture,
-      subtitle: post.publishDate
-        ? dayjs(post.publishDate).format('MMM D, YYYY HH:mm')
-        : post.state,
-      entityType: 'post',
-    }));
-    return { ...items, post: postItems };
-  }, [items, posts]);
-
-  const sortedTypes = useMemo(() => {
-    return ENTITY_ORDER;
-  }, []);
+  // Only entity types that actually have tagged items become tabs.
+  const availableTypes = useMemo(
+    () => ENTITY_ORDER.filter((slug) => (items[slug] || []).length > 0),
+    [items]
+  );
+  const active =
+    activeType && availableTypes.includes(activeType)
+      ? activeType
+      : availableTypes[0] ?? null;
 
   const remove = useCallback(
     async (entityType: CampaignEntitySlug, entityId: string) => {
@@ -278,7 +260,7 @@ export const TaggedItemsPanels: FC<{
       children: (
         <AddItemsModal
           campaignId={campaignId}
-          existingItems={mergedItems}
+          existingItems={items}
           onDone={() => {
             modal.closeAll();
             onMutate();
@@ -286,7 +268,7 @@ export const TaggedItemsPanels: FC<{
         />
       ),
     });
-  }, [campaignId, mergedItems, modal, onMutate, t]);
+  }, [campaignId, items, modal, onMutate, t]);
 
   return (
     <div className="p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor">
@@ -297,34 +279,47 @@ export const TaggedItemsPanels: FC<{
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-[16px]">
-        {sortedTypes.map((slug) => {
-          const panelItems = mergedItems[slug] || [];
-          if (panelItems.length === 0) return null;
-          return (
-            <div
-              key={slug}
-              className="flex flex-col gap-[8px] p-[12px] border border-newTableBorder rounded-[12px] bg-newBgColorInner"
-            >
-              <div className="text-[13px] font-medium text-textColor">{ENTITY_LABELS[slug]}</div>
-              <div className="flex flex-col gap-[6px]">
-                {panelItems.map((item) => (
-                  <PanelItem
-                    key={item.id}
-                    item={item}
-                    onRemove={remove}
-                    busy={removingKey === `${item.entityType}:${item.id}`}
-                  />
-                ))}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {sortedTypes.every((slug) => !(mergedItems[slug] || []).length) && (
+      {availableTypes.length === 0 ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
           {t('no_tagged_items', 'No items tagged yet. Click Add items to tag channels, brands, files, posts, and more.')}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-[12px]">
+          {/* One tab per set of tagged items. */}
+          <div className="border-b border-newTableBorder overflow-x-auto overflow-y-hidden">
+            <div className="flex gap-[2px] min-w-max">
+              {availableTypes.map((slug) => (
+                <button
+                  key={slug}
+                  type="button"
+                  onClick={() => setActiveType(slug)}
+                  aria-current={active === slug ? 'page' : undefined}
+                  className={clsx(
+                    'px-[14px] py-[8px] text-[13px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors',
+                    active === slug
+                      ? 'border-btnPrimary text-textColor'
+                      : 'border-transparent text-newTableText hover:text-textColor'
+                  )}
+                >
+                  {ENTITY_LABELS[slug]}
+                  <span className="ms-[6px] text-[11px] text-newTableText">
+                    {(items[slug] || []).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[8px]">
+            {(active ? items[active] || [] : []).map((item) => (
+              <PanelItem
+                key={item.id}
+                item={item}
+                onRemove={remove}
+                busy={removingKey === `${item.entityType}:${item.id}`}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>
