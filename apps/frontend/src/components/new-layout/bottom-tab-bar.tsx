@@ -10,9 +10,9 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { MenuItemRow } from './menu-item-row';
 
-// Primary destinations pinned to the bottom bar (in order). Everything else
-// goes into the "More" sheet.
-const PRIMARY_PATHS = ['/schedule', '/analytics', '/media'];
+// Primary destinations pinned to the bottom bar (rendered alphabetically → Analytics,
+// Campaigns, Media). Everything else — including Schedule — goes into the "More" sheet.
+const PRIMARY_PATHS = ['/analytics', '/campaigns', '/media'];
 
 const MoreIcon = (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">

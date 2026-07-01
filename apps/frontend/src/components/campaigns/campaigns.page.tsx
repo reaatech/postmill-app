@@ -9,10 +9,14 @@ import { Button } from '@gitroom/react/form/button';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import dayjs from 'dayjs';
-import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { CreateEditCampaignModal } from '@gitroom/frontend/components/campaigns/index/create-edit-campaign.modal';
 import { CopyCampaignModal } from '@gitroom/frontend/components/campaigns/index/copy-campaign.modal';
 import { CampaignCard } from '@gitroom/frontend/components/campaigns/index/campaign-card';
+import {
+  CampaignFilterBar,
+  DEFAULT_CAMPAIGN_FILTERS,
+  type CampaignFilters,
+} from '@gitroom/frontend/components/campaigns/index/campaign-filter-bar';
 import type { Campaign } from '@gitroom/frontend/components/campaigns/campaign-types';
 
 const PAGE_SIZE = 25;
@@ -23,8 +27,7 @@ export const CampaignsPage: FC = () => {
   const modal = useModals();
   const toast = useToaster();
 
-  const [search, setSearch] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'created' | 'posts'>('created');
+  const [filters, setFilters] = useState<CampaignFilters>(DEFAULT_CAMPAIGN_FILTERS);
   const [page, setPage] = useState(0);
 
   const { data: campaigns, error, isLoading } = useSWR<Campaign[]>(
@@ -36,21 +39,52 @@ export const CampaignsPage: FC = () => {
     },
   );
 
-  const filtered = useMemo(() => {
+  // Full filtered + sorted result set (pagination is applied after).
+  const results = useMemo(() => {
     if (!campaigns) return [];
-    let list = [...campaigns];
-    if (search) {
-      const q = search.toLowerCase();
-      list = list.filter((c) => c.name.toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q));
-    }
-    if (sortBy === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
-    else if (sortBy === 'posts') list.sort((a, b) => b._count.posts - a._count.posts);
-    else list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const start = page * PAGE_SIZE;
-    return list.slice(start, start + PAGE_SIZE);
-  }, [campaigns, search, sortBy, page]);
+    const { search, status, client, tags, sort } = filters;
+    let list = campaigns.filter((c) => {
+      if (status === 'active' && c.archived) return false;
+      if (status === 'archived' && !c.archived) return false;
+      if (client && c.client !== client) return false;
+      if (tags.length && !tags.every((tag) => c.tags?.includes(tag))) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        const haystack = [
+          c.name,
+          c.description,
+          c.client,
+          c.project,
+          ...(c.tags || []),
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+    const posts = (c: Campaign) => c._count?.posts ?? 0;
+    const created = (c: Campaign) => new Date(c.createdAt).getTime();
+    list = [...list].sort((a, b) => {
+      switch (sort) {
+        case 'oldest': return created(a) - created(b);
+        case 'name': return a.name.localeCompare(b.name);
+        case 'name_desc': return b.name.localeCompare(a.name);
+        case 'posts': return posts(b) - posts(a);
+        case 'posts_asc': return posts(a) - posts(b);
+        default: return created(b) - created(a); // 'created' = newest
+      }
+    });
+    return list;
+  }, [campaigns, filters]);
 
-  const totalPages = campaigns ? Math.ceil(campaigns.length / PAGE_SIZE) : 0;
+  const filtered = useMemo(
+    () => results.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE),
+    [results, page]
+  );
+
+  const totalPages = Math.ceil(results.length / PAGE_SIZE);
 
   const openCreateModal = useCallback((campaign?: Campaign) => {
     modal.openModal({
@@ -108,29 +142,23 @@ export const CampaignsPage: FC = () => {
 
   return (
     <div className="flex-1 flex flex-col p-[24px] gap-[24px]">
-      <PageHeader title="Campaigns" description="Organize posts into campaign folders" />
-
-      <div className="flex items-center gap-[12px]">
-        <div className="flex-1">
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder={t('search_campaigns', 'Search campaigns...')}
-            className="w-full px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
-          />
+      <div className="flex items-center justify-between gap-[16px]">
+        <p className="text-[13px] text-newTableText max-w-[720px]">
+          {t(
+            'campaigns_subtitle',
+            'A campaign keeps everything behind one marketing push in a single place — its posts, channels, files, brand assets, and planning notes. Plan it all together, track how it performs as a whole, hit your goals, and share a polished report with your team or clients.'
+          )}
+        </p>
+        <div className="shrink-0">
+          <Button onClick={() => openCreateModal()}>{t('new', 'New')}</Button>
         </div>
-        <select
-          value={sortBy}
-          onChange={(e) => { setSortBy(e.target.value as 'name' | 'created' | 'posts'); setPage(0); }}
-          className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
-        >
-          <option value="created">{t('newest_first', 'Newest')}</option>
-          <option value="name">{t('name', 'Name')}</option>
-          <option value="posts">{t('most_posts', 'Most Posts')}</option>
-        </select>
-        <Button onClick={() => openCreateModal()}>{t('create_campaign', 'Create Campaign')}</Button>
       </div>
+
+      <CampaignFilterBar
+        campaigns={campaigns || []}
+        filters={filters}
+        onChange={(next) => { setFilters(next); setPage(0); }}
+      />
 
       {error && (
         <div className="text-red-500 text-[13px]">
@@ -154,50 +182,32 @@ export const CampaignsPage: FC = () => {
         </div>
       )}
 
-      {!isLoading && campaigns && campaigns.length > 0 && (
+      {!isLoading && campaigns && campaigns.length > 0 && results.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-[48px] gap-[12px]">
+          <div className="text-[15px] text-newTableText">
+            {t('campaigns_no_matches', 'No campaigns match your filters')}
+          </div>
+          <button
+            type="button"
+            onClick={() => { setFilters(DEFAULT_CAMPAIGN_FILTERS); setPage(0); }}
+            className="text-[13px] text-btnPrimary hover:underline"
+          >
+            {t('clear_filters', 'Clear filters')}
+          </button>
+        </div>
+      )}
+
+      {!isLoading && campaigns && results.length > 0 && (
         <div className="grid gap-[12px]">
           {filtered.map((campaign) => (
-            <div
+            <CampaignCard
               key={campaign.id}
-              className="flex flex-col bg-newBgColor border border-newTableBorder rounded-[8px]"
-            >
-              <CampaignCard campaign={campaign} />
-              <div className="flex items-center gap-[8px] justify-end px-[16px] pb-[12px]">
-                <button
-                  onClick={(e) => { e.preventDefault(); openCreateModal(campaign); }}
-                  className="px-[8px] py-[4px] text-[12px] bg-btnPrimary text-white rounded-[8px]"
-                >
-                  {t('edit', 'Edit')}
-                </button>
-                <button
-                  onClick={(e) => { e.preventDefault(); openCopyModal(campaign); }}
-                  className="px-[8px] py-[4px] text-[12px] bg-newBgColor border border-newTableBorder text-textColor rounded-[4px]"
-                >
-                  {t('copy', 'Copy')}
-                </button>
-                {campaign.archived ? (
-                  <button
-                    onClick={(e) => { e.preventDefault(); archiveCampaign(campaign); }}
-                    className="px-[8px] py-[4px] text-[12px] border border-newTableBorder text-newTableText rounded-[4px]"
-                  >
-                    {t('unarchive', 'Unarchive')}
-                  </button>
-                ) : (
-                  <button
-                    onClick={(e) => { e.preventDefault(); archiveCampaign(campaign); }}
-                    className="px-[8px] py-[4px] text-[12px] bg-amber-500 text-white rounded-[4px]"
-                  >
-                    {t('archive', 'Archive')}
-                  </button>
-                )}
-                <button
-                  onClick={(e) => { e.preventDefault(); remove(campaign.id); }}
-                  className="px-[8px] py-[4px] text-[12px] bg-red-500 text-white rounded-[4px]"
-                >
-                  {t('delete', 'Delete')}
-                </button>
-              </div>
-            </div>
+              campaign={campaign}
+              onEdit={() => openCreateModal(campaign)}
+              onCopy={() => openCopyModal(campaign)}
+              onArchive={() => archiveCampaign(campaign)}
+              onDelete={() => remove(campaign.id)}
+            />
           ))}
         </div>
       )}
