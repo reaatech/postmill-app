@@ -12,6 +12,8 @@ import { DashboardKpis } from '@gitroom/frontend/components/campaigns/dashboard/
 import { TaggedItemsPanels } from '@gitroom/frontend/components/campaigns/dashboard/tagged-items-panels';
 import { CampaignChannelsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-channels-section';
 import { CampaignFilesSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-files-section';
+import { CampaignTemplatesSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-templates-section';
+import { CampaignDraftsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-drafts-section';
 import { CampaignPostsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-posts-section';
 import { PlanningWorkspace } from '@gitroom/frontend/components/campaigns/dashboard/planning-workspace';
 import { ChangelogPanel } from '@gitroom/frontend/components/campaigns/dashboard/changelog-panel';
@@ -24,6 +26,8 @@ type TabKey =
   | 'posts'
   | 'channels'
   | 'files'
+  | 'templates'
+  | 'drafts'
   | 'items'
   | 'planning'
   | 'comments'
@@ -104,6 +108,8 @@ export const CampaignDashboardPage: FC = () => {
     { key: 'posts', label: t('posts', 'Posts') },
     { key: 'channels', label: t('channels', 'Channels') },
     { key: 'files', label: t('files', 'Files') },
+    { key: 'templates', label: t('post_templates', 'Post Templates') },
+    { key: 'drafts', label: t('post_drafts', 'Post Drafts') },
     { key: 'items', label: t('tagged_items', 'Tagged Items') },
     { key: 'planning', label: t('planning', 'Planning') },
     { key: 'comments', label: t('comments', 'Comments') },
@@ -176,6 +182,16 @@ export const CampaignDashboardPage: FC = () => {
       )}
       {tab === 'files' && (
         <CampaignFilesSection campaignId={id} onMutate={mutate} />
+      )}
+      {tab === 'templates' && (
+        <CampaignTemplatesSection
+          campaignId={id}
+          templates={data.itemPanels?.set || []}
+          onMutate={mutate}
+        />
+      )}
+      {tab === 'drafts' && (
+        <CampaignDraftsSection campaignId={id} onMutate={mutate} />
       )}
       {tab === 'items' && (
         <TaggedItemsPanels

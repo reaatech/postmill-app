@@ -1,19 +1,16 @@
 'use client';
 
 import { FC, useCallback, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { Button } from '@gitroom/react/form/button';
 import clsx from 'clsx';
-import useSWR from 'swr';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
-import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
-import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import {
   CampaignEntitySlug,
   ResolvedCampaignItem,
@@ -35,12 +32,12 @@ const ENTITY_LABELS: Record<CampaignEntitySlug, string> = {
   signature: 'Signatures',
 };
 
-// 'channel' and 'file' are intentionally omitted — the dedicated Channels and
-// Files sections own displaying and adding those, so this panel covers the rest.
+// 'channel', 'file', and 'set' are intentionally omitted — the dedicated Channels,
+// Files, and Post Templates sections own displaying and adding those, so this panel
+// covers the rest.
 const ENTITY_ORDER: CampaignEntitySlug[] = [
   'brand',
   'signature',
-  'set',
   'vpn',
   'llm',
   'storage',
@@ -247,63 +244,91 @@ export const TaggedItemsPanels: FC<{
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
+  const router = useRouter();
+  const { hasPermission } = usePermissions();
+  const user = useUser();
   const [removingKey, setRemovingKey] = useState<string | null>(null);
   const [activeType, setActiveType] = useState<CampaignEntitySlug | null>(null);
-  const setLaunchCampaignId = useLaunchStore((state) => state.setCampaignId);
 
-  const { data: integrations } = useSWR<Integrations[]>(
-    '/integrations/list',
-    async () => {
-      const r = await fetch('/integrations/list');
-      if (!r.ok) throw new Error('Failed to load channels');
-      return (await r.json()).integrations;
-    },
-    { revalidateOnFocus: false }
-  );
-
-  // Open a tagged Post Template (Set) in the planner, pre-applied as a new post.
-  const openTemplate = useCallback(
-    async (setId: string, name: string) => {
-      let parsed: any = null;
-      try {
-        const r = await fetch('/sets');
-        if (!r.ok) throw new Error();
-        const data = await r.json();
-        const list = Array.isArray(data) ? data : data.sets || [];
-        const found = list.find((s: any) => s.id === setId);
-        if (found) parsed = JSON.parse(found.content);
-      } catch {
-        /* fall through to an empty template */
+  // Brands: members who can read brands jump to the brand's settings page;
+  // everyone else gets a read-only info modal (they'd 403 the /brands fetch).
+  const canReadBrands = hasPermission('brands', 'read');
+  const openBrand = useCallback(
+    (item: ResolvedCampaignItem) => {
+      if (canReadBrands) {
+        router.push(`/settings/ai/brands/${item.id}`);
+        return;
       }
-      setLaunchCampaignId(campaignId);
-      const close = () => {
-        useLaunchStore.getState().setCampaignId(null);
-        modal.closeAll();
-      };
       modal.openModal({
-        withCloseButton: false,
-        fullScreen: true,
-        removeLayout: true,
-        size: '100%',
-        height: '100%',
+        title: t('brand', 'Brand'),
+        withCloseButton: true,
+        // size + height together center the modal; keep it responsive on mobile.
+        size: '420px',
+        maxSize: 'calc(100vw - 24px)',
+        height: 'auto',
         children: (
-          <div className="relative w-full h-full">
-            <CloseModalButton onClick={close} />
-            <AddEditModal
-              date={newDayjs()}
-              set={parsed || undefined}
-              integrations={integrations || []}
-              allIntegrations={integrations || []}
-              reopenModal={() => undefined}
-              mutate={onMutate}
-              customClose={close}
-              padding="p-0"
-            />
+          <div className="flex flex-col gap-[14px] p-[4px] text-textColor">
+            <div className="flex items-center gap-[12px]">
+              <div className="w-[40px] h-[40px] rounded-[8px] bg-btnPrimary/10 text-btnPrimary flex items-center justify-center text-[16px] font-semibold shrink-0">
+                {(item.name || '?').charAt(0).toUpperCase()}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-[15px] font-semibold truncate">{item.name}</span>
+                {item.subtitle && (
+                  <span className="text-[12px] text-newTableText truncate">{item.subtitle}</span>
+                )}
+              </div>
+            </div>
+            <p className="text-[13px] text-newTableText">
+              {t(
+                'brand_info_no_access',
+                'You don’t have access to manage brand settings. Ask an admin for access to Settings → AI → Brands.'
+              )}
+            </p>
           </div>
         ),
       });
     },
-    [campaignId, fetch, integrations, modal, onMutate, setLaunchCampaignId, t]
+    [canReadBrands, modal, router, t]
+  );
+
+  // Signatures: no dedicated RBAC resource — the Settings → Content → Signatures
+  // tab is tier-gated (non-FREE), so eligible members jump there; everyone else
+  // gets a read-only info modal with the signature's content preview.
+  const canManageSignatures = user?.tier?.current !== 'FREE';
+  const openSignature = useCallback(
+    (item: ResolvedCampaignItem) => {
+      if (canManageSignatures) {
+        router.push('/settings/content/signatures');
+        return;
+      }
+      modal.openModal({
+        title: t('signature', 'Signature'),
+        withCloseButton: true,
+        size: '460px',
+        maxSize: 'calc(100vw - 24px)',
+        height: 'auto',
+        children: (
+          <div className="flex flex-col gap-[14px] p-[4px] text-textColor">
+            <div className="text-[15px] font-semibold break-words">{item.name}</div>
+            {item.subtitle ? (
+              <div className="text-[13px] text-newTableText whitespace-pre-wrap break-words max-h-[240px] overflow-y-auto rounded-[8px] border border-newTableBorder bg-newBgColorInner p-[12px]">
+                {item.subtitle}
+              </div>
+            ) : (
+              <div className="text-[13px] text-newTableText">{t('no_content', 'No content')}</div>
+            )}
+            <p className="text-[13px] text-newTableText">
+              {t(
+                'signature_info_no_access',
+                'You don’t have access to manage signatures. Ask an admin for access to Settings → Content → Signatures.'
+              )}
+            </p>
+          </div>
+        ),
+      });
+    },
+    [canManageSignatures, modal, router, t]
   );
 
   // Only entity types that actually have tagged items become tabs.
@@ -432,8 +457,10 @@ export const TaggedItemsPanels: FC<{
                 onRemove={remove}
                 busy={removingKey === `${item.entityType}:${item.id}`}
                 onOpen={
-                  active === 'set'
-                    ? () => openTemplate(item.id, item.name)
+                  active === 'brand'
+                    ? () => openBrand(item)
+                    : active === 'signature'
+                    ? () => openSignature(item)
                     : undefined
                 }
               />

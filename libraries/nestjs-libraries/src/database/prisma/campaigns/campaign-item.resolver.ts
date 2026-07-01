@@ -60,9 +60,23 @@ export class CampaignItemResolverRepository {
       case 'AI_BRAND_PROFILE': {
         const rows = await this._brand.model.aIBrandProfile.findMany({
           where,
-          select: { id: true, name: true },
+          // Non-sensitive display fields only — never the brand voice/instructions,
+          // so the read-only info modal shown to members without `brands:read`
+          // doesn't leak the AI prompt content.
+          select: { id: true, name: true, language: true, enabled: true, isDefault: true },
         });
-        rows.forEach((r) => map.set(r.id, { id: r.id, name: r.name || 'Untitled brand' }));
+        rows.forEach((r) => {
+          const parts = [
+            r.isDefault ? 'Default brand' : null,
+            r.language || null,
+            r.enabled === false ? 'Disabled' : null,
+          ].filter(Boolean) as string[];
+          map.set(r.id, {
+            id: r.id,
+            name: r.name || 'Untitled brand',
+            subtitle: parts.join(' · ') || undefined,
+          });
+        });
         break;
       }
       case 'STORAGE_PROVIDER_CONFIG': {
@@ -96,9 +110,16 @@ export class CampaignItemResolverRepository {
           where,
           select: { id: true, name: true, content: true },
         });
-        rows.forEach((r) =>
-          map.set(r.id, { id: r.id, name: r.name || r.content.slice(0, 40) })
-        );
+        rows.forEach((r) => {
+          // Signature content is plain text (textarea-edited). Surface a bounded
+          // preview so the tagged-items panel + read-only info modal can show it.
+          const preview = (r.content || '').trim().slice(0, 280);
+          map.set(r.id, {
+            id: r.id,
+            name: r.name || preview.slice(0, 40) || 'Untitled signature',
+            subtitle: preview || undefined,
+          });
+        });
         break;
       }
       default:
