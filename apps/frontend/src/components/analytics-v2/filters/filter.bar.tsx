@@ -76,7 +76,7 @@ const Section: FC<{ title: string; children: ReactNode }> = ({
   title,
   children,
 }) => (
-  <div className="rounded-[10px] border border-studioBorder bg-newBgColorInner overflow-hidden">
+  <div className="shrink-0 rounded-[10px] border border-studioBorder bg-newBgColorInner overflow-hidden">
     <div className="h-[40px] px-[14px] flex items-center bg-studioBg border-b border-studioBorder">
       <span className="text-[13px] font-[600] text-textColor">{title}</span>
     </div>
@@ -395,13 +395,16 @@ export const AnalyticsFilterBar: FC<AnalyticsFilterBarProps> = ({
               )}
             </div>
 
-            <label className="flex items-center gap-[10px] cursor-pointer text-[14px] text-textColor">
+            <label className="flex items-center gap-[10px] cursor-pointer select-none text-[14px] text-textColor">
               <input
                 type="checkbox"
+                className="sr-only peer"
                 checked={compare}
-                onChange={() => onRangeChange({ from, to, compare: !compare })}
-                className="w-[16px] h-[16px] accent-[#2B5CD3]"
+                onChange={(e) =>
+                  onRangeChange({ from, to, compare: e.target.checked })
+                }
               />
+              <div className="relative w-[44px] h-[24px] shrink-0 bg-newTableBorder peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-[20px] after:w-[20px] after:transition-all peer-checked:bg-btnPrimary" />
               {t('compare_previous', 'Compare to previous period')}
             </label>
           </Section>
