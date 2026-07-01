@@ -254,7 +254,15 @@ export const CommentInbox: FC = () => {
 
       <div className="flex flex-col gap-[8px]">
         {comments.map((comment) => (
-          <CommentCard key={comment.id} comment={comment} onChanged={mutate} />
+          <CommentCard
+            key={comment.id}
+            comment={comment}
+            onChanged={mutate}
+            enableReply
+            enableLike
+            enableStatusCycle
+            teamMembers={teamMembers}
+          />
         ))}
       </div>
 
