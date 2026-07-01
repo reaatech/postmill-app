@@ -50,6 +50,22 @@ posts — no need to open each post or the standalone inbox:
 Replies are posted to the live platform, so a channel must support comment replies for the action to
 succeed.
 
+## Discussion
+
+Below the tabs, the **Discussion** section is an internal, team-only thread for talking *about* the
+campaign — separate from the platform **Comments** above (which sync from your social posts). Nothing
+here is ever published or shown on a public report.
+
+- Write with a **rich-text editor**: bold, italic, underline, strike, headings, bullet/numbered lists,
+  links, and emoji.
+- **Embed media** — click the image button to pick a photo or video from your media library and drop
+  it right into the note.
+- **@mention** a teammate to notify them (respecting their notification preferences).
+- **React** with emoji, **reply** to a note (one level of threading), **pin** an important note to the
+  top, or **resolve** one to grey it out once it's handled.
+- **Edit or delete** your own notes; each note shows the author, avatar, and how long ago it was
+  posted (with an "edited" marker when changed).
+
 ## Planning Workspace and Draft Approval
 
 Drafts created inside a campaign start with approval status **Pending**. A draft must be marked

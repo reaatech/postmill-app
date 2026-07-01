@@ -19,6 +19,7 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
 import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { CampaignReportService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.service';
+import { CampaignNoteService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.service';
 import { CampaignItemDto } from '@gitroom/nestjs-libraries/dtos/campaigns/campaign-item.dto';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { CopyCampaignDto } from '@gitroom/nestjs-libraries/dtos/campaigns/copy-campaign.dto';
@@ -29,7 +30,7 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested, ArrayMaxSize, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested, ArrayMaxSize, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
@@ -134,6 +135,44 @@ class UpdateCampaignDto {
 const CAMPAIGNS_MAX_LIMIT = 100;
 
 @ApiTags('Campaigns')
+class CreateCampaignNoteDto {
+  @IsString()
+  @MaxLength(20000)
+  content!: string;
+
+  @IsOptional()
+  @IsUUID()
+  parentId?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(50)
+  @IsUUID('all', { each: true })
+  mentions?: string[];
+}
+
+class UpdateCampaignNoteDto {
+  @IsString()
+  @MaxLength(20000)
+  content!: string;
+}
+
+class NotePinDto {
+  @IsBoolean()
+  pinned!: boolean;
+}
+
+class NoteResolveDto {
+  @IsBoolean()
+  resolved!: boolean;
+}
+
+class NoteReactionDto {
+  @IsString()
+  @MaxLength(16)
+  emoji!: string;
+}
+
 @Controller('/campaigns')
 export class CampaignsController {
   constructor(
@@ -141,6 +180,7 @@ export class CampaignsController {
     private _campaignTagService: CampaignTagService,
     private _postsService: PostsService,
     private _reportService: CampaignReportService,
+    private _noteService: CampaignNoteService,
   ) {}
 
   private _parseGoals(goals?: CampaignGoalDto[]): any {
@@ -418,5 +458,111 @@ export class CampaignsController {
     @Param('entityId') entityId: string
   ) {
     return this._campaignTagService.untagItem(org.id, id, user?.id, entityType, entityId);
+  }
+
+  // ── Discussion: internal Jira-style note thread on a campaign ──
+  @Get('/:id/notes')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async listNotes(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+  ) {
+    return this._noteService.list(id, org.id, user?.id);
+  }
+
+  @Post('/:id/notes')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async createNote(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Body() body: CreateCampaignNoteDto,
+  ) {
+    return this._noteService.create({
+      campaignId: id,
+      organizationId: org.id,
+      userId: user?.id,
+      content: body.content,
+      parentId: body.parentId,
+      mentions: body.mentions,
+    });
+  }
+
+  @Put('/:id/notes/:noteId')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async editNote(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Body() body: UpdateCampaignNoteDto,
+  ) {
+    return this._noteService.edit(
+      noteId,
+      id,
+      org.id,
+      user?.id,
+      !!user?.isSuperAdmin,
+      body.content,
+    );
+  }
+
+  @Delete('/:id/notes/:noteId')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async deleteNote(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+  ) {
+    return this._noteService.remove(
+      noteId,
+      id,
+      org.id,
+      user?.id,
+      !!user?.isSuperAdmin,
+    );
+  }
+
+  @Post('/:id/notes/:noteId/pin')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async pinNote(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Body() body: NotePinDto,
+  ) {
+    return this._noteService.setPinned(noteId, id, org.id, body.pinned);
+  }
+
+  @Post('/:id/notes/:noteId/resolve')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async resolveNote(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Body() body: NoteResolveDto,
+  ) {
+    return this._noteService.setResolved(noteId, id, org.id, user?.id, body.resolved);
+  }
+
+  @Post('/:id/notes/:noteId/reactions')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Update, Sections.POSTS_PER_MONTH])
+  async reactNote(
+    @GetOrgFromRequest() org: Organization,
+    @GetUserFromRequest() user: User,
+    @Param('id') id: string,
+    @Param('noteId') noteId: string,
+    @Body() body: NoteReactionDto,
+  ) {
+    return this._noteService.react(noteId, id, org.id, user?.id, body.emoji);
   }
 }

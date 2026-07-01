@@ -92,6 +92,8 @@ import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prism
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
 import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { CampaignReportService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.service';
+import { CampaignNoteRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.repository';
+import { CampaignNoteService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.service';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
@@ -190,6 +192,8 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     CampaignItemResolverRepository,
     CampaignTagService,
     CampaignReportService,
+    CampaignNoteRepository,
+    CampaignNoteService,
     BrandsService,
     BrandsRepository,
     OrgProviderConfigService,

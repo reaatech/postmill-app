@@ -609,6 +609,33 @@ and a dashboard of KPIs.
   type, skipping orphans (deleted source rows).
 - `Post.approvalStatus` / `approvedById` / `approvedAt` — draft approval state; only `approved`
   drafts can be promoted to scheduled.
+- `CampaignNote` / `CampaignNoteReaction` — the internal **Discussion** thread (see below). Additive
+  tables; `CampaignNote.content` is sanitized rich HTML, `parentId` gives one-level threading,
+  `mentions` is a JSON `string[]` of userIds, plus `pinned` / `resolvedAt` / `editedAt` / soft
+  `deletedAt`. `CampaignNoteReaction` is unique on `(noteId, userId, emoji)` (toggle).
+
+### Discussion (internal collaborative thread)
+- **`dashboard/campaign-discussion-section.tsx`** renders a Jira-style **Discussion** thread **below
+  the tabbed content** (always visible, not a tab) where org members talk about the campaign — this is
+  **distinct from the synced social `Comments`** feature (`SocialComment`). Notes are rich HTML with
+  **embedded image/video**, **@mentions**, **emoji reactions**, one-level **threaded replies**, and
+  **pin/resolve**; authors show avatar + relative time; edit/delete is own-only (super-admin bypass).
+- **Editor** (`dashboard/discussion-editor.tsx`) is a lightweight **TipTap** editor — `StarterKit`
+  (which already bundles Link+Underline in v3; do **not** re-add them) + `Mention` (reusing the
+  composer's exported `suggestion(loadList)` from `new-launch/mention.component.tsx`) + two tiny custom
+  atom nodes (`image`/`video`) so picked media embeds inline. Media is inserted via the shared
+  `MediaSelectorModal`; emoji via `emoji-picker-react`.
+- **Rendering** goes through `SafeContent` (DOMPurify allowlist — extended to cover StarterKit output:
+  `em`/`s`/`ol`/`code`/`pre`/`blockquote`). Note HTML is **also sanitized server-side on write**
+  (`campaign-note.sanitize.ts`, allowlist kept in lockstep with `SafeContent`) — sanitize-on-write AND
+  on-render.
+- **Backend**: `campaign-note.repository.ts` + `campaign-note.service.ts` (validates the campaign is in
+  the org, rejects >1-level replies, intersects `mentions` with real org member ids before notifying,
+  fires `NotificationService.notify` with `category:'comments'` + `targetUserIds`, non-fatal). Routes
+  live on `CampaignsController`: `GET/POST /campaigns/:id/notes`, `PUT/DELETE
+  /campaigns/:id/notes/:noteId`, `POST …/:noteId/{pin,resolve,reactions}` — all org-scoped, billing
+  `POSTS_PER_MONTH`, RBAC `posts:update` for writes. Frontend hooks `useCampaignNotes` /
+  `useTeamMembers` in `campaign.hooks.ts`.
 
 ### Architecture
 - Backend: `CampaignsController` + `CampaignTagService` (apps/backend) and `CampaignsService`,
@@ -641,6 +668,11 @@ and a dashboard of KPIs.
   `GET /integrations/social/:integration?campaign=` → `ioRedis` `campaign:<state>`; the OAuth callback
   (`no.auth.integrations.controller.ts`) reads it and auto-tags the new channel onto the campaign
   (non-fatal; covers both direct connect and the invite link).
+- **Files section** (`dashboard/campaign-files-section.tsx`): a first-class **Files** tab (after
+  Channels) that owns the campaign's tagged files, reading `getDashboard`'s `itemPanels.file`. Like
+  channels, `file` was removed from `tagged-items-panels.tsx` `ENTITY_ORDER` to avoid a double render;
+  the section reuses the exported `PanelItem` grid and the generalized `AddItemsModal`
+  (`types={['file']}`, which hides the type dropdown when a single type is passed).
 - **Creator + profile**: `getDashboard` resolves `campaign.createdById` into
   `createdBy { id, name, email, avatarUrl }` (via `UsersService.getPublicProfilesByIds`); the header
   links "Created by" to a read-only, tenant-guarded member-profile page at `/profile/[id]`

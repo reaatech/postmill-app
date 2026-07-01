@@ -139,9 +139,11 @@ resolution falls back to the org's primary set for the provider identifier (enab
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Campaign` | Grouping folder for posts — name, color, date range, archive state, goals, public-share token/settings, UTM toggle | FK → `Organization`; has many `Post` |
+| `Campaign` | Grouping folder for posts — name, color, date range, archive state, goals, public-share token/settings, UTM toggle | FK → `Organization`; has many `Post`, `CampaignNote` |
 | `CampaignItem` | Polymorphic tagged item (`entityType` + `entityId`) linking a campaign to one of 8 non-post entity types | FK → `Campaign` |
 | `CampaignItemResolver` | Internal resolver used by `CampaignTagService`/`CampaignsService` to load display names/icons for `CampaignItem` rows without generic Prisma relations | not a Prisma model; resolves per-type in batches |
+| `CampaignNote` | Internal **Discussion** thread note — sanitized rich HTML `content`, `parentId` (one-level threading), `mentions` (JSON userId[]), `pinned`, `resolvedAt`, `editedAt`, soft `deletedAt` | FK → `Campaign`; self-FK `parent`/`replies`; has many `CampaignNoteReaction` |
+| `CampaignNoteReaction` | Emoji reaction on a note, toggled | FK → `CampaignNote`; unique `(noteId, userId, emoji)` |
 
 `Post` carries `approvalStatus` / `approvedById` / `approvedAt` for the campaign draft-approval
 flow, and `Campaign.utmEnabled` drives automatic UTM append on publish.

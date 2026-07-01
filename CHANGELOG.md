@@ -11,6 +11,16 @@
 ## Unreleased
 
 ### Added
+- **Campaign Discussion (Jira-style collaborative thread).** The campaign dashboard gains a
+  **Discussion** section below the tabbed content where org members talk about the campaign. It has a
+  TipTap WYSIWYG editor (bold/italic/underline/strike, headings, lists, links, emoji) that can
+  **embed images/video** picked from the media library, plus **@mentions** (notify via the existing
+  `NotificationService`, `comments` category), **emoji reactions**, one-level **threaded replies**,
+  **pin/resolve**, and edit/delete-your-own with author avatars and relative timestamps. Note HTML is
+  sanitized on write (server) and on render (`SafeContent`). Backed by two additive tables
+  (`CampaignNote`, `CampaignNoteReaction`) and `GET/POST/PUT/DELETE /campaigns/:id/notes` (+ `pin`,
+  `resolve`, `reactions`) — org-scoped and RBAC-gated (`posts:update`). Distinct from the synced
+  social **Comments** feature.
 - **Per-organization AI Model Defaults and Media Defaults.** Settings → AI gains a **Model Defaults**
   sub-tab where admins pick the default model for each category (`low-reasoning`, `high-reasoning`,
   `vision`, `workflow`). Settings → Content gains a **Media Defaults** sub-tab for all 16 media

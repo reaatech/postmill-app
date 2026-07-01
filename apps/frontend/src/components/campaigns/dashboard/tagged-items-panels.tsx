@@ -4,6 +4,7 @@ import { FC, useCallback, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import clsx from 'clsx';
@@ -34,11 +35,10 @@ const ENTITY_LABELS: Record<CampaignEntitySlug, string> = {
   signature: 'Signatures',
 };
 
-// 'channel' is intentionally omitted — the dedicated Channels section owns
-// displaying and adding channels, so this panel covers the other entity types.
+// 'channel' and 'file' are intentionally omitted — the dedicated Channels and
+// Files sections own displaying and adding those, so this panel covers the rest.
 const ENTITY_ORDER: CampaignEntitySlug[] = [
   'brand',
-  'file',
   'signature',
   'set',
   'vpn',
@@ -46,7 +46,7 @@ const ENTITY_ORDER: CampaignEntitySlug[] = [
   'storage',
 ];
 
-const PanelItem: FC<{
+export const PanelItem: FC<{
   item: ResolvedCampaignItem;
   onRemove: (entityType: CampaignEntitySlug, entityId: string) => void;
   busy: boolean;
@@ -97,15 +97,20 @@ const PanelItem: FC<{
   );
 };
 
-const AddItemsModal: FC<{
+export const AddItemsModal: FC<{
   campaignId: string;
   existingItems: Record<string, ResolvedCampaignItem[]>;
   onDone: () => void;
-}> = ({ campaignId, existingItems, onDone }) => {
+  // Restrict the entity-type picker (e.g. the Files section passes ['file']).
+  types?: CampaignEntitySlug[];
+  defaultType?: CampaignEntitySlug;
+}> = ({ campaignId, existingItems, onDone, types = ENTITY_ORDER, defaultType }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
-  const [selectedType, setSelectedType] = useState<CampaignEntitySlug>('brand');
+  const [selectedType, setSelectedType] = useState<CampaignEntitySlug>(
+    defaultType ?? types[0]
+  );
   const [query, setQuery] = useState('');
   const [taggingId, setTaggingId] = useState<string | null>(null);
   const { data: entities, isLoading, error } = useOrgEntities(selectedType);
@@ -149,23 +154,25 @@ const AddItemsModal: FC<{
 
   return (
     <div className="flex flex-col gap-[16px] p-[16px] min-w-[420px] max-w-[90vw]">
-      <div className="flex flex-col gap-[4px]">
-        <label className="text-[12px] text-newTableText">{t('entity_type', 'Entity type')}</label>
-        <select
-          value={selectedType}
-          onChange={(e) => {
-            setSelectedType(e.target.value as CampaignEntitySlug);
-            setQuery('');
-          }}
-          className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] text-textColor outline-none"
-        >
-          {ENTITY_ORDER.map((slug) => (
-            <option key={slug} value={slug}>
-              {ENTITY_LABELS[slug]}
-            </option>
-          ))}
-        </select>
-      </div>
+      {types.length > 1 && (
+        <div className="flex flex-col gap-[4px]">
+          <label className="text-[12px] text-newTableText">{t('entity_type', 'Entity type')}</label>
+          <select
+            value={selectedType}
+            onChange={(e) => {
+              setSelectedType(e.target.value as CampaignEntitySlug);
+              setQuery('');
+            }}
+            className="px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] text-textColor outline-none"
+          >
+            {types.map((slug) => (
+              <option key={slug} value={slug}>
+                {ENTITY_LABELS[slug]}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-[4px]">
         <label className="text-[12px] text-newTableText">{t('search', 'Search')}</label>
@@ -309,6 +316,32 @@ export const TaggedItemsPanels: FC<{
       ? activeType
       : availableTypes[0] ?? null;
 
+  // On mobile only the first 3 type-tabs show inline; the rest fold into a kebab.
+  const primaryTypes = availableTypes.slice(0, 3);
+  const overflowTypes = availableTypes.slice(3);
+  const overflowActive = !!active && overflowTypes.includes(active);
+
+  const renderSubTab = (slug: CampaignEntitySlug, extra = '') => (
+    <button
+      key={slug}
+      type="button"
+      onClick={() => setActiveType(slug)}
+      aria-current={active === slug ? 'page' : undefined}
+      className={clsx(
+        'px-[14px] py-[8px] text-[13px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors',
+        extra,
+        active === slug
+          ? 'border-btnPrimary text-textColor'
+          : 'border-transparent text-newTableText hover:text-textColor'
+      )}
+    >
+      {ENTITY_LABELS[slug]}
+      <span className="ms-[6px] text-[11px] text-newTableText">
+        {(items[slug] || []).length}
+      </span>
+    </button>
+  );
+
   const remove = useCallback(
     async (entityType: CampaignEntitySlug, entityId: string) => {
       if (removingKey) return;
@@ -361,29 +394,34 @@ export const TaggedItemsPanels: FC<{
         </div>
       ) : (
         <div className="flex flex-col gap-[12px]">
-          {/* One tab per set of tagged items. */}
-          <div className="border-b border-newTableBorder overflow-x-auto overflow-y-hidden">
-            <div className="flex gap-[2px] min-w-max">
-              {availableTypes.map((slug) => (
-                <button
-                  key={slug}
-                  type="button"
-                  onClick={() => setActiveType(slug)}
-                  aria-current={active === slug ? 'page' : undefined}
-                  className={clsx(
-                    'px-[14px] py-[8px] text-[13px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors',
-                    active === slug
-                      ? 'border-btnPrimary text-textColor'
-                      : 'border-transparent text-newTableText hover:text-textColor'
-                  )}
-                >
-                  {ENTITY_LABELS[slug]}
-                  <span className="ms-[6px] text-[11px] text-newTableText">
-                    {(items[slug] || []).length}
-                  </span>
-                </button>
-              ))}
+          {/* One tab per set of tagged items. On mobile only the first 3 show
+              inline; the rest fold into a kebab (matching the dashboard's top
+              tab pattern). The kebab lives OUTSIDE the scrolling track so its
+              menu isn't clipped. */}
+          <div className="flex items-stretch border-b border-newTableBorder">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden">
+              <div className="flex items-center gap-[2px] min-w-max">
+                {primaryTypes.map((slug) => renderSubTab(slug))}
+                {overflowTypes.map((slug) => renderSubTab(slug, 'hidden lg:block'))}
+              </div>
             </div>
+            {overflowTypes.length > 0 && (
+              <div className="lg:hidden flex items-center shrink-0 ps-[8px]">
+                <KebabMenu
+                  ariaLabel={t('more_item_types', 'More item types')}
+                  active={overflowActive}
+                  align="right"
+                  items={overflowTypes.map((slug) => ({
+                    label: (
+                      <span className={clsx(active === slug && 'text-btnPrimary')}>
+                        {ENTITY_LABELS[slug]} ({(items[slug] || []).length})
+                      </span>
+                    ),
+                    onClick: () => setActiveType(slug),
+                  }))}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[8px]">

@@ -11,16 +11,19 @@ import { DashboardHeader } from '@gitroom/frontend/components/campaigns/dashboar
 import { DashboardKpis } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-kpis';
 import { TaggedItemsPanels } from '@gitroom/frontend/components/campaigns/dashboard/tagged-items-panels';
 import { CampaignChannelsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-channels-section';
+import { CampaignFilesSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-files-section';
 import { CampaignPostsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-posts-section';
 import { PlanningWorkspace } from '@gitroom/frontend/components/campaigns/dashboard/planning-workspace';
 import { ChangelogPanel } from '@gitroom/frontend/components/campaigns/dashboard/changelog-panel';
 import { CampaignCommentsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-comments-section';
+import { CampaignDiscussionSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-discussion-section';
 import { ChannelOption } from '@gitroom/frontend/components/comments/comment.inbox.filters';
 import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 
 type TabKey =
   | 'posts'
   | 'channels'
+  | 'files'
   | 'items'
   | 'planning'
   | 'comments'
@@ -100,6 +103,7 @@ export const CampaignDashboardPage: FC = () => {
   const tabs: { key: TabKey; label: string }[] = [
     { key: 'posts', label: t('posts', 'Posts') },
     { key: 'channels', label: t('channels', 'Channels') },
+    { key: 'files', label: t('files', 'Files') },
     { key: 'items', label: t('tagged_items', 'Tagged Items') },
     { key: 'planning', label: t('planning', 'Planning') },
     { key: 'comments', label: t('comments', 'Comments') },
@@ -170,6 +174,13 @@ export const CampaignDashboardPage: FC = () => {
           onMutate={mutate}
         />
       )}
+      {tab === 'files' && (
+        <CampaignFilesSection
+          campaignId={id}
+          files={data.itemPanels?.file || []}
+          onMutate={mutate}
+        />
+      )}
       {tab === 'items' && (
         <TaggedItemsPanels
           campaignId={id}
@@ -182,6 +193,9 @@ export const CampaignDashboardPage: FC = () => {
         <CampaignCommentsSection campaignId={id} channels={channels} onMutate={mutate} />
       )}
       {tab === 'activity' && <ChangelogPanel logs={data.recentChangelog} />}
+
+      {/* Always-visible collaborative Discussion thread, below the tabbed content. */}
+      <CampaignDiscussionSection campaignId={id} />
     </div>
   );
 };

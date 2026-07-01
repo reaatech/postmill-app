@@ -1630,9 +1630,50 @@ model Campaign {
   posts          Post[]
   designs        Design[]
   items          CampaignItem[]
+  notes          CampaignNote[]
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+// Jira-style internal "Discussion" thread on a campaign: org members post rich-HTML
+// notes (with embedded image/video) to talk about the campaign. Distinct from the
+// synced social SocialComment feature. One level of threading via parentId.
+model CampaignNote {
+  id             String    @id @default(uuid())
+  campaignId     String
+  organizationId String
+  createdById    String
+  parentId       String?               // one-level threaded replies (parent must be top-level)
+  content        String                // sanitized rich HTML
+  mentions       Json?                 // string[] of mentioned userIds
+  pinned         Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedById   String?
+  editedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  campaign       Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  parent         CampaignNote?          @relation("NoteThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies        CampaignNote[]         @relation("NoteThread")
+  reactions      CampaignNoteReaction[]
+
+  @@index([campaignId, deletedAt])
+  @@index([organizationId])
+  @@index([parentId])
+}
+
+model CampaignNoteReaction {
+  id        String       @id @default(uuid())
+  noteId    String
+  userId    String
+  emoji     String
+  createdAt DateTime     @default(now())
+  note      CampaignNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, userId, emoji])
+  @@index([noteId])
 }
 
 // Polymorphic association: tags a campaign onto any of the 8 non-post entity types

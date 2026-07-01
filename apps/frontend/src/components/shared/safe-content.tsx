@@ -4,8 +4,9 @@ import { FC, HTMLAttributes } from 'react';
 import DOMPurify from 'isomorphic-dompurify';
 
 const ALLOWED_TAGS = [
-  'p', 'br', 'strong', 'u', 'a', 'ul', 'li', 'h1', 'h2', 'h3', 'span',
-  'mark', 'img', 'video', 'source', 'div', 'sub', 'sup',
+  'p', 'br', 'strong', 'em', 's', 'del', 'u', 'a', 'ul', 'ol', 'li',
+  'h1', 'h2', 'h3', 'span', 'mark', 'img', 'video', 'source', 'div',
+  'sub', 'sup', 'code', 'pre', 'blockquote',
 ];
 
 const ALLOWED_ATTR = [

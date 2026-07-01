@@ -8,6 +8,15 @@ has the full per-commit detail.
 
 ---
 
+### Unreleased
+
+**Campaign Discussion.** The campaign dashboard gains an internal, Jira-style **Discussion** thread
+(below the tabs) for org members to talk about a campaign — separate from the synced social
+**Comments**. Rich-text (TipTap) notes with embedded image/video, @mentions (notify), emoji
+reactions, one-level threaded replies, pin/resolve, and edit/delete-your-own. New additive tables
+`CampaignNote` / `CampaignNoteReaction`; new routes under `/campaigns/:id/notes`. Note HTML is
+sanitized on write and on render.
+
 ### v4.0.0 (June 2026)
 
 **Unified, versioned provider framework.** All provider domains — AI, Media, Storage, Short-link,

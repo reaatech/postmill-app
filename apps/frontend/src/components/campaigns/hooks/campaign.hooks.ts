@@ -65,6 +65,61 @@ export const useCampaignDashboard = (id?: string) => {
   return useSWR<any>(id ? `campaign-dashboard-${id}` : null, loader, { revalidateOnFocus: false });
 };
 
+// ── Campaign Discussion (internal Jira-style note thread) ──
+export interface DiscussionReaction {
+  emoji: string;
+  count: number;
+  reactedByMe: boolean;
+}
+export interface DiscussionNote {
+  id: string;
+  content: string;
+  createdById: string;
+  parentId: string | null;
+  pinned: boolean;
+  resolvedAt: string | null;
+  editedAt: string | null;
+  createdAt: string;
+  isOwn: boolean;
+  author: { id: string; name: string; avatarUrl: string | null } | null;
+  reactions: DiscussionReaction[];
+  replies: DiscussionNote[];
+}
+
+export const useCampaignNotes = (campaignId?: string) => {
+  const fetch = useFetch();
+  const loader = useCallback(async () => {
+    const r = await fetch(`/campaigns/${campaignId}/notes`);
+    if (!r.ok) throw new Error('Failed to load discussion');
+    return r.json();
+  }, [fetch, campaignId]);
+  return useSWR<DiscussionNote[]>(
+    campaignId ? `campaign-notes-${campaignId}` : null,
+    loader,
+    { revalidateOnFocus: false }
+  );
+};
+
+export interface TeamMemberRow {
+  user: {
+    id: string;
+    email: string;
+    profile?: { name?: string | null; pictureId?: string | null } | null;
+  };
+}
+export const useTeamMembers = () => {
+  const fetch = useFetch();
+  const loader = useCallback(async () => {
+    const r = await fetch('/settings/team');
+    if (!r.ok) throw new Error('Failed to load team');
+    const json = await r.json();
+    return (json?.users ?? []) as TeamMemberRow[];
+  }, [fetch]);
+  return useSWR<TeamMemberRow[]>('settings-team-members', loader, {
+    revalidateOnFocus: false,
+  });
+};
+
 // Campaign-scoped comment inbox. Reuses the /posts/inbox endpoint with a campaignId
 // (and optional channel/status/assignee) filter — one hook per resource (rules-of-hooks).
 export interface CampaignCommentFilters {
