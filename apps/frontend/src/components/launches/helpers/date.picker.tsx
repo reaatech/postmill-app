@@ -5,7 +5,10 @@ import { useClickOutside } from '@mantine/hooks';
 import { Button } from '@gitroom/react/form/button';
 import { isUSCitizen } from './isuscitizen.utils';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { newDayjs, getTimezone } from '@gitroom/frontend/components/layout/set.timezone';
+import {
+  newDayjs,
+  getTimezoneAbbr,
+} from '@gitroom/frontend/components/layout/set.timezone';
 import { CalendarIcon } from '@gitroom/frontend/components/ui/icons';
 export const DatePicker: FC<{
   date: dayjs.Dayjs;
@@ -35,7 +38,7 @@ export const DatePicker: FC<{
   );
   return (
     <div
-      className="px-[16px] border border-newTextColor/10 rounded-[8px] justify-center flex gap-[8px] items-center relative h-[44px] text-[15px] font-[600] ml-[7px] select-none flex-1"
+      className="px-[12px] lg:px-[16px] border border-newTextColor/10 rounded-[8px] justify-center flex gap-[8px] items-center relative h-[36px] lg:h-[44px] text-[13px] lg:text-[15px] font-[600] ml-[7px] select-none flex-1"
       onClick={changeShow}
       ref={ref}
     >
@@ -45,7 +48,7 @@ export const DatePicker: FC<{
       <div className="cursor-pointer flex items-center gap-[4px]">
         {date.format(isUSCitizen() ? 'MM/DD/YYYY hh:mm A' : 'DD/MM/YYYY HH:mm')}
         <span className="text-[11px] text-textColor/50 font-[400]">
-          {getTimezone()}
+          {getTimezoneAbbr(date)}
         </span>
       </div>
       {open && (

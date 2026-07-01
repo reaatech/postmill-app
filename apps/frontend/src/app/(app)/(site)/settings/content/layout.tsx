@@ -20,7 +20,7 @@ export default function ContentSettingsLayout({ children }: { children: React.Re
       : []),
     ...(canManageTemplates
       ? [
-          { href: '/settings/content/sets', label: t('sets', 'Sets') },
+          { href: '/settings/content/sets', label: t('post_templates', 'Post Templates') },
           { href: '/settings/content/signatures', label: t('signatures', 'Signatures') },
         ]
       : []),

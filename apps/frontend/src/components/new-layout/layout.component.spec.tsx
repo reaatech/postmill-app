@@ -137,7 +137,8 @@ vi.mock('../layout/check.payment', () => ({
 }));
 
 vi.mock('../files/file.component', () => ({
-  ShowFileBoxModal: () => null,
+  MultiFileComponent: () => null,
+  FileComponent: () => null,
 }));
 
 vi.mock('../launches/helpers/linkedin.component', () => ({

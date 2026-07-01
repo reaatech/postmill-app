@@ -12,9 +12,19 @@ const SUGGESTED_SEARCHES = ['Home', 'User', 'Heart', 'Arrow', 'Social'];
 interface StockIconsProps {
   mode?: 'browse' | 'select';
   onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' | 'video' | 'audio' }) => void;
+  onSelectFull?: (item: {
+    url: string;
+    width: number;
+    height: number;
+    thumbnail?: string;
+    type: 'image' | 'video' | 'audio';
+    source?: string;
+    attribution?: Record<string, unknown>;
+    name?: string;
+  }) => void;
 }
 
-export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect }) => {
+export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -172,14 +182,19 @@ export const StockIcons: FC<StockIconsProps> = ({ mode = 'browse', onSelect }) =
                 key={icon.id}
                 type="button"
                 onClick={() => {
-                  if (mode === 'select' && onSelect) {
-                    onSelect({
+                  if (mode === 'select' && (onSelect || onSelectFull)) {
+                    const payload = {
                       url: icon.url,
                       width: icon.width,
                       height: icon.height,
                       thumbnail: icon.url,
-                      type: 'image',
-                    });
+                      type: 'image' as const,
+                      source: icon.source,
+                      attribution: icon.attribution,
+                      name: icon.description || undefined,
+                    };
+                    onSelectFull?.(payload);
+                    onSelect?.(payload);
                   } else {
                     openIcon(icon);
                   }

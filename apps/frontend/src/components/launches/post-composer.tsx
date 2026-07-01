@@ -25,6 +25,7 @@ export interface PostComposerProps {
   reopenModal?: () => void;
   mutate?: () => void;
   customClose?: () => void;
+  onLoadDraft?: (group: string) => void;
 }
 
 export const PostComposer: FC<PostComposerProps> = (props) => {
@@ -236,6 +237,7 @@ const PostComposerInnerInner: FC<PostComposerProps> = (props) => {
         customClose={props.customClose || (() => router.push('/schedule'))}
         mutate={props.mutate || (() => router.refresh())}
         reopenModal={props.reopenModal || (() => {})}
+        onLoadDraft={props.onLoadDraft}
       />
     </>
   );

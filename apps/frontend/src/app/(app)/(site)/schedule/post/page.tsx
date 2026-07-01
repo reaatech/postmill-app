@@ -2,13 +2,14 @@
 import { useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { PostComposer } from '@gitroom/frontend/components/launches/post-composer';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 
 export default function CreatePostPage() {
   const fetch = useFetch();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const loadIntegrations = useCallback(async (path: string) => {
@@ -39,6 +40,13 @@ export default function CreatePostPage() {
     ? [{ content: decodeURIComponent(contentParam), id: 'new' }]
     : undefined;
 
+  const handleLoadDraft = useCallback(
+    (group: string) => {
+      router.push(`/schedule/post/${group}`);
+    },
+    [router]
+  );
+
   if (isLoading) {
     return <LoadingComponent />;
   }
@@ -54,6 +62,7 @@ export default function CreatePostPage() {
       date={date}
       selectedChannels={selectedChannels}
       onlyValues={onlyValues}
+      onLoadDraft={handleLoadDraft}
     />
   );
 }

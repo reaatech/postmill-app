@@ -36,7 +36,6 @@ import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creat
 import {
   SettingsIcon,
   ChevronDownIcon,
-  CloseIcon,
   TrashIcon,
   DropdownArrowSmallIcon,
 } from '@gitroom/frontend/components/ui/icons';
@@ -48,6 +47,8 @@ import { PreflightPanel } from '@gitroom/frontend/components/new-launch/content-
 import dayjs from 'dayjs';
 import { Button } from '@gitroom/react/form/button';
 import SafeImage from '@gitroom/react/helpers/safe.image';
+import { useRouter } from 'next/navigation';
+import { ComposerLibraryModal } from '@gitroom/frontend/components/new-launch/composer-library.modal';
 
 export const ManageModal: FC<AddEditModalProps> = (props) => {
   const t = useT();
@@ -58,11 +59,20 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const [loading, setLoading] = useState(false);
   const toaster = useToaster();
   const modal = useModals();
+  const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
   const [showPreflight, setShowPreflight] = useState(false);
   const [pendingScheduleType, setPendingScheduleType] = useState<'draft' | 'now' | 'schedule' | 'update' | null>(null);
   const [preflightData, setPreflightData] = useState<PreflightResponse | null>(null);
+  const [mobileTab, setMobileTab] = useState<'compose' | 'preview'>('compose');
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
+  const [shortlinkInfo, setShortlinkInfo] = useState<{
+    ask: boolean;
+    providerName?: string;
+    domain?: string;
+  } | null>(null);
+  const [shortLinkEnabled, setShortLinkEnabled] = useState(false);
+  const shortlinkUserToggled = useRef(false);
   const { runPreflight, loading: preflightLoading, reset: resetPreflight } = usePreflight();
 
   const { addEditSets, mutate, customClose, dummy } = props;
@@ -84,6 +94,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     setHide,
     brandId,
     campaignId,
+    global,
+    internal,
   } = useLaunchStore(
     useShallow((state) => ({
       hide: state.hide,
@@ -102,6 +114,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       activateExitButton: state.activateExitButton,
       brandId: state.brandId,
       campaignId: state.campaignId,
+      global: state.global,
+      internal: state.internal,
     }))
   );
 
@@ -110,6 +124,49 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setHide(false);
     }
   }, [hide, setHide]);
+
+  const allContent = useMemo(
+    () =>
+      [
+        ...global.map((v) => v.content),
+        ...internal.flatMap((i) => i.integrationValue.map((v) => v.content)),
+      ].join(' '),
+    [global, internal]
+  );
+
+  useEffect(() => {
+    if (dummy || addEditSets) return;
+
+    const text = allContent;
+    if (!text.trim()) {
+      setShortlinkInfo(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch('/posts/should-shortlink', {
+          method: 'POST',
+          body: JSON.stringify({ messages: [text] }),
+        });
+        const data = await res.json();
+        setShortlinkInfo(data);
+        if (data.ask && !shortlinkUserToggled.current) {
+          setShortLinkEnabled(shortlinkPreferenceData?.shortlink === 'YES');
+        }
+      } catch {
+        setShortlinkInfo(null);
+      }
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [
+    allContent,
+    shortlinkPreferenceData,
+    dummy,
+    addEditSets,
+    fetch,
+  ]);
 
   const currentIntegrationText = useMemo(() => {
     if (current === 'global') {
@@ -160,27 +217,72 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     [integrations, setSelectedIntegrations]
   );
 
-  const askClose = useCallback(async () => {
-    if (!activateExitButton || dummy) {
-      return;
-    }
+  // "Started composing" = any editor has real text or attached media. Drives both nav guards
+  // below so we only warn when there's actual unsaved work — not on an empty composer.
+  const hasStartedComposing = useMemo(() => {
+    const stripped = (html: string) =>
+      (html || '')
+        .replace(/<[^>]*>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+    return (global || []).some(
+      (g) => stripped(g?.content).length > 0 || (g?.media?.length ?? 0) > 0
+    );
+  }, [global]);
 
-    if (
-      await deleteDialog(
-        t(
-          'are_you_sure_you_want_to_close_this_modal_all_data_will_be_lost',
-          'Are you sure you want to close this modal? (all data will be lost)'
-        ),
-        t('yes_close_it', 'Yes, close it!')
-      )
-    ) {
-      if (customClose) {
-        customClose();
+  // Warn before navigating away (refresh / tab close / back button / new URL) once the user
+  // has actually started composing.
+  useEffect(() => {
+    if (!activateExitButton || dummy || !hasStartedComposing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [activateExitButton, dummy, hasStartedComposing]);
+
+  // Guard soft in-app navigation (clicking a link/nav item) the same way: App Router has no
+  // route-change block, so intercept internal-link clicks in the capture phase, confirm via the
+  // shared dialog, and only navigate on approval. Only active once the user has started composing.
+  useEffect(() => {
+    if (!activateExitButton || dummy || !hasStartedComposing) return;
+    const onClick = (e: MouseEvent) => {
+      if (e.defaultPrevented) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
         return;
-      }
-      modal.closeAll();
-    }
-  }, [activateExitButton, dummy, customClose, modal, t]);
+      const anchor = (e.target as HTMLElement | null)?.closest?.(
+        'a[href]'
+      ) as HTMLAnchorElement | null;
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      // Skip external, new-tab, hash, mailto/tel, download and same-path links.
+      if (
+        !href ||
+        href.startsWith('http') ||
+        href.startsWith('#') ||
+        href.startsWith('mailto:') ||
+        href.startsWith('tel:') ||
+        anchor.target === '_blank' ||
+        anchor.hasAttribute('download') ||
+        href === window.location.pathname
+      )
+        return;
+      e.preventDefault();
+      e.stopPropagation();
+      deleteDialog(
+        t(
+          'leave_composer_unsaved',
+          'You have unsaved changes. Leave and lose them?'
+        ),
+        t('yes_leave', 'Yes, leave')
+      ).then((confirmed) => {
+        if (confirmed) router.push(href);
+      });
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [activateExitButton, dummy, hasStartedComposing, router, t]);
 
   const deletePost = useCallback(async () => {
     setLoading(true);
@@ -207,6 +309,90 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     modal.closeAll();
     return;
   }, [existingData, mutate, modal, customClose, fetch, t]);
+
+  const saveAsTemplate = useCallback(async () => {
+    if (!ref.current?.getAllValues) return;
+    const allValues = await ref.current.getAllValues();
+    const posts = allValues.map((post: any) => ({
+      integration: { id: post.id },
+      settings: { ...(post.settings || {}) },
+      value: post.values.map((value: any) => ({
+        content: value.content,
+        delay: value.delay || 0,
+        image: (value?.media || []).map(
+          ({ id, path, alt, thumbnail, thumbnailTimestamp }: any) => ({
+            id,
+            path,
+            alt,
+            thumbnail,
+            thumbnailTimestamp,
+          })
+        ),
+      })),
+    }));
+
+    modal.openModal({
+      title: t('save_as_template', 'Save as Template'),
+      children: (
+        <div className="flex flex-col gap-4 p-[16px]">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const input = e.currentTarget.elements.namedItem(
+                'templateName'
+              ) as HTMLInputElement;
+              const name = input?.value.trim();
+              if (!name) return;
+              try {
+                const res = await fetch('/sets', {
+                  method: 'POST',
+                  body: JSON.stringify({
+                    name,
+                    content: JSON.stringify({ posts }),
+                  }),
+                });
+                if (!res.ok) throw new Error('Failed to save template');
+                modal.closeAll();
+                toaster.show(
+                  t('template_saved', 'Template saved successfully'),
+                  'success'
+                );
+              } catch {
+                toaster.show(
+                  t('template_save_failed', 'Failed to save template'),
+                  'warning'
+                );
+              }
+            }}
+          >
+            <label className="text-[12px] text-newTableText mb-[6px] block">
+              {t('template_name', 'Template name')}
+            </label>
+            <input
+              name="templateName"
+              type="text"
+              placeholder={t(
+                'template_name_placeholder',
+                'e.g. Product launch boilerplate'
+              )}
+              className="w-full bg-newBgColor border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[14px] text-textColor outline-none focus:border-btnPrimary mb-[16px]"
+            />
+
+            <div className="flex gap-2 justify-end">
+              <Button
+                type="button"
+                secondary
+                onClick={() => modal.closeAll()}
+              >
+                {t('cancel', 'Cancel')}
+              </Button>
+              <Button type="submit">{t('save', 'Save')}</Button>
+            </div>
+          </form>
+        </div>
+      ),
+    });
+  }, [fetch, modal, toaster, t]);
 
   const schedule = useCallback(
     (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
@@ -394,41 +580,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         }
       }
 
-      const shortlinkPreference = shortlinkPreferenceData?.shortlink || 'ASK';
-
-      let shortLink = false;
-
-      if (!dummy && shortlinkPreference !== 'NO') {
-        const shortLinkUrl = await (
-          await fetch('/posts/should-shortlink', {
-            method: 'POST',
-            body: JSON.stringify({
-              messages: allValues
-                // platforms that remove links won't keep shortlinks either
-                .filter(
-                  (p: any) => !integrationById(p.id)?.integration?.stripLinks
-                )
-                .flatMap((p: any) => p.values.flatMap((a: any) => a.content)),
-            }),
-          })
-        ).json();
-
-        if (shortLinkUrl.ask) {
-          if (shortlinkPreference === 'YES') {
-            // Automatically shortlink without asking
-            shortLink = true;
-          } else {
-            // ASK: Show the dialog
-            shortLink = await deleteDialog(
-              t(
-                'shortlink_urls_question',
-                'Do you want to shortlink the URLs? it will let you get statistics over clicks'
-              ),
-              t('yes_shortlink_it', 'Yes, shortlink it!')
-            );
-          }
-        }
-      }
+      // The footer toggle (WS6) now decides short-link application. The
+      // debounced `/posts/should-shortlink` call supplies `shortlinkInfo.ask`.
+      const shortLink = !dummy && shortLinkEnabled && !!shortlinkInfo?.ask;
 
       const data = {
         type,
@@ -499,7 +653,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       date,
       addEditSets,
       dummy,
-      shortlinkPreferenceData,
+      shortLinkEnabled,
+      shortlinkInfo,
       brandId,
       campaignId,
       customClose,
@@ -515,29 +670,85 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   );
 
   return (
-    <div className="w-full h-full flex-1 p-[40px] flex relative">
-      <div className="flex flex-1 bg-newBgColorInner rounded-[20px] flex-col">
-        <div className="flex-1 flex">
-          <div className="flex flex-col flex-1 border-e border-newBorder">
-            <div className="bg-newBgColor h-[65px] rounded-s-[20px] !rounded-b-[0] flex items-center gap-[12px] px-[20px] text-[20px] font-[600]">
+    <div className="w-full h-full flex-1 p-[16px] lg:p-[40px] flex relative">
+      <div className="flex flex-1 bg-newBgColorInner rounded-[20px] flex-col overflow-hidden">
+        <div className="lg:hidden flex items-center justify-center p-[12px] border-b border-newBorder bg-newBgColor">
+          <div className="flex bg-newBgColorInner border border-newBorder rounded-[8px] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setMobileTab('compose')}
+              className={clsx(
+                'px-[16px] py-[6px] text-[13px] font-[500] transition-colors',
+                mobileTab === 'compose'
+                  ? 'bg-btnPrimary text-white'
+                  : 'text-textColor hover:bg-boxHover'
+              )}
+            >
+              {t('compose_post', 'Compose Post')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setMobileTab('preview')}
+              className={clsx(
+                'px-[16px] py-[6px] text-[13px] font-[500] transition-colors',
+                mobileTab === 'preview'
+                  ? 'bg-btnPrimary text-white'
+                  : 'text-textColor hover:bg-boxHover'
+              )}
+            >
+              {t('preview', 'Preview')}
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0">
+          <div
+            className={clsx(
+              'flex flex-col flex-1 border-b lg:border-b-0 lg:border-e border-newBorder min-h-0',
+              mobileTab === 'preview' ? 'hidden lg:flex' : 'flex'
+            )}
+          >
+            <div className="bg-newBgColor h-[65px] lg:rounded-s-[20px] !rounded-b-[0] hidden lg:flex items-center gap-[12px] px-[20px] text-[20px] font-[600]">
               {t('create_post_title', 'Create Post')}
               <CreationMethodBadge
                 creationMethod={existingData?.posts?.[0]?.creationMethod}
                 size="sm"
               />
             </div>
-            <div className="flex-1 flex flex-col gap-[16px]">
+            <div className="flex-1 flex flex-col gap-[16px] min-h-0">
               <div
                 className={clsx('flex-1 relative', showSettings && 'hidden')}
               >
                 <div
                   id="social-content"
-                  className="gap-[32px] flex flex-col pe-[8px] pt-[20px] ps-[20px] absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-scroll scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
+                  className="gap-[16px] md:gap-[32px] flex flex-col pe-[8px] pt-[16px] md:pt-[20px] ps-[20px] absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-scroll scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
                 >
-                  <div className="flex w-full">
-                    <div className="flex flex-1">
+                  <div className="flex w-full items-center gap-[8px] flex-wrap">
+                    <div className="flex flex-1 min-w-0">
                       <PicksSocialsComponent toolTip={true} />
                     </div>
+                    {!dummy && !addEditSets && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          modal.openModal({
+                            title: t('library', 'Library'),
+                            children: (
+                              <ComposerLibraryModal
+                                onLoadDraft={
+                                  props.onLoadDraft ||
+                                  ((group) =>
+                                    router.push(`/schedule/post/${group}`))
+                                }
+                                onClose={() => modal.closeAll()}
+                              />
+                            ),
+                          })
+                        }
+                        className="border border-newTableBorder bg-btnSimple text-textColor rounded-[8px] px-[14px] h-[40px] text-[13px] font-[500] hover:bg-boxHover"
+                      >
+                        {t('start_from', 'Start from…')}
+                      </button>
+                    )}
                     <div>
                       {!dummy && (
                         <SelectCustomer
@@ -549,7 +760,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   </div>
                   <div className="flex flex-1 gap-[6px] flex-col">
                     <div>{!existingData.integration && <SelectCurrent />}</div>
-                    <div className="flex-1 flex">
+                    <div className="flex-1 flex min-h-[220px] lg:min-h-0">
                       {!hide && <EditorWrapper totalPosts={1} value="" />}
                     </div>
                     <div
@@ -608,14 +819,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               </div>
             </div>
           </div>
-          <div className="w-[580px] flex flex-col">
-            <div className="bg-newBgColor h-[65px] rounded-e-[20px] !rounded-b-[0] flex items-center px-[20px] text-[20px] font-[600]">
+          <div
+            className={clsx(
+              'w-full lg:w-[580px] flex flex-col min-h-0',
+              mobileTab === 'compose' ? 'hidden lg:flex' : 'flex'
+            )}
+          >
+            <div className="bg-newBgColor h-[65px] lg:rounded-e-[20px] !rounded-b-[0] hidden lg:flex items-center px-[20px] text-[20px] font-[600]">
               <div className="flex-1">{t('post_preview', 'Post Preview')}</div>
-              <div className="cursor-pointer">
-                <CloseIcon onClick={askClose} className="text-[#A3A3A3]" />
-              </div>
             </div>
-            <div className="flex-1 relative">
+            <div className="flex-1 relative min-h-0">
               <Scrollable
                 scrollClasses="!pe-[20px]"
                 className="absolute top-0 p-[20px] pe-[8px] left-0 w-full h-full overflow-x-hidden overflow-y-scroll scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
@@ -625,8 +838,8 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             </div>
           </div>
         </div>
-        <div className="select-none h-[84px] py-[20px] border-t border-newBorder flex items-center">
-          <div className="flex-1 flex ps-[20px] gap-[8px]">
+        <div className="select-none h-auto lg:h-[84px] py-[16px] lg:py-[20px] border-t border-newBorder flex flex-col lg:flex-row items-start lg:items-center gap-[12px] lg:gap-0">
+          <div className="flex-1 flex ps-[20px] gap-[8px] flex-wrap">
             {!dummy && (
               <TagsComponent
                 name="tags"
@@ -643,11 +856,43 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
             {!dummy && <BrandPicker />}
           </div>
-          <div className="pe-[20px] flex items-center justify-end gap-[8px]">
+          <div className="pe-[20px] flex items-center justify-start lg:justify-end gap-[8px] flex-wrap w-full lg:w-auto">
+            {!dummy && !addEditSets && shortlinkInfo && (
+              <>
+                {shortlinkInfo.ask && shortlinkInfo.providerName && (
+                  <label className="flex items-center gap-[8px] cursor-pointer text-[13px] text-textColor select-none">
+                    <input
+                      type="checkbox"
+                      checked={shortLinkEnabled}
+                      onChange={() => {
+                        shortlinkUserToggled.current = true;
+                        setShortLinkEnabled((v) => !v);
+                      }}
+                      className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary"
+                    />
+                    <span>
+                      {t('shorten_links_via', 'Shorten links via')}{' '}
+                      {shortlinkInfo.domain || shortlinkInfo.providerName}
+                    </span>
+                  </label>
+                )}
+                {!shortlinkInfo.providerName && !shortlinkInfo.domain && (
+                  <a
+                    href="/settings/shortlinks"
+                    className="text-[13px] text-btnPrimary hover:underline"
+                  >
+                    {t(
+                      'connect_shortlink_provider',
+                      'Connect a short-link provider to track clicks'
+                    )}
+                  </a>
+                )}
+              </>
+            )}
             {existingData?.integration && (
               <button
                 onClick={deletePost}
-                className="cursor-pointer flex text-[#FF3F3F] gap-[8px] items-center text-[15px] font-[600]"
+                className="cursor-pointer flex text-[#FF3F3F] gap-[8px] items-center text-[13px] lg:text-[15px] font-[600]"
               >
                 <div>
                   <TrashIcon />
@@ -657,22 +902,52 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             )}
             <DatePicker onChange={setDate} date={date} />
             {!addEditSets && (
-              <button
-                disabled={
-                  selectedIntegrations.length === 0 || loading || locked
-                }
-                onClick={schedule('draft')}
-                className="relative cursor-pointer disabled:cursor-not-allowed px-[20px] h-[44px] bg-btnSimple justify-center items-center flex rounded-[8px] text-[15px] font-[600]"
-              >
-                {loading && (
-                  <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-                    <div className="animate-spin h-[20px] w-[20px] border-4 border-textColor border-t-transparent rounded-full" />
+              <div className="group cursor-pointer relative">
+                <button
+                  type="button"
+                  disabled={
+                    selectedIntegrations.length === 0 || loading || locked
+                  }
+                  className="relative cursor-pointer disabled:cursor-not-allowed px-[12px] lg:px-[20px] h-[36px] lg:h-[44px] bg-btnSimple justify-center items-center flex gap-[6px] rounded-[8px] text-[13px] lg:text-[15px] font-[600]"
+                >
+                  {loading && (
+                    <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
+                      <div className="animate-spin h-[20px] w-[20px] border-4 border-textColor border-t-transparent rounded-full" />
+                    </div>
+                  )}
+                  <div
+                    className={clsx(
+                      'flex items-center gap-[6px]',
+                      loading && 'invisible'
+                    )}
+                  >
+                    {t('save_as', 'Save as')}
+                    <DropdownArrowSmallIcon className="group-hover:rotate-180 text-textColor" />
                   </div>
-                )}
-                <div className={clsx(loading && 'invisible')}>
-                  {t('save_as_draft', 'Save as Draft')}
+                </button>
+                <div className="hidden group-hover:flex flex-col absolute bottom-[100%] left-0 mb-[8px] w-[200px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[8px] gap-[6px] z-[300]">
+                  <button
+                    type="button"
+                    disabled={
+                      selectedIntegrations.length === 0 || loading || locked
+                    }
+                    onClick={schedule('draft')}
+                    className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 h-[40px] rounded-[6px] bg-btnSimple hover:bg-boxHover flex justify-center items-center text-[14px] font-[600]"
+                  >
+                    {t('save_as_draft', 'Save as Draft')}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={
+                      selectedIntegrations.length === 0 || loading || locked
+                    }
+                    onClick={saveAsTemplate}
+                    className="cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 h-[40px] rounded-[6px] bg-btnSimple hover:bg-boxHover flex justify-center items-center text-[14px] font-[600]"
+                  >
+                    {t('save_as_template', 'Save as Template')}
+                  </button>
                 </div>
-              </button>
+              </div>
             )}
             {addEditSets && (
               <button
@@ -686,13 +961,13 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               </button>
             )}
             {!addEditSets && (
-              <div className="group cursor-pointer relative">
+              <div className="group cursor-pointer relative w-full lg:w-auto">
                 <button
                   disabled={
                     selectedIntegrations.length === 0 || loading || locked
                   }
                   onClick={schedule('schedule')}
-                  className="text-white relative min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[44px] rounded-[8px] bg-[#2B5CD3] ps-[20px] pe-[16px]"
+                  className="text-white relative w-full lg:min-w-[180px] btnSub disabled:cursor-not-allowed disabled:opacity-80 outline-none gap-[8px] flex justify-center items-center h-[38px] lg:h-[44px] rounded-[8px] bg-[#2B5CD3] ps-[14px] lg:ps-[20px] pe-[12px] lg:pe-[16px]"
                 >
                   {loading && (
                     <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
@@ -701,12 +976,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                   )}
                   <div
                     className={clsx(
-                      'text-[15px] font-[600]',
+                      'text-[13px] lg:text-[15px] font-[600]',
                       loading && 'invisible'
                     )}
                   >
                     {selectedIntegrations.length === 0
-                      ? t('check_circles_above', 'Check the circles above')
+                      ? t('select_a_channel', 'Select a Channel')
                       : dummy
                       ? t('create_output', 'Create output')
                       : !existingData?.integration

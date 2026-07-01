@@ -33,6 +33,7 @@ export interface AddEditModalProps {
       path: string;
     }>;
   }>;
+  onLoadDraft?: (group: string) => void;
 }
 
 export const AddEditModal: FC<AddEditModalProps> = (props) => {
@@ -272,8 +273,10 @@ export const AddEditModalInnerInner: FC<AddEditModalProps> = (props) => {
                       .split('\n')
                       .map((line: string) => `<p>${line}</p>`)
                       .join(''),
+              // Set content historically stored `image`; older variants may
+              // use `media`. Accept either for a robust round-trip.
               // @ts-ignore
-              media: p.media,
+              media: p.image || p.media || [],
             }))
           : [
               {

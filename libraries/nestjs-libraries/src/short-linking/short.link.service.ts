@@ -45,19 +45,30 @@ export class ShortLinkService {
     }
   }
 
-  async askShortLinkedin(orgId: string, messages: string[]): Promise<boolean> {
+  async shouldShortlink(
+    orgId: string,
+    messages: string[]
+  ): Promise<{ ask: boolean; providerName?: string; domain?: string }> {
     const resolved = await this._resolve(orgId);
-    if (!resolved) return false;
+    if (!resolved) return { ask: false };
 
     const domain = resolved.adapter.resolveDomain(resolved.ctx);
-    if (!domain || domain === 'empty') return false;
+    if (!domain || domain === 'empty') return { ask: false };
 
     const mergeMessages = messages.join(' ');
     const urlRegex = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
     const urls = mergeMessages.match(urlRegex);
-    if (!urls) return false;
+    const ask = urls ? urls.some((url) => url.indexOf(domain) === -1) : false;
 
-    return urls.some((url) => url.indexOf(domain) === -1);
+    return {
+      ask,
+      providerName: resolved.adapter.name || resolved.adapter.identifier,
+      domain,
+    };
+  }
+
+  async askShortLinkedin(orgId: string, messages: string[]): Promise<boolean> {
+    return (await this.shouldShortlink(orgId, messages)).ask;
   }
 
   async convertTextToShortLinks(orgId: string, messagesList: string[]) {

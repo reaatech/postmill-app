@@ -23,6 +23,18 @@ export const newDayjs = (config?: ConfigType) => {
   return d;
 };
 
+// Short, common timezone abbreviation (PST/PDT/EST/…) for the active timezone.
+// Uses native Intl so it stays DST-aware without the dayjs advancedFormat plugin;
+// non-US zones fall back to a short GMT±N form.
+export const getTimezoneAbbr = (d?: dayjs.Dayjs) => {
+  const tz = getTimezone();
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    timeZoneName: 'short',
+  }).formatToParts((d ?? newDayjs()).toDate());
+  return parts.find((p) => p.type === 'timeZoneName')?.value || tz;
+};
+
 const SetTimezone: FC = () => {
   useEffect(() => {
     dayjs.utc = (config?: ConfigType, format?: string, strict?: boolean) => {

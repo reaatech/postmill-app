@@ -12,9 +12,19 @@ const SUGGESTED_SEARCHES = ['Happy', 'Cat', 'Reaction', 'Celebration', 'Meme'];
 interface StockStickersProps {
   mode?: 'browse' | 'select';
   onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' | 'video' }) => void;
+  onSelectFull?: (item: {
+    url: string;
+    width: number;
+    height: number;
+    thumbnail?: string;
+    type: 'image' | 'video';
+    source?: string;
+    attribution?: Record<string, unknown>;
+    name?: string;
+  }) => void;
 }
 
-export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelect }) => {
+export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -168,15 +178,21 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
                 key={sticker.id}
                 type="button"
                 onClick={() => {
-                  if (mode === 'select' && onSelect) {
+                  if (mode === 'select' && (onSelect || onSelectFull)) {
                     const isVideo = !!sticker.mp4Url;
-                    onSelect({
+                    const type: 'image' | 'video' = isVideo ? 'video' : 'image';
+                    const payload = {
                       url: isVideo ? sticker.mp4Url! : sticker.url,
                       width: sticker.width,
                       height: sticker.height,
                       thumbnail: sticker.thumbUrl,
-                      type: isVideo ? 'video' : 'image',
-                    });
+                      type,
+                      source: sticker.source,
+                      attribution: sticker.attribution,
+                      name: sticker.description || undefined,
+                    };
+                    onSelectFull?.(payload);
+                    onSelect?.(payload);
                   } else {
                     openSticker(sticker);
                   }

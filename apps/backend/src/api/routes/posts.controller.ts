@@ -75,7 +75,7 @@ export class PostsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: { messages: string[] }
   ) {
-    return { ask: await this._shortLinkService.askShortLinkedin(org.id, body.messages) };
+    return this._shortLinkService.shouldShortlink(org.id, body.messages);
   }
 
   @Post('/:id/comments')
