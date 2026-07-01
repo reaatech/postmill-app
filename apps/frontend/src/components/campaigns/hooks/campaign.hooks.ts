@@ -65,6 +65,20 @@ export const useCampaignDashboard = (id?: string) => {
   return useSWR<any>(id ? `campaign-dashboard-${id}` : null, loader, { revalidateOnFocus: false });
 };
 
+// Full file records for a campaign's tagged files (newest-tagged first) — feeds
+// the /files-style Files tab (thumbnails + preview). Own hook, own key.
+export const useCampaignFiles = (id?: string) => {
+  const fetch = useFetch();
+  const loader = useCallback(async () => {
+    const r = await fetch(`/campaigns/${id}/files`);
+    if (!r.ok) throw new Error('Failed to load campaign files');
+    return r.json();
+  }, [fetch, id]);
+  return useSWR<any[]>(id ? `campaign-files-${id}` : null, loader, {
+    revalidateOnFocus: false,
+  });
+};
+
 // ── Campaign Discussion (internal Jira-style note thread) ──
 export interface DiscussionReaction {
   emoji: string;

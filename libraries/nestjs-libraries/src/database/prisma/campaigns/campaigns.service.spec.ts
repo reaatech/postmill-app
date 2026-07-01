@@ -51,6 +51,7 @@ function makeService(overrides: any = {}) {
       ),
   };
   const socialCommentsService = { countCampaignComments: vi.fn().mockResolvedValue(0) };
+  const fileService = { getByIds: vi.fn().mockResolvedValue([]) };
 
   const service = new CampaignsService(
     campaignsRepository as any,
@@ -59,7 +60,8 @@ function makeService(overrides: any = {}) {
     audit as any,
     postsService as any,
     usersService as any,
-    socialCommentsService as any
+    socialCommentsService as any,
+    fileService as any
   );
   return { service, campaignsRepository, usersService };
 }

@@ -30,6 +30,10 @@ export class FileService {
     return this._fileRepository.getFileById(id);
   }
 
+  getByIds(org: string, ids: string[]) {
+    return this._fileRepository.getByIds(org, ids);
+  }
+
   getFileByPath(org: string, filePath: string) {
     return this._fileRepository.getFileByPath(org, filePath);
   }

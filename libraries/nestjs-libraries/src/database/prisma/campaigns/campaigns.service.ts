@@ -6,6 +6,7 @@ import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/au
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ENTITY_ENUM_TO_SLUG } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-entity.types';
 import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-goal-progress';
 import { randomBytes } from 'crypto';
@@ -20,7 +21,29 @@ export class CampaignsService {
     private _postsService: PostsService,
     private _usersService: UsersService,
     private _socialCommentsService: SocialCommentsService,
+    private _fileService: FileService,
   ) {}
+
+  // Full file records for a campaign's tagged files (newest-tagged first,
+  // orphans/deleted dropped), for the /files-style Files tab. Capped defensively.
+  async getCampaignFiles(id: string, organizationId: string) {
+    const campaign = await this._campaignsRepository.findById(id, organizationId);
+    if (!campaign) throw new NotFoundException('Campaign not found');
+
+    const items = await this._campaignsRepository.getCappedItemsByCampaign(
+      id,
+      organizationId,
+      'FILE',
+      500,
+    );
+    const ids = items.map((i) => i.entityId);
+    if (!ids.length) return [];
+
+    const files = await this._fileService.getByIds(organizationId, ids);
+    const byId = new Map(files.map((f) => [f.id, f]));
+    // Preserve the tagged order (newest first) and drop any deleted rows.
+    return ids.map((fid) => byId.get(fid)).filter(Boolean);
+  }
 
   list(organizationId: string) {
     return this._campaignsRepository.findByOrg(organizationId);

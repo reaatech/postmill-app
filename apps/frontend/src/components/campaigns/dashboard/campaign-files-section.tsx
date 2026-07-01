@@ -1,95 +1,312 @@
 'use client';
 
 import { FC, useCallback, useState } from 'react';
+import clsx from 'clsx';
+import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
+import { hasExtension } from '@gitroom/helpers/utils/has.extension';
+import { useModals, areYouSure } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
-import { ResolvedCampaignItem } from '@gitroom/frontend/components/campaigns/campaign-types';
+import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
+import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import {
-  PanelItem,
-  AddItemsModal,
-} from '@gitroom/frontend/components/campaigns/dashboard/tagged-items-panels';
+  FilePreviewModal,
+} from '@gitroom/frontend/components/files/file-preview-modal';
+import type { FileItem } from '@gitroom/frontend/components/files/file-manager';
+import { useCampaignFiles } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
+import { UploadFilesModal } from '@gitroom/frontend/components/campaigns/dashboard/upload-files-modal';
 
-// Dedicated Files section — the campaign's tagged files, promoted out of the
-// Tagged Items panel into their own first-class tab (mirrors Channels).
+const formatDate = (d: string) => {
+  try {
+    return new Date(d).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return '';
+  }
+};
+
+const fileSize = (bytes: number) => {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+};
+
+const FileTile: FC<{
+  file: FileItem;
+  onOpen: () => void;
+  onRemove: () => void;
+  removing: boolean;
+}> = ({ file, onOpen, onRemove, removing }) => {
+  const mediaDirectory = useMediaDirectory();
+  const [broken, setBroken] = useState(false);
+  const isVideo = hasExtension(file.path, 'mp4', 'mov', 'webm');
+  const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
+  // Prefer a still thumbnail (works as a video poster too); fall back to the
+  // raw image path for images, and to the <video> first frame for videos.
+  const thumb = file.thumbnail
+    ? mediaDirectory.set(file.thumbnail)
+    : !isVideo && !isAudio
+    ? mediaDirectory.set(file.path)
+    : '';
+
+  return (
+    <div className="group relative rounded-[8px] border border-newTableBorder bg-newBgColorInner overflow-hidden hover:border-btnPrimary/50 transition-colors">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="block w-full text-left"
+        aria-label={file.originalName || file.name}
+      >
+        <div className="w-full aspect-square overflow-hidden bg-newBgColor flex items-center justify-center text-newTableText">
+          {isAudio ? (
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M9 18V5l12-2v13" />
+              <circle cx="6" cy="18" r="3" />
+              <circle cx="18" cy="16" r="3" />
+            </svg>
+          ) : thumb && !broken ? (
+            // onError drives the broken-thumbnail fallback below (legitimate use).
+            // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
+            <img
+              src={thumb}
+              alt={file.alt || file.name}
+              className="w-full h-full object-cover"
+              loading="lazy"
+              onError={() => setBroken(true)}
+            />
+          ) : isVideo && !broken ? (
+            <video
+              src={mediaDirectory.set(file.path)}
+              className="w-full h-full object-cover"
+              muted
+              preload="metadata"
+            />
+          ) : (
+            // Graceful placeholder for a missing/unrenderable source.
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="2" />
+              <path d="M21 15l-5-5L5 21" />
+            </svg>
+          )}
+        </div>
+        <div className="px-[8px] py-[6px]">
+          <div
+            className="text-[12px] text-textColor truncate"
+            title={file.originalName || file.name}
+          >
+            {file.originalName || file.name}
+          </div>
+          <div className="text-[10px] text-newTableText truncate">
+            {formatDate(file.createdAt)}
+            {file.fileSize ? ` · ${fileSize(file.fileSize)}` : ''}
+          </div>
+        </div>
+      </button>
+      <button
+        type="button"
+        disabled={removing}
+        onClick={onRemove}
+        aria-label="Remove from campaign"
+        className="absolute top-[6px] end-[6px] w-[22px] h-[22px] rounded-full bg-black/60 text-white text-[13px] flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 transition-all disabled:opacity-40"
+      >
+        ×
+      </button>
+    </div>
+  );
+};
+
+// Dedicated Files section — the campaign's tagged files rendered /files-style
+// (thumbnails + details), with a preview modal that can open the file in a new
+// post draft or in the Designer.
 export const CampaignFilesSection: FC<{
   campaignId: string;
-  files: ResolvedCampaignItem[];
   onMutate: () => void;
-}> = ({ campaignId, files, onMutate }) => {
+}> = ({ campaignId, onMutate }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
-  const [removingKey, setRemovingKey] = useState<string | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const { data: files, isLoading, mutate: mutateFiles } = useCampaignFiles(campaignId);
+
+  const { data: integrations } = useSWR<Integrations[]>(
+    '/integrations/list',
+    async () => {
+      const r = await fetch('/integrations/list');
+      if (!r.ok) throw new Error('Failed to load channels');
+      return (await r.json()).integrations;
+    },
+    { revalidateOnFocus: false }
+  );
+
+  const refresh = useCallback(() => {
+    mutateFiles();
+    onMutate();
+  }, [mutateFiles, onMutate]);
 
   const remove = useCallback(
-    async (entityType: string, entityId: string) => {
-      if (removingKey) return;
-      setRemovingKey(`${entityType}:${entityId}`);
+    async (fileId: string) => {
+      if (removingId) return;
+      setRemovingId(fileId);
       try {
-        const r = await fetch(`/campaigns/${campaignId}/items/${entityType}/${entityId}`, {
+        const r = await fetch(`/campaigns/${campaignId}/items/file/${fileId}`, {
           method: 'DELETE',
         });
         if (!r.ok) throw new Error();
         toaster.show(t('item_untagged', 'File removed'), 'success');
-        onMutate();
+        refresh();
       } catch {
         toaster.show(t('failed_to_untag_item', 'Failed to remove file'), 'warning');
       } finally {
-        setRemovingKey(null);
+        setRemovingId(null);
       }
     },
-    [campaignId, fetch, onMutate, removingKey, t, toaster]
+    [campaignId, fetch, refresh, removingId, t, toaster]
   );
 
-  const openAddModal = useCallback(() => {
+  // Danger action from the preview: confirm, then untag from the campaign.
+  // `remove` refreshes the grid (and dashboard count) on success.
+  const confirmRemoveFromCampaign = useCallback(
+    async (file: FileItem) => {
+      const ok = await areYouSure({
+        title: t('remove_from_campaign', 'Remove from campaign?'),
+        description: t(
+          'remove_file_from_campaign_desc',
+          'This removes the file from this campaign. It stays in your media library.'
+        ),
+        approveLabel: t('remove', 'Remove'),
+        cancelLabel: t('cancel', 'Cancel'),
+      });
+      if (!ok) return;
+      modal.closeAll(); // close the preview
+      await remove(file.id);
+    },
+    [remove, modal, t]
+  );
+
+  // Open the composer on a fresh draft with this file preloaded, scoped to the
+  // campaign (mirrors tagged-items-panels' openTemplate handoff).
+  const openNewPostDraft = useCallback(
+    (file: FileItem) => {
+      useLaunchStore.getState().setCampaignId(campaignId);
+      const close = () => {
+        useLaunchStore.getState().setCampaignId(null);
+        modal.closeAll();
+      };
+      modal.openModal({
+        withCloseButton: false,
+        fullScreen: true,
+        removeLayout: true,
+        size: '100%',
+        height: '100%',
+        children: (
+          <div className="relative w-full h-full">
+            <CloseModalButton onClick={close} />
+            <AddEditModal
+              date={newDayjs()}
+              integrations={integrations || []}
+              allIntegrations={integrations || []}
+              onlyValues={[
+                { content: '', id: 'new', image: [{ id: file.id, path: file.path }] },
+              ]}
+              reopenModal={() => undefined}
+              mutate={onMutate}
+              customClose={close}
+              padding="p-0"
+            />
+          </div>
+        ),
+      });
+    },
+    [campaignId, integrations, modal, onMutate]
+  );
+
+  const openPreview = useCallback(
+    (file: FileItem) => {
+      modal.openModal({
+        title: '',
+        closeOnClickOutside: true,
+        closeOnEscape: true,
+        withCloseButton: true,
+        // Responsive + centered; never wider than the viewport (was overflowing
+        // on mobile). size + height together enable the manager's centering.
+        size: 'min(760px, calc(100vw - 24px))',
+        height: 'auto',
+        children: (
+          <FilePreviewModal
+            file={file}
+            onNewPostDraft={openNewPostDraft}
+            onRemoveFromCampaign={confirmRemoveFromCampaign}
+          />
+        ),
+      });
+    },
+    [modal, openNewPostDraft, confirmRemoveFromCampaign]
+  );
+
+  const openUploadModal = useCallback(() => {
     modal.openModal({
-      title: t('add_files_to_campaign', 'Add files to campaign'),
+      title: t('upload_files', 'Upload files'),
       withCloseButton: true,
+      // size + height center the modal; maxSize keeps it responsive on mobile.
+      size: '760px',
+      maxSize: 'calc(100vw - 24px)',
+      height: 'auto',
       children: (
-        <AddItemsModal
-          campaignId={campaignId}
-          existingItems={{ file: files }}
-          types={['file']}
-          defaultType="file"
-          onDone={() => {
-            modal.closeAll();
-            onMutate();
-          }}
-        />
+        <UploadFilesModal campaignId={campaignId} onUploaded={refresh} />
       ),
     });
-  }, [campaignId, files, modal, onMutate, t]);
+  }, [campaignId, modal, refresh, t]);
+
+  const count = files?.length ?? 0;
 
   return (
     <div className="p-[16px] border border-newTableBorder rounded-[12px] bg-newBgColor">
       <div className="flex items-center justify-between mb-[12px]">
         <div className="flex items-center gap-[8px]">
           <h3 className="text-[16px] font-semibold text-textColor">{t('files', 'Files')}</h3>
-          {files.length > 0 && (
-            <span className="text-[12px] text-newTableText">({files.length})</span>
+          {count > 0 && (
+            <span className="text-[12px] text-newTableText">({count})</span>
           )}
         </div>
-        <Button onClick={openAddModal} className="!h-[32px] !px-[12px] text-[13px]">
-          {t('add_files', 'Add files')}
+        <Button onClick={openUploadModal} className="!h-[32px] !px-[12px] text-[13px]">
+          {t('upload', 'Upload')}
         </Button>
       </div>
 
-      {files.length === 0 ? (
+      {isLoading ? (
         <div className="text-[13px] text-newTableText text-center py-[24px]">
-          {t('no_tagged_files', 'No files tagged yet. Click Add files to attach files to this campaign.')}
+          {t('loading', 'Loading…')}
+        </div>
+      ) : count === 0 ? (
+        <div className="text-[13px] text-newTableText text-center py-[24px]">
+          {t('no_tagged_files', 'No files yet. Click Upload to add files to this campaign.')}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-[8px]">
-          {files.map((item) => (
-            <PanelItem
-              key={item.id}
-              item={item}
-              onRemove={remove}
-              busy={removingKey === `${item.entityType}:${item.id}`}
+        <div
+          className={clsx(
+            'grid gap-[8px]',
+            'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6'
+          )}
+        >
+          {files!.map((file) => (
+            <FileTile
+              key={file.id}
+              file={file}
+              onOpen={() => openPreview(file)}
+              onRemove={() => remove(file.id)}
+              removing={removingId === file.id}
             />
           ))}
         </div>

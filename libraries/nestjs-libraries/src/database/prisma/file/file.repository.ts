@@ -424,6 +424,31 @@ export class FileRepository {
     });
   }
 
+  // Full file records for a set of ids (org-scoped, non-deleted). Same select
+  // shape as getFiles() so callers get the FileItem shape used by the /files UI.
+  async getByIds(org: string, ids: string[]) {
+    if (!ids.length) return [];
+    return this._file.model.file.findMany({
+      where: { id: { in: ids }, organizationId: org, deletedAt: null as null },
+      select: {
+        id: true,
+        name: true,
+        originalName: true,
+        path: true,
+        thumbnail: true,
+        alt: true,
+        thumbnailTimestamp: true,
+        fileSize: true,
+        type: true,
+        tags: true,
+        description: true,
+        folderId: true,
+        createdAt: true,
+        folder: { select: { id: true, name: true } },
+      },
+    });
+  }
+
   async searchFiles(org: string, query: string, folderId?: string) {
     const where: any = {
       organizationId: org,

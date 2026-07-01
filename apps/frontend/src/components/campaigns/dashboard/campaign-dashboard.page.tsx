@@ -175,11 +175,7 @@ export const CampaignDashboardPage: FC = () => {
         />
       )}
       {tab === 'files' && (
-        <CampaignFilesSection
-          campaignId={id}
-          files={data.itemPanels?.file || []}
-          onMutate={mutate}
-        />
+        <CampaignFilesSection campaignId={id} onMutate={mutate} />
       )}
       {tab === 'items' && (
         <TaggedItemsPanels

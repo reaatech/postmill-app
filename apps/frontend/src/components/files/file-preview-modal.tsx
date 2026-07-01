@@ -18,7 +18,13 @@ const fileSize = (bytes: number) => {
 export const FilePreviewModal: FC<{
   file: FileItem;
   onDetails?: (file: FileItem) => void;
-}> = ({ file, onDetails }) => {
+  // Optional extra action (used by the campaign Files tab) — opens the composer
+  // with this file preloaded. Not passed by the /files library, so unchanged there.
+  onNewPostDraft?: (file: FileItem) => void;
+  // Optional danger action (campaign Files tab) — untag the file from the
+  // campaign. The caller handles confirmation. Not passed by /files.
+  onRemoveFromCampaign?: (file: FileItem) => void;
+}> = ({ file, onDetails, onNewPostDraft, onRemoveFromCampaign }) => {
   const router = useRouter();
   const modal = useModals();
   const mediaDirectory = useMediaDirectory();
@@ -65,6 +71,14 @@ export const FilePreviewModal: FC<{
           {(file.type || 'file')} · {fileSize(file.fileSize)}
         </div>
         <div className="flex items-center gap-[10px] flex-wrap">
+          {onRemoveFromCampaign && (
+            <button
+              onClick={() => onRemoveFromCampaign(file)}
+              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-red-400 text-[13px] font-[500] hover:bg-red-500/10 transition-all"
+            >
+              Remove from campaign
+            </button>
+          )}
           {onDetails && (
             <button
               onClick={() => {
@@ -82,6 +96,20 @@ export const FilePreviewModal: FC<{
           >
             Download
           </button>
+          {onNewPostDraft && canDesign && (
+            <button
+              onClick={() => {
+                modal.closeAll();
+                onNewPostDraft(file);
+              }}
+              className="px-[16px] py-[10px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-[500] hover:opacity-90 transition-all flex items-center gap-[6px]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New Post Draft
+            </button>
+          )}
           {canDesign && (
             <button
               onClick={openInDesigner}

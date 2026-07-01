@@ -299,6 +299,15 @@ export class CampaignsController {
     return this._campaignsService.getDashboard(id, org.id);
   }
 
+  @Get('/:id/files')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async getCampaignFiles(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    return this._campaignsService.getCampaignFiles(id, org.id);
+  }
+
   @Get('/:id/report')
   @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
   async getReport(
