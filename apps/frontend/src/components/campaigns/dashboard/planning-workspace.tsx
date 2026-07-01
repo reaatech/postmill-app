@@ -17,9 +17,9 @@ import {
 import { PlatformAvatar } from '@gitroom/frontend/components/shared/platform-avatar';
 import { KebabMenu, KebabMenuItem } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useCampaignDrafts } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 
 const ListIcon = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -191,7 +191,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
       children: (
         <div className="relative w-full h-full">
           <CloseModalButton onClick={close} />
-          <AddEditModal
+          <Composer
             date={dayjs()}
             integrations={integrations}
             allIntegrations={integrations}

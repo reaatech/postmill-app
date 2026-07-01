@@ -8,7 +8,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { useEditor, EditorContent } from '@tiptap/react';
 import EmojiPicker, { Theme } from 'emoji-picker-react';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
-import { suggestion } from '@gitroom/frontend/components/new-launch/mention.component';
+import { suggestion } from '@gitroom/frontend/components/composer/mention.component';
 
 // Minimal atom nodes so picked media embeds inline in the note HTML. Both tags
 // (img / video[controls]) are in the SafeContent allowlist used to render notes.

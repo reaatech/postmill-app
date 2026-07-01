@@ -113,7 +113,7 @@ export const FileGrid: FC<{
             draggable
             onDragStart={(e) => handleDragStart(e, file.id)}
             className={clsx(
-              'group relative w-[calc(12.5%-3px)] min-w-[120px] rounded-[8px] cursor-grab active:cursor-grabbing border-[3px] transition-all',
+              'group relative w-[calc(50%-3px)] sm:w-[calc(33.333%-3px)] md:w-[calc(25%-3px)] lg:w-[calc(16.666%-3px)] xl:w-[calc(12.5%-3px)] min-w-[100px] rounded-[8px] cursor-grab active:cursor-grabbing border-[3px] transition-all',
               isSelected ? 'border-[#2B5CD3]' : 'border-transparent hover:border-[#2B5CD3]/40'
             )}
             onClick={() => {

@@ -49,8 +49,8 @@ vi.mock('@gitroom/react/toaster/toaster', () => ({
 vi.mock('@gitroom/frontend/components/launches/helpers/use.existing.data', () => ({
   ExistingDataContextProvider: ({ children }: any) => children,
 }));
-vi.mock('@gitroom/frontend/components/new-launch/add.edit.modal', () => ({
-  AddEditModal: () => <div data-testid="add-edit-modal" />,
+vi.mock('@gitroom/frontend/components/composer/composer', () => ({
+  Composer: () => <div data-testid="add-edit-modal" />,
 }));
 vi.mock('@gitroom/frontend/components/launches/statistics', () => ({
   StatisticsModal: () => <div data-testid="statistics-modal" />,

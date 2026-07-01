@@ -30,7 +30,8 @@ export const FolderTree: FC<{
   onSelectFolder: (id: string | null) => void;
   onRefresh: () => void;
   onFileMoved?: () => void;
-}> = ({ folders, selectedFolderId, onSelectFolder, onRefresh, onFileMoved }) => {
+  drawerMode?: boolean;
+}> = ({ folders, selectedFolderId, onSelectFolder, onRefresh, onFileMoved, drawerMode }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
@@ -236,16 +237,25 @@ export const FolderTree: FC<{
   };
 
   return (
-    <div className="w-[240px] shrink-0 flex flex-col bg-newBgColorInner rounded-[12px] border border-newBorder">
-      <div className="flex items-center justify-between px-[12px] py-[12px] border-b border-newBorder">
-        <div className="text-[13px] font-[600] text-textColor">Folders</div>
-        <button
-          onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
-          className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-        </button>
-      </div>
+    <div
+      className={clsx(
+        'flex flex-col bg-newBgColorInner',
+        drawerMode
+          ? 'flex-1 w-full overflow-hidden'
+          : 'w-[240px] shrink-0 rounded-[12px] border border-newBorder'
+      )}
+    >
+      {!drawerMode && (
+        <div className="flex items-center justify-between px-[12px] py-[12px] border-b border-newBorder">
+          <div className="text-[13px] font-[600] text-textColor">Folders</div>
+          <button
+            onClick={() => { setNewFolderParent(null); setNewFolderName(''); }}
+            className="p-[4px] rounded-[4px] text-newTextColor/60 hover:text-textColor hover:bg-boxHover transition-all"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1V13M1 7H13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent py-[4px]">
         <div

@@ -622,7 +622,7 @@ and a dashboard of KPIs.
   **pin/resolve**; authors show avatar + relative time; edit/delete is own-only (super-admin bypass).
 - **Editor** (`dashboard/discussion-editor.tsx`) is a lightweight **TipTap** editor — `StarterKit`
   (which already bundles Link+Underline in v3; do **not** re-add them) + `Mention` (reusing the
-  composer's exported `suggestion(loadList)` from `new-launch/mention.component.tsx`) + two tiny custom
+  composer's exported `suggestion(loadList)` from `composer/mention.component.tsx`) + two tiny custom
   atom nodes (`image`/`video`) so picked media embeds inline. Media is inserted via the shared
   `MediaSelectorModal`; emoji via `emoji-picker-react`.
 - **Rendering** goes through `SafeContent` (DOMPurify allowlist — extended to cover StarterKit output:

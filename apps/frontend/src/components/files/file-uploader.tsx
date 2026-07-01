@@ -1,6 +1,7 @@
 'use client';
 
 import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import { Dashboard } from '@uppy/react';
@@ -9,7 +10,8 @@ import { PlusIcon } from '@gitroom/frontend/components/ui/icons';
 export const FileUploader: FC<{
   folderId: string | null;
   onUploadComplete: () => void;
-}> = ({ folderId, onUploadComplete }) => {
+  variant?: 'default' | 'header';
+}> = ({ folderId, onUploadComplete, variant = 'default' }) => {
   const uploaderRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,13 +37,20 @@ export const FileUploader: FC<{
     if (e.target) e.target.value = '';
   }, [uppy]);
 
+  const isHeader = variant === 'header';
+
   return (
-    <div className="mb-[10px]">
-      <div className="flex items-center gap-[8px]">
+    <div className={isHeader ? '' : 'mb-[10px]'}>
+      <div className={clsx('flex items-center gap-[8px]', isHeader && 'flex-row-reverse')}>
         <button
           disabled={loading}
           onClick={() => uploaderRef.current?.click()}
-          className="relative cursor-pointer bg-btnSimple flex gap-[8px] h-[36px] px-[14px] justify-center items-center rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
+          className={clsx(
+            'relative cursor-pointer flex gap-[8px] h-[36px] px-[14px] justify-center items-center rounded-[8px] text-[13px] transition-all',
+            isHeader
+              ? 'bg-[#2B5CD3] text-white hover:opacity-90'
+              : 'bg-btnSimple text-textColor hover:bg-boxHover'
+          )}
         >
           {loading ? (
             <div className="w-[14px] h-[14px] border-2 border-white border-t-transparent rounded-full animate-spin" />

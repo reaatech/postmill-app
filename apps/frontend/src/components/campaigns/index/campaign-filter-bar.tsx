@@ -353,7 +353,7 @@ export const CampaignFilterBar: FC<CampaignFilterBarProps> = ({
               className="flex-1 h-[40px] rounded-[8px] border border-newTableBorder text-[14px] font-[500] text-textColor hover:bg-[#2B5CD3]/10 transition-all disabled:opacity-40 disabled:cursor-default disabled:hover:bg-transparent"
             >
               {activeCount > 0
-                ? t('clear_all_count', 'Clear all ({{count}})', { count: String(activeCount) })
+                ? t('clear_all_count', 'Clear all ({{count}})', { count: activeCount })
                 : t('clear_all', 'Clear all')}
             </button>
             <button

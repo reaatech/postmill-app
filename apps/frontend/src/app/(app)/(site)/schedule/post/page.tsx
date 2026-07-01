@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { PostComposer } from '@gitroom/frontend/components/launches/post-composer';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 
@@ -56,7 +56,7 @@ export default function CreatePostPage() {
   }
 
   return (
-    <PostComposer
+    <Composer
       integrations={integrations}
       allIntegrations={integrations}
       date={date}

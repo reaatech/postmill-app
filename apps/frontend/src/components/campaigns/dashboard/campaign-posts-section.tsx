@@ -5,8 +5,8 @@ import dayjs from 'dayjs';
 import clsx from 'clsx';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
@@ -157,7 +157,7 @@ export const CampaignPostsSection: FC<{ campaignId: string; posts: CampaignPost[
       children: (
         <div className="relative w-full h-full">
           <CloseModalButton onClick={close} />
-          <AddEditModal
+          <Composer
             date={newDayjs()}
             integrations={integrations || []}
             allIntegrations={integrations || []}

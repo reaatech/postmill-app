@@ -40,13 +40,13 @@ import {
   DesignMediaIcon,
   VerticalDividerIcon,
 } from '@gitroom/frontend/components/ui/icons';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useShallow } from 'zustand/react/shallow';
 import {
   MediaSelectorItem,
   MediaSelectorModal,
 } from '@gitroom/frontend/components/media-tools/media-selector-modal';
-import { useComposerImportFolder } from '@gitroom/frontend/components/new-launch/use-composer-import-folder';
+import { useComposerImportFolder } from '@gitroom/frontend/components/composer/use-composer-import-folder';
 const Designer = dynamic(
   () => import('@gitroom/frontend/components/media-tools/designer/designer').then(
     (m) => m.Designer

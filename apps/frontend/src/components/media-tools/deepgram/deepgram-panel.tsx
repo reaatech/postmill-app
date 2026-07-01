@@ -156,13 +156,13 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       return;
     }
     const integrations = await integrationsRes.json();
-    const { AddEditModal } = await import('@gitroom/frontend/components/new-launch/add.edit.modal');
+    const { Composer } = await import('@gitroom/frontend/components/composer/composer');
     const dayjs = (await import('dayjs')).default;
     modal.openModal({
       fullScreen: true,
       removeLayout: true,
       children: (
-        <AddEditModal
+        <Composer
           date={dayjs()}
           integrations={integrations}
           allIntegrations={integrations}

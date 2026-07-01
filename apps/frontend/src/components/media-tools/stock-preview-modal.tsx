@@ -167,8 +167,8 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
       const savedFile = await res.json();
       const integrationsRes = await fetch('/integrations');
       const integrations = integrationsRes.ok ? await integrationsRes.json() : [];
-      const { AddEditModal } = await import(
-        '@gitroom/frontend/components/new-launch/add.edit.modal'
+      const { Composer } = await import(
+        '@gitroom/frontend/components/composer/composer'
       );
       const dayjs = (await import('dayjs')).default;
       modal.closeAll();
@@ -176,7 +176,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
         fullScreen: true,
         removeLayout: true,
         children: (
-          <AddEditModal
+          <Composer
             date={dayjs()}
             integrations={integrations}
             allIntegrations={integrations}

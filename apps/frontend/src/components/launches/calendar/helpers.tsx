@@ -12,7 +12,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Fragment } from 'react';
 import { Post } from '@prisma/client';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { Button } from '@gitroom/react/form/button';
 import { ColorPicker } from '@gitroom/frontend/components/ui/color-picker';
 import { StatisticsModal } from '@gitroom/frontend/components/launches/statistics';
@@ -262,7 +262,7 @@ export const usePostActions = (onMutate?: () => void) => {
         },
         children: (
           <Fragment>
-            <AddEditModal
+            <Composer
               onlyValues={data.posts.map(
                 ({
                   image,

@@ -39,6 +39,14 @@
   for existing orgs on deploy.
 
 ### Changed
+- **Post composer unified + renamed `new-launch` → `composer`.** The `apps/frontend/src/components/new-launch/`
+  directory is now `components/composer/`, and the two former thin wrappers (`PostComposer` route wrapper
+  + `AddEditModal` modal wrapper) are merged into a **single `Composer` entry** (`composer/composer.tsx`)
+  mounted everywhere a post is composed — `/schedule/post`, agent chat, Settings → Content → Sets,
+  campaign planning, the calendar edit modal, standalone modal, and the media-tool "send to composer"
+  handoffs. Import-path/rename only for consumers (no editor rebuild). **Behavior parity:** the
+  `/schedule/post` create route and agent-chat new-post path now **auto-add signatures** like every other
+  surface already did.
 - **Public API `POST /public/v1/generate-video` is now asynchronous (response shape changed).**
   Video generation moved from a synchronous call (which returned the finished video at `response.path`)
   to the queued media-job pipeline. The response is now a self-describing, back-compatible object:

@@ -3,8 +3,8 @@ import 'reflect-metadata';
 import { FC, MutableRefObject, useEffect, useMemo } from 'react';
 import { FormProvider, useForm, useWatch } from 'react-hook-form';
 import { classValidatorResolver } from '@hookform/resolvers/class-validator';
-import { Providers } from '@gitroom/frontend/components/new-launch/providers/show.all.providers';
-import { getProviderSettingsMeta } from '@gitroom/frontend/components/new-launch/providers/high.order.provider';
+import { Providers } from '@gitroom/frontend/components/composer/providers/show.all.providers';
+import { getProviderSettingsMeta } from '@gitroom/frontend/components/composer/providers/high.order.provider';
 import {
   IntegrationContext,
   type IntegrationContextType,

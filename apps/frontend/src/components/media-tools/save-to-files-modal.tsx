@@ -88,13 +88,13 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
         const integrationsRes = await fetch('/integrations');
         if (integrationsRes.ok) {
           const integrations = await integrationsRes.json();
-          const { AddEditModal } = await import('@gitroom/frontend/components/new-launch/add.edit.modal');
+          const { Composer } = await import('@gitroom/frontend/components/composer/composer');
           const dayjs = (await import('dayjs')).default;
           modal.openModal({
             fullScreen: true,
             removeLayout: true,
             children: (
-              <AddEditModal
+              <Composer
                 date={dayjs()}
                 integrations={integrations}
                 allIntegrations={integrations}

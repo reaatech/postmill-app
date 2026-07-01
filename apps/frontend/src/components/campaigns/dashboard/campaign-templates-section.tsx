@@ -8,8 +8,8 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
 import { CloseModalButton } from '@gitroom/frontend/components/shared/close-modal-button';
 import {
@@ -95,7 +95,7 @@ export const CampaignTemplatesSection: FC<{
         children: (
           <div className="relative w-full h-full">
             <CloseModalButton onClick={close} />
-            <AddEditModal
+            <Composer
               date={newDayjs()}
               set={parsed || undefined}
               integrations={integrations || []}

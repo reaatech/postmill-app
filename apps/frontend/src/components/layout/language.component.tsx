@@ -16,7 +16,7 @@ import countries from 'i18n-iso-countries';
 // Register required locales
 import countriesEn from 'i18n-iso-countries/langs/en.json';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ModalWrapperComponent } from '../new-launch/modal.wrapper.component';
+import { ModalWrapperComponent } from '../composer/modal.wrapper.component';
 
 import clsx from 'clsx';
 countries.registerLocale(countriesEn);

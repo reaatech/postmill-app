@@ -12,7 +12,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import Compressor from '@uppy/compressor';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { uniqBy } from 'lodash';
 
 export class CompressionWrapper<M = any, B = any> extends Compressor<any, any> {

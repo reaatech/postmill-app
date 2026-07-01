@@ -6,7 +6,7 @@ import { useParams } from 'next/navigation';
 import dayjs from 'dayjs';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
-import { PostComposer } from '@gitroom/frontend/components/launches/post-composer';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 
 export default function EditPostPage() {
@@ -63,7 +63,7 @@ export default function EditPostPage() {
 
   return (
     <ExistingDataContextProvider value={postData}>
-      <PostComposer
+      <Composer
         integrations={integrations.filter(
           (f) => f.id === postData.integration
         )}

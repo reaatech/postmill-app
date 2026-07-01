@@ -130,8 +130,8 @@ vi.mock('@gitroom/frontend/components/launches/post-detail/post.detail.modal', (
   PostDetailModal: () => <div data-testid="post-detail-modal" />,
 }));
 
-vi.mock('@gitroom/frontend/components/new-launch/add.edit.modal', () => ({
-  AddEditModal: () => <div data-testid="add-edit-modal" />,
+vi.mock('@gitroom/frontend/components/composer/composer', () => ({
+  Composer: () => <div data-testid="add-edit-modal" />,
 }));
 
 vi.mock('@gitroom/react/helpers/delete.dialog', () => ({
