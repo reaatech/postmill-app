@@ -1403,7 +1403,7 @@ export class AnalyticsService {
         title: `Best time to post: ${dayNames[slot.day]} at ${slot.hour}:00`,
         description: `Your content gets the highest engagement when posted at this time. Try scheduling more posts here.`,
         action: 'Schedule a post',
-        link: `/schedule`,
+        link: `/posts`,
         priority: 2,
       });
     }

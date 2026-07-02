@@ -8,10 +8,10 @@ validation panel.
 
 Since v3.8.10 the composer lives on dedicated pages instead of a modal:
 
-- **`/schedule/post`** — create a new post. From the **Schedule** page (`/schedule`), the
+- **`/posts/post`** — create a new post. From the **Posts** page (`/posts`), the
   **New Post** button navigates here; clicking a calendar slot prefills the slot's date and time
   (in your timezone).
-- **`/schedule/post/<post-id>`** — edit an existing post. The edit action on a calendar card
+- **`/posts/post/<post-id>`** — edit an existing post. The edit action on a calendar card
   opens this page.
 
 Create and edit share the same composer form.

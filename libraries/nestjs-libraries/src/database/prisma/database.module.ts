@@ -105,6 +105,7 @@ import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/email
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
 import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder';
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
+import { DemoSeeder } from '@gitroom/nestjs-libraries/database/seeds/demo-seeder';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { HealthRepository } from '@gitroom/nestjs-libraries/database/prisma/health/health.repository';
@@ -224,6 +225,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     // were removed.
     RbacSeeder,
     BackfillService,
+    DemoSeeder,
     MigrationLedgerRepository,
     InngestRunRepository,
     HealthRepository,
@@ -245,6 +247,26 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
         return true;
       },
       inject: [RbacSeeder, BackfillService],
+    },
+    {
+      // Dev-only demo fixtures. Opt-in via DEV_SEED_DEMO=true (and NODE_ENV=
+      // development — DemoSeeder hard-gates on this too). Ledger-idempotent, so
+      // it seeds once; set DEV_SEED_DEMO_RESET=true to wipe + reseed. Never runs
+      // in prod. Runs after RBAC/backfill so the target org's roles exist.
+      provide: 'DEMO_SEED_ON_INIT',
+      useFactory: (demo: DemoSeeder) => {
+        if (
+          process.env.NODE_ENV === 'development' &&
+          process.env.DEV_SEED_DEMO === 'true'
+        ) {
+          demo.seed().catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            new Logger('DatabaseModule').error(`Demo seed failed: ${msg}`);
+          });
+        }
+        return true;
+      },
+      inject: [DemoSeeder],
     },
   ],
   get exports() {

@@ -293,7 +293,7 @@ export const PlanningWorkspace: FC<{ campaignId: string; onMutate: () => void }>
     if (post.group) {
       items.push({
         label: t('open_in_composer', 'Open in composer'),
-        onClick: () => router.push(`/schedule/post/${post.group}`),
+        onClick: () => router.push(`/posts/post/${post.group}`),
       });
     }
     const approvalItems: KebabMenuItem[] = [];

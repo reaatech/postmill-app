@@ -231,8 +231,8 @@ per-surface copies:
 ## Schedule pages (v3.8.10)
 
 The post composer moved out of the `AddEditModal` onto dedicated routes:
-`/schedule/post` (create — accepts `date`/`channel`/`content` query params from calendar slots and
-other entry points) and `/schedule/post/:id` (edit). Both render the shared `PostComposer`
+`/posts/post` (create — accepts `date`/`channel`/`content` query params from calendar slots and
+other entry points) and `/posts/post/:id` (edit). Both render the shared `PostComposer`
 component; the time picker displays in the user's IANA timezone and saves UTC.
 
 > Verified against v3.8.10

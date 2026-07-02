@@ -1,38 +1,83 @@
 'use client';
 
-import {
-  PlugSettings,
-  PlugsInterface,
-  usePlugs,
-} from '@gitroom/frontend/components/plugs/plugs.context';
-import { Button } from '@gitroom/react/form/button';
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  createContext,
+  FC,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import useSWR, { mutate } from 'swr';
-import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
+import useSWR from 'swr';
 import {
   FormProvider,
   SubmitHandler,
   useForm,
   useFormContext,
 } from 'react-hook-form';
-import { Input } from '@gitroom/react/form/input';
-import { CopilotTextarea } from '@copilotkit/react-textarea';
-import clsx from 'clsx';
-import { string, object } from 'yup';
+import { object, string } from 'yup';
 import { yupResolver } from '@hookform/resolvers/yup';
+import clsx from 'clsx';
+import { CopilotTextarea } from '@copilotkit/react-textarea';
+import { Button } from '@gitroom/react/form/button';
+import { Input } from '@gitroom/react/form/input';
 import { Slider } from '@gitroom/react/form/slider';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ModalWrapperComponent } from '@gitroom/frontend/components/composer/modal.wrapper.component';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
+
+// ── Types + context (relocated from the retired components/plugs/plugs.context.ts) ──
+interface PlugSettings {
+  providerId: string;
+  name: string;
+  identifier: string;
+}
+interface FieldsInterface {
+  name: string;
+  type: string;
+  validation: string;
+  placeholder: string;
+  description: string;
+}
+export interface PlugsInterface {
+  title: string;
+  description: string;
+  runEveryMilliseconds: number;
+  methodName: string;
+  fields: FieldsInterface[];
+}
+interface PlugInterface extends PlugSettings {
+  plugs: PlugsInterface[];
+}
+const PlugsContext = createContext<PlugInterface>({
+  providerId: '',
+  name: '',
+  identifier: '',
+  plugs: [],
+});
+const usePlugs = () => useContext(PlugsContext);
+
+// A persisted plug row for a given integration.
+interface SavedPlug {
+  activated: boolean;
+  data: string;
+  id: string;
+  integrationId: string;
+  organizationId: string;
+  plugFunction: string;
+}
+
 export function convertBackRegex(s: string) {
   const matches = s.match(/\/(.*)\/([a-z]*)/);
   const pattern = matches?.[1] || '';
   const flags = matches?.[2] || '';
   return new RegExp(pattern, flags);
 }
-export const TextArea: FC<{
+
+const TextArea: FC<{
   name: string;
   placeHolder: string;
 }> = (props) => {
@@ -68,22 +113,17 @@ export const TextArea: FC<{
     </>
   );
 };
-export const PlugPop: FC<{
+
+const PlugPop: FC<{
   plug: PlugsInterface;
   settings: PlugSettings;
-  data?: {
-    activated: boolean;
-    data: string;
-    id: string;
-    integrationId: string;
-    organizationId: string;
-    plugFunction: string;
-  };
+  data?: SavedPlug;
 }> = (props) => {
   const { plug, settings, data } = props;
   const { closeAll } = useModals();
   const fetch = useFetch();
   const toaster = useToaster();
+  const t = useT();
   const values = useMemo(() => {
     if (!data?.data) {
       return {};
@@ -129,8 +169,6 @@ export const PlugPop: FC<{
     closeAll();
   }, []);
 
-  const t = useT();
-
   return (
     <FormProvider {...form}>
       <form onSubmit={form.handleSubmit(submit)}>
@@ -161,19 +199,14 @@ export const PlugPop: FC<{
     </FormProvider>
   );
 };
-export const PlugItem: FC<{
+
+const PlugItem: FC<{
   plug: PlugsInterface;
-  addPlug: (data: any) => void;
-  data?: {
-    activated: boolean;
-    data: string;
-    id: string;
-    integrationId: string;
-    organizationId: string;
-    plugFunction: string;
-  };
+  addPlug: (data?: SavedPlug) => void;
+  data?: SavedPlug;
 }> = (props) => {
   const { plug, addPlug, data } = props;
+  const t = useT();
   const [activated, setActivated] = useState(!!data?.activated);
   useEffect(() => {
     setActivated(!!data?.activated);
@@ -197,29 +230,31 @@ export const PlugItem: FC<{
   return (
     <div
       onClick={() => addPlug(data)}
-      key={plug.title}
-      className="w-full h-[300px] rounded-[8px] bg-newTableHeader hover:bg-newTableBorder"
+      className="w-full rounded-[8px] border border-newTableBorder bg-newTableHeader hover:bg-newTableBorder cursor-pointer p-[15px] flex flex-col gap-[10px]"
     >
-      <div key={plug.title} className="p-[16px] h-full flex flex-col flex-1">
-        <div className="flex">
-          <div className="text-[20px] mb-[8px] flex-1">{plug.title}</div>
-          {!!data && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <Slider
-                value={activated ? 'on' : 'off'}
-                onChange={changeActivated}
-                fill={true}
-              />
-            </div>
-          )}
-        </div>
-        <div className="flex-1">{plug.description}</div>
-        <Button>{!data ? 'Set Plug' : 'Edit Plug'}</Button>
+      <div className="flex items-center gap-[10px]">
+        <div className="text-[16px] flex-1">{plug.title}</div>
+        {!!data && (
+          <div onClick={(e) => e.stopPropagation()}>
+            <Slider
+              value={activated ? 'on' : 'off'}
+              onChange={changeActivated}
+              fill={true}
+            />
+          </div>
+        )}
+      </div>
+      <div className="flex-1 text-[12px] text-newTableText">
+        {plug.description}
+      </div>
+      <div>
+        <Button>{!data ? t('set_plug', 'Set Plug') : t('edit_plug', 'Edit Plug')}</Button>
       </div>
     </div>
   );
 };
-export const Plug = () => {
+
+const Plug = () => {
   const plug = usePlugs();
   const modals = useModals();
   const fetch = useFetch();
@@ -228,42 +263,34 @@ export const Plug = () => {
   }, [plug.providerId]);
   const { data, isLoading, mutate } = useSWR(`plugs-${plug.providerId}`, load);
   const addEditPlug = useCallback(
-    (p: PlugsInterface) =>
-      (data?: {
-        activated: boolean;
-        data: string;
-        id: string;
-        integrationId: string;
-        organizationId: string;
-        plugFunction: string;
-      }) => {
-        modals.openModal({
-          withCloseButton: false,
-          onClose() {
-            mutate();
-          },
-          size: '500px',
-          title: `Auto Plug: ${p.title}`,
-          children: (
-            <PlugPop
-              plug={p}
-              data={data}
-              settings={{
-                identifier: plug.identifier,
-                providerId: plug.providerId,
-                name: plug.name,
-              }}
-            />
-          ),
-        });
-      },
+    (p: PlugsInterface) => (data?: SavedPlug) => {
+      modals.openModal({
+        withCloseButton: false,
+        onClose() {
+          mutate();
+        },
+        size: '500px',
+        title: `Auto Plug: ${p.title}`,
+        children: (
+          <PlugPop
+            plug={p}
+            data={data}
+            settings={{
+              identifier: plug.identifier,
+              providerId: plug.providerId,
+              name: plug.name,
+            }}
+          />
+        ),
+      });
+    },
     [data]
   );
   if (isLoading) {
     return null;
   }
   return (
-    <div className="grid grid-cols-3 gap-[30px]">
+    <div className="flex flex-col gap-[10px]">
       {plug.plugs.map((p) => (
         <PlugItem
           key={p.title + '-' + plug.providerId}
@@ -273,5 +300,67 @@ export const Plug = () => {
         />
       ))}
     </div>
+  );
+};
+
+/**
+ * Channel-wide "global" plugs (@Plug), configured with the channel in the composer's
+ * per-channel settings panel. Distinct from the per-post plugs (@PostPlug / InternalChannels)
+ * rendered alongside it. Self-gating: renders nothing unless the channel's provider declares
+ * global plugs and the member can manage channels.
+ */
+export const ChannelGlobalPlugs: FC<{
+  integration: { id: string; identifier: string; name: string };
+}> = ({ integration }) => {
+  const t = useT();
+  const fetch = useFetch();
+  const permissions = usePermissions();
+  const { data: plugList } = useSWR(
+    '/integrations/plug/list',
+    (url: string) => fetch(url).then((r) => r.json()),
+    {
+      revalidateOnFocus: false,
+      revalidateOnReconnect: false,
+      revalidateIfStale: false,
+    }
+  );
+  const plug = useMemo(
+    () =>
+      (plugList?.plugs || []).find(
+        (p: any) => p.identifier === integration.identifier
+      ),
+    [plugList, integration.identifier]
+  );
+
+  // Writes require channels:create/update — hide the section for members who can't save it.
+  if (!permissions.hasPermission('channels', 'update')) {
+    return null;
+  }
+  if (!plug || !plug.plugs?.length) {
+    return null;
+  }
+
+  return (
+    <PlugsContext.Provider
+      value={{
+        providerId: integration.id,
+        identifier: integration.identifier,
+        name: integration.name,
+        plugs: plug.plugs,
+      }}
+    >
+      <div className="flex flex-col gap-[10px] mt-[15px]">
+        <div className="text-[14px] font-[500]">
+          {t('channel_automations', 'Automations')}
+        </div>
+        <div className="text-[12px] text-newTableText">
+          {t(
+            'channel_automations_desc',
+            'Runs automatically on every post this channel publishes.'
+          )}
+        </div>
+        <Plug />
+      </div>
+    </PlugsContext.Provider>
   );
 };

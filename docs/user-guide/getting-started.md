@@ -70,7 +70,7 @@ active Skool session.
 
 ## 3. Create and Schedule Your First Post
 
-1. Go to the **Schedule** page (`/schedule`) — this is your content schedule.
+1. Go to the **Posts** page (`/posts`) — this is your content schedule.
 2. Click the **New Post** button (top-right).
 3. Select one or more channels you have connected.
 4. Write your post content in the text editor.
@@ -88,12 +88,11 @@ Postmill is organized into these sections, accessible from the left sidebar:
 
 | Page            | Route           | Purpose                                                |
 |-----------------|-----------------|--------------------------------------------------------|
-| Schedule        | `/schedule`     | Schedule view for scheduling posts and managing content|
+| Posts           | `/posts`        | Post schedule (calendar) view for scheduling and managing content|
 | Agents          | `/agents`       | AI agent for content generation and automation         |
 | Comments        | `/comments`     | Unified inbox for social comments across all channels  |
 | Analytics       | `/analytics`    | Dashboard with overview, channel, post, and best-time metrics |
 | Media           | `/media`        | Media library (upload, organize, search)               |
-| Plugs           | `/plugs`        | Provider-specific automations and integrations         |
 | Campaigns       | `/campaigns`    | Campaign folders for grouping posts and analytics      |
 | Settings        | `/settings`     | Org settings: profile, channels, team, AI, billing     |
 

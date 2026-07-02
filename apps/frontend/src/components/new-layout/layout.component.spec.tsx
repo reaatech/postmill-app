@@ -94,6 +94,8 @@ vi.mock('../layout/chrome.extension.component', () => ({
 // CreateMenu ("+" dropdown) deps — kept inert; the dropdown is closed in these tests.
 vi.mock('../layout/new-modal', () => ({
   useModals: () => ({ openModal: vi.fn(), closeAll: vi.fn() }),
+  // BottomTabBar reads this to hide itself while a modal is open; no modals in these tests.
+  useHasOpenModals: () => false,
 }));
 
 vi.mock('../launches/add.provider.component', () => ({
@@ -235,7 +237,7 @@ describe('LayoutComponent header', () => {
     // "+" create menu sits in the header (left of the dark/light toggle); its items
     // (New Post, etc.) live in the dropdown, which is closed here.
     expect(screen.getByRole('button', { name: 'Create new' })).toBeDefined();
-    expect(container.querySelector('a[href="/schedule/post"]')).toBeNull();
+    expect(container.querySelector('a[href="/posts/post"]')).toBeNull();
     // Language moved out of the header into the avatar dropdown (closed here).
     expect(screen.queryByTestId('language')).toBeNull();
 

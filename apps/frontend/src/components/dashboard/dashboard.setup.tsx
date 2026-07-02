@@ -11,7 +11,7 @@ const SETUP_STEPS = [
   { key: 'media', label: 'Connect an AI Media Provider', hint: 'OpenAI, Replicate, Luma', href: '/settings/content/ai-media' },
   { key: 'storage', label: 'Connect a Storage Provider', hint: 'AWS S3, Cloudflare R2, Backblaze B2', href: '/settings/storage/providers' },
   { key: 'channel', label: 'Connect a Social Channel', hint: 'Instagram, TikTok, YouTube', href: '/settings/channels' },
-  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/schedule' },
+  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/posts' },
   { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings/team' },
 ];
 

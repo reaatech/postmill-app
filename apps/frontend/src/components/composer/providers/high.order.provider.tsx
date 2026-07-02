@@ -19,6 +19,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { InternalChannels } from '@gitroom/frontend/components/launches/internal.channels';
+import { ChannelGlobalPlugs } from '@gitroom/frontend/components/composer/providers/channel.global.plugs';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import SafeImage from '@gitroom/react/helpers/safe.image';
@@ -313,7 +314,12 @@ export const withProvider = function <T extends object>(params: {
                       <div className="text-[20px]">{selectedIntegration?.integration.name}</div>
                     </div>
                   )}
-                  <SettingsComponent />
+                  {SettingsComponent && <SettingsComponent />}
+                  {!dummy && (
+                    <ChannelGlobalPlugs
+                      integration={selectedIntegration.integration}
+                    />
+                  )}
                   {!!data?.internalPlugs?.length && !dummy && (
                     <InternalChannels plugs={data?.internalPlugs} />
                   )}

@@ -1,7 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
 import * as fs from 'fs';
 
-// Full functional walkthrough of the composer (/schedule/post) exercising every surface
+// Full functional walkthrough of the composer (/posts/post) exercising every surface
 // touched by the composer upgrade: hybrid channel selector, Start-from Library (drafts/
 // templates/signatures), unified media picker (constrained tabs), inline shortlink control,
 // Save-as dropup, main-CTA gating, and the timezone abbreviation.
@@ -36,7 +36,7 @@ test.describe('composer — full UI walkthrough', () => {
     });
 
     // ---- Load ----
-    await page.goto('/schedule/post');
+    await page.goto('/posts/post');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2500);
     await shot(page, 'full-01-loaded');

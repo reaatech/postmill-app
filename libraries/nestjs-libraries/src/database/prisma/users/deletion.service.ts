@@ -146,9 +146,6 @@ export class DeletionService {
     const org = { organizationId: orgId };
 
     // --- Post graph: post-children → posts → integration-children → integrations
-    await tx.exisingPlugData.deleteMany({
-      where: { integration: { organizationId: orgId } },
-    });
     await tx.plugs.deleteMany({ where: org });
     await tx.tagsPosts.deleteMany({
       where: { post: { organizationId: orgId } },

@@ -21,7 +21,7 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { difference, uniq } from 'lodash';
+import { uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -250,7 +250,7 @@ export class IntegrationService {
       orgId,
       category: 'channels',
       title: `Could not refresh your ${integration.providerIdentifier} channel ${err}`,
-      message: `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/schedule`,
+      message: `Could not refresh your ${integration.providerIdentifier} channel ${err}. Please go back to the system and connect it again ${process.env.FRONTEND_URL}/posts`,
       metadata: { integrationId: integration.id, providerIdentifier: integration.providerIdentifier },
       channels: { email: true, push: true, inApp: true },
     });
@@ -679,19 +679,6 @@ export class IntegrationService {
     return this._integrationRepository.getPlugs(orgId, integrationId);
   }
 
-  async loadExisingData(
-    methodName: string,
-    integrationId: string,
-    id: string[]
-  ) {
-    const exisingData = await this._integrationRepository.loadExisingData(
-      methodName,
-      integrationId,
-      id
-    );
-    const loadOnlyIds = exisingData.map((p) => p.value);
-    return difference(id, loadOnlyIds);
-  }
 
   async findFreeDateTime(
     orgId: string,

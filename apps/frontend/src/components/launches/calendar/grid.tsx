@@ -276,7 +276,7 @@ export const CalendarColumn: FC<{
       params.set('content', encodeURIComponent('\n' + signature.content));
     }
 
-    router.push(`/schedule/post?${params.toString()}`);
+    router.push(`/posts/post?${params.toString()}`);
   }, [getDate, sets, signature, router, modal, randomHour, t]);
 
   const addProvider = useAddProvider();

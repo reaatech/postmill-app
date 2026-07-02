@@ -14,7 +14,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { useAddProvider } from '@gitroom/frontend/components/launches/add.provider.component';
 
-// Kept as a shared export — imported by agents/agent.tsx and plugs/plugs.tsx.
+// Kept as a shared export — imported by agents/agent.tsx.
 export const SVGLine = () => {
   return (
     <svg

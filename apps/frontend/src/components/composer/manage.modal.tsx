@@ -779,7 +779,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                                 onLoadDraft={
                                   props.onLoadDraft ||
                                   ((group) =>
-                                    router.push(`/schedule/post/${group}`))
+                                    router.push(`/posts/post/${group}`))
                                 }
                                 onClose={() => modal.closeAll()}
                               />

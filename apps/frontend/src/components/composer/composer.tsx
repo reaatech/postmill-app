@@ -17,7 +17,7 @@ export type { ComposerProps, AddEditModalProps } from '@gitroom/frontend/compone
 // The single post-composer entry point. It unifies the two former thin wrappers
 // (route `PostComposer` + modal `AddEditModal`) into one component: a 3-layer
 // store initializer that renders `ManageModal`. Every surface that composes a
-// post mounts <Composer/> — /schedule/post, agent chat, Settings → Content → Sets,
+// post mounts <Composer/> — /posts/post, agent chat, Settings → Content → Sets,
 // campaign planning, the calendar edit modal, standalone modal, and the media-tool
 // "send to composer" handoffs.
 export const Composer: FC<ComposerProps> = (props) => {
@@ -291,7 +291,7 @@ const ComposerInnerInner: FC<ComposerProps> = (props) => {
       <ManageModal
         {...props}
         date={props.date || newDayjs()}
-        customClose={props.customClose ?? (() => router.push('/schedule'))}
+        customClose={props.customClose ?? (() => router.push('/posts'))}
         mutate={props.mutate ?? (() => router.refresh())}
         reopenModal={props.reopenModal ?? (() => {})}
       />

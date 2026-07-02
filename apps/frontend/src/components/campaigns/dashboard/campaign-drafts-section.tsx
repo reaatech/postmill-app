@@ -78,7 +78,7 @@ export const CampaignDraftsSection: FC<{
   // Load an existing draft group in the planner (the canonical edit path).
   const openInPlanner = useCallback(
     (groupId: string) => {
-      router.push(`/schedule/post/${groupId}`);
+      router.push(`/posts/post/${groupId}`);
     },
     [router]
   );

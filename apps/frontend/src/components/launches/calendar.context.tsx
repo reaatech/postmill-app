@@ -398,7 +398,7 @@ export const CalendarWeekProvider: FC<{
         `display=${newFilters.display}`,
         newFilters.customer ? `customer=${newFilters.customer}` : ``,
       ].filter((f) => f);
-      window.history.replaceState(null, '', `/schedule?${path.join('&')}`);
+      window.history.replaceState(null, '', `/posts?${path.join('&')}`);
     },
     []
   );

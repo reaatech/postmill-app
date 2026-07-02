@@ -26,7 +26,7 @@ export interface AddEditModalProps {
 }
 
 // Public props for the single <Composer/> entry point. The route pages
-// (/schedule/post, agent chat) omit `date`/`mutate`/`reopenModal`/`customClose`;
+// (/posts/post, agent chat) omit `date`/`mutate`/`reopenModal`/`customClose`;
 // Composer fills those with router-based defaults before handing a complete
 // AddEditModalProps to ManageModal.
 export type ComposerProps = Omit<

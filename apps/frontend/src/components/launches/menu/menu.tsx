@@ -215,7 +215,7 @@ export const Menu: FC<{
       const params = new URLSearchParams();
       params.set('date', dayjs.utc(date).local().format('YYYY-MM-DDTHH:mm:ss'));
       params.set('channel', integration.id);
-      router.push(`/schedule/post?${params.toString()}`);
+      router.push(`/posts/post?${params.toString()}`);
     },
     [router, fetch]
   );

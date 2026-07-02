@@ -10,6 +10,18 @@ has the full per-commit detail.
 
 ### Unreleased
 
+**Schedule renamed to Posts.** The main scheduling workspace is now **Posts** at `/posts` (was
+"Schedule" at `/schedule`; the composer pages move to `/posts/post` and `/posts/post/:id`). The
+sidebar label, page title, and docs use "Posts." Legacy `/schedule` (and sub-paths) and the older
+`/launches` both permanently redirect to `/posts`, so existing links keep working.
+
+**Plugs folded into the composer.** The provider "plugs" automations no longer have a standalone
+`/plugs` page — both types are configured in the composer's per-channel settings panel. Channel-wide
+**auto plugs** (`@Plug`) appear as an **Automations** section (still stored channel-scoped in the
+`Plugs` table, gated on `channels:update`); per-post **post plugs** (`@PostPlug`) keep their existing
+per-post section. The `/plugs` route/nav and `components/plugs/` are removed; backend plug routes and
+storage are unchanged. The orphaned `ExisingPlugData` dedup table (and its dead code) was dropped.
+
 **Campaign Discussion.** The campaign dashboard gains an internal, Jira-style **Discussion** thread
 (below the tabs) for org members to talk about a campaign — separate from the synced social
 **Comments**. Rich-text (TipTap) notes with embedded image/video, @mentions (notify), emoji
@@ -240,7 +252,7 @@ base-plus-mounted model with no default provider.
 
 - **Calendar renamed to Schedule** — the route changes from `/launches` to `/schedule` (with a
   permanent redirect). All user-facing copy updated: the sidebar, page titles, and documentation
-  now use "Schedule."
+  now use "Schedule." (Later renamed again to **Posts** / `/posts` — see Unreleased.)
 - **Calendar stats live-fallback** — post cards now show views/likes/comments even when no
   `PostAnalyticsSnapshot` exists yet (fallback to live platform data). Previously the stats footer
   was hidden until the next cron sweep.

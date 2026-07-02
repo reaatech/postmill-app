@@ -225,7 +225,7 @@ const CreateMenuItems: React.FC<{ onSelect?: () => void; showChannel: boolean }>
   return (
     <>
       <a
-        href="/schedule/post"
+        href="/posts/post"
         role="menuitem"
         onClick={onSelect}
         className={createMenuRow}

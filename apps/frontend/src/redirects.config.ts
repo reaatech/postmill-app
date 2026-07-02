@@ -7,7 +7,17 @@ type Redirect = {
 export const redirectsList: Redirect[] = [
   {
     source: '/launches',
-    destination: '/schedule',
+    destination: '/posts',
+    permanent: true,
+  },
+  {
+    source: '/schedule',
+    destination: '/posts',
+    permanent: true,
+  },
+  {
+    source: '/schedule/:path*',
+    destination: '/posts/:path*',
     permanent: true,
   },
   {

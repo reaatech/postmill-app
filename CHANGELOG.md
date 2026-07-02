@@ -39,6 +39,24 @@
   for existing orgs on deploy.
 
 ### Changed
+- **"Schedule" renamed to "Posts" (`/schedule` → `/posts`).** The main scheduling workspace is now
+  **Posts** at `/posts`; the composer pages move to `/posts/post` and `/posts/post/:id`. The sidebar
+  label (general mode), page `<title>`, and docs use "Posts." The Next.js route directory
+  `app/(app)/(site)/schedule` was renamed to `posts`, and all in-app links (`router.push`/`href`),
+  the post-detail deep links, campaign draft links, and the backend deep links in
+  channel-refresh/notification/Stripe-onboarding/analytics-recommendation now target `/posts`. Legacy
+  `/schedule` (and sub-paths) plus the older `/launches` permanently redirect to `/posts`, so existing
+  links/bookmarks keep working. (Verb usages of "Schedule" — the composer submit button and the
+  "when to publish" column headers — are unchanged.)
+- **Plugs moved into the composer; standalone `/plugs` page removed.** The two provider automations
+  ("plugs") are now configured in the composer's per-channel settings panel instead of a separate
+  page: channel-wide **auto plugs** (`@Plug` — e.g. X/Bluesky/LinkedIn Page/Threads "Auto Repost" /
+  "Auto plug post") render as a new **Automations** section (channel-scoped, still stored in the
+  `Plugs` table, gated on `channels:update`), alongside the existing per-post **post plugs**
+  (`@PostPlug`). The `/plugs` route, its nav entry, and the `components/plugs/` UI are deleted. No
+  storage or endpoint changes — the backend plug routes are unchanged. Also removed the orphaned,
+  never-read `ExisingPlugData` dedup table and its dead service/repository code (drop migration
+  `20260701000000_drop_exising_plug_data`).
 - **Post composer unified + renamed `new-launch` → `composer`.** The `apps/frontend/src/components/new-launch/`
   directory is now `components/composer/`, and the two former thin wrappers (`PostComposer` route wrapper
   + `AddEditModal` modal wrapper) are merged into a **single `Composer` entry** (`composer/composer.tsx`)

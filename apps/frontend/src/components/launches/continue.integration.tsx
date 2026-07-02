@@ -122,7 +122,7 @@ export const ContinueIntegration: FC<{
       if (data.status === HttpStatusCode.PreconditionFailed) {
         const { returnURL } = await data.json().catch(() => ({}));
         navigateOrShow(
-          `/schedule?precondition=true`,
+          `/posts?precondition=true`,
           returnURL,
           'Precondition failed'
         );
@@ -131,7 +131,7 @@ export const ContinueIntegration: FC<{
 
       if (data.status === HttpStatusCode.NotAcceptable) {
         const { msg, returnURL } = await data.json();
-        navigateOrShow(`/schedule?msg=${msg}`, returnURL, msg);
+        navigateOrShow(`/posts?msg=${msg}`, returnURL, msg);
         return;
       }
 
@@ -193,7 +193,7 @@ export const ContinueIntegration: FC<{
       }
 
       navigateOrShow(
-        `/schedule?added=${provider}&msg=Channel Updated${
+        `/posts?added=${provider}&msg=Channel Updated${
           onboarding ? '&onboarding=true' : ''
         }`,
         returnURL,
@@ -232,7 +232,7 @@ export const ContinueIntegration: FC<{
         }
 
         navigateOrShow(
-          `/schedule?added=${provider}&msg=Channel Added${
+          `/posts?added=${provider}&msg=Channel Added${
             twoStepState.onboarding ? '&onboarding=true' : ''
           }`,
           twoStepState.returnURL,
@@ -394,7 +394,7 @@ export const ContinueIntegration: FC<{
                 'An error occurred. Please try again.'
               )}
           </div>
-          {logged && <Redirect url="/schedule" delay={3000} />}
+          {logged && <Redirect url="/posts" delay={3000} />}
         </div>
       </div>
     );

@@ -14,7 +14,7 @@ export const useIntegrationList = () => {
     // unexpected shape, `.integrations` can be a non-array — and consumers do
     // `integrations?.filter(...)` / `.map(...)` in render `useMemo`s, so a
     // non-array throws `_?.filter is not a function` and crashes the whole tree
-    // (white screen on /schedule). Coerce here so every consumer stays safe.
+    // (white screen on /posts). Coerce here so every consumer stays safe.
     const json = await (await fetch(path)).json().catch(() => null);
     const list = json?.integrations;
     return Array.isArray(list) ? list : [];

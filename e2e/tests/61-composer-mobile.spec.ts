@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 
-// Mobile audit of the composer (/schedule/post) across phone + phablet widths.
+// Mobile audit of the composer (/posts/post) across phone + phablet widths.
 // CRITICAL: the composer body (#social-content) uses overflow-x-hidden, which SILENTLY CLIPS
 // horizontal overflow — a page-level overflow check misses it. We measure the inner scroll
 // container's scrollWidth vs clientWidth directly (the real "content cut off at the edge" bug),
@@ -32,7 +32,7 @@ for (const width of WIDTHS) {
   test(`composer mobile audit @${width}px — no horizontal clipping`, async ({ page }) => {
     if (!fs.existsSync(SHOTS)) fs.mkdirSync(SHOTS, { recursive: true });
     await page.setViewportSize({ width, height: 860 });
-    await page.goto('/schedule/post');
+    await page.goto('/posts/post');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2500);
 

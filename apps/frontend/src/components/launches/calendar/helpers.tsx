@@ -237,7 +237,7 @@ export const usePostActions = (onMutate?: () => void) => {
     (loadPost: Post & { actualDate?: string }, isDuplicate?: boolean) =>
       async () => {
       if (!isDuplicate) {
-        router.push(`/schedule/post/${loadPost.group}`);
+        router.push(`/posts/post/${loadPost.group}`);
         return;
       }
 
@@ -275,7 +275,7 @@ export const usePostActions = (onMutate?: () => void) => {
                 })
               )}
               allIntegrations={integrations.map((p) => ({ ...p }))}
-              reopenModal={() => router.push(`/schedule/post/${post.group}`)}
+              reopenModal={() => router.push(`/posts/post/${post.group}`)}
               mutate={mutate}
               integrations={integrations}
               date={publishDate}

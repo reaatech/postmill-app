@@ -10,7 +10,7 @@ const GUARD_TEXT = 'You have unsaved changes. Leave and lose them?';
 test.describe('composer — unsaved-changes in-app nav guard', () => {
   test('empty → no guard; dirty → cancel stays, confirm leaves', async ({ page }) => {
     // --- Empty composer: nav is NOT guarded ---
-    await page.goto('/schedule/post');
+    await page.goto('/posts/post');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -23,7 +23,7 @@ test.describe('composer — unsaved-changes in-app nav guard', () => {
     expect(pathOf(page.url())).toBe('/analytics');
 
     // --- Dirty composer: nav IS guarded ---
-    await page.goto('/schedule/post');
+    await page.goto('/posts/post');
     await page.waitForLoadState('networkidle');
     await page.waitForTimeout(2000);
 
@@ -37,12 +37,12 @@ test.describe('composer — unsaved-changes in-app nav guard', () => {
     // Click nav → guard dialog appears, URL unchanged.
     await navLink2.click();
     await expect(page.getByText(GUARD_TEXT), 'guard dialog on nav while dirty').toBeVisible();
-    expect(pathOf(page.url()), 'stayed on composer while dialog open').toBe('/schedule/post');
+    expect(pathOf(page.url()), 'stayed on composer while dialog open').toBe('/posts/post');
 
     // Cancel → stay.
     await page.getByRole('button', { name: /no, cancel/i }).first().click();
     await page.waitForTimeout(600);
-    expect(pathOf(page.url()), 'cancel keeps us on the composer').toBe('/schedule/post');
+    expect(pathOf(page.url()), 'cancel keeps us on the composer').toBe('/posts/post');
     await expect(page.getByText(GUARD_TEXT)).toHaveCount(0);
 
     // Click nav again → confirm → navigate away.

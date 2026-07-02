@@ -3,12 +3,29 @@ import { redirects, redirectsList } from './redirects.config';
 
 describe('redirects.config', () => {
   describe('redirectsList', () => {
-    it('redirects /launches to /schedule permanently', () => {
+    it('redirects /launches to /posts permanently', () => {
       expect(redirectsList).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             source: '/launches',
-            destination: '/schedule',
+            destination: '/posts',
+            permanent: true,
+          }),
+        ])
+      );
+    });
+
+    it('redirects legacy /schedule (and sub-paths) to /posts permanently', () => {
+      expect(redirectsList).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            source: '/schedule',
+            destination: '/posts',
+            permanent: true,
+          }),
+          expect.objectContaining({
+            source: '/schedule/:path*',
+            destination: '/posts/:path*',
             permanent: true,
           }),
         ])

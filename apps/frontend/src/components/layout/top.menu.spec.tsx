@@ -34,7 +34,7 @@ vi.mock('@gitroom/frontend/components/layout/agent.media.modal', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/schedule',
+  usePathname: () => '/posts',
 }));
 
 let mockPermissions = {
@@ -55,24 +55,24 @@ vi.mock('@gitroom/frontend/components/layout/use-permissions', () => ({
 import { TopMenu } from './top.menu';
 
 describe('TopMenu', () => {
-  describe('v3.8.3 Schedule rename', () => {
+  describe('Posts rename (was Schedule/Launches)', () => {
     beforeEach(() => {
       mockBillingEnabled = false;
     });
 
-    it('in general mode, the menu item name should be "Schedule"', () => {
+    it('in general mode, the menu item name should be "Posts"', () => {
       mockIsGeneral = true;
       render(<TopMenu />);
 
-      expect(screen.getByTitle('Schedule')).toBeDefined();
+      expect(screen.getByTitle('Posts')).toBeDefined();
     });
 
-    it('in general mode, the menu item path should be "/schedule"', () => {
+    it('in general mode, the menu item path should be "/posts"', () => {
       mockIsGeneral = true;
       render(<TopMenu />);
 
-      const scheduleLink = screen.getByTitle('Schedule');
-      expect(scheduleLink.getAttribute('href')).toBe('/schedule');
+      const postsLink = screen.getByTitle('Posts');
+      expect(postsLink.getAttribute('href')).toBe('/posts');
     });
 
     it('in non-general mode, the label should be "Launches"', () => {

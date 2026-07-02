@@ -42,7 +42,7 @@ export default function CreatePostPage() {
 
   const handleLoadDraft = useCallback(
     (group: string) => {
-      router.push(`/schedule/post/${group}`);
+      router.push(`/posts/post/${group}`);
     },
     [router]
   );
