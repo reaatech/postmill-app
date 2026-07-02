@@ -22,7 +22,12 @@ export default defineConfig({
     exclude: ['node_modules', 'dist'],
     pool: 'threads',
     maxWorkers: 1,
-    isolate: false,
+    // isolate: true — each spec gets a fresh module registry. Many specs `vi.mock(...)`
+    // shared modules (e.g. redis.service's `ioRedis`, Stripe config) with different stub
+    // shapes; under `isolate: false` the first-imported mock is cached and shadows the
+    // others, so pass/fail depended on file order (green locally, red in CI). A fresh
+    // registry per file makes the suite order-independent.
+    isolate: true,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
