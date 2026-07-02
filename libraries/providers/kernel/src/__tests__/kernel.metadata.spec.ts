@@ -7,6 +7,17 @@ import {
 } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
 import { LANGUAGE_CODES } from '../domains/languages';
 
+// Orchestration categories have no model catalog by design — they reuse another
+// operation's pipeline (image-slide/image-focal-point → the image pipeline,
+// video-caption → STT). Mirrored verbatim from the completeness gate in
+// libraries/nestjs-libraries/src/ai/defaults/media-defaults-completeness.spec.ts;
+// keep the two lists in lockstep.
+const ORCHESTRATION_CATEGORIES = new Set([
+  'image-focal-point',
+  'image-slide',
+  'video-caption',
+]);
+
 describe('ProviderKernel metadata conformance', () => {
   const kernel = new ProviderKernel();
   for (const mod of providerModules) {
@@ -65,6 +76,8 @@ describe('ProviderKernel metadata conformance', () => {
       it('backs every declared media category with a model catalog', () => {
         const declared = mod.metadata?.mediaCategories ?? [];
         for (const cat of declared) {
+          // Orchestration categories are model-less by design (see set above).
+          if (ORCHESTRATION_CATEGORIES.has(cat)) continue;
           const hasStaticModels = (mod.metadata?.mediaModels?.[cat]?.length ?? 0) > 0;
           const canEnumerate =
             mod.metadata?.hasModelList === true ||

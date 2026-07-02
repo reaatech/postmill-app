@@ -1,3 +1,6 @@
+// Must be first: installs the runtime resolver for bare `@gitroom/provider-*` imports
+// (see register-provider-paths.ts) before any transitive require of a provider package.
+import './register-provider-paths';
 import { initializeOtel } from '@gitroom/nestjs-libraries/otel/initialize.otel';
 // Start OpenTelemetry first — before Sentry init and before the Nest app is created — so
 // auto-instrumentations can patch modules as they load. No-ops unless configured (G3).
