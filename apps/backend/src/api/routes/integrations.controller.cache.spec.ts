@@ -47,7 +47,8 @@ const org = { id: 'org-1' } as Organization;
 function makeController() {
   return new IntegrationsController(
     {} as any,
-    new IntegrationService(...([] as any)) as any,
+    new (IntegrationService as any)() as any,
+    {} as any,
     {} as any,
     {} as any
   );

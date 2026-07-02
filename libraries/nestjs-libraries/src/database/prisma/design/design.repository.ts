@@ -69,9 +69,13 @@ export class DesignRepository {
     });
   }
 
-  findTemplateById(id: string) {
+  findTemplateForOrg(id: string, orgId: string) {
     return this._designTemplate.model.designTemplate.findFirst({
-      where: { id, deletedAt: null },
+      where: {
+        id,
+        deletedAt: null,
+        OR: [{ organizationId: orgId }, { isSystem: true }],
+      },
     });
   }
 

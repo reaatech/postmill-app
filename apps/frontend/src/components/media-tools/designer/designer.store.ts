@@ -1,150 +1,43 @@
 import { create } from 'zustand';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 import { smartReflow, estimateFocalPoint, detectFocalPoint } from './reflow';
+import {
+  migrateDoc,
+  genId,
+  matchPreset,
+} from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.migrate';
+import type {
+  DesignerDoc,
+  DesignerElement,
+  DesignerOutput,
+  VideoOutput,
+  VideoTrack,
+  VideoClip,
+  DesignerBackground,
+  DesignerGradient,
+  DesignerMask,
+  TextRun,
+  DesignerAttribution,
+  DesignerTextShadow,
+  StickerFrame,
+} from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.schema';
 
-export interface TextRun {
-  text: string;
-  fontFamily?: string;
-  fontSize?: number;
-  fontWeight?: number;
-  fontStyle?: 'normal' | 'italic';
-  fill?: string;
-  underline?: boolean;
-}
-
-export interface DesignerTextShadow { color: string; blur: number; offsetX: number; offsetY: number; }
-
-export interface DesignerMask {
-  type: 'shape' | 'text';
-  shape?: 'ellipse' | 'rounded-rect' | 'triangle' | 'star' | 'hexagon' | 'heart';
-  cornerRadius?: number;
-  text?: string;
-  fontFamily?: string;
-  fontWeight?: number;
-}
-
-export interface DesignerElement {
-  id: string;
-  type: 'text' | 'image' | 'shape' | 'icon';
-  x: number; y: number; width: number; height: number;
-  rotation: number; opacity: number; locked: boolean; hidden: boolean;
-  name?: string;
-  groupId?: string;
-  flipX?: boolean; flipY?: boolean;
-  // text
-  text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number;
-  fontStyle?: 'normal' | 'italic'; fill?: string; align?: 'left' | 'center' | 'right';
-  richText?: TextRun[];
-  lineHeight?: number; letterSpacing?: number;
-  textShadow?: DesignerTextShadow; textStroke?: { color: string; width: number };
-  curve?: number;
-  textPath?: string;
-  // image
-  src?: string; fileId?: string; crop?: { x: number; y: number; width: number; height: number };
-  filters?: string[]; borderRadius?: number;
-  fitMode?: 'contain' | 'cover' | 'fill';
-  focalPoint?: { x: number; y: number };
-  mask?: DesignerMask;
-  alt?: string;
-  naturalWidth?: number; naturalHeight?: number;
-  boxShadow?: DesignerTextShadow;
-  // shape
-  shape?: 'rect' | 'ellipse' | 'line' | 'star';
-  fillGradient?: DesignerGradient; stroke?: string; strokeWidth?: number;
-  // reflow / seeding
-  originId?: string;
-  anchor?:
-    | 'top-left' | 'top-center' | 'top-right'
-    | 'center-left' | 'center' | 'center-right'
-    | 'bottom-left' | 'bottom-center' | 'bottom-right';
-}
-
-export interface DesignerGradient {
-  type: 'linear' | 'radial'; angle?: number; stops: { offset: number; color: string }[];
-}
-
-export interface DesignerBackground {
-  type: 'color' | 'gradient' | 'image';
-  color?: string; gradient?: DesignerGradient; src?: string; fileId?: string;
-}
-
-export interface DesignerOutput {
-  id: string;
-  formatId: string;
-  name: string;
-  width: number;
-  height: number;
-  background: string;
-  bg?: DesignerBackground;
-  children: DesignerElement[];
-}
-
-export interface StickerFrame {
-  url: string;
-  durationMs: number;
-}
-
-export interface CaptionWord {
-  word: string;
-  startMs: number;
-  endMs: number;
-}
-
-export interface VideoClip {
-  id: string;
-  startMs: number;
-  endMs: number;
-  trimInMs?: number;
-  trimOutMs?: number;
-  src?: string;
-  fileId?: string;
-  x?: number; y?: number; width?: number; height?: number;
-  rotation?: number; opacity?: number;
-  text?: string; fontFamily?: string; fontSize?: number; fontWeight?: number; fill?: string;
-  volume?: number; fadeInMs?: number; fadeOutMs?: number;
-  keyframes?: { tMs: number; props: Record<string, number>; ease?: 'linear' | 'easeInOut' | 'easeIn' | 'easeOut' }[];
-  naturalWidth?: number; naturalHeight?: number;
-  transitionIn?: { type: 'cut' | 'fade' | 'dissolve' | 'slide'; durationMs: number; direction?: 'left' | 'right' | 'up' | 'down' };
-  transitionOut?: { type: 'cut' | 'fade' | 'dissolve' | 'slide'; durationMs: number; direction?: 'left' | 'right' | 'up' | 'down' };
-  speed?: number;
-  reverse?: boolean;
-  freezeAtMs?: number;
-  filters?: string[];
-  /** Decoded sticker frames (GIF/WebP) so preview + render advance by frame index. */
-  frames?: StickerFrame[];
-  /** Per-word timing for caption clips ( karaoke highlight). */
-  words?: CaptionWord[];
-}
-
-export interface VideoTrack {
-  id: string;
-  type: 'video' | 'image' | 'text' | 'audio' | 'sticker' | 'caption';
-  clips: VideoClip[];
-  gain?: number;
-  autoDuck?: boolean;
-}
-
-export interface VideoOutput {
-  id: string;
-  formatId: string;
-  name: string;
-  width: number;
-  height: number;
-  fps: number;
-  durationMs: number;
-  tracks: VideoTrack[];
-}
-
-export interface DesignerAttribution {
-  source?: string; url?: string; downloadLocation?: string; author?: string; authorUrl?: string;
-}
-
-export interface DesignerDoc {
-  version: number;
-  mode: 'image' | 'video';
-  outputs: (DesignerOutput | VideoOutput)[];
-  attribution?: DesignerAttribution;
-}
+export type {
+  DesignerDoc,
+  DesignerElement,
+  DesignerOutput,
+  VideoOutput,
+  VideoTrack,
+  VideoClip,
+  DesignerBackground,
+  DesignerGradient,
+  DesignerMask,
+  TextRun,
+  DesignerAttribution,
+  DesignerTextShadow,
+  StickerFrame,
+};
+export { migrateDoc };
 
 export interface DesignerState {
   doc: DesignerDoc;
@@ -220,24 +113,6 @@ export interface DesignerActions {
 
 export type DesignerStore = DesignerState & DesignerActions;
 
-let elementCounter = 0;
-const genId = () => `el-${Date.now()}-${++elementCounter}`;
-
-const matchPreset = (w: number, h: number) => {
-  const exact = CHANNEL_PRESETS.find((p) => p.width === w && p.height === h);
-  if (exact) return { formatId: exact.id, name: exact.name };
-  // Fuzzy match by nearest aspect ratio
-  const targetRatio = w / h;
-  let best: { formatId: string; name: string } | null = null;
-  let bestDiff = Infinity;
-  for (const p of CHANNEL_PRESETS) {
-    if (p.id === 'custom') continue;
-    const diff = Math.abs(p.width / p.height - targetRatio);
-    if (diff < bestDiff) { bestDiff = diff; best = { formatId: p.id, name: p.name }; }
-  }
-  return best || { formatId: 'custom', name: `${w}×${h}` };
-};
-
 const createEmptyDoc = (width = 1080, height = 1080, attribution?: DesignerAttribution, mode: 'image' | 'video' = 'image'): DesignerDoc => {
   const m = matchPreset(width, height);
   if (mode === 'video') {
@@ -265,50 +140,6 @@ const createEmptyDoc = (width = 1080, height = 1080, attribution?: DesignerAttri
     outputs: [{ id: genId(), formatId: m.formatId, name: m.name, width, height, background: '#ffffff', children: [] }],
     attribution,
   };
-};
-
-// Load-time migration: legacy { width, height, pages[] } → { mode, outputs[] }
-export const migrateDoc = (raw: any): DesignerDoc => {
-  if (raw && Array.isArray(raw.outputs)) {
-    return { version: raw.version || 2, mode: raw.mode || 'image', outputs: raw.outputs, attribution: raw.attribution };
-  }
-  const w = raw?.width || 1080;
-  const h = raw?.height || 1080;
-  const m = matchPreset(w, h);
-  if (raw?.mode === 'video') {
-    const preset = CHANNEL_PRESETS.find((p) => p.id === m.formatId);
-    // Preserve any existing video tracks/clips from the legacy shape.
-    const existingTracks: VideoTrack[] = Array.isArray(raw?.tracks)
-      ? raw.tracks.map((t: any) => ({
-          id: t.id || genId(),
-          type: t.type || 'video',
-          clips: Array.isArray(t.clips) ? t.clips : [],
-        }))
-      : [];
-    const tracks = existingTracks.length > 0
-      ? existingTracks
-      : [{ id: genId(), type: 'video' as const, clips: [] }];
-    return {
-      version: 2, mode: 'video',
-      outputs: [{
-        id: genId(), formatId: m.formatId, name: m.name, width: w, height: h,
-        fps: preset?.fps ?? 30,
-        durationMs: preset?.maxDurationMs ?? 10000,
-        tracks,
-      }],
-      attribution: raw?.attribution,
-    };
-  }
-  const outputs: DesignerOutput[] = (raw?.pages || [{ id: genId(), background: '#ffffff', children: [] }]).map(
-    (p: any, i: number) => ({
-      id: p.id || genId(),
-      formatId: m.formatId,
-      name: (raw?.pages?.length || 1) > 1 ? `${m.name} ${i + 1}` : m.name,
-      width: w, height: h,
-      background: p.background || '#ffffff', bg: p.bg, children: p.children || [],
-    })
-  );
-  return { version: 2, mode: 'image', outputs, attribution: raw?.attribution };
 };
 
 // Seed an element (positioned for the active output) into a target output, scaled + centered.
@@ -916,7 +747,7 @@ export const createDesignerStore = (
       setPlayhead: (ms) => set({ playheadMs: ms }),
 
       setSelectedClip: (clip) => {
-        set({ selectedClip: clip, selectedIds: clip ? [] : undefined } as any);
+        set({ selectedClip: clip, selectedIds: clip ? [] : [] });
       },
 
       setTrackGain: (outputIndex, trackId, gain) => {

@@ -17,6 +17,8 @@ const org = { id: 'org-1' } as any;
 function build(defaultsOverride: Record<string, any> = {}, credits = 100, budgetAllowed = true) {
   const aiDefaults = {
     imageToImage: vi.fn().mockResolvedValue('https://cdn/out.png'),
+    textToImage: vi.fn().mockResolvedValue('https://cdn/gen.png'),
+    lowReasoningText: vi.fn().mockResolvedValue('a vivid cat'),
     videoUpscale: vi.fn().mockResolvedValue('job-up'),
     videoBackground: vi.fn().mockResolvedValue('job-bg'),
     videoToVideo: vi.fn().mockResolvedValue('job-v2v'),
@@ -148,6 +150,39 @@ describe('MediaController — Designer AI-media routes', () => {
       await expect(
         controller.generateSlide(org, { prompt: 'x' } as any)
       ).rejects.toMatchObject({ status: HttpStatus.CONFLICT });
+    });
+
+    it('generate-image returns { output: <base64 dataUrl> }', async () => {
+      const { controller, aiDefaults } = build();
+      (controller as any)._urlToBase64Image = vi.fn().mockResolvedValue('data:image/png;base64,abc');
+
+      const res = await controller.generateImage(org, { body: {} } as any, 'a cat');
+
+      expect(aiDefaults.textToImage).toHaveBeenCalledWith('org-1', 'a cat');
+      expect(res).toEqual({ output: 'data:image/png;base64,abc' });
+    });
+
+    it('generate-image-with-prompt persists and returns { id, path, name }', async () => {
+      const { controller } = build();
+      (controller as any)._urlToBase64Image = vi.fn().mockResolvedValue('data:image/png;base64,abc');
+      (controller as any)._saveUrlToFile = vi.fn().mockResolvedValue({
+        id: 'file-1',
+        path: 'http://localhost/uploads/file-1.png',
+        name: 'generated-123.png',
+      });
+
+      const res = await controller.generateImageFromText(org, { body: {} } as any, 'a cat');
+
+      expect((controller as any)._saveUrlToFile).toHaveBeenCalledWith(
+        'org-1',
+        'data:image/png;base64,abc',
+        'generated'
+      );
+      expect(res).toEqual({
+        id: 'file-1',
+        path: 'http://localhost/uploads/file-1.png',
+        name: 'generated-123.png',
+      });
     });
   });
 });

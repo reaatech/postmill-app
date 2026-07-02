@@ -6,6 +6,7 @@ import { GenerateImageTool } from '@gitroom/nestjs-libraries/chat/tools/generate
 import { IntegrationListTool } from '@gitroom/nestjs-libraries/chat/tools/integration.list.tool';
 import { GroupListTool } from '@gitroom/nestjs-libraries/chat/tools/group.list.tool';
 import { UploadFromUrlTool } from '@gitroom/nestjs-libraries/chat/tools/upload.from.url.tool';
+import { DesignerDesignTool } from '@gitroom/nestjs-libraries/chat/tools/designer.design.tool';
 
 export const toolList = [
   IntegrationListTool,
@@ -16,4 +17,5 @@ export const toolList = [
   GenerateVideoTool,
   GenerateImageTool,
   UploadFromUrlTool,
+  DesignerDesignTool,
 ];

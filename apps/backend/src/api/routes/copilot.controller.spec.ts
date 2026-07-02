@@ -176,6 +176,7 @@ import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/s
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { RequestContext } from '@mastra/core/di';
 
 describe('CopilotController', () => {
   let controller: CopilotController;
@@ -458,8 +459,9 @@ describe('CopilotController', () => {
         json: vi.fn(),
       } as any;
       const org = { id: 'org-agent-1' } as any;
+      const user = { id: 'user-agent-1' } as any;
 
-      await controller.agent(req, res, org);
+      await controller.agent(req, res, org, user);
 
       expect(mockResolveConfigForScope).toHaveBeenCalledWith('agent', 'org-agent-1');
     });
@@ -473,11 +475,35 @@ describe('CopilotController', () => {
         json: vi.fn(),
       } as any;
       const org = { id: 'org-agent-empty' } as any;
+      const user = { id: 'user-agent-empty' } as any;
 
-      await controller.agent(req, res, org);
+      await controller.agent(req, res, org, user);
 
       const lastCall = (copilotRuntimeNestEndpoint as any).mock.calls.at(-1)[0];
       expect(lastCall.serviceAdapter).toBe(mockEmptyAdapterInstance);
+    });
+
+    it('sets organization and user in the Mastra requestContext', async () => {
+      process.env.OPENAI_API_KEY = 'sk-agent-test';
+      mockResolveConfigForScope.mockResolvedValue({
+        adapter: mockOpenaiAdapter,
+        modelId: 'gpt-5.2',
+        creds: { apiKey: 'sk-agent-test' },
+        providerId: 'openai',
+      });
+      const req = { body: { variables: { properties: { integrations: [] } } } } as any;
+      const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+      const org = { id: 'org-agent-ctx' } as any;
+      const user = { id: 'user-agent-ctx' } as any;
+      const setSpy = vi.spyOn(RequestContext.prototype, 'set');
+
+      await controller.agent(req, res, org, user);
+
+      const orgCall = setSpy.mock.calls.find((c) => c[0] === 'organization');
+      const userCall = setSpy.mock.calls.find((c) => c[0] === 'user');
+      expect(orgCall?.[1]).toBe(JSON.stringify(org));
+      expect(userCall?.[1]).toBe(JSON.stringify({ id: user.id }));
+      setSpy.mockRestore();
     });
   });
 

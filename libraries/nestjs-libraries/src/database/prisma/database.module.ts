@@ -113,6 +113,7 @@ import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
 import { DesignService } from '@gitroom/nestjs-libraries/database/prisma/design/design.service';
+import { DesignerDocService } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.service';
 import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
 import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
 import { FontLoaderService } from '@gitroom/nestjs-libraries/media/design-render/font-loader.service';
@@ -233,6 +234,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     RolesService,
     DesignRepository,
     DesignService,
+    DesignerDocService,
     DesignRenderService,
     DesignBulkService,
     FontLoaderService,

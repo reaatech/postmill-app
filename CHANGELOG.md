@@ -11,6 +11,18 @@
 ## Unreleased
 
 ### Added
+- **AI Designer Foundations.** The server now owns the `DesignerDoc` contract: a single zod schema
+  in `libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts` is the source of
+  truth, while the frontend store and renderer `import type` from it and the dependency-free
+  `migrateDoc`/`createBlankDoc`/limits live in `designer-doc.migrate.ts` (no zod in the designer
+  chunk). `DesignerDocService` provides `validate` (lenient/clamping), `validateStrict`, `applyOps`,
+  and `assignIdsAndNormalize`. Every design/template write validates and persists the clamped doc,
+  and `Design.width/height` are reconciled from `doc.outputs[0]`. New endpoints:
+  `POST /media/designs/validate` (`media:read`, lenient) and `POST /media/designs/apply-ops`
+  (`media:create`, strict). `/copilot/agent` now carries the acting `user` in Mastra context, and the
+  new `designerDesign` Mastra tool creates/updates designs from a doc, template, or op sequence with
+  image preview persistence. No Prisma migration is required (`Design.doc` and `DesignTemplate.doc`
+  are already `Json`).
 - **Campaign Discussion (Jira-style collaborative thread).** The campaign dashboard gains a
   **Discussion** section below the tabbed content where org members talk about the campaign. It has a
   TipTap WYSIWYG editor (bold/italic/underline/strike, headings, lists, links, emoji) that can

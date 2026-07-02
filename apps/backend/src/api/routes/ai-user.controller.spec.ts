@@ -116,6 +116,7 @@ describe('AiUserController', () => {
       {} as GuardrailService,
       {} as BudgetService,
       new (AnalyticsService as any)(),
+      {} as any,
     );
   });
 

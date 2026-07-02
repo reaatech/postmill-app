@@ -10,6 +10,16 @@ has the full per-commit detail.
 
 ### Unreleased
 
+**AI Designer Foundations.** The server now owns the `DesignerDoc` contract with a single zod
+schema (`libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts`) shared as a
+type-only import by the frontend store and renderer. `DesignerDocService` provides `validate`,
+`validateStrict`, `applyOps`, and `assignIdsAndNormalize`; every design/template write validates
+and persists the clamped doc, and `Design.width/height` are reconciled from `doc.outputs[0]`. New
+endpoints: `POST /media/designs/validate` and `POST /media/designs/apply-ops`. `/copilot/agent`
+now carries the acting `user` in Mastra context, and the `designerDesign` Mastra tool creates/
+updates designs from a doc, template, or op sequence with image preview persistence. No Prisma
+migration is required.
+
 **Schedule renamed to Posts.** The main scheduling workspace is now **Posts** at `/posts` (was
 "Schedule" at `/schedule`; the composer pages move to `/posts/post` and `/posts/post/:id`). The
 sidebar label, page title, and docs use "Posts." Legacy `/schedule` (and sub-paths) and the older

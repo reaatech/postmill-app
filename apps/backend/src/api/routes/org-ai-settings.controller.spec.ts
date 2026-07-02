@@ -254,7 +254,7 @@ describe('OrgAiSettingsController — seed + cache invalidation', () => {
 });
 
 describe('OrgAiSettingsController — model defaults validation', () => {
-  const validator = new DefaultsSettingsValidator();
+  const validator = new (DefaultsSettingsValidator as any)({} as any);
 
   function makeControllerWithValidator() {
     return new OrgAiSettingsController(

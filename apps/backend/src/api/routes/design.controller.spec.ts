@@ -15,6 +15,11 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/file/file.service', () => ({
   FileService: class {},
 }));
 
+vi.mock('@gitroom/nestjs-libraries/media/designer-doc/designer-doc.service', () => ({
+  DesignerDocService: class {},
+}));
+
+import { BadRequestException } from '@nestjs/common';
 import {
   DesignController,
   DesignTemplateController,
@@ -38,6 +43,11 @@ describe('DesignController', () => {
   let fileService: {
     getFileById: ReturnType<typeof vi.fn>;
   };
+  let designerDocService: {
+    validate: ReturnType<typeof vi.fn>;
+    validateStrict: ReturnType<typeof vi.fn>;
+    applyOps: ReturnType<typeof vi.fn>;
+  };
   let controller: DesignController;
   let templateController: DesignTemplateController;
 
@@ -56,12 +66,18 @@ describe('DesignController', () => {
     fileService = {
       getFileById: vi.fn(),
     };
+    designerDocService = {
+      validate: vi.fn(),
+      validateStrict: vi.fn(),
+      applyOps: vi.fn(),
+    };
     controller = new DesignController(
       designService as any,
       fileService as any,
       {} as any,
       {} as any,
-      {} as any
+      {} as any,
+      designerDocService as any
     );
     templateController = new DesignTemplateController(designService as any);
   });
@@ -137,6 +153,24 @@ describe('DesignController', () => {
         )
       ).toEqual({ resource: 'media', action: 'delete' });
     });
+
+    it(' validateDoc is gated on media:read', () => {
+      expect(
+        Reflect.getMetadata(
+          REQUIRE_PERMISSION_KEY,
+          DesignController.prototype.validateDoc
+        )
+      ).toEqual({ resource: 'media', action: 'read' });
+    });
+
+    it(' applyOps is gated on media:create', () => {
+      expect(
+        Reflect.getMetadata(
+          REQUIRE_PERMISSION_KEY,
+          DesignController.prototype.applyOps
+        )
+      ).toEqual({ resource: 'media', action: 'create' });
+    });
   });
 
   describe('GET /media/designs', () => {
@@ -204,6 +238,89 @@ describe('DesignController', () => {
     });
   });
 
+  describe('POST /media/designs/validate', () => {
+    it('returns valid:true when the doc passes lenient validation', async () => {
+      const doc = { mode: 'image', outputs: [] } as any;
+      designerDocService.validate.mockReturnValue(doc);
+
+      expect(await controller.validateDoc({ doc })).toEqual({ valid: true });
+      expect(designerDocService.validate).toHaveBeenCalledWith(doc);
+    });
+
+    it('returns valid:false with errors when validation throws BadRequestException', async () => {
+      const err = new BadRequestException({
+        message: 'Invalid DesignerDoc',
+        issues: [{ path: ['outputs'], message: 'Required' }],
+      });
+      designerDocService.validate.mockImplementation(() => {
+        throw err;
+      });
+
+      expect(await controller.validateDoc({ doc: {} })).toEqual({
+        valid: false,
+        errors: [{ path: ['outputs'], message: 'Required' }],
+      });
+    });
+  });
+
+  describe('POST /media/designs/apply-ops', () => {
+    it('returns the transformed doc after strict validation and ops', async () => {
+      const doc = { mode: 'image', outputs: [] } as any;
+      const ops = [{ op: 'setDoc', doc }];
+      const transformed = { mode: 'image', outputs: [{ id: 'out-1' }] };
+      designerDocService.validateStrict.mockReturnValue(doc);
+      designerDocService.applyOps.mockReturnValue(transformed);
+
+      expect(await controller.applyOps({ doc, ops })).toEqual({ doc: transformed });
+      expect(designerDocService.validateStrict).toHaveBeenCalledWith(doc);
+      expect(designerDocService.applyOps).toHaveBeenCalledWith(doc, ops);
+    });
+
+    it('propagates BadRequestException from strict validation', async () => {
+      designerDocService.validateStrict.mockImplementation(() => {
+        throw new BadRequestException('bad doc');
+      });
+
+      await expect(controller.applyOps({ doc: {}, ops: [] })).rejects.toThrow(
+        BadRequestException
+      );
+    });
+  });
+
+  describe('POST /media/designs/render', () => {
+    it('validates the doc before rendering', async () => {
+      const doc = { mode: 'image', outputs: [{ id: 'out-1' }] } as any;
+      designerDocService.validate.mockReturnValue(doc);
+      (controller as any)._designRenderService = {
+        renderPage: vi.fn().mockResolvedValue(Buffer.from('png')),
+      };
+
+      const res = { setHeader: vi.fn(), end: vi.fn() } as any;
+      await controller.render(org, { doc, format: 'png' } as any, res);
+
+      expect(designerDocService.validate).toHaveBeenCalledWith(doc);
+    });
+  });
+
+  describe('POST /media/designs/bulk-generate', () => {
+    it('validates the doc and passes org context to the batch renderer', async () => {
+      const doc = { mode: 'image', outputs: [] } as any;
+      designerDocService.validate.mockReturnValue(doc);
+      (controller as any)._designBulkService = {
+        generateBatch: vi.fn().mockResolvedValue({ images: [], truncated: false, totalRows: 0 }),
+      };
+
+      await controller.bulkGenerate(org, { doc, rows: [] } as any);
+
+      expect(designerDocService.validate).toHaveBeenCalledWith(doc);
+      expect((controller as any)._designBulkService.generateBatch).toHaveBeenCalledWith(
+        doc,
+        [],
+        { orgId: 'org-1' },
+      );
+    });
+  });
+
   describe('GET /media/design-templates', () => {
     it('lists templates scoped to the org', async () => {
       const templates = [{ id: 't1' }];
@@ -215,12 +332,12 @@ describe('DesignController', () => {
   });
 
   describe('GET /media/design-templates/:id', () => {
-    it('returns the template by id', async () => {
+    it('returns the template scoped to the org', async () => {
       const template = { id: 't1', name: 'Social Post' };
       designService.getTemplate.mockResolvedValue(template);
 
-      expect(await templateController.get('t1')).toBe(template);
-      expect(designService.getTemplate).toHaveBeenCalledWith('t1');
+      expect(await templateController.get(org, 't1')).toBe(template);
+      expect(designService.getTemplate).toHaveBeenCalledWith('org-1', 't1');
     });
   });
 
