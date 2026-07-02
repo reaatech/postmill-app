@@ -79,6 +79,12 @@ jobs:
             --exit-code
 
       - name: Destructive schema guard (vs origin/main)
+        # The guard blocks DROP/rename/NOT-NULL-without-default by default. When a branch
+        # carries reviewed, expand/contract-planned destructive changes, set the repository
+        # variable ALLOW_DESTRUCTIVE_SCHEMA=true (Settings → Secrets and variables → Actions
+        # → Variables) to acknowledge them. Unset (the default) keeps the guard enforcing.
+        env:
+          ALLOW_DESTRUCTIVE_SCHEMA: ${{ vars.ALLOW_DESTRUCTIVE_SCHEMA }}
         run: |
           # Ensure origin/main is available even on shallow forks.
           git fetch --no-tags --depth=1 origin main || true
