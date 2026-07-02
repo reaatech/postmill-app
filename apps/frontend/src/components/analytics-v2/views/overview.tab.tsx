@@ -113,11 +113,11 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   if (loading) {
     return (
       <div className="space-y-[16px] animate-pulse">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px]">
+        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] mobile:gap-[8px]">
           {[1, 2, 3, 4].map((i) => (
             <div
               key={i}
-              className="h-[180px] bg-newTableHeader rounded-[12px]"
+              className="h-[180px] mobile:h-[112px] bg-newTableHeader rounded-[12px]"
             />
           ))}
         </div>
@@ -209,7 +209,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
 
   return (
     <div className="space-y-[16px]">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px]">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] mobile:gap-[8px]">
         {data.kpis.map((kpi, i) => (
           <KPICard
             key={kpi.metric}

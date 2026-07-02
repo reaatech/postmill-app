@@ -5,7 +5,7 @@ import { IntegrationContext } from '@gitroom/frontend/components/launches/helper
 import dayjs from 'dayjs';
 import useSWR, { useSWRConfig } from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { continueProviderList } from '@gitroom/frontend/components/new-launch/providers/continue-provider/list';
+import { continueProviderList } from '@gitroom/frontend/components/composer/providers/continue-provider/list';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 export const Null: FC<{

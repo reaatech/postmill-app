@@ -1,12 +1,27 @@
-import { Global, Module } from '@nestjs/common';
+import { Global, Module, OnModuleInit, Logger } from '@nestjs/common';
+import { setSocialFetchPorts } from '@gitroom/provider-kernel';
+import { getVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
+import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import {
+  RefreshTokenError,
+  BadBodyError,
+} from '@gitroom/nestjs-libraries/inngest/errors';
+import { fetch as undiciFetch } from 'undici';
+import { timer } from '@gitroom/helpers/utils/timer';
+import { readOrFetch } from '@gitroom/helpers/utils/read.or.fetch';
+import sharp from 'sharp';
 import { PrismaRepository, PrismaService, PrismaTransaction } from './prisma.service';
-import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { DeletionService } from '@gitroom/nestjs-libraries/database/prisma/users/deletion.service';
+import { DataExportService } from '@gitroom/nestjs-libraries/database/prisma/users/data-export.service';
 import { UsersRepository } from '@gitroom/nestjs-libraries/database/prisma/users/users.repository';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
+import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { IntegrationRepository } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.repository';
@@ -15,15 +30,16 @@ import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
+import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
+import { PushNotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service';
+import { NotificationDigestService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-digest.service';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.content.service';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
 import { AuthProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/auth-providers/auth-provider.repository';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
@@ -34,25 +50,6 @@ import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/databas
 import { OrgContentPackSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.repository';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
-import { BitlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/bitly.adapter';
-import { BlinkAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/blink.adapter';
-import { CuttlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/cuttly.adapter';
-import { DubAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/dub.adapter';
-import { IsgdAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/isgd.adapter';
-import { RebrandlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/rebrandly.adapter';
-import { ShortioAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/shortio.adapter';
-import { TinyccAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tinycc.adapter';
-import { TinyurlAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tinyurl.adapter';
-import { TlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/tly.adapter';
-import { VgdAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/vgd.adapter';
-import { CleanuriAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/cleanuri.adapter';
-import { LinklyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/linkly.adapter';
-import { OwlyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/owly.adapter';
-import { PixelmeAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/pixelme.adapter';
-import { ReplugAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/replug.adapter';
-import { SniplyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/sniply.adapter';
-import { SwitchyAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/switchy.adapter';
-import { T2mAdapter } from '@gitroom/nestjs-libraries/short-linking/adapters/t2m.adapter';
 import { WebhooksRepository } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.repository';
 import { WebhooksService } from '@gitroom/nestjs-libraries/database/prisma/webhooks/webhooks.service';
 import { SignatureRepository } from '@gitroom/nestjs-libraries/database/prisma/signatures/signature.repository';
@@ -61,7 +58,6 @@ import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/au
 import { AutopostService } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.service';
 import { SetsService } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.service';
 import { SetsRepository } from '@gitroom/nestjs-libraries/database/prisma/sets/sets.repository';
-import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
 import { FalService } from '@gitroom/nestjs-libraries/openai/fal.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OAuthRepository } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.repository';
@@ -92,27 +88,32 @@ import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/w
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
+import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
+import { CampaignReportService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.service';
+import { CampaignNoteRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.repository';
+import { CampaignNoteService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-note.service';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
 import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { ApiKeysRepository } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.repository';
 import { ApiKeysService } from '@gitroom/nestjs-libraries/database/prisma/api-keys/api-keys.service';
 import { EmailLogRepository } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.repository';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
-import { EmptyAdapter } from '@gitroom/nestjs-libraries/emails/adapters/empty.adapter';
-import { ResendAdapter } from '@gitroom/nestjs-libraries/emails/adapters/resend.adapter';
-import { SendGridAdapter } from '@gitroom/nestjs-libraries/emails/adapters/sendgrid.adapter';
-import { MailgunAdapter } from '@gitroom/nestjs-libraries/emails/adapters/mailgun.adapter';
-import { PostmarkAdapter } from '@gitroom/nestjs-libraries/emails/adapters/postmark.adapter';
-import { SesAdapter } from '@gitroom/nestjs-libraries/emails/adapters/ses.adapter';
-import { SmtpAdapter } from '@gitroom/nestjs-libraries/emails/adapters/smtp.adapter';
 import { RbacSeeder } from '@gitroom/nestjs-libraries/database/seeds/rbac-seeder';
 import { BackfillService } from '@gitroom/nestjs-libraries/database/seeds/backfill.service';
+import { DemoSeeder } from '@gitroom/nestjs-libraries/database/seeds/demo-seeder';
+import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
+import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { HealthRepository } from '@gitroom/nestjs-libraries/database/prisma/health/health.repository';
 import { RolesRepository } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.repository';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
 import { DesignRepository } from '@gitroom/nestjs-libraries/database/prisma/design/design.repository';
 import { DesignService } from '@gitroom/nestjs-libraries/database/prisma/design/design.service';
+import { DesignerDocService } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.service';
 import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
 import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
 import { FontLoaderService } from '@gitroom/nestjs-libraries/media/design-render/font-loader.service';
@@ -129,12 +130,18 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     PrismaTransaction,
     UsersService,
     UsersRepository,
+    DeletionService,
+    DataExportService,
     OrganizationService,
     OrganizationRepository,
     SubscriptionService,
     SubscriptionRepository,
+    StripeEventRepository,
     NotificationService,
     NotificationsRepository,
+    NotificationPreferenceService,
+    PushNotificationService,
+    NotificationDigestService,
     WebhooksRepository,
     WebhooksService,
     IntegrationService,
@@ -148,7 +155,6 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     SignatureService,
     FileService,
     FileRepository,
-    AiMediaGenerationService,
     IntegrationManager,
     RefreshIntegrationService,
     ExtractContentService,
@@ -161,7 +167,6 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     SetsRepository,
     OAuthRepository,
     OAuthService,
-    VideoManager,
     AnnouncementsRepository,
     AnnouncementsService,
     ProviderConfigManager,
@@ -185,64 +190,51 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     WatchlistService,
     CampaignsRepository,
     CampaignsService,
+    CampaignItemRepository,
+    CampaignItemResolverRepository,
+    CampaignTagService,
+    CampaignReportService,
+    CampaignNoteRepository,
+    CampaignNoteService,
     BrandsService,
     BrandsRepository,
     OrgProviderConfigService,
     OrgProviderConfigRepository,
     OrgProviderConfigManager,
     AuditRepository,
+    AuditService,
     ApiKeysRepository,
     ApiKeysService,
     EmailLogRepository,
     EmailLogService,
+    // EmailAdapterRegistry resolves the active email provider through the
+    // ProviderKernel (ProviderResolutionService). It is no longer a legacy
+    // in-memory store and has no PROVIDER_KERNEL=legacy fallback.
     EmailAdapterRegistry,
-    ShortLinkRegistry,
     OrgShortLinkSettingsService,
     OrgShortLinkSettingsRepository,
     AuthProviderRepository,
-    // MediaProviderRegistry intentionally comes from MediaModule (imported + re-exported
-    // below) — providing it here would create a second, EMPTY registry instance that
-    // never receives the adapter registrations from MediaModule.onModuleInit.
     OrgMediaProviderSettingsService,
     OrgMediaProviderSettingsRepository,
     OrgContentPackSettingsService,
     OrgContentPackSettingsRepository,
     ProviderCredentialLinkService,
     MediaJobLifecycleService,
-    {
-      provide: 'SHORT_LINK_ADAPTER_REGISTRATION',
-      useFactory: (registry: ShortLinkRegistry, flags: FeatureFlagsService) => {
-        if (flags.isDisabled('shortlinks')) {
-          return;
-        }
-        registry.registerFactory('bitly', BitlyAdapter);
-        registry.registerFactory('blink', BlinkAdapter);
-        registry.registerFactory('cuttly', CuttlyAdapter);
-        registry.registerFactory('dub', DubAdapter);
-        registry.registerFactory('isgd', IsgdAdapter);
-        registry.registerFactory('rebrandly', RebrandlyAdapter);
-        registry.registerFactory('shortio', ShortioAdapter);
-        registry.registerFactory('tinycc', TinyccAdapter);
-        registry.registerFactory('tinyurl', TinyurlAdapter);
-        registry.registerFactory('tly', TlyAdapter);
-        registry.registerFactory('vgd', VgdAdapter);
-        registry.registerFactory('cleanuri', CleanuriAdapter);
-        registry.registerFactory('linkly', LinklyAdapter);
-        registry.registerFactory('owly', OwlyAdapter);
-        registry.registerFactory('pixelme', PixelmeAdapter);
-        registry.registerFactory('replug', ReplugAdapter);
-        registry.registerFactory('sniply', SniplyAdapter);
-        registry.registerFactory('switchy', SwitchyAdapter);
-        registry.registerFactory('t2m', T2mAdapter);
-      },
-      inject: [ShortLinkRegistry, FeatureFlagsService],
-    },
+    // Short-link resolution goes through the ProviderKernel via
+    // OrgShortLinkSettingsService → ProviderResolutionService.resolveShortLink.
+    // The legacy ShortLinkRegistry (and the PROVIDER_KERNEL=legacy kill switch)
+    // were removed.
     RbacSeeder,
     BackfillService,
+    DemoSeeder,
+    MigrationLedgerRepository,
+    InngestRunRepository,
+    HealthRepository,
     RolesRepository,
     RolesService,
     DesignRepository,
     DesignService,
+    DesignerDocService,
     DesignRenderService,
     DesignBulkService,
     FontLoaderService,
@@ -252,36 +244,64 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
         // Run idempotently on every app bootstrap — safe and cheap.
         seeder.seed().then(() => backfill.backfill()).catch((e: unknown) => {
           const msg = e instanceof Error ? e.message : String(e);
-          console.error('RBAC seed/backfill failed:', msg);
+          new Logger('DatabaseModule').error(`RBAC seed/backfill failed: ${msg}`);
         });
         return true;
       },
       inject: [RbacSeeder, BackfillService],
     },
     {
-      provide: 'EMAIL_ADAPTER_REGISTRATION',
-      useFactory: (registry: EmailAdapterRegistry, flags: FeatureFlagsService) => {
-        // Empty adapter is always registered so EmailService has a safe fallback.
-        registry.registerFactory('empty', EmptyAdapter);
-        if (flags.isDisabled('email')) {
-          return;
+      // Dev-only demo fixtures. Opt-in via DEV_SEED_DEMO=true (and NODE_ENV=
+      // development — DemoSeeder hard-gates on this too). Ledger-idempotent, so
+      // it seeds once; set DEV_SEED_DEMO_RESET=true to wipe + reseed. Never runs
+      // in prod. Runs after RBAC/backfill so the target org's roles exist.
+      provide: 'DEMO_SEED_ON_INIT',
+      useFactory: (demo: DemoSeeder) => {
+        if (
+          process.env.NODE_ENV === 'development' &&
+          process.env.DEV_SEED_DEMO === 'true'
+        ) {
+          demo.seed().catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            new Logger('DatabaseModule').error(`Demo seed failed: ${msg}`);
+          });
         }
-        registry.registerFactory('resend', ResendAdapter);
-        registry.registerFactory('sendgrid', SendGridAdapter);
-        registry.registerFactory('mailgun', MailgunAdapter);
-        registry.registerFactory('postmark', PostmarkAdapter);
-        registry.registerFactory('ses', SesAdapter);
-        registry.registerFactory('smtp', SmtpAdapter);
+        return true;
       },
-      inject: [EmailAdapterRegistry, FeatureFlagsService],
+      inject: [DemoSeeder],
     },
   ],
   get exports() {
-    // Re-export MediaModule so the populated MediaProviderRegistry (adapters are
-    // registered in MediaModule.onModuleInit) is globally injectable. VideoRenderModule
-    // is likewise re-exported so VideoRenderService is globally injectable (MediaJobsActivity
-    // in InngestModule, design.controller in ApiModule) without each module re-importing it.
+    // Re-export MediaModule so its media services are globally injectable.
+    // VideoRenderModule is likewise re-exported so VideoRenderService is globally
+    // injectable (MediaJobsActivity in InngestModule, design.controller in
+    // ApiModule) without each module re-importing it.
     return [...this.providers, MediaModule, VideoRenderModule];
   },
 })
-export class DatabaseModule {}
+export class DatabaseModule implements OnModuleInit {
+  private static _socialFetchPortsWired = false;
+
+  onModuleInit() {
+    // Wire SocialAbstract.fetch's security/runtime primitives into the kernel
+    // ONCE, before any publish. The VPN AsyncLocalStorage (vpn.context) and the
+    // inngest error classes never leave nestjs-libraries, so they stay
+    // single-instance and instanceof-correct. Idempotent.
+    if (DatabaseModule._socialFetchPortsWired) {
+      return;
+    }
+    DatabaseModule._socialFetchPortsWired = true;
+    setSocialFetchPorts({
+      getVpnDispatcher,
+      ssrfSafeDispatcher,
+      isSafePublicHttpsUrl,
+      undiciFetch: undiciFetch as unknown as typeof fetch,
+      RefreshTokenError,
+      BadBodyError,
+      timer,
+      sharp,
+      readOrFetch,
+      safeFetch,
+    });
+  }
+}

@@ -1,8 +1,11 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
 
 @Injectable()
 export class OrgAiSettingsService {
@@ -11,13 +14,38 @@ export class OrgAiSettingsService {
   constructor(
     private _repository: OrgAiSettingsRepository,
     private _encryption: EncryptionService,
-    private _registry: AIProviderRegistry,
+    private _resolution: ProviderResolutionService,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
   ) {}
 
+  // Resolve a single AI adapter through the ProviderKernel; null for an
+  // unknown/unregistered provider (mirrors the old registry.getAdapter).
+  private _resolveAdapter(identifier: string, version?: string): AIProviderAdapter | null {
+    try {
+      return this._resolution.resolveAI(identifier, version ? { version } : {});
+    } catch {
+      return null;
+    }
+  }
+
+  // Enumerate the registered AI adapters (one per provider id, latest registered
+  // manifest wins) — replaces the legacy in-memory registry enumeration.
+  private _listAdapters(): AIProviderAdapter[] {
+    const seen = new Set<string>();
+    const adapters: AIProviderAdapter[] = [];
+    for (const manifest of this._kernel.listManifests('ai')) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      const adapter = this._resolveAdapter(manifest.providerId, manifest.version);
+      if (adapter) adapters.push(adapter);
+    }
+    return adapters;
+  }
+
   async getProviders(orgId: string) {
     const configs = await this._repository.getByOrg(orgId);
-    const adapters = this._registry.list();
+    const adapters = this._listAdapters();
 
     return adapters.map((adapter) => {
       const dbConfig = configs.find((c) => c.identifier === adapter.identifier);
@@ -33,6 +61,7 @@ export class OrgAiSettingsService {
         isConfigured,
         defaultModel: dbConfig?.defaultModel || '',
         reasoningModel: dbConfig?.reasoningModel || '',
+        version: dbConfig?.version ?? 'v1',
         createdAt: dbConfig?.createdAt || null,
         updatedAt: dbConfig?.updatedAt || null,
       };
@@ -43,17 +72,45 @@ export class OrgAiSettingsService {
     const config = await this._repository.getActive(orgId);
     if (!config) return null;
 
-    const adapter = this._registry.getAdapter(config.identifier);
+    const adapter = this._resolveAdapter(config.identifier, config.version ?? 'v1');
     if (!adapter) return null;
 
     const decrypted = this._decryptCredentials(config.credentials);
     return {
       identifier: config.identifier,
+      version: config.version ?? 'v1',
       name: adapter.name,
       type: adapter.type,
       capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields,
+      enabled: config.enabled,
+      isActive: config.isActive,
       defaultModel: config.defaultModel,
       reasoningModel: config.reasoningModel,
+      credentials: decrypted,
+    };
+  }
+
+  async getByIdentifier(orgId: string, identifier: string, version?: string) {
+    const resolvedVersion = this._resolveVersion(identifier, version);
+    const config = await this._repository.getByIdentifier(orgId, identifier, resolvedVersion);
+    if (!config) return null;
+
+    const adapter = this._resolveAdapter(identifier, resolvedVersion);
+    if (!adapter) return null;
+
+    const decrypted = this._decryptCredentials(config.credentials);
+    return {
+      identifier: config.identifier,
+      version: config.version ?? 'v1',
+      name: adapter.name,
+      type: adapter.type,
+      capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields,
+      enabled: config.enabled,
+      isActive: config.isActive,
+      defaultModel: config.defaultModel || '',
+      reasoningModel: config.reasoningModel || '',
       credentials: decrypted,
     };
   }
@@ -68,21 +125,25 @@ export class OrgAiSettingsService {
       defaultModel?: string;
       reasoningModel?: string;
       extraConfig?: Record<string, unknown> | string;
+      version?: string;
     },
   ) {
-    const encryptedCredentials = data.credentials
-      ? this._encryption.encrypt(JSON.stringify(data.credentials))
+    const { version: requestedVersion, ...payload } = data;
+    const version = this._resolveVersion(identifier, requestedVersion);
+
+    const encryptedCredentials = payload.credentials
+      ? this._encryption.encrypt(JSON.stringify(payload.credentials))
       : undefined;
 
-    const extraConfig = data.extraConfig
-      ? (typeof data.extraConfig === 'string' ? data.extraConfig : JSON.stringify(data.extraConfig))
+    const extraConfig = payload.extraConfig
+      ? (typeof payload.extraConfig === 'string' ? payload.extraConfig : JSON.stringify(payload.extraConfig))
       : undefined;
 
     const result = await this._repository.upsert(orgId, identifier, {
-      ...data,
+      ...payload,
       credentials: encryptedCredentials,
       extraConfig,
-    });
+    }, version);
 
     // §11.4 auto-config: OpenAI/MiniMax AI credentials live-link to the media surface.
     if (data.credentials && this._credentialLink) {
@@ -92,13 +153,14 @@ export class OrgAiSettingsService {
     return result;
   }
 
-  async setActive(orgId: string, identifier: string) {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+  async setActive(orgId: string, identifier: string, version?: string) {
+    const resolvedVersion = this._resolveVersion(identifier, version);
+    const config = await this._repository.getByIdentifier(orgId, identifier, resolvedVersion);
     if (!config) {
       throw new Error(`Provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier, resolvedVersion);
     if (!adapter) {
       throw new Error(`Unknown provider: ${identifier}`);
     }
@@ -108,7 +170,7 @@ export class OrgAiSettingsService {
       throw new Error(`Provider "${identifier}" is not fully configured. Fill in all required credential fields first.`);
     }
 
-    return this._repository.setActive(orgId, identifier);
+    return this._repository.setActive(orgId, identifier, resolvedVersion);
   }
 
   async delete(orgId: string, identifier: string) {
@@ -121,24 +183,13 @@ export class OrgAiSettingsService {
       throw new Error(`Provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier, config.version ?? 'v1');
     if (!adapter) {
       throw new Error(`Unknown provider: ${identifier}`);
     }
 
     const decrypted = this._decryptCredentials(config.credentials);
     return adapter.validateCredentials(decrypted);
-  }
-
-  async getSpend(
-    orgId: string,
-    scope?: string,
-    limit = 100,
-    offset = 0,
-  ) {
-    const clampedLimit = limit < 1 ? 1 : limit > 1000 ? 1000 : limit;
-    const safeOffset = offset < 0 ? 0 : offset;
-    return this._repository.getSpendLogs(orgId, scope, clampedLimit, safeOffset);
   }
 
   async getBudget(orgId: string) {
@@ -152,6 +203,12 @@ export class OrgAiSettingsService {
     enabled?: boolean;
   }) {
     return this._repository.upsertBudget(orgId, data);
+  }
+
+  private _resolveVersion(identifier: string, version?: string): string {
+    if (version) return version;
+    const latest = this._kernel.latestActive('ai', identifier);
+    return latest?.manifest.version ?? DEFAULT_VERSION;
   }
 
   private _decryptCredentials(encrypted: string | null): Record<string, string> {

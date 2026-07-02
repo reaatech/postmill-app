@@ -12,7 +12,6 @@ const mockRepo = {
   getSystemSettings: vi.fn(),
   upsertSystemSettings: vi.fn(),
   // AISpendLog
-  getSpendLogs: vi.fn(),
   createSpendLog: vi.fn(),
   getSpendSummary: vi.fn(),
   // AISettingsAudit
@@ -371,17 +370,6 @@ describe('AiSettingsService', () => {
   });
 
   // ── AISpendLog ──
-
-  describe('getSpendLogs', () => {
-    it('delegates to repository with all params', () => {
-      const params = { organizationId: 'org1', scope: 'chat', limit: 20, offset: 0 };
-      mockRepo.getSpendLogs.mockReturnValue([]);
-
-      service.getSpendLogs(params);
-
-      expect(mockRepo.getSpendLogs).toHaveBeenCalledWith(params);
-    });
-  });
 
   describe('createSpendLog', () => {
     it('delegates to repository (recordSpend)', () => {

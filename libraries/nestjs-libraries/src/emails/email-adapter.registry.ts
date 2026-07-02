@@ -1,56 +1,87 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import {
+  ProviderKernel,
+  ProviderRuntimeContext,
+  parseQualified,
+  DEFAULT_VERSION,
+} from '@gitroom/provider-kernel';
 import { EmailAdapter } from '@gitroom/nestjs-libraries/emails/email-adapter.interface';
-
-type EmailAdapterConstructor = new () => EmailAdapter;
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { RuntimeContextFactory } from '@gitroom/nestjs-libraries/providers/runtime-context.factory';
 
 @Injectable()
 export class EmailAdapterRegistry {
   private readonly _instances = new Map<string, EmailAdapter>();
-  private readonly _factories = new Map<string, EmailAdapterConstructor>();
+
+  constructor(
+    @Optional()
+    @Inject(PROVIDER_KERNEL)
+    private readonly _kernel?: ProviderKernel,
+    @Optional()
+    private readonly _runtimeContext?: RuntimeContextFactory,
+  ) {}
 
   /** Eager registration (kept for tests and callers that already have an instance). */
   register(adapter: EmailAdapter): void {
     this._instances.set(adapter.name, adapter);
   }
 
-  /** Lazy registration: the adapter is constructed on first use. */
-  registerFactory(name: string, factory: EmailAdapterConstructor): void {
-    this._factories.set(name, factory);
-  }
-
-  private _ensureAdapter(name: string): EmailAdapter | undefined {
-    if (this._instances.has(name)) {
-      return this._instances.get(name);
-    }
-
-    const factory = this._factories.get(name);
-    if (!factory) {
-      return undefined;
-    }
-
-    const adapter = new factory();
-    this._instances.set(name, adapter);
-    return adapter;
-  }
-
   getAdapter(name: string): EmailAdapter | undefined {
-    return this._ensureAdapter(name);
+    return this._instances.get(name);
   }
 
   getActiveAdapter(): EmailAdapter {
-    const name = process.env.EMAIL_PROVIDER || '';
-    const adapter = this._ensureAdapter(name);
-    if (adapter && adapter.isConfigured()) {
-      return adapter;
-    }
-    return this._ensureAdapter('empty')!;
+    const raw = process.env.EMAIL_PROVIDER || '';
+    return this._resolveViaKernel(raw);
   }
 
-  /** Instantiates any registered factories so the returned list is complete. */
-  list(): EmailAdapter[] {
-    for (const name of this._factories.keys()) {
-      this._ensureAdapter(name);
+  /** Resolve the active email module through the provider kernel. */
+  private _resolveViaKernel(raw: string): EmailAdapter {
+    const ctx = this._runtimeContext!.build({});
+    if (!raw) {
+      return this._kernelEmpty(ctx);
     }
+
+    try {
+      // EMAIL_PROVIDER accepts a qualified id ("resend@v1"); a bare name
+      // ("resend") resolves to the latest active version.
+      const { providerId, version } = parseQualified(raw);
+      const mod = version
+        ? this._kernel!.resolveForRead<unknown, EmailAdapter>(
+            'email',
+            providerId,
+            version,
+          )
+        : this._kernel!.latestActive<unknown, EmailAdapter>('email', providerId);
+
+      if (!mod) {
+        return this._kernelEmpty(ctx);
+      }
+
+      const adapter = mod.create(ctx);
+      if (adapter && adapter.isConfigured()) {
+        return adapter;
+      }
+      return this._kernelEmpty(ctx);
+    } catch {
+      return this._kernelEmpty(ctx);
+    }
+  }
+
+  private _kernelEmpty(ctx: ProviderRuntimeContext): EmailAdapter {
+    try {
+      const mod = this._kernel!.resolveForRead<unknown, EmailAdapter>(
+        'email',
+        'empty',
+        DEFAULT_VERSION,
+      );
+      return mod.create(ctx);
+    } catch {
+      return this._instances.get('empty')!;
+    }
+  }
+
+  list(): EmailAdapter[] {
     return Array.from(this._instances.values());
   }
 }

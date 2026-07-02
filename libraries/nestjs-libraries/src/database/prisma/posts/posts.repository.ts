@@ -99,7 +99,13 @@ export class PostsRepository {
     });
   }
 
-  getOldPosts(orgId: string, date: string) {
+  getOldPosts(
+    orgId: string,
+    date: string,
+    options?: { take?: number; page?: number }
+  ) {
+    const take = options?.take && options.take > 0 ? options.take : 100;
+    const page = options?.page && options.page > 0 ? options.page : 1;
     return this._post.model.post.findMany({
       where: {
         integration: {
@@ -117,6 +123,8 @@ export class PostsRepository {
       orderBy: {
         publishDate: 'desc',
       },
+      take,
+      skip: (page - 1) * take,
       select: {
         id: true,
         content: true,
@@ -136,10 +144,14 @@ export class PostsRepository {
     });
   }
 
-  updateImages(id: string, images: string) {
+  updateImages(id: string, images: string, orgId?: string) {
     return this._post.model.post.update({
       where: {
         id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId
+        // (mirrors updateReleaseId). Optional so existing callers stay behaviour-identical;
+        // org is already enforced upstream.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       data: {
         image: images,
@@ -217,6 +229,10 @@ export class PostsRepository {
         intervalInDays: true,
         group: true,
         creationMethod: true,
+        campaignId: true,
+        approvalStatus: true,
+        image: true,
+        settings: true,
         lastViews: true,
         lastLikes: true,
         lastComments: true,
@@ -263,7 +279,58 @@ export class PostsRepository {
       await this._enrichWithUnreadComments(posts, userId);
     }
 
-    return posts;
+    // Derive a compact media type from the (heavy) image JSON and the per-post
+    // heading colour from `settings`, then strip the raw `image`/`settings` so the
+    // calendar payload stays lean.
+    return posts.map((post) => {
+      const { image, settings, ...rest } = post;
+      let color: string | null = null;
+      if (settings) {
+        try {
+          color = JSON.parse(settings)?.color ?? null;
+        } catch {
+          color = null;
+        }
+      }
+      return { ...rest, mediaType: this._computeMediaType(image), color };
+    });
+  }
+
+  private _computeMediaType(imageJson?: string | null): 'none' | 'image' | 'video' {
+    if (!imageJson) return 'none';
+    try {
+      const arr = JSON.parse(imageJson);
+      if (!Array.isArray(arr) || arr.length === 0) return 'none';
+      const isVideo = (m: any) =>
+        typeof m?.path === 'string' && /(mp4|mov|webm|m4v|avi|mkv)(\?|#|$)/i.test(m.path);
+      return arr.some(isVideo) ? 'video' : 'image';
+    } catch {
+      return 'none';
+    }
+  }
+
+  // Sets the heading colour on every post in a group (stored in `settings` JSON).
+  // A null/empty colour clears it (reverts to the default primary blue).
+  async setGroupColor(orgId: string, group: string, color: string | null) {
+    const posts = await this._post.model.post.findMany({
+      where: { organizationId: orgId, group, deletedAt: null },
+      select: { id: true, settings: true },
+    });
+    for (const post of posts) {
+      let settings: any = {};
+      try {
+        settings = post.settings ? JSON.parse(post.settings) : {};
+      } catch {
+        settings = {};
+      }
+      if (color) settings.color = color;
+      else delete settings.color;
+      await this._post.model.post.update({
+        where: { id: post.id },
+        data: { settings: JSON.stringify(settings) },
+      });
+    }
+    return { color: color || null };
   }
 
   async getPostsList(orgId: string, query: GetPostsListDto, userId?: string) {
@@ -397,6 +464,10 @@ export class PostsRepository {
     });
   }
 
+  // No pagination/cap here on purpose: the `where: { group }` already bounds this to a single
+  // group's posts, which feeds arrangePostsByGroup() to reconstruct the parent/child thread tree.
+  // A page cap would silently truncate that tree. The unbounded per-org scan that D3 bounds is
+  // getOldPosts (above), not this group-scoped read.
   getPostsByGroup(orgId: string, group: string) {
     return this._post.model.post.findMany({
       where: {
@@ -444,10 +515,12 @@ export class PostsRepository {
     return decryptPostIntegrationTokens(post);
   }
 
-  updatePost(id: string, postId: string, releaseURL: string) {
+  updatePost(id: string, postId: string, releaseURL: string, orgId?: string) {
     return this._post.model.post.update({
       where: {
         id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       data: {
         state: 'PUBLISHED',
@@ -457,9 +530,13 @@ export class PostsRepository {
     });
   }
 
-  updatePostSettings(id: string, settings: string) {
+  updatePostSettings(id: string, settings: string, orgId?: string) {
     return this._post.model.post.update({
-      where: { id },
+      where: {
+        id,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        ...(orgId ? { organizationId: orgId } : {}),
+      },
       data: { settings },
     });
   }
@@ -641,6 +718,7 @@ export class PostsRepository {
             }),
         image: JSON.stringify(value.image),
         settings: JSON.stringify(body.settings),
+        ...(state === 'draft' && campaignId ? { approvalStatus: 'pending' as const } : {}),
         organization: {
           connect: {
             id: orgId,
@@ -674,6 +752,7 @@ export class PostsRepository {
           const tagsList = await this._tags.model.tags.findMany({
             where: {
               orgId: orgId,
+              deletedAt: null,
               name: {
                 in: tags.map((tag) => tag.label).filter((f) => f),
               },
@@ -1003,6 +1082,62 @@ export class PostsRepository {
         parentPostId: null,
         integration: { deletedAt: null, organizationId: orgId },
       },
+    });
+  }
+
+  getCampaignDrafts(campaignId: string, orgId: string) {
+    return this._post.model.post.findMany({
+      where: {
+        campaignId,
+        organizationId: orgId,
+        state: State.DRAFT,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'asc' },
+      include: {
+        integration: { select: { id: true, name: true, providerIdentifier: true, picture: true } },
+      },
+    });
+  }
+
+  getCampaignPosts(campaignId: string, orgId: string) {
+    return this._post.model.post.findMany({
+      where: {
+        campaignId,
+        organizationId: orgId,
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'desc' },
+      include: {
+        integration: { select: { id: true, name: true, providerIdentifier: true, picture: true } },
+      },
+    });
+  }
+
+  async updateApprovalStatus(
+    id: string,
+    orgId: string,
+    status: 'pending' | 'approved' | 'rejected',
+    approvedById?: string
+  ) {
+    return this._post.model.post.updateMany({
+      where: { id, organizationId: orgId, state: State.DRAFT },
+      data: {
+        approvalStatus: status,
+        approvedById: status === 'approved' ? approvedById : null,
+        approvedAt: status === 'approved' ? new Date() : null,
+      },
+    });
+  }
+
+  async setPostCampaign(id: string, orgId: string, campaignId: string | null) {
+    return this._post.model.post.updateMany({
+      where: { id, organizationId: orgId },
+      data: { campaignId },
     });
   }
 

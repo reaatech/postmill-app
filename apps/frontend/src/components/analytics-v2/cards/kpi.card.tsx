@@ -26,12 +26,12 @@ export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3
       onClick={onClick}
       className="group cursor-pointer bg-newBgColorInner border border-newTableBorder rounded-[12px] overflow-hidden transition-all duration-200 hover:border-newTableText/30 flex flex-col"
     >
-      <div className="px-[16px] pt-[14px] pb-[8px] flex items-center justify-between">
-        <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">
+      <div className="px-[16px] pt-[14px] pb-[8px] mobile:px-[12px] mobile:pt-[10px] mobile:pb-[4px] flex items-center justify-between gap-[6px]">
+        <span className="text-[13px] mobile:text-[11px] font-medium text-newTableText uppercase tracking-wide truncate">
           {kpi.label}
         </span>
         {kpi.percentageChange !== 0 && (
-          <div className={`flex items-center gap-[4px] text-[13px] font-medium ${isPositive ? 'text-[var(--positive,#32d583)]' : 'text-[var(--negative,#f97066)]'}`}>
+          <div className={`flex items-center gap-[4px] text-[13px] mobile:text-[11px] font-medium shrink-0 ${isPositive ? 'text-[var(--positive,#32d583)]' : 'text-[var(--negative,#f97066)]'}`}>
             <svg
               width="10"
               height="10"
@@ -48,14 +48,14 @@ export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3
           </div>
         )}
       </div>
-      <div className="px-[16px]">
-        <div className="text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
+      <div className="px-[16px] mobile:px-[12px]">
+        <div className="text-[32px] leading-[40px] mobile:text-[22px] mobile:leading-[28px] font-semibold tracking-tight tabular-nums truncate">
           {displayValue}
         </div>
       </div>
       {kpi.sparkline.length > 1 && (
-        <div className="mt-[8px] px-[4px]">
-          <div className="h-[48px]">
+        <div className="mt-[8px] mobile:mt-[4px] px-[4px]">
+          <div className="h-[48px] mobile:h-[30px]">
             <AreaChart
               data={kpi.sparkline}
               color={color}
@@ -65,7 +65,7 @@ export const KPICard: FC<KPICardProps> = ({ kpi, color = 'var(--chart-1, #2b5cd3
           </div>
         </div>
       )}
-      <div className="px-[16px] pb-[14px]" />
+      <div className="px-[16px] pb-[14px] mobile:pb-[10px]" />
     </div>
   );
 };
@@ -94,7 +94,7 @@ export const KpiCard: FC<{ label: string; value: string; color?: string }> = ({
     <span className="relative text-[13px] font-medium text-newTableText uppercase tracking-wide">
       {label}
     </span>
-    <span className="relative text-[32px] leading-[40px] font-semibold tracking-tight tabular-nums">
+    <span className="relative text-[32px] mobile:text-[24px] xs:text-[20px] leading-[40px] mobile:leading-[32px] xs:leading-[28px] font-semibold tracking-tight tabular-nums">
       {value}
     </span>
   </div>

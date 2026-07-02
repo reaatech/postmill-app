@@ -10,7 +10,148 @@
 
 ## Unreleased
 
+### Added
+- **AI Designer Foundations.** The server now owns the `DesignerDoc` contract: a single zod schema
+  in `libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts` is the source of
+  truth, while the frontend store and renderer `import type` from it and the dependency-free
+  `migrateDoc`/`createBlankDoc`/limits live in `designer-doc.migrate.ts` (no zod in the designer
+  chunk). `DesignerDocService` provides `validate` (lenient/clamping), `validateStrict`, `applyOps`,
+  and `assignIdsAndNormalize`. Every design/template write validates and persists the clamped doc,
+  and `Design.width/height` are reconciled from `doc.outputs[0]`. New endpoints:
+  `POST /media/designs/validate` (`media:read`, lenient) and `POST /media/designs/apply-ops`
+  (`media:create`, strict). `/copilot/agent` now carries the acting `user` in Mastra context, and the
+  new `designerDesign` Mastra tool creates/updates designs from a doc, template, or op sequence with
+  image preview persistence. No Prisma migration is required (`Design.doc` and `DesignTemplate.doc`
+  are already `Json`).
+- **Campaign Discussion (Jira-style collaborative thread).** The campaign dashboard gains a
+  **Discussion** section below the tabbed content where org members talk about the campaign. It has a
+  TipTap WYSIWYG editor (bold/italic/underline/strike, headings, lists, links, emoji) that can
+  **embed images/video** picked from the media library, plus **@mentions** (notify via the existing
+  `NotificationService`, `comments` category), **emoji reactions**, one-level **threaded replies**,
+  **pin/resolve**, and edit/delete-your-own with author avatars and relative timestamps. Note HTML is
+  sanitized on write (server) and on render (`SafeContent`). Backed by two additive tables
+  (`CampaignNote`, `CampaignNoteReaction`) and `GET/POST/PUT/DELETE /campaigns/:id/notes` (+ `pin`,
+  `resolve`, `reactions`) — org-scoped and RBAC-gated (`posts:update`). Distinct from the synced
+  social **Comments** feature.
+- **Per-organization AI Model Defaults and Media Defaults.** Settings → AI gains a **Model Defaults**
+  sub-tab where admins pick the default model for each category (`low-reasoning`, `high-reasoning`,
+  `vision`, `workflow`). Settings → Content gains a **Media Defaults** sub-tab for all 16 media
+  categories (image/video/audio generation, speech, captions, slides, etc.). Defaults are stored in
+  the new `OrgDefaultModel` table and resolved lazily from enabled providers' live catalogs. The
+  legacy `scopeModels` admin endpoints are removed; `generator`/`agent`/`mcp` now share the
+  `high-reasoning` default, and `reasoning:true` resolves through it. AI-tab providers (e.g. OpenAI)
+  now also appear under **Media Defaults** via the AI+Media candidate union. A kill switch
+  `AI_MODEL_DEFAULTS_ENABLED=false` reverts AI model resolution to the legacy chain. The legacy
+  `VideoManager`, `@Video` registry, `ImagesSlides`, `Veo3`, `AiMediaGenerationService`, and the
+  `generate.video.options` chat tool were deleted; the video generator, composer AI media tools, and
+  Designer media operations now route through the defaults-resolved utility facade. Removed env vars:
+  `KIEAI_API_KEY`, `TRANSLOADIT_AUTH`, `TRANSLOADIT_SECRET`, and the legacy `ELEVENSLABS_API_KEY`
+  path (configure ElevenLabs as an AI Media provider instead). `FAL_KEY` remains in use by the
+  short-link adapter. Run `pnpm run prisma-generate` after pulling; `BackfillService` seeds defaults
+  for existing orgs on deploy.
+
 ### Changed
+- **"Schedule" renamed to "Posts" (`/schedule` → `/posts`).** The main scheduling workspace is now
+  **Posts** at `/posts`; the composer pages move to `/posts/post` and `/posts/post/:id`. The sidebar
+  label (general mode), page `<title>`, and docs use "Posts." The Next.js route directory
+  `app/(app)/(site)/schedule` was renamed to `posts`, and all in-app links (`router.push`/`href`),
+  the post-detail deep links, campaign draft links, and the backend deep links in
+  channel-refresh/notification/Stripe-onboarding/analytics-recommendation now target `/posts`. Legacy
+  `/schedule` (and sub-paths) plus the older `/launches` permanently redirect to `/posts`, so existing
+  links/bookmarks keep working. (Verb usages of "Schedule" — the composer submit button and the
+  "when to publish" column headers — are unchanged.)
+- **Plugs moved into the composer; standalone `/plugs` page removed.** The two provider automations
+  ("plugs") are now configured in the composer's per-channel settings panel instead of a separate
+  page: channel-wide **auto plugs** (`@Plug` — e.g. X/Bluesky/LinkedIn Page/Threads "Auto Repost" /
+  "Auto plug post") render as a new **Automations** section (channel-scoped, still stored in the
+  `Plugs` table, gated on `channels:update`), alongside the existing per-post **post plugs**
+  (`@PostPlug`). The `/plugs` route, its nav entry, and the `components/plugs/` UI are deleted. No
+  storage or endpoint changes — the backend plug routes are unchanged. Also removed the orphaned,
+  never-read `ExisingPlugData` dedup table and its dead service/repository code (drop migration
+  `20260701000000_drop_exising_plug_data`).
+- **Post composer unified + renamed `new-launch` → `composer`.** The `apps/frontend/src/components/new-launch/`
+  directory is now `components/composer/`, and the two former thin wrappers (`PostComposer` route wrapper
+  + `AddEditModal` modal wrapper) are merged into a **single `Composer` entry** (`composer/composer.tsx`)
+  mounted everywhere a post is composed — `/schedule/post`, agent chat, Settings → Content → Sets,
+  campaign planning, the calendar edit modal, standalone modal, and the media-tool "send to composer"
+  handoffs. Import-path/rename only for consumers (no editor rebuild). **Behavior parity:** the
+  `/schedule/post` create route and agent-chat new-post path now **auto-add signatures** like every other
+  surface already did.
+- **Public API `POST /public/v1/generate-video` is now asynchronous (response shape changed).**
+  Video generation moved from a synchronous call (which returned the finished video at `response.path`)
+  to the queued media-job pipeline. The response is now a self-describing, back-compatible object:
+  `{ id, status, jobId, path, name, pollUrl }`. When a finished URL is available synchronously
+  (image/url fallback) `status` is `completed` and `path` is the URL (legacy clients reading `.path`
+  still work). When a job is queued, `status` is `pending`, `path` is empty, and the client polls the
+  **new** API-key-reachable route `GET /public/v1/generate-video/:id` (returned in `pollUrl`) until
+  `status === 'completed'`, then reads `path`. n8n/Zapier integrations that assumed a synchronous
+  `path` must add the poll step. `POST /public/v1/video/function` (`loadVoices`) is unchanged.
+- **Notifications v2 is now the single surface for all email + in-app/push notifications.** The
+  placeholder category set was replaced with eight categories derived from the app's real triggers —
+  `post_published`, `post_failed`, `channels`, `comments`, `budget`, `media`, `announcements`,
+  `streak` — each independently toggleable per channel (email/push/in-app) at `/user/me` →
+  Notifications. The overloaded `system` catch-all and the never-fired `watchlist` category were
+  removed (the unrelated analytics watchlist feature is untouched), and the dead
+  `notifyInboxBacklog` / `notifyWatchlistTrend` / `notifySystem` convenience methods were deleted.
+  The **streak reminder** is now a real, preference-gated category routed through the notification
+  pipeline (it previously emailed every member directly, bypassing preferences, and now also appears
+  in the in-app bell). **Transactional emails** (account activation, password reset, team invite,
+  billing-cancel) are unified onto `NotificationService.sendEmail` as always-on sends (no
+  preference toggle, no stray in-app row) — no email path bypasses `NotificationService` anymore.
+  Category *renames* are code-only (categories persist as JSON and self-heal on read), but this
+  release **does add schema** — the new `NotificationPreference`, `NotificationRead`,
+  `NotificationDigestQueue`, and `PushToken` models plus `Notifications.type/title/metadata` — so a
+  `prisma db push` is required. **Migration safety:** the legacy per-user email toggles
+  (`UserProfile.sendSuccessEmails/sendFailureEmails/sendStreakEmails`) are **retained this release**
+  as an expand-contract step; `BackfillService` copies any opt-OUT into
+  `NotificationPreference.categories` on deploy (no manual script needed), and the columns are
+  scheduled for **drop in the next release**. This prevents opted-out users from being silently
+  re-opted-in (the defaults are opt-in). Run `pnpm run prisma-generate` after pulling.
+
+### Added
+- **Unified, versioned provider framework (v4.0.0).** All provider domains — AI, Media, Storage,
+  Short-link, Social, VPN, Content Packs, Email, Auth — now resolve through a single
+  `ProviderKernel` (`libraries/providers/kernel`) with one workspace package per provider
+  (`libraries/providers/<id>`). Each provider config/ledger row carries a pinned `version`
+  (`v1` today); resolution honors the pinned version so a future `v2` never silently changes an
+  existing org's behavior. A `PROVIDER_KERNEL=legacy` env kill switch reverts to the old
+  in-memory registries for the release window. New endpoints: `GET /providers/catalog?domain=`
+  (public catalog) and `GET /admin/providers/health?domain=` (super-admin health). See
+  `docs/developer-docs/provider-framework.md` and `docs/reference/provider-versions.md`.
+- **Campaign comments — view & reply, folded into the dashboard.** Each campaign's dashboard gains a
+  full **Comments** section over its posts' synced comments: filter by status, **channel**, assignee,
+  or unread; **reply** inline (with AI draft), like, cycle status, assign, and mark handled —
+  individually or in bulk. It reuses the existing cross-channel inbox endpoint, now with optional
+  `campaignId` + `integrationId` filters, plus a shared `CommentCard` (also adopted by the standalone
+  `/comments` inbox). The dashboard's **"Comments" KPI and `comments` goal now count the synced,
+  replyable comments** (matching the section and the public report) rather than the platform-reported
+  engagement total. Additive — no schema change.
+- **Channels settings: many named credential sets per provider.** Settings → Channels now manages
+  *named* OAuth-app credential sets — an org can add **multiple sets for the same provider**, each
+  with a required **name** and its **own auth** (client id/secret/scopes/redirect). Configuration
+  opens in a **modal**; the **Add channel** picker browses providers with their capability tags and a
+  single **Capabilities** checkbox-dropdown filter (replacing the old row of filter buttons); the page
+  heading was removed. Backed by an additive, db-push-safe schema change: `OrgProviderConfiguration`
+  drops its `(organizationId, identifier)` unique in favour of `(organizationId, identifier, name)`
+  and is resolved by row `id`, and `Integration` gains a nullable `providerConfigId` FK
+  (`onDelete: SetNull`) binding each connected account to the credential set it used. Credential
+  resolution falls back to the org's primary set for unbound/legacy connections. When linking a new
+  account, if a provider has more than one credential set the connect flow **prompts which set to
+  use** (one set ⇒ bound automatically; none ⇒ legacy primary-config flow); the choice rides through
+  the OAuth `?config=<id>` binding.
+
+### Changed
+- **Notifications v2 surfaces split to their correct homes.** The combined Settings → Notifications
+  tab is gone: per-user notification preferences (channels × categories + digest) now live in the
+  **Notifications tab of `/user/me`** (replacing the old email-only toggles), and the admin broadcast
+  composer is its own **Settings → Broadcast** tab under the **Workspace** heading (gated on
+  `notifications:manage`). This also fixes two bugs — saving preferences failed validation because
+  `UpdateNotificationPreferenceDto.masters` was typed as nested channel objects instead of flat
+  booleans, and the broadcast panel's `<form>` nested inside the settings form threw a React
+  `validateDOMNesting` console error on load (the broadcast composer no longer uses a `<form>`).
+  The legacy `EmailNotificationsComponent` and its `GET`/`POST /user/email-notifications` shim
+  (success/failure/streak email toggles) were removed — they were a thin adapter over the same v2
+  preferences (streak = the `system` category's email channel), so nothing is lost.
 - **Brand editor redesigned for beginners.** The previously-overwhelming single scroll (Brand Voice +
   Brand Kit + Knowledge Base stacked) is now split into three tabs — **Voice & Tone**, **Brand Kit**,
   **Knowledge** — each with a one-line "what this does" hint, and all copy rewritten in plain language
@@ -18,6 +159,52 @@
   behind an "Advanced settings (most people can skip these)" toggle so the default view stays simple.
 
 ### Added
+- **Campaign Hub.** Campaigns now have a dedicated dashboard (`/campaigns/:id`) with KPIs,
+  recent changelog, planning workspace, tagged items (tags, media, notes, tasks, personas, tone,
+  messages, goals, KPIs), and a post section. Draft approval flow: drafts inside a campaign must be
+  marked `approved` before they can be promoted to scheduled posts. Campaign-level UTM tagging
+  (`utmEnabled`) automatically appends `utm_campaign`, `utm_source`, and `utm_medium` to outbound
+  links. Campaigns can be copied with optional date shifting, cloning only draft posts and re-tagging
+  all campaign items. A shareable public report (`/public/campaign-report/:token`) exposes a read-only
+  JSON view when enabled, plus CSV/PDF export for org members. Daily cron `campaign-tag-purge`
+  soft-deletes/expunges stale campaign items after `CAMPAIGN_PURGE_DAYS` (default 30). Backend:
+  `CampaignsController`, `CampaignsService`, `CampaignReportService`, `CampaignActivity`,
+  `CampaignReportActivity`, `CampaignTagPurgeActivity`. Frontend:
+  `apps/frontend/src/components/campaigns/`.
+- **VPN provider settings surface.** Settings → VPN is a new credential-only provider page that
+  mirrors AI/Shortlinks: provider cards with brand icons, configured/enabled badges, search, and
+  per-provider configuration. Adapters are included for 15 consumer VPN providers: **NordVPN**,
+  **ExpressVPN**, **Surfshark**, **Proton VPN**, **Mullvad**, **CyberGhost**, **Private Internet Access**,
+  **IPVanish**, **Windscribe**, **TunnelBear**, **Hotspot Shield**, **PureVPN**, **VyprVPN**,
+  **hide.me**, and **Mozilla VPN**. Credentials are encrypted at rest in the new `OrgVpnConfig` table
+  and never returned to the browser. Endpoints: `GET /settings/vpn/config`,
+  `GET /settings/vpn/providers`, `PUT/DELETE /settings/vpn/config/:identifier`,
+  `POST /settings/vpn/config/:identifier/test`.
+- **Per-channel VPN egress (multi-region, live routing).** A channel config (Settings → Channels →
+  edit) gains an optional **2-column VPN row** — an Enabled/Disabled switch (off by default) plus a
+  filterable **`provider: region`** combobox. The row is hidden when the org has no enabled VPN
+  regions. Proxy-capable providers (NordVPN, Private Internet Access) now declare a catalog of
+  **egress regions**; Settings → VPN gains a per-provider region multi-select, and the enabled
+  provider×region combinations populate the channel picker. When a channel has an enabled selection,
+  **every outbound posting request that provider makes routes through that region's proxy** — a
+  per-request undici dispatcher (SOCKS5 via the `socks` package, HTTP-CONNECT via undici `ProxyAgent`)
+  injected through `AsyncLocalStorage` at publish time and picked up in `SocialAbstract.fetch()`.
+  SSRF protection is preserved: the proxy endpoint is validated as public, the proxy-connect leg keeps
+  the private-IP DNS pin, and the destination is re-checked as public HTTPS before dispatch.
+  Dispatchers are pooled per `(org, provider, region, creds-fingerprint)` and invalidated on any VPN
+  config change. Additive, db-push-safe schema: `OrgVpnConfig.regions` (JSON id list) and
+  `OrgProviderConfiguration.vpnSelection` (JSON `{enabled, identifier, regionId}`). **Scope/limits:**
+  only SOCKS5/HTTP-CONNECT-capable providers route (WireGuard/OpenVPN tunnels are out of scope);
+  providers that call raw `fetch`/`axios` instead of `this.fetch()` (Medium, parts of LinkedIn auth,
+  Bluesky) are not yet proxied. Region endpoints/credential schemes are source-grounded and need a
+  live smoke test.
+- **Bring-your-own-proxy: a "Custom VPN / Proxy" provider.** Alongside the consumer-VPN catalog,
+  Settings → VPN now offers a generic provider where the org enters its **own** SOCKS5 / HTTP-CONNECT
+  endpoint (connection name, host, port, protocol, optional username/password) — e.g. a proxy on your
+  office network — and channels using it egress from that proxy's IP. Its single region is **derived
+  from the stored config** (no fixed catalog, no per-region checklist); auth is optional for open
+  proxies. The proxy must be reachable from the Postmill server (a public host, or a private address
+  with `SSRF_ALLOWED_PRIVATE_CIDRS` set on a self-hosted instance).
 - **Brand Voice is now per-language.** Language moved to the top of the Brand Voice editor and now
   scopes the dataset: each language has its own instructions **and** its own optional per-channel
   overrides; switching the language shows a fresh dataset. Backed by a new additive

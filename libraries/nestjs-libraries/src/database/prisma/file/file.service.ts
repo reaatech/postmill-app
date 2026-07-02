@@ -30,6 +30,10 @@ export class FileService {
     return this._fileRepository.getFileById(id);
   }
 
+  getByIds(org: string, ids: string[]) {
+    return this._fileRepository.getByIds(org, ids);
+  }
+
   getFileByPath(org: string, filePath: string) {
     return this._fileRepository.getFileByPath(org, filePath);
   }
@@ -54,6 +58,20 @@ export class FileService {
 
   saveMediaInformation(org: string, data: SaveMediaInformationDto) {
     return this._fileRepository.saveMediaInformation(org, data);
+  }
+
+  saveGeneratedMedia(
+    org: string,
+    data: {
+      name: string;
+      path: string;
+      type: string;
+      folderId?: string | null;
+      fileSize?: number;
+      metadata?: Record<string, unknown>;
+    },
+  ) {
+    return this._fileRepository.saveGeneratedMedia(org, data);
   }
 
   // ── Folder Operations ────────────────────────────────────────
@@ -107,6 +125,10 @@ export class FileService {
 
   async getFolderTree(org: string) {
     return this._fileRepository.getFolderTree(org);
+  }
+
+  findFoldersByParent(org: string, parentId: string) {
+    return this._fileRepository.findFoldersByParent(org, parentId);
   }
 
   // ── File Operations ────────────────────────────────────

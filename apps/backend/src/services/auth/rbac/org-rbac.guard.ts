@@ -1,6 +1,7 @@
 import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesService } from '@gitroom/nestjs-libraries/database/prisma/roles/roles.service';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { REQUIRE_PERMISSION_KEY, RequirePermissionMetadata } from './require-permission.decorator';
 
 const RBAC_PERMS_CACHE = Symbol('rbacPermsCache');
@@ -18,7 +19,30 @@ export class OrgRbacGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
     private rolesService: RolesService,
+    private audit: AuditService,
   ) {}
+
+  // F2(a): record an RBAC denial as a non-fatal audit event. Resource is the attempted
+  // `(resource, action)`; never throws/blocks the (already-failing) request.
+  private _recordDenied(
+    orgId: string,
+    userId: string,
+    metadata: RequirePermissionMetadata,
+  ) {
+    try {
+      Promise.resolve(
+        this.audit.record({
+          orgId,
+          userId,
+          action: 'rbac.denied',
+          resource: `${metadata.resource}:${metadata.action}`,
+          metadata: { resource: metadata.resource, action: metadata.action },
+        }),
+      ).catch(() => {});
+    } catch {
+      /* non-fatal: auditing must never break the (already-failing) request */
+    }
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RbacRequest>();
@@ -63,6 +87,7 @@ export class OrgRbacGuard implements CanActivate {
       return true;
     }
 
+    this._recordDenied(orgId, userId, metadata);
     throw new ForbiddenException('Insufficient permissions');
   }
 

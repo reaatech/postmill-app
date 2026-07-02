@@ -2,15 +2,16 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 @Injectable()
 export class GenerateImageTool implements AgentToolInterface {
   constructor(
-    private _aiGeneration: AiMediaGenerationService,
+    private _aiDefaults: AiDefaultsService,
     private _fileService: FileService,
     private _storageService: StorageService,
   ) {}
@@ -42,17 +43,18 @@ export class GenerateImageTool implements AgentToolInterface {
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
-        const image = await this._aiGeneration.generateImage(
-          inputData.prompt,
-          org
-        );
+        const imageUrl = await this._aiDefaults.textToImage(org.id, inputData.prompt);
+
+        const res = await safeFetch(imageUrl);
+        if (!res.ok) throw new Error(`Image download failed (${res.status})`);
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const ct = res.headers.get('content-type')?.split(';')[0] || 'image/png';
+        const ext = ct === 'image/jpeg' ? 'jpg' : ct === 'image/webp' ? 'webp' : 'png';
 
         const adapter = await this._storageService.getLocalAdapterForOrg(org.id, true);
-        const file = await adapter.uploadSimple(
-          'data:image/png;base64,' + image
-        );
-
-        return this._fileService.saveFile(org.id, file.split('/').pop(), file);
+        const path = await adapter.writeBuffer(buffer, ct);
+        const fileName = `generated-image-${Date.now()}.${ext}`;
+        return this._fileService.saveFile(org.id, fileName, path, fileName);
       },
     });
   }

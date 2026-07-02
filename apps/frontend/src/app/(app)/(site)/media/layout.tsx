@@ -9,6 +9,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { useSidebarCollapse } from '@gitroom/frontend/components/layout/use-sidebar-collapse';
 import { SubmenuStrip } from '@gitroom/frontend/components/new-layout/submenu-strip';
+import { StudioErrorBoundary } from '@gitroom/frontend/components/media-tools/studio-error-boundary';
 
 const tabs = [
   {
@@ -191,6 +192,18 @@ const tabs = [
     icon: (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M5 3l14 9-14 9V3z" />
+      </svg>
+    ),
+  },
+  {
+    href: '/media/suno',
+    label: 'Suno',
+    section: 'Providers',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 18V6l10-2v12" />
+        <circle cx="6" cy="18" r="3" />
+        <circle cx="16" cy="16" r="3" />
       </svg>
     ),
   },
@@ -696,7 +709,9 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
             active: pathname.startsWith(t.href),
           }))}
         />
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible">{children}</div>
+        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto mobile:overflow-visible">
+          <StudioErrorBoundary>{children}</StudioErrorBoundary>
+        </div>
       </div>
     </div>
   );

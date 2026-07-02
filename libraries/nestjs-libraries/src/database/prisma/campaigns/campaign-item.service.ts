@@ -1,0 +1,141 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { CampaignEntityType } from '@prisma/client';
+import { CampaignItemRepository } from './campaign-item.repository';
+import { CampaignItemResolverRepository } from './campaign-item.resolver';
+import { CampaignsRepository } from './campaigns.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
+import {
+  ENTITY_ENUM_TO_SLUG,
+  ResolvedCampaignItem,
+  slugToEnum,
+} from './campaign-entity.types';
+
+@Injectable()
+export class CampaignTagService {
+  constructor(
+    private _items: CampaignItemRepository,
+    private _resolver: CampaignItemResolverRepository,
+    private _campaigns: CampaignsRepository,
+    private _audit: AuditService
+  ) {}
+
+  private _toEnum(slug: string): CampaignEntityType {
+    const en = slugToEnum(slug);
+    if (!en) throw new BadRequestException(`Unknown entity type: ${slug}`);
+    return en;
+  }
+
+  private async _requireCampaign(orgId: string, campaignId: string) {
+    const campaign = await this._campaigns.findById(campaignId, orgId);
+    if (!campaign) throw new NotFoundException('Campaign not found');
+    return campaign;
+  }
+
+  async tagItem(
+    orgId: string,
+    campaignId: string,
+    userId: string | undefined,
+    entityTypeSlug: string,
+    entityId: string
+  ) {
+    const campaign = await this._requireCampaign(orgId, campaignId);
+    const entityType = this._toEnum(entityTypeSlug);
+
+    if (entityType === 'POST') {
+      await this._items.setPostCampaign(orgId, entityId, campaignId);
+    } else {
+      await this._items.tag({ campaignId, organizationId: orgId, entityType, entityId, createdById: userId });
+    }
+
+    const name = await this._resolveOneName(orgId, entityType, entityId);
+    await this._audit.create({
+      organizationId: orgId,
+      userId,
+      action: 'campaign.item.add',
+      entity: 'campaign',
+      entityId: campaignId,
+      entityName: campaign.name,
+      details: JSON.stringify({ entityType: entityTypeSlug, entityId, itemName: name }),
+    });
+    return { success: true };
+  }
+
+  async untagItem(
+    orgId: string,
+    campaignId: string,
+    userId: string | undefined,
+    entityTypeSlug: string,
+    entityId: string
+  ) {
+    const campaign = await this._requireCampaign(orgId, campaignId);
+    const entityType = this._toEnum(entityTypeSlug);
+
+    if (entityType === 'POST') {
+      // Only clear if the post is actually on this campaign.
+      const current = await this._items.getPostCampaignId(orgId, entityId);
+      if (current === campaignId) await this._items.setPostCampaign(orgId, entityId, null);
+    } else {
+      await this._items.untag(campaignId, orgId, entityType, entityId);
+    }
+
+    const name = await this._resolveOneName(orgId, entityType, entityId);
+    await this._audit.create({
+      organizationId: orgId,
+      userId,
+      action: 'campaign.item.remove',
+      entity: 'campaign',
+      entityId: campaignId,
+      entityName: campaign.name,
+      details: JSON.stringify({ entityType: entityTypeSlug, entityId, itemName: name }),
+    });
+    return { success: true };
+  }
+
+  // Grouped + resolved items for one campaign (the 8 non-post types). Posts are
+  // surfaced separately by the dashboard via Post.campaignId.
+  async listItems(orgId: string, campaignId: string): Promise<Record<string, ResolvedCampaignItem[]>> {
+    await this._requireCampaign(orgId, campaignId);
+    const rows = await this._items.listByCampaign(campaignId, orgId);
+
+    const byType = new Map<CampaignEntityType, { entityId: string; taggedAt: Date }[]>();
+    for (const r of rows) {
+      const list = byType.get(r.entityType) || [];
+      list.push({ entityId: r.entityId, taggedAt: r.createdAt });
+      byType.set(r.entityType, list);
+    }
+
+    const out: Record<string, ResolvedCampaignItem[]> = {};
+    for (const [entityType, list] of byType) {
+      const resolved = await this._resolver.resolveBatch(orgId, entityType, list.map((l) => l.entityId));
+      const slug = ENTITY_ENUM_TO_SLUG[entityType];
+      out[slug] = list
+        .map((l) => {
+          const r = resolved.get(l.entityId);
+          if (!r) return null; // orphan (deleted source) — skipped
+          return { ...r, entityType: slug, taggedAt: l.taggedAt };
+        })
+        .filter(Boolean) as ResolvedCampaignItem[];
+    }
+    return out;
+  }
+
+  // Reverse: which campaigns is this entity tagged on (for the per-entity selector).
+  async listCampaignsForItem(orgId: string, entityTypeSlug: string, entityId: string) {
+    const entityType = this._toEnum(entityTypeSlug);
+    let campaignIds: string[];
+    if (entityType === 'POST') {
+      const cid = await this._items.getPostCampaignId(orgId, entityId);
+      campaignIds = cid ? [cid] : [];
+    } else {
+      campaignIds = await this._items.listCampaignIdsForItem(orgId, entityType, entityId);
+    }
+    if (campaignIds.length === 0) return [];
+    return this._campaigns.findByIds(orgId, campaignIds);
+  }
+
+  private async _resolveOneName(orgId: string, entityType: CampaignEntityType, entityId: string) {
+    if (entityType === 'POST') return 'a post';
+    const m = await this._resolver.resolveBatch(orgId, entityType, [entityId]);
+    return m.get(entityId)?.name || entityId;
+  }
+}

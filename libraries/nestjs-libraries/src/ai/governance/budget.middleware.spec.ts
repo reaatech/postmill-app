@@ -16,20 +16,14 @@ vi.mock('./budget.service', () => ({
   },
 }));
 
-vi.mock('../ai-provider.registry', () => ({
-  AIProviderRegistry: class {},
-}));
-
 import { BudgetMiddleware } from './budget.middleware';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { BudgetService } from './budget.service';
-import { AIProviderRegistry } from '../ai-provider.registry';
 
 function freshMiddleware() {
   return new BudgetMiddleware(
     new (AiSettingsManager as any)(),
     new (BudgetService as any)(),
-    new (AIProviderRegistry as any)(),
   );
 }
 

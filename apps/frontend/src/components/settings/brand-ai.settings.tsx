@@ -549,17 +549,26 @@ export const PromptTemplatesSection = () => {
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
-      <div className="flex items-center justify-between">
-        <div className="mt-[4px]">{t('prompt_templates', 'Prompt Templates')}</div>
+    <div className="my-[16px] mt-[16px] flex flex-col gap-[16px]">
+      <div className="flex items-start justify-between gap-[16px]">
+        <div className="flex flex-col gap-[4px]">
+          <h3 className="text-[18px] font-semibold text-textColor">{t('prompt_templates', 'Prompt Templates')}</h3>
+          <p className="text-[13px] text-newTableText">
+            {t(
+              'prompt_templates_description',
+              'Save your favorite prompt patterns so the AI writes in your style every time.'
+            )}
+          </p>
+        </div>
         <button
-          className="text-[13px] text-textColor hover:underline"
+          className="text-[13px] text-textColor hover:underline shrink-0"
           onClick={() => setShowNew(!showNew)}
         >
           {showNew ? t('cancel', 'Cancel') : t('add_template', '+ Add Template')}
         </button>
       </div>
 
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       {showNew && (
         <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
           <input
@@ -661,6 +670,7 @@ className="bg-btnPrimary text-white rounded-[8px] px-[12px] py-[6px] text-[13px]
           </div>
         )}
       </div>
+      </div>
     </div>
   );
 };
@@ -716,17 +726,26 @@ export const PromptLibrarySection = () => {
   }
 
   return (
-    <div className="my-[16px] mt-[16px] bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
-      <div className="flex items-center justify-between">
-        <div className="mt-[4px]">{t('prompt_library', 'Prompt Library')}</div>
+    <div className="my-[16px] mt-[16px] flex flex-col gap-[16px]">
+      <div className="flex items-start justify-between gap-[16px]">
+        <div className="flex flex-col gap-[4px]">
+          <h3 className="text-[18px] font-semibold text-textColor">{t('prompt_library', 'Prompt Library')}</h3>
+          <p className="text-[13px] text-newTableText">
+            {t(
+              'prompt_library_description',
+              'Keep a collection of ready-to-use prompts for quick inspiration.'
+            )}
+          </p>
+        </div>
         <button
-          className="text-[13px] text-textColor hover:underline"
+          className="text-[13px] text-textColor hover:underline shrink-0"
           onClick={() => setShowNew(!showNew)}
         >
           {showNew ? t('cancel', 'Cancel') : t('add_prompt', '+ Add Prompt')}
         </button>
       </div>
 
+      <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px] flex flex-col gap-[24px]">
       {showNew && (
         <div className="flex flex-col gap-[12px] bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px]">
           <input
@@ -787,6 +806,7 @@ export const PromptLibrarySection = () => {
             {t('no_prompts', 'No saved prompts yet')}
           </div>
         )}
+      </div>
       </div>
     </div>
   );

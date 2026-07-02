@@ -1,14 +1,19 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpException,
+  Logger,
+  NotFoundException,
   Param,
   Post,
   Query,
   Req,
   Res,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { sign } from 'jsonwebtoken';
 import { Organization, User } from '@prisma/client';
@@ -24,8 +29,11 @@ import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions
 
 import { ApiTags } from '@nestjs/swagger';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import { DeletionService } from '@gitroom/nestjs-libraries/database/prisma/users/deletion.service';
+import { DataExportService } from '@gitroom/nestjs-libraries/database/prisma/users/data-export.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
-import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
+
 import { ChangePasswordDto } from '@gitroom/nestjs-libraries/dtos/users/change-password.dto';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
 import { RealIP } from 'nestjs-real-ip';
@@ -39,13 +47,18 @@ import crypto from 'crypto';
 @ApiTags('User')
 @Controller('/user')
 export class UsersController {
+  private readonly _logger = new Logger(UsersController.name);
   constructor(
     private _subscriptionService: SubscriptionService,
     private _stripeService: StripeService,
     private _authService: AuthService,
     private _orgService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _campaignsService: CampaignsService,
+    private _trackService: TrackService,
+    private _auditService: AuditService,
+    private _deletionService: DeletionService,
+    private _dataExportService: DataExportService
   ) {}
   @Get('/agent-media-sso')
   async getAgentMediaSsoUrl(
@@ -126,8 +139,10 @@ export class UsersController {
   }
 
   @Post('/impersonate')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
   async setImpersonate(
     @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization,
     @Body('id') id: string,
     @Res({ passthrough: true }) response: Response
   ) {
@@ -144,8 +159,23 @@ export class UsersController {
             sameSite: 'none',
           }
         : {}),
-      expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+      // Short-lived impersonation session (B5): 24h, not the 365-day cookie.
+      expires: new Date(Date.now() + 1000 * 60 * 60 * 24),
     });
+
+    // Audit the privileged action (B4): actor super-admin + impersonated target + org.
+    try {
+      await this._auditService.create({
+        organizationId: organization.id,
+        userId: user.id,
+        action: 'user.impersonate',
+        entity: 'user',
+        entityId: id,
+        details: JSON.stringify({ targetUserId: id, actorUserId: user.id }),
+      });
+    } catch (err) {
+      this._logger.warn(`Failed to audit impersonation: ${(err as any)?.message}`);
+    }
 
     if (process.env.NODE_ENV === 'development' && process.env.NOT_SECURED) {
       response.header('impersonate', id);
@@ -158,19 +188,6 @@ export class UsersController {
     @Body() body: UserDetailDto
   ) {
     return this._userService.changePersonal(user.id, body);
-  }
-
-  @Get('/email-notifications')
-  async getEmailNotifications(@GetUserFromRequest() user: User) {
-    return this._userService.getEmailNotifications(user.id);
-  }
-
-  @Post('/email-notifications')
-  async updateEmailNotifications(
-    @GetUserFromRequest() user: User,
-    @Body() body: EmailNotificationsDto
-  ) {
-    return this._userService.updateEmailNotifications(user.id, body);
   }
 
   @Post('/change-password')
@@ -322,6 +339,40 @@ export class UsersController {
     response.status(200).send();
   }
 
+  // Read-only team-member profile. Tenant-guarded: only resolves a user who is a
+  // member of the requester's org (getMemberProfile returns null otherwise).
+  @Get('/profile/:userId')
+  async memberProfile(
+    @GetOrgFromRequest() org: Organization,
+    @Param('userId') userId: string
+  ) {
+    const member = await this._orgService.getMemberProfile(org.id, userId);
+    if (!member) {
+      throw new NotFoundException('Member not found');
+    }
+    const profile = member.user.profile;
+    const fullName = [profile?.name, profile?.lastName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const campaignsCreated = await this._campaignsService.countCreatedBy(
+      org.id,
+      userId
+    );
+    // NOTE: email is deliberately omitted — unlike the policy-gated team list,
+    // this route is available to any org member (via the "Created by" link), so
+    // it must not broaden PII (email) visibility past the team-list role boundary.
+    return {
+      id: member.user.id,
+      name: fullName || member.user.email,
+      bio: profile?.bio || null,
+      avatarUrl: profile?.avatarUrl || profile?.picture?.path || null,
+      role: member.roleRef?.name || member.roleRef?.key || null,
+      joinedAt: member.createdAt,
+      campaignsCreated,
+    };
+  }
+
   @Get('/sessions')
   async getSessions(@GetUserFromRequest() user: User) {
     return this._authService.getUserSessions(user.id);
@@ -388,5 +439,53 @@ export class UsersController {
     res.status(200).json({
       track: uniqueId,
     });
+  }
+
+  // GDPR data-access export (I2): the requesting user's own identity/profile + their
+  // current org's posts/comments/files metadata. Auth-only + throttled.
+  @Get('/me/export')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async exportMyData(
+    @GetUserFromRequest() user: User,
+    @GetOrgFromRequest() organization: Organization,
+    @Res({ passthrough: true }) res: Response
+  ) {
+    if (!organization) {
+      throw new HttpForbiddenException();
+    }
+    const data = await this._dataExportService.exportUserData(
+      user.id,
+      organization.id
+    );
+    res.header(
+      'Content-Disposition',
+      `attachment; filename="postmill-export-${user.id}.json"`
+    );
+    return data;
+  }
+
+  // GDPR erasure (I1): self-service account deletion. Deletes the user, the orgs they
+  // solely own, and all owned children. Auth-only (self) + tight throttle.
+  @Delete('/me')
+  @Throttle({ default: { limit: 3, ttl: 60000 } })
+  async deleteMe(
+    @GetUserFromRequest() user: User,
+    @Res({ passthrough: true }) response: Response
+  ) {
+    await this._deletionService.deleteUser(user.id);
+
+    // Clear the auth/session cookies — the account no longer exists.
+    for (const name of ['auth', 'showorg', 'impersonate', 'refresh_token']) {
+      response.cookie(name, '', {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED || process.env.NODE_ENV !== 'development'
+          ? { secure: true, httpOnly: true, sameSite: 'none' }
+          : {}),
+        maxAge: -1,
+        expires: new Date(0),
+      });
+    }
+    response.header('logout', 'true');
+    return { success: true };
   }
 }

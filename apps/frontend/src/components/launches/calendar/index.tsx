@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useCalendar } from './context';
 
 // dayjs locale imports and setup
@@ -29,6 +29,8 @@ import { DayView } from './day.view';
 import { WeekView } from './week.view';
 import { MonthView } from './month.view';
 import { ListView } from './list.view';
+import { RangeView } from './range.view';
+import { MobileView } from './mobile.view';
 
 extend(isSameOrAfter);
 extend(isSameOrBefore);
@@ -45,13 +47,52 @@ i18next.on('languageChanged', () => {
 
 updateDayjsLocale();
 
+// Matches the `mobile:` Tailwind utility (max-width: 1025px). The guard keeps it
+// safe under SSR and jsdom (which has no `window.matchMedia`).
+const MOBILE_QUERY = '(max-width: 1025px)';
+const matchesMobile = () =>
+  typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia(MOBILE_QUERY).matches;
+
 export const Calendar = () => {
-  const { display } = useCalendar();
+  const { display, customRange } = useCalendar();
+
+  // Below the mobile breakpoint there's only room for a single day column, so the
+  // calendar reflows to MobileView — the same calendar (same `useCalendar` posts,
+  // filters, settings and window), just a single vertical scroll with floating
+  // date/time. Kept in the component body (not module scope) so the calendar specs
+  // — which mock `useCalendar` but not `matchMedia` — never touch it.
+  const [isMobile, setIsMobile] = useState(matchesMobile);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+    const mq = window.matchMedia(MOBILE_QUERY);
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // List is honored first on every screen size — mobile must never override the
+  // user's list view (it paginates any window itself).
+  if (display === 'list') {
+    return <ListView />;
+  }
+
+  // On mobile the grid displays collapse to the dense, floating-header MobileView.
+  if (isMobile) {
+    return <MobileView />;
+  }
+
+  // Desktop: a custom date range renders as its own range grid (exact selected days).
+  if (customRange) {
+    return <RangeView />;
+  }
   return (
     <>
-      {display === 'list' ? (
-        <ListView />
-      ) : display === 'day' ? (
+      {display === 'day' ? (
         <DayView />
       ) : display === 'week' ? (
         <WeekView />

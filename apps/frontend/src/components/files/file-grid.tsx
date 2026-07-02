@@ -1,10 +1,75 @@
 'use client';
 
-import React, { FC, useCallback } from 'react';
+import React, { FC, useCallback, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import clsx from 'clsx';
 import type { FileItem } from './file-manager';
+
+// Thumbnail with a graceful fallback: prefer a still thumbnail (doubles as a
+// video poster), fall back to the raw image path / video first-frame, and show
+// a placeholder icon when the source is missing/unrenderable (broken image).
+const Thumb: FC<{ file: FileItem }> = ({ file }) => {
+  const mediaDirectory = useMediaDirectory();
+  const [broken, setBroken] = useState(false);
+  const isVideo = hasExtension(file.path, 'mp4');
+  const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
+  const thumb = file.thumbnail
+    ? mediaDirectory.set(file.thumbnail)
+    : !isVideo && !isAudio
+    ? mediaDirectory.set(file.path)
+    : '';
+
+  if (isAudio) {
+    // Compact audio tile; the full waveform player opens in the modal.
+    return (
+      <div className="flex flex-col items-center justify-center gap-[10px] w-full h-full bg-newBgColorInner text-newTextColor/70">
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M9 18V5l12-2v13" />
+          <circle cx="6" cy="18" r="3" />
+          <circle cx="18" cy="16" r="3" />
+        </svg>
+        <div className="flex items-end gap-[2px] h-[18px]">
+          {[6, 12, 9, 16, 8, 14, 5, 11, 7].map((h, i) => (
+            <span key={i} style={{ height: h }} className="w-[3px] rounded-full bg-[#2B5CD3]/60" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+  if (thumb && !broken) {
+    return (
+      // onError drives the broken-thumbnail fallback below (legitimate use).
+      // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
+      <img
+        src={thumb}
+        alt={file.alt || file.name}
+        className="w-full h-full object-cover"
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    );
+  }
+  if (isVideo && !broken) {
+    return (
+      <video
+        src={mediaDirectory.set(file.path)}
+        className="w-full h-full object-cover"
+        muted
+        preload="metadata"
+      />
+    );
+  }
+  return (
+    <div className="flex items-center justify-center w-full h-full text-newTextColor/40">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="9" cy="9" r="2" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    </div>
+  );
+};
 
 const formatDate = (d: string) => {
   try {
@@ -29,8 +94,6 @@ export const FileGrid: FC<{
   standalone?: boolean;
   onSelect?: (items: FileItem[]) => void;
 }> = ({ files, selectedFiles, onToggleSelect, onFileClick, onSelect }) => {
-  const mediaDirectory = useMediaDirectory();
-
   const handleDragStart = useCallback((e: React.DragEvent, fileId: string) => {
     e.dataTransfer.setData('text/plain', fileId);
     e.dataTransfer.effectAllowed = 'move';
@@ -42,8 +105,6 @@ export const FileGrid: FC<{
     <div className="flex flex-wrap gap-[3px]">
       {files.map((file) => {
         const isSelected = !!selectedFiles.find(f => f.id === file.id);
-        const isVideo = hasExtension(file.path, 'mp4');
-        const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
         const tags = file.tags ? JSON.parse(file.tags) : [];
 
         return (
@@ -52,7 +113,7 @@ export const FileGrid: FC<{
             draggable
             onDragStart={(e) => handleDragStart(e, file.id)}
             className={clsx(
-              'group relative w-[calc(12.5%-3px)] min-w-[120px] rounded-[8px] cursor-grab active:cursor-grabbing border-[3px] transition-all',
+              'group relative w-[calc(50%-3px)] sm:w-[calc(33.333%-3px)] md:w-[calc(25%-3px)] lg:w-[calc(16.666%-3px)] xl:w-[calc(12.5%-3px)] min-w-[100px] rounded-[8px] cursor-grab active:cursor-grabbing border-[3px] transition-all',
               isSelected ? 'border-[#2B5CD3]' : 'border-transparent hover:border-[#2B5CD3]/40'
             )}
             onClick={() => {
@@ -65,35 +126,7 @@ export const FileGrid: FC<{
             onDoubleClick={() => !onSelect && onFileClick(file)}
           >
             <div className="w-full aspect-square overflow-hidden rounded-t-[5px] bg-newBgColorInner relative">
-              {isAudio ? (
-                // Compact audio tile; the full waveform player opens in the modal.
-                <div className="flex flex-col items-center justify-center gap-[10px] w-full h-full bg-newBgColorInner text-newTextColor/70">
-                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 18V5l12-2v13" />
-                    <circle cx="6" cy="18" r="3" />
-                    <circle cx="18" cy="16" r="3" />
-                  </svg>
-                  <div className="flex items-end gap-[2px] h-[18px]">
-                    {[6, 12, 9, 16, 8, 14, 5, 11, 7].map((h, i) => (
-                      <span key={i} style={{ height: h }} className="w-[3px] rounded-full bg-[#2B5CD3]/60" />
-                    ))}
-                  </div>
-                </div>
-              ) : isVideo ? (
-                <video
-                  src={mediaDirectory.set(file.path)}
-                  className="w-full h-full object-cover"
-                  muted
-                  preload="metadata"
-                />
-              ) : (
-                <img
-                  src={mediaDirectory.set(file.path)}
-                  alt={file.alt || file.name}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
-              )}
+              <Thumb file={file} />
 
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all pointer-events-none" />
 

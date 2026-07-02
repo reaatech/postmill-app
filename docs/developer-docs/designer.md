@@ -1,10 +1,27 @@
 # Designer (native design editor)
 
-> Verified against v3.9.0 (Designer Phase 2).
+> Verified against v3.9.1 (AI Designer Foundations).
 
 The Designer is the native, open-source design editor that replaced the proprietary Polotno SDK.
 It is built on **react-konva** (Konva.js, MIT) and lives under `/media/designer`. It reads input
 from and writes output to the **Files** library; it never stores its own assets outside `/files`.
+
+## DesignerDoc contract (server-authoritative)
+
+The **`DesignerDoc` JSON is the agent interface, and the server owns it.** There is one
+zod-based source of truth in
+`libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts`; the frontend store and
+the server renderer both `import type` from it, while the dependency-free runtime helpers
+(`migrateDoc`, `createBlankDoc`, limits) live in `designer-doc.migrate.ts` and stay out of the
+client bundle. The contract discriminates on `mode` (`image` ⇒ `outputs: DesignerOutput[]`,
+`video` ⇒ `outputs: VideoOutput[]`) and carries `version` + `migrateDoc` for forward-compatible
+upgrades.
+
+`DesignerDocService` provides `validate` (lenient, clamps legacy docs), `validateStrict` (rejects
+unknown keys), `applyOps` (mode-aware document transforms), and `assignIdsAndNormalize`
+(CSPRNG id minting across children/tracks/clips). `DesignService` validates every persisted design
+and template, reconciles `Design.width/height` from `doc.outputs[0]`, and exposes
+`instantiateTemplate` and `placeAsset` for agent use.
 
 ## Frontend architecture
 
@@ -52,7 +69,18 @@ Layering is Controller → Service → Repository (only repositories touch Prism
   `AiMediaService` (Replicate via `@reaatech/media-pipeline-mcp-*`).
 - **Server-side render** (`DesignRenderService`, node-canvas): `POST /media/designs/render`
   → PNG or PDF (pdfkit). **Bulk generation** (`DesignBulkService`): `POST /media/designs/bulk-generate`
-  substitutes `{{variables}}` per row and renders a batch.
+  substitutes `{{variables}}` per row and renders a batch. Both endpoints validate `body.doc`
+  before rendering; `/media/designs/render-video` is intentionally excluded because it accepts a
+  separate `composition` object, not a `DesignerDoc`.
+- **Document ops / validation:** `POST /media/designs/validate` (lenient, `media:read`) returns
+  `{ valid, errors? }`; `POST /media/designs/apply-ops` (strict, `media:create`) returns
+  `{ doc }` after applying a strict-parsed op sequence.
+- **Agent seam:** `/copilot/agent` now carries the acting `user` in the Mastra `requestContext` so
+  user-attributed tools can fill `createdById`. The `designerDesign` Mastra tool
+  (`libraries/nestjs-libraries/src/chat/tools/designer.design.tool.ts`) creates/updates designs from
+  a `DesignerDoc`, template, or op sequence and persists an image preview when `mode === 'image'`.
+- **No migration required.** `Design.doc` and `DesignTemplate.doc` are already Prisma `Json` fields;
+  the new schema is enforced at the service boundary.
 - **Brand kit:** `AIBrandProfile.logoFileIds` / `palette` / `fontFamilies` are read/written through
   the brand profile API.
 

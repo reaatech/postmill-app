@@ -1,7 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
+import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
 
 // Pre-drop User rows still carry the profile columns that moved to UserProfile;
 // the current Prisma client no longer types them, so model the legacy shape here.
@@ -16,6 +18,22 @@ type LegacyUserRow = {
   sendStreakEmails?: boolean;
 };
 
+// UserProfile email opt-out column -> Notifications V2 category key.
+const EMAIL_PREF_COLUMN_TO_CATEGORY: Array<
+  [keyof ProfileEmailFlags, string]
+> = [
+  ['sendSuccessEmails', 'post_published'],
+  ['sendFailureEmails', 'post_failed'],
+  ['sendStreakEmails', 'streak'],
+];
+
+type ProfileEmailFlags = {
+  userId: string;
+  sendSuccessEmails: boolean;
+  sendFailureEmails: boolean;
+  sendStreakEmails: boolean;
+};
+
 function deriveFingerprint(data: (string | null | undefined)[]): string {
   const hash = createHash('sha1');
   for (const part of data) {
@@ -26,17 +44,95 @@ function deriveFingerprint(data: (string | null | undefined)[]): string {
 
 @Injectable()
 export class BackfillService {
-  constructor(private prisma: PrismaService) {}
+  private readonly _logger = new Logger(BackfillService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private _ledger: MigrationLedgerRepository,
+    private _defaultsSeed?: DefaultsSeedService,
+  ) {}
 
   async backfill() {
-    await this.prisma.$transaction(async (tx) => {
-      await this.backfillUserProfiles(tx);
-      await this.backfillUserOrganizationRoles(tx);
-      await this.backfillAIBrandProfiles(tx);
-      await this.backfillStorageProviderFingerprints(tx);
-      await this.backfillShortLinkConfigs(tx);
-      await this.migrateRagSettingsMediaProviders(tx);
-    });
+    // Each step runs in its OWN transaction. Backfill steps are phase-dependent and
+    // idempotent — a column/table a step touches may not exist yet (pre-expand) or
+    // anymore (post-contract). Postgres aborts the ENTIRE transaction on any errored
+    // statement, so a single shared $transaction let one expected failure (e.g. the
+    // deprecated UserProfile.send*Emails columns not yet present) cascade 25P02 into
+    // every later step — silently skipping the RBAC role backfill and the rest.
+    // Per-step isolation keeps an expected/edge failure in one from poisoning the others.
+    // Reconciliation scans (oneTime = false, default): they re-scan `where: { …: null }`
+    // every boot because new rows with null values can be created later (e.g. a new
+    // membership with roleId: null). Marking them "applied" would permanently break self-heal.
+    await this._runStep('user profiles', (tx) => this.backfillUserProfiles(tx));
+    await this._runStep('user-organization roles', (tx) =>
+      this.backfillUserOrganizationRoles(tx),
+    );
+    await this._runStep('AI brand profiles', (tx) =>
+      this.backfillAIBrandProfiles(tx),
+    );
+    await this._runStep('storage provider fingerprints', (tx) =>
+      this.backfillStorageProviderFingerprints(tx),
+    );
+    await this._runStep('short-link configs', (tx) =>
+      this.backfillShortLinkConfigs(tx),
+    );
+
+    // One-time data migrations (oneTime = true): ledger-gated so they run once.
+    // - notification email prefs reads soon-to-be-dropped UserProfile.send*Emails columns.
+    // - RAG media providers self-disables by stripping its blob, but ledger-gate it too so a
+    //   re-add of the blob doesn't silently re-run the migration.
+    await this._runStep(
+      'notification email prefs',
+      (tx) => this.backfillNotificationEmailPrefs(tx),
+      true,
+    );
+    await this._runStep(
+      'RAG media providers',
+      (tx) => this.migrateRagSettingsMediaProviders(tx),
+      true,
+    );
+    await this._runStep(
+      'AI/media default models',
+      () => this.backfillDefaultModels(),
+      true,
+    );
+  }
+
+  private async _runStep(
+    label: string,
+    fn: (tx: Prisma.TransactionClient) => Promise<void>,
+    oneTime = false,
+  ): Promise<void> {
+    const key = `backfill:${label}`;
+    if (oneTime) {
+      let applied = false;
+      try {
+        applied = await this._ledger.wasApplied(key);
+      } catch {
+        // MigrationLedger table may not exist yet — treat as "not applied, proceed".
+        // Never let a missing ledger table silently skip a backfill.
+        applied = false;
+      }
+      if (applied) return;
+    }
+    try {
+      await this.prisma.$transaction(fn);
+      // Only mark applied AFTER the transaction succeeds — a step that throws on a
+      // not-yet-present column must retry on the next boot.
+      if (oneTime) {
+        try {
+          await this._ledger.markApplied(key);
+        } catch {
+          // Ledger write failure must not fail the boot; the step simply re-runs next time.
+        }
+      }
+    } catch (e) {
+      this._logger.warn(
+        `Backfill step "${label}" skipped: ${
+          (e as Error).message.split('\n')[0]
+        }`,
+      );
+    }
   }
 
   private async backfillUserProfiles(tx: Prisma.TransactionClient) {
@@ -63,6 +159,75 @@ export class BackfillService {
     } catch {
       // Profile fields on User may already be dropped after the destructive push —
       // this backfill is only needed pre-drop.
+    }
+  }
+
+  // Notifications V2 expand-contract: copy any email opt-OUT still stored on the
+  // (deprecated) UserProfile.send*Emails columns into NotificationPreference.categories
+  // BEFORE those columns are dropped in the follow-up release. Without this, every
+  // user who disabled success/failure/streak emails would silently revert to the
+  // opt-in defaults (NotificationPreferenceService self-heals missing categories to
+  // email:true on read) and start receiving unwanted mail on deploy.
+  // Only opt-outs need carrying — opt-ins already match the defaults. Idempotent:
+  // never clobbers a value already written under the new key (a post-deploy save wins).
+  private async backfillNotificationEmailPrefs(tx: Prisma.TransactionClient) {
+    let profiles: ProfileEmailFlags[];
+    try {
+      profiles = (await tx.userProfile.findMany({
+        where: {
+          OR: [
+            { sendSuccessEmails: false },
+            { sendFailureEmails: false },
+            { sendStreakEmails: false },
+          ],
+        },
+        select: {
+          userId: true,
+          sendSuccessEmails: true,
+          sendFailureEmails: true,
+          sendStreakEmails: true,
+        },
+      })) as ProfileEmailFlags[];
+    } catch {
+      // Columns already dropped (post-contract release) — nothing left to carry.
+      return;
+    }
+
+    for (const profile of profiles) {
+      const optOuts: Record<string, { email: boolean }> = {};
+      for (const [column, category] of EMAIL_PREF_COLUMN_TO_CATEGORY) {
+        if (profile[column] === false) optOuts[category] = { email: false };
+      }
+      if (Object.keys(optOuts).length === 0) continue;
+
+      const existing = await tx.notificationPreference.findUnique({
+        where: { userId: profile.userId },
+      });
+
+      if (!existing) {
+        await tx.notificationPreference.create({
+          data: { userId: profile.userId, categories: optOuts },
+        });
+        continue;
+      }
+
+      const categories = {
+        ...((existing.categories as Record<string, any>) ?? {}),
+      };
+      let dirty = false;
+      for (const [category, value] of Object.entries(optOuts)) {
+        // Don't overwrite a value the user already set under the new key.
+        if (categories[category]?.email === undefined) {
+          categories[category] = { ...(categories[category] ?? {}), ...value };
+          dirty = true;
+        }
+      }
+      if (dirty) {
+        await tx.notificationPreference.update({
+          where: { userId: profile.userId },
+          data: { categories },
+        });
+      }
     }
   }
 
@@ -159,6 +324,25 @@ export class BackfillService {
     }
   }
 
+  private async backfillDefaultModels() {
+    if (!this._defaultsSeed) {
+      this._logger.warn('DefaultsSeedService not available; skipping default-model backfill');
+      return;
+    }
+    const orgs = await this.prisma.organization.findMany({
+      select: { id: true },
+    });
+    for (const org of orgs) {
+      try {
+        await this._defaultsSeed.seedUnset(org.id);
+      } catch (err) {
+        this._logger.warn(
+          `Default-model backfill failed for org ${org.id}: ${(err as Error).message}`,
+        );
+      }
+    }
+  }
+
   private async migrateRagSettingsMediaProviders(tx: Prisma.TransactionClient) {
     const aiSettings = await tx.aISystemSettings.findFirst();
 
@@ -191,9 +375,10 @@ export class BackfillService {
 
         await tx.mediaProviderConfig.upsert({
           where: {
-            organizationId_identifier: {
+            organizationId_identifier_version: {
               organizationId: org.organizationId,
               identifier,
+              version: 'v1',
             },
           },
           update: {
@@ -203,6 +388,7 @@ export class BackfillService {
           create: {
             organizationId: org.organizationId,
             identifier,
+            version: 'v1',
             enabled: mp.enabled ?? false,
             extraConfig,
           },

@@ -46,13 +46,14 @@ function makeService() {
 
   const pollJob = vi.fn();
   const adapter = { identifier: 'luma', pollJob };
-  const registry = { get: vi.fn().mockReturnValue(adapter) };
+  const resolution = { resolveMedia: vi.fn().mockReturnValue(adapter) };
 
   const orgSettings = {
     getConfigForProvider: vi.fn().mockResolvedValue({
       credentials: { apiKey: 'luma-key' },
       storageProviderId: null,
       storageRootFolderId: null,
+      version: 'v1',
     }),
     getStandardFolderId: vi.fn().mockResolvedValue('folder-video-1'),
   };
@@ -67,12 +68,12 @@ function makeService() {
     saveGeneratedMedia: vi.fn().mockResolvedValue({ id: 'media-1', path: '/uploads/org-1/artifact.mp4' }),
   };
 
-  const notificationService = { inAppNotification: vi.fn().mockResolvedValue(undefined) };
+  const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
 
   const service = new MediaJobLifecycleService(
     aiSettings as never,
     orgSettings as never,
-    registry as never,
+    resolution as never,
     storageService as never,
     mediaRepository as never,
     notificationService as never,
@@ -83,7 +84,7 @@ function makeService() {
     jobs,
     aiSettings,
     pollJob,
-    registry,
+    resolution,
     orgSettings,
     storageAdapter,
     storageService,
@@ -176,7 +177,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         'old-1',
         expect.objectContaining({ status: 'failed' }),
       );
-      expect(notificationService.inAppNotification).toHaveBeenCalled();
+      expect(notificationService.notify).toHaveBeenCalled();
     });
 
     it('stays pending while the provider is still working (and marks processing)', async () => {
@@ -205,13 +206,14 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(await service.processJob('job-1')).toBe('failed');
       expect(jobs.get('job-1')!.status).toBe('failed');
       expect(jobs.get('job-1')!.error).toContain('NSFW rejected');
-      expect(notificationService.inAppNotification).toHaveBeenCalledWith(
-        'org-1',
-        expect.stringContaining('failed'),
-        expect.any(String),
-        false,
-        false,
-        'fail',
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          category: 'media',
+          title: expect.stringContaining('failed'),
+          message: expect.stringContaining('failed'),
+          channels: { email: false, push: false, inApp: true },
+        })
       );
     });
 
@@ -223,6 +225,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'luma-key' },
         storageProviderId: null,
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
       pollJob.mockResolvedValue({
         status: 'completed',
@@ -259,13 +262,14 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(jobs.get('job-1')!.status).toBe('completed');
       expect(jobs.get('job-1')!.artifactUrl).toBe('/uploads/org-1/artifact.mp4');
       // user notified
-      expect(notificationService.inAppNotification).toHaveBeenCalledWith(
-        'org-1',
-        expect.stringContaining('ready'),
-        expect.any(String),
-        false,
-        false,
-        'success',
+      expect(notificationService.notify).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orgId: 'org-1',
+          category: 'media',
+          title: expect.stringContaining('ready'),
+          message: expect.stringContaining('ready'),
+          channels: { email: false, push: false, inApp: true },
+        })
       );
     });
 
@@ -276,6 +280,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'k' },
         storageProviderId: 'sp-1',
         storageRootFolderId: null,
+        version: 'v1',
       });
       pollJob.mockResolvedValue({ status: 'completed', artifactUrl: 'data:video/mp4;base64,AAAA' });
 
@@ -308,9 +313,9 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
     });
 
     it('fails jobs whose adapter cannot poll', async () => {
-      const { service, jobs, registry } = makeService();
+      const { service, jobs, resolution } = makeService();
       jobs.set('job-1', makeJob());
-      registry.get.mockReturnValue({ identifier: 'x' }); // no pollJob
+      resolution.resolveMedia.mockReturnValue({ identifier: 'x' }); // no pollJob
 
       expect(await service.processJob('job-1')).toBe('failed');
     });
@@ -324,12 +329,67 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
     });
   });
 
+  describe('processJob multi-artifact (extraArtifactUrls)', () => {
+    function audioCompleteWithExtras() {
+      const ctx = makeService();
+      ctx.jobs.set('job-1', makeJob({ provider: 'suno', operation: 'audio' }));
+      ctx.orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'suno-key' },
+        storageProviderId: null,
+        storageRootFolderId: 'root-1',
+        version: 'v1',
+      });
+      ctx.pollJob.mockResolvedValue({
+        status: 'completed',
+        artifactUrl: 'https://cdn.suno/a.mp3',
+        extraArtifactUrls: ['https://cdn.suno/b.mp3'],
+        metadata: { mime: 'audio/mpeg' },
+      });
+      mockSafeFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'audio/mpeg', 'content-length': '3' }),
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      });
+      return ctx;
+    }
+
+    it('lands the primary artifact AND a sibling completed job per extra URL', async () => {
+      const { service, aiSettings, mediaRepository } = audioCompleteWithExtras();
+
+      expect(await service.processJob('job-1')).toBe('completed');
+
+      // one sibling job created for the single extra clip, same provider/operation as the primary
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+      expect(aiSettings.createMediaJob).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'suno', operation: 'audio', status: 'pending' }),
+      );
+      // both clips stored (primary + sibling)
+      expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledTimes(2);
+      // the sibling was completed with the stored tenant path
+      expect(aiSettings.updateMediaJob).toHaveBeenCalledWith(
+        'created-1',
+        expect.objectContaining({ status: 'completed' }),
+      );
+    });
+
+    it('is idempotent: a second sweep on the now-completed primary creates no more siblings', async () => {
+      const { service, aiSettings } = audioCompleteWithExtras();
+
+      expect(await service.processJob('job-1')).toBe('completed');
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+
+      // primary is now `completed` → processJob short-circuits to 'skipped', no new siblings
+      expect(await service.processJob('job-1')).toBe('skipped');
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('failJob notify option', () => {
     it('suppresses the notification when notify=false', async () => {
       const { service, jobs, notificationService } = makeService();
       jobs.set('job-1', makeJob());
       await service.failJob(makeJob(), 'provider down', { notify: false });
-      expect(notificationService.inAppNotification).not.toHaveBeenCalled();
+      expect(notificationService.notify).not.toHaveBeenCalled();
     });
   });
 
@@ -340,6 +400,7 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
         credentials: { apiKey: 'k' },
         storageProviderId: null,
         storageRootFolderId: 'root-1',
+        version: 'v1',
       });
 
       const result = await service.storeTranscript({

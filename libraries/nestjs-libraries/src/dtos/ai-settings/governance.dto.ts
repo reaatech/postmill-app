@@ -1,4 +1,19 @@
-import { IsOptional, IsString, IsObject } from 'class-validator';
+import { IsOptional, IsString, IsObject, ValidateNested } from 'class-validator';
+import { Type } from 'class-transformer';
+
+export class ScopeModelEntryDto {
+  @IsOptional()
+  @IsString()
+  provider?: string;
+
+  @IsOptional()
+  @IsString()
+  model?: string;
+
+  @IsOptional()
+  @IsString()
+  version?: string;
+}
 
 export class SaveGovernanceDto {
   @IsOptional()
@@ -27,7 +42,9 @@ export class SaveGovernanceDto {
 
   @IsOptional()
   @IsObject()
-  scopeModels?: Record<string, any>;
+  @ValidateNested({ each: true })
+  @Type(() => ScopeModelEntryDto)
+  scopeModels?: Record<string, ScopeModelEntryDto>;
 
   @IsOptional()
   @IsString()

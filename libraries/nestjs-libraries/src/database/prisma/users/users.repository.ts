@@ -3,7 +3,6 @@ import { Injectable } from '@nestjs/common';
 import { Provider } from '@prisma/client';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { UserDetailDto } from '@gitroom/nestjs-libraries/dtos/users/user.details.dto';
-import { EmailNotificationsDto } from '@gitroom/nestjs-libraries/dtos/users/email-notifications.dto';
 
 @Injectable()
 export class UsersRepository {
@@ -12,6 +11,56 @@ export class UsersRepository {
     private _session: PrismaRepository<'session'>,
     private _profile: PrismaRepository<'userProfile'>
   ) {}
+
+  async getNamesByIds(ids: string[]): Promise<Map<string, string>> {
+    const rows = await this._user.model.user.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, email: true, profile: { select: { name: true } } },
+    });
+    return new Map(
+      rows.map((r) => [r.id, r.profile?.name || r.email || r.id])
+    );
+  }
+
+  // NOTE: not org-scoped — resolves users by id alone. Only call with ids already
+  // obtained from an org-scoped row (e.g. a campaign's createdById). Do not pass
+  // client-supplied ids, or it becomes a cross-org profile lookup.
+  async getPublicProfilesByIds(
+    ids: string[]
+  ): Promise<Map<string, { id: string; name: string; email: string; avatarUrl: string | null }>> {
+    const rows = await this._user.model.user.findMany({
+      where: { id: { in: ids } },
+      select: {
+        id: true,
+        email: true,
+        profile: {
+          select: {
+            name: true,
+            lastName: true,
+            avatarUrl: true,
+            picture: { select: { path: true } },
+          },
+        },
+      },
+    });
+    return new Map(
+      rows.map((r) => {
+        const fullName = [r.profile?.name, r.profile?.lastName]
+          .filter(Boolean)
+          .join(' ')
+          .trim();
+        return [
+          r.id,
+          {
+            id: r.id,
+            name: fullName || r.email,
+            email: r.email,
+            avatarUrl: r.profile?.avatarUrl || r.profile?.picture?.path || null,
+          },
+        ];
+      })
+    );
+  }
 
   getImpersonateUser(name: string) {
     return this._user.model.user.findMany({
@@ -186,38 +235,6 @@ export class UsersRepository {
         picture: body.picture
           ? { connect: { id: body.picture.id } }
           : undefined,
-      },
-    });
-  }
-
-  async getEmailNotifications(userId: string) {
-    return this._profile.model.userProfile.findUnique({
-      where: {
-        userId,
-      },
-      select: {
-        sendSuccessEmails: true,
-        sendFailureEmails: true,
-        sendStreakEmails: true,
-      },
-    });
-  }
-
-  async updateEmailNotifications(userId: string, body: EmailNotificationsDto) {
-    await this._profile.model.userProfile.upsert({
-      where: {
-        userId,
-      },
-      create: {
-        userId,
-        sendSuccessEmails: body.sendSuccessEmails,
-        sendFailureEmails: body.sendFailureEmails,
-        sendStreakEmails: body.sendStreakEmails,
-      },
-      update: {
-        sendSuccessEmails: body.sendSuccessEmails,
-        sendFailureEmails: body.sendFailureEmails,
-        sendStreakEmails: body.sendStreakEmails,
       },
     });
   }

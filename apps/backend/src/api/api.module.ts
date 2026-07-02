@@ -13,12 +13,14 @@ import { PermissionsService } from '@gitroom/backend/services/auth/permissions/p
 import { IntegrationsController } from '@gitroom/backend/api/routes/integrations.controller';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { SettingsController } from '@gitroom/backend/api/routes/settings.controller';
+import { OrganizationsController } from '@gitroom/backend/api/routes/organizations.controller';
 import { PostsController } from '@gitroom/backend/api/routes/posts.controller';
 import { MediaController } from '@gitroom/backend/api/routes/media.controller';
 import { FilesController } from '@gitroom/backend/api/routes/files.controller';
 import { UploadModule } from '@gitroom/nestjs-libraries/upload/upload.module';
 import { BillingController } from '@gitroom/backend/api/routes/billing.controller';
 import { NotificationsController } from '@gitroom/backend/api/routes/notifications.controller';
+import { AdminNotificationsController } from '@gitroom/backend/api/routes/admin-notifications.controller';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.content.service';
 import { CodesService } from '@gitroom/nestjs-libraries/services/codes.service';
@@ -42,16 +44,18 @@ import { ChannelConfigController } from '@gitroom/backend/api/routes/channel.con
 import { ChannelConfigPerTenantController } from '@gitroom/backend/api/routes/channel-config.per-tenant.controller';
 import { SocialCommentsController } from '@gitroom/backend/api/routes/social-comments.controller';
 import { AiSettingsController } from '@gitroom/backend/api/routes/ai-settings.controller';
+import { AdminDefaultsController } from '@gitroom/backend/api/routes/admin-defaults.controller';
 import { AiModerateController } from '@gitroom/backend/api/routes/ai-moderate.controller';
 import { AiUserController } from '@gitroom/backend/api/routes/ai-user.controller';
-import { ProviderCapabilitiesController } from '@gitroom/backend/api/routes/provider-capabilities.controller';
 import { CampaignsController } from '@gitroom/backend/api/routes/campaigns.controller';
 import { RagController } from '@gitroom/backend/api/routes/rag.controller';
 import { StorageController } from '@gitroom/backend/api/routes/storage.controller';
 import { OrgAiSettingsController } from '@gitroom/backend/api/routes/org-ai-settings.controller';
 import { OrgShortLinkSettingsController } from '@gitroom/backend/api/routes/org-shortlink-settings.controller';
+import { OrgVpnSettingsController } from '@gitroom/backend/api/routes/org-vpn-settings.controller';
 import { ContentPackController } from '@gitroom/backend/api/routes/content-pack.controller';
 import { MediaProviderController } from '@gitroom/backend/api/routes/media-provider.controller';
+import { MediaDefaultsController } from '@gitroom/backend/api/routes/media-defaults.controller';
 import { DashboardController } from '@gitroom/backend/api/routes/dashboard.controller';
 import { BrandsController } from '@gitroom/backend/api/routes/brands.controller';
 import { ApiKeysController } from '@gitroom/backend/api/routes/api-keys.controller';
@@ -64,15 +68,13 @@ import { MediaJobsWebhookController } from '@gitroom/backend/api/routes/media-jo
 import { AiGuardMiddleware } from '@gitroom/backend/services/ai/ai-guard.middleware';
 import { BudgetMiddleware } from '@gitroom/nestjs-libraries/ai/governance/budget.middleware';
 import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/providers.manager';
-import { GithubProvider } from '@gitroom/backend/services/auth/providers/github.provider';
-import { GoogleProvider } from '@gitroom/backend/services/auth/providers/google.provider';
-import { FarcasterProvider } from '@gitroom/backend/services/auth/providers/farcaster.provider';
-import { WalletProvider } from '@gitroom/backend/services/auth/providers/wallet.provider';
-import { OauthProvider } from '@gitroom/backend/services/auth/providers/oauth.provider';
-import { AdminController } from '@gitroom/backend/api/routes/admin.controller';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SessionCleanupService } from '@gitroom/backend/services/session-cleanup.service';
 import { HealthController } from '@gitroom/backend/api/routes/health.controller';
+import {
+  ProvidersController,
+  AdminProvidersController,
+} from '@gitroom/backend/api/routes/providers.controller';
 import { InngestModule } from '@gitroom/nestjs-libraries/inngest/inngest.module';
 import { ReplicateStudioModule } from '@gitroom/nestjs-libraries/media/replicate-studio/replicate-studio.module';
 import { ReplicateStudioController } from './routes/replicate-studio.controller';
@@ -87,6 +89,7 @@ const authenticatedController = [
   UsersController,
   IntegrationsController,
   SettingsController,
+  OrganizationsController,
   SocialCommentsController,
   CampaignsController,
   PostsController,
@@ -94,6 +97,7 @@ const authenticatedController = [
   FilesController,
   BillingController,
   NotificationsController,
+  AdminNotificationsController,
   CopilotController,
   WebhookController,
   SignatureController,
@@ -106,16 +110,18 @@ const authenticatedController = [
   ChannelConfigController,
   AnalyticsV2Controller,
   AiSettingsController,
+  AdminDefaultsController,
   AiModerateController,
   AiUserController,
-  ProviderCapabilitiesController,
   StorageController,
   ChannelConfigPerTenantController,
   OrgAiSettingsController,
   RagController,
   OrgShortLinkSettingsController,
+  OrgVpnSettingsController,
   ContentPackController,
   MediaProviderController,
+  MediaDefaultsController,
   ApiKeysController,
   DashboardController,
   BrandsController,
@@ -124,17 +130,18 @@ const authenticatedController = [
   DesignController,
   DesignTemplateController,
   DesignerProxyController,
-  AdminController,
   ReplicateStudioController,
   HeyGenController,
   MediaStudioController,
   DeepgramController,
+  AdminProvidersController,
 ];
 @Module({
   imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule],
   controllers: [
     RootController,
     HealthController,
+    ProvidersController,
     StripeController,
     AuthController,
     PublicController,
@@ -161,11 +168,6 @@ const authenticatedController = [
     TrackService,
     ShortLinkService,
     AuthProviderManager,
-    GithubProvider,
-    GoogleProvider,
-    FarcasterProvider,
-    WalletProvider,
-    OauthProvider,
     AnalyticsService,
     StockMediaService,
     AiGuardMiddleware,

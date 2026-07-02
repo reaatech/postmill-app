@@ -181,6 +181,16 @@ describe('x deep', () => {
     expect(provider.handleErrors('random text')).toBeUndefined();
   });
 
+  it('throws RefreshTokenError on Unsupported Authentication', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Unsupported Authentication', 400));
+    await expect(provider.post('123', 'at:as', [{ id: 'p1', message: 'Hello world', settings: {}, media: [] }], { profile: 'testuser' } as any)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('throws BadBodyError on not-permitted error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('You are not permitted to perform this action', 400));
+    await expect(provider.post('123', 'at:as', [{ id: 'p1', message: 'Hello world', settings: {}, media: [] }], { profile: 'testuser' } as any)).rejects.toThrow(BadBodyError);
+  });
+
   it('refreshToken returns static value', async () => {
     const r = await provider.refreshToken();
     expect(r.accessToken).toBe('');
@@ -339,6 +349,16 @@ describe('facebook deep', () => {
     expect(provider.handleErrors('490', 400)?.type).toBe('refresh-token');
     expect(provider.handleErrors('anything', 401)?.type).toBe('bad-body');
     expect(provider.handleErrors('ok', 200)).toBeUndefined();
+  });
+
+  it('throws RefreshTokenError on access token validation error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Error validating access token', 400));
+    await expect(provider.post('page-123', 'tok', [{ id: 'p1', message: 'Hello', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('throws BadBodyError on error code 1366046', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('1366046', 400));
+    await expect(provider.post('page-123', 'tok', [{ id: 'p1', message: 'Hello', settings: {}, media: [] }])).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken returns static value', async () => {
@@ -713,6 +733,16 @@ describe('instagram-standalone deep', () => {
     expect(r?.type).toBe('retry');
   });
 
+  it('throws RefreshTokenError on REVOKED_ACCESS_TOKEN', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('REVOKED_ACCESS_TOKEN', 401));
+    await expect(provider.post('ig-123', 'tok', [{ id: 'p1', message: 'x', settings: {}, media: [{ type: 'image', path: 'https://ex.com/img.jpg' }] }], {} as any)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('throws BadBodyError on error code 2207081', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('2207081', 400));
+    await expect(provider.post('ig-123', 'tok', [{ id: 'p1', message: 'x', settings: {}, media: [{ type: 'image', path: 'https://ex.com/img.jpg' }] }], {} as any)).rejects.toThrow(BadBodyError);
+  });
+
   it('refreshToken refreshes via graph.instagram.com', async () => {
     globalThis.fetch = vi.fn()
       .mockImplementationOnce(() => Promise.resolve(resp({ access_token: 'new-tok' })))
@@ -957,6 +987,16 @@ describe('tiktok deep', () => {
     expect(provider.handleErrors('internal', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('picture_size_check_failed', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('TikTok API error', 400)?.type).toBe('bad-body');
+  });
+
+  it('throws RefreshTokenError on access_token_invalid', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('access_token_invalid', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Test video', media: [{ path: 'https://ex.com/vid.mp4' }], settings: { content_posting_method: 'DIRECT_POST', privacy_level: 'PUBLIC_TO_EVERYONE', duet: true, comment: true, stitch: true, brand_content_toggle: false, brand_organic_toggle: false } }], { profile: 'user123' } as any)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('throws BadBodyError on invalid_params', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('invalid_params', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Test video', media: [{ path: 'https://ex.com/vid.mp4' }], settings: { content_posting_method: 'DIRECT_POST', privacy_level: 'PUBLIC_TO_EVERYONE', duet: true, comment: true, stitch: true, brand_content_toggle: false, brand_organic_toggle: false } }], { profile: 'user123' } as any)).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken refreshes token', async () => {
@@ -1482,6 +1522,11 @@ describe('pinterest deep', () => {
     expect(provider.handleErrors('cover_image_url or cover_image_content_type', 400)?.type).toBe('bad-body');
   });
 
+  it('throws BadBodyError on Board not found', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Board not found', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Test pin', media: [{ type: 'image', path: 'https://ex.com/img.jpg' }], settings: { board: 'board-123' } }])).rejects.toThrow(BadBodyError);
+  });
+
   it('refreshToken fetches new token and user info', async () => {
     globalThis.fetch = vi.fn()
       .mockImplementationOnce(() => Promise.resolve(resp({ access_token: 'new-tok', expires_in: 7200 })))
@@ -1598,6 +1643,16 @@ describe('threads deep', () => {
     expect(provider.handleErrors('2207051', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('The media could not be fetched from this URI', 400)?.type).toBe('bad-body');
     expect(provider.handleErrors('text must be at most 500 characters', 400)?.type).toBe('bad-body');
+  });
+
+  it('throws RefreshTokenError on access token validation error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Error validating access token', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Hello Threads!', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('throws BadBodyError on error code 2207051', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('2207051', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Hello Threads!', settings: {}, media: [] }])).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken fetches new long-lived token', async () => {

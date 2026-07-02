@@ -191,6 +191,10 @@ export function createIntrospectionValidator(
         headers['Authorization'] = `Basic ${credentials}`;
       }
 
+      // Intentionally a bare fetch, NOT safeFetch: introspectionEndpoint is the
+      // operator-configured IdP token-introspection URL (set when the MCP server's OAuth
+      // config is created), not per-request user input, and is commonly a self-hosted /
+      // private-network IdP that safeFetch's public-only check would reject.
       const response = await fetch(introspectionEndpoint, {
         method: 'POST',
         headers,

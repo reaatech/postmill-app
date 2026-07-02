@@ -66,6 +66,11 @@ const useModalStore = create<State>((set) => ({
   closeAll: () => set({ modalManager: [] }),
 }));
 
+// True while any modal is open — used e.g. to hide the mobile bottom nav so a
+// full-screen modal's footer isn't covered by it.
+export const useHasOpenModals = () =>
+  useModalStore((state) => state.modalManager.length > 0);
+
 const CurrentModalContext = createContext({ id: '' });
 
 interface ModalManagerInterface extends ModalManagerStoreInterface {
@@ -187,7 +192,7 @@ export const Component: FC<{
               !modal.fullScreen
                 ? modal.top
                   ? ''
-                  : 'min-h-full pt-[100px] pb-[100px]'
+                  : 'min-h-full pt-[40px] pb-[40px] md:pt-[100px] md:pb-[100px]'
                 : 'h-screen',
               modal.size && modal.height
                 ? 'flex justify-center items-center'
@@ -196,9 +201,12 @@ export const Component: FC<{
           >
             <div
               className={clsx(
-                !modal.removeLayout && 'gap-[40px] p-[32px]',
+                !modal.removeLayout &&
+                  'gap-[24px] p-[20px] md:gap-[40px] md:p-[32px]',
                 'bg-newBgColorInner border border-newTableBorder mx-auto flex flex-col w-fit rounded-[12px] relative',
-                modal.size ? '' : 'min-w-[600px]',
+                modal.size
+                  ? ''
+                  : 'max-w-[calc(100vw-24px)] md:min-w-[600px] md:max-w-none',
                 modal.fullScreen && 'h-full'
               )}
               {...((!!modal.size || !!modal.height || !!modal.maxSize) && {

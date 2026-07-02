@@ -21,15 +21,23 @@ export class MediaStudioController {
   @Get('/:provider/status')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   @RequirePermission('media', 'read')
-  getStatus(@Param('provider') provider: string, @GetOrgFromRequest() org: Organization) {
-    return this._studio.getStatus(org.id, provider);
+  getStatus(
+    @Param('provider') provider: string,
+    @GetOrgFromRequest() org: Organization,
+    @Query('version') version?: string,
+  ) {
+    return this._studio.getStatus(org.id, provider, version);
   }
 
   @Get('/:provider/jobs')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   @RequirePermission('media', 'read')
-  getJobs(@Param('provider') provider: string, @GetOrgFromRequest() org: Organization) {
-    return this._studio.listJobs(org.id, provider);
+  getJobs(
+    @Param('provider') provider: string,
+    @GetOrgFromRequest() org: Organization,
+    @Query('version') version?: string,
+  ) {
+    return this._studio.listJobs(org.id, provider, version);
   }
 
   // Runtime model catalog for the studio's dynamic model dropdown.
@@ -40,9 +48,10 @@ export class MediaStudioController {
     @Param('provider') provider: string,
     @Query('operation') operation: string,
     @GetOrgFromRequest() org: Organization,
+    @Query('version') version?: string,
   ) {
     const op = operation === 'video' || operation === 'audio' ? operation : 'image';
-    return this._studio.listModels(org.id, provider, op);
+    return this._studio.listModels(org.id, provider, op, version);
   }
 
   @Post('/:provider/generate')
@@ -54,6 +63,7 @@ export class MediaStudioController {
     @Body() body: MediaStudioGenerateDto,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
+    @Query('version') version?: string,
   ) {
     return this._studio.generate(org.id, user.id, provider, {
       operation: body.operation,
@@ -61,6 +71,7 @@ export class MediaStudioController {
       input: body.input,
       mediaInputs: body.mediaInputs,
       folderId: body.folderId,
+      version,
     });
   }
 }

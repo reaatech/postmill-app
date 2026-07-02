@@ -1,94 +1,67 @@
 import 'reflect-metadata';
 
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { XProvider } from '@gitroom/nestjs-libraries/integrations/social/x.provider';
-import { SocialProvider } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { LinkedinProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.provider';
-import { RedditProvider } from '@gitroom/nestjs-libraries/integrations/social/reddit.provider';
-import { DevToProvider } from '@gitroom/nestjs-libraries/integrations/social/dev.to.provider';
-import { HashnodeProvider } from '@gitroom/nestjs-libraries/integrations/social/hashnode.provider';
-import { MediumProvider } from '@gitroom/nestjs-libraries/integrations/social/medium.provider';
-import { FacebookProvider } from '@gitroom/nestjs-libraries/integrations/social/facebook.provider';
-import { InstagramProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.provider';
-import { YoutubeProvider } from '@gitroom/nestjs-libraries/integrations/social/youtube.provider';
-import { TiktokProvider } from '@gitroom/nestjs-libraries/integrations/social/tiktok.provider';
-import { PinterestProvider } from '@gitroom/nestjs-libraries/integrations/social/pinterest.provider';
-import { DribbbleProvider } from '@gitroom/nestjs-libraries/integrations/social/dribbble.provider';
-import { LinkedinPageProvider } from '@gitroom/nestjs-libraries/integrations/social/linkedin.page.provider';
-import { ThreadsProvider } from '@gitroom/nestjs-libraries/integrations/social/threads.provider';
-import { DiscordProvider } from '@gitroom/nestjs-libraries/integrations/social/discord.provider';
-import { SlackProvider } from '@gitroom/nestjs-libraries/integrations/social/slack.provider';
-import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
-import { BlueskyProvider } from '@gitroom/nestjs-libraries/integrations/social/bluesky.provider';
-import { LemmyProvider } from '@gitroom/nestjs-libraries/integrations/social/lemmy.provider';
-import { InstagramStandaloneProvider } from '@gitroom/nestjs-libraries/integrations/social/instagram.standalone.provider';
-import { FarcasterProvider } from '@gitroom/nestjs-libraries/integrations/social/farcaster.provider';
-import { TelegramProvider } from '@gitroom/nestjs-libraries/integrations/social/telegram.provider';
-import { NostrProvider } from '@gitroom/nestjs-libraries/integrations/social/nostr.provider';
-import { VkProvider } from '@gitroom/nestjs-libraries/integrations/social/vk.provider';
-import { WordpressProvider } from '@gitroom/nestjs-libraries/integrations/social/wordpress.provider';
-import { ListmonkProvider } from '@gitroom/nestjs-libraries/integrations/social/listmonk.provider';
-import { GmbProvider } from '@gitroom/nestjs-libraries/integrations/social/gmb.provider';
-import { KickProvider } from '@gitroom/nestjs-libraries/integrations/social/kick.provider';
-import { TwitchProvider } from '@gitroom/nestjs-libraries/integrations/social/twitch.provider';
-import { SocialAbstract } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { MoltbookProvider } from '@gitroom/nestjs-libraries/integrations/social/moltbook.provider';
-import { SkoolProvider } from '@gitroom/nestjs-libraries/integrations/social/skool.provider';
-import { WhopProvider } from '@gitroom/nestjs-libraries/integrations/social/whop.provider';
-import { MeweProvider } from '@gitroom/nestjs-libraries/integrations/social/mewe.provider';
-import { TumblrProvider } from '@gitroom/nestjs-libraries/integrations/social/tumblr.provider';
-import { PixelfedProvider } from '@gitroom/nestjs-libraries/integrations/social/pixelfed.provider';
-import { PeerTubeProvider } from '@gitroom/nestjs-libraries/integrations/social/peertube.provider';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  SocialProvider,
+  SocialAbstract,
+  ProviderKernel,
+  DEFAULT_VERSION,
+} from '@gitroom/provider-kernel';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { ProviderNotConfiguredError } from '@gitroom/nestjs-libraries/integrations/provider-not-configured.error';
-
-export const socialIntegrationList: Array<SocialAbstract & SocialProvider> = [
-  new XProvider(),
-  new LinkedinProvider(),
-  new LinkedinPageProvider(),
-  new RedditProvider(),
-  new InstagramProvider(),
-  new InstagramStandaloneProvider(),
-  new FacebookProvider(),
-  new ThreadsProvider(),
-  new YoutubeProvider(),
-  new GmbProvider(),
-  new TiktokProvider(),
-  new PinterestProvider(),
-  new DribbbleProvider(),
-  new DiscordProvider(),
-  new SlackProvider(),
-  new KickProvider(),
-  new TwitchProvider(),
-  new MastodonProvider(),
-  new BlueskyProvider(),
-  new LemmyProvider(),
-  new FarcasterProvider(),
-  new TelegramProvider(),
-  new NostrProvider(),
-  new VkProvider(),
-  new MediumProvider(),
-  new DevToProvider(),
-  new HashnodeProvider(),
-  new WordpressProvider(),
-  new ListmonkProvider(),
-  new MoltbookProvider(),
-  new WhopProvider(),
-  new SkoolProvider(),
-  new MeweProvider(),
-  new TumblrProvider(),
-  new PixelfedProvider(),
-  new PeerTubeProvider(),
-  // new MastodonCustomProvider(),
-];
+import {
+  getEnvClientInfo,
+  getEnvEnabledIdentifiers,
+  isEnvEnabled,
+} from '@gitroom/nestjs-libraries/integrations/channel-env-credentials';
 
 @Injectable()
 export class IntegrationManager {
+  private readonly _logger = new Logger(IntegrationManager.name);
+
   constructor(
     private _providerConfigManager: ProviderConfigManager,
-    private _orgProviderConfigManager: OrgProviderConfigManager
+    private _orgProviderConfigManager: OrgProviderConfigManager,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel
   ) {}
+
+  // Raw social provider singletons, sourced from the ProviderKernel registry —
+  // the single source of truth (the legacy in-memory social registry and the
+  // PROVIDER_KERNEL kill switch were removed). The kernel's
+  // `create()` returns a credential-mapping bridge that intentionally does NOT
+  // carry the providers' @Plug/@Rules/@Tool decorator metadata or their custom
+  // tool methods, so enumeration + dynamic dispatch read the raw `legacyProvider`
+  // instance each registered module exposes.
+  getSocialProviders(): Array<SocialAbstract & SocialProvider> {
+    const seen = new Set<string>();
+    const list: Array<SocialAbstract & SocialProvider> = [];
+    for (const manifest of this._kernel.listManifests('social')) {
+      if (seen.has(manifest.providerId)) {
+        continue;
+      }
+      const mod = this._kernel.get(
+        'social',
+        manifest.providerId,
+        manifest.version
+      );
+      const raw = mod?.legacyProvider as
+        | (SocialAbstract & SocialProvider)
+        | undefined;
+      if (!raw) {
+        continue;
+      }
+      seen.add(manifest.providerId);
+      list.push(raw);
+    }
+    return list;
+  }
 
   async getAllIntegrations(orgId?: string) {
     if (orgId) {
@@ -102,12 +75,15 @@ export class IntegrationManager {
     const allConfigs = orgId
       ? await this._orgProviderConfigManager.getAllConfigs(orgId)
       : await this._providerConfigManager.getAllConfigs();
-    const enabledSet = new Set(enabledIdentifiers);
+    // Providers the deployment env supplies a platform OAuth app for always stay
+    // connectable (click-connect), even after the org has added its own configs.
+    const envEnabled = getEnvEnabledIdentifiers();
+    const enabledSet = new Set([...enabledIdentifiers, ...envEnabled]);
     const hasAnyConfigs = allConfigs.length > 0;
 
     return {
       social: await Promise.all(
-        socialIntegrationList
+        this.getSocialProviders()
           .filter((p) => !hasAnyConfigs || enabledSet.has(p.identifier))
           .map(async (p) => {
             const config = orgId
@@ -147,7 +123,7 @@ export class IntegrationManager {
       methodName: string;
     }[];
   } {
-    return socialIntegrationList.reduce(
+    return this.getSocialProviders().reduce(
       (all, current) => ({
         ...all,
         [current.identifier]:
@@ -161,7 +137,7 @@ export class IntegrationManager {
   getAllRulesDescription(): {
     [key: string]: string;
   } {
-    return socialIntegrationList.reduce(
+    return this.getSocialProviders().reduce(
       (all, current) => ({
         ...all,
         [current.identifier]:
@@ -175,7 +151,7 @@ export class IntegrationManager {
   }
 
   getAllPlugs() {
-    return socialIntegrationList
+    return this.getSocialProviders()
       .map((p) => {
         return {
           name: p.name,
@@ -197,14 +173,17 @@ export class IntegrationManager {
   }
 
   async getInternalPlugs(providerName: string, orgId?: string) {
-    const p = socialIntegrationList.find((p) => p.identifier === providerName);
+    const p = this.getSocialIntegrationUnchecked(providerName);
     if (!p) {
-      console.warn(`IntegrationManager: Unknown provider '${providerName}' requested in getInternalPlugs`);
+      this._logger.warn(`Unknown provider '${providerName}' requested in getInternalPlugs`);
       return { internalPlugs: [] };
     }
-    const enabled = orgId
-      ? await this._orgProviderConfigManager.isEnabled(orgId, providerName)
-      : await this._providerConfigManager.isEnabled(providerName);
+    const enabled =
+      (orgId
+        ? await this._orgProviderConfigManager.isEnabled(orgId, providerName)
+        : false) ||
+      (await this._providerConfigManager.isEnabled(providerName)) ||
+      isEnvEnabled(providerName);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${providerName}`);
     }
@@ -220,16 +199,19 @@ export class IntegrationManager {
   }
 
   getAllowedSocialsIntegrations() {
-    return socialIntegrationList.map((p) => p.identifier);
+    return this.getSocialProviders().map((p) => p.identifier);
   }
   async getSocialIntegration(integration: string, orgId?: string): Promise<SocialProvider> {
-    const provider = socialIntegrationList.find((i) => i.identifier === integration);
+    const provider = this.getSocialIntegrationUnchecked(integration);
     if (!provider) {
       throw new NotFoundException(`Unknown integration: ${integration}`);
     }
-    const enabled = orgId
-      ? await this._orgProviderConfigManager.isEnabled(orgId, integration)
-      : await this._providerConfigManager.isEnabled(integration);
+    const enabled =
+      (orgId
+        ? await this._orgProviderConfigManager.isEnabled(orgId, integration)
+        : false) ||
+      (await this._providerConfigManager.isEnabled(integration)) ||
+      isEnvEnabled(integration);
     if (!enabled) {
       throw new NotFoundException(`Integration not available: ${integration}`);
     }
@@ -241,21 +223,63 @@ export class IntegrationManager {
   // token refresh), which must keep working even if an admin later disables the
   // provider for new connections. Returns undefined for genuinely unknown ids.
   getSocialIntegrationUnchecked(
-    integration: string
+    integration: string,
+    version?: string
   ): SocialProvider | undefined {
-    return socialIntegrationList.find((i) => i.identifier === integration);
+    // Resolve the raw provider singleton from the ProviderKernel registry. The
+    // raw instance (not the kernel's credential-mapping bridge) is returned so
+    // callers can invoke custom tool / internal-plug methods by name — these
+    // live only on the provider class, not on the bridge interface.
+    const mod = version
+      ? this._kernel.get('social', integration, version)
+      : this._kernel.get('social', integration, DEFAULT_VERSION) ??
+        this._kernel.latestActive('social', integration);
+    return mod?.legacyProvider as SocialProvider | undefined;
   }
 
-  // INTERNAL USE ONLY - returns decrypted client credentials
-  async getClientInformation(integration: string, orgId?: string) {
+  // INTERNAL USE ONLY - returns decrypted client credentials.
+  // When configId is provided the credentials of that specific named config are used
+  // (each named credential set has its own auth); otherwise resolution falls back to
+  // the org's primary config for the provider identifier.
+  async getClientInformation(integration: string, orgId?: string, configId?: string | null) {
+    // Resolve the pinned version from the org's channel config (or the global default
+    // when no org context). This version is returned with the credentials so callers
+    // can resolve the exact provider adapter that matches the pinned config.
+    const configVersion =
+      orgId && this._orgProviderConfigManager
+        ? await (async () => {
+            const config = configId
+              ? await this._orgProviderConfigManager.getConfigById(orgId, configId)
+              : await this._orgProviderConfigManager.getConfig(orgId, integration);
+            return config?.version ?? 'v1';
+          })()
+        : 'v1';
+
     if (orgId) {
-      return this._orgProviderConfigManager.getClientInfo(orgId, integration);
+      // A specific named credential set, or the org's own app for this provider,
+      // always wins over the platform default (BYO-app override).
+      const orgInfo = configId
+        ? await this._orgProviderConfigManager.getClientInfoById(orgId, configId)
+        : await this._orgProviderConfigManager.getClientInfo(orgId, integration);
+      if (orgInfo?.client_id || orgInfo?.token) {
+        return { ...orgInfo, version: configVersion };
+      }
+      // Platform-owned OAuth app (deployment env) — powers click-connect when the
+      // org hasn't brought its own keys. Falls through to the global config below.
+      const envInfo = getEnvClientInfo(integration);
+      if (envInfo) {
+        return { ...envInfo, version: configVersion };
+      }
+      return orgInfo ? { ...orgInfo, version: configVersion } : undefined;
     }
-    return this._providerConfigManager.getClientInfo(integration);
+    const globalInfo =
+      (await this._providerConfigManager.getClientInfo(integration)) ||
+      getEnvClientInfo(integration);
+    return globalInfo ? { ...globalInfo, version: configVersion } : undefined;
   }
 
-  async requireClientInformation(integration: string, orgId?: string) {
-    const info = await this.getClientInformation(integration, orgId);
+  async requireClientInformation(integration: string, orgId?: string, configId?: string | null) {
+    const info = await this.getClientInformation(integration, orgId, configId);
     if (!info?.client_id && !info?.token) {
       throw new ProviderNotConfiguredError(integration, orgId);
     }
@@ -263,9 +287,14 @@ export class IntegrationManager {
   }
 
   async isProviderEnabled(integration: string, orgId?: string) {
-    if (orgId) {
-      return this._orgProviderConfigManager.isEnabled(orgId, integration);
+    if (
+      (orgId &&
+        (await this._orgProviderConfigManager.isEnabled(orgId, integration))) ||
+      (await this._providerConfigManager.isEnabled(integration)) ||
+      isEnvEnabled(integration)
+    ) {
+      return true;
     }
-    return this._providerConfigManager.isEnabled(integration);
+    return false;
   }
 }

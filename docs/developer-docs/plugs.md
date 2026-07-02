@@ -1,8 +1,9 @@
 # Plugs
 
 Plugs are automation hooks attached to social channel providers. They allow
-providers to define custom actions that run either on a schedule (polling) or
-immediately after a post is published.
+providers to define custom actions that run either on a schedule after publish
+(auto plugs) or immediately after a post is published (post plugs). Both are
+configured in the composer's per-channel settings panel.
 
 ## Two plug types
 
@@ -81,32 +82,42 @@ Parameters:
 
 ### Configuration
 
-1. Users configure plugs on the Plugs page (`/plugs`).
-2. The frontend fetches `/integrations/:id/plugs` to get existing configurations.
-3. Configuration is saved via `POST /integrations/:id/plugs` with `PlugDto`.
-4. Data is stored in the `Plugs` Prisma table, upserted by
-   `(plugFunction, integrationId)`.
+Both plug types are configured **in the composer's per-channel settings panel** (there is no
+standalone `/plugs` page — it was retired). The panel is shown per selected channel and only surfaces
+the plugs that channel's provider actually declares.
+
+**Auto plugs (channel-wide)** — the `ChannelGlobalPlugs` section
+(`composer/providers/channel.global.plugs.tsx`):
+1. The frontend fetches `/integrations/plug/list` and matches the entry for the channel's provider
+   identifier (renders nothing if the provider declares no auto plugs, or the member lacks
+   `channels:update`).
+2. It fetches `/integrations/:id/plugs` for existing configurations.
+3. Configuration is saved via `POST /integrations/:id/plugs` with `PlugDto` and toggled via
+   `PUT /integrations/plugs/:id/activate`.
+4. Data is stored in the `Plugs` Prisma table, upserted by `(plugFunction, integrationId)` — so the
+   config is **channel-wide** and applies to every post that channel publishes.
+
+**Post plugs (per-post)** — the `InternalChannels` section
+(`launches/internal.channels.tsx`), fetched from `/integrations/:identifier/internal-plugs`. Its
+values are written into the post's `settings` JSON (`plug--<identifier>--*` keys) and travel with that
+single post.
 
 ### Execution
 
 **Auto Plugs**: During the post workflow, `PostActivity` checks configured plugs.
 When conditions are met, the plug handler is called.
 
-**Post Plugs**: Executed by `PostActivity` immediately after a successful
-`provider.post()`. The workflow processes post plugs before completing.
-
-### Deduplication
-
-The `ExisingPlugData` model prevents re-reposting. When a post plug runs, it
-records that the plug has been executed for this post/plug combination so that
-retries (e.g. Temporal `continueAsNew`) don't trigger duplicate actions.
+**Post Plugs**: Executed by the `post/publish` Inngest function immediately after a successful
+`provider.post()`, before the workflow completes. Idempotency comes from Inngest's durable
+`step.run` (no `continueAsNew` — the Temporal orchestrator was removed).
 
 ## Frontend integration
 
-The frontend features:
-- `plugs.tsx` — sidebar with plug categories and a list of configured plugs
-- `plug.tsx` — individual plug cards with a configuration modal built with
-  `react-hook-form` + `yup` validation
+Both plug surfaces live in the composer's per-channel settings panel
+(`composer/providers/high.order.provider.tsx`, portalled into `#social-settings`):
+- `composer/providers/channel.global.plugs.tsx` — the channel-wide **auto plugs** section, with
+  per-plug cards and a configuration modal built with `react-hook-form` + `yup` validation.
+- `launches/internal.channels.tsx` (`InternalChannels`) — the per-post **post plugs** section.
 
 The configuration modal renders fields based on the plug's `fields` definition
 (type, placeholder, validation regex).
@@ -117,12 +128,12 @@ The configuration modal renders fields based on the plug's `fields` definition
 Provider @Plug/@PostPlug decorator
   → Reflect metadata ('custom:plug' / 'custom:internal_plug')
     → IntegrationManager.getAllPlugs() reads metadata
-      → GET /integrations/plug/list → frontend renders available plugs
+      → GET /integrations/plug/list → composer channel-settings panel renders available plugs
       → User configures plug → POST /integrations/:id/plugs
         → Stored in Plugs table (upsert by plugFunction + integrationId)
-          → PostActivity reads plugs during workflow execution
-            → Internal plugs: check ExisingPlugData → execute if new
-            → Auto plugs: run on polling interval
+          → post/publish Inngest function reads plugs during publish
+            → Post plugs: run once after provider.post()
+            → Auto plugs: scheduled for totalRuns at runEveryMilliseconds
 ```
 
-> Verified against v3.7.0
+> Verified against v4.0.0

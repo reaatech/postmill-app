@@ -2,6 +2,9 @@ import { Injectable, Logger } from '@nestjs/common';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
+import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { getRenderConcurrency } from '@gitroom/nestjs-libraries/media/design-render/render-config';
+import { mapWithConcurrency } from '@gitroom/nestjs-libraries/utils/concurrency';
 
 // Polling fallback for async media generations (§11.2): drives `adapter.pollJob()` for
 // every pending/processing AIMediaJob via the shared lifecycle service (which also
@@ -16,6 +19,25 @@ export class MediaJobsActivity {
     private _videoRenderService: VideoRenderService,
   ) {}
 
+  /** True for the two local-compute render kinds (design timeline render + clip merge). */
+  private isLocalRender(job: { provider: string; model?: string | null }): boolean {
+    return job.provider === 'chromium-ffmpeg' || job.model === 'local/ffmpeg-merge';
+  }
+
+  /**
+   * Process one local render job (invoked by the concurrency-limited `media-render`
+   * Inngest function). No-ops unless the job is still pending.
+   */
+  async processRenderJob(jobId: string): Promise<void> {
+    const job = await this._aiSettings.getMediaJobById(jobId);
+    if (!job) return;
+    if (job.model === 'local/ffmpeg-merge') {
+      await this._videoRenderService.processMergeRender(jobId);
+    } else if (job.provider === 'chromium-ffmpeg') {
+      await this._videoRenderService.processVideoRender(jobId);
+    }
+  }
+
   async processPendingMediaJobs(): Promise<{ processed: number; completed: number; failed: number }> {
     let result = { processed: 0, completed: 0, failed: 0 };
     try {
@@ -29,28 +51,43 @@ export class MediaJobsActivity {
       this.logger.warn(`media jobs sweep failed: ${(err as Error).message}`);
     }
 
-    let videoProcessed = 0;
+    // Local renders are processed by the concurrency-limited `media-render` Inngest
+    // function. This sweep is a safety net: re-enqueue any still-pending local render
+    // (idempotent — processRenderJob no-ops once status != pending). When Inngest is off
+    // there is no event consumer, so render inline through a host semaphore that holds the
+    // same 3-concurrent cap.
     try {
-      const videoJobs = await this._aiSettings.getPendingMediaJobs(10);
-      for (const job of videoJobs) {
-        if (job.provider !== 'chromium-ffmpeg') continue;
-        try {
-          await this._videoRenderService.processVideoRender(job.id);
-          result.processed++;
-          result.completed++;
-          videoProcessed++;
-        } catch (err) {
-          result.processed++;
-          result.failed++;
-          videoProcessed++;
-          this.logger.warn(`Video render sweep error for ${job.id}: ${(err as Error).message}`);
+      const pending = await this._aiSettings.getPendingMediaJobs(50);
+      const localJobs = pending.filter((j) => this.isLocalRender(j));
+      if (localJobs.length > 0) {
+        if (isInngestEnabled()) {
+          for (const job of localJobs) {
+            await inngest.send({
+              name: 'media/render',
+              data: {
+                jobId: job.id,
+                op: job.model === 'local/ffmpeg-merge' ? 'merge' : 'design',
+              },
+            });
+          }
+        } else {
+          await mapWithConcurrency(localJobs, getRenderConcurrency(), async (job) => {
+            try {
+              await this.processRenderJob(job.id);
+              result.processed++;
+              result.completed++;
+            } catch (err) {
+              result.processed++;
+              result.failed++;
+              this.logger.warn(
+                `Inline render error for ${job.id}: ${(err as Error).message}`,
+              );
+            }
+          });
         }
       }
-      if (videoProcessed > 0) {
-        this.logger.log(`video render sweep: processed=${videoProcessed}`);
-      }
     } catch (err) {
-      this.logger.warn(`Video render sweep failed: ${(err as Error).message}`);
+      this.logger.warn(`Local render sweep failed: ${(err as Error).message}`);
     }
 
     return result;

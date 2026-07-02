@@ -26,9 +26,19 @@ const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'Ocean', 'Abstract']
 interface StockVideosProps {
   mode?: 'browse' | 'select';
   onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'video' }) => void;
+  onSelectFull?: (item: {
+    url: string;
+    width: number;
+    height: number;
+    thumbnail?: string;
+    type: 'video';
+    source?: string;
+    attribution?: Record<string, unknown>;
+    name?: string;
+  }) => void;
 }
 
-export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect }) => {
+export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -255,14 +265,19 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect })
                 key={video.id}
                 type="button"
                 onClick={() => {
-                  if (mode === 'select' && onSelect) {
-                    onSelect({
+                  if (mode === 'select' && (onSelect || onSelectFull)) {
+                    const payload = {
                       url: video.url,
                       width: video.width,
                       height: video.height,
                       thumbnail: video.thumbUrl,
-                      type: 'video',
-                    });
+                      type: 'video' as const,
+                      source: video.source,
+                      attribution: video.attribution,
+                      name: video.description || undefined,
+                    };
+                    onSelectFull?.(payload);
+                    onSelect?.(payload);
                   } else {
                     openVideo(video);
                   }

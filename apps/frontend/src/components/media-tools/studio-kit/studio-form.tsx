@@ -108,13 +108,13 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                 <ModelSelect
                   provider={provider}
                   operation={operation}
-                  value={(value as string) ?? field.default}
+                  value={(value as string) ?? (field.default as string)}
                   staticOptions={field.options}
                   onChange={(v) => onChange(field.name, v)}
                 />
               ) : (
                 <select
-                  value={(value as string) ?? field.default ?? ''}
+                  value={(value as string) ?? (field.default as string) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value)}
                   className={inputClass}
                 >
@@ -134,12 +134,12 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                     min={field.min}
                     max={field.max}
                     step={field.step ?? 1}
-                    value={(value as number) ?? field.default ?? field.min}
+                    value={(value as number) ?? (field.default as number) ?? field.min}
                     onChange={(e) => onChange(field.name, Number(e.target.value))}
                     className="flex-1 accent-[#2B5CD3]"
                   />
                   <span className="text-[12px] text-textColor w-[40px] text-right tabular-nums">
-                    {(value as number) ?? field.default ?? field.min}
+                    {(value as number) ?? (field.default as number) ?? field.min}
                   </span>
                 </div>
               ) : (
@@ -148,7 +148,7 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
                   min={field.min}
                   max={field.max}
                   step={field.step ?? 1}
-                  value={(value as number) ?? field.default ?? ''}
+                  value={(value as number) ?? (field.default as number) ?? ''}
                   onChange={(e) => onChange(field.name, e.target.value === '' ? undefined : Number(e.target.value))}
                   className={inputClass}
                 />
@@ -157,14 +157,14 @@ export const StudioForm: FC<StudioFormProps> = ({ fields, values, onChange, prov
             {field.type === 'toggle' && (
               <button
                 type="button"
-                onClick={() => onChange(field.name, !((value as boolean) ?? field.default ?? false))}
-                className={`flex items-center gap-[8px] text-[13px] ${(value as boolean) ?? field.default ? 'text-textColor' : 'text-newTextColor/60'}`}
+                onClick={() => onChange(field.name, !((value as boolean) ?? (field.default as boolean) ?? false))}
+                className={`flex items-center gap-[8px] text-[13px] ${(value as boolean) ?? (field.default as boolean) ? 'text-textColor' : 'text-newTextColor/60'}`}
               >
                 <span
-                  className={`w-[36px] h-[20px] rounded-full p-[2px] transition-colors ${(value as boolean) ?? field.default ? 'bg-[#2B5CD3]' : 'bg-studioBorder'}`}
+                  className={`w-[36px] h-[20px] rounded-full p-[2px] transition-colors ${(value as boolean) ?? (field.default as boolean) ? 'bg-[#2B5CD3]' : 'bg-studioBorder'}`}
                 >
                   <span
-                    className={`block w-[16px] h-[16px] rounded-full bg-white transition-transform ${(value as boolean) ?? field.default ? 'translate-x-[16px]' : ''}`}
+                    className={`block w-[16px] h-[16px] rounded-full bg-white transition-transform ${(value as boolean) ?? (field.default as boolean) ? 'translate-x-[16px]' : ''}`}
                   />
                 </span>
                 {field.help || field.label}

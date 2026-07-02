@@ -42,6 +42,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
   const [aiLoading, setAiLoading] = useState<string | false>(false);
   const [upscaleScale, setUpscaleScale] = useState(2);
   const [inpaintPrompt, setInpaintPrompt] = useState('');
+  const [imageToImagePrompt, setImageToImagePrompt] = useState('');
   const [mediaModalOpen, setMediaModalOpen] = useState(false);
 
   const [inpaintMaskUrl, setInpaintMaskUrl] = useState<string | null>(null);
@@ -189,6 +190,25 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
       updateElement(element.id, { src: data.url, fileId: undefined });
     } catch {
       toaster.show('Inpaint failed', 'warning');
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleImageToImage = async () => {
+    if (!element.src || !imageToImagePrompt.trim()) return;
+    setAiLoading('image-to-image');
+    try {
+      const res = await fetch('/media/image-to-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageUrl: element.src, prompt: imageToImagePrompt.trim() }),
+      });
+      if (!res.ok) throw new Error('Failed');
+      const data = await res.json();
+      updateElement(element.id, { src: data.url, fileId: undefined });
+    } catch {
+      toaster.show('Image-to-image failed', 'warning');
     } finally {
       setAiLoading(false);
     }
@@ -881,7 +901,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
           <div className="flex gap-2">
             <select
-              className="flex-1 px-2 py-1.5 bg-[#0f0f23] border border-[#2a2a4a] rounded text-sm text-white"
+              className="flex-1 px-2 py-1.5 bg-newBgColor border border-newBorder rounded text-sm text-textColor"
               value={upscaleScale}
               onChange={e => setUpscaleScale(Number(e.target.value))}
             >
@@ -899,7 +919,23 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
           <div className="flex flex-col gap-2">
             <input
-              className="w-full px-2 py-1.5 bg-[#0f0f23] border border-[#2a2a4a] rounded text-sm text-white"
+              className="w-full px-2 py-1.5 bg-newBgColor border border-newBorder rounded text-sm text-textColor"
+              placeholder="Image-to-image prompt..."
+              value={imageToImagePrompt}
+              onChange={(e) => setImageToImagePrompt(e.target.value)}
+            />
+            <button
+              className="w-full px-3 py-1.5 bg-designerAccent/10 hover:bg-designerAccent/20 text-sm rounded border border-designerAccent/30 text-left"
+              onClick={handleImageToImage}
+              disabled={!!aiLoading || !imageToImagePrompt.trim()}
+            >
+              {aiLoading === 'image-to-image' ? '…' : 'Image to Image'}
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <input
+              className="w-full px-2 py-1.5 bg-newBgColor border border-newBorder rounded text-sm text-textColor"
               placeholder="Inpaint prompt..."
               value={inpaintPrompt}
               onChange={(e) => setInpaintPrompt(e.target.value)}

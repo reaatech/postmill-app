@@ -12,6 +12,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDebounce } from 'use-debounce';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { TemplatesPanel } from './panels/templates-panel';
 import { MyDesignsPanel } from './panels/my-designs-panel';
 import { TextPanel } from './panels/text-panel';
@@ -38,6 +39,7 @@ import { CanvasInspector } from './panels/canvas-inspector';
 import { MediaSelectorModal } from '../media-selector-modal';
 import { StartDialog } from './start-dialog';
 import { aiRemoveBackground, aiUpscale, aiDetectSubject } from './ai-image-actions';
+import { addMediaToTimeline } from './add-media-to-timeline';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 import { FullscreenButton } from '@gitroom/frontend/components/media-tools/fullscreen-button';
 import { useFullscreen } from '@gitroom/frontend/components/media-tools/use-fullscreen';
@@ -87,6 +89,14 @@ interface DesignerProps {
     width?: number;
     height?: number;
     words: { word: string; start: number; end: number }[];
+  };
+  // Timeline handoff: land a video/audio artifact directly on the timeline.
+  initialTimelineMedia?: {
+    type: 'video' | 'audio';
+    url: string;
+    fileId?: string;
+    width?: number;
+    height?: number;
   };
   designId?: string;
 }
@@ -163,6 +173,7 @@ export const Designer: FC<DesignerProps> = ({
   initialAsset,
   initialAssets,
   initialCaptionVideo,
+  initialTimelineMedia,
   designId,
 }) => {
   const fetch = useFetch();
@@ -180,9 +191,24 @@ export const Designer: FC<DesignerProps> = ({
   // no caller-supplied size) — forces an explicit format choice instead of the
   // silent 1080² "Instagram Post" default.
   const [showStart, setShowStart] = useState(
-    () => !initialAsset && !initialAssets?.length && !initialCaptionVideo && !designId && !(width && height)
+    () =>
+      !initialAsset &&
+      !initialAssets?.length &&
+      !initialCaptionVideo &&
+      !initialTimelineMedia &&
+      !designId &&
+      !(width && height)
   );
   const aiActive = useAiActive();
+  // Per-operation media-tool availability gates the AI generation actions (remove-bg,
+  // upscale, inpaint, generate). `status` is a stable SWR ref so the accessor (and the
+  // action ctx) stay memo-stable; optimistic while loading, fail-open on error.
+  const { status: mediaToolsStatus } = useMediaToolsStatus();
+  const mediaOperationAvailable = useCallback(
+    (operation: string): boolean =>
+      mediaToolsStatus ? !!mediaToolsStatus.operations?.[operation]?.available : true,
+    [mediaToolsStatus]
+  );
   const user = useUser();
   const brandColors = useBrandColors();
   const brandFonts = useBrandFonts();
@@ -537,10 +563,15 @@ export const Designer: FC<DesignerProps> = ({
     captionInitRef.current = true;
     const { url, fileId, words } = initialCaptionVideo;
 
-    const build = (durationMs: number) => {
+    const build = (rawDurationMs: number) => {
       store.getState().setMode('video');
+      const out = store.getState().currentOutput;
+      // Cap + extend the output duration BEFORE adding the clip: addClip silently
+      // drops any clip whose endMs exceeds the current (seeded ~10 s) duration, and
+      // setVideoDuration hard-clamps to 60 s — so the clip's endMs must be capped too.
+      const durationMs = Math.min(rawDurationMs, 60000);
+      store.getState().setVideoDuration(out, durationMs);
       let s = store.getState();
-      const out = s.currentOutput;
       const vo = () => s.doc.outputs[out] as VideoOutput;
       const videoTrack = vo().tracks.find((t) => t.type === 'video');
       if (videoTrack) {
@@ -552,7 +583,6 @@ export const Designer: FC<DesignerProps> = ({
           fileId,
         });
       }
-      s.setVideoDuration(out, durationMs);
 
       if (words?.length) {
         store.getState().addTrack(out, 'caption');
@@ -584,6 +614,16 @@ export const Designer: FC<DesignerProps> = ({
     const guard = window.setTimeout(() => finish(10000), 5000);
     return () => window.clearTimeout(guard);
   }, [initialCaptionVideo, store]);
+
+  // Timeline handoff: land a video/audio artifact directly on the timeline.
+  const timelineInitRef = useRef(false);
+  useEffect(() => {
+    if (!initialTimelineMedia || timelineInitRef.current) return;
+    timelineInitRef.current = true;
+    addMediaToTimeline(store, initialTimelineMedia).catch(() => {
+      toaster.show('Could not add media to timeline', 'warning');
+    });
+  }, [initialTimelineMedia, store, toaster]);
 
   // --- Unsaved-changes guard shared by New / Open / Templates (D-7b) ---
   const confirmDiscardIfDirty = useCallback(() => {
@@ -666,6 +706,7 @@ export const Designer: FC<DesignerProps> = ({
       showSafeZones,
       showRulers,
       aiActive,
+      mediaOperationAvailable,
       canShare: !!currentDesignId,
       collabEnabled,
       inModal: !!(setMedia || closeModal),
@@ -759,6 +800,7 @@ export const Designer: FC<DesignerProps> = ({
       showSafeZones,
       showRulers,
       aiActive,
+      mediaOperationAvailable,
       currentDesignId,
       collabEnabled,
       setMedia,

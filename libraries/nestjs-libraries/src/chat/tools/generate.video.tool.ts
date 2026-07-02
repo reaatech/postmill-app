@@ -2,23 +2,15 @@ import { AgentToolInterface } from '@gitroom/nestjs-libraries/chat/agent.tool.in
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
-import {
-  IntegrationManager,
-  socialIntegrationList,
-} from '@gitroom/nestjs-libraries/integrations/integration.manager';
-import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
-import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
-import { timer } from '@gitroom/helpers/utils/timer';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
-import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
-import { VideoManager } from '@gitroom/nestjs-libraries/videos/video.manager';
+import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 
 @Injectable()
 export class GenerateVideoTool implements AgentToolInterface {
   constructor(
-    private _aiGeneration: AiMediaGenerationService,
-    private _videoManager: VideoManager
+    private _aiDefaults: AiDefaultsService,
+    private _defaultsResolution: DefaultsResolutionService,
   ) {}
   name = 'generateVideoTool';
 
@@ -34,47 +26,25 @@ export class GenerateVideoTool implements AgentToolInterface {
           openWorldHint: true,
         },
       },
-      description: `Generate video to use in a post,
-                    in case the user specified a platform that requires attachment and attachment was not provided,
-                    ask if they want to generate a picture of a video.
-                    In many cases 'videoFunctionTool' will need to be called first, to get things like voice id
-                    Here are the type of video that can be generated:
-                    ${this._videoManager
-                      .getAllVideos()
-                      .map((p) => "-" + p.title)
-                      .join('\n')}
+      description: `Generate video to use in a post.
+                    In case the user specified a platform that requires attachment and attachment was not provided,
+                    ask if they want to generate a picture or a video.
+                    Available video categories are derived from the org's media defaults.
       `,
       inputSchema: z.object({
-        identifier: z.string(),
-        output: z.enum(['vertical', 'horizontal']),
-        customParams: z.array(
-          z.object({
-            key: z.string().describe('Name of the settings key to pass'),
-            value: z.any().describe('Value of the key'),
-          })
-        ),
+        prompt: z.string().describe('Prompt describing the video to generate'),
+        imageUrl: z.string().optional().describe('Optional source image URL for image-to-video'),
       }),
       outputSchema: z.object({
-        url: z.string(),
+        id: z.string(),
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
-        const value = await this._aiGeneration.generateVideo(org, {
-          type: inputData.identifier,
-          output: inputData.output,
-          customParams: inputData.customParams.reduce(
-            (all: Record<string, any>, current: { key: string; value: any }) => ({
-              ...all,
-              [current.key]: current.value,
-            }),
-            {} as Record<string, any>
-          ),
-        });
-
-        return {
-          url: value.path,
-        };
+        const artifact = inputData.imageUrl
+          ? await this._aiDefaults.imageToVideo(org.id, inputData.prompt, inputData.imageUrl)
+          : await this._aiDefaults.textToVideo(org.id, inputData.prompt);
+        return { id: artifact };
       },
     });
   }

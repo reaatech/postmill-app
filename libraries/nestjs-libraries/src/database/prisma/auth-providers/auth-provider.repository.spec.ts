@@ -57,7 +57,7 @@ describe('AuthProviderRepository', () => {
 
       expect(await repository.findByProvider(Provider.GOOGLE)).toBe(config);
       expect(model.findUnique).toHaveBeenCalledWith({
-        where: { provider: Provider.GOOGLE },
+        where: { provider_version: { provider: Provider.GOOGLE, version: 'v1' } },
       });
     });
 
@@ -75,8 +75,8 @@ describe('AuthProviderRepository', () => {
       const result = await repository.upsert(Provider.GITHUB, data);
 
       expect(model.upsert).toHaveBeenCalledWith({
-        where: { provider: Provider.GITHUB },
-        create: { provider: Provider.GITHUB, ...data },
+        where: { provider_version: { provider: Provider.GITHUB, version: 'v1' } },
+        create: { provider: Provider.GITHUB, version: 'v1', ...data },
         update: data,
       });
       expect(result).toEqual({ provider: Provider.GITHUB, ...data });
@@ -122,8 +122,8 @@ describe('AuthProviderRepository', () => {
       await repository.upsert(Provider.GENERIC, data);
 
       expect(model.upsert).toHaveBeenCalledWith({
-        where: { provider: Provider.GENERIC },
-        create: { provider: Provider.GENERIC, ...data },
+        where: { provider_version: { provider: Provider.GENERIC, version: 'v1' } },
+        create: { provider: Provider.GENERIC, version: 'v1', ...data },
         update: data,
       });
     });
@@ -136,7 +136,7 @@ describe('AuthProviderRepository', () => {
       const result = await repository.delete(Provider.GITHUB);
 
       expect(model.delete).toHaveBeenCalledWith({
-        where: { provider: Provider.GITHUB },
+        where: { provider_version: { provider: Provider.GITHUB, version: 'v1' } },
       });
       expect(result).toEqual({ provider: Provider.GITHUB });
     });

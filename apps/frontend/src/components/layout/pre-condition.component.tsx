@@ -1,6 +1,6 @@
 import React, { FC, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ModalWrapperComponent } from '@gitroom/frontend/components/new-launch/modal.wrapper.component';
+import { ModalWrapperComponent } from '@gitroom/frontend/components/composer/modal.wrapper.component';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { Button } from '@gitroom/react/form/button';
 

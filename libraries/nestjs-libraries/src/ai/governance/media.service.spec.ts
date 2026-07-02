@@ -5,10 +5,12 @@ const mockImageModelGenerate = vi.fn().mockResolvedValue('https://cdn.example.co
 const mockImageModel = vi.fn().mockResolvedValue({
   generate: mockImageModelGenerate,
 });
+const mockGenerateTextWithModel = vi.fn().mockResolvedValue('{"x":0.5,"y":0.5}');
 
 vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
   AIModelProvider: class MockProvider {
     imageModel = mockImageModel;
+    generateTextWithModel = mockGenerateTextWithModel;
   },
 }));
 
@@ -88,7 +90,7 @@ function makeAdapter(
 }
 
 interface TestSetup {
-  registry: { get: (id: string) => MediaProviderAdapter | undefined };
+  resolution: { resolveMedia: (id: string) => MediaProviderAdapter | undefined };
   orgSettings: {
     getEnabledProviders: ReturnType<typeof vi.fn>;
     getConfigForProvider: ReturnType<typeof vi.fn>;
@@ -104,7 +106,11 @@ interface TestSetup {
   };
 }
 
-function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]): TestSetup & { service: AiMediaService } {
+function setup(
+  adapters: MediaProviderAdapter[],
+  enabledIdentifiers?: string[],
+  defaultsResolution?: { resolve: ReturnType<typeof vi.fn> },
+): TestSetup & { service: AiMediaService } {
   const map = new Map(adapters.map((a) => [a.identifier, a]));
   const enabled = (enabledIdentifiers ?? adapters.map((a) => a.identifier)).map((identifier) => ({
     identifier,
@@ -113,7 +119,7 @@ function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]):
     extraConfig: {},
   }));
 
-  const registry = { get: (id: string) => map.get(id) };
+  const resolution = { resolveMedia: (id: string) => map.get(id) };
   const orgSettings = {
     getEnabledProviders: vi.fn().mockResolvedValue(enabled),
     getConfigForProvider: vi.fn().mockImplementation(async (_orgId: string, id: string) => ({
@@ -136,12 +142,13 @@ function setup(adapters: MediaProviderAdapter[], enabledIdentifiers?: string[]):
     new (AiSettingsService as never)(),
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
+    resolution as never,
+    defaultsResolution as never,
     orgSettings as never,
-    registry as never,
     lifecycle as never,
   );
 
-  return { service, registry, orgSettings, lifecycle };
+  return { service, resolution, orgSettings, lifecycle };
 }
 
 function bareService() {
@@ -149,6 +156,8 @@ function bareService() {
     new (AiSettingsService as never)(),
     new (AIModelProvider as never)(),
     new (AiSettingsManager as never)(),
+    { resolveMedia: () => undefined } as never,
+    undefined,
   );
 }
 
@@ -157,6 +166,7 @@ describe('AiMediaService', () => {
     vi.clearAllMocks();
     mockImageModelGenerate.mockResolvedValue('https://cdn.example.com/image.png');
     mockImageModel.mockResolvedValue({ generate: mockImageModelGenerate });
+    mockGenerateTextWithModel.mockResolvedValue('{"x":0.5,"y":0.5}');
     mockGetSettings.mockResolvedValue(null);
     mockCreateMediaJob.mockResolvedValue({ id: 'job-1' });
   });
@@ -599,6 +609,45 @@ describe('AiMediaService', () => {
     });
   });
 
+  // ── Focal point ──
+
+  describe('detectFocalPoint', () => {
+    it('returns clamped coordinates from the vision default model', async () => {
+      mockGenerateTextWithModel.mockResolvedValueOnce('{"x":1.5,"y":-0.2}');
+      const defaultsResolution = {
+        resolve: vi.fn().mockResolvedValue({
+          providerId: 'openai',
+          version: 'v1',
+          model: 'gpt-4o',
+          source: 'auto',
+        }),
+      };
+      const { service } = setup([], [], defaultsResolution);
+
+      const result = await service.detectFocalPoint('https://cdn.example.com/photo.jpg', { orgId: 'org-1' });
+
+      expect(result).toEqual({ x: 1, y: 0, source: 'provider' });
+      expect(defaultsResolution.resolve).toHaveBeenCalledWith('ai', 'vision', 'org-1');
+      expect(mockGenerateTextWithModel).toHaveBeenCalledWith(
+        'org-1',
+        'openai',
+        'v1',
+        'gpt-4o',
+        expect.objectContaining({ imageUrl: 'https://cdn.example.com/photo.jpg' }),
+      );
+    });
+
+    it('falls back to center when no vision default is configured', async () => {
+      const defaultsResolution = { resolve: vi.fn().mockResolvedValue(null) };
+      const { service } = setup([], [], defaultsResolution);
+
+      const result = await service.detectFocalPoint('https://cdn.example.com/photo.jpg', { orgId: 'org-1' });
+
+      expect(result).toEqual({ x: 0.5, y: 0.5, source: 'fallback' });
+      expect(mockGenerateTextWithModel).not.toHaveBeenCalled();
+    });
+  });
+
   // ── 4F summary ──
 
   describe('getMediaProviderSummary (4F)', () => {
@@ -616,6 +665,11 @@ describe('AiMediaService', () => {
         'upscale',
         'bg-remove',
         'inpaint',
+        'focal-point',
+        'slide',
+        'caption',
+        'video-bg',
+        'video-upscale',
       ]);
       expect(summary.every((e) => e.available === false)).toBe(true);
       expect(summary.every((e) => e.providers.length === 0)).toBe(true);
@@ -689,8 +743,9 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: (id: string) => map.get(id) } as never,
+        undefined as never,
         orgSettings as never,
-        { get: (id: string) => map.get(id) } as never,
         // no lifecycle
       );
 
@@ -720,8 +775,8 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: (id: string) => map.get(id) } as never,
         orgSettings as never,
-        { get: (id: string) => map.get(id) } as never,
       );
 
       await expect(service.generateAudio('a jingle', { orgId: 'org-1' })).rejects.toThrow(
@@ -738,8 +793,8 @@ describe('AiMediaService', () => {
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),
         new (AiSettingsManager as never)(),
+        { resolveMedia: () => undefined } as never,
         orgSettings as never,
-        { get: () => undefined } as never,
       );
       const result = await service.generateImage('a cat', { orgId: 'org-1' });
       expect(result).toBe('https://cdn.example.com/image.png');

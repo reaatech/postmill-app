@@ -3,7 +3,7 @@ import {
   PostDetails,
   PostResponse,
 } from '@gitroom/nestjs-libraries/integrations/social/social.integrations.interface';
-import { MastodonProvider } from '@gitroom/nestjs-libraries/integrations/social/mastodon.provider';
+import { MastodonProvider } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { Integration } from '@prisma/client';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';

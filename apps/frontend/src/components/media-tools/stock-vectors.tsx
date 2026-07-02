@@ -31,9 +31,19 @@ const SUGGESTED_SEARCHES = ['Business', 'Nature', 'Abstract', 'Technology', 'Peo
 interface StockVectorsProps {
   mode?: 'browse' | 'select';
   onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' | 'video' | 'audio' }) => void;
+  onSelectFull?: (item: {
+    url: string;
+    width: number;
+    height: number;
+    thumbnail?: string;
+    type: 'image' | 'video' | 'audio';
+    source?: string;
+    attribution?: Record<string, unknown>;
+    name?: string;
+  }) => void;
 }
 
-export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect }) => {
+export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -239,14 +249,19 @@ export const StockVectors: FC<StockVectorsProps> = ({ mode = 'browse', onSelect 
                 key={vector.id}
                 type="button"
                 onClick={() => {
-                  if (mode === 'select' && onSelect) {
-                    onSelect({
+                  if (mode === 'select' && (onSelect || onSelectFull)) {
+                    const payload = {
                       url: vector.url,
                       width: vector.width,
                       height: vector.height,
                       thumbnail: vector.thumbUrl,
-                      type: 'image',
-                    });
+                      type: 'image' as const,
+                      source: vector.source,
+                      attribution: vector.attribution,
+                      name: vector.description || undefined,
+                    };
+                    onSelectFull?.(payload);
+                    onSelect?.(payload);
                   } else {
                     openVector(vector);
                   }

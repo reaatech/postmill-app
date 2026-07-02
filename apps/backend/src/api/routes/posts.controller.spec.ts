@@ -10,7 +10,7 @@ vi.mock('@gitroom/nestjs-libraries/agent/agent.graph.service', () => ({
 
 vi.mock('@gitroom/nestjs-libraries/short-linking/short.link.service', () => ({
   ShortLinkService: class MockShortLinkService {
-    askShortLinkedin = vi.fn();
+    shouldShortlink = vi.fn();
   },
 }));
 
@@ -34,21 +34,29 @@ describe('PostsController', () => {
   });
 
   describe('shouldShortlink', () => {
-    it('awaits the promise from askShortLinkedin', async () => {
+    it('returns enriched response including provider name and domain', async () => {
       const org = { id: 'org-1' } as any;
       const body = { messages: ['check https://example.com'] };
-      vi.mocked(shortLinkService.askShortLinkedin).mockResolvedValue(true);
+      vi.mocked(shortLinkService.shouldShortlink).mockResolvedValue({
+        ask: true,
+        providerName: 'Bitly',
+        domain: 'bit.ly',
+      });
 
       const result = await controller.shouldShortlink(org, body);
 
-      expect(shortLinkService.askShortLinkedin).toHaveBeenCalledWith('org-1', body.messages);
-      expect(result).toEqual({ ask: true });
+      expect(shortLinkService.shouldShortlink).toHaveBeenCalledWith('org-1', body.messages);
+      expect(result).toEqual({
+        ask: true,
+        providerName: 'Bitly',
+        domain: 'bit.ly',
+      });
     });
 
-    it('returns false when askShortLinkedin returns false', async () => {
+    it('returns ask:false when no provider or urls', async () => {
       const org = { id: 'org-1' } as any;
       const body = { messages: ['no urls here'] };
-      vi.mocked(shortLinkService.askShortLinkedin).mockResolvedValue(false);
+      vi.mocked(shortLinkService.shouldShortlink).mockResolvedValue({ ask: false });
 
       const result = await controller.shouldShortlink(org, body);
 

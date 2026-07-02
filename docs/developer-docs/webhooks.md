@@ -42,13 +42,14 @@ Body: UpdateDto (same shape as create, with id)
 POST /webhooks/test-ping/:id
 ```
 
-Sends a test payload to the webhook URL via `safeFetch`:
+Sends a signed test payload to the webhook URL via `safeFetch` (same envelope and
+`X-Postmill-Signature` header as real deliveries):
 
 ```json
 {
   "event": "ping",
   "timestamp": "2026-06-09T00:00:00.000Z",
-  "message": "This is a test ping from Postmill"
+  "data": { "message": "This is a test ping from Postmill" }
 }
 ```
 
@@ -80,6 +81,9 @@ self-hosted instances with internal targets).
 
 ### Payload format
 
+Every delivery wraps a stable, minimal subset of the post in a fixed envelope —
+the raw Prisma row is never shipped:
+
 ```json
 {
   "event": "post.published",
@@ -87,15 +91,44 @@ self-hosted instances with internal targets).
   "data": {
     "postId": "clx...",
     "integrationId": "cly...",
-    "url": "https://platform.com/post/123"
+    "providerIdentifier": "x",
+    "integrationName": "My X account",
+    "content": "The published post text",
+    "url": "https://platform.com/post/123",
+    "state": "PUBLISHED",
+    "publishDate": "2026-06-09T00:00:00.000Z"
   }
 }
 ```
 
+Deliveries are bounded-retried (3 attempts with backoff) and run inside a durable
+Inngest `step.run`. Each request is bounded by `WEBHOOK_TIMEOUT_MS` (default
+`10000`).
+
 ### HMAC signing
 
-Webhooks include an HMAC-SHA256 signature in the `X-Postmill-Signature` header.
-Verify this signature using your webhook secret on the receiving end.
+Every delivery (real, test-ping, and `/webhooks/send`) carries an HMAC-SHA256
+signature in the `X-Postmill-Signature` header, formatted `sha256=<hex>`.
+
+The signature is computed over the **exact serialized JSON body** using a
+**deployment-wide secret** — `WEBHOOK_SIGNING_SECRET`. When that env var is
+unset, the secret falls back to `JWT_SECRET` (mirroring `EncryptionService`'s
+key-derivation), so signing is **always on**.
+
+**Verification recipe (receiver side):**
+
+```
+expected = "sha256=" + hex(HMAC_SHA256(WEBHOOK_SIGNING_SECRET, rawRequestBody))
+constant_time_equals(expected, header["X-Postmill-Signature"])
+```
+
+Use the raw request body bytes exactly as received (do not re-serialize), and a
+constant-time comparison.
+
+> **Note:** the secret is **deployment-wide**, not per-webhook — every webhook for
+> the deployment is signed with the same secret. **Tracked follow-up:** add a
+> per-`Webhooks`-row `secret` column (with create-flow + UI surfacing to
+> generate/display it) so each endpoint can rotate its own secret.
 
 ## Data model
 
@@ -103,4 +136,12 @@ Verify this signature using your webhook secret on the receiving end.
 - **`Webhooks.integrations`**: Implicit many-to-many relation with `Integration`
   (Prisma manages the join table).
 
-> Verified against v3.7.0
+## Environment
+
+| Var | Default | Purpose |
+|-----|---------|---------|
+| `WEBHOOK_SIGNING_SECRET` | falls back to `JWT_SECRET` | HMAC key for the `X-Postmill-Signature` header |
+| `WEBHOOK_TIMEOUT_MS` | `10000` | Per-request timeout for webhook dispatch |
+| `OUTBOUND_HTTP_TIMEOUT_MS` | `30000` | Default `safeFetch` timeout (webhooks use the tighter value above) |
+
+> Verified against v4.4.0

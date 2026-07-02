@@ -1,7 +1,11 @@
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { EmailActivity } from '@gitroom/nestjs-libraries/inngest/activities/email.activity';
+import { PostActivity } from '@gitroom/nestjs-libraries/inngest/activities/post.activity';
 
-export const createStreakTracker = (emailActivity: EmailActivity) =>
+export const createStreakTracker = (
+  emailActivity: EmailActivity,
+  postActivity: PostActivity
+) =>
   inngest.createFunction(
     {
       id: 'streak-tracker',
@@ -19,20 +23,11 @@ export const createStreakTracker = (emailActivity: EmailActivity) =>
         emailActivity.setStreak(organizationId, 'start')
       );
       await step.sleep('wait-22h', '22h');
-      await step.run('send-reminder', async () => {
-        const users = await emailActivity.getUserOrgs(organizationId);
-        const members = (users as any)?.users || [];
-        for (const member of members) {
-          const email = member?.user?.email;
-          if (!email) continue;
-          await emailActivity.sendEmailAsync(
-            email,
-            'Keep your streak alive!',
-            '<p>You have 2 hours left to keep your posting streak alive.</p>',
-            'top'
-          );
-        }
-      });
+      // Route through the v2 notification pipeline (category 'streak') so the
+      // reminder respects per-user preferences and lands in the in-app bell.
+      await step.run('send-reminder', () =>
+        postActivity.notifyStreakReminder(organizationId)
+      );
       await step.sleep('wait-2h', '2h');
       await step.run('set-streak-end', () =>
         emailActivity.setStreak(organizationId, 'end')

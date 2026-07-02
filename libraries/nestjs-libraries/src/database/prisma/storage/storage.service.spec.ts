@@ -9,29 +9,39 @@ const adapterMock = {
   testConnection: vi.fn(),
 };
 
+const resolveStorageMock = vi.fn(() => adapterMock);
+
 vi.mock(
-  '@gitroom/nestjs-libraries/upload/adapters/adapter.factory',
+  '@gitroom/nestjs-libraries/providers/provider-resolution.service',
   () => ({
-    StorageAdapterFactory: {
-      createFromConfig: vi.fn(() => adapterMock),
-      createLocal: vi.fn(() => adapterMock),
+    ProviderResolutionService: class {
+      resolveStorage = resolveStorageMock;
     },
   })
 );
 
-import { StorageAdapterFactory } from '@gitroom/nestjs-libraries/upload/adapters/adapter.factory';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { StorageService } from './storage.service';
-import type { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import type { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 const encryption = {
   encrypt: (s: string) => `enc:${s}`,
   decrypt: (s: string) => s.replace(/^enc:/, ''),
 } as any;
 
+function makeResolution(overrides: Record<string, any> = {}) {
+  return {
+    resolveStorage: vi.fn(() => adapterMock),
+    latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    ...overrides,
+  } as unknown as ProviderResolutionService;
+}
+
 function makeRepo(overrides: Record<string, any> = {}) {
   return {
     findByOrg: vi.fn().mockResolvedValue([]),
     findById: vi.fn(),
+    findByFingerprint: vi.fn().mockResolvedValue(null),
     create: vi.fn(),
     update: vi.fn(),
     delete: vi.fn(),
@@ -52,8 +62,13 @@ const localConfig = {
   id: 'local-1',
   organizationId: 'org-1',
   type: StorageProviderType.LOCAL,
+  version: 'v1',
   name: 'Local Storage',
   credentials: null,
+  region: null,
+  bucket: null,
+  endpoint: null,
+  publicUrl: null,
 };
 
 beforeEach(() => {
@@ -67,8 +82,8 @@ describe('StorageService — credential sanitization (#54)', () => {
         { ...localConfig, credentials: 'enc:{"k":"v"}' },
       ]),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const result = await service.getProviderConfigs('org-1');
 
@@ -84,8 +99,8 @@ describe('StorageService — quota enforcement (#57)', () => {
       getOrgQuota: vi.fn().mockResolvedValue(BigInt(150)),
     });
     adapterMock.getUsageBytes.mockResolvedValue(BigInt(100));
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     await expect(service.assertWithinQuota('org-1', 100)).rejects.toMatchObject({
       status: 413,
@@ -98,8 +113,8 @@ describe('StorageService — quota enforcement (#57)', () => {
       getOrgQuota: vi.fn().mockResolvedValue(BigInt(150)),
     });
     adapterMock.getUsageBytes.mockResolvedValue(BigInt(100));
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     await expect(service.assertWithinQuota('org-1', 10)).resolves.toBeUndefined();
   });
@@ -110,15 +125,25 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
     id: 'src',
     organizationId: 'org-1',
     type: StorageProviderType.S3,
+    version: 'v1',
     name: 'S3',
     credentials: 'enc:{}',
+    region: 'us-east-1',
+    bucket: 'src-bucket',
+    endpoint: null,
+    publicUrl: null,
   };
   const target = {
     id: 'tgt',
     organizationId: 'org-1',
     type: StorageProviderType.LOCAL,
+    version: 'v1',
     name: 'Local',
     credentials: null,
+    region: null,
+    bucket: null,
+    endpoint: null,
+    publicUrl: null,
   };
 
   function repoForMigrate(page: any[]) {
@@ -134,12 +159,12 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
     const repo = repoForMigrate([
       { id: 'm1', name: 'a.png', path: 'p1', type: 'image', fileSize: 10 },
     ]);
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
+    const auditService = { create: vi.fn() } as unknown as AuditService;
     adapterMock.readFile
       .mockResolvedValueOnce(Buffer.alloc(10)) // source read
       .mockResolvedValueOnce(Buffer.alloc(10)); // target verify
     adapterMock.writeBuffer.mockResolvedValue('new-path');
-    const service = new StorageService(repo, auditRepo, encryption);
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const res = await service.migrate('src', 'tgt', 'org-1');
 
@@ -158,8 +183,8 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
       .mockResolvedValueOnce(Buffer.alloc(10)) // source read
       .mockResolvedValueOnce(Buffer.alloc(5)); // target verify — corrupt
     adapterMock.writeBuffer.mockResolvedValue('new-path');
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const res = await service.migrate('src', 'tgt', 'org-1');
 
@@ -177,8 +202,8 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
       .mockResolvedValueOnce(Buffer.alloc(10))
       .mockResolvedValueOnce(Buffer.alloc(10));
     adapterMock.writeBuffer.mockResolvedValue('new-path');
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const res = await service.migrate('src', 'tgt', 'org-1', undefined, 1);
 
@@ -187,8 +212,8 @@ describe('StorageService — migration verify-before-delete (#48/#51)', () => {
   });
 
   it('rejects migrating a provider onto itself', async () => {
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(makeRepo(), auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(makeRepo(), auditService, encryption, makeResolution());
     await expect(service.migrate('x', 'x', 'org-1')).rejects.toThrow(
       'must be different'
     );
@@ -201,8 +226,8 @@ describe('StorageService — quota status (#61)', () => {
       getStorageUsedByOrg: vi.fn().mockResolvedValue(BigInt(4000000000)),
       getOrgQuota: vi.fn().mockResolvedValue(BigInt(5000000000)),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const status = await service.getQuotaStatus('org-1');
 
@@ -216,8 +241,8 @@ describe('StorageService — quota status (#61)', () => {
       getStorageUsedByOrg: vi.fn().mockResolvedValue(BigInt(2000000000)),
       getOrgQuota: vi.fn().mockResolvedValue(BigInt(5000000000)),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const status = await service.getQuotaStatus('org-1');
 
@@ -242,14 +267,78 @@ describe('StorageService — usage breakdown (#65)', () => {
           { providerId: 's3-1', providerName: 'S3', totalBytes: BigInt(500) },
         ]),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const breakdown = await service.getUsageBreakdown('org-1');
 
     expect(breakdown.byFolder).toHaveLength(2);
     expect(breakdown.byProvider).toHaveLength(2);
     expect(breakdown.byFolder[0].folderName).toBe('Images');
+  });
+});
+
+describe('StorageService — version pin-on-write', () => {
+  it('pins kernel.latestActive version when creating a config', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockResolvedValue({ id: 's3-1', version: 'v2' }),
+    });
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution({
+      latestActiveVersion: vi.fn().mockReturnValue('v2'),
+    });
+    const service = new StorageService(repo, auditService, encryption, resolution);
+
+    await service.createConfig('org-1', {
+      type: StorageProviderType.S3,
+      name: 'My S3',
+      credentials: { accessKeyId: 'key', secretAccessKey: 'secret' },
+    });
+
+    expect(resolution.latestActiveVersion).toHaveBeenCalledWith('storage', 's3');
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ version: 'v2' }),
+    );
+  });
+
+  it('falls back to v1 when kernel has no active version', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockResolvedValue({ id: 's3-1', version: 'v1' }),
+    });
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution({
+      latestActiveVersion: vi.fn().mockReturnValue(undefined),
+    });
+    const service = new StorageService(repo, auditService, encryption, resolution);
+
+    await service.createConfig('org-1', {
+      type: StorageProviderType.S3,
+      name: 'My S3',
+    });
+
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ version: 'v1' }),
+    );
+  });
+
+  it('uses explicit body.version when provided', async () => {
+    const repo = makeRepo({
+      create: vi.fn().mockResolvedValue({ id: 's3-1', version: 'v3' }),
+    });
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution();
+    const service = new StorageService(repo, auditService, encryption, resolution);
+
+    await service.createConfig('org-1', {
+      type: StorageProviderType.S3,
+      name: 'My S3',
+      version: 'v3',
+    });
+
+    expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ version: 'v3' }),
+    );
   });
 });
 
@@ -264,8 +353,8 @@ describe('StorageService — health tracking (#62)', () => {
       updateHealthCheck: vi.fn(),
     });
     adapterMock.testConnection.mockResolvedValue({ ok: true });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const result = await service.testConnection('p1', 'org-1');
 
@@ -286,8 +375,8 @@ describe('StorageService — health tracking (#62)', () => {
       ok: false,
       error: 'Access Denied',
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const result = await service.testConnection('p1', 'org-1');
 
@@ -302,13 +391,17 @@ describe('StorageService — getLocalAdapterForOrg', () => {
       findByOrg: vi.fn().mockResolvedValue([]),
       create: vi.fn(),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution();
+    const service = new StorageService(repo, auditService, encryption, resolution);
 
     const result = await service.getLocalAdapterForOrg('org-1');
 
     expect(repo.create).not.toHaveBeenCalled();
-    expect(StorageAdapterFactory.createLocal).toHaveBeenCalledWith('org-1');
+    expect(resolution.resolveStorage).toHaveBeenCalledWith(
+      'local',
+      expect.objectContaining({ orgId: 'org-1' })
+    );
     expect(result).toBe(adapterMock);
   });
 
@@ -321,8 +414,8 @@ describe('StorageService — getLocalAdapterForOrg', () => {
         .mockResolvedValueOnce([localConfig]),
       create: vi.fn().mockResolvedValue(localConfig),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     const result = await service.getLocalAdapterForOrg('org-1', true);
 
@@ -339,23 +432,28 @@ describe('StorageService — getLocalAdapterForOrg', () => {
       id: 's3-1',
       organizationId: 'org-1',
       type: StorageProviderType.S3,
+      version: 'v1',
       name: 'S3',
       credentials: 'enc:{}',
+      region: 'us-east-1',
+      bucket: 'my-bucket',
+      endpoint: null,
+      publicUrl: null,
     };
     const repo = makeRepo({
       findByOrg: vi.fn().mockResolvedValue([localConfig, s3Config]),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution();
+    const service = new StorageService(repo, auditService, encryption, resolution);
 
     const result = await service.getLocalAdapterForOrg('org-1');
 
     expect(result).toBe(adapterMock);
-    expect(StorageAdapterFactory.createFromConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'local-1', type: StorageProviderType.LOCAL })
-    );
-    expect(StorageAdapterFactory.createFromConfig).not.toHaveBeenCalledWith(
-      expect.objectContaining({ id: 's3-1' })
+    expect(resolution.resolveStorage).toHaveBeenCalledTimes(1);
+    expect(resolution.resolveStorage).toHaveBeenCalledWith(
+      'local',
+      expect.objectContaining({ orgId: 'org-1' })
     );
   });
 
@@ -363,8 +461,8 @@ describe('StorageService — getLocalAdapterForOrg', () => {
     const repo = makeRepo({
       findByOrg: vi.fn().mockResolvedValue([localConfig]),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
 
     await service.getLocalAdapterForOrg('org-1');
 
@@ -376,17 +474,25 @@ describe('StorageService — getLocalAdapterForOrg', () => {
     const repo = makeRepo({
       findByOrg: vi.fn().mockResolvedValue([localConfig]),
     });
-    const auditRepo = { create: vi.fn() } as unknown as AuditRepository;
-    const service = new StorageService(repo, auditRepo, encryption);
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const resolution = makeResolution();
+    const service = new StorageService(repo, auditService, encryption, resolution);
 
     const result = await service.getLocalAdapterForOrg('org-1');
 
     expect(result).toBe(adapterMock);
-    expect(StorageAdapterFactory.createFromConfig).toHaveBeenCalledWith(
+    expect(resolution.resolveStorage).toHaveBeenCalledWith(
+      'local',
       expect.objectContaining({
-        id: 'local-1',
-        type: StorageProviderType.LOCAL,
-        credentials: '{}',
+        version: 'v1',
+        credentials: {},
+        orgId: 'org-1',
+        extras: expect.objectContaining({
+          bucket: null,
+          region: null,
+          endpoint: null,
+          publicUrl: null,
+        }),
       })
     );
   });

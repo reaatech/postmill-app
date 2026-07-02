@@ -1,13 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockCreateNotification = vi.fn().mockResolvedValue(undefined);
-const mockGetAllUsersOrgs = vi.fn().mockResolvedValue({ users: [] });
+const mockCreateNotification = vi.fn().mockResolvedValue({ id: 'notif-1' });
+const mockCreateReadRecords = vi.fn().mockResolvedValue(undefined);
+const mockGetTeam = vi.fn().mockResolvedValue({ users: [] });
+const mockEnsureDefaults = vi.fn().mockResolvedValue({
+  masters: { email: true, push: true, inApp: true },
+  categories: {
+    announcements: { email: true, push: true, inApp: true },
+  },
+});
+const mockGetDigestFrequencies = vi.fn().mockResolvedValue({});
+const mockEnqueueMany = vi.fn().mockResolvedValue(undefined);
 
 vi.mock(
   '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository',
   () => ({
     NotificationsRepository: class {
       createNotification = mockCreateNotification;
+      createReadRecords = mockCreateReadRecords;
       getMainPageCount = vi.fn();
       getNotificationsPaginated = vi.fn();
       getNotifications = vi.fn();
@@ -26,59 +36,176 @@ vi.mock(
   '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository',
   () => ({
     OrganizationRepository: class {
-      getAllUsersOrgs = mockGetAllUsersOrgs;
+      getTeam = mockGetTeam;
     },
   })
 );
 
-vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
-  inngest: { send: vi.fn() },
-  isInngestEnabled: vi.fn().mockReturnValue(true),
-}));
+vi.mock(
+  '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service',
+  () => ({
+    NotificationPreferenceService: class {
+      ensureDefaults = mockEnsureDefaults;
+      getPreferences = vi.fn();
+      updatePreferences = vi.fn();
+      getDigestFrequencies = mockGetDigestFrequencies;
+    },
+  })
+);
+
+vi.mock(
+  '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service',
+  () => ({
+    PushNotificationService: class {
+      sendPushNotification = vi.fn().mockResolvedValue(undefined);
+      hasProvider = vi.fn().mockReturnValue(false);
+    },
+  })
+);
+
+vi.mock(
+  '@gitroom/nestjs-libraries/database/prisma/notifications/notification-digest.service',
+  () => ({
+    NotificationDigestService: class {
+      enqueueMany = mockEnqueueMany;
+    },
+  })
+);
 
 import { NotificationService } from './notification.service';
-import {
-  inngest,
-  isInngestEnabled,
-} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { NotificationsRepository } from '@gitroom/nestjs-libraries/database/prisma/notifications/notifications.repository';
 import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
+import { PushNotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/push-notification.service';
+import { NotificationDigestService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-digest.service';
 
-describe('NotificationService Inngest dispatch', () => {
+describe('NotificationService', () => {
   let service: NotificationService;
+  let emailService: EmailService;
 
   beforeEach(() => {
-    vi.mocked(isInngestEnabled).mockReturnValue(true);
     vi.clearAllMocks();
-    vi.mocked(inngest.send).mockResolvedValue(undefined);
 
+    emailService = new EmailService();
     service = new NotificationService(
       new NotificationsRepository(),
-      new EmailService(),
-      new OrganizationRepository()
+      emailService,
+      new OrganizationRepository(),
+      new NotificationPreferenceService(),
+      new PushNotificationService(),
+      new NotificationDigestService()
     );
   });
 
-  it('sends email/digest event when digest is requested and Inngest is enabled', async () => {
-    await service.inAppNotification('org-1', 'Subject', 'Message', true, true, 'info');
-
-    expect(inngest.send).toHaveBeenCalledWith({
-      name: 'email/digest',
-      data: {
-        organizationId: 'org-1',
-        title: 'Subject',
-        message: 'Message',
-        type: 'info',
-      },
+  it('creates a notification row for enabled members', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
     });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+    });
+
+    expect(mockCreateNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: 'org-1',
+        type: 'announcements',
+        title: 'Subject',
+        content: 'Message',
+      })
+    );
   });
 
-  it('skips email/digest event when Inngest is disabled', async () => {
-    vi.mocked(isInngestEnabled).mockReturnValue(false);
+  it('sends digest emails immediately when frequency is instant', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
+    });
+    mockGetDigestFrequencies.mockResolvedValue({ 'user-1': 'instant' });
 
-    await service.inAppNotification('org-1', 'Subject', 'Message', true, true, 'info');
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+      digest: true,
+    });
 
-    expect(inngest.send).not.toHaveBeenCalled();
+    expect(emailService.sendEmail).toHaveBeenCalledWith(
+      'a@b.com',
+      'Subject',
+      'Message',
+      'top',
+      undefined
+    );
+    expect(mockEnqueueMany).not.toHaveBeenCalled();
+  });
+
+  it('enqueues digest emails when frequency is daily', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
+    });
+    mockGetDigestFrequencies.mockResolvedValue({ 'user-1': 'daily' });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+      digest: true,
+    });
+
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
+    expect(mockEnqueueMany).toHaveBeenCalledWith(
+      ['user-1'],
+      'org-1',
+      expect.objectContaining({
+        title: 'Subject',
+        message: 'Message',
+        category: 'announcements',
+      })
+    );
+  });
+
+  it('skips digest emails when frequency is never', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
+    });
+    mockGetDigestFrequencies.mockResolvedValue({ 'user-1': 'never' });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+      digest: true,
+    });
+
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
+    expect(mockEnqueueMany).not.toHaveBeenCalled();
+  });
+
+  it('does not email a member whose category preference is off', async () => {
+    mockGetTeam.mockResolvedValue({
+      users: [{ user: { id: 'user-1', email: 'a@b.com' } }],
+    });
+    mockEnsureDefaults.mockResolvedValue({
+      masters: { email: true, push: true, inApp: true },
+      categories: {
+        announcements: { email: false, push: true, inApp: true },
+      },
+    });
+
+    await service.notify({
+      orgId: 'org-1',
+      category: 'announcements',
+      title: 'Subject',
+      message: 'Message',
+    });
+
+    expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
 });

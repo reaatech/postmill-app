@@ -79,7 +79,7 @@ describe('ProviderConfigRepository', () => {
 
       expect(mockProviderConfig.findUnique).toHaveBeenCalledTimes(1);
       expect(mockProviderConfig.findUnique).toHaveBeenCalledWith({
-        where: { identifier: 'github' },
+        where: { identifier_version: { identifier: 'github', version: 'v1' } },
       });
       expect(result).toEqual(config);
     });
@@ -99,7 +99,7 @@ describe('ProviderConfigRepository', () => {
       const result = await repository.getByIdentifier('my-app_123');
 
       expect(mockProviderConfig.findUnique).toHaveBeenCalledWith({
-        where: { identifier: 'my-app_123' },
+        where: { identifier_version: { identifier: 'my-app_123', version: 'v1' } },
       });
       expect(result).toEqual(config);
     });
@@ -160,8 +160,8 @@ describe('ProviderConfigRepository', () => {
 
       expect(mockProviderConfig.upsert).toHaveBeenCalledTimes(1);
       expect(mockProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { identifier: 'github' },
-        create: { identifier: 'github', ...baseData },
+        where: { identifier_version: { identifier: 'github', version: 'v1' } },
+        create: { identifier: 'github', version: 'v1', ...baseData },
         update: baseData,
       });
       expect(result).toEqual(upsertResult);
@@ -177,8 +177,8 @@ describe('ProviderConfigRepository', () => {
       const result = await repository.upsert('min', minimal);
 
       expect(mockProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { identifier: 'min' },
-        create: { identifier: 'min', ...minimal },
+        where: { identifier_version: { identifier: 'min', version: 'v1' } },
+        create: { identifier: 'min', version: 'v1', ...minimal },
         update: minimal,
       });
       expect(result.identifier).toBe('min');
@@ -203,8 +203,8 @@ describe('ProviderConfigRepository', () => {
       const result = await repository.upsert('full', full);
 
       expect(mockProviderConfig.upsert).toHaveBeenCalledWith({
-        where: { identifier: 'full' },
-        create: { identifier: 'full', ...full },
+        where: { identifier_version: { identifier: 'full', version: 'v1' } },
+        create: { identifier: 'full', version: 'v1', ...full },
         update: full,
       });
       expect(result.scopes).toBe('read,write');
@@ -220,7 +220,7 @@ describe('ProviderConfigRepository', () => {
 
       expect(mockProviderConfig.delete).toHaveBeenCalledTimes(1);
       expect(mockProviderConfig.delete).toHaveBeenCalledWith({
-        where: { identifier: 'github' },
+        where: { identifier_version: { identifier: 'github', version: 'v1' } },
       });
       expect(result).toEqual(deleted);
     });
@@ -242,7 +242,7 @@ describe('ProviderConfigRepository', () => {
 
       expect(mockProviderConfig.update).toHaveBeenCalledTimes(1);
       expect(mockProviderConfig.update).toHaveBeenCalledWith({
-        where: { identifier: 'github' },
+        where: { identifier_version: { identifier: 'github', version: 'v1' } },
         data: { enabled: true },
       });
       expect(result).toEqual(updated);
@@ -255,7 +255,7 @@ describe('ProviderConfigRepository', () => {
       const result = await repository.setEnabled('github', false);
 
       expect(mockProviderConfig.update).toHaveBeenCalledWith({
-        where: { identifier: 'github' },
+        where: { identifier_version: { identifier: 'github', version: 'v1' } },
         data: { enabled: false },
       });
       expect(result.enabled).toBe(false);

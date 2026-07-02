@@ -190,6 +190,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
     <div
       className="flex flex-col gap-1"
       role="listbox"
+      tabIndex={0}
       aria-label="Layers"
       onKeyDown={handlePanelKeyDown}
     >

@@ -8,6 +8,7 @@ import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-play
 import { VideoPlayer } from './players/video-player';
 import { ElapsedTimer } from './elapsed-timer';
 import { useGenerate } from './use-generate';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
 type Medium = 'image' | 'video' | 'audio';
 
@@ -214,15 +215,6 @@ export function ResultPanel({ medium }: { medium: Medium }) {
     window.open(target, '_blank');
   }, [saveFolderId]);
 
-  const openInDesigner = useCallback(
-    (url: string) => {
-      const storedUrl = savedPaths[url] || url;
-      const params = new URLSearchParams({ url: storedUrl, type: 'photo', w: '', h: '' });
-      window.open(`/media/designer?${params.toString()}`, '_blank');
-    },
-    [savedPaths]
-  );
-
   // ── State 1: placeholder ───────────────────────────────────────────────────
   if (!selectedModel) {
     return (
@@ -383,9 +375,14 @@ export function ResultPanel({ medium }: { medium: Medium }) {
                   Open in Files
                 </button>
               )}
-              {result.kind === 'image' && (
+              {['image', 'audio', 'video'].includes(result.kind) && (
                 <button
-                  onClick={() => openInDesigner(urls[0])}
+                  onClick={() =>
+                    openInDesigner({
+                      operation: result.kind,
+                      artifactUrl: savedPaths[urls[0]] || urls[0],
+                    })
+                  }
                   className="px-3 py-1.5 rounded-lg bg-designerAccent/20 text-designerAccent text-xs hover:bg-designerAccent/30 transition-colors"
                 >
                   Open in Designer

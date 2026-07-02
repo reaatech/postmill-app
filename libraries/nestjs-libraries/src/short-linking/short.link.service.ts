@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import { type ShortLinkContext } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
@@ -11,41 +11,64 @@ export class ShortLinkService {
   private readonly _logger = new Logger(ShortLinkService.name);
 
   constructor(
-    private _registry: ShortLinkRegistry,
     private _settingsService: OrgShortLinkSettingsService,
     private _repository: OrgShortLinkSettingsRepository,
+    private _resolution: ProviderResolutionService,
   ) {}
 
-  private async _resolve(orgId: string): Promise<{ adapter: any; ctx: ShortLinkContext } | null> {
+  private async _resolve(
+    orgId: string
+  ): Promise<{ adapter: any; ctx: ShortLinkContext; version: string } | null> {
     const active = await this._settingsService.getActiveProvider(orgId);
     if (!active) return null;
 
-    const adapter = this._registry.getAdapter(active.identifier);
-    if (!adapter) return null;
-
-    return {
-      adapter,
-      ctx: {
-        orgId,
+    const version = active.version ?? 'v1';
+    try {
+      const adapter = this._resolution.resolveShortLink(active.identifier, {
+        version,
         credentials: active.credentials || {},
-        customDomain: active.customDomain || undefined,
-      },
-    };
+        orgId,
+      });
+      if (!adapter) return null;
+
+      return {
+        adapter,
+        ctx: {
+          orgId,
+          credentials: active.credentials || {},
+          customDomain: active.customDomain || undefined,
+        },
+        version,
+      };
+    } catch {
+      return null;
+    }
   }
 
-  async askShortLinkedin(orgId: string, messages: string[]): Promise<boolean> {
+  async shouldShortlink(
+    orgId: string,
+    messages: string[]
+  ): Promise<{ ask: boolean; providerName?: string; domain?: string }> {
     const resolved = await this._resolve(orgId);
-    if (!resolved) return false;
+    if (!resolved) return { ask: false };
 
     const domain = resolved.adapter.resolveDomain(resolved.ctx);
-    if (!domain || domain === 'empty') return false;
+    if (!domain || domain === 'empty') return { ask: false };
 
     const mergeMessages = messages.join(' ');
     const urlRegex = /(https?:\/\/(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b(?:[-a-zA-Z0-9()@:%_\+.~#?&//=]*))/gm;
     const urls = mergeMessages.match(urlRegex);
-    if (!urls) return false;
+    const ask = urls ? urls.some((url) => url.indexOf(domain) === -1) : false;
 
-    return urls.some((url) => url.indexOf(domain) === -1);
+    return {
+      ask,
+      providerName: resolved.adapter.name || resolved.adapter.identifier,
+      domain,
+    };
+  }
+
+  async askShortLinkedin(orgId: string, messages: string[]): Promise<boolean> {
+    return (await this.shouldShortlink(orgId, messages)).ask;
   }
 
   async convertTextToShortLinks(orgId: string, messagesList: string[]) {
@@ -80,6 +103,7 @@ export class ShortLinkService {
                   shortUrl: result.shortUrl,
                   originalUrl: url,
                   providerLinkId: result.providerLinkId,
+                  providerVersion: resolved.version,
                   postId: undefined,
                 }).catch((err) => {
                   this._logger.warn(`Failed to record short link in ledger: ${(err as Error).message}`);

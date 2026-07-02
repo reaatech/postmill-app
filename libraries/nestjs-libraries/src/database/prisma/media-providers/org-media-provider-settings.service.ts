@@ -1,8 +1,10 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional, Inject } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
-import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel } from '@gitroom/provider-kernel';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ProviderCredentialLinkService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/provider-credential-link.service';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 
@@ -47,15 +49,35 @@ export class OrgMediaProviderSettingsService {
   constructor(
     private _repository: OrgMediaProviderSettingsRepository,
     private _encryption: EncryptionService,
-    private _registry: MediaProviderRegistry,
-    private _fileRepository: FileRepository,
+    private _resolution: ProviderResolutionService,
+    private _fileService: FileService,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     @Optional() private _credentialLink?: ProviderCredentialLinkService,
+    // layering: sanctioned leaf-read of OrgAiSettingsRepository (OrgAiSettingsService
+    // imports ProviderCredentialLinkService from media-providers → routing up would cycle)
     @Optional() private _orgAiRepository?: OrgAiSettingsRepository,
   ) {}
 
+  // Enumerate the registered media providers (one entry per provider id) from the
+  // ProviderKernel — replaces the legacy in-memory registry enumeration.
+  private _listProviders(): { identifier: string; name: string; capabilities: Record<string, boolean> }[] {
+    const seen = new Set<string>();
+    const out: { identifier: string; name: string; capabilities: Record<string, boolean> }[] = [];
+    for (const manifest of this._kernel.listManifests('media')) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      out.push({
+        identifier: manifest.providerId,
+        name: manifest.displayName,
+        capabilities: manifest.capabilities as Record<string, boolean>,
+      });
+    }
+    return out;
+  }
+
   async getProviders(orgId: string) {
     const configs = await this._repository.getByOrg(orgId);
-    const adapters = this._registry.getAll();
+    const adapters = this._listProviders();
     // Universal-credential providers (Qwen) count as configured/active when the org has
     // the matching AI provider key, even without a dedicated media credential row.
     const universalConfigured = await this._universalAiConfigured(orgId, adapters);
@@ -67,9 +89,11 @@ export class OrgMediaProviderSettingsService {
         name: adapter.name,
         capabilities: adapter.capabilities,
         enabled: dbConfig?.enabled || inherited || false,
+        isActive: dbConfig?.isActive || false,
         isConfigured: !!dbConfig?.credentials || inherited,
         storageProviderId: dbConfig?.storageProviderId || null,
         storageRootFolderId: dbConfig?.storageRootFolderId || null,
+        version: dbConfig?.version ?? 'v1',
         createdAt: dbConfig?.createdAt || null,
         updatedAt: dbConfig?.updatedAt || null,
       };
@@ -109,18 +133,27 @@ export class OrgMediaProviderSettingsService {
       credentials?: Record<string, string>;
       storageProviderId?: string;
       storageRootFolderId?: string;
+      version?: string;
     },
   ) {
     const encryptedCredentials = data.credentials
       ? this._encryption.encrypt(JSON.stringify(data.credentials))
       : undefined;
 
-    const result = await this._repository.upsert(orgId, identifier, {
-      enabled: data.enabled,
-      credentials: encryptedCredentials,
-      storageProviderId: data.storageProviderId,
-      storageRootFolderId: data.storageRootFolderId,
-    });
+    const version =
+      data.version ?? this._resolution.latestActiveVersion('media', identifier) ?? 'v1';
+
+    const result = await this._repository.upsert(
+      orgId,
+      identifier,
+      {
+        enabled: data.enabled,
+        credentials: encryptedCredentials,
+        storageProviderId: data.storageProviderId,
+        storageRootFolderId: data.storageRootFolderId,
+      },
+      version,
+    );
 
     if (data.storageProviderId && data.storageRootFolderId) {
       await this.ensureStandardFolders(orgId, data.storageRootFolderId);
@@ -138,6 +171,33 @@ export class OrgMediaProviderSettingsService {
     return this._repository.delete(orgId, identifier);
   }
 
+  /**
+   * Mark a provider as the org's Primary media provider (call-time default;
+   * plan §1.4/§2.4). Validates the provider is configured (own creds OR the
+   * universal-credential AI fallback), ensures a row exists to flip, then clears
+   * the prior Primary's `isActive` and sets this one (enable-many + one Primary).
+   */
+  async setActive(orgId: string, identifier: string, version?: string) {
+    const resolvedVersion =
+      version ?? this._resolution.latestActiveVersion('media', identifier) ?? 'v1';
+    const config = await this.getConfigForProvider(orgId, identifier, resolvedVersion);
+    if (!config || Object.keys(config.credentials).length === 0) {
+      throw new Error(
+        `Media provider "${identifier}" is not configured. Add credentials first.`,
+      );
+    }
+    // Universal-credential providers (Qwen) may have no media row yet — make one so
+    // there is an `isActive` flag to flip.
+    await this._repository.upsert(orgId, identifier, { enabled: true }, resolvedVersion);
+    return this._repository.setActive(orgId, identifier, resolvedVersion);
+  }
+
+  /** The org's Primary media provider row, or null. Studio pickers default to it. */
+  async getPrimaryProvider(orgId: string) {
+    const configs = await this._repository.getByOrg(orgId);
+    return configs.find((c) => c.isActive) ?? null;
+  }
+
   /** Identifiers enabled in at least one org — for the platform-admin overview. */
   async getEnabledIdentifiers(): Promise<string[]> {
     return this._repository.getEnabledIdentifiers();
@@ -152,8 +212,8 @@ export class OrgMediaProviderSettingsService {
     return ops.includes(operation);
   }
 
-  async getConfigForProvider(orgId: string, identifier: string) {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+  async getConfigForProvider(orgId: string, identifier: string, version = 'v1') {
+    const config = await this._repository.getByIdentifier(orgId, identifier, version);
     const credentials = config ? this._decryptCredentials(config.credentials) : {};
     // Prefer the dedicated media credential; for universal-credential providers (Qwen),
     // fall back to the org's AI provider key so the same key drives both surfaces.
@@ -164,11 +224,17 @@ export class OrgMediaProviderSettingsService {
           credentials: aiCredentials,
           storageProviderId: config?.storageProviderId ?? null,
           storageRootFolderId: config?.storageRootFolderId ?? null,
+          version: config?.version ?? version,
         };
       }
     }
     if (!config) return null;
-    return { credentials, storageProviderId: config.storageProviderId, storageRootFolderId: config.storageRootFolderId };
+    return {
+      credentials,
+      storageProviderId: config.storageProviderId,
+      storageRootFolderId: config.storageRootFolderId,
+      version: config.version,
+    };
   }
 
   async testConnection(orgId: string, identifier: string) {
@@ -177,12 +243,13 @@ export class OrgMediaProviderSettingsService {
       throw new Error(`Media provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._registry.get(identifier);
-    if (!adapter) {
-      throw new Error(`Unknown media provider: ${identifier}`);
-    }
-
     const decrypted = this._decryptCredentials(config.credentials);
+    const adapter = this._resolution.resolveMedia(identifier, {
+      version: config.version,
+      credentials: decrypted,
+      orgId,
+    });
+
     try {
       // Prefer the adapter's own auth check; only image-capable providers can be
       // verified via generateImage. Without either, the key can't be actively tested.
@@ -251,13 +318,13 @@ export class OrgMediaProviderSettingsService {
   // Ensure the provider root's typed 5-folder tree (§11.5). Public so the async-job
   // completion path can lazily (re)create it before landing an artifact.
   async ensureStandardFolders(orgId: string, rootFolderId: string) {
-    const existing = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
+    const existing = await this._fileService.findFoldersByParent(orgId, rootFolderId);
     const existingNames = new Set(existing.map((f) => f.name.toLowerCase()));
 
     for (const folderName of STANDARD_FOLDERS) {
       if (!existingNames.has(folderName)) {
         try {
-          await this._fileRepository.createFolder(orgId, {
+          await this._fileService.createFolder(orgId, {
             name: folderName,
             parentId: rootFolderId,
           });
@@ -272,7 +339,7 @@ export class OrgMediaProviderSettingsService {
   async getStandardFolderId(orgId: string, rootFolderId: string, folderName: string): Promise<string | null> {
     if (!STANDARD_FOLDERS.includes(folderName)) return null;
     await this.ensureStandardFolders(orgId, rootFolderId);
-    const folders = await this._fileRepository.findFoldersByParent(orgId, rootFolderId);
+    const folders = await this._fileService.findFoldersByParent(orgId, rootFolderId);
     const match = folders.find((f) => f.name.toLowerCase() === folderName);
     return match?.id ?? null;
   }

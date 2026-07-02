@@ -74,12 +74,43 @@ vi.mock('@gitroom/frontend/components/launches/calendar.context', () => ({
     loading: false,
     startDate: dayjs().format('YYYY-MM-DD'),
     comments: [],
-    listPosts: [],
-    listPage: 0,
-    listTotalPages: 0,
-    setListPage: vi.fn(),
     listState: 'all',
     setListState: vi.fn(),
+    listRangeMode: 'week',
+    setListRangeMode: vi.fn(),
+    engagementFilter: 'all',
+    setEngagementFilter: vi.fn(),
+    channelFilter: [],
+    setChannelFilter: vi.fn(),
+    campaigns: [],
+    campaignFilter: [],
+    setCampaignFilter: vi.fn(),
+    tags: [],
+    tagFilter: [],
+    setTagFilter: vi.fn(),
+    metricFilter: {
+      views: { op: 'gte', value: null },
+      likes: { op: 'gte', value: null },
+      comments: { op: 'gte', value: null },
+    },
+    setMetricFilter: vi.fn(),
+    contentSearch: '',
+    setContentSearch: vi.fn(),
+    platformFilter: [],
+    setPlatformFilter: vi.fn(),
+    creationMethodFilter: [],
+    setCreationMethodFilter: vi.fn(),
+    approvalFilter: [],
+    setApprovalFilter: vi.fn(),
+    mediaTypeFilter: 'all',
+    setMediaTypeFilter: vi.fn(),
+    recurringOnly: false,
+    setRecurringOnly: vi.fn(),
+    unreadOnly: false,
+    setUnreadOnly: vi.fn(),
+    appliedFilterCount: 0,
+    customRange: false,
+    applyCustomRange: vi.fn(),
   })),
 }));
 
@@ -99,8 +130,8 @@ vi.mock('@gitroom/frontend/components/launches/post-detail/post.detail.modal', (
   PostDetailModal: () => <div data-testid="post-detail-modal" />,
 }));
 
-vi.mock('@gitroom/frontend/components/new-launch/add.edit.modal', () => ({
-  AddEditModal: () => <div data-testid="add-edit-modal" />,
+vi.mock('@gitroom/frontend/components/composer/composer', () => ({
+  Composer: () => <div data-testid="add-edit-modal" />,
 }));
 
 vi.mock('@gitroom/react/helpers/delete.dialog', () => ({
@@ -161,6 +192,7 @@ function baseProps(overrides?: Partial<CalendarItemProps>): CalendarItemProps {
     statistics: vi.fn(),
     missingRelease: undefined,
     openPostDetail: vi.fn(),
+    changeColor: vi.fn(),
     integrations: [],
     state: 'PUBLISHED',
     display: 'day',
@@ -175,9 +207,9 @@ describe('CalendarItem', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the EditSettings icon in the hover strip', () => {
+  it('renders a visible actions kebab menu in the header', () => {
     render(<CalendarItem {...baseProps()} />);
-    expect(screen.getByLabelText('Edit Post')).toBeTruthy();
+    expect(screen.getByLabelText('Post actions')).toBeTruthy();
   });
 
   describe('stats footer', () => {
@@ -232,18 +264,18 @@ describe('CalendarItem', () => {
       expect(likesSpan).toBeDefined();
       expect(likesSpan?.getAttribute('aria-label')).toBe('Likes');
 
-      const commentsSpan = container.querySelector('span[title="Comments"]');
+      const commentsSpan = container.querySelector('span[title="Replies"]');
       expect(commentsSpan).toBeDefined();
-      expect(commentsSpan?.getAttribute('aria-label')).toBe('Comments');
+      expect(commentsSpan?.getAttribute('aria-label')).toBe('Replies');
     });
 
     it('commentCount stat span also has accessible label', () => {
       const post = basePost({ lastViews: null, lastLikes: null, lastComments: null, commentCount: 8 });
       const { container } = render(<CalendarItem {...baseProps()} post={post} />);
 
-      const commentsSpan = container.querySelector('span[title="Comments"]');
+      const commentsSpan = container.querySelector('span[title="Replies"]');
       expect(commentsSpan).toBeDefined();
-      expect(commentsSpan?.getAttribute('aria-label')).toBe('Comments');
+      expect(commentsSpan?.getAttribute('aria-label')).toBe('Replies');
     });
 
     it('is hidden when all stats are undefined', () => {

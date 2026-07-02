@@ -68,10 +68,6 @@ export class AiSettingsService {
     }
   }
 
-  decryptOrgProviderConfig(config: { credentials?: string | null }) {
-    return this.decryptProviderConfig(config);
-  }
-
   async deleteProviderConfig(identifier: string) {
     return this._repository.deleteProviderConfig(identifier);
   }
@@ -150,16 +146,6 @@ export class AiSettingsService {
   }
 
   // ── AISpendLog ──
-
-  getSpendLogs(params: {
-    organizationId?: string;
-    scope?: string;
-    provider?: string;
-    limit?: number;
-    offset?: number;
-  }) {
-    return this._repository.getSpendLogs(params);
-  }
 
   createSpendLog(data: {
     organizationId?: string;
@@ -338,7 +324,7 @@ export class AiSettingsService {
     error?: string;
     folderId?: string | null;
     model?: string | null;
-    versionId?: string | null;
+    version?: string | null;
     inputJson?: string | null;
   }) {
     return this._repository.createMediaJob(data);
@@ -354,7 +340,7 @@ export class AiSettingsService {
       error?: string | null;
       folderId?: string | null;
       model?: string | null;
-      versionId?: string | null;
+      version?: string | null;
       inputJson?: string | null;
       creditType?: string | null;
     },

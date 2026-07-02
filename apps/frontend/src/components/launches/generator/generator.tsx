@@ -156,7 +156,7 @@ const FirstStep: FC = (props) => {
       const params = new URLSearchParams();
       params.set('date', dayjs.utc(load.date).local().format('YYYY-MM-DDTHH:mm:ss'));
       params.set('content', encodeURIComponent(messages[0]?.content || ''));
-      router.push(`/schedule/post?${params.toString()}`);
+      router.push(`/posts/post?${params.toString()}`);
       setLoading(false);
     },
     [fetch, generateStep, router]

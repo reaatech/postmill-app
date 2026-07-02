@@ -6,8 +6,8 @@ import {
 } from './replicate-catalog.allowlist';
 
 describe('Replicate catalog allowlist', () => {
-  it('has 18 categories', () => {
-    expect(CATEGORIES).toHaveLength(18);
+  it('has 19 categories', () => {
+    expect(CATEGORIES).toHaveLength(19);
   });
 
   it('has at least one model in every non-local category', () => {

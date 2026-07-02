@@ -109,8 +109,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Push schema to the ephemeral DB
-        run: pnpm run prisma-db-push
+      - name: Apply migrations to the ephemeral DB
+        run: pnpm run prisma-migrate-deploy-safe
 
       - name: Build backend
         run: pnpm run build:backend

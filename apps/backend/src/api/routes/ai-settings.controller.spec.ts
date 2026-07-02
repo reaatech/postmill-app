@@ -16,10 +16,18 @@ const mockAdapter = {
   createLanguageModel: vi.fn(() => ({ doGenerate: vi.fn().mockResolvedValue({ content: [{ type: 'text', text: 'test' }], usage: { inputTokens: 10, outputTokens: 20 } }) })),
 };
 
-vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
-  AIProviderRegistry: class {
-    getAdapter = vi.fn().mockReturnValue(mockAdapter);
-    list = vi.fn().mockReturnValue([mockAdapter]);
+// The legacy AIProviderRegistry was deleted; the controller now enumerates via the
+// ProviderKernel (listManifests) and resolves adapters via ProviderResolutionService.
+const mockResolveAI = vi.fn().mockReturnValue(mockAdapter);
+const mockKernel = {
+  listManifests: vi.fn().mockReturnValue([{ providerId: 'openai', version: 'v1' }]),
+  versions: vi.fn().mockReturnValue([]),
+  latestActive: vi.fn().mockReturnValue(undefined),
+};
+
+vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
+  ProviderResolutionService: class {
+    resolveAI = mockResolveAI;
   },
 }));
 
@@ -33,7 +41,6 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.servi
     getDecryptedSystemSettings = vi.fn().mockResolvedValue(null);
     createAuditLog = vi.fn().mockResolvedValue({});
     createSpendLog = vi.fn().mockResolvedValue({});
-    getSpendLogs = vi.fn().mockResolvedValue([]);
     getSpendSummary = vi.fn().mockResolvedValue([]);
     getAuditLogs = vi.fn().mockResolvedValue([]);
     decryptProviderConfig = vi.fn().mockReturnValue({ credentials: { apiKey: 'sk-test' } });
@@ -76,7 +83,7 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/rag.service', () => ({
 }));
 
 import { AiSettingsController } from './ai-settings.controller';
-import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { ProviderHealthService } from '@gitroom/nestjs-libraries/ai/governance/provider-health.service';
@@ -90,7 +97,7 @@ const regularUser = { id: 'user-1', isSuperAdmin: false } as any;
 
 describe('AiSettingsController', () => {
   let controller: AiSettingsController;
-  let registry: AIProviderRegistry;
+  let resolution: ProviderResolutionService;
   let aiSettings: AiSettingsService;
   let settingsManager: AiSettingsManager;
   let health: ProviderHealthService;
@@ -101,7 +108,12 @@ describe('AiSettingsController', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    registry = new (AIProviderRegistry as any)();
+    // Restore default kernel/resolution behaviour after clearAllMocks (per-test overrides leak otherwise).
+    mockResolveAI.mockReturnValue(mockAdapter);
+    mockKernel.listManifests.mockReturnValue([{ providerId: 'openai', version: 'v1' }]);
+    mockKernel.versions.mockReturnValue([]);
+    mockKernel.latestActive.mockReturnValue(undefined);
+    resolution = new (ProviderResolutionService as any)();
     aiSettings = new (AiSettingsService as any)();
     settingsManager = new (AiSettingsManager as any)();
     health = new (ProviderHealthService as any)();
@@ -115,12 +127,13 @@ describe('AiSettingsController', () => {
     controller = new AiSettingsController(
       aiSettings as any,
       settingsManager as any,
-      registry as any,
+      resolution as any,
       health as any,
       guardrails as any,
       budget as any,
       rag as any,
       orgMediaProviderSettings as unknown as OrgMediaProviderSettingsService,
+      mockKernel as any,
     );
   });
 
@@ -154,7 +167,8 @@ describe('AiSettingsController', () => {
           { key: 'region', label: 'Region', type: 'string', required: true },
         ],
       };
-      (registry as any).list.mockReturnValue([regionAdapter]);
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'bedrock', version: 'v1' }]);
+      mockResolveAI.mockReturnValue(regionAdapter);
       (aiSettings as any).getProviderConfigs.mockResolvedValue([
         { identifier: 'bedrock', enabled: true, credentials: 'encrypted' },
       ]);
@@ -204,8 +218,7 @@ describe('AiSettingsController', () => {
     });
 
     it('throws BadRequestException for unknown provider', async () => {
-      const getAdapter = (registry as any).getAdapter as any;
-      getAdapter.mockReturnValue(undefined);
+      mockResolveAI.mockReturnValue(undefined);
       await expect(controller.getProvider(superAdmin, 'nonexistent')).rejects.toThrow(BadRequestException);
     });
   });

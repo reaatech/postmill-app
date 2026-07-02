@@ -60,18 +60,6 @@ export const ApprovedAppsComponent: FC = () => {
 
   return (
     <div className="flex flex-col gap-[20px]">
-      <div className="flex flex-col">
-        <h3 className="text-[20px]">
-          {t('approved_apps', 'Approved Apps')}
-        </h3>
-        <div className="text-newTableText mt-[4px]">
-          {t(
-            'apps_you_have_authorized',
-            'Applications you have authorized to access your Postmill account.'
-          )}
-        </div>
-      </div>
-
       <div className="bg-newBgColorInner border-newTableBorder border rounded-[12px] p-[24px]">
         {!apps?.length ? (
           <div className="text-newTableText">

@@ -3,7 +3,8 @@ import { createHash } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
-import { createContentPack } from './content-packs/content-pack.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import type { ContentPackCapability as ContentPackCapabilityInstance } from '@gitroom/provider-kernel';
 import type { ContentPackCapability } from './content-packs/content-pack.interface';
 import {
   StockAudioItem,
@@ -21,7 +22,8 @@ const CACHE_TTL_SECONDS = 60;
 export class StockMediaService {
   constructor(
     private readonly _redis: RedisService,
-    private readonly _contentPacks: OrgContentPackSettingsService
+    private readonly _contentPacks: OrgContentPackSettingsService,
+    private readonly _resolution: ProviderResolutionService
   ) {}
 
   private get unsplashKey(): string | undefined {
@@ -436,15 +438,11 @@ export class StockMediaService {
     capability: ContentPackCapability = 'photos'
   ) {
     // Caller is responsible for having an active pack; this is used by /files/import.
-    const active = await this._contentPacks.getActiveForCapability(orgId, capability);
-    if (!active) {
+    const resolved = await this._contentPacks.getActiveForCapability(orgId, capability);
+    if (!resolved) {
       throw new Error('No active content pack');
     }
-    const pack = createContentPack(active.identifier, active.credentials);
-    if (!pack) {
-      throw new Error(`Unknown content pack provider "${active.identifier}"`);
-    }
-    return pack.resolveDownload(id, capability);
+    return resolved.capability.resolveDownload(id, capability as any);
   }
 
   // ── Download triggers ──────────────────────────────────────
@@ -470,20 +468,21 @@ export class StockMediaService {
     filters: Record<string, string | undefined>,
     freeSearch: () => Promise<StockSearchResponse<T>>
   ): Promise<StockSearchResponse<T>> {
-    // If the org's active content pack covers this capability, use it; otherwise
-    // (pack absent, or it doesn't declare this capability) fall back to the free
-    // provider. This is the per-capability "default to free" behaviour.
-    const active = await this._contentPacks.getActiveForCapability(orgId, capability);
-    if (active) {
-      const pack = createContentPack(active.identifier, active.credentials);
-      if (pack) {
-        return pack.search(
-          capability,
-          query,
-          page,
-          Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined)) as Record<string, string>
-        );
-      }
+    // If the org's active content pack covers this capability, use the kernel-
+    // resolved capability; otherwise (pack absent, or it doesn't declare this
+    // capability) fall back to the free provider. This is the per-capability
+    // "default to free" behaviour.
+    const resolved = await this._contentPacks.getActiveForCapability(orgId, capability);
+    if (resolved) {
+      const result = await resolved.capability.search(
+        capability as any,
+        query,
+        page,
+        Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined)) as Record<string, string>
+      );
+      // v1 content-pack adapters delegate to the legacy ContentPack implementation,
+      // which already returns the StockSearchResponse shape. Cast for type parity.
+      return result as unknown as StockSearchResponse<T>;
     }
     return freeSearch();
   }

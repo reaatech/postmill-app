@@ -78,8 +78,17 @@ export const FileManager: FC<{
   const [filterTag, setFilterTag] = useState('');
   const [detailsFile, setDetailsFile] = useState<FileItem | null>(null);
   const [showTrash, setShowTrash] = useState(false);
+  const [folderDrawerOpen, setFolderDrawerOpen] = useState(false);
 
-  useEffect(() => { setPage(0); }, [debouncedSearch, selectedFolderId, filterType, filterTag]);
+  const setSearchAndReset = useCallback((value: string) => {
+    setSearch(value);
+    setPage(0);
+  }, []);
+
+  const setFilterTypeAndReset = useCallback((value: string) => {
+    setFilterType(value);
+    setPage(0);
+  }, []);
 
   useEffect(() => {
     onFolderChange?.(selectedFolderId);
@@ -148,39 +157,103 @@ export const FileManager: FC<{
 
   return (
     <div className="flex flex-1 h-full gap-[15px]">
-      <FolderTree
-        folders={foldersData || []}
-        selectedFolderId={selectedFolderId}
-        onSelectFolder={handleFolderSelect}
-        onRefresh={mutateFolders}
-        onFileMoved={refresh}
-      />
+      {/* Desktop sidebar */}
+      <div className="hidden lg:block">
+        <FolderTree
+          folders={foldersData || []}
+          selectedFolderId={selectedFolderId}
+          onSelectFolder={handleFolderSelect}
+          onRefresh={mutateFolders}
+          onFileMoved={refresh}
+        />
+      </div>
+
+      {/* Mobile folder drawer */}
+      <div
+        aria-hidden={!folderDrawerOpen}
+        className={clsx(
+          'fixed inset-0 z-[210] flex justify-start lg:hidden',
+          !folderDrawerOpen && 'pointer-events-none'
+        )}
+      >
+        <div
+          className={clsx(
+            'absolute inset-0 bg-black/50 transition-opacity duration-200',
+            folderDrawerOpen ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={() => setFolderDrawerOpen(false)}
+        />
+        <div
+          className={clsx(
+            'relative h-full w-[280px] max-w-[85vw] bg-newBgColor border-e border-studioBorder shadow-2xl flex flex-col text-textColor',
+            'transition-transform duration-300 ease-out will-change-transform',
+            folderDrawerOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'
+          )}
+        >
+          <div className="h-[56px] shrink-0 flex items-center justify-between px-[16px] bg-studioBg border-b border-studioBorder">
+            <div className="text-[16px] font-[600]">Folders</div>
+            <button
+              type="button"
+              aria-label="Close"
+              onClick={() => setFolderDrawerOpen(false)}
+              className="w-[32px] h-[32px] flex items-center justify-center rounded-[8px] text-newTableText hover:bg-[#2B5CD3]/15 hover:text-textColor transition-all"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                <path d="M1 1L13 13M13 1L1 13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-hidden p-[12px]">
+            <FolderTree
+              folders={foldersData || []}
+              selectedFolderId={selectedFolderId}
+              onSelectFolder={(id) => {
+                handleFolderSelect(id);
+                setFolderDrawerOpen(false);
+              }}
+              onRefresh={mutateFolders}
+              onFileMoved={refresh}
+              drawerMode
+            />
+          </div>
+        </div>
+      </div>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <PageHeader title="Media Library" description="Manage your images, videos, and files" />
-        <div className="flex items-center gap-[12px] mb-[15px]">
-          <div className="flex-1 relative">
-            <input
-              type="text"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search files by name, tags..."
-              className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
+        <PageHeader
+          title="Media Library"
+          description="Manage your images, videos, and files"
+          action={
+            <FileUploader
+              folderId={selectedFolderId}
+              onUploadComplete={refresh}
+              variant="header"
             />
-            <svg
-              className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/40"
-              width="16" height="16" viewBox="0 0 16 16" fill="none"
-            >
-              <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M10 10L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </div>
+          }
+        />
+        <div className="flex flex-wrap items-center gap-[12px] mb-[15px]">
+          <div className="flex flex-1 items-center gap-[8px] min-w-0 mobile:flex-none mobile:w-full">
+            <div className="flex-1 relative min-w-0">
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearchAndReset(e.target.value)}
+                placeholder="Search files by name, tags..."
+                className="w-full h-[44px] pl-[40px] pr-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3] text-textColor"
+              />
+              <svg
+                className="absolute left-[12px] top-[50%] -translate-y-[50%] text-newTextColor/40"
+                width="16" height="16" viewBox="0 0 16 16" fill="none"
+              >
+                <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" strokeWidth="1.5" />
+                <path d="M10 10L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+              </svg>
+            </div>
 
-          <div className="flex items-center gap-[8px]">
             <select
               value={filterType}
-              onChange={e => setFilterType(e.target.value)}
-              className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3]"
+              onChange={e => setFilterTypeAndReset(e.target.value)}
+              className="h-[44px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-[#2B5CD3] shrink-0"
             >
               <option value="">All types</option>
               <option value="image">Images</option>
@@ -188,30 +261,47 @@ export const FileManager: FC<{
               <option value="audio">Audio</option>
               <option value="document">Documents</option>
             </select>
+          </div>
 
-            <button
-              onClick={() => setViewMode('grid')}
-              className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
-                ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
-                : 'border-newColColor text-textColor hover:bg-boxHover')}
-            >
-              <GridIcon />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
-                ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
-                : 'border-newColColor text-textColor hover:bg-boxHover')}
-            >
-              <ListViewIcon />
-            </button>
+          <div className="flex items-center gap-[8px] mobile:w-full mobile:justify-between">
+            <div className="flex items-center gap-[8px] mobile:order-2">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'grid'
+                  ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
+                  : 'border-newColColor text-textColor hover:bg-boxHover')}
+              >
+                <GridIcon />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={clsx('p-[10px] rounded-[8px] border transition-all', viewMode === 'list'
+                  ? 'border-[#2B5CD3] text-[#2B5CD3] bg-[#2B5CD3]/10'
+                  : 'border-newColColor text-textColor hover:bg-boxHover')}
+              >
+                <ListViewIcon />
+              </button>
+            </div>
 
-            <button
-              onClick={() => setShowTrash(!showTrash)}
-              className="px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-boxHover transition-colors"
-            >
-              🗑️ Trash
-            </button>
+            <div className="flex items-center gap-[8px] mobile:order-1">
+              <button
+                type="button"
+                onClick={() => setFolderDrawerOpen(true)}
+                className="lg:hidden px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-boxHover transition-colors flex items-center gap-[6px]"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                </svg>
+                <span>Folder</span>
+              </button>
+
+              <button
+                onClick={() => setShowTrash(!showTrash)}
+                className="px-[12px] h-[44px] rounded-[8px] border border-newColColor text-[13px] text-textColor hover:bg-boxHover transition-colors"
+              >
+                🗑️ Trash
+              </button>
+            </div>
           </div>
         </div>
 
@@ -220,11 +310,6 @@ export const FileManager: FC<{
           onClearSelection={clearSelection}
           onRefresh={refresh}
           foldersData={foldersData || []}
-        />
-
-        <FileUploader
-          folderId={selectedFolderId}
-          onUploadComplete={refresh}
         />
 
         <div className="flex-1 relative min-h-0">
@@ -316,12 +401,35 @@ export const FileManager: FC<{
         )}
       </div>
 
+      {/* Desktop details panel */}
+      <div className="hidden lg:block">
+        {detailsFile && (
+          <FileDetailsPanel
+            key={detailsFile.id}
+            file={detailsFile}
+            onClose={() => setDetailsFile(null)}
+            onRefresh={refresh}
+          />
+        )}
+      </div>
+
+      {/* Mobile details drawer */}
       {detailsFile && (
-        <FileDetailsPanel
-          file={detailsFile}
-          onClose={() => setDetailsFile(null)}
-          onRefresh={refresh}
-        />
+        <div className="fixed inset-0 z-[210] flex justify-end lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setDetailsFile(null)}
+          />
+          <div className="relative h-full w-[340px] max-w-[90vw] bg-newBgColor border-s border-studioBorder shadow-2xl flex flex-col">
+            <FileDetailsPanel
+              key={detailsFile.id}
+              file={detailsFile}
+              onClose={() => setDetailsFile(null)}
+              onRefresh={refresh}
+              drawerMode
+            />
+          </div>
+        </div>
       )}
 
       {showTrash && (

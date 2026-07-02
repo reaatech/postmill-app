@@ -25,7 +25,7 @@ import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { TextMessage } from '@copilotkit/runtime-client-gql';
-import { PostComposer } from '@gitroom/frontend/components/launches/post-composer';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ExistingDataContextProvider } from '@gitroom/frontend/components/launches/helpers/use.existing.data';
@@ -361,7 +361,7 @@ const OpenModal: FC<{
                 })),
               }}
             >
-              <PostComposer
+              <Composer
                 date={dayjs.utc(integration.date)}
                 allIntegrations={properties}
                 integrations={properties.filter(

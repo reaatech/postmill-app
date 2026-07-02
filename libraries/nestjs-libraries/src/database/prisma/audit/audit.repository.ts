@@ -46,4 +46,19 @@ export class AuditRepository {
       },
     });
   }
+
+  // Changelog for a single resource (e.g. one campaign): entity + entityId scoped.
+  findByEntity(
+    orgId: string,
+    entity: string,
+    entityId: string,
+    options?: { limit?: number; offset?: number }
+  ) {
+    return this._auditLog.model.auditLog.findMany({
+      where: { organizationId: orgId, entity, entityId },
+      orderBy: { createdAt: 'desc' },
+      take: options?.limit || 50,
+      skip: options?.offset || 0,
+    });
+  }
 }

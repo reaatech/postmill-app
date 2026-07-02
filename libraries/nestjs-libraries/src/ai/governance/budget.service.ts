@@ -60,8 +60,29 @@ export class BudgetService {
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    const totals = await this._batchTotals(startOfMonth, startOfDay);
+    const maps = this._computeMaps(
+      await this._batchTotals(startOfMonth, startOfDay)
+    );
 
+    this._spendAccum = {
+      key: this._getAccumKey(),
+      ...maps,
+      ts: Date.now(),
+    };
+  }
+
+  // Aggregate a _batchTotals result into per-global/org/scope sums.
+  private _computeMaps(totals: {
+    monthly: Record<string, number>;
+    daily: Record<string, number>;
+  }): {
+    globalMonthly: number;
+    globalDaily: number;
+    orgMonthly: Map<string, number>;
+    orgDaily: Map<string, number>;
+    scopeMonthly: Map<string, number>;
+    scopeDaily: Map<string, number>;
+  } {
     const orgMonthly = new Map<string, number>();
     const orgDaily = new Map<string, number>();
     const scopeMonthly = new Map<string, number>();
@@ -82,15 +103,13 @@ export class BudgetService {
       }
     }
 
-    this._spendAccum = {
-      key: this._getAccumKey(),
+    return {
       globalMonthly: totals.monthly['__global::__any'] ?? 0,
       globalDaily: totals.daily['__global::__any'] ?? 0,
       orgMonthly,
       orgDaily,
       scopeMonthly,
       scopeDaily,
-      ts: Date.now(),
     };
   }
 
@@ -116,16 +135,20 @@ export class BudgetService {
   private async _batchTotals(
     startOfMonth: Date,
     startOfDay: Date,
+    organizationId?: string,
   ): Promise<{ monthly: Record<string, number>; daily: Record<string, number> }> {
+    // When an org is given, scope the aggregation to that org (cheap, indexed) instead of
+    // scanning the whole ledger. Callers that need true cross-org global totals pass no org.
+    const orgFilter = organizationId ? { organizationId } : {};
     const [monthlyRows, dailyRows] = await Promise.all([
       this._spendLogRepo.model.aISpendLog.groupBy({
         by: ['organizationId', 'scope'],
-        where: { createdAt: { gte: startOfMonth } },
+        where: { ...orgFilter, createdAt: { gte: startOfMonth } },
         _sum: { costUsd: true },
       }),
       this._spendLogRepo.model.aISpendLog.groupBy({
         by: ['organizationId', 'scope'],
-        where: { createdAt: { gte: startOfDay } },
+        where: { ...orgFilter, createdAt: { gte: startOfDay } },
         _sum: { costUsd: true },
       }),
     ]);
@@ -164,8 +187,28 @@ export class BudgetService {
 
     await this._ensureAccum();
 
-    const globalMonthly = this._spendAccum!.globalMonthly;
-    const globalDaily = this._spendAccum!.globalDaily;
+    // DB-authoritative read: the persisted AISpendLog is the source of truth for the cap
+    // decision, so a stale/lost in-memory accumulator can't let spend drift under-counted.
+    // The accumulator stays a fast-path floor (never under-count) via Math.max below.
+    // NOTE: this does NOT make the cap a hard transactional limit — two concurrent checks
+    // can still each pass just under the cap and both proceed (check-then-act). It closes
+    // the stale-accumulator gap, not the concurrent-overshoot one. Caps are a soft guardrail.
+    // Perf: when no GLOBAL cap is configured we only need this org's totals, so scope the
+    // aggregation to the org (indexed) rather than scanning the whole ledger per request.
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const needsGlobal = !!(caps.monthlyCap || caps.dailyCap);
+    const db = this._computeMaps(
+      await this._batchTotals(
+        startOfMonth,
+        startOfDay,
+        needsGlobal ? undefined : organizationId,
+      )
+    );
+
+    const globalMonthly = Math.max(this._spendAccum!.globalMonthly, db.globalMonthly);
+    const globalDaily = Math.max(this._spendAccum!.globalDaily, db.globalDaily);
 
     if (caps.monthlyCap && globalMonthly + this.RESERVATION_BUFFER > caps.monthlyCap) {
       return {
@@ -183,8 +226,14 @@ export class BudgetService {
 
     if (organizationId) {
       const orgCaps = caps.perOrgCaps?.[organizationId];
-      const orgMonthly = this._spendAccum!.orgMonthly.get(organizationId) ?? 0;
-      const orgDaily = this._spendAccum!.orgDaily.get(organizationId) ?? 0;
+      const orgMonthly = Math.max(
+        this._spendAccum!.orgMonthly.get(organizationId) ?? 0,
+        db.orgMonthly.get(organizationId) ?? 0
+      );
+      const orgDaily = Math.max(
+        this._spendAccum!.orgDaily.get(organizationId) ?? 0,
+        db.orgDaily.get(organizationId) ?? 0
+      );
 
       if (orgCaps?.monthly && orgMonthly + this.RESERVATION_BUFFER > orgCaps.monthly) {
         return {
@@ -203,8 +252,14 @@ export class BudgetService {
     const scopeCaps = caps.scopeCaps?.[scope];
     if (scopeCaps) {
       const scopeKey = `${organizationId ?? '__global'}::${scope}`;
-      const scopeMonthly = this._spendAccum!.scopeMonthly.get(scopeKey) ?? 0;
-      const scopeDaily = this._spendAccum!.scopeDaily.get(scopeKey) ?? 0;
+      const scopeMonthly = Math.max(
+        this._spendAccum!.scopeMonthly.get(scopeKey) ?? 0,
+        db.scopeMonthly.get(scopeKey) ?? 0
+      );
+      const scopeDaily = Math.max(
+        this._spendAccum!.scopeDaily.get(scopeKey) ?? 0,
+        db.scopeDaily.get(scopeKey) ?? 0
+      );
 
       if (scopeCaps.monthly && scopeMonthly + this.RESERVATION_BUFFER > scopeCaps.monthly) {
         return {

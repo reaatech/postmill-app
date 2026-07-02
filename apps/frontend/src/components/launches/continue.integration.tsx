@@ -7,7 +7,7 @@ import { Redirect } from '@gitroom/frontend/components/layout/redirect';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import dayjs from 'dayjs';
-import { continueProviderList } from '@gitroom/frontend/components/new-launch/providers/continue-provider/list';
+import { continueProviderList } from '@gitroom/frontend/components/composer/providers/continue-provider/list';
 import { IntegrationContext } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
@@ -122,7 +122,7 @@ export const ContinueIntegration: FC<{
       if (data.status === HttpStatusCode.PreconditionFailed) {
         const { returnURL } = await data.json().catch(() => ({}));
         navigateOrShow(
-          `/schedule?precondition=true`,
+          `/posts?precondition=true`,
           returnURL,
           'Precondition failed'
         );
@@ -131,7 +131,7 @@ export const ContinueIntegration: FC<{
 
       if (data.status === HttpStatusCode.NotAcceptable) {
         const { msg, returnURL } = await data.json();
-        navigateOrShow(`/schedule?msg=${msg}`, returnURL, msg);
+        navigateOrShow(`/posts?msg=${msg}`, returnURL, msg);
         return;
       }
 
@@ -193,7 +193,7 @@ export const ContinueIntegration: FC<{
       }
 
       navigateOrShow(
-        `/schedule?added=${provider}&msg=Channel Updated${
+        `/posts?added=${provider}&msg=Channel Updated${
           onboarding ? '&onboarding=true' : ''
         }`,
         returnURL,
@@ -232,7 +232,7 @@ export const ContinueIntegration: FC<{
         }
 
         navigateOrShow(
-          `/schedule?added=${provider}&msg=Channel Added${
+          `/posts?added=${provider}&msg=Channel Added${
             twoStepState.onboarding ? '&onboarding=true' : ''
           }`,
           twoStepState.returnURL,
@@ -394,7 +394,7 @@ export const ContinueIntegration: FC<{
                 'An error occurred. Please try again.'
               )}
           </div>
-          {logged && <Redirect url="/schedule" delay={3000} />}
+          {logged && <Redirect url="/posts" delay={3000} />}
         </div>
       </div>
     );

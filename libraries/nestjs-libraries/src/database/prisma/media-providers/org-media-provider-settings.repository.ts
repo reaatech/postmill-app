@@ -13,9 +13,9 @@ export class OrgMediaProviderSettingsRepository {
     });
   }
 
-  getByIdentifier(orgId: string, identifier: string) {
+  getByIdentifier(orgId: string, identifier: string, version = 'v1') {
     return this._mediaProviderConfig.model.mediaProviderConfig.findUnique({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
     });
   }
 
@@ -39,18 +39,36 @@ export class OrgMediaProviderSettingsRepository {
       storageRootFolderId?: string;
       accountFingerprint?: string;
       extraConfig?: string;
+      version?: string;
     },
+    version = 'v1',
   ) {
     return this._mediaProviderConfig.model.mediaProviderConfig.upsert({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
-      create: { organizationId: orgId, identifier, ...data },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
+      create: { organizationId: orgId, identifier, version, ...data },
       update: data,
     });
   }
 
-  delete(orgId: string, identifier: string) {
+  /**
+   * Mark one provider as the org's Primary (call-time default). Clears the
+   * previous Primary's `isActive` only — never touches other rows' `enabled`
+   * (enable-many + one Primary, plan §1.4). Mirrors the AI repo pattern.
+   */
+  async setActive(orgId: string, identifier: string, version = 'v1') {
+    await this._mediaProviderConfig.model.mediaProviderConfig.updateMany({
+      where: { organizationId: orgId, isActive: true },
+      data: { isActive: false },
+    });
+    return this._mediaProviderConfig.model.mediaProviderConfig.update({
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
+      data: { isActive: true, enabled: true },
+    });
+  }
+
+  delete(orgId: string, identifier: string, version = 'v1') {
     return this._mediaProviderConfig.model.mediaProviderConfig.delete({
-      where: { organizationId_identifier: { organizationId: orgId, identifier } },
+      where: { organizationId_identifier_version: { organizationId: orgId, identifier, version } },
     });
   }
 }

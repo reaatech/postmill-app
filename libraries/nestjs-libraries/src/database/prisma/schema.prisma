@@ -28,6 +28,7 @@ model Organization {
   Integration         Integration[]
   files               File[]
   notifications       Notifications[]
+  notificationDigestQueues NotificationDigestQueue[]
   plugs               Plugs[]
   post                Post[]               @relation("organization")
   socialComments      SocialComment[]
@@ -43,6 +44,7 @@ model Organization {
   oauthApp            OAuthApp[]
   oauthAuthorizations OAuthAuthorization[]
   aiOrgProviderConfigs AIOrgProviderConfig[]
+  orgDefaultModels    OrgDefaultModel[]
   aiBrandProfiles     AIBrandProfile[]
   aiPromptTemplates   AIPromptTemplate[]
   aiSpendLogs         AISpendLog[]     // only includes rows where organizationId IS NOT null (nullable FK means null-org rows are excluded from back-relation)
@@ -61,6 +63,7 @@ model Organization {
   orgShortLinkConfigs  OrgShortLinkConfig[]
   shortLinks           ShortLink[]
   shortLinkSnapshots   ShortLinkSnapshot[]
+  orgVpnConfigs        OrgVpnConfig[]
   apiKeys              ApiKey[]
   roles                AppRole[]
   designs              Design[]
@@ -79,7 +82,7 @@ model Tags {
   deletedAt    DateTime?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-  organization Organization @relation(fields: [orgId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   posts        TagsPosts[]
 
   @@index([orgId])
@@ -113,6 +116,8 @@ model User {
   lastOnline            DateTime             @default(now())
   ip                    String?
   agent                 String?
+  tosAcceptedAt         DateTime?
+  tosVersion            String?
   comments              Comments[]
   organizations         UserOrganization[]
   oauthAuthorizations   OAuthAuthorization[]
@@ -125,6 +130,10 @@ model User {
   profile               UserProfile?
   sessions              Session[]
   designs               Design[]
+  notificationReads     NotificationRead[]
+  notificationPreference NotificationPreference?
+  notificationDigestQueues NotificationDigestQueue[]
+  pushTokens            PushToken[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -138,7 +147,7 @@ model UsedCodes {
   orgId        String
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
-  organization Organization @relation(fields: [orgId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([code])
 }
@@ -152,7 +161,7 @@ model UserOrganization {
   roleRef        AppRole?     @relation(fields: [roleId], references: [id])
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id])
 
   @@unique([userId, organizationId])
@@ -181,7 +190,7 @@ model File {
   description        String?
   metadata           Json?
   folder             FileFolder? @relation(fields: [folderId], references: [id])
-  organization       Organization        @relation(fields: [organizationId], references: [id])
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userProfiles       UserProfile[]
   oauthApps          OAuthApp[]
   designPreviews     Design[]
@@ -203,7 +212,7 @@ model Credits {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   type           String       @default("ai_images")
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([createdAt])
@@ -218,13 +227,20 @@ model Subscription {
   period           String          @default("MONTHLY")
   totalChannels    Int
   isLifetime       Boolean          @default(false)
+  gracePeriodEnd   DateTime?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
   deletedAt        DateTime?
-  organization     Organization     @relation(fields: [organizationId], references: [id])
+  organization     Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+model StripeEvent {
+  id          String   @id // the Stripe event.id
+  type        String
+  processedAt DateTime @default(now())
 }
 
 model Customer {
@@ -234,7 +250,7 @@ model Customer {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   deletedAt    DateTime?
-  organization Organization  @relation(fields: [orgId], references: [id])
+  organization Organization  @relation(fields: [orgId], references: [id], onDelete: Cascade)
   integrations Integration[]
 
   @@unique([orgId, name, deletedAt])
@@ -263,9 +279,11 @@ model Integration {
   customerId            String?
   rootInternalId        String?
   additionalSettings    String?                @default("[]")
-  exisingPlugData       ExisingPlugData[]
+  providerConfigId      String?
+  providerVersion       String                 @default("v1")
   customer              Customer?              @relation(fields: [customerId], references: [id])
-  organization          Organization           @relation(fields: [organizationId], references: [id])
+  organization          Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  providerConfig        OrgProviderConfiguration? @relation(fields: [providerConfigId], references: [id], onDelete: SetNull)
   webhooks              Webhooks[]
   plugs                 Plugs[]
   posts                     Post[]
@@ -284,6 +302,8 @@ model Integration {
   @@index([inBetweenSteps])
   @@index([refreshNeeded])
   @@index([disabled])
+  @@index([providerConfigId])
+  @@index([organizationId, providerIdentifier, disabled])
 }
 
 model AnalyticsSnapshot {
@@ -323,7 +343,8 @@ model PostAnalyticsSnapshot {
 // Keep model for backward-compatible db-push; drop after migration helper runs.
 model ProviderConfiguration {
   id                String   @id @default(cuid())
-  identifier        String   @unique
+  identifier        String
+  version           String   @default("v1")
   name              String
   enabled           Boolean  @default(false)
   clientId          String?
@@ -335,6 +356,7 @@ model ProviderConfiguration {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
+  @@unique([identifier, version])
   @@index([enabled])
 }
 
@@ -350,7 +372,7 @@ model Signatures {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   picture        File?        @relation(fields: [pictureId], references: [id])
 
   @@index([createdAt])
@@ -367,7 +389,7 @@ model Comments {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   post           Post         @relation(fields: [postId], references: [id])
   user           User         @relation(fields: [userId], references: [id])
 
@@ -403,7 +425,7 @@ model Post {
   comments                   Comments[]
   errors                     Errors[]
   integration                Integration               @relation(fields: [integrationId], references: [id])
-  organization               Organization              @relation("organization", fields: [organizationId], references: [id])
+  organization               Organization              @relation("organization", fields: [organizationId], references: [id], onDelete: Cascade)
   parentPost                 Post?                     @relation("parentPostId", fields: [parentPostId], references: [id])
   childrenPost               Post[]                    @relation("parentPostId")
   tags                       TagsPosts[]
@@ -413,6 +435,9 @@ model Post {
   commentCount               Int                       @default(0)
   campaignId                 String?
   campaign                   Campaign?                 @relation(fields: [campaignId], references: [id])
+  approvalStatus             String?                   // campaign draft approval: pending|approved|rejected
+  approvedById               String?
+  approvedAt                 DateTime?
   brandId                    String?
   brand                      AIBrandProfile?          @relation(fields: [brandId], references: [id])
   analyticsSnapshots         PostAnalyticsSnapshot[]
@@ -432,6 +457,7 @@ model Post {
   @@index([releaseURL])
   @@index([integrationId])
   @@index([commentCount])
+  @@index([organizationId, state, publishDate])
 }
 
 model SocialComment {
@@ -460,7 +486,7 @@ model SocialComment {
 
   post         Post         @relation(fields: [postId], references: [id], onDelete: Cascade)
   integration  Integration  @relation(fields: [integrationId], references: [id], onDelete: Cascade)
-  organization Organization @relation(fields: [organizationId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   assignee     User?        @relation(fields: [assigneeId], references: [id])
 
   @@unique([integrationId, platformCommentId])
@@ -472,6 +498,7 @@ model SocialComment {
   @@index([postId, deletedAt, isOwn, platformCreatedAt])
   @@index([status])
   @@index([assigneeId])
+  @@index([organizationId, platformCreatedAt])
 }
 
 model PostCommentRead {
@@ -493,18 +520,74 @@ model PostCommentRead {
 model Notifications {
   id             String       @id @default(uuid())
   organizationId String
+  type           String       @default("general")
+  title          String?
   content        String
   link           String?
+  metadata       Json?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reads          NotificationRead[]
 
-  @@index([createdAt])
-  @@index([organizationId])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type])
   @@index([deletedAt])
 }
 
+model NotificationRead {
+  id             String        @id @default(uuid())
+  notificationId String
+  userId         String
+  readAt         DateTime      @default(now())
+  notification   Notifications @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@index([userId, readAt])
+}
+
+model NotificationPreference {
+  id              String @id @default(uuid())
+  userId          String @unique
+  masters         Json   @default("{\"email\":true,\"push\":true,\"inApp\":true}")
+  categories      Json   @default("{\"post_published\":{\"email\":true,\"push\":false,\"inApp\":true},\"post_failed\":{\"email\":true,\"push\":true,\"inApp\":true},\"channels\":{\"email\":true,\"push\":true,\"inApp\":true},\"comments\":{\"email\":true,\"push\":false,\"inApp\":true},\"budget\":{\"email\":true,\"push\":false,\"inApp\":true},\"media\":{\"email\":false,\"push\":false,\"inApp\":true},\"announcements\":{\"email\":true,\"push\":false,\"inApp\":true},\"streak\":{\"email\":true,\"push\":false,\"inApp\":true}}")
+  digestFrequency String @default("instant")
+  user            User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model NotificationDigestQueue {
+  id             String   @id @default(uuid())
+  userId         String
+  organizationId String
+  title          String
+  message        String
+  html           String?
+  category       String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model PushToken {
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  platform   String
+  deviceName String?
+  active     Boolean  @default(true)
+  lastUsedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, active])
+}
 
 
 model Plugs {
@@ -515,20 +598,10 @@ model Plugs {
   integrationId  String
   activated      Boolean      @default(true)
   integration    Integration  @relation(fields: [integrationId], references: [id])
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([plugFunction, integrationId])
   @@index([organizationId])
-}
-
-model ExisingPlugData {
-  id            String      @id @default(uuid())
-  integrationId String
-  methodName    String
-  value         String
-  integration   Integration @relation(fields: [integrationId], references: [id])
-
-  @@unique([integrationId, methodName, value])
 }
 
 model PopularPosts {
@@ -550,7 +623,7 @@ model Webhooks {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   integrations   Integration[]
-  organization   Organization  @relation(fields: [organizationId], references: [id])
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([deletedAt])
@@ -572,7 +645,7 @@ model AutoPost {
   deletedAt       DateTime?
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
-  organization    Organization @relation(fields: [organizationId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([deletedAt])
 }
@@ -584,7 +657,7 @@ model Sets {
   content        String
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
 }
@@ -598,7 +671,7 @@ model Errors {
   updatedAt      DateTime     @updatedAt
   postId         String
   body           String       @default("{}")
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   post           Post         @relation(fields: [postId], references: [id])
 
   @@index([organizationId])
@@ -632,7 +705,7 @@ model FileFolder {
   children          FileFolder[]  @relation("FolderTree")
   files             File[]
   storageProvider   StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
-  organization      Organization  @relation(fields: [organizationId], references: [id])
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([parentId])
@@ -659,6 +732,7 @@ model StorageProviderConfig {
   id               String              @id @default(cuid())
   organizationId   String
   type             StorageProviderType
+  version          String              @default("v1")
   name             String              // display name (e.g. "My R2 Bucket")
   credentials      String?             // encrypted JSON; schema varies by type
   region           String?
@@ -673,13 +747,14 @@ model StorageProviderConfig {
   accountFingerprint String?
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  organization     Organization        @relation(fields: [organizationId], references: [id])
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   folders          FileFolder[]
   mediaProviderConfigs MediaProviderConfig[]
 
   @@unique([organizationId, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, mounted])
+  @@index([organizationId, type, version])
 }
 
 // ── v3.6.0: Per-tenant channel provider OAuth credentials (replaces ProviderConfiguration) ──
@@ -695,12 +770,17 @@ model OrgProviderConfiguration {
   redirectUri      String?      // if null, platform default is used
   scopes           String?
   setupNotes       String?      // per-provider instructions for the admin
+  vpnSelection     String?      // JSON { enabled, identifier, regionId, vpnVersion } — optional VPN egress (not secret)
+  version          String       @default("v1")
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
-  organization     Organization @relation(fields: [organizationId], references: [id])
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  integrations     Integration[]
 
-  @@unique([organizationId, identifier])
+  // Many named credential sets per provider per org; the name disambiguates them.
+  @@unique([organizationId, identifier, name, version])
   @@index([organizationId])
+  @@index([organizationId, identifier])
 }
 
 // ── v3.6.0: DB-backed audit log for credential & storage mutations ──
@@ -714,7 +794,7 @@ model AuditLog {
   entityName       String?  // display name
   details          String?  // JSON-encoded context (never credentials)
   createdAt        DateTime @default(now())
-  organization     Organization @relation(fields: [organizationId], references: [id])
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([organizationId, createdAt(sort: Desc)])
@@ -890,7 +970,7 @@ model OAuthApp {
   createdAt      DateTime             @default(now())
   updatedAt      DateTime             @updatedAt
   deletedAt      DateTime?
-  organization   Organization         @relation(fields: [organizationId], references: [id])
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   picture        File?                @relation(fields: [pictureId], references: [id])
   authorizations OAuthAuthorization[]
 
@@ -920,7 +1000,7 @@ model OAuthAuthorization {
   updatedAt             DateTime     @updatedAt
   oauthApp              OAuthApp     @relation(fields: [oauthAppId], references: [id])
   user                  User         @relation(fields: [userId], references: [id])
-  organization          Organization @relation(fields: [organizationId], references: [id])
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([oauthAppId, userId, organizationId])
   @@index([accessToken])
@@ -935,7 +1015,8 @@ model OAuthAuthorization {
 // Keep model for backward-compatible db-push; drop after migration helper runs.
 model AIProviderConfig {
   id            String   @id @default(cuid())
-  identifier    String   @unique
+  identifier    String
+  version       String   @default("v1")
   enabled       Boolean  @default(false)
   credentials   String?
   defaultModel  String?
@@ -944,6 +1025,7 @@ model AIProviderConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([identifier, version])
   @@index([enabled])
 }
 
@@ -998,6 +1080,7 @@ model AIOrgProviderConfig {
   id             String       @id @default(cuid())
   organizationId String
   identifier     String
+  version        String       @default("v1")
   enabled        Boolean      @default(false)
   isActive       Boolean      @default(false) // only one can be active per org
   credentials    String?
@@ -1007,18 +1090,36 @@ model AIOrgProviderConfig {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
   @@index([enabled])
   @@index([organizationId, isActive])
+}
+
+model OrgDefaultModel {
+  id             String       @id @default(cuid())
+  organizationId String
+  domain         String       // 'ai' | 'media'
+  category       String       // e.g. 'high-reasoning' | 'text-to-image'
+  providerId     String       // resolved provider identifier (e.g. 'openai')
+  version        String       @default("v1")
+  model          String?      // model id; null allowed for action-only providers
+  settings       String?      // JSON: per-category tunables (non-secret)
+  updatedAt      DateTime     @updatedAt
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, domain, category])
+  @@index([organizationId, domain])
 }
 
 model OrgShortLinkConfig {
   id             String   @id @default(cuid())
   organizationId String
   identifier     String
+  version        String   @default("v1")
   enabled        Boolean  @default(false)
   isActive       Boolean  @default(false)
   credentials    String?
@@ -1028,9 +1129,9 @@ model OrgShortLinkConfig {
   extraConfig    String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, identifier, accountFingerprint])
+  @@unique([organizationId, identifier, version, accountFingerprint])
   @@index([organizationId])
   @@index([organizationId, isActive])
 }
@@ -1039,17 +1140,19 @@ model ShortLink {
   id             String   @id @default(cuid())
   organizationId String
   provider       String
+  providerVersion String  @default("v1")
   shortUrl       String
   originalUrl    String
   providerLinkId String?
   postId         String?
   createdAt      DateTime @default(now())
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   snapshots      ShortLinkSnapshot[]
 
   @@unique([organizationId, shortUrl])
   @@index([organizationId, provider])
   @@index([organizationId, createdAt])
+  @@index([postId])
 }
 
 model ShortLinkSnapshot {
@@ -1060,7 +1163,7 @@ model ShortLinkSnapshot {
   date           DateTime     @db.Date
   createdAt      DateTime     @default(now())
   shortLink      ShortLink    @relation(fields: [shortLinkId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([shortLinkId, date])
   @@index([organizationId, date])
@@ -1079,7 +1182,7 @@ model ApiKey {
   revokedAt      DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id])
 
   @@index([organizationId])
@@ -1138,6 +1241,11 @@ model UserProfile {
   avatarUrl         String?
   pictureId         String?
   timezone          String?  // IANA tz
+  // DEPRECATED (Notifications V2): superseded by NotificationPreference.categories
+  // (post_published / post_failed / streak email toggles). Retained for one release
+  // as an expand-contract step so BackfillService can copy any opt-OUT into the new
+  // preference rows before these columns are dropped in the follow-up release.
+  // No runtime code reads these — do NOT add new readers.
   sendSuccessEmails Boolean  @default(true)
   sendFailureEmails Boolean  @default(true)
   sendStreakEmails  Boolean  @default(true)
@@ -1172,6 +1280,7 @@ model Session {
 model AuthProviderConfig {
   id            String   @id @default(uuid())
   provider      Provider
+  version       String   @default("v1")
   enabled       Boolean  @default(false)
   clientId      String?
   clientSecret  String?
@@ -1183,7 +1292,7 @@ model AuthProviderConfig {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  @@unique([provider])
+  @@unique([provider, version])
 }
 
 // ── v3.8.10: Per-org media provider config ──
@@ -1191,7 +1300,9 @@ model MediaProviderConfig {
   id                  String         @id @default(uuid())
   organizationId      String
   identifier          String
+  version             String         @default("v1")
   enabled             Boolean        @default(false)
+  isActive            Boolean        @default(false) // the org's Primary media provider (call-time default); only one per org
   credentials         String?        // encrypted
   storageProviderId   String?        // null = LOCAL
   storageRootFolderId String?        // root folder in storage
@@ -1199,10 +1310,30 @@ model MediaProviderConfig {
   extraConfig         String?
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
-  organization        Organization   @relation(fields: [organizationId], references: [id])
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   storageProvider     StorageProviderConfig? @relation(fields: [storageProviderId], references: [id])
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
+  @@index([organizationId])
+  @@index([organizationId, isActive])
+}
+
+// ── v3.9.0: Per-organization VPN provider config ──
+model OrgVpnConfig {
+  id              String   @id @default(uuid())
+  organizationId  String
+  identifier      String
+  version         String   @default("v1")
+  name            String?
+  credentials     String?  // encrypted JSON
+  regions         String?  // JSON string[] of enabled proxy-region ids
+  enabled         Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
 }
 
@@ -1211,14 +1342,15 @@ model ContentPackConfig {
   id             String   @id @default(cuid())
   organizationId String
   identifier     String   // e.g. 'magnific'
+  version        String   @default("v1")
   credentials    String?  // encrypted JSON
   extraConfig    Json?    // provider-specific non-secret config
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, identifier])
+  @@unique([organizationId, identifier, version])
   @@index([organizationId])
 }
 
@@ -1248,7 +1380,7 @@ model AIBrandProfile {
   createdAt         DateTime     @default(now())
   updatedAt         DateTime     @updatedAt
 
-  organization      Organization @relation(fields: [organizationId], references: [id])
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   posts             Post[]
 
   @@index([organizationId])
@@ -1301,12 +1433,16 @@ model AIMediaJob {
   error          String?
   folderId    String?
   model       String?
-  versionId   String?
+  // Provider-framework version pin. Renamed from the former `versionId String?`
+  // under db push (drop+create). Loss-free: no production caller ever populated
+  // `versionId` (it was an unused optional param) — verified NULL everywhere — so
+  // no backfill is required; existing rows default to "v1".
+  version     String       @default("v1")
   inputJson   String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User?        @relation(fields: [userId], references: [id])
 
   @@index([organizationId, createdAt])
@@ -1324,7 +1460,7 @@ model AIPromptLibraryItem {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([organizationId, createdAt])
@@ -1345,7 +1481,7 @@ model AIContentIndex {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, sourceType, sourceId, chunkIndex])
   @@index([organizationId])
@@ -1421,7 +1557,7 @@ model MultipartUpload {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@unique([organizationId, uploadId])
   @@index([organizationId, state])
@@ -1440,7 +1576,7 @@ model WatchedAccount {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   metrics        WatchedAccountMetric[]
 
   @@unique([organizationId, provider, handle])
@@ -1468,15 +1604,95 @@ model Campaign {
   startDate      DateTime?
   endDate        DateTime?
   archived       Boolean  @default(false)
+  createdById    String?              // user who created the campaign
+  client         String?              // optional: which client this campaign is for
+  project        String?              // optional: which project this campaign belongs to
+  tags           Json?                // optional: string[] of free-form tags
+  goals          Json?                // [{ metric, target }] targets shown vs progress on the dashboard
+  shareToken     String?  @unique     // CSPRNG token for the public read-only client report link
+  shareEnabled   Boolean  @default(false)
+  utmEnabled     Boolean  @default(false) // auto-append utm_campaign/source to links in this campaign's posts
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   deletedAt      DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   posts          Post[]
   designs        Design[]
+  items          CampaignItem[]
+  notes          CampaignNote[]
 
   @@index([organizationId])
   @@index([deletedAt])
+}
+
+// Jira-style internal "Discussion" thread on a campaign: org members post rich-HTML
+// notes (with embedded image/video) to talk about the campaign. Distinct from the
+// synced social SocialComment feature. One level of threading via parentId.
+model CampaignNote {
+  id             String    @id @default(uuid())
+  campaignId     String
+  organizationId String
+  createdById    String
+  parentId       String?               // one-level threaded replies (parent must be top-level)
+  content        String                // sanitized rich HTML
+  mentions       Json?                 // string[] of mentioned userIds
+  pinned         Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolvedById   String?
+  editedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+  campaign       Campaign               @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  parent         CampaignNote?          @relation("NoteThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies        CampaignNote[]         @relation("NoteThread")
+  reactions      CampaignNoteReaction[]
+
+  @@index([campaignId, deletedAt])
+  @@index([organizationId])
+  @@index([parentId])
+}
+
+model CampaignNoteReaction {
+  id        String       @id @default(uuid())
+  noteId    String
+  userId    String
+  emoji     String
+  createdAt DateTime     @default(now())
+  note      CampaignNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, userId, emoji])
+  @@index([noteId])
+}
+
+// Polymorphic association: tags a campaign onto any of the 8 non-post entity types
+// (posts use Post.campaignId). entityType+entityId identify the tagged row; no FK to
+// the source tables (orphans are skipped on read and reaped by the purge cron).
+model CampaignItem {
+  id             String             @id @default(uuid())
+  campaignId     String
+  organizationId String
+  entityType     CampaignEntityType
+  entityId       String
+  createdById    String?
+  createdAt      DateTime           @default(now())
+  campaign       Campaign           @relation(fields: [campaignId], references: [id])
+
+  @@unique([campaignId, entityType, entityId])
+  @@index([organizationId, entityType, entityId])
+  @@index([campaignId, entityType])
+}
+
+enum CampaignEntityType {
+  POST
+  INTEGRATION
+  ORG_VPN_CONFIG
+  AI_ORG_PROVIDER_CONFIG
+  AI_BRAND_PROFILE
+  STORAGE_PROVIDER_CONFIG
+  FILE
+  SETS
+  SIGNATURES
 }
 
 // Editable design documents — one per org-scoped design
@@ -1495,7 +1711,7 @@ model Design {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  organization    Organization  @relation(fields: [organizationId], references: [id])
+  organization    Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   createdBy       User          @relation(fields: [createdById], references: [id])
   campaign        Campaign?     @relation(fields: [campaignId], references: [id])
   previewFile     File?         @relation(fields: [previewFileId], references: [id])
@@ -1545,4 +1761,29 @@ model EmailLog {
   @@index([provider, providerMessageId])
   @@index([sentAt])
   @@index([status])
+}
+
+model MigrationLedger {
+  id         String   @id @default(cuid())
+  key        String   @unique
+  appliedAt  DateTime @default(now())
+  durationMs Int?
+  note       String?
+
+  @@index([appliedAt])
+}
+
+// One row per Inngest cron function (upsert on functionId), recording the latest run's
+// timing/status for the /health endpoint. Bounded — never grows with run count.
+model InngestFunctionRun {
+  id          String    @id @default(cuid())
+  functionId  String    @unique
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  durationMs  Int?
+  status      String    @default("running") // running | completed | failed
+  error       String?
+  updatedAt   DateTime  @updatedAt
+
+  @@index([updatedAt])
 }

@@ -1796,34 +1796,6 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/AiGovernance' } } }
       responses: { '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessFlag' } } } } }
 
-  /admin/ai-settings/scope-models:
-    get:
-      tags: [AI Settings]
-      summary: Get per-scope model overrides
-      operationId: aiGetScopeModels
-      responses: { '200': { description: Scope models map } }
-    put:
-      tags: [AI Settings]
-      summary: Set per-scope model overrides
-      operationId: aiSetScopeModels
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [scopeModels]
-              properties:
-                scopeModels:
-                  type: object
-                  description: 'Keyed by scope: utility | generator | agent | mcp'
-                  additionalProperties:
-                    type: object
-                    properties: { provider: { type: string }, model: { type: string } }
-      responses:
-        '200': { description: Saved, content: { application/json: { schema: { $ref: '#/components/schemas/SuccessFlag' } } } }
-        '400': { description: Invalid scope }
-
   /admin/ai-settings/spend:
     get:
       tags: [AI Settings]

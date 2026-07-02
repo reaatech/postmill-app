@@ -1,0 +1,15 @@
+'use client';
+
+import { useParams } from 'next/navigation';
+import { usePublicCampaignReport } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
+import { CampaignReportView } from '@gitroom/frontend/components/campaigns/report/campaign-report-view';
+
+export default function PublicCampaignSharePage() {
+  const { token } = useParams<{ token: string }>();
+  const { data, isLoading, error } = usePublicCampaignReport(token);
+
+  if (error) return <div className="p-[24px] text-center text-red-500">Report unavailable.</div>;
+  if (isLoading || !data) return <div className="p-[24px] text-center">Loading…</div>;
+
+  return <CampaignReportView report={data} publicMode token={token} />;
+}

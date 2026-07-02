@@ -11,19 +11,48 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
+import { StripeEventRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/stripe-event.repository';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_nothing');
 
 @Injectable()
 export class StripeService {
+  private readonly _logger = new Logger(StripeService.name);
+  // Dunning grace window (C2): how long after a payment failure we keep channels live
+  // before the terminal subscription.deleted teardown.
+  private readonly GRACE_PERIOD_DAYS = 7;
   constructor(
     private _subscriptionService: SubscriptionService,
     private _organizationService: OrganizationService,
     private _userService: UsersService,
-    private _trackService: TrackService
+    private _trackService: TrackService,
+    private _stripeEventRepository: StripeEventRepository,
+    private _notificationService: NotificationService,
+    private _audit: AuditService
   ) {}
   validateRequest(rawBody: Buffer, signature: string, endpointSecret: string) {
     return stripe.webhooks.constructEvent(rawBody, signature, endpointSecret);
+  }
+
+  // F2(b): record a subscription state transition as a non-fatal audit event. Resolves
+  // the org from the Stripe customer id; metadata carries only the new status (no secret).
+  private async _auditSubscriptionChanged(customerId: string, status: string) {
+    try {
+      const org = await this._organizationService.getOrgByCustomerId(customerId);
+      if (!org?.id) {
+        return;
+      }
+      await this._audit.record({
+        orgId: org.id,
+        action: 'billing.subscription.changed',
+        resource: 'subscription',
+        metadata: { status },
+      });
+    } catch {
+      /* non-fatal: auditing must never break webhook processing */
+    }
   }
 
   async checkValidCard(
@@ -44,7 +73,7 @@ export class StripeService {
       return true;
     }
 
-    console.log('Checking card');
+    this._logger.log('Checking card');
 
     const paymentMethods = await stripe.paymentMethods.list({
       customer: event.data.object.customer as string,
@@ -77,7 +106,7 @@ export class StripeService {
       });
 
       if (paymentIntent.status !== 'requires_capture') {
-        console.error('Cant charge');
+        this._logger.error('Cant charge');
         await stripe.paymentMethods.detach(paymentMethods.data[0].id);
         await stripe.subscriptions.cancel(event.data.object.id as string);
         return false;
@@ -116,6 +145,11 @@ export class StripeService {
       return { ok: false };
     }
 
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      event.data.object.status
+    );
+
     return this._subscriptionService.createOrUpdateSubscription(
       event.data.object.status !== 'active',
       uniqueId,
@@ -126,7 +160,57 @@ export class StripeService {
       event.data.object.cancel_at
     );
   }
+  // Dunning (C2): a past-due subscription enters a grace window + notifies the org
+  // instead of tearing down channels. The terminal `subscription.deleted` still downgrades.
+  private async _enterGracePeriod(customerId: string) {
+    if (!customerId) {
+      return { ok: true };
+    }
+
+    const now = new Date();
+    const existing = await this._stripeEventRepository.getGracePeriod(customerId);
+    // Already inside an unexpired grace window — keep it; don't re-notify or tear down.
+    if (existing && existing.getTime() > now.getTime()) {
+      return { ok: true, grace: true };
+    }
+
+    const until = new Date(
+      now.getTime() + this.GRACE_PERIOD_DAYS * 24 * 60 * 60 * 1000
+    );
+    await this._stripeEventRepository.setGracePeriod(customerId, until);
+
+    const org = await this._organizationService.getOrgByCustomerId(customerId);
+    if (org?.id) {
+      try {
+        await this._notificationService.notify({
+          orgId: org.id,
+          category: 'budget',
+          title: 'Payment failed — action needed',
+          message: `We couldn't process your latest payment. Please update your billing details before ${until.toDateString()} to keep your channels active.`,
+          link: (process.env.FRONTEND_URL || '') + '/billing',
+        });
+      } catch (err) {
+        this._logger.warn(
+          `Failed to send dunning notification for customer ${customerId}: ${
+            (err as Error)?.message ?? String(err)
+          }`
+        );
+      }
+    }
+
+    return { ok: true, grace: true };
+  }
+
+  async paymentFailed(event: Stripe.InvoicePaymentFailedEvent) {
+    return this._enterGracePeriod(event.data.object.customer as string);
+  }
+
   async updateSubscription(event: Stripe.CustomerSubscriptionUpdatedEvent) {
+    // Past-due: grant grace + notify rather than re-running the tier transition/teardown.
+    if (event.data.object.status === 'past_due') {
+      return this._enterGracePeriod(event.data.object.customer as string);
+    }
+
     const {
       uniqueId,
       billing,
@@ -142,6 +226,11 @@ export class StripeService {
       return { ok: false };
     }
 
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      event.data.object.status
+    );
+
     return this._subscriptionService.createOrUpdateSubscription(
       event.data.object.status !== 'active',
       uniqueId,
@@ -156,6 +245,10 @@ export class StripeService {
   async deleteSubscription(event: Stripe.CustomerSubscriptionDeletedEvent) {
     await this._subscriptionService.deleteSubscription(
       event.data.object.customer as string
+    );
+    await this._auditSubscriptionChanged(
+      event.data.object.customer as string,
+      'deleted'
     );
   }
 
@@ -428,7 +521,11 @@ export class StripeService {
 
       return null;
     } catch (err) {
-      console.error('Error finding auto-apply promotion code:', err);
+      this._logger.error(
+        `Error finding auto-apply promotion code: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
       return null;
     }
   }
@@ -470,7 +567,7 @@ export class StripeService {
       customer,
       return_url:
         process.env['FRONTEND_URL'] +
-        `/schedule?onboarding=true&check=${uniqueId}${isUtm}`,
+        `/posts?onboarding=true&check=${uniqueId}${isUtm}`,
       mode: 'subscription',
       subscription_data: {
         ...(allowTrial ? { trial_period_days: 7 } : {}),
@@ -531,7 +628,7 @@ export class StripeService {
       cancel_url: process.env['FRONTEND_URL'] + `/billing?cancel=true${isUtm}`,
       success_url:
         process.env['FRONTEND_URL'] +
-        `/schedule?onboarding=true&check=${uniqueId}${isUtm}`,
+        `/posts?onboarding=true&check=${uniqueId}${isUtm}`,
       mode: 'subscription',
       subscription_data: {
         ...(allowTrial ? { trial_period_days: 7 } : {}),
@@ -992,7 +1089,7 @@ export class StripeService {
         success: true,
       };
     } catch (err) {
-      console.log(err);
+      this._logger.warn((err as Error)?.message ?? String(err));
       return {
         success: false,
       };

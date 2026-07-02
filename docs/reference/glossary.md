@@ -45,8 +45,8 @@ or failures.
 A scheduled content item. Has content (text, media, poll settings), a target set of channels, a
 scheduled date/time, and optional campaign, first-comment, and signature settings.
 
-**Schedule** (previously Launches/Calendar)
-The scheduling interface at `/schedule`. A grid view where users create, schedule, and
+**Posts** (previously Schedule/Launches/Calendar)
+The post scheduling interface at `/posts`. A grid/calendar view where users create, schedule, and
 manage posts.
 
 **Workflow**

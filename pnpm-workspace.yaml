@@ -1,6 +1,7 @@
 packages:
   - apps/*
   - libraries/*
+  - libraries/providers/*
 
 overrides:
   next: 16.2.7

@@ -9,8 +9,8 @@ import { AuthProviderManager } from '@gitroom/backend/services/auth/providers/pr
 import dayjs from 'dayjs';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { ForgotReturnPasswordDto } from '@gitroom/nestjs-libraries/dtos/auth/forgot-return.password.dto';
-import { EmailService } from '@gitroom/nestjs-libraries/services/email.service';
 import { NewsletterService } from '@gitroom/nestjs-libraries/newsletter/newsletter.service';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import crypto from 'crypto';
 
 @Injectable()
@@ -19,7 +19,6 @@ export class AuthService {
     private _userService: UsersService,
     private _organizationService: OrganizationService,
     private _notificationService: NotificationService,
-    private _emailService: EmailService,
     private _providerManager: AuthProviderManager
   ) {}
 
@@ -122,14 +121,16 @@ export class AuthService {
 
         user = create.users[0].user;
 
+        // Set Gravatar avatar for local email signups.
+        await this.handleProviderPicture(user.id, user.email, null);
+
         const jwt = await this.jwt(user);
         const refreshToken = await this.createSession(user.id, ip, userAgent);
 
-        await this._emailService.sendEmail(
+        await this._notificationService.sendEmail(
           body.email,
           'Activate your account',
-          `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`,
-          'top'
+          `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`
         );
         return { addedOrg, jwt, refreshToken };
       }
@@ -261,7 +262,9 @@ export class AuthService {
   ) {
     if (email && datafast_visitor_id && process.env.DATAFAST_API_KEY) {
       try {
-        await fetch('https://datafa.st/api/v1/goals', {
+        // Fixed public host, but routed through safeFetch to align with the outbound-HTTP
+        // standard (SSRF dispatcher + per-hop redirect re-validation).
+        await safeFetch('https://datafa.st/api/v1/goals', {
           method: 'POST',
           headers: {
             Authorization: `Bearer ${process.env.DATAFAST_API_KEY}`,
@@ -343,11 +346,10 @@ export class AuthService {
 
     const jwt = await this.jwt(user);
 
-    await this._emailService.sendEmail(
+    await this._notificationService.sendEmail(
       user.email,
       'Activate your account',
-      `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`,
-      'top'
+      `Click <a href="${process.env.FRONTEND_URL}/auth/activate/${jwt}">here</a> to activate your account`
     );
 
     return true;

@@ -73,14 +73,46 @@ function DesignerWithParams() {
     }
   }
 
+  // Timeline handoff: studios/open-in-designer stashes a video/audio artifact in
+  // sessionStorage and navigates here with ?timeline=1. The Designer lands it directly
+  // on the video/audio track.
+  let initialTimelineMedia:
+    | { type: 'video' | 'audio'; url: string; fileId?: string; width?: number; height?: number }
+    | undefined;
+  if (sp.get('timeline') && typeof window !== 'undefined') {
+    try {
+      const raw = window.sessionStorage.getItem('designer:timeline-handoff');
+      if (raw) initialTimelineMedia = JSON.parse(raw);
+    } catch {
+      // ignore malformed handoff
+    }
+  }
+
+  // Clear consumed handoff keys so a refresh does not re-apply them.
+  if (typeof window !== 'undefined') {
+    window.sessionStorage.removeItem('designer:timeline-handoff');
+    window.sessionStorage.removeItem('designer:caption-handoff');
+    window.sessionStorage.removeItem('designer:bulk-assets');
+  }
+
   // The Designer initialises its store once from initialAsset, so remount it
   // when the asset changes (navigating straight from one asset to another).
   return (
     <DesignerPage
-      key={url || (initialCaptionVideo ? 'captions' : initialAssets ? 'bulk' : 'blank')}
+      key={
+        url ||
+        (initialTimelineMedia
+          ? `timeline-${initialTimelineMedia.type}`
+          : initialCaptionVideo
+          ? 'captions'
+          : initialAssets
+          ? 'bulk'
+          : 'blank')
+      }
       initialAsset={initialAsset}
       initialAssets={initialAssets}
       initialCaptionVideo={initialCaptionVideo}
+      initialTimelineMedia={initialTimelineMedia}
     />
   );
 }

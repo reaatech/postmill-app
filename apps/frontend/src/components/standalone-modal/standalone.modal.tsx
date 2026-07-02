@@ -6,7 +6,7 @@ import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import dayjs from 'dayjs';
 import { useParams } from 'next/navigation';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 export const StandaloneModal: FC = () => {
   const fetch = useFetch();
@@ -43,7 +43,7 @@ export const StandaloneModal: FC = () => {
     return null;
   }
   return (
-    <AddEditModal
+    <Composer
       dummy={params.platform === 'all'}
       customClose={() => {
         window.parent.postMessage(

@@ -27,9 +27,21 @@ const SUGGESTED_SEARCHES = ['Nature', 'City', 'Technology', 'People', 'Abstract'
 interface StockPhotosProps {
   mode?: 'browse' | 'select';
   onSelect?: (item: { url: string; width: number; height: number; thumbnail?: string; type: 'image' }) => void;
+  /** Rich select callback that includes import metadata (attribution, downloadLocation, etc.). */
+  onSelectFull?: (item: {
+    url: string;
+    width: number;
+    height: number;
+    thumbnail?: string;
+    type: 'image';
+    source?: string;
+    attribution?: Record<string, unknown>;
+    downloadLocation?: string | null;
+    name?: string;
+  }) => void;
 }
 
-export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect }) => {
+export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, onSelectFull }) => {
   const modal = useModals();
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebounce(query, 300);
@@ -244,14 +256,20 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect })
                 key={photo.id}
                 type="button"
                 onClick={() => {
-                  if (mode === 'select' && onSelect) {
-                    onSelect({
+                  if (mode === 'select' && (onSelect || onSelectFull)) {
+                    const payload = {
                       url: photo.url,
                       width: photo.width,
                       height: photo.height,
                       thumbnail: photo.thumbUrl,
-                      type: 'image',
-                    });
+                      type: 'image' as const,
+                      source: photo.source,
+                      attribution: photo.attribution,
+                      downloadLocation: photo.downloadLocation,
+                      name: photo.description || undefined,
+                    };
+                    onSelectFull?.(payload);
+                    onSelect?.(payload);
                   } else {
                     openPhoto(photo);
                   }

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { FC, Fragment, useMemo } from 'react';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useShallow } from 'zustand/react/shallow';
 import clsx from 'clsx';
 import SafeImage from '@gitroom/react/helpers/safe.image';

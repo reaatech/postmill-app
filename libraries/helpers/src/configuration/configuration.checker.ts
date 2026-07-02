@@ -5,6 +5,11 @@ import { resolve } from 'path';
 export class ConfigurationChecker {
   cfg: dotenv.DotenvParseOutput;
   issues: string[] = [];
+  // Fatal issues are a strict subset of misconfigurations that should refuse a
+  // production boot (see main.ts). They are ALSO mirrored into `issues` so the
+  // existing warning surface still lists them; `getFatalIssues()`/`hasFatalIssues()`
+  // expose just the boot-blocking set.
+  fatalIssues: string[] = [];
 
   readEnvFromFile() {
     const envFile = resolve(__dirname, '../../../.env');
@@ -35,6 +40,69 @@ export class ConfigurationChecker {
     this.checkDeprecatedStorageVars();
     this.checkDeprecatedChannelVars();
     this.checkDeprecatedAiVars();
+    this.checkEncryptionKey();
+    this.checkFatal();
+  }
+
+  // The boot-blocking subset. A missing/invalid value here should stop a production
+  // start (main.ts exits non-zero). Each fatal is also pushed to `issues` so it shows
+  // in the normal warning list too.
+  checkFatal() {
+    const jwt = this.get('JWT_SECRET');
+    if (!jwt) {
+      this.pushFatal('JWT_SECRET is not set — required to sign/verify auth tokens.');
+    } else if (jwt.length < 32) {
+      // Non-fatal WARNING only: a short secret is weaker but functional, and existing
+      // deployments boot with it today. Making it fatal would (a) take down a healthy
+      // deployment on upgrade and (b) force lengthening JWT_SECRET, which rotates the
+      // ENCRYPTION_KEY derived from it and breaks decryption of at-rest secrets. Warn,
+      // don't kill boot.
+      this.issues.push(
+        'JWT_SECRET is shorter than 32 characters — consider a longer signing key (note: changing it rotates the derived ENCRYPTION_KEY).'
+      );
+    }
+
+    if (!this.get('DATABASE_URL')) {
+      this.pushFatal('DATABASE_URL is not set — the backend cannot reach its database.');
+    }
+
+    // FRONTEND_URL is the canonical public URL (MAIN_URL is an optional alias used for an
+    // extra CORS origin). Require at least one to be present.
+    if (!this.get('FRONTEND_URL') && !this.get('MAIN_URL')) {
+      this.pushFatal('Neither FRONTEND_URL nor MAIN_URL is set — set the public app URL.');
+    }
+
+    // Inngest keys are mandatory ONLY when Inngest is actually enabled (USE_INNGEST=true)
+    // AND we are not pointed at a local dev server (INNGEST_DEV=1). Deployments that don't
+    // use Inngest (USE_INNGEST unset/false) are fully supported and must still boot — gating
+    // on INNGEST_DEV alone would wrongly down every non-Inngest production deployment.
+    if (this.get('USE_INNGEST') === 'true' && this.get('INNGEST_DEV') !== '1') {
+      if (!this.get('INNGEST_EVENT_KEY')) {
+        this.pushFatal(
+          'INNGEST_EVENT_KEY is not set — required when USE_INNGEST=true and INNGEST_DEV is not "1".'
+        );
+      }
+      if (!this.get('INNGEST_SIGNING_KEY')) {
+        this.pushFatal(
+          'INNGEST_SIGNING_KEY is not set — required when USE_INNGEST=true and INNGEST_DEV is not "1".'
+        );
+      }
+    }
+  }
+
+  pushFatal(message: string) {
+    this.fatalIssues.push(message);
+    this.issues.push(message);
+  }
+
+  checkEncryptionKey() {
+    if (!this.get('ENCRYPTION_KEY')) {
+      this.issues.push(
+        'ENCRYPTION_KEY not set — at-rest secrets are keyed from JWT_SECRET. ' +
+          'Set a dedicated 32-byte key (base64 or hex) for production so rotating ' +
+          'JWT_SECRET does not invalidate every stored ciphertext.',
+      );
+    }
   }
 
   checkInngest() {
@@ -189,6 +257,14 @@ export class ConfigurationChecker {
 
   hasIssues() {
     return this.issues.length > 0;
+  }
+
+  hasFatalIssues() {
+    return this.fatalIssues.length > 0;
+  }
+
+  getFatalIssues() {
+    return this.fatalIssues;
   }
 
   getIssues() {

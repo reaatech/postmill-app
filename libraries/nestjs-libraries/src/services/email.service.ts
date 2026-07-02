@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { EmailAdapterRegistry } from '@gitroom/nestjs-libraries/emails/email-adapter.registry';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
@@ -33,7 +34,20 @@ export class EmailService {
       return undefined;
     }
 
+    // D3: deterministic id so a retried enqueue is deduplicated at the event
+    // layer (matches the `post_${postId}` / `autopost-${id}` pattern). Bucketed
+    // to the minute so legitimately re-sent identical mail later still goes out.
+    // The body (html) is part of the digest so two DISTINCT same-minute mails with
+    // an identical to+subject but different content — e.g. two password-reset
+    // requests with rotated tokens — are NOT collapsed into one.
+    const bucket = Math.floor(Date.now() / 60_000);
+    const digest = createHash('sha256')
+      .update(`${to}:${subject}:${html}`)
+      .digest('hex')
+      .slice(0, 32);
+
     return inngest.send({
+      id: `email_${digest}_${bucket}`,
       name: 'email/send',
       data: { to, subject, html, replyTo, addTo },
     });

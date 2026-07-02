@@ -140,13 +140,124 @@ async function getVideoDuration(filePath: string): Promise<number> {
   throw new Error(`Could not determine duration for ${filePath}`);
 }
 
-export async function mergeClips(
-  clips: Clip[],
+export interface LocalMergeInput {
+  /** Absolute (or workdir-relative, resolved by caller) path to a raw clip file. */
+  path: string;
+  trimStart?: number;
+  trimEnd?: number;
+}
+
+/**
+ * Pure ffmpeg trim + xfade/acrossfade merge over already-resolved LOCAL files. No storage
+ * or network access — this is the portion that runs inside the Podman render worker (and
+ * in-process as a fallback). Writes the merged result to `outputPath`.
+ */
+export async function mergeLocalFiles(
+  inputs: LocalMergeInput[],
   transitions: Transition[],
+  workDir: string,
+  outputPath: string,
+): Promise<void> {
+  if (inputs.length === 0) {
+    throw new Error('At least one clip is required');
+  }
+  if (inputs.length > MAX_CLIPS) {
+    throw new Error(`Maximum ${MAX_CLIPS} clips allowed`);
+  }
+
+  const tempFiles: string[] = [];
+  for (let i = 0; i < inputs.length; i++) {
+    let buffer = await readFile(inputs[i].path);
+    if (inputs[i].trimStart !== undefined || inputs[i].trimEnd !== undefined) {
+      buffer = await trimClip(buffer, inputs[i].trimStart, inputs[i].trimEnd, workDir, i);
+    }
+    const tempPath = join(workDir, `clip_${i}.mp4`);
+    await writeFile(tempPath, buffer);
+    tempFiles.push(tempPath);
+  }
+
+  if (tempFiles.length === 1) {
+    await execFileAsync('ffmpeg', ['-y', '-i', tempFiles[0], '-c', 'copy', outputPath]);
+    return;
+  }
+
+  const ffmpegInputs: string[] = [];
+  for (const tf of tempFiles) {
+    ffmpegInputs.push('-i', tf);
+  }
+
+  const durations: number[] = [];
+  for (const tf of tempFiles) {
+    durations.push(await getVideoDuration(tf));
+  }
+
+  const filterParts: string[] = [];
+  let lastVideo = '[0:v]';
+  let lastAudio = '[0:a]';
+
+  for (let i = 1; i < tempFiles.length; i++) {
+    const transIdx = i - 1;
+    const transition = transitions[transIdx];
+    const duration = transition?.duration ?? 0.5;
+    const effect = TRANSITION_MAP[transition?.type || 'fade'] || 'fade';
+
+    // Offset for the transition between clip i-1 and clip i is the sum of all
+    // clip durations up to and including clip i-1, minus the sum of all transition
+    // durations up to and including this transition.
+    let offset = 0;
+    for (let j = 0; j < i; j++) {
+      offset += durations[j];
+    }
+    for (let j = 0; j <= transIdx; j++) {
+      const priorDuration = transitions[j]?.duration ?? 0.5;
+      offset -= priorDuration;
+    }
+
+    const vidOut = `[v${i}]`;
+    const audOut = `[a${i}]`;
+
+    filterParts.push(
+      `${lastVideo}[${i}:v]xfade=transition=${effect}:duration=${duration}:offset=${offset}${vidOut};`,
+    );
+    filterParts.push(`${lastAudio}[${i}:a]acrossfade=d=${duration}${audOut};`);
+
+    lastVideo = vidOut;
+    lastAudio = audOut;
+  }
+
+  await execFileAsync('ffmpeg', [
+    '-y',
+    ...ffmpegInputs,
+    '-filter_complex',
+    filterParts.join(''),
+    '-map',
+    lastVideo.replace(/[[\]]/g, ''),
+    '-map',
+    lastAudio.replace(/[[\]]/g, ''),
+    '-c:v',
+    'libx264',
+    '-preset',
+    'fast',
+    '-crf',
+    '23',
+    '-c:a',
+    'aac',
+    outputPath,
+  ]);
+}
+
+/**
+ * Resolve clips (storage/URL) into raw files in `workDir` and return their local-merge
+ * inputs. This is the host-side step (keeps storage creds out of the render container).
+ * Enforces per-clip and total size caps.
+ */
+export async function resolveClipsToFiles(
+  clips: Clip[],
   orgId: string,
   storageService: StorageService,
   resolveFileId: (fileId: string) => Promise<string>,
-): Promise<Buffer> {
+  workDir: string,
+): Promise<LocalMergeInput[]> {
   if (clips.length === 0) {
     throw new Error('At least one clip is required');
   }
@@ -154,112 +265,48 @@ export async function mergeClips(
     throw new Error(`Maximum ${MAX_CLIPS} clips allowed`);
   }
 
-  const tmpDir = await mkdtemp(join(tmpdir(), 'replicate-merge-'));
-  const tempFiles: string[] = [];
+  const out: LocalMergeInput[] = [];
   let totalSize = 0;
+  for (let i = 0; i < clips.length; i++) {
+    const buffer = await resolveClipBuffer(clips[i], i, orgId, storageService, resolveFileId);
+    if (buffer.length > MAX_CLIP_SIZE) {
+      throw new Error(`Clip ${i + 1} exceeds 500 MB limit`);
+    }
+    totalSize += buffer.length;
+    if (totalSize > MAX_TOTAL_SIZE) {
+      throw new Error('Total clip size exceeds 1 GB limit');
+    }
+    const rawPath = join(workDir, `raw_${i}.mp4`);
+    await writeFile(rawPath, buffer);
+    out.push({ path: rawPath, trimStart: clips[i].trimStart, trimEnd: clips[i].trimEnd });
+  }
+  return out;
+}
 
+/**
+ * Back-compat one-shot merge (resolve + merge in-process). Retained for the in-process
+ * fallback path and any existing callers.
+ */
+export async function mergeClips(
+  clips: Clip[],
+  transitions: Transition[],
+  orgId: string,
+  storageService: StorageService,
+  resolveFileId: (fileId: string) => Promise<string>,
+): Promise<Buffer> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'replicate-merge-'));
   try {
-    for (let i = 0; i < clips.length; i++) {
-      let buffer = await resolveClipBuffer(clips[i], i, orgId, storageService, resolveFileId);
-
-      if (buffer.length > MAX_CLIP_SIZE) {
-        throw new Error(`Clip ${i + 1} exceeds 500 MB limit`);
-      }
-      totalSize += buffer.length;
-      if (totalSize > MAX_TOTAL_SIZE) {
-        throw new Error('Total clip size exceeds 1 GB limit');
-      }
-
-      if (clips[i].trimStart !== undefined || clips[i].trimEnd !== undefined) {
-        buffer = await trimClip(buffer, clips[i].trimStart, clips[i].trimEnd, tmpDir, i);
-      }
-
-      const tempPath = join(tmpDir, `clip_${i}.mp4`);
-      await writeFile(tempPath, buffer);
-      tempFiles.push(tempPath);
-    }
-
+    const inputs = await resolveClipsToFiles(
+      clips,
+      orgId,
+      storageService,
+      resolveFileId,
+      tmpDir,
+    );
     const outputPath = join(tmpDir, 'merged.mp4');
-
-    if (tempFiles.length === 1) {
-      await execFileAsync('ffmpeg', ['-y', '-i', tempFiles[0], '-c', 'copy', outputPath]);
-    } else {
-      const inputs: string[] = [];
-      for (const tf of tempFiles) {
-        inputs.push('-i', tf);
-      }
-
-      const durations: number[] = [];
-      for (const tf of tempFiles) {
-        durations.push(await getVideoDuration(tf));
-      }
-
-      const filterParts: string[] = [];
-      let lastVideo = '[0:v]';
-      let lastAudio = '[0:a]';
-
-      for (let i = 1; i < tempFiles.length; i++) {
-        const transIdx = i - 1;
-        const transition = transitions[transIdx];
-        const duration = transition?.duration ?? 0.5;
-        const effect = TRANSITION_MAP[transition?.type || 'fade'] || 'fade';
-
-        // Offset for the transition between clip i-1 and clip i is the sum of all
-        // clip durations up to and including clip i-1, minus the sum of all transition
-        // durations up to and including this transition.
-        let offset = 0;
-        for (let j = 0; j < i; j++) {
-          offset += durations[j];
-        }
-        for (let j = 0; j <= transIdx; j++) {
-          const priorDuration = transitions[j]?.duration ?? 0.5;
-          offset -= priorDuration;
-        }
-
-        const vidOut = `[v${i}]`;
-        const audOut = `[a${i}]`;
-
-        filterParts.push(
-          `${lastVideo}[${i}:v]xfade=transition=${effect}:duration=${duration}:offset=${offset}${vidOut};`,
-        );
-        filterParts.push(
-          `${lastAudio}[${i}:a]acrossfade=d=${duration}${audOut};`,
-        );
-
-        lastVideo = vidOut;
-        lastAudio = audOut;
-      }
-
-      await execFileAsync('ffmpeg', [
-        '-y',
-        ...inputs,
-        '-filter_complex',
-        filterParts.join(''),
-        '-map',
-        lastVideo.replace(/[[\]]/g, ''),
-        '-map',
-        lastAudio.replace(/[[\]]/g, ''),
-        '-c:v',
-        'libx264',
-        '-preset',
-        'fast',
-        '-crf',
-        '23',
-        '-c:a',
-        'aac',
-        outputPath,
-      ]);
-    }
-
+    await mergeLocalFiles(inputs, transitions, tmpDir, outputPath);
     return await readFile(outputPath);
   } finally {
-    for (const tf of tempFiles) {
-      try {
-        await unlink(tf);
-      } catch {
-        /* ignore */
-      }
-    }
     try {
       await rm(tmpDir, { recursive: true, force: true });
     } catch {

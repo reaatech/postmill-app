@@ -53,6 +53,11 @@ vi.mock('./views/posts.tab', () => ({
   ),
 }));
 
+// The filter drawer embeds the Mantine range calendar; stub it (no provider in tests).
+vi.mock('@mantine/dates', () => ({
+  RangeCalendar: () => <div data-testid="range-calendar" />,
+}));
+
 const mockUseOverview = vi.mocked(useOverview);
 const mockUsePosts = vi.mocked(usePosts);
 
@@ -91,20 +96,20 @@ beforeEach(() => {
 });
 
 describe('AnalyticsDashboard', () => {
-  it('renders the filter bar with DateRangePicker', () => {
+  it('renders the timeframe filter controls', () => {
     render(<AnalyticsDashboard />);
 
-    expect(screen.getByText('7 days')).toBeTruthy();
-    expect(screen.getByText('30 days')).toBeTruthy();
-    expect(screen.getByText('90 days')).toBeTruthy();
-    expect(screen.getByText('Custom')).toBeTruthy();
-    expect(screen.getByText('Compare')).toBeTruthy();
+    expect(screen.getByText('Timeframe')).toBeTruthy();
+    expect(screen.getByText('Day')).toBeTruthy();
+    expect(screen.getByText('Week')).toBeTruthy();
+    expect(screen.getByText('Month')).toBeTruthy();
+    expect(screen.getByText('Compare to previous period')).toBeTruthy();
   });
 
-  it('renders the ChannelMultiSelect', () => {
+  it('renders the filter button', () => {
     render(<AnalyticsDashboard />);
 
-    expect(screen.getByText('All channels')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Filter/ })).toBeTruthy();
   });
 
   it('renders analytics tab buttons', () => {

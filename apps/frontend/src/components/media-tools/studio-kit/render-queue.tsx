@@ -6,6 +6,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import type { StudioJob } from './types';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
 const STATUS_META: Record<StudioJob['status'], { label: string; className: string }> = {
   pending: { label: 'Queued', className: 'text-amber-600 bg-amber-500/10' },
@@ -30,13 +31,6 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
   const toaster = useToaster();
   const fetch = useFetch();
 
-  const openInDesigner = useCallback((job: StudioJob) => {
-    if (!job.artifactUrl) return;
-    const type = job.operation === 'audio' ? 'audio' : job.operation === 'image' ? 'image' : 'video';
-    const params = new URLSearchParams({ url: job.artifactUrl, type, w: '', h: '' });
-    window.open(`/media/designer?${params.toString()}`, '_blank');
-  }, []);
-
   const openComposer = useCallback(
     async (content: string, image: { id: string; path: string }[]) => {
       const integrationsRes = await fetch('/integrations');
@@ -45,13 +39,13 @@ export const RenderQueue: FC<{ jobs: StudioJob[] | undefined; isLoading: boolean
         return;
       }
       const integrations = await integrationsRes.json();
-      const { AddEditModal } = await import('@gitroom/frontend/components/new-launch/add.edit.modal');
+      const { Composer } = await import('@gitroom/frontend/components/composer/composer');
       const dayjs = (await import('dayjs')).default;
       modal.openModal({
         fullScreen: true,
         removeLayout: true,
         children: (
-          <AddEditModal
+          <Composer
             date={dayjs()}
             integrations={integrations}
             allIntegrations={integrations}

@@ -1,14 +1,29 @@
 'use client';
 
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import useSWR from 'swr';
-import { FC, useCallback, useState } from 'react';
+import useSWR, { useSWRConfig } from 'swr';
+import { FC, useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { useClickAway } from '@uidotdev/usehooks';
 import ReactLoading from '@gitroom/frontend/components/layout/loading';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+
+dayjs.extend(relativeTime);
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title?: string | null;
+  content: string;
+  link?: string | null;
+  metadata?: Record<string, any> | null;
+  createdAt: string;
+  readAt?: string | null;
+}
+
 function replaceLinks(text: string) {
   const urlRegex =
     /(\bhttps?:\/\/[-A-Z0-9+&@#/%?=~_|!:,.;]*[-A-Z0-9+&@#/%=~_|])/gi;
@@ -17,31 +32,73 @@ function replaceLinks(text: string) {
     '<a class="cursor-pointer underline font-bold" target="_blank" href="$1">$1</a>'
   );
 }
-export const ShowNotification: FC<{
-  notification: {
-    createdAt: string;
-    content: string;
-  };
-  lastReadNotification: string;
-}> = (props) => {
-  const { notification } = props;
-  const [newNotification] = useState(
-    new Date(notification.createdAt) > new Date(props.lastReadNotification)
-  );
+
+const NotificationRow: FC<{
+  notification: NotificationItem;
+  onMarkRead: (id: string) => void;
+  onDelete: (id: string) => void;
+}> = ({ notification, onMarkRead, onDelete }) => {
+  const t = useT();
   const createdAt = dayjs(notification.createdAt);
   const isWithin24h = dayjs().diff(createdAt, 'hour') < 24;
   const fullDate = createdAt.format('MMM D, YYYY h:mm A');
+  const isUnread = !notification.readAt;
+
   return (
     <div
       className={clsx(
-        `text-textColor px-[16px] py-[10px] border-b border-newTableBorder last:border-b-0 transition-colors`,
-        newNotification && 'font-bold bg-seventh animate-newMessages'
+        'px-[16px] py-[12px] border-b border-newTableBorder last:border-b-0 transition-colors group',
+        isUnread && 'bg-seventh/40'
       )}
     >
-      <SafeContent
-        className="break-words"
-        content={replaceLinks(notification.content)}
-      />
+      <div className="flex items-start justify-between gap-[12px]">
+        <div className="flex-1 min-w-0">
+          {notification.title && (
+            <div
+              className={clsx(
+                'text-[13px] mb-[2px]',
+                isUnread ? 'font-semibold text-textColor' : 'text-textColor'
+              )}
+            >
+              {notification.title}
+            </div>
+          )}
+          <SafeContent
+            className="text-[13px] text-textColor/90 break-words"
+            content={replaceLinks(notification.content)}
+          />
+          {notification.link && (
+            <a
+              href={notification.link}
+              target="_blank"
+              rel="noreferrer"
+              className="text-[12px] text-btnPrimary hover:underline mt-[4px] inline-block"
+            >
+              {t('view', 'View')}
+            </a>
+          )}
+        </div>
+        <div className="flex items-center gap-[4px] shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          {isUnread && (
+            <button
+              type="button"
+              onClick={() => onMarkRead(notification.id)}
+              className="text-[11px] text-btnPrimary hover:underline px-[6px] py-[2px]"
+              title={t('mark_as_read', 'Mark as read')}
+            >
+              {t('read', 'Read')}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => onDelete(notification.id)}
+            className="text-[11px] text-red-500 hover:underline px-[6px] py-[2px]"
+            title={t('delete', 'Delete')}
+          >
+            {t('delete', 'Delete')}
+          </button>
+        </div>
+      </div>
       <div
         className="text-[11px] mt-[4px] opacity-60 font-normal"
         title={isWithin24h ? fullDate : undefined}
@@ -51,23 +108,102 @@ export const ShowNotification: FC<{
     </div>
   );
 };
-export const NotificationOpenComponent = () => {
-  const fetch = useFetch();
-  const loadNotifications = useCallback(async () => {
-    return await (await fetch('/notifications/list')).json();
-  }, []);
-  const t = useT();
 
-  const { data, isLoading } = useSWR('notifications', loadNotifications);
+export const NotificationOpenComponent: FC<{
+  onClose: () => void;
+}> = ({ onClose }) => {
+  const fetch = useFetch();
+  const t = useT();
+  const { mutate: mutateUnread } = useSWRConfig();
+
+  const loadNotifications = useCallback(
+    async (): Promise<{ notifications: NotificationItem[] }> => {
+      return (await fetch('/notifications/list')).json();
+    },
+    [fetch]
+  );
+
+  const { data, isLoading, mutate } = useSWR(
+    'notifications-list',
+    loadNotifications,
+    { refreshInterval: 30000 }
+  );
+
+  const markAsRead = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/notifications/${id}/read`, { method: 'PATCH' });
+      if (!res.ok) return;
+      mutate(
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                notifications: prev.notifications.map((n) =>
+                  n.id === id ? { ...n, readAt: new Date().toISOString() } : n
+                ),
+              }
+            : prev,
+        false
+      );
+      mutateUnread('notifications-count');
+    },
+    [fetch, mutate, mutateUnread]
+  );
+
+  const markAllAsRead = useCallback(async () => {
+    const res = await fetch('/notifications/read-all', { method: 'POST' });
+    if (!res.ok) return;
+    mutate(
+      (prev) =>
+        prev
+          ? {
+              ...prev,
+              notifications: prev.notifications.map((n) => ({
+                ...n,
+                readAt: n.readAt || new Date().toISOString(),
+              })),
+            }
+          : prev,
+      false
+    );
+    mutateUnread('notifications-count');
+  }, [fetch, mutate, mutateUnread]);
+
+  const deleteNotification = useCallback(
+    async (id: string) => {
+      const res = await fetch(`/notifications/${id}`, { method: 'DELETE' });
+      if (!res.ok) return;
+      mutate(
+        (prev) =>
+          prev
+            ? {
+                ...prev,
+                notifications: prev.notifications.filter((n) => n.id !== id),
+              }
+            : prev,
+        false
+      );
+      mutateUnread('notifications-count');
+    },
+    [fetch, mutate, mutateUnread]
+  );
+
   return (
     <div
       id="notification-popup"
-      className="opacity-0 animate-normalFadeDown mt-[10px] absolute w-[420px] min-h-[200px] top-[100%] end-0 bg-third text-textColor rounded-[16px] flex flex-col border border-newTableBorder z-[600]"
+      className="opacity-0 animate-normalFadeDown mt-[10px] absolute w-[420px] min-h-[200px] top-[100%] end-0 bg-newBgColorInner text-textColor rounded-[16px] flex flex-col border border-newTableBorder z-[600] shadow-lg"
     >
-      <div
-        className={`p-[16px] border-b border-newTableBorder font-bold`}
-      >
-        {t('notifications', 'Notifications')}
+      <div className="p-[16px] border-b border-newTableBorder flex items-center justify-between">
+        <div className="font-bold">{t('notifications', 'Notifications')}</div>
+        {!!data?.notifications.length && (
+          <button
+            type="button"
+            onClick={markAllAsRead}
+            className="text-[12px] text-btnPrimary hover:underline"
+          >
+            {t('mark_all_read', 'Mark all read')}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-col max-h-[400px] overflow-y-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
@@ -76,54 +212,60 @@ export const NotificationOpenComponent = () => {
             <ReactLoading type="spin" color="#fff" width={36} height={36} />
           </div>
         )}
-        {!isLoading && !data.notifications.length && (
+        {!isLoading && !data?.notifications.length && (
           <div className="text-center p-[16px] text-textColor flex-1 flex justify-center items-center mt-[20px]">
             {t('no_notifications', 'No notifications')}
           </div>
         )}
         {!isLoading &&
-          data.notifications.map(
-            (
-              notification: {
-                createdAt: string;
-                content: string;
-              },
-              index: number
-            ) => (
-              <ShowNotification
-                notification={notification}
-                lastReadNotification={data.lastReadNotifications}
-                key={`notifications_${index}`}
-              />
-            )
-          )}
+          data?.notifications.map((notification) => (
+            <NotificationRow
+              key={notification.id}
+              notification={notification}
+              onMarkRead={markAsRead}
+              onDelete={deleteNotification}
+            />
+          ))}
+      </div>
+
+      <div className="p-[12px] border-t border-newTableBorder text-center">
+        <a
+          href="/user/me"
+          onClick={onClose}
+          className="text-[12px] text-btnPrimary hover:underline"
+        >
+          {t('notification_preferences', 'Notification preferences')}
+        </a>
       </div>
     </div>
   );
 };
+
 const NotificationComponent = () => {
   const fetch = useFetch();
   const [show, setShow] = useState(false);
-  const loadNotifications = useCallback(async () => {
-    return await (await fetch('/notifications')).json();
-  }, []);
-  const { data, mutate } = useSWR('notifications-list', loadNotifications);
+
+  const loadUnreadCount = useCallback(async (): Promise<{ total: number }> => {
+    return (await fetch('/notifications')).json();
+  }, [fetch]);
+
+  const { data, mutate } = useSWR('notifications-count', loadUnreadCount, {
+    refreshInterval: 30000,
+    revalidateOnFocus: true,
+  });
+
   const changeShow = useCallback(() => {
-    mutate(
-      {
-        ...data,
-        total: 0,
-      },
-      {
-        revalidate: false,
-      }
-    );
-    setShow(!show);
-  }, [show, data]);
+    setShow((prev) => !prev);
+    if (!show) {
+      mutate((prev) => (prev ? { ...prev, total: 0 } : prev), false);
+    }
+  }, [show, mutate]);
+
   const ref = useClickAway<HTMLDivElement>(() => setShow(false));
+
   return (
     <div className="relative cursor-pointer select-none" ref={ref}>
-      <div onClick={changeShow}>
+      <div onClick={changeShow} className="relative">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -139,20 +281,16 @@ const NotificationComponent = () => {
             strokeLinecap="round"
             strokeLinejoin="round"
           />
-          {data && data.total > 0 && (
-            <circle
-              cx="17.0625"
-              cy="5"
-              r="4"
-              fill="#FF3EA2"
-              stroke="#1A1919"
-              strokeWidth="2"
-            />
-          )}
         </svg>
+        {!!data?.total && (
+          <span className="absolute -top-[2px] -right-[2px] min-w-[16px] h-[16px] px-[4px] flex items-center justify-center bg-[#FF3EA2] text-white text-[10px] font-bold rounded-full border border-newBgColorInner">
+            {data.total > 99 ? '99+' : data.total}
+          </span>
+        )}
       </div>
-      {show && <NotificationOpenComponent />}
+      {show && <NotificationOpenComponent onClose={() => setShow(false)} />}
     </div>
   );
 };
+
 export default NotificationComponent;

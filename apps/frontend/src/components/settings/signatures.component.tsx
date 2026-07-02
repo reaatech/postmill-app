@@ -10,6 +10,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 
 const PAGE_SIZE = 25;
 
@@ -204,6 +205,10 @@ const AddOrEditSignature: FC<{
           {content.length} {t('characters', 'characters')}
         </div>
       </div>
+
+      {data?.id && (
+        <CampaignSelector entityType="signature" entityId={data.id} />
+      )}
 
       {/* Logo / sticker */}
       <div>
@@ -412,13 +417,13 @@ export const SignaturesComponent: FC<{
   return (
     <div className="flex flex-col">
       <div className="mb-[16px]">
-        <h3 className="text-[20px]">{t('signatures', 'Signatures')}</h3>
-        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed max-w-[640px]">
+        <h3 className="text-[18px] font-semibold text-textColor">{t('signatures', 'Signatures')}</h3>
+        <p className="text-[13px] text-newTableText mt-[4px] max-w-[640px]">
           {t(
             'signatures_description',
-            'Reusable text blocks — and an optional logo or sticker — that you can append to your posts. Scope a signature to specific channels, or auto-add it to every new post.'
+            'Create reusable closings or disclaimers that are added automatically to your posts.'
           )}
-        </div>
+        </p>
       </div>
 
       <div className="flex items-center gap-[12px] mb-[16px]">

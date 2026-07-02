@@ -246,13 +246,6 @@ export const Autopost: FC = () => {
 
   return (
     <div className="flex flex-col">
-      <div className="mb-[16px]">
-        <h3 className="text-[20px]">{t('autopost', 'Auto Post')}</h3>
-        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
-          {t('autopost_description', 'Auto Post automatically publishes drafts or queued posts on a schedule. Connect an RSS feed and we\'ll fetch new content and publish it to your social channels automatically.')}
-        </div>
-      </div>
-
       <div className="flex items-center gap-[12px] mb-[16px]">
         <div className="flex-1">
           <input
@@ -291,7 +284,7 @@ export const Autopost: FC = () => {
           <div className="flex flex-col items-center py-[40px] gap-[16px]">
             <div className="text-textColor/50 text-[14px]">{t('no_autopost_rules', 'No auto post rules yet')}</div>
             <p className="text-[12px] text-newTableText max-w-[400px] text-center">
-              {t('autopost_empty_hint', 'Auto Post lets you automatically fetch content from an RSS feed and publish it to your social channels on a schedule.')}
+              {t('autopost_empty_hint', 'Autopost creates posts for you from an RSS feed. Add a feed to get started.')}
             </p>
             <Button onClick={addEdit()}>{t('create_first_autopost', 'Create your first auto post rule')}</Button>
           </div>

@@ -312,8 +312,7 @@ describe('mergeClips', () => {
       ),
     ).rejects.toThrow('ffmpeg failed');
 
-    expect(mockUnlink).toHaveBeenCalledWith(clipPath(0));
-    expect(mockUnlink).toHaveBeenCalledWith(clipPath(1));
+    // Cleanup is now a single recursive rm of the work dir (covers every temp file).
     expect(mockRm).toHaveBeenCalledWith(WORK_DIR, { recursive: true, force: true });
   });
 

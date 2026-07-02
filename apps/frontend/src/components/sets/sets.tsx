@@ -10,7 +10,7 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import dayjs from 'dayjs';
@@ -66,8 +66,8 @@ const SaveSetModal: FC<{
     <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-[16px]">
       <div>
         <Input
-          label="Set Name"
-          translationKey="label_set_name"
+          label="Template Name"
+          translationKey="label_template_name"
           name="setName"
           value={name}
           disableForm
@@ -143,12 +143,12 @@ export const Sets: FC = () => {
       fullScreen: true,
       classNames: { modal: 'w-[100%] max-w-[1400px] text-textColor' },
       children: (
-        <AddEditModal
+        <Composer
           allIntegrations={(integrations || []).map((p: any) => ({ ...p }))}
           {...(params?.id ? { set: JSON.parse(params.content) } : {})}
           addEditSets={(data: any) => {
             modal.openModal({
-              title: 'Save as Set',
+              title: 'Save as Template',
               children: (
                 <SaveSetModal
                   initialValue={params?.name || ''}
@@ -165,9 +165,9 @@ export const Sets: FC = () => {
                       });
                       modal.closeAll();
                       mutate();
-                      toaster.show(t('set_saved', 'Set saved successfully'), 'success');
+                      toaster.show(t('template_saved', 'Template saved successfully'), 'success');
                     } catch {
-                      toaster.show(t('set_save_failed', 'Failed to save set'), 'warning');
+                      toaster.show(t('template_save_failed', 'Failed to save template'), 'warning');
                     }
                   }}
                   onCancel={() => modal.closeAll()}
@@ -189,17 +189,17 @@ export const Sets: FC = () => {
     if (await deleteDialog(t('are_you_sure_delete_set', 'Are you sure you want to delete this set?'))) {
       await fetch(`/sets/${setData.id}`, { method: 'DELETE' });
       mutate();
-      toaster.show(t('set_deleted', 'Set deleted successfully'), 'success');
+      toaster.show(t('template_deleted', 'Template deleted successfully'), 'success');
     }
   }, [fetch, mutate, toaster, t]);
 
   return (
     <div className="flex flex-col">
       <div className="mb-[16px]">
-        <h3 className="text-[20px]">{t('sets', 'Sets')}</h3>
-        <div className="text-newTableText mt-[4px] text-[13px] leading-relaxed">
-          {t('sets_description', 'A Set is a saved group of social accounts and post content that you can reuse across multiple posts. Create sets for recurring campaigns, weekly digests, or common post configurations.')}
-        </div>
+        <h3 className="text-[18px] font-semibold text-textColor">{t('post_templates', 'Post Templates')}</h3>
+        <p className="text-[13px] text-newTableText mt-[4px]">
+          {t('post_templates_description', 'Save a reusable bundle of channels, text, and media for posts you create often.')}
+        </p>
       </div>
 
       <div className="flex items-center gap-[12px] mb-[16px]">
@@ -208,11 +208,11 @@ export const Sets: FC = () => {
             type="text"
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(0); }}
-            placeholder={t('search_sets', 'Search by name...')}
+            placeholder={t('search_templates', 'Search by name...')}
             className="w-full px-[12px] py-[8px] bg-newBgColor border border-newTableBorder rounded-[8px] text-[14px] outline-none"
           />
         </div>
-        <Button onClick={addSet()}>{t('add_set', 'Add Set')}</Button>
+        <Button onClick={addSet()}>{t('add_template', 'Add Template')}</Button>
       </div>
 
       {isLoading && (
@@ -228,18 +228,18 @@ export const Sets: FC = () => {
 
       {!isLoading && error && !data && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
-          <span className="text-[14px] text-red-400">{t('failed_loading_sets', 'Failed to load sets')}</span>
+          <span className="text-[14px] text-red-400">{t('failed_loading_templates', 'Failed to load templates')}</span>
           <button onClick={() => mutate()} className="text-[13px] bg-newBgColor border border-newTableBorder rounded-[8px] px-[16px] py-[8px] hover:bg-boxHover transition-colors">{t('try_again', 'Try again')}</button>
         </div>
       )}
 
       {!isLoading && !error && (!data || data.length === 0) && (
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] flex flex-col items-center py-[40px] gap-[16px]">
-          <div className="text-textColor/50 text-[14px]">{t('no_sets', 'No sets created yet')}</div>
+          <div className="text-textColor/50 text-[14px]">{t('no_templates', 'No post templates created yet')}</div>
           <p className="text-[12px] text-newTableText max-w-[400px] text-center">
-            {t('sets_empty_hint', 'Sets let you save groups of channels, content and media together so you can quickly reuse them when creating new posts.')}
+            {t('templates_empty_hint', 'Post templates let you save groups of channels, content and media together so you can quickly reuse them when creating new posts.')}
           </p>
-          <Button onClick={addSet()}>{t('create_first_set', 'Create your first set')}</Button>
+          <Button onClick={addSet()}>{t('create_first_template', 'Create your first template')}</Button>
         </div>
       )}
 

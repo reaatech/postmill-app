@@ -41,7 +41,7 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
   const maxAvg = Math.max(...data.heatmap.map((e) => e.avgEngagement), 1);
 
   return (
-    <div className="p-[24px]">
+    <div className="p-[24px] mobile:p-[16px]">
       <h2 className="text-[18px] font-semibold mb-[16px]">
         {t('best_time_to_post', 'Best Time to Post')}
       </h2>

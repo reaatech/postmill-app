@@ -28,6 +28,7 @@ export interface ShortlinkProviderInfo {
   enabled: boolean;
   isActive: boolean;
   isConfigured: boolean;
+  version: string;
   customDomain: string;
   configName: string;
   accountFingerprint: string;

@@ -5,6 +5,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 import type { StudioCustomProps } from '@gitroom/frontend/components/media-tools/studio-kit/types';
 
 interface Segment {
@@ -156,13 +157,13 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
       return;
     }
     const integrations = await integrationsRes.json();
-    const { AddEditModal } = await import('@gitroom/frontend/components/new-launch/add.edit.modal');
+    const { Composer } = await import('@gitroom/frontend/components/composer/composer');
     const dayjs = (await import('dayjs')).default;
     modal.openModal({
       fullScreen: true,
       removeLayout: true,
       children: (
-        <AddEditModal
+        <Composer
           date={dayjs()}
           integrations={integrations}
           allIntegrations={integrations}
@@ -184,7 +185,7 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
   // Hand the source video + computed word timings to the Designer so it opens a video
   // project with a caption track already built — no re-transcribe. Payload rides in
   // sessionStorage (too large/long for the query string), keyed for the Designer to read.
-  const editInDesigner = useCallback(() => {
+  const openCaptionInDesigner = useCallback(() => {
     if (!source || source.type !== 'video' || !result) return;
     const payload = {
       url: source.url,
@@ -201,6 +202,12 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
     }
     window.open('/media/designer?captions=1', '_blank');
   }, [source, result, toaster]);
+
+  // Audio sources open directly on the timeline audio track.
+  const openAudioInDesigner = useCallback(() => {
+    if (!source || source.type === 'video' || !source.url) return;
+    openInDesigner({ operation: 'audio', artifactUrl: source.url, fileId: source.fileId });
+  }, [source]);
 
   const segments = useMemo(() => result?.segments ?? [], [result]);
 
@@ -296,7 +303,12 @@ export const DeepgramPanel: React.FC<StudioCustomProps> = ({ onGenerated }) => {
               Save to Files
             </button>
             {source?.type === 'video' && (
-              <button type="button" onClick={editInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+              <button type="button" onClick={openCaptionInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
+                Edit in Designer
+              </button>
+            )}
+            {source?.type === 'audio' && (
+              <button type="button" onClick={openAudioInDesigner} className="px-[12px] py-[8px] rounded-[8px] bg-btnSimple text-textColor text-[12px] hover:bg-boxHover transition-all">
                 Edit in Designer
               </button>
             )}

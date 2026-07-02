@@ -14,6 +14,8 @@ import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-librar
 import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -66,6 +68,7 @@ type PostWithConditionals = Post & {
 export class PostsService {
   constructor(
     private _postRepository: PostsRepository,
+    // layering: sanctioned leaf-read of AnalyticsRepository (AnalyticsService → PostsService, routing up would cycle)
     private _analyticsRepository: AnalyticsRepository,
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
@@ -75,6 +78,9 @@ export class PostsService {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _ragService: RagService,
     private _storageService: StorageService,
+    // layering: sanctioned leaf-read of CampaignsRepository (CampaignsService → PostsService, routing up would cycle)
+    private _campaignsRepository: CampaignsRepository,
+    private _auditService: AuditService,
   ) {}
 
   searchForMissingThreeHoursPosts() {
@@ -157,6 +163,10 @@ export class PostsService {
     return this._postRepository.getPostById(postId, orgId);
   }
 
+  updateCommentCount(postId: string, count: number) {
+    return this._postRepository.updateCommentCount(postId, count);
+  }
+
   async updateReleaseId(orgId: string, postId: string, releaseId: string) {
     return this._postRepository.updateReleaseId(postId, orgId, releaseId);
   }
@@ -224,7 +234,8 @@ export class PostsService {
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
         getIntegration.providerIdentifier,
-        getIntegration.organizationId
+        getIntegration.organizationId,
+        getIntegration.providerConfigId
       ).catch(() => undefined);
 
       const loadAnalytics = await integrationProvider.postAnalytics(
@@ -461,6 +472,10 @@ export class PostsService {
     );
   }
 
+  async setGroupColor(orgId: string, group: string, color: string | null) {
+    return this._postRepository.setGroupColor(orgId, group, color);
+  }
+
   async updateMedia(id: string, imagesList: any[], convertToJPEG = false, orgId: string) {
     try {
       let imageUpdateNeeded = false;
@@ -671,8 +686,12 @@ export class PostsService {
     return list;
   }
 
-  async getOldPosts(orgId: string, date: string) {
-    return this._postRepository.getOldPosts(orgId, date);
+  async getOldPosts(
+    orgId: string,
+    date: string,
+    options?: { take?: number; page?: number }
+  ) {
+    return this._postRepository.getOldPosts(orgId, date, options);
   }
 
   public async updateTags(orgId: string, post: Post[]): Promise<Post[]> {
@@ -972,6 +991,40 @@ export class PostsService {
     return '';
   }
 
+  private _parsePostJson<T>(raw: string | null | undefined, fallback: T): T {
+    if (!raw) return fallback;
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      return fallback;
+    }
+  }
+
+  private async _appendUtmToMessages(
+    messages: string[],
+    campaignId: string | undefined,
+    organizationId: string,
+    providerIdentifier: string | undefined
+  ): Promise<string[]> {
+    if (!campaignId || !providerIdentifier) return messages;
+    const campaign = await this._campaignsRepository.findById(campaignId, organizationId);
+    if (!campaign?.utmEnabled) return messages;
+
+    const slug = campaign.name
+      .toLowerCase()
+      .replace(/\s+/g, '-')
+      .replace(/[^a-z0-9-]/g, '');
+    const utm = `utm_campaign=${encodeURIComponent(slug)}&utm_source=${encodeURIComponent(providerIdentifier)}&utm_medium=social`;
+
+    return messages.map((msg) =>
+      msg.replace(/(https?:\/\/[^\s<"']+)/g, (url) => {
+        if (url.includes('utm_campaign')) return url;
+        const sep = url.includes('?') ? '&' : '?';
+        return `${url}${sep}${utm}`;
+      })
+    );
+  }
+
   async createPost(
     orgId: string,
     body: CreatePostDto,
@@ -979,12 +1032,20 @@ export class PostsService {
   ): Promise<any[]> {
     const postList = [];
     for (const post of body.posts) {
+      const providerIdentifier = (post.settings as any)?.__type;
       const provider = await this._integrationManager.getSocialIntegration(
-        (post.settings as any)?.__type
+        providerIdentifier
       );
       const removeLinks = !!provider?.stripLinks?.();
 
-      const messages = (post.value || []).map((p) => p.content);
+      let messages = (post.value || []).map((p) => p.content);
+      // Append campaign UTM params before short-linking so short links carry them.
+      messages = await this._appendUtmToMessages(
+        messages,
+        body.campaignId,
+        orgId,
+        providerIdentifier
+      );
       // No point shortlinking links on platforms that strip them out anyway
       const updateContent =
         !body.shortLink || removeLinks
@@ -1113,12 +1174,19 @@ export class PostsService {
   ) {
     const results = await this.validatePosts(orgId, body.posts || []);
 
-    const enhanced = await Promise.all(
-      results.map(async (result) => {
+    // Batch the integration lookups into one query, then map by id (was one query per
+    // result inside Promise.all — N parallel queries collapsed to 1).
+    const integrations = await this._integrationService.getIntegrationsByIds(
+      orgId,
+      results.map((r) => r.id),
+    );
+    const integrationById = new Map(integrations.map((i) => [i.id, i]));
+
+    const enhanced = results.map((result) => {
         const warnings: string[] = [];
         const blocks: string[] = [];
 
-        const integration = await this._integrationService.getIntegrationById(orgId, result.id);
+        const integration = integrationById.get(result.id) || null;
         const provider = integration
           ? this._integrationManager.getSocialIntegrationUnchecked(integration.providerIdentifier)
           : null;
@@ -1186,8 +1254,7 @@ export class PostsService {
           blocks,
           maximumCharacters: result.maximumCharacters,
         };
-      })
-    );
+      });
 
     return {
       passed: enhanced.every((r) => r.valid && r.warnings.length === 0),
@@ -1227,6 +1294,159 @@ export class PostsService {
     } catch (err) {}
 
     return { id, state };
+  }
+
+  async getCampaignDrafts(orgId: string, campaignId: string) {
+    const drafts = await this._postRepository.getCampaignDrafts(campaignId, orgId);
+    const grouped: Record<string, typeof drafts> = {};
+    for (const draft of drafts) {
+      const key = draft.group || 'Uncategorized';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(draft);
+    }
+    return grouped;
+  }
+
+  async getCampaignPosts(orgId: string, campaignId: string) {
+    return this._postRepository.getCampaignPosts(campaignId, orgId);
+  }
+
+  async setPostCampaign(orgId: string, postId: string, campaignId: string | null) {
+    return this._postRepository.setPostCampaign(postId, orgId, campaignId);
+  }
+
+  async setCampaign(orgId: string, postId: string, campaignId: string | null) {
+    return this.setPostCampaign(orgId, postId, campaignId);
+  }
+
+  async approveDraft(orgId: string, postId: string, approvedById: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'approved', approvedById);
+
+    if (post.campaignId) {
+      const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
+      await this._auditService.create({
+        organizationId: orgId,
+        userId: approvedById,
+        action: 'campaign.draft.approve',
+        entity: 'campaign',
+        entityId: post.campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ postId, postContent: post.content?.slice(0, 100) }),
+      });
+    }
+
+    return { id: postId, approvalStatus: 'approved' };
+  }
+
+  async rejectDraft(orgId: string, postId: string, rejectedById?: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'rejected');
+
+    if (post.campaignId) {
+      const campaign = await this._campaignsRepository.findById(post.campaignId, orgId);
+      await this._auditService.create({
+        organizationId: orgId,
+        userId: rejectedById,
+        action: 'campaign.draft.reject',
+        entity: 'campaign',
+        entityId: post.campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ postId, postContent: post.content?.slice(0, 100) }),
+      });
+    }
+
+    return { id: postId, approvalStatus: 'rejected' };
+  }
+
+  async setDraftPending(orgId: string, postId: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.state !== 'DRAFT') {
+      throw new BadRequestException('Draft not found');
+    }
+    await this._postRepository.updateApprovalStatus(postId, orgId, 'pending');
+    return { id: postId, approvalStatus: 'pending' };
+  }
+
+  async promoteDrafts(orgId: string, campaignId: string, postIds: string[], promotedById?: string) {
+    const results: Array<{ id: string; status: 'promoted' | 'blocked' | 'not_found'; reason?: string }> = [];
+    for (const id of postIds) {
+      const post = await this._postRepository.getPostById(id, orgId);
+      if (!post || post.state !== 'DRAFT' || post.campaignId !== campaignId) {
+        results.push({ id, status: 'not_found' });
+        continue;
+      }
+      if (post.approvalStatus !== 'approved') {
+        results.push({ id, status: 'blocked', reason: 'Draft must be approved before promotion' });
+        continue;
+      }
+      await this.changePostStatus(orgId, id, 'schedule');
+      results.push({ id, status: 'promoted' });
+    }
+
+    const promotedCount = results.filter((r) => r.status === 'promoted').length;
+    if (promotedCount > 0) {
+      const campaign = await this._campaignsRepository.findById(campaignId, orgId);
+      await this._auditService.create({
+        organizationId: orgId,
+        userId: promotedById,
+        action: 'campaign.promote',
+        entity: 'campaign',
+        entityId: campaignId,
+        entityName: campaign?.name || undefined,
+        details: JSON.stringify({ count: promotedCount, postIds }),
+      });
+    }
+
+    return results;
+  }
+
+  buildCreateDtoFromPost(post: any): any {
+    // Read-only DTO snapshot suitable for creating a new draft clone.
+    // Post.settings and Post.image are JSON strings in the DB — parse them
+    // before handing them back to createOrUpdatePost, which stringifies again.
+    const settings = this._parsePostJson(post.settings, {});
+    const image = this._parsePostJson(post.image, []);
+    const values = [
+      {
+        content: post.content || '',
+        image,
+        delay: post.delay || 0,
+      },
+    ];
+
+    // Preserve direct thread children if they were loaded (best-effort).
+    if (Array.isArray(post.childrenPost)) {
+      for (const child of post.childrenPost) {
+        values.push({
+          content: child.content || '',
+          image: this._parsePostJson(child.image, []),
+          delay: child.delay || 0,
+        });
+      }
+    }
+
+    return {
+      type: 'draft',
+      date: post.publishDate ? new Date(post.publishDate).toISOString() : new Date().toISOString(),
+      posts: [
+        {
+          integration: { id: post.integration?.id || post.integrationId },
+          value: values,
+          settings,
+        },
+      ],
+      tags: [],
+      shortLink: false,
+      campaignId: undefined,
+      brandId: post.brandId,
+    };
   }
 
   async changeDate(

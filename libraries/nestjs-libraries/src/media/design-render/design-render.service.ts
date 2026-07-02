@@ -1,4 +1,4 @@
-/// <reference path="./pdfkit.d.ts" />
+/// <reference types="./pdfkit" />
 import { Injectable, Logger } from '@nestjs/common';
 import PDFDocument from 'pdfkit';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
@@ -16,6 +16,7 @@ import {
   cssFilterForToken,
   parseDesignerFilterToken,
 } from './filter-tokens';
+import { MAX_CANVAS_DIMENSION } from '../designer-doc/designer-doc.limits';
 
 const MAX_IMAGE_BYTES = 25 * 1024 * 1024;
 
@@ -196,8 +197,8 @@ const sampleArc = (
   const cx = cosP * cxp - sinP * cyp + (x1 + x2) / 2;
   const cy = sinP * cxp + cosP * cyp + (y1 + y2) / 2;
 
-  let theta1 = Math.atan2((y1p - cyp) / ryAbs, (x1p - cxp) / rxAbs);
-  let theta2 = Math.atan2((-y1p - cyp) / ryAbs, (-x1p - cxp) / rxAbs);
+  const theta1 = Math.atan2((y1p - cyp) / ryAbs, (x1p - cxp) / rxAbs);
+  const theta2 = Math.atan2((-y1p - cyp) / ryAbs, (-x1p - cxp) / rxAbs);
   let delta = theta2 - theta1;
   if (sweep && delta < 0) delta += 2 * Math.PI;
   if (!sweep && delta > 0) delta -= 2 * Math.PI;
@@ -517,8 +518,14 @@ export class DesignRenderService {
     await this._fontLoaderService.loadCuratedFonts(output.children ?? []);
 
     const ratio = opts?.pixelRatio && opts.pixelRatio > 0 ? opts.pixelRatio : 1;
-    const width = Math.max(1, Math.round(output.width * ratio));
-    const height = Math.max(1, Math.round(output.height * ratio));
+    const width = Math.max(
+      1,
+      Math.min(Math.round(output.width * ratio), MAX_CANVAS_DIMENSION)
+    );
+    const height = Math.max(
+      1,
+      Math.min(Math.round(output.height * ratio), MAX_CANVAS_DIMENSION)
+    );
 
     const { createCanvas } = await loadCanvasModule();
     const canvas = createCanvas(width, height);

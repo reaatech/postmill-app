@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   HttpException,
+  Logger,
   Param,
   Post,
   UseFilters,
@@ -27,17 +28,20 @@ import {
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
+import { CampaignTagService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 
 @ApiTags('Integrations')
 @Controller('/integrations')
 export class NoAuthIntegrationsController {
+  private readonly _logger = new Logger(NoAuthIntegrationsController.name);
   constructor(
     private _integrationManager: IntegrationManager,
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
-    private _organizationService: OrganizationService
+    private _organizationService: OrganizationService,
+    private _campaignTagService: CampaignTagService
   ) {}
 
   @Get('/')
@@ -99,9 +103,16 @@ export class NoAuthIntegrationsController {
       await ioRedis.del(`onboarding:${body.state}`);
     }
 
+    // The named credential config this connection was initiated from (if any).
+    const providerConfigId = await ioRedis.get(`config:${body.state}`);
+    if (providerConfigId) {
+      await ioRedis.del(`config:${body.state}`);
+    }
+
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration,
-      org.id
+      org.id,
+      providerConfigId || undefined
     ).catch(() => undefined);
 
     const {
@@ -139,7 +150,7 @@ export class NoAuthIntegrationsController {
         }
 
         if (refresh && integrationProvider.reConnect) {
-          console.log('reconnect');
+          this._logger.log('reconnect');
           try {
             const newAuth = await integrationProvider.reConnect(
               auth.id,
@@ -247,14 +258,37 @@ export class NoAuthIntegrationsController {
           ? AuthService.fixedEncryption(
               Buffer.from(body.code, 'base64').toString()
             )
-          : undefined
+          : undefined,
+        providerConfigId || undefined,
+        (clientInformation as any)?.version ?? 'v1'
       );
 
     this._refreshIntegrationService
       .startRefreshWorkflow(org.id, createUpdate.id, integrationProvider)
       .catch((err) => {
-        console.log(err);
+        this._logger.warn((err as Error)?.message ?? String(err));
       });
+
+    // Campaign-scoped connect/invite: if this connection was initiated from a
+    // campaign, auto-tag the new channel onto it. Non-fatal — a tagging failure
+    // must never break the channel connect.
+    const campaignId = await ioRedis.get(`campaign:${body.state}`);
+    if (campaignId) {
+      await ioRedis.del(`campaign:${body.state}`);
+      try {
+        await this._campaignTagService.tagItem(
+          org.id,
+          campaignId,
+          undefined,
+          'channel',
+          createUpdate.id
+        );
+      } catch (err) {
+        this._logger.warn(
+          `Failed to tag channel to campaign: ${(err as Error)?.message ?? String(err)}`
+        );
+      }
+    }
 
     // Fetch pages if this is a two-step provider and not a refresh
     let pages: any[] = [];
@@ -273,7 +307,9 @@ export class NoAuthIntegrationsController {
           pages = await integrationProvider[fetchMethod](accessToken);
         }
       } catch (err) {
-        console.log('Failed to fetch pages:', err);
+        this._logger.warn(
+          `Failed to fetch pages: ${(err as Error)?.message ?? String(err)}`
+        );
       }
     }
 

@@ -10,7 +10,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
  * Returns `undefined` while loading so callers can avoid flashing AI UI before
  * the answer is known. When `false`, the app must NOT mount CopilotKit (its
  * runtime handshake would 403 on the CSRF-protected /copilot routes and spam
- * the console) — route the user to the AI setup page (`/settings?tab=ai`)
+ * the console) — route the user to the AI setup page (`/settings/ai/llm-providers`)
  * instead. See copilot-bridges.tsx and layout.component.tsx.
  */
 export const useAiActive = (): boolean | undefined => {
@@ -30,4 +30,4 @@ export const useAiActive = (): boolean | undefined => {
 };
 
 /** Canonical deep-link to the AI provider setup page. */
-export const AI_SETUP_HREF = '/settings?tab=ai';
+export const AI_SETUP_HREF = '/settings/ai/llm-providers';

@@ -46,18 +46,21 @@ export class OrgShortLinkSettingsRepository {
       extraConfig?: string;
       name?: string;
       accountFingerprint?: string;
+      version?: string;
     },
   ) {
+    const version = data.version ?? 'v1';
     if (data.accountFingerprint) {
       return this._orgShortLinkConfig.model.orgShortLinkConfig.upsert({
         where: {
-          organizationId_identifier_accountFingerprint: {
+          organizationId_identifier_version_accountFingerprint: {
             organizationId: orgId,
             identifier,
+            version,
             accountFingerprint: data.accountFingerprint,
           },
         },
-        create: { organizationId: orgId, identifier, ...data },
+        create: { organizationId: orgId, identifier, version, ...data },
         update: data,
       });
     }
@@ -69,7 +72,7 @@ export class OrgShortLinkSettingsRepository {
       });
     }
     return this._orgShortLinkConfig.model.orgShortLinkConfig.create({
-      data: { organizationId: orgId, identifier, ...data },
+      data: { organizationId: orgId, identifier, version, ...data },
     });
   }
 
@@ -85,16 +88,21 @@ export class OrgShortLinkSettingsRepository {
     });
   }
 
-  async setActive(orgId: string, identifier: string) {
+  async setActive(orgId: string, identifier: string, version?: string) {
     await this._orgShortLinkConfig.model.orgShortLinkConfig.updateMany({
       where: { organizationId: orgId, isActive: true },
       data: { isActive: false },
     });
     const config = await this.getByIdentifier(orgId, identifier);
     if (!config) throw new Error('Configuration not found');
+    const data: { isActive: true; enabled: true; version?: string } = {
+      isActive: true,
+      enabled: true,
+    };
+    if (version) data.version = version;
     return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
       where: { id: config.id },
-      data: { isActive: true, enabled: true },
+      data,
     });
   }
 
@@ -104,6 +112,7 @@ export class OrgShortLinkSettingsRepository {
     shortUrl: string;
     originalUrl: string;
     providerLinkId?: string;
+    providerVersion?: string;
     postId?: string;
   }) {
     return this._shortLink.model.shortLink.create({ data });

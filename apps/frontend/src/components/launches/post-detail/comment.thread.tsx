@@ -460,7 +460,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
     return (
       <div className="bg-newTableHeader border border-newTableBorder rounded-[8px] p-[20px] text-center">
         <div className="text-newTableText text-[14px]">
-          {t('comments_not_available_channel', "Comments aren't available for this channel yet")}
+          {t('comments_not_available_channel', "Replies aren't available for this channel yet")}
         </div>
       </div>
     );
@@ -470,7 +470,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
     return (
       <div className="bg-newTableHeader border border-newTableBorder rounded-[8px] p-[20px] text-center">
         <div className="text-newTableText text-[14px]">
-          {t('no_comments_yet', 'No comments yet')}
+          {t('no_comments_yet', 'No replies yet')}
         </div>
       </div>
     );
@@ -487,7 +487,7 @@ export const CommentThread: FC<CommentThreadProps> = ({
         >
           {summarizing
             ? t('summarizing', 'Summarizing...')
-            : t('summarize_comments', 'Summarize Comments')}
+            : t('summarize_comments', 'Summarize Replies')}
         </button>
       </div>
 
@@ -532,8 +532,8 @@ export const CommentThread: FC<CommentThreadProps> = ({
           className="self-center text-[12px] text-btnPrimary hover:underline disabled:opacity-50 mt-[4px]"
         >
           {loadingMore
-            ? t('loading_comments', 'Loading comments...')
-            : t('load_more_comments', 'Load more comments')}
+            ? t('loading_comments', 'Loading replies...')
+            : t('load_more_comments', 'Load more replies')}
         </button>
       )}
     </div>

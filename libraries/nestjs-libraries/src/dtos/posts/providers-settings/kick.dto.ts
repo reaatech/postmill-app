@@ -1,7 +1,2 @@
-import { Allow } from 'class-validator';
-export class KickDto {
-  // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
-  // union; the service reads settings.__type. Allow it so forbidNonWhitelisted does not 400.
-  @Allow()
-  __type?: string;
-}
+// Re-export shim — DTO relocated into @gitroom/provider-kernel (step 7.5.1).
+export { KickDto } from '@gitroom/provider-kernel/domains/social-dtos';

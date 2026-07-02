@@ -1,10 +1,7 @@
 'use client';
 
 import React, {
-  ChangeEvent,
-  ClipboardEvent,
   FC,
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -12,58 +9,50 @@ import React, {
   useState,
 } from 'react';
 import { Button } from '@gitroom/react/form/button';
-import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
-import { File as PrismaFile } from '@prisma/client';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
-import EventEmitter from 'events';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import { VideoFrame } from '@gitroom/react/helpers/video.frame';
-import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import dynamic from 'next/dynamic';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { usePermissions } from '@gitroom/frontend/components/layout/use-permissions';
 import { AiImage } from '@gitroom/frontend/components/launches/ai.image';
-import { DropFiles } from '@gitroom/frontend/components/layout/drop.files';
-import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { ReactSortable } from 'react-sortablejs';
 import { MediaComponentInner } from '@gitroom/frontend/components/launches/helpers/media.settings.component';
 import { AiVideo } from '@gitroom/frontend/components/launches/ai.video';
-import { AiMediaOperations } from '@gitroom/frontend/components/launches/ai.media.operations';
 import { AiBestTime } from '@gitroom/frontend/components/launches/ai.best-time';
 import { AiContentTools } from '@gitroom/frontend/components/launches/ai.content.tools';
 import { AiPromptLibraryInsert } from '@gitroom/frontend/components/launches/ai.prompt-library.insert';
 import { AiSearch } from '@gitroom/frontend/components/launches/ai.search';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { Dashboard } from '@uppy/react';
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  PlusIcon,
-  DeleteCircleIcon,
   CloseCircleIcon,
   DragHandleIcon,
   MediaSettingsIcon,
   InsertMediaIcon,
   DesignMediaIcon,
   VerticalDividerIcon,
-  NoMediaIcon,
 } from '@gitroom/frontend/components/ui/icons';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useShallow } from 'zustand/react/shallow';
-import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
-import { useDebounce } from 'use-debounce';
+import {
+  MediaSelectorItem,
+  MediaSelectorModal,
+} from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { useComposerImportFolder } from '@gitroom/frontend/components/composer/use-composer-import-folder';
 const Designer = dynamic(
   () => import('@gitroom/frontend/components/media-tools/designer/designer').then(
     (m) => m.Designer
   ),
   { ssr: false }
 );
-const showModalEmitter = new EventEmitter();
 export const Pagination: FC<{
   current: number;
   totalPages: number;
@@ -164,492 +153,23 @@ export const Pagination: FC<{
           current + 1 === totalPages && 'opacity-20 pointer-events-none'
         )}
       >
-        <a
+        <button
+          type="button"
           className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-boxHover"
           aria-label="Go to next page"
           onClick={() => setPage(current + 1)}
         >
           <span>{t('next', 'Next')}</span>
           <ChevronRightIcon className="lucide lucide-chevron-right h-4 w-4" />
-        </a>
+        </button>
       </li>
     </ul>
   );
 };
-export const ShowFileBoxModal: FC = () => {
-  const [showModal, setShowModal] = useState(false);
-  const [callBack, setCallBack] =
-    useState<(params: { id: string; path: string }[]) => void | undefined>();
-  const closeModal = useCallback(() => {
-    setShowModal(false);
-    setCallBack(undefined);
-  }, []);
-  const handleShowModal = useCallback((cCallback: any) => {
-    setShowModal(true);
-    setCallBack(() => cCallback);
-  }, []);
+type MediaSlot =
+  | { kind: 'media'; data: { id: string; path: string; thumbnail?: string } }
+  | { kind: 'pending'; key: string; url: string; thumbnail?: string };
 
-  useEffect(() => {
-    showModalEmitter.on('show-modal', handleShowModal);
-    return () => {
-      showModalEmitter.off('show-modal', handleShowModal);
-    };
-  }, [handleShowModal]);
-  if (!showModal) return null;
-  return (
-    <div className="text-textColor">
-      <FileBox setMedia={callBack!} closeModal={closeModal} />
-    </div>
-  );
-};
-export const showFileBox = (
-  callback: (params: { id: string; path: string }) => void
-) => {
-  showModalEmitter.emit('show-modal', callback);
-};
-const CHUNK_SIZE = 1024 * 1024;
-const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
-export const FileBox: FC<{
-  setMedia: (params: { id: string; path: string }[]) => void;
-  standalone?: boolean;
-  type?: 'image' | 'video' | 'audio';
-  closeModal: () => void;
-}> = ({ type, standalone, setMedia }) => {
-  const [page, setPage] = useState(0);
-  const [search, setSearch] = useState('');
-  const [debouncedSearch] = useDebounce(search, 300);
-  const fetch = useFetch();
-  const modals = useModals();
-  const toaster = useToaster();
-  useEffect(() => {
-    setPage(0);
-  }, [debouncedSearch]);
-  const loadMedia = useCallback(async () => {
-    const params = new URLSearchParams({ page: String(page + 1) });
-    if (debouncedSearch.trim()) {
-      params.set('search', debouncedSearch.trim());
-    }
-    return (await fetch(`/files?${params.toString()}`)).json();
-  }, [page, debouncedSearch]);
-  const { data, mutate, isLoading } = useSWR(
-    `get-media-${page}-${debouncedSearch}`,
-    loadMedia
-  );
-  const [selected, setSelected] = useState([]);
-  const t = useT();
-  const uploaderRef = useRef<any>(null);
-  const mediaDirectory = useMediaDirectory();
-  const [loading, setLoading] = useState(false);
-
-  const uppy = useUppyUploader({
-    allowedFileTypes:
-      type == 'image'
-        ? 'image/*'
-        : type == 'video'
-        ? 'video/mp4'
-        : 'image/*,video/mp4',
-    onUploadSuccess: async (arr) => {
-      await mutate();
-      if (standalone) {
-        return;
-      }
-      setSelected((prevSelected) => {
-        return [...prevSelected, ...arr];
-      });
-    },
-    onStart: () => setLoading(true),
-    onEnd: () => setLoading(false),
-  });
-
-  const addRemoveSelected = useCallback(
-    (media: any) => () => {
-      if (standalone) {
-        return;
-      }
-      const exists = selected.find((p: any) => p.id === media.id);
-      if (exists) {
-        setSelected(selected.filter((f: any) => f.id !== media.id));
-        return;
-      }
-      setSelected([...selected, media]);
-    },
-    [selected]
-  );
-
-  const addMedia = useCallback(async () => {
-    if (standalone) {
-      return;
-    }
-    // @ts-ignore
-    setMedia(selected);
-    modals.closeCurrent();
-  }, [selected]);
-
-  const addToUpload = useCallback(
-    async (e: ChangeEvent<HTMLInputElement>) => {
-      const files = Array.from(e.target.files || []);
-      const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-
-      if (totalSize > MAX_UPLOAD_SIZE) {
-        toaster.show(
-          t(
-            'upload_size_limit_exceeded',
-            'Upload size limit exceeded. Maximum 1 GB per upload session.'
-          ),
-          'warning'
-        );
-        return;
-      }
-
-      setLoading(true);
-
-      // @ts-ignore
-      uppy.addFiles(files);
-    },
-    [toaster, t]
-  );
-
-  const dragAndDrop = useCallback(
-    async (event: ClipboardEvent<HTMLDivElement> | File[]) => {
-      // @ts-ignore
-      const clipboardItems = event.map((p) => ({
-        kind: 'file',
-        getAsFile: () => p,
-      }));
-      if (!clipboardItems) {
-        return;
-      }
-
-      const files: File[] = [];
-      // @ts-ignore
-      for (const item of clipboardItems) {
-        if (item.kind === 'file') {
-          const file = item.getAsFile();
-          if (file) {
-            files.push(file);
-          }
-        }
-      }
-
-      const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-
-      if (totalSize > MAX_UPLOAD_SIZE) {
-        toaster.show(
-          t(
-            'upload_size_limit_exceeded',
-            'Upload size limit exceeded. Maximum 1 GB per upload session.'
-          ),
-          'warning'
-        );
-        return;
-      }
-
-      setLoading(true);
-
-      for (const file of files) {
-        uppy.addFile(file);
-      }
-    },
-    [toaster, t]
-  );
-
-  const maximize = useCallback(
-    (media: PrismaFile) => async (e: any) => {
-      e.stopPropagation();
-      modals.openModal({
-        title: '',
-        top: 10,
-        children: (
-          <div className="w-full h-full p-[50px]">
-          {hasExtension(media.path, 'mp4') ? (
-            <VideoFrame
-              autoplay={true}
-              url={mediaDirectory.set(media.path)}
-            />
-          ) : hasExtension(media.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
-            <audio
-              controls
-              className="w-full"
-              src={mediaDirectory.set(media.path)}
-            />
-          ) : (
-            <img
-              width="100%"
-              height="100%"
-              className="w-full h-full max-h-[100%] max-w-[100%] object-cover"
-              src={mediaDirectory.set(media.path)}
-              alt="media"
-            />
-          )}
-          </div>
-        ),
-      });
-    },
-    []
-  );
-
-  const deleteImage = useCallback(
-    (media: PrismaFile) => async (e: any) => {
-      e.stopPropagation();
-      if (
-        !(await deleteDialog(
-          t(
-            'are_you_sure_you_want_to_delete_the_image',
-            'Are you sure you want to delete the image?'
-          )
-        ))
-      ) {
-        return;
-      }
-      await fetch(`/files/${media.id}`, {
-        method: 'DELETE',
-      });
-      mutate();
-    },
-    [mutate]
-  );
-
-  const btn = useMemo(() => {
-    return (
-      <button
-        disabled={loading}
-        onClick={() => uploaderRef?.current?.click()}
-        className="relative cursor-pointer bg-btnSimple changeColor flex gap-[8px] h-[44px] px-[18px] justify-center items-center rounded-[8px]"
-      >
-        {loading ? (
-          <div className="absolute left-[50%] top-[50%] -translate-y-[50%] -translate-x-[50%]">
-            <div className="animate-spin h-[20px] w-[20px] border-4 border-white border-t-transparent rounded-full" />
-          </div>
-        ) : (
-          <PlusIcon size={14} />
-        )}
-        <div className={loading ? 'invisible' : undefined}>{t('upload', 'Upload')}</div>
-      </button>
-    );
-  }, [t, loading]);
-
-  return (
-    <DropFiles disabled={loading} className="flex flex-col flex-1" onDrop={dragAndDrop}>
-      <div className="flex flex-col flex-1">
-        <div
-          className={clsx(
-            'flex items-center gap-[12px]',
-            !isLoading &&
-              !data?.results?.length &&
-              !debouncedSearch &&
-              'hidden'
-          )}
-        >
-          <div className="flex-1">
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t('search_media_by_name', 'Search by file name')}
-              className="w-full h-[44px] px-[14px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[14px] outline-none focus:border-[#2B5CD3]"
-            />
-          </div>
-          <input
-            type="file"
-            ref={uploaderRef}
-            onChange={addToUpload}
-            className="hidden"
-            multiple={true}
-          />
-          <div className="flex gap-[8px]">
-            {btn}
-          </div>
-        </div>
-        <div className="w-full pointer-events-none relative mt-[5px] mb-[5px]">
-          <div className="w-full h-[46px] overflow-hidden absolute left-0 bg-newBgColorInner uppyChange">
-            <Dashboard
-              height={46}
-              uppy={uppy}
-              id={`uploader`}
-              showProgressDetails={true}
-              hideUploadButton={true}
-              hideRetryButton={true}
-              hidePauseResumeButton={true}
-              hideCancelButton={true}
-              hideProgressAfterFinish={true}
-            />
-          </div>
-          <div className="w-full h-[46px] uppyChange" />
-        </div>
-        <div
-          className={clsx(
-            'flex-1 relative',
-            !isLoading &&
-              !data?.results?.length &&
-              'bg-newTextColor/[0.02] rounded-[12px]'
-          )}
-        >
-          <div
-            className={clsx(
-              'absolute -left-[3px] -top-[3px] withp3 h-full overflow-x-hidden overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner',
-              !isLoading &&
-                !data?.results?.length &&
-                'flex justify-center items-center gap-[20px] flex-col'
-            )}
-          >
-            {!isLoading && !data?.results?.length && (
-              <>
-                <NoMediaIcon />
-                <div className="text-[20px] font-[600]">
-                  {debouncedSearch
-                    ? t(
-                        'no_media_match_search',
-                        'No media matches your search'
-                      )
-                    : t(
-                        'you_dont_have_any_media_yet',
-                        "You don't have any media yet"
-                      )}
-                </div>
-                <div className="whitespace-pre-line text-newTextColor/[0.6] text-center">
-                  {t(
-                    'select_or_upload_pictures_max_1gb',
-                    'Select or upload pictures (maximum 1 GB per upload).'
-                  )}{' '}
-                  {'\n'}
-                  {t(
-                    'you_can_drag_drop_pictures',
-                    'You can also drag & drop pictures.'
-                  )}
-                </div>
-                <div className="forceChange flex gap-[8px]">
-                  {btn}
-                </div>
-              </>
-            )}
-            {isLoading && (
-              <>
-                {[...new Array(16)].map((_, i) => (
-                  <div
-                    className={clsx(
-                      'px-[3px] py-[3px] float-left rounded-[6px] cursor-pointer w8-max aspect-square'
-                    )}
-                    key={i}
-                  >
-                    <div className="w-full h-full bg-newSep rounded-[6px] animate-pulse" />
-                  </div>
-                ))}
-              </>
-            )}
-            {data?.results
-              ?.filter((f: any) => {
-                if (type === 'video') {
-                  return hasExtension(f.path, 'mp4');
-                } else if (type === 'image') {
-                  return !hasExtension(f.path, 'mp4') && !hasExtension(f.path, 'mp3', 'wav', 'ogg', 'm4a');
-                } else if (type === 'audio') {
-                  return hasExtension(f.path, 'mp3', 'wav', 'ogg', 'm4a');
-                }
-                return true;
-              })
-              .map((media: any) => (
-                <div
-                  className={clsx(
-                    'group px-[3px] py-[3px] float-left rounded-[6px] w8-max aspect-square',
-                    !standalone && 'cursor-pointer'
-                  )}
-                  key={media.id}
-                >
-                  <div
-                    className={clsx(
-                      'w-full h-full rounded-[6px] border-[4px] relative',
-                      !!selected.find((p) => p.id === media.id)
-                        ? 'border-[#2B5CD3]'
-                        : 'border-transparent'
-                    )}
-                    onClick={addRemoveSelected(media)}
-                  >
-                    {!!selected.find((p: any) => p.id === media.id) ? (
-                      <div className="text-white flex z-[101] justify-center items-center text-[14px] font-[500] w-[24px] h-[24px] rounded-full bg-[#2B5CD3] absolute -bottom-[10px] -end-[10px]">
-                        {selected.findIndex((z: any) => z.id === media.id) + 1}
-                      </div>
-                    ) : (
-                      <DeleteCircleIcon
-                        className="cursor-pointer hidden z-[100] group-hover:block absolute -top-[5px] -end-[5px]"
-                        onClick={deleteImage(media)}
-                      />
-                    )}
-                    <div className="absolute bottom-[10px] end-[10px] z-[100]">{media.originalName}</div>
-                    <div className="w-full h-full rounded-[6px] overflow-hidden relative">
-                      <div className="absolute z-[20] left-[50%] top-[50%] -translate-x-[50%] -translate-y-[50%]">
-                        <div
-                          onClick={maximize(media)}
-                          className="cursor-pointer p-[4px] bg-black/40 hidden group-hover:block hover:scale-150 transition-all"
-                        >
-                          <svg
-                            width="30"
-                            height="30"
-                            viewBox="0 0 14 14"
-                            fill="none"
-                            xmlns="http://www.w3.org/2000/svg"
-                          >
-                            <path
-                              d="M2 9H0V14H5V12H2V9ZM0 5H2V2H5V0H0V5ZM12 12H9V14H14V9H12V12ZM9 0V2H12V5H14V0H9Z"
-                              fill="#F1F5F9"
-                            />
-                          </svg>
-                        </div>
-                      </div>
-                      {hasExtension(media.path, 'mp4') ? (
-                        <VideoFrame url={mediaDirectory.set(media.path)} />
-                      ) : hasExtension(media.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
-                        <div className="flex items-center justify-center w-full h-full bg-gray-800">
-                          <audio
-                            controls
-                            className="w-full"
-                            src={mediaDirectory.set(media.path)}
-                          />
-                        </div>
-                      ) : (
-                        <img
-                          width="100%"
-                          height="100%"
-                          className="w-full h-full object-cover"
-                          src={mediaDirectory.set(media.path)}
-                          alt="media"
-                        />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-          </div>
-        </div>
-        {(data?.pages || 0) > 1 && (
-          <Pagination
-            current={page}
-            totalPages={data?.pages}
-            setPage={setPage}
-          />
-        )}
-        {!standalone && (
-          <div className="flex justify-end mt-[32px] gap-[8px]">
-            <button
-              onClick={() => modals.closeCurrent()}
-              className="cursor-pointer h-[52px] px-[20px] items-center justify-center border border-newTextColor/10 flex rounded-[10px]"
-            >
-              {t('cancel', 'Cancel')}
-            </button>
-            {!isLoading && !!data?.results?.length && (
-              <button
-                onClick={standalone ? () => {} : addMedia}
-                disabled={selected.length === 0}
-                className="cursor-pointer text-white disabled:opacity-80 disabled:cursor-not-allowed h-[52px] px-[20px] items-center justify-center bg-[#2B5CD3] flex rounded-[10px]"
-              >
-                {t('add_selected_media', 'Add selected media')}
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-    </DropFiles>
-  );
-};
 export const MultiFileComponent: FC<{
   label: string;
   description: string;
@@ -702,7 +222,19 @@ export const MultiFileComponent: FC<{
   const permissions = usePermissions();
   const modals = useModals();
   const t = useT();
+  const toaster = useToaster();
+  const fetch = useFetch();
+  const findOrCreateImportFolder = useComposerImportFolder();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  // Per-tool media availability — optimistic while loading, fail-open on error (a status
+  // outage must not silently kill the AI buttons). Gates AI Image / AI Video so we don't
+  // offer a generation the org has no provider for (it would 409 server-side).
+  const { operationAvailable } = useMediaToolsStatus();
   const [currentMedia, setCurrentMedia] = useState(value);
+  const [pendingMedia, setPendingMedia] = useState<
+    { key: string; url: string; thumbnail?: string }[]
+  >([]);
+
   useEffect(() => {
     if (value) {
       setCurrentMedia(value);
@@ -716,10 +248,12 @@ export const MultiFileComponent: FC<{
         | {
             path: string;
             id: string;
+            thumbnail?: string;
           }
         | {
             path: string;
             id: string;
+            thumbnail?: string;
           }[]
     ) => {
       const mediaArray = Array.isArray(m) ? m : [m];
@@ -734,19 +268,102 @@ export const MultiFileComponent: FC<{
     },
     [currentMedia]
   );
-  const showModal = useCallback(() => {
-    modals.openModal({
-      title: t('media_library', 'Media Library'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: 'calc(100% - 80px)',
-      height: 'calc(100% - 80px)',
-      children: (close) => (
-        <FileBox setMedia={changeMedia} closeModal={close} />
-      ),
-    });
-  }, [changeMedia, t]);
+
+  const importStock = useCallback(
+    async (item: MediaSelectorItem, folderId: string) => {
+      const body: Record<string, any> = {
+        url: item.url,
+        name: item.name || 'stock-import',
+        folderId,
+        type: item.type,
+        source: item.stockSource,
+        attribution: item.attribution,
+      };
+      if (item.downloadLocation) {
+        body.downloadLocation = item.downloadLocation;
+      }
+      const res = await fetch('/files/import', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => 'Import failed');
+        throw new Error(text);
+      }
+      return (await res.json()) as { id: string; path: string };
+    },
+    [fetch]
+  );
+
+  const handleConfirm = useCallback(
+    async (items: MediaSelectorItem[]) => {
+      setPickerOpen(false);
+      if (items.length === 0) return;
+
+      const fileItems = items.filter((i) => i.source === 'file');
+      const stockItems = items.filter((i) => i.source === 'stock');
+
+      // Add file picks immediately.
+      if (fileItems.length > 0) {
+        changeMedia(
+          fileItems.map((i) => ({
+            id: i.fileId!,
+            path: i.url,
+            thumbnail: i.thumbnail,
+          }))
+        );
+      }
+
+      if (stockItems.length === 0) return;
+
+      // Resolve the dated folder once for the batch.
+      let folderId: string;
+      try {
+        folderId = await findOrCreateImportFolder();
+      } catch (err) {
+        toaster.show(
+          (err as Error).message || t('import_folder_failed', 'Failed to prepare import folder'),
+          'warning'
+        );
+        return;
+      }
+
+      // Add pending placeholders.
+      const pendingKeys = stockItems.map(
+        (i, idx) => `pending-${Date.now()}-${idx}-${Math.random().toString(36).slice(2, 8)}`
+      );
+      setPendingMedia((prev) => [
+        ...prev,
+        ...stockItems.map((i, idx) => ({
+          key: pendingKeys[idx],
+          url: i.url,
+          thumbnail: i.thumbnail,
+        })),
+      ]);
+
+      // Import in parallel; per-item failure is isolated.
+      await Promise.all(
+        stockItems.map(async (item, idx) => {
+          const key = pendingKeys[idx];
+          try {
+            const imported = await importStock(item, folderId);
+            setPendingMedia((prev) => prev.filter((p) => p.key !== key));
+            changeMedia([{ id: imported.id, path: imported.path, thumbnail: item.thumbnail }]);
+          } catch (err) {
+            setPendingMedia((prev) => prev.filter((p) => p.key !== key));
+            toaster.show(
+              `${item.name || t('stock_item', 'Stock item')} ${t(
+                'import_failed',
+                'failed to import'
+              )}: ${(err as Error).message}`,
+              'warning'
+            );
+          }
+        })
+      );
+    },
+    [changeMedia, findOrCreateImportFolder, importStock, t, toaster]
+  );
 
   const clearMedia = useCallback(
     (topIndex: number) => () => {
@@ -762,6 +379,13 @@ export const MultiFileComponent: FC<{
     [currentMedia]
   );
 
+  const clearPending = useCallback(
+    (key: string) => () => {
+      setPendingMedia((prev) => prev.filter((p) => p.key !== key));
+    },
+    []
+  );
+
   const designMedia = useCallback(() => {
     if (!dummy && permissions.hasPermission('media', 'read')) {
       modals.openModal({
@@ -773,7 +397,7 @@ export const MultiFileComponent: FC<{
         ),
       });
     }
-  }, [changeMedia, t, permissions]);
+  }, [changeMedia, t, permissions, dummy]);
 
   return (
     <>
@@ -839,6 +463,7 @@ export const MultiFileComponent: FC<{
                         </div>
                       ) : (
                         <img
+                          alt="Media"
                           className="w-full h-full object-cover rounded-[4px]"
                           src={mediaDirectory.set(media?.path)}
                         />
@@ -851,14 +476,27 @@ export const MultiFileComponent: FC<{
                     />
                   </div>
               ))}
+              {pendingMedia.map((pending) => (
+                <div
+                  key={pending.key}
+                  className="rounded-[5px] w-[40px] h-[40px] border-2 border-dashed border-newTableBorder relative flex items-center justify-center"
+                  title={t('importing', 'Importing…')}
+                >
+                  <div className="w-4 h-4 border-2 border-textColor border-t-transparent rounded-full animate-spin" />
+                  <CloseCircleIcon
+                    onClick={clearPending(pending.key)}
+                    className="absolute -end-[4px] -top-[4px] z-[20] rounded-full bg-white cursor-pointer"
+                  />
+                </div>
+              ))}
             </ReactSortable>
           )}
         </div>
-        <div className="flex gap-[8px] px-[12px] border-t border-newColColor w-full b1 text-textColor">
+        <div className="flex flex-wrap gap-[8px] px-[12px] border-t border-newColColor w-full b1 text-textColor">
           {!mediaNotAvailable && (
-            <div className="flex py-[10px] b2 items-center gap-[4px]">
+            <div className="flex flex-wrap py-[10px] b2 items-center gap-[4px]">
               <div
-                onClick={showModal}
+                onClick={() => setPickerOpen(true)}
                 className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
               >
                 <div className="flex gap-[8px] items-center">
@@ -888,9 +526,16 @@ export const MultiFileComponent: FC<{
 
               {!!user?.tier?.ai && (
                 <>
-                  <AiImage value={text} onChange={changeMedia} />
-                  <AiVideo value={text} onChange={changeMedia} />
-                  <AiMediaOperations />
+                  <AiImage
+                    value={text}
+                    onChange={changeMedia}
+                    disabled={!operationAvailable('image')}
+                  />
+                  <AiVideo
+                    value={text}
+                    onChange={changeMedia}
+                    disabled={!operationAvailable('video')}
+                  />
                   <AiContentTools />
                   <AiBestTime />
                   <AiPromptLibraryInsert />
@@ -905,7 +550,7 @@ export const MultiFileComponent: FC<{
             </div>
           )}
           {!!toolBar && (
-            <div className="flex py-[10px] b2 items-center gap-[4px]">
+            <div className="flex flex-wrap py-[10px] b2 items-center gap-[4px]">
               {toolBar}
             </div>
           )}
@@ -916,6 +561,14 @@ export const MultiFileComponent: FC<{
           )}
         </div>
       </div>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        multiple
+        onConfirm={handleConfirm}
+        kinds={['image', 'video']}
+        excludeTabs={['Stock Stickers', 'Stock Icons']}
+      />
       <div className="text-[12px] text-red-400">{error}</div>
     </>
   );
@@ -946,9 +599,12 @@ export const FileComponent: FC<{
   const { name, type, label, description, onChange, value, width, height } =
     props;
   const { getValues } = useSettings();
-  const user = useUser();
   const permissions = usePermissions();
+  const fetch = useFetch();
+  const toaster = useToaster();
   const [currentMedia, setCurrentMedia] = useState(value);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
   useEffect(() => {
     const settings = getValues()[props.name];
     if (settings) {
@@ -976,29 +632,60 @@ export const FileComponent: FC<{
         />
       ),
     });
-  }, [t, permissions]);
-  const changeMedia = useCallback((m: { path: string; id: string }[]) => {
-    setCurrentMedia(m[0]);
-    onChange({
-      target: {
-        name,
-        value: m[0],
-      },
-    });
-  }, []);
-  const showModal = useCallback(() => {
-    modals.openModal({
-      title: t('media_library', 'Media Library'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: 'calc(100% - 80px)',
-      height: 'calc(100% - 80px)',
-      children: (close) => (
-        <FileBox setMedia={changeMedia} closeModal={close} type={type} />
-      ),
-    });
-  }, [t]);
+  }, [t, permissions, width, height, modals]);
+  const changeMedia = useCallback(
+    (m: { path: string; id: string; thumbnail?: string }[]) => {
+      setCurrentMedia(m[0]);
+      onChange({
+        target: {
+          name,
+          value: m[0],
+        },
+      });
+    },
+    [name, onChange]
+  );
+
+  const handleSelect = useCallback(
+    async (item: MediaSelectorItem) => {
+      setPickerOpen(false);
+      if (item.source === 'file') {
+        changeMedia([{ id: item.fileId!, path: item.url }]);
+        return;
+      }
+      setImporting(true);
+      try {
+        const res = await fetch('/files/import', {
+          method: 'POST',
+          body: JSON.stringify({
+            url: item.url,
+            name: item.name || 'stock-import',
+            type: item.type,
+            source: item.stockSource,
+            attribution: item.attribution,
+            ...(item.downloadLocation
+              ? { downloadLocation: item.downloadLocation }
+              : {}),
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => 'Import failed');
+          throw new Error(text);
+        }
+        const imported = (await res.json()) as { id: string; path: string };
+        changeMedia([{ id: imported.id, path: imported.path }]);
+      } catch (err) {
+        toaster.show(
+          `${t('import_failed', 'Import failed')}: ${(err as Error).message}`,
+          'warning'
+        );
+      } finally {
+        setImporting(false);
+      }
+    },
+    [changeMedia, fetch, t, toaster]
+  );
+
   const clearMedia = useCallback(() => {
     setCurrentMedia(undefined);
     onChange({
@@ -1007,7 +694,7 @@ export const FileComponent: FC<{
         value: undefined,
       },
     });
-  }, [value]);
+  }, [name, onChange]);
   return (
     <div className="flex flex-col gap-[8px]">
       <div className="text-[14px]">{label}</div>
@@ -1028,25 +715,40 @@ export const FileComponent: FC<{
               src={mediaDirectory.set(currentMedia.path)}
             />
           ) : (
-            <img
-              className="w-full h-full object-cover cursor-pointer"
-              src={currentMedia.path}
+            <button
+              type="button"
+              aria-label="Open media preview"
+              className="w-full h-full cursor-pointer"
               onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
-            />
+            >
+              <img
+                alt="Media preview"
+                className="w-full h-full object-cover"
+                src={currentMedia.path}
+              />
+            </button>
           )}
         </div>
       )}
       <div className="flex gap-[5px]">
-        <Button onClick={showModal}>{t('select', 'Select')}</Button>
+        <Button onClick={() => setPickerOpen(true)} disabled={importing}>
+          {importing ? t('importing', 'Importing…') : t('select', 'Select')}
+        </Button>
         {permissions.hasPermission('media', 'read') && (
           <Button onClick={showDesignModal} className="!bg-btnPrimary">
             {t('editor', 'Editor')}
           </Button>
         )}
-        <Button secondary={true} onClick={clearMedia}>
+        <Button secondary={true} onClick={clearMedia} disabled={importing}>
           {t('clear', 'Clear')}
         </Button>
       </div>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelect}
+        kinds={type ? [type === 'audio' ? 'audio' : type === 'video' ? 'video' : 'image'] : undefined}
+      />
     </div>
   );
 };

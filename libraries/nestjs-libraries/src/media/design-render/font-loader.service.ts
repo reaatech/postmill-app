@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { BrandsRepository } from '@gitroom/nestjs-libraries/database/prisma/brands/brands.repository';
+import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { registerFont } from 'canvas';
 import path from 'path';
@@ -80,10 +80,10 @@ export class FontLoaderService {
   private readonly _tempDir = path.join(os.tmpdir(), 'postmill-fonts');
   private _dirEnsured = false;
 
-  constructor(private _brandsRepository: BrandsRepository) {}
+  constructor(private _brandsService: BrandsService) {}
 
   async loadOrgFonts(orgId: string): Promise<void> {
-    const fonts = await this._brandsRepository.getCustomFonts(orgId);
+    const fonts = await this._brandsService.getCustomFonts(orgId);
     if (!fonts.length) return;
 
     await this._ensureTempDir();
@@ -120,7 +120,7 @@ export class FontLoaderService {
   }
 
   async preregisterDefaultWeights(orgId: string, fontFamily: string, weights: number[]): Promise<void> {
-    const fonts = await this._brandsRepository.getCustomFonts(orgId);
+    const fonts = await this._brandsService.getCustomFonts(orgId);
     const font = fonts.find((f: any) => f.family === fontFamily);
     if (!font) return;
 

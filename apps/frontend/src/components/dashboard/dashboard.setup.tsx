@@ -7,12 +7,12 @@ import { useIntegrationList } from '@gitroom/frontend/components/launches/helper
 import { useDashboardSummary } from './hooks/useDashboardSummary';
 
 const SETUP_STEPS = [
-  { key: 'ai', label: 'Connect an AI (LLM) Provider', hint: 'OpenAI, Anthropic, DeepSeek', href: '/settings?tab=ai' },
-  { key: 'media', label: 'Connect an AI Media Provider', hint: 'OpenAI, Replicate, Luma', href: '/settings?tab=media_providers' },
-  { key: 'storage', label: 'Connect a Storage Provider', hint: 'AWS S3, Cloudflare R2, Backblaze B2', href: '/settings?tab=storage' },
-  { key: 'channel', label: 'Connect a Social Channel', hint: 'Instagram, TikTok, YouTube', href: '/settings?tab=channels' },
-  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/schedule' },
-  { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings?tab=teams' },
+  { key: 'ai', label: 'Connect an AI (LLM) Provider', hint: 'OpenAI, Anthropic, DeepSeek', href: '/settings/ai/llm-providers' },
+  { key: 'media', label: 'Connect an AI Media Provider', hint: 'OpenAI, Replicate, Luma', href: '/settings/content/ai-media' },
+  { key: 'storage', label: 'Connect a Storage Provider', hint: 'AWS S3, Cloudflare R2, Backblaze B2', href: '/settings/storage/providers' },
+  { key: 'channel', label: 'Connect a Social Channel', hint: 'Instagram, TikTok, YouTube', href: '/settings/channels' },
+  { key: 'post', label: 'Create your First Post', hint: 'Craft, review, publish', href: '/posts' },
+  { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings/team' },
 ];
 
 export const DashboardSetup: FC = () => {
@@ -48,7 +48,7 @@ export const DashboardSetup: FC = () => {
   if (dismissed || allComplete) return null;
 
   return (
-    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] mb-[24px]">
+    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[20px] mb-[24px]">
       <div className="flex items-center justify-between mb-[16px]">
         <div>
           <h2 className="text-[16px] font-[600]">Welcome to Postmill</h2>

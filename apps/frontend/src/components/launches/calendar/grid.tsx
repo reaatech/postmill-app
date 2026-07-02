@@ -84,7 +84,7 @@ export const CalendarColumn: FC<{
   const modal = useModals();
   const fetch = useFetch();
 
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor } = usePostActions();
   const postList = useMemo(() => {
     return posts.filter((post) => {
       const pList = newDayjs(post.publishDate);
@@ -276,7 +276,7 @@ export const CalendarColumn: FC<{
       params.set('content', encodeURIComponent('\n' + signature.content));
     }
 
-    router.push(`/schedule/post?${params.toString()}`);
+    router.push(`/posts/post?${params.toString()}`);
   }, [getDate, sets, signature, router, modal, randomHour, t]);
 
   const addProvider = useAddProvider();
@@ -297,7 +297,7 @@ export const CalendarColumn: FC<{
       )}
       <div
         className={clsx(
-          'relative flex flex-col flex-1 text-white rounded-[8px] min-h-[90px]',
+          'relative flex flex-col flex-1 text-white rounded-[8px] min-h-[60px]',
           canDrop && 'border border-[#2B5CD3]'
         )}
       >
@@ -332,6 +332,7 @@ export const CalendarColumn: FC<{
                   duplicatePost={editPost(post, true)}
                   copyDebugJson={user?.isSuperAdmin ? copyDebugJson(post) : undefined}
                   openPostDetail={openPostDetail(post)}
+                  changeColor={changeColor(post)}
                   post={post}
                   integrations={integrations}
                   deletePost={deletePost(post)}

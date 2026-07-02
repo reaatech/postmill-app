@@ -7,6 +7,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 import ProviderListShell from '@gitroom/frontend/components/settings/shared/provider-list-shell';
+import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
 import { ProviderFormModal } from '@gitroom/frontend/components/settings/storage/provider-form.modal';
 import { MigrationModal } from '@gitroom/frontend/components/settings/storage/migration.modal';
 import { AuditTab } from '@gitroom/frontend/components/settings/storage/audit.tab';
@@ -25,6 +26,7 @@ export interface StorageProviderRow {
   organizationId: string;
   type: string;
   name: string;
+  version?: string;
   region: string | null;
   bucket: string | null;
   endpoint: string | null;
@@ -126,17 +128,22 @@ const CLOUD_TYPES = [
   'S3_COMPATIBLE',
 ];
 
-export const StorageTab: React.FC = () => {
+export const StorageTab: React.FC<{ activeSubTab?: SubTab }> = ({
+  activeSubTab = 'providers',
+}) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
 
   const { data: providers, mutate: mutateProviders } = useStorageProviders();
+  const { data: catalog } = useProviderCatalog('storage');
   const { data: usage, mutate: mutateUsage } = useStorageUsage();
   const { data: quotaStatus, mutate: mutateQuota } = useQuotaStatus();
   const { data: usageBreakdown, mutate: mutateBreakdown } = useUsageBreakdown();
 
-  const [subTab, setSubTab] = useState<SubTab>('providers');
+  // The sub-tab is driven by the route (/settings/storage/{providers,audit,usage}); the nav
+  // strip lives in the storage layout, not here.
+  const subTab = activeSubTab;
   const [showModal, setShowModal] = useState(false);
   const [editProvider, setEditProvider] = useState<StorageProviderRow | null>(null);
   const [presetType, setPresetType] = useState<string | undefined>(undefined);
@@ -231,12 +238,20 @@ export const StorageTab: React.FC = () => {
     setShowModal(true);
   }, []);
 
+  const storageTypeToKernelId = (type: string) => type.toLowerCase().replace(/_/g, '');
+
   // A single inline list: local pinned to the very top, then configured cloud
   // instances (pinned), then one always-present "add another" row per cloud
   // provider type so the same provider can be configured again.
   const shellProviders = [
     ...(localProvider
-      ? [{ id: localProvider.id, identifier: 'postmill', name: t('postmill_storage', 'Postmill Storage'), enabled: true }]
+      ? [{
+          id: localProvider.id,
+          identifier: 'local',
+          name: t('postmill_storage', 'Postmill Storage'),
+          enabled: true,
+          version: localProvider.version ?? 'v1',
+        }]
       : []),
     ...configuredInstances.map((p) => ({
       id: p.id,
@@ -244,6 +259,7 @@ export const StorageTab: React.FC = () => {
       name: p.name,
       enabled: true,
       mounted: p.mounted,
+      version: p.version ?? 'v1',
     })),
     ...[...CLOUD_TYPES]
       .sort((a, b) =>
@@ -254,8 +270,15 @@ export const StorageTab: React.FC = () => {
         identifier: type,
         name: PROVIDER_TYPE_LABELS[type] || type,
         enabled: false,
+        version: 'v1',
       })),
-  ];
+  ].map((p) => {
+    const kernelId = storageTypeToKernelId(p.identifier);
+    const catalogEntry = catalog?.find(
+      (e) => e.providerId === kernelId && e.version === p.version
+    );
+    return { ...p, versionStatus: catalogEntry?.status ?? 'active' };
+  });
 
   const usageBar = (usageBytes: number | null, quotaBytes: number | null) => {
     const percent =
@@ -285,34 +308,8 @@ export const StorageTab: React.FC = () => {
     );
   };
 
-  const subTabs: { key: SubTab; label: string }[] = [
-    { key: 'providers', label: t('providers', 'Providers') },
-    { key: 'audit', label: t('audit_log', 'Audit Log') },
-    { key: 'breakdown', label: t('usage_breakdown', 'Usage Breakdown') },
-  ];
-
   return (
     <div className="flex flex-col gap-[16px]">
-      <div className="flex items-center justify-between">
-        <h3 className="text-[20px]">{t('file_storage', 'File Storage')}</h3>
-      </div>
-
-      <div className="flex gap-[8px] border-b border-newTableBorder pb-[8px]">
-        {subTabs.map((tab) => (
-          <button
-            key={tab.key}
-            className={`text-[13px] px-[16px] py-[8px] rounded-t-[4px] transition-colors ${
-              subTab === tab.key
-                ? 'bg-newBgColorInner border border-newTableBorder border-b-transparent text-textColor'
-                : 'text-newTableText hover:text-textColor'
-            }`}
-            onClick={() => setSubTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
       {/* Quota warning banner */}
       {quotaStatus?.warning && (
         <div className="px-[16px] py-[12px] rounded-[8px] bg-[#2a2a1a] border border-[#f59e0b] text-[#f59e0b] text-[13px]">
@@ -321,9 +318,21 @@ export const StorageTab: React.FC = () => {
       )}
 
       {subTab === 'providers' && (
-        <ProviderListShell
-          title=""
-          providers={shellProviders}
+        <div className="flex flex-col gap-[16px]">
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">
+              {t('storage_providers', 'Storage Providers')}
+            </h3>
+            <p className="text-[13px] text-newTableText max-w-[640px]">
+              {t(
+                'storage_providers_description',
+                'See and manage where your files are stored. Mount a provider to make it active.'
+              )}
+            </p>
+          </div>
+          <ProviderListShell
+            title=""
+            providers={shellProviders}
           onConfigure={(id) => {
             const p = instanceMap.get(id);
             if (p) openEdit(p);
@@ -405,14 +414,33 @@ export const StorageTab: React.FC = () => {
               </button>
             );
           }}
-        />
+          />
+        </div>
       )}
 
-      {subTab === 'audit' && <AuditTab />}
+      {subTab === 'audit' && (
+        <div className="flex flex-col gap-[16px]">
+          <p className="text-[13px] text-newTableText max-w-[640px]">
+            {t(
+              'storage_audit_description',
+              'Review recent changes to your storage, like mounts and migrations.'
+            )}
+          </p>
+          <AuditTab />
+        </div>
+      )}
 
       {subTab === 'breakdown' && (
         <div className="flex flex-col gap-[20px]">
-          <h3 className="text-[18px] text-textColor">{t('usage_breakdown', 'Usage Breakdown')}</h3>
+          <div className="flex flex-col gap-[4px]">
+            <h3 className="text-[18px] font-semibold text-textColor">{t('usage_breakdown', 'Usage Breakdown')}</h3>
+            <p className="text-[13px] text-newTableText max-w-[640px]">
+              {t(
+                'storage_usage_description',
+                'Check how much storage you are using and which folders use the most space.'
+              )}
+            </p>
+          </div>
           {usageBreakdown ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-[20px]">
               <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[20px] flex flex-col gap-[12px]">

@@ -8,11 +8,12 @@ import { useMenuItem } from '@gitroom/frontend/components/layout/top.menu';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useHasOpenModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MenuItemRow } from './menu-item-row';
 
-// Primary destinations pinned to the bottom bar (in order). Everything else
-// goes into the "More" sheet.
-const PRIMARY_PATHS = ['/dashboard', '/schedule', '/analytics', '/media'];
+// Primary destinations pinned to the bottom bar (rendered alphabetically → Analytics,
+// Campaigns, Media). Everything else — including Schedule — goes into the "More" sheet.
+const PRIMARY_PATHS = ['/analytics', '/campaigns', '/media'];
 
 const MoreIcon = (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -31,6 +32,7 @@ export const BottomTabBar: FC = () => {
   const user = useUser();
   const t = useT();
   const pathname = usePathname();
+  const hasOpenModals = useHasOpenModals();
   const [moreOpen, setMoreOpen] = useState(false);
 
   // Close the sheet whenever the route changes (derived-state-during-render —
@@ -40,6 +42,9 @@ export const BottomTabBar: FC = () => {
     setLastPath(pathname);
     if (moreOpen) setMoreOpen(false);
   }
+
+  // Hide the bar while a modal is open so a full-screen modal's footer isn't covered.
+  if (hasOpenModals) return null;
 
   const visible = (f: { hide?: boolean; requireBilling?: boolean }) =>
     !f.hide && !(f.requireBilling && !billingEnabled);
@@ -55,9 +60,9 @@ export const BottomTabBar: FC = () => {
   };
 
   const all = [...firstMenu, ...secondMenu].filter(visible).map(resolve);
-  const primary = PRIMARY_PATHS.map((p) => all.find((i) => i.path === p)).filter(
+  const primary = (PRIMARY_PATHS.map((p) => all.find((i) => i.path === p)).filter(
     Boolean
-  ) as any[];
+  ) as any[]).sort((a, b) => a.name.localeCompare(b.name));
   const primaryPaths = new Set(primary.map((i) => i.path));
   const rest = all.filter((i) => !primaryPaths.has(i.path));
 

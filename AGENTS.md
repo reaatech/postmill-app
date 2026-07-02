@@ -39,6 +39,27 @@ Docs & plans:
 - `dev/` — release/implementation plans (e.g. `dev/RELEASE_v3.5.0.md`). Plans here drive a release;
   reconcile code against the plan, not the other way around.
 
+## Unified provider framework (v4.0.0)
+
+All provider domains (AI, Media, Storage, Short-link, Social, VPN, Content Packs, Email, Auth)
+resolve through a single **`ProviderKernel`** (`libraries/providers/kernel`).
+
+- **Package-per-provider:** every provider is a workspace package under `libraries/providers/<id>`;
+  each version is an internal module (`src/v1`, `src/v2`, …). The kernel registers them by
+  `(domain, providerId, version)`.
+- **Identity triple:** a provider is addressed as `domain/providerId@version` (e.g. `ai/openai@v1`).
+  Config and ledger rows pin the version at write time (`version` columns on every provider table).
+- **Resolution:** domain services use `ProviderResolutionService`
+  (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`). It resolves the
+  kernel module — the kernel is the **sole** resolution path; the legacy in-memory registries and the
+  `PROVIDER_KERNEL=legacy` kill switch have been removed.
+- **Catalog & health:** `GET /providers/catalog?domain=` returns the public provider catalog;
+  `GET /admin/providers/health?domain=` (super-admin) returns per-version health counters.
+- **Stock providers** (free, env-keyed) are intentionally outside the versioning framework.
+
+See `docs/developer-docs/provider-framework.md` for the full playbook and
+`docs/reference/provider-versions.md` for the catalog.
+
 ## Setup & commands
 
 Use **pnpm only** — never npm or yarn.
@@ -141,13 +162,61 @@ Controller → Manager → Service → Repository   (when a manager is involved)
   Prisma. Controllers/services must not call Prisma directly.
 - A service should go through another domain's **service**, not reach into its repository.
 - The backend app is mostly controllers + wiring that import from `nestjs-libraries`.
+- **Sanctioned exception:** seeders/migration steps under `database/seeds/**` — notably
+  `BackfillService` and `RbacSeeder` — intentionally use `PrismaService` + `$transaction` directly
+  (cross-table backfills/seeds), and are exempt from the repository-only rule by design.
+- **Sanctioned exception (cross-domain leaf-reads):** a service may read another domain's
+  **repository** directly where the owning service depends back on the caller, so routing "up"
+  through the service would create a Nest DI cycle. These are deliberate, behaviour-neutral
+  leaf-reads — keep them and do **not** "fix" them into a service call: `PostsService` →
+  `AnalyticsRepository` / `CampaignsRepository` (the analytics/campaigns services depend on
+  `PostsService`), and `OrgMediaProviderSettingsService` → `@Optional() OrgAiSettingsRepository` (the
+  Qwen/Google universal-credential read; `OrgAiSettingsService` depends on this package's
+  `ProviderCredentialLinkService`). Each carries a `// layering: sanctioned leaf-read` comment at the
+  call site.
 
 ## Frontend conventions (Next.js App Router)
 
 - UI components live in `apps/frontend/src/components/ui`; other components in
   `apps/frontend/src/components`. Routing/pages are in `apps/frontend/src/app`.
 - **Check existing components before building a new one** to match the established design.
-- **Native components only** — never install a UI component from npmjs; write it natively.
+
+### Component / design-system policy
+
+The real policy (reconciled with what's installed — the older "native components only, never install a
+UI component from npmjs" rule was aspirational and contradicted by reality):
+
+- **Default to the shared bespoke primitives.** They are the canonical building blocks — use them
+  rather than re-rolling or pulling a new npm widget:
+  - **Button** → `Button` from `@gitroom/react/form/button` (~70 call sites). Native, supports
+    `secondary`/`danger`/`loading`.
+  - **Input / form fields** → `Input` from `@gitroom/react/form/input` (~40 call sites). Native,
+    `react-hook-form`-integrated.
+  - **Modals** → the bespoke `useModals()` / `ModalManager` from
+    `@gitroom/frontend/components/layout/new-modal` (~80 call sites). This — **not** `@mantine/modals`
+    — is the canonical modal system; `@mantine/modals` is a vestigial dependency that is no longer
+    imported in `src/` (tracked follow-up: drop the unused dep).
+- **Mantine is the sanctioned base for the few primitives where bespoke would be wasteful**, and stays:
+  `@mantine/core` (e.g. `Autocomplete` — 2 files), `@mantine/dates` (the date picker — 1 file), and
+  `@mantine/hooks` (utility hooks like `useClickOutside` — a handful of files). Reach for an existing
+  Mantine primitive before hand-rolling one of these; do **not** rip Mantine out.
+- **Write bespoke (native) only when no shared or Mantine primitive fits.** Match the design tokens
+  (`colors.scss` / `tailwind.config.cjs`); don't introduce a new npm UI kit (shadcn, MUI, Chakra, etc.).
+- **Deprecate ad-hoc duplicates.** Don't add a new one-off button/input/modal that overlaps the
+  canonical ones — consolidate onto them. (Larger de-duplication of existing one-offs is a tracked
+  follow-up.)
+
+### Error boundaries
+
+- App Router segment boundaries: each main route group ships `error.tsx` + `not-found.tsx`
+  (`(app)`, `(app)/(site)`, `(app)/(site)/media`, `(provider)`), rendering the shared
+  `RouteError` / `RouteNotFound` (`components/errors/`). `error.tsx` is a `'use client'` component
+  receiving `{ error, reset }`.
+- The `/media/*` canvas studios (Designer, HeyGen, Replicate, Deepgram, every Studio Kit `StudioShell`)
+  are wrapped at the **media layout** level in `StudioErrorBoundary`
+  (`components/media-tools/studio-error-boundary.tsx`) so a studio crash shows a themed fallback with a
+  reset instead of a blank screen. Reuse this pattern (mirrors the analytics-v2 `ErrorBoundary`) for
+  new canvas tools rather than adding ad-hoc try/catch.
 
 ### Data fetching — SWR via `useFetch`
 Always fetch with **SWR** through the `useFetch` hook from
@@ -179,29 +248,119 @@ All `--color-custom*` variables are **deprecated** — do not use them.
 
 ## Database
 
-The single schema is `libraries/nestjs-libraries/src/database/prisma/schema.prisma`, applied with
-**`prisma db push --accept-data-loss`** — there are **no SQL migration files**, and the schema is the
-source of truth. Because pushes can force destructive diffs against the live production DB:
+The schema is authored in `libraries/nestjs-libraries/src/database/prisma/schema.prisma`, and changes
+are applied through **committed Prisma migrations** (`migrations/` next to the schema, starting from
+the `0_init` baseline). The canonical apply path is **`prisma migrate deploy`** — what CI, the backend
+boot (`pm2-run`), and production use; `db push` is **local-prototyping/reset only** (a quick scratch
+diff that produces no migration — never the apply path for a shared/production DB). Because migrations
+still run against the live production DB:
 
-- Add columns as **nullable or defaulted**; a new required column without a default breaks the push.
-- Renames/drops are destructive under `db push` — provide a manual backfill / expand-contract plan.
-- Run `pnpm run prisma-generate` after schema edits to keep the client in sync.
+- Add columns as **nullable or defaulted**; a new required column without a default breaks the apply.
+- Renames/drops are destructive — provide a manual backfill / expand-contract plan (contract step in a
+  later migration).
+- Run `pnpm run prisma-generate` after schema edits to keep the client in sync (`migrate dev` does
+  this for you).
+
+**Schema-change workflow:** edit schema → `pnpm run prisma-migrate-dev` (authors + commits the
+migration under `migrations/`) → `pnpm run prisma-schema-diff` (forward SQL under `dev/schema-changes/`
+for review) → `pnpm run prisma-schema-check` (destructive guard) → apply elsewhere via
+`pnpm run prisma-migrate-deploy`. Destructive changes (`DROP`, in-place rename, new required column)
+need an expand/contract plan and an explicit `ALLOW_DESTRUCTIVE_SCHEMA=true` to pass the guard.
+**CI drift gate (`test.yml`):** `migrate deploy` applies the committed migrations to an empty CI DB,
+then `prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel <schema> --exit-code` must
+exit 0 — a schema edit committed **without** a matching migration fails the job; CI also re-runs the
+destructive guard against `origin/main`. To onboard a DB created before migrations, baseline it once
+with `pnpm run prisma-migrate-resolve --applied 0_init`. Rolling back is forward-only — author a new
+contract/down migration (see `docs/operations-guide/schema-rollback.md`). For a quick local reset use
+`pnpm run prisma-db-push` / `pnpm run prisma-reset` (`db push --accept-data-loss` / `--force-reset`).
+Connection-pool size is env-tunable via `DATABASE_CONNECTION_LIMIT` / `DATABASE_POOL_TIMEOUT` (unset =
+default behaviour, byte-for-byte). Full details in `docs/developer-docs/database.md`.
 
 ---
 
 ## Channel credentials
 
-All channel provider credentials live exclusively in the database via `OrgProviderConfiguration`,
-encrypted at rest through `EncryptionService` (AES-GCM). There is **no env var fallback** — the
-`getEnvOr()` function and `ChannelEnvMigrationService` were removed in v3.7.1. Each provider
-receives credentials through `clientInformation` (passed from `OrgProviderConfiguration`) or via
-`getOrgCredential(orgId, identifier, key)`. Never read `process.env` for channel credentials.
+Channel (social) OAuth-app credentials resolve along **two paths**, "click-connect primary, keys as
+fallback":
 
-AI provider credentials follow the same pattern: stored in `AIOrgProviderConfig`, encrypted at rest,
-with no `OPENAI_API_KEY` or other env var fallback.
+1. **Per-org `OrgProviderConfiguration`** (Settings → Channels) — named credential sets, encrypted at
+   rest through `EncryptionService` (AES-GCM). This is the **override**: when an org has its own app
+   for a provider it always wins.
+2. **Platform OAuth app from deployment env** (`channel-env-credentials.ts`) — when the operator sets
+   a provider's app keys in the environment, every org gets one-click "Connect" with no key entry.
+   Resolution is **live, per-request, presence-based, and never persisted to a tenant row** (unlike
+   the pre-v3.7.1 `ChannelEnvMigrationService`, which seeded env into the DB and was removed). If the
+   env var is unset, behaviour is per-org-only — no change.
+
+Resolution funnels through `IntegrationManager.getClientInformation(integration, orgId, configId?)`:
+explicit `configId` → org-by-id; else org primary config; else **env platform app**
+(`getEnvClientInfo`); else (no org context) global `ProviderConfiguration` → env. The add-channel
+list and `isEnabled`/`getSocialIntegration` gates union `getEnvEnabledIdentifiers()` so env-backed
+providers always stay connectable. This restores a deliberately-removed (v3.7.1) env path **for
+channels only** — the operator owns the OAuth apps, which is the normal multi-tenant social model.
+
+AI provider credentials do **not** follow this: stored in `AIOrgProviderConfig`, encrypted at rest,
+with **no** `OPENAI_API_KEY` or other env var fallback (a deployment's AI key must never be silently
+billed/leaked as a tenant's — preserve this).
 
 Short-link provider credentials follow the same pattern: stored in `OrgShortLinkConfig`, encrypted
 at rest through `EncryptionService` (AES-GCM), with no `process.env` fallback.
+
+### Per-channel VPN egress
+
+A channel config (`OrgProviderConfiguration`) can opt into routing **all of its outbound posting
+requests through a VPN region's proxy**. Stored as the non-secret `vpnSelection` JSON column
+(`{ enabled, identifier, regionId }`); selectable only from the org's **enabled** VPN provider×region
+combinations. VPN providers (`OrgVpnConfig`, encrypted creds, Settings → VPN) that expose a public
+proxy declare a `proxyRegions` catalog + `resolveProxyAuth` on their adapter; the org enables a subset
+of regions (`OrgVpnConfig.regions` JSON). Only **SOCKS5 / HTTP-CONNECT** providers route — WireGuard/
+OpenVPN tunnels are out of scope (can't be applied per-request in Node).
+
+Routing chokepoint: `PostActivity.postSocial` resolves the selection → `VpnDispatcherService.get`
+(pooled undici dispatcher: SOCKS5 via `socks`, HTTP-CONNECT via undici `ProxyAgent`) → wraps the
+provider's `post()` in `runWithVpnDispatcher` (AsyncLocalStorage, because providers are singletons).
+`SocialAbstract.fetch()` reads `getVpnDispatcher()` and uses it in place of `ssrfSafeDispatcher`.
+**SSRF posture when proxied:** the proxy host is validated public, the proxy-connect leg keeps the
+private-IP DNS pin, and the destination is re-checked `isSafePublicHttpsUrl` before dispatch.
+Dispatchers are keyed by `(org, provider, region, creds-fingerprint)` and invalidated on any VPN
+config change. **Known gap:** providers that bypass `this.fetch()` (raw `fetch`/`axios` — Medium,
+parts of LinkedIn auth, Bluesky) are not proxied.
+
+VPN adapters expose regions one of two ways: a **static `proxyRegions`** catalog (consumer VPNs the
+user ticks region-by-region), or **dynamic `resolveRegions(config)`** that derives the region(s) from
+the org's own stored config — used by the generic **`custom`** ("Custom VPN / Proxy") adapter where
+the user supplies their own host/port/protocol/auth (e.g. an office proxy). Dynamic providers have a
+single derived region, auto-enabled (no per-region toggle; UI hides the checklist via
+`isDynamicRegions`). The custom proxy host is still SSRF-validated — private addresses need
+`SSRF_ALLOWED_PRIVATE_CIDRS` on a self-hosted instance.
+
+---
+
+## Unified provider framework (v4.0.0)
+
+All provider domains — AI, Media, Storage, Short-link, Social, VPN, Content Packs, Email, and Auth —
+resolve through a single **`ProviderKernel`** (`libraries/providers/kernel`) with one workspace
+package per provider (`libraries/providers/<id>`).
+
+- A provider is addressed as `domain/providerId@version` (e.g. `ai/openai@v1`).
+- Every config/ledger row carries a non-null `version` column and keeps using that version until an
+  explicit upgrade. New `v2` adapters cannot silently change existing behavior.
+- Version lifecycle statuses: `preview → active → deprecated → retired`. Deprecated versions reject
+  new writes; retired versions return `410 Gone`.
+- Runtime resolution goes through `ProviderResolutionService`
+  (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`). The kernel is the
+  **sole** resolution path; the legacy in-memory registries and the `PROVIDER_KERNEL=legacy` kill
+  switch have been removed.
+- Telemetry: every resolved capability is wrapped so that provider calls log a `keyString` and feed
+  per-version health counters in the kernel.
+- Public API: `GET /providers/catalog?domain=` returns the live catalog;
+  `GET /admin/providers/health?domain=` (super-admin) returns health counters.
+- Free stock providers (Unsplash, Pexels, Pixabay, GIPHY, Jamendo, Iconify) are intentionally
+  excluded from versioning — they have no stored config row.
+- Email/Auth resolve through the kernel like every other domain; their former legacy registries have
+  been removed along with the kill switch.
+
+See `docs/developer-docs/provider-framework.md` and `docs/reference/provider-versions.md`.
 
 ---
 
@@ -222,11 +381,56 @@ The backend serves the Inngest handler at **`/api/inngest`**; functions live in
 - **Event-triggered**: `post/publish` (`post-publish.ts` — sleeps until the publish date, posts,
   posts thread items as comments, then first comment / webhooks / plugins; per-`taskQueue`
   concurrency cap), `autopost/process`, `integration/refresh-token`, `email/send` (global 1/sec),
-  `email/digest`, `analytics/backfill`, `streak/start`.
+  `email/digest`, `analytics/backfill`, `streak/start`, `media/render` (`media-render.ts` — local
+  video renders: Designer timeline + clip-merge, `concurrency.limit = VIDEO_RENDER_CONCURRENCY`
+  (default 3), each optionally in a resource-capped Podman container — see **Video rendering** below).
 - **Cron-triggered**: `comments-collection.ts` (every minute — sync comments, dispatch webhooks,
   prune, notify), `analytics-collection.ts` (daily 02:00 UTC — the snapshot sweep below),
-  `media-jobs-poll.ts` (every minute — poll pending media jobs + FFmpeg video renders),
+  `media-jobs-poll.ts` (every minute — poll pending external media jobs; **re-enqueues** stuck
+  local renders to `media/render`, no longer renders inline),
   `missing-post-finder.ts` (hourly — recover posts that should have published).
+
+## Video rendering (queue + Podman workers)
+
+Local video compute — the Designer timeline render (headless Chromium + FFmpeg) and the clip-merge
+(FFmpeg) — is queued through the `media/render` Inngest function and capped to
+`VIDEO_RENDER_CONCURRENCY` (default 3). With `VIDEO_RENDER_PODMAN_ENABLED=true`, each render runs in
+a `postmill-render` Podman container (the backend shells out to the local `podman` CLI); all render
+containers join **one pod** whose cgroup caps the **aggregate** `VIDEO_RENDER_CPUS`/`VIDEO_RENDER_MEMORY`
+across all of them (a lone render may burst to the whole pool). Storage/clip resolution stays
+host-side (no creds in the container); the worker is the app build + distro Chromium/FFmpeg with
+`media-render-worker.ts` as ENTRYPOINT (reads `/work/job.json` → writes `/work/out`). Podman is
+**opt-in**; off (default) = the existing in-process renderer (dev/CI + graceful degradation), with
+the 3-concurrent cap still applied via a host semaphore when `USE_INNGEST` is off. Requires cgroup v2
+for the aggregate pool (else a logged per-container even-split fallback). See
+`docs/operations-guide/video-rendering.md`.
+
+## Notifications (V2)
+
+`NotificationService` (`libraries/nestjs-libraries/src/database/prisma/notifications/`) is the
+**single chokepoint** for every user-facing email + in-app/push notification. **Do not call
+`EmailService` directly** from feature code — the only exceptions are `digest.activity.ts` (the
+daily/weekly digest flush) and the `email/send` Inngest relay.
+
+- **Two dispatch modes.** `notify({ orgId, category, ... })` fans out to org members and is gated by
+  each member's per-category, per-channel preferences (with digest routing). `sendEmail(to, subject,
+  html, replyTo?)` is the **always-on transactional** path for single/arbitrary recipients
+  (activation, password reset, team invite, billing-cancel) — no preference gate, no in-app row.
+- **Eight categories**, derived from real triggers, each toggleable per channel (email/push/in-app)
+  at `/user/me` → Notifications: `post_published`, `post_failed`, `channels`, `comments`, `budget`,
+  `media`, `announcements`, `streak`. The set is hardcoded in three lockstep places — the DTO
+  (`dtos/notifications/notification-preference.dto.ts`: union + `NOTIFICATION_CATEGORIES` +
+  `NotificationPreferenceCategoriesDto`, whose `whitelist`/`forbidNonWhitelisted` requires the
+  frontend to send exactly these keys), `DEFAULT_CATEGORY_TOGGLES`
+  (`notification-preference.service.ts`), and the frontend panel
+  (`settings/notifications/notification-preferences.panel.tsx`).
+- **No schema migration to change the set.** Categories persist as plain `String`/JSON columns;
+  `ensureDefaults` writes explicit defaults and `toData()` backfills new keys / drops orphaned ones
+  on read, so renames/adds are code-only (the Prisma `@default` JSON is cosmetic). `_channelEnabled`
+  tolerates an unknown category (gates on the master channel only) so stale strings never throw.
+- **Admin broadcast** (`/admin/notifications/broadcast`, `notifications:manage`) sends category
+  `announcements` with `override: true`. The **bell** (`components/notifications/notification.component.tsx`)
+  reads the V2 `/notifications` routes and renders `type` opaquely.
 
 ## Analytics
 
@@ -325,6 +529,33 @@ Settings → AI (`/settings?tab=ai`). **Preserve this — do not reintroduce an 
 `AIOrgProviderConfig`, `AIBrandProfile`, `AIPromptTemplate`, `AISettingsAudit`, `AIMediaJob`,
 `AIPromptLibraryItem`, `AIContentIndex`.
 
+## AI Model Defaults & Media Defaults
+
+Default model resolution is now **per-organization and category-driven** instead of the legacy
+scope/model hardcoding.
+
+- **Model categories (AI):** `low-reasoning`, `high-reasoning`, `vision`, `workflow`. The legacy AI
+  scopes `utility`, `generator`, `agent`, `mcp` map to these categories (`utility` → `low-reasoning`;
+  the rest → `high-reasoning`). `reasoning:true` now resolves the `high-reasoning` category.
+- **Media categories (Content):** 16 categories covering image, video, audio, and slide/caption
+  operations (e.g. `text-to-image`, `text-to-video`, `image-upscale`, `video-caption`). Each maps to
+  a base media operation (`image`, `video`, `audio`, `tts`, `upscale`, etc.).
+- **Storage:** `OrgDefaultModel` rows (`domain`, `category`, `providerId`, `version`, `model`,
+  `settings`) keyed by `(organizationId, domain, category)`.
+- **Resolution:** `DefaultsResolutionService` reads the stored row; if none, it auto-picks from the
+  org's enabled providers using provider `metadata.ts` category/capability flags and a hint list that
+  targets the historical default models. Auto-picks are deterministic but **may differ** from the old
+  hardcoded defaults when the active provider is not the historical one.
+- **API:** `GET /settings/ai/defaults`, `PUT/DELETE /settings/ai/defaults/:category`,
+  `GET /settings/ai/defaults/catalog?category=`. Media mirror under `/settings/content/media-defaults`.
+- **UI:** Settings → AI → **Model Defaults**; Settings → Content → **Media Defaults**.
+- **Kill switch:** `AI_MODEL_DEFAULTS_ENABLED=false` (default `true`) reverts AI model resolution to
+  the legacy `orgActive`/`SURFACE_DEFAULTS` chain. Media defaults have no kill switch — they are new
+  functionality, not a behavior change.
+- **Legacy deleted:** `VideoManager`, `@Video` registry, `ImagesSlides`, `Veo3`,
+  `AiMediaGenerationService`, and the `generate.video.options` chat tool. All media/text callers now
+  route through `AiDefaultsService` / `AiMediaService`.
+
 ## Short-link providers (v3.8.0)
 
 The short-link system is a pluggable, per-org configurable multi-provider system replacing the old
@@ -356,6 +587,102 @@ No active short-link provider for an org = the `ShortLinkService` returns the or
 unmodified (passthrough). Publishes never fail due to missing short-link config. The composer's
 short-link toggle is hidden when no provider is configured, and the Settings → Shortlinks tab shows
 an empty state guiding the admin to configure one.
+
+## Campaign Hub (v3.9.0+)
+
+A campaign is an org-scoped command center for posts, channels, brands, files, and planning notes.
+It supports tagged items, draft approvals, UTM tagging, goals, copy/clone, shareable public reports,
+and a dashboard of KPIs.
+
+### Data model
+- `Campaign` — org-scoped folder; `shareToken` / `shareEnabled` control public reports; `utmEnabled`
+  toggles automatic UTM query-string append; `goals` stores a JSON array of `{ metric, target }`.
+  Optional metadata: `client` / `project` (free-text) and `tags` (JSON `string[]`) — collected in the
+  create/edit modal, shown read-only on the dashboard header. **Internal-only:** these (and the
+  resolved `createdBy`) are **not** in `CampaignReportService.toPublicJson`'s whitelist, so they never
+  leak on the public client report.
+- `CampaignEntityType` enum — `POST`, `INTEGRATION`, `ORG_VPN_CONFIG`, `AI_ORG_PROVIDER_CONFIG`,
+  `AI_BRAND_PROFILE`, `STORAGE_PROVIDER_CONFIG`, `FILE`, `SETS`, `SIGNATURES`.
+- `CampaignItem` — polymorphic tag table (`campaignId`, `entityType`, `entityId`) for the 8 non-post
+  types. Posts remain single-campaign via the existing `Post.campaignId` FK.
+- `CampaignItemResolverRepository` resolves batches of `CampaignItem` ids to display names/icons per
+  type, skipping orphans (deleted source rows).
+- `Post.approvalStatus` / `approvedById` / `approvedAt` — draft approval state; only `approved`
+  drafts can be promoted to scheduled.
+- `CampaignNote` / `CampaignNoteReaction` — the internal **Discussion** thread (see below). Additive
+  tables; `CampaignNote.content` is sanitized rich HTML, `parentId` gives one-level threading,
+  `mentions` is a JSON `string[]` of userIds, plus `pinned` / `resolvedAt` / `editedAt` / soft
+  `deletedAt`. `CampaignNoteReaction` is unique on `(noteId, userId, emoji)` (toggle).
+
+### Discussion (internal collaborative thread)
+- **`dashboard/campaign-discussion-section.tsx`** renders a Jira-style **Discussion** thread **below
+  the tabbed content** (always visible, not a tab) where org members talk about the campaign — this is
+  **distinct from the synced social `Comments`** feature (`SocialComment`). Notes are rich HTML with
+  **embedded image/video**, **@mentions**, **emoji reactions**, one-level **threaded replies**, and
+  **pin/resolve**; authors show avatar + relative time; edit/delete is own-only (super-admin bypass).
+- **Editor** (`dashboard/discussion-editor.tsx`) is a lightweight **TipTap** editor — `StarterKit`
+  (which already bundles Link+Underline in v3; do **not** re-add them) + `Mention` (reusing the
+  composer's exported `suggestion(loadList)` from `composer/mention.component.tsx`) + two tiny custom
+  atom nodes (`image`/`video`) so picked media embeds inline. Media is inserted via the shared
+  `MediaSelectorModal`; emoji via `emoji-picker-react`.
+- **Rendering** goes through `SafeContent` (DOMPurify allowlist — extended to cover StarterKit output:
+  `em`/`s`/`ol`/`code`/`pre`/`blockquote`). Note HTML is **also sanitized server-side on write**
+  (`campaign-note.sanitize.ts`, allowlist kept in lockstep with `SafeContent`) — sanitize-on-write AND
+  on-render.
+- **Backend**: `campaign-note.repository.ts` + `campaign-note.service.ts` (validates the campaign is in
+  the org, rejects >1-level replies, intersects `mentions` with real org member ids before notifying,
+  fires `NotificationService.notify` with `category:'comments'` + `targetUserIds`, non-fatal). Routes
+  live on `CampaignsController`: `GET/POST /campaigns/:id/notes`, `PUT/DELETE
+  /campaigns/:id/notes/:noteId`, `POST …/:noteId/{pin,resolve,reactions}` — all org-scoped, billing
+  `POSTS_PER_MONTH`, RBAC `posts:update` for writes. Frontend hooks `useCampaignNotes` /
+  `useTeamMembers` in `campaign.hooks.ts`.
+
+### Architecture
+- Backend: `CampaignsController` + `CampaignTagService` (apps/backend) and `CampaignsService`,
+  `CampaignReportService`, `CampaignItemRepository`, `CampaignItemResolverRepository`,
+  `CampaignActivity` in `libraries/nestjs-libraries/src/database/prisma/campaigns/`.
+  `PostsService` appends UTM parameters before short-linking when a post belongs to a campaign with
+  `utmEnabled`.
+- Frontend: `apps/frontend/src/components/campaigns/` — index, dashboard, planning workspace,
+  copy modal, report view, public share page. Uses existing `useFetch`/`useSWR` conventions.
+- Cron: `campaign-tag-purge` runs daily 03:00 UTC and deletes `CampaignItem` rows for campaigns whose
+  `endDate` is more than `CAMPAIGN_PURGE_DAYS` (default 30) ago; ongoing campaigns (`endDate: null`)
+  are never purged.
+- **Comments section** (`dashboard/campaign-comments-section.tsx`): a full view/reply surface over
+  the campaign's posts' synced comments. It reuses the existing **`/posts/inbox`** endpoint — which
+  gained optional **`campaignId`** + **`integrationId`** filters (`SocialCommentsRepository.getInbox`
+  adds a `post: { campaignId }` relation filter; campaign id is a **uuid**, validated with `isUUID`,
+  not `isCuid`) — plus the per-post reply/like/status/assign/bulk-read routes and the shared
+  `CommentCard` + `CommentComposer`. The dashboard's **"Comments" KPI and `comments` goal now reflect
+  the synced `SocialComment` count** (`SocialCommentsService.countCampaignComments`), not the
+  platform-reported `lastComments` sum — `CampaignsService.getDashboard` and
+  `CampaignReportService.buildReport` both override `engagement.totalComments` with that count, so the
+  KPI, goal, section, and public report all agree.
+- **Channels section** (`dashboard/campaign-channels-section.tsx`): the dashboard's
+  `getDashboard` returns a `channels` array = **union of** channels the campaign's posts publish to
+  **and** explicitly-tagged `INTEGRATION` items, deduped by integration id with a `postCount`
+  (rendered with the shared `ProviderIcon`). Because this dedicated section owns channels, `channel`
+  was removed from `tagged-items-panels.tsx` (`ENTITY_ORDER` + default add-type) to avoid a double
+  render. Its **Add Channel** / **Invite Client** buttons reuse `useAddProvider(update, invite,
+  campaignId)` — an optional `campaignId` now threads through `AddProviderComponent` →
+  `GET /integrations/social/:integration?campaign=` → `ioRedis` `campaign:<state>`; the OAuth callback
+  (`no.auth.integrations.controller.ts`) reads it and auto-tags the new channel onto the campaign
+  (non-fatal; covers both direct connect and the invite link).
+- **Files section** (`dashboard/campaign-files-section.tsx`): a first-class **Files** tab (after
+  Channels) that owns the campaign's tagged files, reading `getDashboard`'s `itemPanels.file`. Like
+  channels, `file` was removed from `tagged-items-panels.tsx` `ENTITY_ORDER` to avoid a double render;
+  the section reuses the exported `PanelItem` grid and the generalized `AddItemsModal`
+  (`types={['file']}`, which hides the type dropdown when a single type is passed).
+- **Creator + profile**: `getDashboard` resolves `campaign.createdById` into
+  `createdBy { id, name, email, avatarUrl }` (via `UsersService.getPublicProfilesByIds`); the header
+  links "Created by" to a read-only, tenant-guarded member-profile page at `/profile/[id]`
+  (`GET /user/profile/:userId` → `OrganizationService.getMemberProfile`, which returns null for a
+  non-member so cross-org lookup is blocked).
+
+### Public share
+`GET /public/campaign-report/:token` returns a read-only, stripped JSON report when `shareEnabled`
+is true. The token is a random 64-character hex string minted by `CampaignsService.mintShareToken()`;
+`POST /campaigns/:id/share` mints/rotates it, and `DELETE /campaigns/:id/share` disables sharing.
 
 ## Feature surfaces (v3.5.0)
 
@@ -455,6 +782,11 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
 - **Secrets at rest are encrypted via `EncryptionService`** (AES-GCM, `v2:` prefix, expand-contract
   read-fallback) — integration OAuth tokens (1I), Nostr keys (3AN), and other at-rest secrets (3U).
   `ENCRYPTION_KEY` is optional and falls back to deriving from `JWT_SECRET`. Never store secrets plaintext.
+  **Single-key model:** one deployment-wide key encrypts every secret — there is **no per-org crypto
+  key**. "Org-scoped" means DB-column-scoped (storage), not cryptographically isolated; cross-org
+  isolation is enforced by query scoping. `EncryptionService` (per-org domain rows) and
+  `AuthService.fixedEncryption` (global rows) are the same key behind two routes — never mix the
+  decrypt route for a given row.
 - **JWT** verification pins `algorithms: ['HS256']`; new tokens carry `exp` with sliding renewal
   (legacy exp-less tokens still verify — no forced re-auth) (1E). IDs/secrets use CSPRNG (1F).
 - **CSRF** is required on cookie-authenticated mutating routes (3Z); header/API-key clients are
@@ -724,6 +1056,18 @@ provider-neutral package: `apps/frontend/src/components/media-tools/studio-kit/`
   `camera_motion`/`last_frame_uri`) ride flat into the body — LTX is not DashScope-split. **Built without a
   live key** — endpoints/params are grounded in the official `docs.ltx.video` reference; resolution-string
   vs. named-preset formatting may need a live smoke test.
+- **Suno** (`api.sunoapi.org`) is an **own-key** AI-**music** kit studio (`/media/suno`) configured at
+  Settings → Media — single Bearer key, **audio-only**. Two tabs (**Song** / **Instrumental**), both
+  `operation: 'audio'`. **Async submit-and-poll**: `POST /api/v1/generate` → `{ data: { taskId } }`, then
+  poll `GET /api/v1/generate/record-info?taskId=` until `data.status === 'SUCCESS'`, reading
+  `data.response.sunoData[].audioUrl` (public MP3s, re-downloadable; no webhook → poll-cron like
+  Runway/LTX). The adapter sets `customMode` only when both `style` **and** `title` are filled (else a
+  non-custom prompt-only generation) and always sends `callBackUrl: ''` (polling-only). **Two clips per
+  generation:** Suno returns 2 takes, so `pollJob` returns the first as the artifact and the rest via the
+  generic **`extraArtifactUrls`** field on `MediaPollResult` — `MediaJobLifecycleService.processJob` lands
+  each extra as a **sibling completed job** (one render-queue card / audio file per take; provider-agnostic,
+  no Suno branch). **Built without a live key** — endpoints/status strings grounded in the `docs.sunoapi.org`
+  reference; the status set + `sunoData[].audioUrl` path + 2-clip array need a live smoke test.
 - **Reel.Farm** (`reel.farm`) and **Genviral** (`genviral.io`) are two **own-key** faceless/short-form
   **video** kit studios configured at Settings → Media — each a `<provider>.adapter.ts` + descriptor +
   3-line studio + route + nav entry (`/media/reelfarm`, `/media/genviral`), `operation: 'video'`, single

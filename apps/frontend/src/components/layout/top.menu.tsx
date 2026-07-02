@@ -35,17 +35,7 @@ export const useMenuItem = () => {
 
   const firstMenu = [
     {
-      name: 'Dashboard',
-      icon: (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-          <polyline points="9 22 9 12 15 12 15 22" />
-        </svg>
-      ),
-      path: '/dashboard',
-    },
-    {
-      name: isGeneral ? t('schedule', 'Schedule') : t('launches', 'Launches'),
+      name: isGeneral ? t('posts', 'Posts') : t('launches', 'Launches'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -63,7 +53,7 @@ export const useMenuItem = () => {
           />
         </svg>
       ),
-      path: '/schedule',
+      path: '/posts',
     },
     {
       name: 'Agent',
@@ -84,7 +74,7 @@ export const useMenuItem = () => {
       path: '/agents',
     },
     {
-      name: t('comments', 'Comments'),
+      name: t('replies', 'Replies'),
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -100,7 +90,7 @@ export const useMenuItem = () => {
           <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
         </svg>
       ),
-      path: '/comments',
+      path: '/replies',
     },
     {
       name: t('analytics', 'Analytics'),
@@ -158,27 +148,6 @@ export const useMenuItem = () => {
       hide:
         permissions.isResolved &&
         !permissions.hasPermission('media', 'read'),
-    },
-    {
-      name: t('plugs', 'Plugs'),
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 18 19"
-          fill="none"
-        >
-          <path
-            d="M11.6711 6.21205C11.3397 5.88068 11.174 5.715 11.1119 5.52395C11.0573 5.35589 11.0573 5.17486 11.1119 5.00681C11.174 4.81575 11.3397 4.65007 11.6711 4.3187L14.0461 1.94369C13.4158 1.65867 12.7162 1.5 11.9795 1.5C9.20677 1.5 6.95901 3.74776 6.95901 6.5205C6.95901 6.93138 7.00837 7.33073 7.10148 7.71294C7.20119 8.12224 7.25104 8.32689 7.24219 8.45618C7.23292 8.59154 7.21274 8.66355 7.15032 8.78401C7.0907 8.89907 6.97646 9.0133 6.748 9.24177L1.52013 14.4696C0.826947 15.1628 0.826948 16.2867 1.52013 16.9799C2.21332 17.6731 3.3372 17.6731 4.03039 16.9799L9.25825 11.752C9.48672 11.5236 9.60095 11.4093 9.71601 11.3497C9.83647 11.2873 9.90848 11.2671 10.0438 11.2578C10.1731 11.249 10.3778 11.2988 10.7871 11.3985C11.1693 11.4916 11.5686 11.541 11.9795 11.541C14.7523 11.541 17 9.29325 17 6.5205C17 5.78382 16.8413 5.0842 16.5563 4.45394L14.1813 6.82895C13.8499 7.16032 13.6843 7.326 13.4932 7.38808C13.3252 7.44269 13.1441 7.44269 12.9761 7.38808C12.785 7.326 12.6193 7.16032 12.288 6.82895L11.6711 6.21205Z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-      path: '/plugs',
     },
     {
       name: t('campaigns', 'Campaigns'),
@@ -319,29 +288,6 @@ export const useMenuItem = () => {
         !permissions.hasPermission('billing', 'read'),
     },
     {
-      name: t('admin', 'Admin'),
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-        </svg>
-      ),
-      path: '/admin',
-      // Platform operator only (User.isSuperAdmin) — hidden until the
-      // permission fetch confirms it, since this is the sensitive axis.
-      hide: !(permissions.isResolved && permissions.isSuperAdmin),
-    },
-    {
       name: t('settings', 'Settings'),
       icon: (
         <svg
@@ -376,6 +322,8 @@ export const useMenuItem = () => {
         !permissions.hasPermission('settings', 'read'),
     },
   ] satisfies MenuItemInterface[] as MenuItemInterface[];
+
+  firstMenu.sort((a, b) => a.name.localeCompare(b.name));
 
   return {
     all: [...firstMenu, ...secondMenu],

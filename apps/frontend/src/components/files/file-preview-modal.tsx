@@ -6,6 +6,7 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 import type { FileItem } from './file-manager';
 
 const fileSize = (bytes: number) => {
@@ -18,7 +19,13 @@ const fileSize = (bytes: number) => {
 export const FilePreviewModal: FC<{
   file: FileItem;
   onDetails?: (file: FileItem) => void;
-}> = ({ file, onDetails }) => {
+  // Optional extra action (used by the campaign Files tab) — opens the composer
+  // with this file preloaded. Not passed by the /files library, so unchanged there.
+  onNewPostDraft?: (file: FileItem) => void;
+  // Optional danger action (campaign Files tab) — untag the file from the
+  // campaign. The caller handles confirmation. Not passed by /files.
+  onRemoveFromCampaign?: (file: FileItem) => void;
+}> = ({ file, onDetails, onNewPostDraft, onRemoveFromCampaign }) => {
   const router = useRouter();
   const modal = useModals();
   const mediaDirectory = useMediaDirectory();
@@ -27,18 +34,22 @@ export const FilePreviewModal: FC<{
   const isVideo = hasExtension(file.path, 'mp4', 'mov', 'webm');
   const isAudio = hasExtension(file.path, 'mp3', 'wav', 'ogg', 'm4a');
   const isImage = hasExtension(file.path, 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'svg', 'bmp');
-  const canDesign = isImage || isVideo; // only images/videos render on the canvas
+  const canDesign = isImage || isVideo || isAudio; // images/videos on canvas, audio on timeline
 
-  const openInDesigner = () => {
-    const params = new URLSearchParams();
-    params.set('url', url);
-    params.set('type', isVideo ? 'video' : 'photo');
-    params.set('source', 'files');
-    if (isVideo && file.thumbnail) {
-      params.set('thumbUrl', mediaDirectory.set(file.thumbnail));
-    }
+  const handleOpenInDesigner = () => {
+    const operation = isVideo ? 'video' : isAudio ? 'audio' : 'image';
+    const thumbUrl = isVideo && file.thumbnail ? mediaDirectory.set(file.thumbnail) : undefined;
     modal.closeAll();
-    router.push(`/media/designer?${params.toString()}`);
+    openInDesigner(
+      {
+        operation,
+        artifactUrl: url,
+        fileId: file.id,
+        source: 'files',
+        thumbUrl,
+      },
+      router.push
+    );
   };
 
   return (
@@ -65,6 +76,14 @@ export const FilePreviewModal: FC<{
           {(file.type || 'file')} · {fileSize(file.fileSize)}
         </div>
         <div className="flex items-center gap-[10px] flex-wrap">
+          {onRemoveFromCampaign && (
+            <button
+              onClick={() => onRemoveFromCampaign(file)}
+              className="px-[16px] py-[10px] rounded-[8px] border border-red-500/50 text-red-400 text-[13px] font-[500] hover:bg-red-500/10 transition-all"
+            >
+              Remove from campaign
+            </button>
+          )}
           {onDetails && (
             <button
               onClick={() => {
@@ -82,9 +101,23 @@ export const FilePreviewModal: FC<{
           >
             Download
           </button>
+          {onNewPostDraft && canDesign && (
+            <button
+              onClick={() => {
+                modal.closeAll();
+                onNewPostDraft(file);
+              }}
+              className="px-[16px] py-[10px] rounded-[8px] bg-btnPrimary text-white text-[13px] font-[500] hover:opacity-90 transition-all flex items-center gap-[6px]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" />
+              </svg>
+              New Post Draft
+            </button>
+          )}
           {canDesign && (
             <button
-              onClick={openInDesigner}
+              onClick={handleOpenInDesigner}
               className="px-[16px] py-[10px] rounded-[8px] bg-green-600 text-white text-[13px] font-[500] hover:bg-green-700 transition-all flex items-center gap-[6px]"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

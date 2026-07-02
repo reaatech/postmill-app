@@ -5,7 +5,7 @@ import { VideoOrImage } from '@gitroom/react/helpers/video.or.image';
 import { FC } from 'react';
 import { textSlicer } from '@gitroom/helpers/utils/count.length';
 import SafeImage from '@gitroom/react/helpers/safe.image';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 

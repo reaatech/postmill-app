@@ -24,14 +24,6 @@ export type InngestEvents = {
       addTo?: 'top' | 'bottom';
     };
   };
-  'email/digest': {
-    data: {
-      organizationId: string;
-      title: string;
-      message: string;
-      type: string;
-    };
-  };
   'autopost/process': {
     data: {
       id: string;
@@ -69,6 +61,24 @@ export type InngestEvents = {
       organizationId: string;
     };
   };
+  'comments/sync-org': {
+    data: {
+      organizationId: string;
+      daysBack: number;
+    };
+  };
+  'analytics/sync-org': {
+    data: {
+      organizationId: string;
+    };
+  };
+  'media/render': {
+    data: {
+      jobId: string;
+      op: 'design' | 'merge';
+    };
+  };
+
 };
 
 export const inngestSchemas = new EventSchemas().fromRecord<InngestEvents>();

@@ -24,12 +24,27 @@ test('capture composer valid/preflight request + response', async ({ page }) => 
   await page.waitForTimeout(1500);
   await page.getByText('Create Post', { exact: false }).first().click();
   await page.waitForTimeout(2500);
-  await page.locator('div.cursor-pointer.rounded-full:has(img[alt])').first().click().catch(() => {});
+  // Hybrid channel selector: dropdown (>4 channels) or icon row (<=4).
+  const dropdown = page.locator('button[aria-haspopup="listbox"]').first();
+  if (await dropdown.count()) {
+    await dropdown.click().catch(() => {});
+    await page.waitForTimeout(400);
+    await page.locator('[role="option"]').first().click().catch(() => {});
+    await page.keyboard.press('Escape').catch(() => {});
+  } else {
+    await page.locator('div.cursor-pointer.rounded-full:has(img[alt])').first().click().catch(() => {});
+  }
   await page.waitForTimeout(2000);
   const ed = page.locator('[contenteditable="true"], .ProseMirror').first();
   await ed.click().catch(() => {});
   await ed.type('Composer valid-check ' + Date.now(), { delay: 10 }).catch(() => {});
   await page.waitForTimeout(800);
+  // "Save as Draft" now lives inside the "Save as" dropup — hover to reveal it.
+  const saveAs = page.getByRole('button', { name: /^save as$/i }).first();
+  if (await saveAs.count()) {
+    await saveAs.hover().catch(() => {});
+    await page.waitForTimeout(300);
+  }
   await page.getByRole('button', { name: /save as draft/i }).first().click().catch(() => {});
   await page.waitForTimeout(4000);
 

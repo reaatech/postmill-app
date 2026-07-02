@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import pLimit from 'p-limit';
 const limit = pLimit(10);
 
 @Injectable()
 export class FalService {
+  private readonly _logger = new Logger(FalService.name);
   async generateImageFromText(
     model: string,
     text: string,
@@ -30,7 +31,9 @@ export class FalService {
       )
     ).json();
 
-    console.log(all, video, images);
+    this._logger.debug(
+      `fal response: hasVideo=${!!video} images=${images?.length ?? 0}`
+    );
 
     if (video) {
       return video.url;

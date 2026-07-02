@@ -3,7 +3,12 @@ import { BackfillService } from './backfill.service';
 
 type Tx = {
   user: { findMany: ReturnType<typeof vi.fn> };
-  userProfile: { create: ReturnType<typeof vi.fn> };
+  userProfile: { create: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
+  notificationPreference: {
+    findUnique: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
   appRole: { findMany: ReturnType<typeof vi.fn> };
   userOrganization: {
     groupBy: ReturnType<typeof vi.fn>;
@@ -20,7 +25,12 @@ type Tx = {
 
 const makeTx = (): Tx => ({
   user: { findMany: vi.fn().mockResolvedValue([]) },
-  userProfile: { create: vi.fn() },
+  userProfile: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+  notificationPreference: {
+    findUnique: vi.fn().mockResolvedValue(null),
+    create: vi.fn(),
+    update: vi.fn(),
+  },
   appRole: { findMany: vi.fn().mockResolvedValue([]) },
   userOrganization: {
     groupBy: vi.fn().mockResolvedValue([]),
@@ -70,9 +80,10 @@ describe('BackfillService — ragSettings.mediaProviders migration', () => {
     expect(tx.mediaProviderConfig.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
-          organizationId_identifier: {
+          organizationId_identifier_version: {
             organizationId: 'org-1',
             identifier: 'openai',
+            version: 'v1',
           },
         },
         create: expect.objectContaining({ enabled: true }),
@@ -116,5 +127,120 @@ describe('BackfillService — ragSettings.mediaProviders migration', () => {
 
     expect(tx.mediaProviderConfig.upsert).not.toHaveBeenCalled();
     expect(tx.aISystemSettings.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('BackfillService — notifications V2 email opt-out carry-forward', () => {
+  let tx: Tx;
+
+  beforeEach(() => {
+    tx = makeTx();
+  });
+
+  it('copies each UserProfile email opt-OUT into a new NotificationPreference', async () => {
+    tx.userProfile.findMany.mockResolvedValue([
+      {
+        userId: 'user-1',
+        sendSuccessEmails: false,
+        sendFailureEmails: true,
+        sendStreakEmails: false,
+      },
+    ]);
+
+    await makeService(tx).backfill();
+
+    expect(tx.notificationPreference.create).toHaveBeenCalledWith({
+      data: {
+        userId: 'user-1',
+        categories: {
+          post_published: { email: false },
+          streak: { email: false },
+        },
+      },
+    });
+    // opted-in category (failure) is not carried — defaults are opt-in already.
+    const created = tx.notificationPreference.create.mock.calls[0][0];
+    expect(created.data.categories.post_failed).toBeUndefined();
+  });
+
+  it('does not clobber a value already set under the new key (post-deploy save wins)', async () => {
+    tx.userProfile.findMany.mockResolvedValue([
+      { userId: 'user-1', sendSuccessEmails: false, sendFailureEmails: true, sendStreakEmails: true },
+    ]);
+    tx.notificationPreference.findUnique.mockResolvedValue({
+      userId: 'user-1',
+      categories: { post_published: { email: true, inApp: true } },
+    });
+
+    await makeService(tx).backfill();
+
+    expect(tx.notificationPreference.create).not.toHaveBeenCalled();
+    expect(tx.notificationPreference.update).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when no profile has an opt-out', async () => {
+    tx.userProfile.findMany.mockResolvedValue([]);
+
+    await makeService(tx).backfill();
+
+    expect(tx.notificationPreference.create).not.toHaveBeenCalled();
+    expect(tx.notificationPreference.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('BackfillService — AI/media default models', () => {
+  let tx: Tx;
+  const mockSeedUnset = vi.fn();
+  const mockWasApplied = vi.fn().mockResolvedValue(false);
+  const mockMarkApplied = vi.fn().mockResolvedValue(undefined);
+
+  beforeEach(() => {
+    tx = makeTx();
+    mockSeedUnset.mockReset();
+    mockWasApplied.mockReset().mockResolvedValue(false);
+    mockMarkApplied.mockReset().mockResolvedValue(undefined);
+  });
+
+  function makeServiceWithSeed() {
+    const prisma = {
+      $transaction: vi.fn(async (fn: (tx: Tx) => Promise<void>) => fn(tx)),
+      organization: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'org-1' },
+          { id: 'org-2' },
+        ]),
+      },
+    };
+    const ledger = {
+      wasApplied: mockWasApplied,
+      markApplied: mockMarkApplied,
+    };
+    const seedService = {
+      seedUnset: mockSeedUnset,
+      seedAllOrgs: vi.fn(),
+    };
+    return new BackfillService(prisma as never, ledger as never, seedService as never);
+  }
+
+  it('calls seedUnset for every org with an enabled provider', async () => {
+    await makeServiceWithSeed().backfill();
+
+    expect(mockSeedUnset).toHaveBeenCalledTimes(2);
+    expect(mockSeedUnset).toHaveBeenCalledWith('org-1');
+    expect(mockSeedUnset).toHaveBeenCalledWith('org-2');
+  });
+
+  it('is idempotent via the migration ledger', async () => {
+    mockWasApplied.mockResolvedValue(true);
+
+    await makeServiceWithSeed().backfill();
+
+    expect(mockSeedUnset).not.toHaveBeenCalled();
+  });
+
+  it('marks the step applied after success', async () => {
+    await makeServiceWithSeed().backfill();
+
+    expect(mockMarkApplied).toHaveBeenCalledWith('backfill:AI/media default models');
   });
 });

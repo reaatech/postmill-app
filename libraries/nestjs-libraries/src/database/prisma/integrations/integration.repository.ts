@@ -14,7 +14,6 @@ export class IntegrationRepository {
     private _integration: PrismaRepository<'integration'>,
     private _posts: PrismaRepository<'post'>,
     private _plugs: PrismaRepository<'plugs'>,
-    private _exisingPlugData: PrismaRepository<'exisingPlugData'>,
     private _customers: PrismaRepository<'customer'>,
     private _mentions: PrismaRepository<'mentions'>
   ) {}
@@ -113,10 +112,14 @@ export class IntegrationRepository {
     });
   }
 
-  getPlug(plugId: string) {
+  getPlug(plugId: string, orgId?: string) {
     return this._plugs.model.plugs.findFirst({
       where: {
         id: plugId,
+        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
+        // Optional because the current Inngest caller (processPlugs) carries no orgId
+        // in its event payload; org is still enforced upstream by the plug flow.
+        ...(orgId ? { organizationId: orgId } : {}),
       },
       include: {
         integration: true,
@@ -221,7 +224,9 @@ export class IntegrationRepository {
     isBetweenSteps = false,
     refresh?: string,
     timezone?: number,
-    customInstanceDetails?: string
+    customInstanceDetails?: string,
+    providerConfigId?: string,
+    providerVersion = 'v1'
   ) {
     const postTimes = timezone
       ? {
@@ -264,6 +269,8 @@ export class IntegrationRepository {
         refreshNeeded: false,
         rootInternalId: internalId,
         ...(customInstanceDetails ? { customInstanceDetails } : {}),
+        ...(providerConfigId ? { providerConfigId } : {}),
+        providerVersion,
         additionalSettings: additionalSettings
           ? JSON.stringify(additionalSettings)
           : '[]',
@@ -273,6 +280,7 @@ export class IntegrationRepository {
           ? { additionalSettings: JSON.stringify(additionalSettings) }
           : {}),
         ...(customInstanceDetails ? { customInstanceDetails } : {}),
+        ...(providerConfigId ? { providerConfigId } : {}),
         type: type as any,
         ...(!refresh
           ? {
@@ -291,6 +299,7 @@ export class IntegrationRepository {
         organizationId: org,
         deletedAt: null,
         refreshNeeded: false,
+        providerVersion,
       },
     });
 
@@ -384,6 +393,17 @@ export class IntegrationRepository {
     return decryptIntegrationTokens(result);
   }
 
+  async getIntegrationsByIds(org: string, ids: string[]) {
+    if (!ids.length) return [];
+    const results = await this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        id: { in: ids },
+      },
+    });
+    return results.map(decryptIntegrationTokens);
+  }
+
   async updateOnCustomerName(org: string, id: string, name: string) {
     const customer = !name
       ? undefined
@@ -460,23 +480,6 @@ export class IntegrationRepository {
     }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
-  getIntegrationsForHealth(org: string) {
-    return this._integration.model.integration.findMany({
-      where: {
-        organizationId: org,
-        deletedAt: null,
-      },
-      select: {
-        id: true,
-        providerIdentifier: true,
-        name: true,
-        picture: true,
-        disabled: true,
-        refreshNeeded: true,
-        tokenExpiration: true,
-      },
-    });
-  }
 
   async disableChannel(org: string, id: string) {
     await this._integration.model.integration.update({
@@ -608,35 +611,6 @@ export class IntegrationRepository {
     });
   }
 
-  async loadExisingData(
-    methodName: string,
-    integrationId: string,
-    id: string[]
-  ) {
-    return this._exisingPlugData.model.exisingPlugData.findMany({
-      where: {
-        integrationId,
-        methodName,
-        value: {
-          in: id,
-        },
-      },
-    });
-  }
-
-  async saveExisingData(
-    methodName: string,
-    integrationId: string,
-    value: string[]
-  ) {
-    return this._exisingPlugData.model.exisingPlugData.createMany({
-      data: value.map((p) => ({
-        integrationId,
-        methodName,
-        value: p,
-      })),
-    });
-  }
 
   async getPostingTimes(orgId: string, integrationsId?: string) {
     return this._integration.model.integration.findMany({

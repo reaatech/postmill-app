@@ -1,221 +1,210 @@
 import { Button } from '@gitroom/react/form/button';
-import React, { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
 import Loading from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { useLaunchStore } from '@gitroom/frontend/components/new-launch/store';
-import useSWR from 'swr';
-import { VideoWrapper } from '@gitroom/frontend/components/videos/video.render.component';
-import { FormProvider, useForm } from 'react-hook-form';
-import { VideoContextWrapper } from '@gitroom/frontend/components/videos/video.context.wrapper';
-import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { createPortal } from 'react-dom';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 
-export const Modal: FC<{
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLLS = 200; // ~10 minutes
+
+type VideoJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
+
+export const isArtifactPath = (id: string) =>
+  id.includes('/') || id.startsWith('http') || id.startsWith('data:');
+
+const AiVideoModal: FC<{
   close: () => void;
-  type: any;
   setLoading: (loading: boolean) => void;
   onChange: (params: { id: string; path: string }) => void;
 }> = (props) => {
-  const { type, onChange, close, setLoading } = props;
+  const { close, setLoading, onChange } = props;
+  const t = useT();
   const fetch = useFetch();
-  const setLocked = useLaunchStore((state) => state.setLocked);
-  const form = useForm();
-  const [position, setPosition] = useState('vertical');
   const toaster = useToaster();
+  const setLocked = useLaunchStore((p) => p.setLocked);
+  const [prompt, setPrompt] = useState('');
+  const [output, setOutput] = useState('vertical');
+  const [polling, setPolling] = useState(false);
 
-  const loadCredits = useCallback(async () => {
-    const res = await fetch(`/copilot/credits?type=ai_videos`, {
-      method: 'GET',
-    });
-    if (!res.ok) throw new Error('Failed to load AI video credits');
-    return res.json();
-  }, [fetch]);
+  useEffect(() => {
+    return () => {
+      setLocked(false);
+      setLoading(false);
+    };
+  }, [setLocked, setLoading]);
 
-  const { data } = useSWR('copilot-credits', loadCredits);
+  const pollJob = useCallback(
+    async (jobId: string): Promise<{ id: string; path: string } | null> => {
+      let polls = 0;
+      while (polls < MAX_POLLS) {
+        const res = await fetch(`/media/jobs/${jobId}`);
+        if (!res.ok) {
+          throw new Error('Failed to check video status');
+        }
+        const job = await res.json();
+        if (job.status === 'completed') {
+          if (!job.artifactUrl) {
+            throw new Error('Video completed but no artifact was returned');
+          }
+          return { id: job.id, path: job.artifactUrl };
+        }
+        if (job.status === 'failed') {
+          throw new Error(job.error || 'Video generation failed');
+        }
+        polls++;
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      }
+      throw new Error('Video generation timed out');
+    },
+    [fetch]
+  );
 
   const generate = useCallback(async () => {
-    const customParams = form.getValues();
-    if (!(await form.trigger())) {
-      toaster.show('Please fill all required fields', 'warning');
+    if (!prompt.trim()) {
+      toaster.show(
+        t('please_type_your_prompt', 'Please type your prompt'),
+        'warning'
+      );
       return;
     }
+
     setLoading(true);
-    close();
     setLocked(true);
+    setPolling(true);
+    close();
 
     try {
-      const allowed = await fetch(`/media/generate-video/${type.identifier}/allowed`);
-      if (!allowed.ok) {
-        toaster.show('Video generation is not available for this provider', 'warning');
-        return;
-      }
-      const image = await fetch(`/media/generate-video`, {
+      const res = await fetch('/media/generate-video', {
         method: 'POST',
-        body: JSON.stringify({
-          type: type.identifier,
-          output: position,
-          customParams,
-        }),
+        body: JSON.stringify({ prompt, output }),
       });
 
-      if (image.status == 200 || image.status == 201) {
-        onChange(await image.json());
-      } else {
-        toaster.show('Failed to generate video', 'warning');
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toaster.show(
+          err.error || t('failed_to_generate_video', 'Failed to generate video'),
+          'warning'
+        );
+        return;
+      }
+
+      const { id } = await res.json();
+
+      if (isArtifactPath(id)) {
+        onChange({ id, path: id });
+        return;
+      }
+
+      const result = await pollJob(id);
+      if (result) {
+        onChange(result);
       }
     } catch (e) {
-      toaster.show('Failed to generate video', 'warning');
+      toaster.show(
+        (e as Error).message ||
+          t('failed_to_generate_video', 'Failed to generate video'),
+        'warning'
+      );
     } finally {
       setLocked(false);
       setLoading(false);
+      setPolling(false);
     }
-  }, [type, position, form, fetch, setLoading, close, setLocked, toaster, onChange]);
+  }, [prompt, output, fetch, close, setLoading, setLocked, toaster, t, onChange, pollJob]);
 
   return (
-    // Start with an empty prompt — we no longer copy the post's text field.
-    <VideoContextWrapper.Provider value={{ value: '' }}>
-      <form
-        onSubmit={form.handleSubmit(generate)}
-        className="flex flex-col gap-[10px]"
-      >
-        {createPortal(
-          <>{data?.credits || 0} credits left</>,
-          document.querySelector('.top-title-content') ||
-            document.createElement('div')
-        )}
-        <FormProvider {...form}>
-          <div>
-            <div className="relative h-[400px]">
-              <div className="absolute left-0 top-0 w-full h-full overflow-hidden overflow-y-auto">
-                <div className="mt-[10px] flex w-full justify-center items-center gap-[10px]">
-                  <div className="flex-1 flex">
-                    <Button
-                      className="!flex-1"
-                      onClick={() => setPosition('vertical')}
-                      secondary={position === 'horizontal'}
-                    >
-                      Vertical (Stories, Reels)
-                    </Button>
-                  </div>
-                  <div className="flex-1 flex mt-[10px]">
-                    <Button
-                      className="!flex-1"
-                      onClick={() => setPosition('horizontal')}
-                      secondary={position === 'vertical'}
-                    >
-                      Horizontal (Normal Post)
-                    </Button>
-                  </div>
-                </div>
-                <VideoWrapper identifier={type.identifier} />
-              </div>
-            </div>
-            <div className="flex">
-              <Button type="submit" className="flex-1">
-                Generate
-              </Button>
-            </div>
-          </div>
-        </FormProvider>
-      </form>
-    </VideoContextWrapper.Provider>
-  );
-};
-
-const AiVideoModal: FC<{
-  list: any[];
-  close: () => void;
-  setLoading: (loading: boolean) => void;
-  onChange: (params: { id: string; path: string }) => void;
-}> = (props) => {
-  const { list, close, setLoading, onChange } = props;
-  const t = useT();
-  const [type, setType] = useState<any | null>(
-    list.length === 1 ? list[0] : null
-  );
-
-  if (!type) {
-    return (
-      <div className="flex flex-col gap-[10px]">
-        <div className="text-[14px]">
-          {t('choose_a_video_type', 'Choose a video type')}
-        </div>
-        {list.map((p) => (
-          <Button key={p.identifier} type="button" onClick={() => setType(p)}>
-            {p.title}
-          </Button>
-        ))}
+    <div className="flex flex-col gap-[16px]">
+      <div className="flex flex-col gap-[6px]">
+        <div className="text-[14px]">{t('prompt', 'Prompt')}</div>
+        <textarea
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder={t(
+            'describe_the_video_you_want_to_generate',
+            'Describe the video you want to generate'
+          )}
+          className="bg-input min-h-[150px] p-[16px] outline-none border-newTableBorder border rounded-[4px] text-inputText placeholder-inputText"
+        />
       </div>
-    );
-  }
-
-  return (
-    <Modal
-      type={type}
-      close={close}
-      setLoading={setLoading}
-      onChange={onChange}
-    />
+      <div className="flex flex-col gap-[6px]">
+        <div className="text-[14px]">{t('aspect_ratio', 'Aspect ratio')}</div>
+        <div className="flex gap-[8px]">
+          {[
+            { key: 'vertical', label: t('vertical', 'Vertical') },
+            { key: 'horizontal', label: t('horizontal', 'Horizontal') },
+            { key: 'square', label: t('square', 'Square') },
+          ].map((o) => (
+            <Button
+              key={o.key}
+              type="button"
+              onClick={() => setOutput(o.key)}
+              secondary={output !== o.key}
+              className="flex-1"
+            >
+              {o.label}
+            </Button>
+          ))}
+        </div>
+      </div>
+      <div className="flex">
+        <Button
+          type="button"
+          onClick={generate}
+          className="flex-1"
+          loading={polling}
+        >
+          {t('generate', 'Generate')}
+        </Button>
+      </div>
+    </div>
   );
 };
 
 export const AiVideo: FC<{
   value: string;
   onChange: (params: { id: string; path: string }) => void;
+  disabled?: boolean;
 }> = (props) => {
   const t = useT();
-  const { onChange } = props;
+  const { onChange, disabled } = props;
   const [loading, setLoading] = useState(false);
-  const fetch = useFetch();
   const modals = useModals();
 
-  const loadVideoList = useCallback(async () => {
-    const res = await fetch('/media/video-options');
-    if (!res.ok) throw new Error('Failed to load AI video options');
-    return (await res.json()).filter(
-      (f: any) => f.placement === 'text-to-image'
-    );
-  }, [fetch]);
-
-  const { isLoading, data } = useSWR('load-videos-ai', loadVideoList, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    refreshWhenHidden: false,
-    revalidateIfStale: false,
-    refreshWhenOffline: false,
-    keepPreviousData: true,
-  });
-
   const openVideoModal = useCallback(() => {
-    if (loading || !data?.length) {
+    if (loading || disabled) {
       return;
     }
     modals.openModal({
-      title: <div className="top-title-content" />,
+      title: t('generate_ai_video', 'Generate AI Video'),
       children: (close) => (
         <AiVideoModal
-          list={data}
-          onChange={onChange}
-          setLoading={setLoading}
           close={close}
+          setLoading={setLoading}
+          onChange={onChange}
         />
       ),
     });
-  }, [loading, data, onChange, modals]);
-
-  if (isLoading || data?.length === 0) {
-    return null;
-  }
+  }, [loading, disabled, onChange, modals, t]);
 
   return (
     <div className="relative">
       <div
         onClick={openVideoModal}
+        title={
+          disabled
+            ? t(
+                'configure_video_provider',
+                'Configure a video provider in Settings → Media'
+              )
+            : undefined
+        }
         className={clsx(
-          'cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]'
+          'h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]',
+          disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
         )}
       >
         {loading && (

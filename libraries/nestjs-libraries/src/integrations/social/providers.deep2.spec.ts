@@ -475,6 +475,11 @@ describe('mastodon deep', () => {
     expect(provider.handleErrors('random error')).toBeUndefined();
   });
 
+  it('propagates RefreshTokenError when post hits a disabled login', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Your login is currently disabled', 403));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Hello Mastodon!', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
   it('refreshToken returns static value', async () => {
     const r = await provider.refreshToken('rtok');
     expect(r.accessToken).toBe('');
@@ -595,6 +600,11 @@ describe('mastodon-custom deep', () => {
     expect(r[0].postId).toBe('custom-status-123');
   });
 
+  it('propagates RefreshTokenError when post hits a disabled login', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('Your login is currently disabled', 403));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Custom instance post', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
   it('comment delegates to dynamicComment', async () => {
     globalThis.fetch = vi.fn()
       .mockImplementationOnce(() => Promise.resolve(resp({ id: 'custom-comment-123' })));
@@ -647,6 +657,16 @@ describe('gmb deep', () => {
     expect(provider.handleErrors('INVALID_ARGUMENT')?.type).toBe('bad-body');
     expect(provider.handleErrors('RESOURCE_EXHAUSTED')?.type).toBe('bad-body');
     expect(provider.handleErrors('OK')).toBeUndefined();
+  });
+
+  it('propagates RefreshTokenError when post hits an auth error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('UNAUTHENTICATED', 403));
+    await expect(provider.post('accounts/123/locations/456', 'tok', [{ id: 'p1', message: 'Hello GMB!', settings: { topicType: 'STANDARD' }, media: [] }])).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError when post hits a not-found error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('NOT_FOUND', 404));
+    await expect(provider.post('accounts/123/locations/456', 'tok', [{ id: 'p1', message: 'Hello GMB!', settings: { topicType: 'STANDARD' }, media: [] }])).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken refreshes and returns user info', async () => {
@@ -888,6 +908,16 @@ describe('whop deep', () => {
     expect(provider.handleErrors('invalid_request')?.type).toBe('bad-body');
     expect(provider.handleErrors('not_found')?.type).toBe('bad-body');
     expect(provider.handleErrors('ok')).toBeUndefined();
+  });
+
+  it('propagates RefreshTokenError when post hits an invalid_grant error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('invalid_grant', 403));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Hello Whop!', settings: { experience: 'exp-1' }, media: [] }], {} as any)).rejects.toThrow(RefreshTokenError);
+  });
+
+  it('propagates BadBodyError when post hits an invalid_request error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue(respError('invalid_request', 400));
+    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Hello Whop!', settings: { experience: 'exp-1' }, media: [] }], {} as any)).rejects.toThrow(BadBodyError);
   });
 
   it('refreshToken calls token and userinfo endpoints', async () => {

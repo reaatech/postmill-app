@@ -25,7 +25,8 @@ import {
 import Anthropic from '@anthropic-ai/sdk';
 import { Groq } from 'groq-sdk';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
-import { Organization } from '@prisma/client';
+import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
+import { Organization, User } from '@prisma/client';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { MastraAgent } from '@ag-ui/mastra';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
@@ -39,6 +40,7 @@ import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.se
 export type ChannelsContext = {
   integrations: string;
   organization: string;
+  user: string;
   ui: string;
 };
 
@@ -194,8 +196,16 @@ export class CopilotController {
   async agent(
     @Req() req: Request,
     @Res() res: Response,
-    @GetOrgFromRequest() organization: Organization
+    @GetOrgFromRequest() organization: Organization,
+    @GetUserFromRequest() user: User
   ) {
+    const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
+    if (!inDevMode && organization) {
+      const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
+      if (!budgetCheck.allowed) {
+        return res.status(429).json({ error: 'AI budget exceeded', detail: budgetCheck.reason });
+      }
+    }
     try {
       const serviceAdapter = await this._serviceAdapterOrEmpty(organization.id);
       const mastra = await this._mastraService.mastra();
@@ -206,6 +216,7 @@ export class CopilotController {
       );
 
       requestContext.set('organization', JSON.stringify(organization));
+      requestContext.set('user', JSON.stringify({ id: user.id }));
       requestContext.set('ui', 'true');
 
       const agents = MastraAgent.getLocalAgents({

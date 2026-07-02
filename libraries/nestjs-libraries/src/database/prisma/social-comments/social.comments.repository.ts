@@ -1,7 +1,9 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable, BadRequestException } from '@nestjs/common';
 import dayjs from 'dayjs';
-import { InboxFilterOptions } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
+// type-only: the service value-imports this repository, so a runtime import here would
+// close a circular require. InboxFilterOptions is only a type, so import it as such.
+import type { InboxFilterOptions } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 
 @Injectable()
 export class SocialCommentsRepository {
@@ -11,12 +13,6 @@ export class SocialCommentsRepository {
     private _userOrganization: PrismaRepository<'userOrganization'>,
     private _post: PrismaRepository<'post'>,
   ) {}
-
-  getCommentByPlatformId(integrationId: string, platformCommentId: string) {
-    return this._socialComment.model.socialComment.findUnique({
-      where: { integrationId_platformCommentId: { integrationId, platformCommentId } },
-    });
-  }
 
   async getInbox(orgId: string, userId: string, filters: InboxFilterOptions) {
     const where: any = {
@@ -30,6 +26,14 @@ export class SocialCommentsRepository {
 
     if (filters.assigneeId) {
       where.assigneeId = filters.assigneeId;
+    }
+
+    if (filters.integrationIds?.length) {
+      where.integrationId = { in: filters.integrationIds };
+    }
+
+    if (filters.campaignIds?.length) {
+      where.post = { campaignId: { in: filters.campaignIds }, deletedAt: null };
     }
 
     if (filters.unreadOnly) {
@@ -232,6 +236,16 @@ export class SocialCommentsRepository {
     });
   }
 
+  async countByCampaign(orgId: string, campaignId: string): Promise<number> {
+    return this._socialComment.model.socialComment.count({
+      where: {
+        organizationId: orgId,
+        deletedAt: null,
+        post: { campaignId, deletedAt: null },
+      },
+    });
+  }
+
   async getUnreadCount(userId: string, postId: string) {
     const readState = await this.getReadState(userId, postId);
     const where: any = {
@@ -243,5 +257,55 @@ export class SocialCommentsRepository {
       where.platformCreatedAt = { gt: readState.lastReadAt };
     }
     return this._socialComment.model.socialComment.count({ where });
+  }
+
+  // ── CommentsActivity extraction (D1): comment-sweep data access ──
+
+  // Posts that received fresh, non-own comments since `since` (id-only probe).
+  getPostsWithRecentComments(orgId: string, since: Date, take = 50) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        socialComments: {
+          some: { createdAt: { gte: since }, isOwn: false, deletedAt: null },
+        },
+      },
+      select: { id: true },
+      take,
+    });
+  }
+
+  // A page of live comments older than `cutoff` (id-only), for the prune loop.
+  findCommentsToPrune(orgId: string, cutoff: Date, take = 1000) {
+    return this._socialComment.model.socialComment.findMany({
+      where: {
+        organizationId: orgId,
+        platformCreatedAt: { lt: cutoff },
+        deletedAt: null,
+      },
+      take,
+      select: { id: true },
+    });
+  }
+
+  // Posts with their newest non-own comments since `cutoff`, for the digest notification.
+  getPostsForCommentDigest(orgId: string, cutoff: Date, take = 10) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        socialComments: {
+          some: { createdAt: { gte: cutoff }, isOwn: false, deletedAt: null },
+        },
+      },
+      include: {
+        socialComments: {
+          where: { createdAt: { gte: cutoff }, isOwn: false, deletedAt: null },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+        integration: true,
+      },
+      take,
+    });
   }
 }

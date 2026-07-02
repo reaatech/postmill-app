@@ -70,7 +70,6 @@ vi.mock('@gitroom/helpers/utils/timer', () => ({
 import { AnalyticsActivity } from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
-import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
@@ -78,14 +77,14 @@ import { normalizeMetric } from '@gitroom/nestjs-libraries/integrations/social/a
 import { timer } from '@gitroom/helpers/utils/timer';
 import type { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import type { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
-import type { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
 
 type Mocked<T> = T & { [K in keyof T]: T[K] extends (...args: any[]) => any ? ReturnType<typeof vi.fn> : T[K] };
 
 describe('AnalyticsActivity', () => {
   let activity: AnalyticsActivity;
-  let prisma: Mocked<PrismaService>;
+  let analyticsRepository: any;
   let integrationManager: Mocked<IntegrationManager>;
   let providerConfigManager: Mocked<ProviderConfigManager>;
   let organizationService: Mocked<OrganizationService>;
@@ -94,8 +93,6 @@ describe('AnalyticsActivity', () => {
   let webhooksService: any;
   let watchlistService: any;
 
-  const mockUpsert = vi.fn();
-
   beforeEach(() => {
     vi.resetAllMocks();
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
@@ -103,24 +100,17 @@ describe('AnalyticsActivity', () => {
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => {});
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => {});
 
-    mockUpsert.mockResolvedValue(undefined);
-
-    prisma = {
-      analyticsSnapshot: {
-        upsert: mockUpsert,
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockReturnValue({ op: 'asDelete' }),
-        createMany: vi.fn().mockReturnValue({ op: 'asCreate' }),
-      } as any,
-      postAnalyticsSnapshot: {
-        upsert: mockUpsert,
-        findMany: vi.fn().mockResolvedValue([]),
-        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      } as any,
-      integration: { findUnique: vi.fn() } as any,
-      post: { findMany: vi.fn(), update: vi.fn().mockResolvedValue({}) } as any,
-      $transaction: vi.fn().mockResolvedValue([]),
-    } as any;
+    analyticsRepository = {
+      upsertChannelSnapshot: vi.fn().mockResolvedValue({}),
+      findPostsForSnapshots: vi.fn().mockResolvedValue([]),
+      upsertPostSnapshot: vi.fn().mockResolvedValue({}),
+      getLatestPostSnapshotsForCounters: vi.fn().mockResolvedValue([]),
+      updatePostCounters: vi.fn().mockResolvedValue({}),
+      deletePostSnapshotsBefore: vi.fn().mockResolvedValue({ count: 0 }),
+      findChannelSnapshotsBefore: vi.fn().mockResolvedValue([]),
+      replaceRolledUpSnapshots: vi.fn().mockResolvedValue([]),
+      findIntegrationByIdRaw: vi.fn().mockResolvedValue(null),
+    };
 
     integrationManager = {
       getSocialIntegrationUnchecked: vi.fn(),
@@ -151,7 +141,7 @@ describe('AnalyticsActivity', () => {
     };
 
     activity = new AnalyticsActivity(
-      prisma as any,
+      analyticsRepository as any,
       integrationManager as any,
       providerConfigManager as any,
       organizationService as any,
@@ -166,8 +156,8 @@ describe('AnalyticsActivity', () => {
         getByOrg: vi.fn().mockResolvedValue([]),
       } as unknown as OrgShortLinkSettingsRepository,
       {
-        getAdapter: vi.fn().mockReturnValue(null),
-      } as unknown as ShortLinkRegistry,
+        resolveShortLink: vi.fn().mockReturnValue(null),
+      } as unknown as ProviderResolutionService,
       {
         recordSent: vi.fn().mockResolvedValue(undefined),
       } as unknown as EmailLogService
@@ -273,7 +263,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('skips provider that has no analytics method', async () => {
@@ -284,7 +274,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('calls provider.analytics with correct arguments', async () => {
@@ -449,66 +439,30 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledTimes(3);
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(3);
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          integrationId_metric_date: {
-            integrationId: 'int-1',
-            metric: 'impressions',
-            date: date1,
-          },
-        },
-        create: {
-          organizationId: orgId,
-          integrationId: 'int-1',
-          metric: 'impressions',
-          value: 500,
-          date: date1,
-        },
-        update: {
-          value: 500,
-        },
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
+        organizationId: orgId,
+        integrationId: 'int-1',
+        metric: 'impressions',
+        value: 500,
+        date: date1,
       });
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          integrationId_metric_date: {
-            integrationId: 'int-1',
-            metric: 'impressions',
-            date: date2,
-          },
-        },
-        create: {
-          organizationId: orgId,
-          integrationId: 'int-1',
-          metric: 'impressions',
-          value: 300,
-          date: date2,
-        },
-        update: {
-          value: 300,
-        },
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
+        organizationId: orgId,
+        integrationId: 'int-1',
+        metric: 'impressions',
+        value: 300,
+        date: date2,
       });
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          integrationId_metric_date: {
-            integrationId: 'int-1',
-            metric: 'followers',
-            date: date1,
-          },
-        },
-        create: {
-          organizationId: orgId,
-          integrationId: 'int-1',
-          metric: 'followers',
-          value: 1200,
-          date: date1,
-        },
-        update: {
-          value: 1200,
-        },
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
+        organizationId: orgId,
+        integrationId: 'int-1',
+        metric: 'followers',
+        value: 1200,
+        date: date1,
       });
     });
 
@@ -527,7 +481,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('skips NaN values in data points', async () => {
@@ -549,11 +503,9 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledTimes(1);
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ value: 500 }),
-        })
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 500 })
       );
     });
 
@@ -584,7 +536,7 @@ describe('AnalyticsActivity', () => {
 
       expect(provider1.analytics).toHaveBeenCalled();
       expect(provider2.analytics).toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
       expect(Logger.prototype.error).not.toHaveBeenCalled();
     });
 
@@ -623,7 +575,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('handles all integrations being non-social', async () => {
@@ -636,7 +588,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('handles all integrations being disabled', async () => {
@@ -649,7 +601,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('handles token refresh returning false', async () => {
@@ -706,7 +658,7 @@ describe('AnalyticsActivity', () => {
     });
 
     it('calls ensureFresh on ProviderConfigManager', async () => {
-      (prisma.post.findMany as any).mockResolvedValue([]);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue([]);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
@@ -714,32 +666,25 @@ describe('AnalyticsActivity', () => {
     });
 
     it('fetches posts with releaseId not null and publishDate within date range', async () => {
-      (prisma.post.findMany as any).mockResolvedValue([]);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue([]);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.post.findMany).toHaveBeenCalledWith({
-        where: {
-          organizationId: orgId,
-          releaseId: { not: null },
-          publishDate: {
-            gte: expect.any(Date),
-          },
-        },
-        include: {
-          integration: true,
-        },
-      });
+      expect(analyticsRepository.findPostsForSnapshots).toHaveBeenCalledWith(
+        orgId,
+        expect.any(Date),
+        expect.any(Number),
+        undefined
+      );
     });
 
     it('computes since date correctly based on daysBack', async () => {
-      const before = dayjs();
-      (prisma.post.findMany as any).mockResolvedValue([]);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue([]);
 
       await activity.collectPostSnapshots(orgId, 3);
 
-      const callArgs = (prisma.post.findMany as any).mock.calls[0][0];
-      const sinceDate = callArgs.where.publishDate.gte;
+      const callArgs = (analyticsRepository.findPostsForSnapshots as any).mock.calls[0];
+      const sinceDate = callArgs[1];
       const expectedSince = dayjs().subtract(3, 'day').startOf('day');
 
       expect(sinceDate.getTime()).toBe(expectedSince.toDate().getTime());
@@ -753,7 +698,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.postAnalytics.mockResolvedValue([]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
@@ -776,7 +721,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.postAnalytics.mockResolvedValue([]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
@@ -791,7 +736,7 @@ describe('AnalyticsActivity', () => {
       ];
       const provider = stubProvider();
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
@@ -815,7 +760,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.postAnalytics.mockResolvedValue([]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
@@ -829,23 +774,23 @@ describe('AnalyticsActivity', () => {
       const posts = [buildPost()];
       const provider = stubProvider({ postAnalytics: undefined });
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertPostSnapshot).not.toHaveBeenCalled();
     });
 
     it('skips null provider from getSocialIntegrationUnchecked', async () => {
       const posts = [buildPost()];
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(null);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertPostSnapshot).not.toHaveBeenCalled();
     });
 
     it('calls provider.postAnalytics with correct arguments', async () => {
@@ -853,7 +798,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.postAnalytics.mockResolvedValue([]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.collectPostSnapshots(orgId, daysBack);
@@ -878,7 +823,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.postAnalytics.mockResolvedValue([]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue({
         accessToken: 'fresh-token',
@@ -908,7 +853,7 @@ describe('AnalyticsActivity', () => {
       ];
       const provider = stubProvider();
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue(null);
 
@@ -931,7 +876,7 @@ describe('AnalyticsActivity', () => {
         ]),
       ]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any)
         .mockReturnValueOnce('likes')
@@ -939,48 +884,24 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledTimes(2);
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(2);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          postId_metric_date: {
-            postId: 'post-1',
-            metric: 'likes',
-            date: date1,
-          },
-        },
-        create: {
-          organizationId: orgId,
-          postId: 'post-1',
-          integrationId: 'int-1',
-          metric: 'likes',
-          value: 42,
-          date: date1,
-        },
-        update: {
-          value: 42,
-        },
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith({
+        organizationId: orgId,
+        postId: 'post-1',
+        integrationId: 'int-1',
+        metric: 'likes',
+        value: 42,
+        date: date1,
       });
 
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          postId_metric_date: {
-            postId: 'post-1',
-            metric: 'comments',
-            date: date1,
-          },
-        },
-        create: {
-          organizationId: orgId,
-          postId: 'post-1',
-          integrationId: 'int-1',
-          metric: 'comments',
-          value: 7,
-          date: date1,
-        },
-        update: {
-          value: 7,
-        },
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith({
+        organizationId: orgId,
+        postId: 'post-1',
+        integrationId: 'int-1',
+        metric: 'comments',
+        value: 7,
+        date: date1,
       });
     });
 
@@ -993,13 +914,13 @@ describe('AnalyticsActivity', () => {
         ]),
       ]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue(undefined);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertPostSnapshot).not.toHaveBeenCalled();
     });
 
     it('skips NaN values in post data points', async () => {
@@ -1014,17 +935,15 @@ describe('AnalyticsActivity', () => {
         ]),
       ]);
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue('likes');
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledTimes(1);
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ value: 42 }),
-        })
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 42 })
       );
     });
 
@@ -1035,7 +954,7 @@ describe('AnalyticsActivity', () => {
       ];
       const provider = stubProvider();
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       provider.postAnalytics
         .mockRejectedValueOnce(new RefreshToken('ig-1', '{}', 'body', 'Token expired'))
@@ -1047,7 +966,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectPostSnapshots(orgId, daysBack);
 
       expect(provider.postAnalytics).toHaveBeenCalledTimes(2);
-      expect(prisma.postAnalyticsSnapshot.upsert).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(1);
       expect(Logger.prototype.error).not.toHaveBeenCalled();
     });
 
@@ -1055,7 +974,7 @@ describe('AnalyticsActivity', () => {
       const posts = [buildPost()];
       const provider = stubProvider();
 
-      (prisma.post.findMany as any).mockResolvedValue(posts);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue(posts);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       provider.postAnalytics.mockRejectedValue(new Error('API down'));
 
@@ -1068,11 +987,11 @@ describe('AnalyticsActivity', () => {
     });
 
     it('handles empty posts list', async () => {
-      (prisma.post.findMany as any).mockResolvedValue([]);
+      (analyticsRepository.findPostsForSnapshots as any).mockResolvedValue([]);
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(prisma.postAnalyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertPostSnapshot).not.toHaveBeenCalled();
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
     });
   });
@@ -1108,7 +1027,7 @@ describe('AnalyticsActivity', () => {
     });
 
     it('calls ensureFresh on ProviderConfigManager for the integration org', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(buildIntegration());
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration());
 
       await activity.backfillIntegration(integrationId);
 
@@ -1119,26 +1038,26 @@ describe('AnalyticsActivity', () => {
     });
 
     it('fetches integration by ID', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(null);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(null);
 
       await activity.backfillIntegration(integrationId);
 
-      expect(prisma.integration.findUnique).toHaveBeenCalledWith({
-        where: { id: integrationId },
-      });
+      expect(analyticsRepository.findIntegrationByIdRaw).toHaveBeenCalledWith(
+        integrationId
+      );
     });
 
     it('returns early when integration is not found', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(null);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(null);
 
       await activity.backfillIntegration(integrationId);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('returns early when integration type is not social', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(buildIntegration({ type: 'article' }));
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration({ type: 'article' }));
 
       await activity.backfillIntegration(integrationId);
 
@@ -1146,23 +1065,23 @@ describe('AnalyticsActivity', () => {
     });
 
     it('returns early when provider has no analytics method', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(buildIntegration());
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration());
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(
         stubProvider({ analytics: undefined })
       );
 
       await activity.backfillIntegration(integrationId);
 
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('returns early when getSocialIntegrationUnchecked returns null', async () => {
-      (prisma.integration.findUnique as any).mockResolvedValue(buildIntegration());
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(buildIntegration());
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(null);
 
       await activity.backfillIntegration(integrationId);
 
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('calls provider.analytics with 90 days back', async () => {
@@ -1170,7 +1089,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.analytics.mockResolvedValue([]);
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
 
       await activity.backfillIntegration(integrationId);
@@ -1184,7 +1103,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider();
       provider.analytics.mockResolvedValue([]);
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue({
         accessToken: 'refreshed-backfill',
@@ -1201,7 +1120,7 @@ describe('AnalyticsActivity', () => {
       const integration = buildIntegration({ tokenExpiration: pastExpiry });
       const provider = stubProvider();
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue(null);
 
@@ -1216,7 +1135,7 @@ describe('AnalyticsActivity', () => {
       const provider = stubProvider({ refreshWait: true });
       provider.analytics.mockResolvedValue([]);
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (refreshIntegrationService.refresh as any).mockResolvedValue({
         accessToken: 'refreshed-backfill',
@@ -1238,30 +1157,18 @@ describe('AnalyticsActivity', () => {
         ]),
       ]);
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue('impressions');
 
       await activity.backfillIntegration(integrationId);
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith({
-        where: {
-          integrationId_metric_date: {
-            integrationId,
-            metric: 'impressions',
-            date: date1,
-          },
-        },
-        create: {
-          organizationId: 'org-1',
-          integrationId,
-          metric: 'impressions',
-          value: 999,
-          date: date1,
-        },
-        update: {
-          value: 999,
-        },
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
+        organizationId: 'org-1',
+        integrationId,
+        metric: 'impressions',
+        value: 999,
+        date: date1,
       });
     });
 
@@ -1277,17 +1184,15 @@ describe('AnalyticsActivity', () => {
         ]),
       ]);
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       (normalizeMetric as any).mockReturnValue('impressions');
 
       await activity.backfillIntegration(integrationId);
 
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledTimes(1);
-      expect(prisma.analyticsSnapshot.upsert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          create: expect.objectContaining({ value: 100 }),
-        })
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({ value: 100 })
       );
     });
 
@@ -1295,7 +1200,7 @@ describe('AnalyticsActivity', () => {
       const integration = buildIntegration();
       const provider = stubProvider();
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       provider.analytics.mockRejectedValue(
         new RefreshToken('fb-page-1', '{}', 'body', 'Token expired')
@@ -1304,14 +1209,14 @@ describe('AnalyticsActivity', () => {
       await activity.backfillIntegration(integrationId);
 
       expect(Logger.prototype.error).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.upsert).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
     });
 
     it('handles generic errors during backfill by logging', async () => {
       const integration = buildIntegration();
       const provider = stubProvider();
 
-      (prisma.integration.findUnique as any).mockResolvedValue(integration);
+      (analyticsRepository.findIntegrationByIdRaw as any).mockResolvedValue(integration);
       (integrationManager.getSocialIntegrationUnchecked as any).mockReturnValue(provider);
       provider.analytics.mockRejectedValue(new Error('Backfill API error'));
 
@@ -1345,11 +1250,11 @@ describe('AnalyticsActivity', () => {
     it('prunes old post snapshots beyond the retention window', async () => {
       await activity.pruneAndRollupSnapshots('org-1');
 
-      const call = (prisma.postAnalyticsSnapshot.deleteMany as any).mock
-        .calls[0][0];
-      expect(call.where.organizationId).toBe('org-1');
+      const call = (analyticsRepository.deletePostSnapshotsBefore as any).mock
+        .calls[0];
+      expect(call[0]).toBe('org-1');
       // ~90 days back
-      const cutoff = dayjs(call.where.date.lt);
+      const cutoff = dayjs(call[1]);
       expect(dayjs().diff(cutoff, 'day')).toBeGreaterThanOrEqual(89);
       expect(dayjs().diff(cutoff, 'day')).toBeLessThanOrEqual(91);
     });
@@ -1364,14 +1269,12 @@ describe('AnalyticsActivity', () => {
         await activity.pruneAndRollupSnapshots('org-1');
 
         const postCutoff = dayjs(
-          (prisma.postAnalyticsSnapshot.deleteMany as any).mock.calls[0][0].where
-            .date.lt
+          (analyticsRepository.deletePostSnapshotsBefore as any).mock.calls[0][1]
         );
         expect(dayjs().diff(postCutoff, 'day')).toBe(7);
 
         const dailyCutoff = dayjs(
-          (prisma.analyticsSnapshot.findMany as any).mock.calls[0][0].where.date
-            .lt
+          (analyticsRepository.findChannelSnapshotsBefore as any).mock.calls[0][1]
         );
         expect(dayjs().diff(dailyCutoff, 'day')).toBe(30);
       } finally {
@@ -1388,8 +1291,7 @@ describe('AnalyticsActivity', () => {
         await activity.pruneAndRollupSnapshots('org-1');
 
         const dailyCutoff = dayjs(
-          (prisma.analyticsSnapshot.findMany as any).mock.calls[0][0].where.date
-            .lt
+          (analyticsRepository.findChannelSnapshotsBefore as any).mock.calls[0][1]
         );
         // ~548 days default
         expect(dayjs().diff(dailyCutoff, 'day')).toBeGreaterThanOrEqual(547);
@@ -1400,17 +1302,16 @@ describe('AnalyticsActivity', () => {
     });
 
     it('no-ops the rollup when there are no rows beyond daily retention', async () => {
-      (prisma.analyticsSnapshot.findMany as any).mockResolvedValue([]);
+      (analyticsRepository.findChannelSnapshotsBefore as any).mockResolvedValue([]);
 
       await activity.pruneAndRollupSnapshots('org-1');
 
-      expect(prisma.$transaction).not.toHaveBeenCalled();
-      expect(prisma.analyticsSnapshot.createMany).not.toHaveBeenCalled();
+      expect(analyticsRepository.replaceRolledUpSnapshots).not.toHaveBeenCalled();
     });
 
     it('sums flow metrics per ISO week and replaces daily rows atomically', async () => {
       // Three days in the same ISO week (Mon 2023-01-02 .. Sun 2023-01-08).
-      (prisma.analyticsSnapshot.findMany as any).mockResolvedValue([
+      (analyticsRepository.findChannelSnapshotsBefore as any).mockResolvedValue([
         old('2023-01-03', 'impressions', 10),
         old('2023-01-04', 'impressions', 20),
         old('2023-01-06', 'impressions', 30),
@@ -1418,23 +1319,22 @@ describe('AnalyticsActivity', () => {
 
       await activity.pruneAndRollupSnapshots('org-1');
 
-      const createArg = (prisma.analyticsSnapshot.createMany as any).mock
-        .calls[0][0];
-      expect(createArg.skipDuplicates).toBe(true);
-      expect(createArg.data).toHaveLength(1);
-      const weekly = createArg.data[0];
+      // delete + create executed atomically inside the repository
+      expect(analyticsRepository.replaceRolledUpSnapshots).toHaveBeenCalledOnce();
+      const [orgArg, , weeklyRows] = (
+        analyticsRepository.replaceRolledUpSnapshots as any
+      ).mock.calls[0];
+      expect(orgArg).toBe('org-1');
+      expect(weeklyRows).toHaveLength(1);
+      const weekly = weeklyRows[0];
       expect(weekly.metric).toBe('impressions');
       expect(weekly.value).toBe(60); // 10 + 20 + 30
       expect(dayjs(weekly.date).format('YYYY-MM-DD')).toBe('2023-01-02'); // Monday
       expect(weekly.organizationId).toBe('org-1');
-
-      // delete + create executed in a single transaction
-      expect(prisma.$transaction).toHaveBeenCalledOnce();
-      expect(prisma.analyticsSnapshot.deleteMany).toHaveBeenCalled();
     });
 
     it('keeps the latest in-week value for stock metrics instead of summing', async () => {
-      (prisma.analyticsSnapshot.findMany as any).mockResolvedValue([
+      (analyticsRepository.findChannelSnapshotsBefore as any).mockResolvedValue([
         old('2023-01-03', 'followers', 1000),
         old('2023-01-06', 'followers', 1050),
         old('2023-01-04', 'followers', 1020),
@@ -1442,14 +1342,14 @@ describe('AnalyticsActivity', () => {
 
       await activity.pruneAndRollupSnapshots('org-1');
 
-      const weekly = (prisma.analyticsSnapshot.createMany as any).mock
-        .calls[0][0].data[0];
+      const weekly = (analyticsRepository.replaceRolledUpSnapshots as any).mock
+        .calls[0][2][0];
       expect(weekly.metric).toBe('followers');
       expect(weekly.value).toBe(1050); // latest date (Jan 6), not the sum
     });
 
     it('separates weeks and integrations into distinct weekly rows', async () => {
-      (prisma.analyticsSnapshot.findMany as any).mockResolvedValue([
+      (analyticsRepository.findChannelSnapshotsBefore as any).mockResolvedValue([
         old('2023-01-03', 'impressions', 10, 'int-1'),
         old('2023-01-10', 'impressions', 40, 'int-1'), // next week
         old('2023-01-03', 'impressions', 5, 'int-2'),
@@ -1457,8 +1357,8 @@ describe('AnalyticsActivity', () => {
 
       await activity.pruneAndRollupSnapshots('org-1');
 
-      const data = (prisma.analyticsSnapshot.createMany as any).mock.calls[0][0]
-        .data;
+      const data = (analyticsRepository.replaceRolledUpSnapshots as any).mock
+        .calls[0][2];
       expect(data).toHaveLength(3);
     });
   });

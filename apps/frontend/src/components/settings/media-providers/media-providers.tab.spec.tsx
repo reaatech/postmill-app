@@ -82,7 +82,7 @@ describe('MediaProvidersTab (F2)', () => {
       expect(screen.getAllByText('OpenAI').length).toBeGreaterThan(0);
     });
     expect(screen.getAllByText('ElevenLabs').length).toBeGreaterThan(0);
-    expect(screen.getByText('AI Media Providers')).toBeTruthy();
+    expect(screen.getByText('AI Media')).toBeTruthy();
   });
 
   it('does not render any credential or secret fields', async () => {
@@ -129,7 +129,7 @@ describe('MediaProvidersTab (F2)', () => {
     render(<MediaProvidersTab />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText('Failed to load media providers')).toBeTruthy();
+      expect(screen.getByText('Failed to load settings')).toBeTruthy();
     });
     expect(screen.getByText('Try again')).toBeTruthy();
   });

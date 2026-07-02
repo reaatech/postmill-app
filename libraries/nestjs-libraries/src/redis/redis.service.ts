@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { Redis } from 'ioredis';
 
 // Create a mock Redis implementation for testing environments
@@ -77,7 +77,7 @@ const rawClient = buildRedisClient();
 export const ioRedis = rawClient;
 
 @Injectable()
-export class RedisService {
+export class RedisService implements OnModuleDestroy {
   private _client: Redis;
 
   constructor() {
@@ -86,6 +86,27 @@ export class RedisService {
 
   get client(): Redis {
     return this._client;
+  }
+
+  // Cheap readiness probe for /health/ready. Throws if the client cannot reach Redis.
+  async ping(): Promise<'PONG'> {
+    return this._client.ping() as Promise<'PONG'>;
+  }
+
+  // Drain the connection on graceful shutdown (SIGTERM/SIGINT → app.close()). MockRedis
+  // (no REDIS_URL) has no `quit`, so guard on it.
+  async onModuleDestroy() {
+    if (!process.env.REDIS_URL) {
+      return;
+    }
+    try {
+      await this._client.quit();
+    } catch (err) {
+      Logger.warn(
+        `Redis quit on shutdown failed: ${(err as Error).message}`,
+        RedisService.name
+      );
+    }
   }
 
   async get(key: string) {

@@ -94,7 +94,6 @@ describe('AuthService (backend)', () => {
   let usersService: Record<string, ReturnType<typeof vi.fn>>;
   let organizationService: Record<string, ReturnType<typeof vi.fn>>;
   let notificationService: Record<string, ReturnType<typeof vi.fn>>;
-  let emailService: Record<string, ReturnType<typeof vi.fn>>;
   let providerInstance: Record<string, ReturnType<typeof vi.fn>>;
   let providerManager: Record<string, ReturnType<typeof vi.fn>>;
   let service: AuthService;
@@ -129,7 +128,6 @@ describe('AuthService (backend)', () => {
       addUserToOrg: vi.fn(),
     };
     notificationService = { sendEmail: vi.fn().mockResolvedValue(undefined) };
-    emailService = { sendEmail: vi.fn().mockResolvedValue(undefined) };
     providerInstance = {
       getUser: vi.fn(),
       getToken: vi.fn(),
@@ -144,7 +142,6 @@ describe('AuthService (backend)', () => {
       usersService as never,
       organizationService as never,
       notificationService as never,
-      emailService as never,
       providerManager as never
     );
   });
@@ -440,16 +437,23 @@ describe('AuthService (backend)', () => {
       );
 
       expect(organizationService.createOrgAndUser).toHaveBeenCalled();
-      expect(emailService.sendEmail).toHaveBeenCalledWith(
+      expect(notificationService.sendEmail).toHaveBeenCalledWith(
         'new@example.com',
         'Activate your account',
-        expect.stringContaining('jwt:user-1'),
-        'top'
+        expect.stringContaining('jwt:user-1')
       );
       expect(result.addedOrg).toBe(false);
       expect(result.jwt).toBe('jwt:user-1');
       expect(result.refreshToken).toMatch(/^[0-9a-f]{128}$/);
       expect(usersService.createSession).toHaveBeenCalled();
+      const md5 = crypto
+        .createHash('md5')
+        .update('new@example.com')
+        .digest('hex');
+      expect(usersService.updateUserAvatar).toHaveBeenCalledWith(
+        'user-1',
+        `https://www.gravatar.com/avatar/${md5}?d=404&s=200`
+      );
     });
 
     it('lowercases the email before lookup', async () => {
@@ -516,6 +520,10 @@ describe('AuthService (backend)', () => {
         'role-member'
       );
       expect(result.addedOrg).toEqual({ id: 'uo-1' });
+      expect(usersService.updateUserAvatar).toHaveBeenCalledWith(
+        'user-1',
+        expect.stringContaining('https://www.gravatar.com/avatar/')
+      );
     });
   });
 
@@ -868,11 +876,10 @@ describe('AuthService (backend)', () => {
       });
 
       expect(await service.resendActivationEmail('x@example.com')).toBe(true);
-      expect(emailService.sendEmail).toHaveBeenCalledWith(
+      expect(notificationService.sendEmail).toHaveBeenCalledWith(
         'x@example.com',
         'Activate your account',
-        expect.stringContaining('jwt:user-1'),
-        'top'
+        expect.stringContaining('jwt:user-1')
       );
     });
   });

@@ -195,6 +195,26 @@ function getEncryptionKey(): Buffer {
 
 Login refresh tokens are **hashed** (`sha256`), not encrypted — see Sessions below.
 
+### Key rotation
+
+The deployment uses a **single** at-rest key (`ENCRYPTION_KEY`, or `SHA-256(JWT_SECRET)`
+when unset). Because there is one key, rotating it requires re-encrypting every stored
+secret in a controlled migration:
+
+1. Add a one-time, ledger-gated `BackfillService` step (see the migration runbook in the
+   [Upgrading guide](./upgrading.md#schema-changes-rollback)) that reads each encrypted
+   column with the **old** key, then re-encrypts and writes it back with the **new** key.
+2. Deploy with **both** keys available to that step, run it once (the migration ledger
+   ensures it runs exactly once), then drop the old key.
+3. Until multi-key support exists, do **not** rotate `ENCRYPTION_KEY` (or `JWT_SECRET`
+   when it is the fallback) without this re-encryption step — every existing ciphertext
+   would otherwise fail to decrypt. The `v2:` envelope can carry a key-id prefix in a
+   future release to support overlapping keys; that is not implemented today.
+
+> Startup safeguard: if `ENCRYPTION_KEY` is unset, the `ConfigurationChecker` logs a
+> warning at boot (secrets are then keyed from `JWT_SECRET`). Set a dedicated 32-byte
+> key in production.
+
 ## JWT security
 
 | Property   | Value                                              |

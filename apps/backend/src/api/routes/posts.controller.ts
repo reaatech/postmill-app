@@ -28,6 +28,7 @@ import { Response } from 'express';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
+import { SetPostColorDto } from '@gitroom/nestjs-libraries/dtos/posts/set.post.color.dto';
 import {
   AuthorizationActions,
   Sections,
@@ -75,7 +76,7 @@ export class PostsController {
     @GetOrgFromRequest() org: Organization,
     @Body() body: { messages: string[] }
   ) {
-    return { ask: await this._shortLinkService.askShortLinkedin(org.id, body.messages) };
+    return this._shortLinkService.shouldShortlink(org.id, body.messages);
   }
 
   @Post('/:id/comments')
@@ -152,9 +153,10 @@ export class PostsController {
   @Get('/old')
   oldPosts(
     @GetOrgFromRequest() org: Organization,
-    @Query('date') date: string
+    @Query('date') date: string,
+    @Query('page') page?: string
   ) {
-    return this._postsService.getOldPosts(org.id, date);
+    return this._postsService.getOldPosts(org.id, date, this.parsePage(page));
   }
 
   @Get('/group/:group/debug-export')
@@ -169,6 +171,17 @@ export class PostsController {
   @Get('/group/:group')
   getPostsByGroup(@GetOrgFromRequest() org: Organization, @Param('group') group: string) {
     return this._postsService.getPostsByGroup(org.id, group);
+  }
+
+  // Parse + clamp an optional `page` query param (1..1000) into the options shape getOldPosts
+  // accepts, so `/posts/old` (an unbounded per-org scan) can never be driven past a sane
+  // ceiling. Returns `undefined` when absent so the service / repository fall back to page 1
+  // with the default page size.
+  private parsePage(page?: string): { page: number } | undefined {
+    if (page === undefined) return undefined;
+    const parsed = Number.parseInt(page, 10);
+    if (Number.isNaN(parsed) || parsed < 1) return { page: 1 };
+    return { page: Math.min(parsed, 1000) };
   }
 
   @Get('/:id')
@@ -226,6 +239,16 @@ export class PostsController {
     @Param('group') group: string
   ) {
     return this._postsService.deletePost(org.id, group);
+  }
+
+  @Put('/group/:group/color')
+  @RequirePermission('posts', 'update')
+  setGroupColor(
+    @GetOrgFromRequest() org: Organization,
+    @Param('group') group: string,
+    @Body() body: SetPostColorDto
+  ) {
+    return this._postsService.setGroupColor(org.id, group, body.color || null);
   }
 
   @Put('/:id/date')

@@ -13,7 +13,15 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custom.upload.validation';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiHeader,
+  ApiQuery,
+  ApiResponse,
+  ApiSecurity,
+  ApiTags,
+} from '@nestjs/swagger';
+import { parseQualified } from '@gitroom/provider-kernel';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -30,8 +38,6 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
-import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
 import { UploadDto } from '@gitroom/nestjs-libraries/dtos/file/upload.dto';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { GetNotificationsDto } from '@gitroom/nestjs-libraries/dtos/notifications/get.notifications.dto';
@@ -39,6 +45,9 @@ import { Readable } from 'stream';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { fromBuffer } = require('file-type');
+
+// J2 — hard cap for the public `/posts` list (default page size == max).
+const PUBLIC_POSTS_MAX_LIMIT = 100;
 
 const PUBLIC_API_ALLOWED_MIME = new Set<string>([
   'image/jpeg',
@@ -51,18 +60,24 @@ const PUBLIC_API_ALLOWED_MIME = new Set<string>([
   'video/mp4',
 ]);
 import * as Sentry from '@sentry/nestjs';
-import {
-  socialIntegrationList,
-  IntegrationManager,
-} from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
-import { AiMediaGenerationService } from '@gitroom/nestjs-libraries/ai/ai-media-generation.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import {
+  AiDefaultsService,
+  DefaultNotConfiguredError,
+} from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
+import { VideoDto } from '@gitroom/nestjs-libraries/dtos/videos/video.dto';
+import { VideoFunctionDto } from '@gitroom/nestjs-libraries/dtos/videos/video.function.dto';
 
 @ApiTags('Public API')
+@ApiSecurity('api-key')
+@ApiBearerAuth('bearer')
 @Controller('/public/v1')
 export class PublicIntegrationsController {
   constructor(
@@ -74,10 +89,19 @@ export class PublicIntegrationsController {
     private _refreshIntegrationService: RefreshIntegrationService,
     private _analyticsService: AnalyticsService,
     private _storageService: StorageService,
-    private _aiGeneration: AiMediaGenerationService
+    private _subscriptionService: SubscriptionService,
+    private _aiDefaults: AiDefaultsService,
+    private _aiMediaService: AiMediaService
   ) {}
 
   @Post('/upload')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response instead of re-uploading.',
+  })
+  @ApiResponse({ status: 201, description: 'The saved file record.' })
   @UseInterceptors(FileInterceptor('file'))
   @UsePipes(new CustomFileValidationPipe())
   async uploadSimple(
@@ -147,19 +171,43 @@ export class PublicIntegrationsController {
   }
 
   @Get('/posts')
+  @ApiResponse({
+    status: 200,
+    description:
+      'Posts in the requested publish-date window, capped at `limit` (default/max 100). ' +
+      '`cursor` is the offset for the next page; it is null when the last page is reached.',
+  })
   async getPosts(
     @GetOrgFromRequest() org: Organization,
     @Query() query: GetPostsDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    const posts = await this._postsService.getPosts(org.id, query);
+    const all = await this._postsService.getPosts(org.id, query);
+
+    // J2 — bound the previously-unbounded array. Back-compat: when no paging
+    // param is sent we still return `{ posts }`, just capped at the hard max
+    // rather than the whole window.
+    const offset = query.cursor ?? 0;
+    const limit = query.limit ?? PUBLIC_POSTS_MAX_LIMIT;
+    const posts = all.slice(offset, offset + limit);
+    const nextOffset = offset + limit;
+    const cursor = nextOffset < all.length ? nextOffset : null;
+
     return {
       posts,
+      cursor,
       // comments,
     };
   }
 
   @Post('/posts')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response instead of creating a duplicate post.',
+  })
+  @ApiResponse({ status: 201, description: 'The created post group.' })
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
@@ -181,6 +229,12 @@ export class PublicIntegrationsController {
   }
 
   @Delete('/posts/:id')
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description:
+      'Optional. Repeats with the same key within 24h replay the first response.',
+  })
   async deletePost(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -242,22 +296,56 @@ export class PublicIntegrationsController {
 
   @Get('/social/:integration')
   @CheckPolicies([AuthorizationActions.Create, Sections.CHANNEL])
+  @ApiQuery({
+    name: 'version',
+    required: false,
+    description:
+      'Optional provider version (e.g. "v1"). The provider id may also be passed qualified as "providerId@version" in the path. A bare id resolves the latest active version.',
+  })
+  @ApiResponse({
+    status: 410,
+    description:
+      'Gone — the requested provider version has been retired. The body includes { providerId, version, latestActive }.',
+  })
   async getIntegrationUrl(
     @Param('integration') integration: string,
     @Query('refresh') refresh: string,
-    @GetOrgFromRequest() org: Organization
+    @GetOrgFromRequest() org: Organization,
+    @Query('version') version?: string
   ) {
     Sentry.metrics.count('public_api-request', 1);
+    // Accept either a qualified id ("providerId@version") in the path or an
+    // optional ?version= query param. A bare id keeps the original behaviour
+    // (resolve the latest active version) for n8n/Zapier backward compatibility.
+    const { providerId, version: qualifiedVersion } = parseQualified(integration);
+    const requestedVersion = qualifiedVersion ?? version;
+
     if (
       !this._integrationManager
         .getAllowedSocialsIntegrations()
-        .includes(integration)
+        .includes(providerId)
     ) {
       throw new HttpException({ msg: 'Integration not allowed' }, 400);
     }
 
-    const integrationProvider =
-      await this._integrationManager.getSocialIntegration(integration);
+    let integrationProvider =
+      await this._integrationManager.getSocialIntegration(providerId);
+
+    // When a specific version is requested, pin to that version through the
+    // kernel resolution path; an unknown version resolves to undefined → 404.
+    if (requestedVersion) {
+      const pinned = this._integrationManager.getSocialIntegrationUnchecked(
+        providerId,
+        requestedVersion
+      );
+      if (!pinned) {
+        throw new HttpException(
+          { msg: 'Integration version not available' },
+          404
+        );
+      }
+      integrationProvider = pinned;
+    }
 
     if (integrationProvider.externalUrl) {
       throw new HttpException(
@@ -270,7 +358,7 @@ export class PublicIntegrationsController {
 
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
-        integration,
+        providerId,
         org.id
       );
 
@@ -296,29 +384,158 @@ export class PublicIntegrationsController {
     @Query() query: GetNotificationsDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._notificationService.getNotificationsPaginated(
+    return this._notificationService.getNotificationsPaginatedForOrg(
       org.id,
       query.page ?? 0
     );
   }
 
   @Post('/generate-video')
-  generateVideo(
+  async generateVideo(
     @GetOrgFromRequest() org: Organization,
     @Body() body: VideoDto
   ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._aiGeneration.generateVideo(org, body);
+
+    const totalCredits = await this._subscriptionService.checkCredits(org, 'ai_videos');
+    if (totalCredits.credits <= 0) {
+      throw new HttpException('Not enough AI video credits', 402);
+    }
+
+    const params = body.customParams || {};
+    const prompt = typeof params.prompt === 'string' ? params.prompt : '';
+
+    // Consume one `ai_videos` credit on successful generation — restores the legacy
+    // billing semantics (the pre-async route wrapped generation in `useCredit`). The
+    // credit is spent only if the callback resolves; a provider error / 409 does not bill.
+    let artifact: string;
+    try {
+      artifact = await this._subscriptionService.useCredit(
+        org,
+        'ai_videos',
+        async () => {
+          if (body.type === 'image-to-video' || params.imageUrl) {
+            return this._aiDefaults.imageToVideo(
+              org.id,
+              prompt,
+              params.imageUrl as string,
+            );
+          }
+          if (body.type === 'video-to-video' || params.videoUrl) {
+            return this._aiDefaults.videoToVideo(
+              org.id,
+              prompt,
+              params.videoUrl as string,
+            );
+          }
+          return this._aiDefaults.textToVideo(org.id, prompt);
+        },
+      );
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException(
+          { error: err.message, category: err.category },
+          409,
+        );
+      }
+      throw err;
+    }
+
+    // FROZEN PUBLIC CONTRACT — do not change field names/semantics without a new
+    // versioned route. Legacy n8n/Zapier clients read `response.path` as the finished
+    // video URL. This endpoint used to be synchronous (always a URL); it is now async,
+    // so the response is self-describing and back-compatible:
+    //   - `id`     : back-compat — '' when completed, the AIMediaJob id when pending
+    //                (matches the historical { id, path, name } File-like shape).
+    //   - `status` : 'completed' when a finished URL is available synchronously
+    //                (image / data: / url fallback), 'pending' when a job was queued.
+    //   - `jobId`  : the AIMediaJob id when pending, '' otherwise.
+    //   - `path`   : the finished media URL when completed; '' when pending (poll instead).
+    //   - `name`   : preserved from the historical shape (always '').
+    //   - `pollUrl`: when pending, the public route to GET (with the same API key) to poll
+    //                job completion — `GET /public/v1/generate-video/:id` below; '' when completed.
+    const looksLikeUrl =
+      typeof artifact === 'string' &&
+      (artifact.startsWith('http') || artifact.startsWith('data:'));
+
+    if (looksLikeUrl) {
+      return {
+        id: '',
+        status: 'completed',
+        jobId: '',
+        path: artifact,
+        name: '',
+        pollUrl: '',
+      };
+    }
+
+    return {
+      id: artifact,
+      status: 'pending',
+      jobId: artifact,
+      path: '',
+      name: '',
+      pollUrl: `/public/v1/generate-video/${artifact}`,
+    };
+  }
+
+  // Public, API-key-reachable poll route for the async /generate-video job above.
+  // FROZEN PUBLIC CONTRACT — mirrors the generate-video response keys so a legacy client
+  // can GET this with the same API key until it reaches a terminal state and read `path`.
+  // `status` is one of 'pending' | 'completed' | 'failed'. `completed` and `failed` are
+  // BOTH terminal — `pollUrl` is '' for either so a client looping `while (pollUrl)` (or
+  // `while (status === 'pending')`) stops on failure instead of polling a dead job forever.
+  // `error` carries the failure reason on a failed job ('' otherwise).
+  @Get('/generate-video/:id')
+  async getGenerateVideoJob(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+
+    const job = await this._aiMediaService.getJob(id);
+    if (!job || job.organizationId !== org.id) {
+      throw new HttpException('Job not found', 404);
+    }
+
+    const completed = job.status === 'completed';
+    const failed = job.status === 'failed';
+    const terminal = completed || failed;
+    return {
+      id: job.id,
+      status: completed ? 'completed' : failed ? 'failed' : 'pending',
+      jobId: job.id,
+      path: completed ? job.artifactUrl || '' : '',
+      name: '',
+      pollUrl: terminal ? '' : `/public/v1/generate-video/${job.id}`,
+      error: job.error || '',
+    };
   }
 
   @Post('/video/function')
-  videoFunction(@Body() body: VideoFunctionDto) {
+  async videoFunction(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: VideoFunctionDto
+  ) {
     Sentry.metrics.count('public_api-request', 1);
-    return this._aiGeneration.videoFunction(
-      body.identifier,
-      body.functionName,
-      body.params
-    );
+
+    if (body.functionName !== 'loadVoices') {
+      throw new HttpException(
+        `Function ${body.functionName} not supported`,
+        400,
+      );
+    }
+
+    const voices = await this._aiMediaService.listVoices(org.id, {
+      provider: body.identifier,
+    });
+    return {
+      voices: voices.map((v) => ({
+        id: v.id,
+        name: v.label,
+        preview_url: v.previewUrl,
+      })),
+    };
   }
 
   @Delete('/integrations/:id')
@@ -360,8 +577,8 @@ export class PublicIntegrationsController {
         (p: any) => p?.title === 'Verified'
       )?.value || false;
 
-    const integration = socialIntegrationList.find(
-      (p) => p.identifier === loadIntegration.providerIdentifier
+    const integration = this._integrationManager.getSocialIntegrationUnchecked(
+      loadIntegration.providerIdentifier
     )!;
 
     if (!integration) {
@@ -470,9 +687,10 @@ export class PublicIntegrationsController {
       throw new HttpException({ msg: 'Integration not found' }, 404);
     }
 
-    const integrationProvider = socialIntegrationList.find(
-      (p) => p.identifier === getIntegration.providerIdentifier
-    )!;
+    const integrationProvider =
+      this._integrationManager.getSocialIntegrationUnchecked(
+        getIntegration.providerIdentifier
+      )!;
 
     if (!integrationProvider) {
       throw new HttpException({ msg: 'Integration provider not found' }, 404);

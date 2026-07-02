@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback } from 'react';
+import React, { FC, useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
@@ -12,7 +12,9 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Fragment } from 'react';
 import { Post } from '@prisma/client';
-import { AddEditModal } from '@gitroom/frontend/components/new-launch/add.edit.modal';
+import { Composer } from '@gitroom/frontend/components/composer/composer';
+import { Button } from '@gitroom/react/form/button';
+import { ColorPicker } from '@gitroom/frontend/components/ui/color-picker';
 import { StatisticsModal } from '@gitroom/frontend/components/launches/statistics';
 import { MissingReleaseModal } from '@gitroom/frontend/components/launches/missing-release.modal';
 import { PostDetailModal } from '@gitroom/frontend/components/launches/post-detail/post.detail.modal';
@@ -204,6 +206,20 @@ export const DeletePost = () => {
   );
 };
 
+const ChangeColorModalBody: FC<{
+  initial: string | null;
+  onApply: (color: string | null) => void;
+}> = ({ initial, onApply }) => {
+  const t = useT();
+  const [value, setValue] = useState<string | null>(initial);
+  return (
+    <div className="flex flex-col gap-[18px] min-w-[280px]">
+      <ColorPicker value={value} onChange={setValue} />
+      <Button onClick={() => onApply(value)}>{t('apply', 'Apply')}</Button>
+    </div>
+  );
+};
+
 export const usePostActions = (onMutate?: () => void) => {
   const t = useT();
   const fetch = useFetch();
@@ -221,7 +237,7 @@ export const usePostActions = (onMutate?: () => void) => {
     (loadPost: Post & { actualDate?: string }, isDuplicate?: boolean) =>
       async () => {
       if (!isDuplicate) {
-        router.push(`/schedule/post/${loadPost.group}`);
+        router.push(`/posts/post/${loadPost.group}`);
         return;
       }
 
@@ -246,7 +262,7 @@ export const usePostActions = (onMutate?: () => void) => {
         },
         children: (
           <Fragment>
-            <AddEditModal
+            <Composer
               onlyValues={data.posts.map(
                 ({
                   image,
@@ -259,7 +275,7 @@ export const usePostActions = (onMutate?: () => void) => {
                 })
               )}
               allIntegrations={integrations.map((p) => ({ ...p }))}
-              reopenModal={() => router.push(`/schedule/post/${post.group}`)}
+              reopenModal={() => router.push(`/posts/post/${post.group}`)}
               mutate={mutate}
               integrations={integrations}
               date={publishDate}
@@ -375,5 +391,29 @@ export const usePostActions = (onMutate?: () => void) => {
     [modal]
   );
 
-  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail };
+  const changeColor = useCallback(
+    (post: Post & { color?: string | null }) => () => {
+      modal.openModal({
+        title: t('change_color', 'Change color'),
+        withCloseButton: true,
+        children: (
+          <ChangeColorModalBody
+            initial={post.color ?? null}
+            onApply={async (color) => {
+              await fetch(`/posts/group/${post.group}/color`, {
+                method: 'PUT',
+                body: JSON.stringify({ color }),
+              });
+              modal.closeAll();
+              toaster.show(t('color_updated', 'Color updated'), 'success');
+              mutate();
+            }}
+          />
+        ),
+      });
+    },
+    [modal, fetch, mutate, toaster, t]
+  );
+
+  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor };
 };

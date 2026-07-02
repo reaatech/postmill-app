@@ -115,7 +115,7 @@ export function StudioShell({ descriptor }: { descriptor: StudioDescriptor }) {
           Add your {title} credentials to start generating, then come back here.
         </p>
         <a
-          href="/settings?tab=media_providers"
+          href="/settings/content/ai-media"
           className="mt-[4px] px-[16px] py-[9px] rounded-[8px] bg-[#2B5CD3] text-white text-[13px] font-[500] hover:bg-[#2B5CD3]/80 transition-all"
         >
           Configure {title}

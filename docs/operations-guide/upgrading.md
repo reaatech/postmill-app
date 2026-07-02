@@ -145,6 +145,69 @@ works without `--accept-data-loss`:
 - New columns are nullable or defaulted — safe
 - Renames/drops are destructive and uncommon — noted prominently in the CHANGELOG when they occur
 
+## Schema changes & rollback
+
+The schema is applied with `prisma db push --accept-data-loss` — there are **no SQL migration
+files and no down-migrations**. The schema file is the only source of truth, so the operational
+discipline below replaces what a migration tool would otherwise give you (a backup, an
+expand-contract path, and a drift check).
+
+### Always back up first
+
+Take a `pg_dump` **immediately before** any `db push`. This is your only rollback path — there is
+no generated down-migration to reverse a push.
+
+```bash
+docker exec postmill-postgres pg_dump -U postmill-user postmill-db-local \
+  > pre_push_$(date +%Y%m%d_%H%M%S).sql
+```
+
+### Adding a column
+
+A new column must be **nullable** or carry a **default**. A required column without a default
+breaks the push because existing rows have no value for it. New tables are always safe.
+
+### Renames and drops — expand-contract
+
+Under `db push` an in-place rename or drop is a `DROP + CREATE`, which loses data. Never rename or
+drop a column or table in the same release that stops using it. Instead, spread the change across
+releases:
+
+1. **Expand** — add the new nullable column alongside the old one and deploy.
+2. **Backfill** — copy data from the old column to the new one (add a one-time step to
+   `BackfillService`, `libraries/nestjs-libraries/src/database/seeds/backfill.service.ts`).
+3. **Switch** — point all reads and writes at the new column and deploy.
+4. **Contract** — only once nothing references the old column (prove it with a grep) drop it in a
+   later release, after taking the pre-push `pg_dump` above.
+
+### Rollback
+
+There is no down-migration. To roll back a destructive push, restore the pre-push `pg_dump`:
+
+```bash
+# Stop the app first so nothing writes during the restore
+cat pre_push_YYYYMMDD_HHMMSS.sql | docker exec -i postmill-postgres \
+  psql -U postmill-user postmill-db-local
+```
+
+Then redeploy the previous image tag (see [Rollback](#rollback) below for the full image rollback
+flow).
+
+### Drift check
+
+After deploying, confirm the live database matches the committed schema. `prisma migrate diff`
+exits `2` when there is a difference, `0` when there is none:
+
+```bash
+pnpm exec prisma migrate diff \
+  --from-schema-datamodel libraries/nestjs-libraries/src/database/prisma/schema.prisma \
+  --to-url "$DATABASE_URL" \
+  --exit-code
+```
+
+The `mastra_*` tables are created at runtime by the Mastra chat agent, outside the Prisma schema,
+so they always appear as out-of-schema drift — that is **expected noise**, not a real diff.
+
 ## Building from source
 
 If you prefer to build the container image locally:

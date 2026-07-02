@@ -1,5 +1,7 @@
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import { CampaignEntityType, State } from '@prisma/client';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class CampaignsRepository {
@@ -11,7 +13,12 @@ export class CampaignsRepository {
     return this._prisma.campaign.findMany({
       where: { organizationId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { _count: { select: { posts: true } } },
+      include: {
+        _count: { select: { posts: true } },
+        // Distinct channels the campaign publishes to — lets the analytics
+        // campaign filter scope by channel without an extra request per campaign.
+        posts: { select: { integrationId: true }, distinct: ['integrationId'] },
+      },
     });
   }
 
@@ -22,6 +29,28 @@ export class CampaignsRepository {
     });
   }
 
+  findByShareToken(token: string) {
+    return this._prisma.campaign.findFirst({
+      where: { shareToken: token, shareEnabled: true, deletedAt: null },
+    });
+  }
+
+  // Lightweight fetch for the per-entity campaign selector (id/name/color/dates).
+  findByIds(organizationId: string, ids: string[]) {
+    return this._prisma.campaign.findMany({
+      where: { id: { in: ids }, organizationId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        color: true,
+        startDate: true,
+        endDate: true,
+        archived: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   create(data: {
     organizationId: string;
     name: string;
@@ -29,6 +58,12 @@ export class CampaignsRepository {
     description?: string;
     startDate?: Date;
     endDate?: Date;
+    createdById?: string;
+    goals?: any;
+    utmEnabled?: boolean;
+    client?: string;
+    project?: string;
+    tags?: any;
   }) {
     return this._prisma.campaign.create({ data });
   }
@@ -43,9 +78,22 @@ export class CampaignsRepository {
       startDate?: Date;
       endDate?: Date;
       archived?: boolean;
+      goals?: any;
+      shareToken?: string;
+      shareEnabled?: boolean;
+      utmEnabled?: boolean;
+      client?: string;
+      project?: string;
+      tags?: any;
     },
   ) {
     return this._prisma.campaign.update({ where: { id, organizationId }, data });
+  }
+
+  countCreatedBy(organizationId: string, userId: string) {
+    return this._prisma.campaign.count({
+      where: { organizationId, createdById: userId, deletedAt: null },
+    });
   }
 
   softDelete(id: string, organizationId: string) {
@@ -97,5 +145,86 @@ export class CampaignsRepository {
           }
         : null,
     };
+  }
+
+  async getPostStateCounts(id: string, organizationId: string) {
+    const rows = await this._prisma.post.groupBy({
+      by: ['state'],
+      where: { campaignId: id, organizationId, deletedAt: null, parentPostId: null },
+      _count: { _all: true },
+    });
+    return rows.reduce((acc, r) => {
+      acc[r.state] = r._count._all;
+      return acc;
+    }, {} as Record<string, number>);
+  }
+
+  async getUpcomingQueuePosts(id: string, organizationId: string, limit = 5) {
+    return this._prisma.post.findMany({
+      where: {
+        campaignId: id,
+        organizationId,
+        state: State.QUEUE,
+        publishDate: { gte: dayjs.utc().toDate() },
+        deletedAt: null,
+        parentPostId: null,
+      },
+      orderBy: { publishDate: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        publishDate: true,
+        integration: { select: { id: true, name: true, providerIdentifier: true, picture: true } },
+      },
+    });
+  }
+
+  async getCappedItemsByCampaign(
+    id: string,
+    organizationId: string,
+    entityType: CampaignEntityType,
+    limit = 10
+  ) {
+    return this._prisma.campaignItem.findMany({
+      where: { campaignId: id, organizationId, entityType },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { entityId: true, createdAt: true },
+    });
+  }
+
+  async getCampaignClickTotal(id: string, organizationId: string): Promise<number> {
+    // ShortLink stores postId without a Prisma relation, so resolve ids in two
+    // indexed steps rather than loading all org short links into memory.
+    const campaignPosts = await this._prisma.post.findMany({
+      where: {
+        campaignId: id,
+        organizationId,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (campaignPosts.length === 0) return 0;
+
+    const campaignPostIds = campaignPosts.map((p) => p.id);
+    const links = await this._prisma.shortLink.findMany({
+      where: {
+        organizationId,
+        postId: { in: campaignPostIds },
+      },
+      select: { id: true },
+    });
+    if (links.length === 0) return 0;
+
+    const result = await this._prisma.shortLinkSnapshot.aggregate({
+      where: {
+        organizationId,
+        shortLinkId: { in: links.map((l) => l.id) },
+      },
+      _sum: { clicks: true },
+    });
+    return result._sum.clicks || 0;
   }
 }

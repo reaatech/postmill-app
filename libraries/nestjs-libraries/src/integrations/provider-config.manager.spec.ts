@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { Logger } from '@nestjs/common';
 import { ProviderConfigManager } from './provider-config.manager';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { replaceCredentialsMap, clearCredentials, getCredential } from './credentials';
@@ -39,7 +40,9 @@ describe('ProviderConfigManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     clearCredentials();
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    consoleErrorSpy = vi
+      .spyOn(Logger.prototype, 'error')
+      .mockImplementation(() => {});
     mockNow = 1_000_000;
     vi.spyOn(Date, 'now').mockImplementation(() => mockNow);
 
@@ -58,14 +61,13 @@ describe('ProviderConfigManager', () => {
   });
 
   describe('onModuleInit', () => {
-    it('calls refreshCache', async () => {
-      const spy = vi.spyOn(manager, 'refreshCache');
+    it('loads configs on init (internal refresh, no cross-replica broadcast)', async () => {
       await manager.onModuleInit();
-      expect(spy).toHaveBeenCalledOnce();
+      expect(mockProviderConfigService.getAll).toHaveBeenCalledOnce();
     });
 
     it('handles errors gracefully', async () => {
-      vi.spyOn(manager, 'refreshCache').mockRejectedValue(new Error('fail'));
+      mockProviderConfigService.getAll.mockRejectedValueOnce(new Error('fail'));
       await expect(manager.onModuleInit()).resolves.toBeUndefined();
       expect(consoleErrorSpy).toHaveBeenCalled();
     });
@@ -312,7 +314,7 @@ describe('ProviderConfigManager', () => {
       await manager.refreshCache();
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        'ProviderConfigManager: Failed to parse additionalConfig for test'
+        'Failed to parse additionalConfig for test'
       );
     });
 

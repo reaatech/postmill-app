@@ -38,6 +38,9 @@ export class ChromiumFrameCaptureService {
 
     const browser = await puppeteer.launch({
       headless: true,
+      // Honour a distro Chromium when set (used by the render-worker container); falls
+      // back to puppeteer's bundled Chromium when unset (the in-process default).
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',

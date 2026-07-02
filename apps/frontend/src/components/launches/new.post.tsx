@@ -13,7 +13,7 @@ export const NewPost = () => {
     const { date } = await (await fetch('/posts/find-slot')).json();
     const params = new URLSearchParams();
     params.set('date', dayjs.utc(date).local().format('YYYY-MM-DDTHH:mm:ss'));
-    router.push(`/schedule/post?${params.toString()}`);
+    router.push(`/posts/post?${params.toString()}`);
   }, [router, fetch]);
 
   return (

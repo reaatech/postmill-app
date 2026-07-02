@@ -1,9 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
-import {
-  NotificationService,
-  NotificationType,
-} from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { Integration, Post, State } from '@prisma/client';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
@@ -17,6 +14,15 @@ import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { PROVIDER_CAPABILITIES } from '@gitroom/nestjs-libraries/integrations/social/provider-capabilities';
 import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
 import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import { BadBodyError } from '@gitroom/nestjs-libraries/inngest/errors/bad-body.error';
+import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
+import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
+import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
+import { runWithVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
+import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { CircuitBreakerService } from '@gitroom/nestjs-libraries/ai/governance/circuit-breaker.service';
+import { webhookSignature, webhookTimeoutMs } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import type { Dispatcher } from 'undici';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
 function slimPost(post: any) {
@@ -42,6 +48,16 @@ function slimPost(post: any) {
 export class PostActivity {
   private readonly logger = new Logger(PostActivity.name);
 
+  // D2: per-(provider, org) circuit breaker around the social post() path. The
+  // breaker is process-local and conservative — `SocialAbstract.fetch` already
+  // retries transient 429/5xx internally, so a thrown post() error is post-retry
+  // ("hard"). Opens only after several consecutive hard failures, then fast-fails
+  // during cooldown and half-opens with a single probe.
+  private readonly _socialBreaker = new CircuitBreakerService({
+    failureThreshold: 5,
+    cooldownMs: 60_000,
+  });
+
   constructor(
     private _postService: PostsService,
     private _notificationService: NotificationService,
@@ -49,8 +65,47 @@ export class PostActivity {
     private _integrationService: IntegrationService,
     private _refreshIntegrationService: RefreshIntegrationService,
     private _webhookService: WebhooksService,
-    private _subscriptionService: SubscriptionService
+    private _subscriptionService: SubscriptionService,
+    private _orgProviderConfigService: OrgProviderConfigService,
+    private _orgVpnConfigService: OrgVpnConfigService,
+    private _vpnDispatcherService: VpnDispatcherService,
+    private _campaignsRepository: CampaignsRepository
   ) {}
+
+  // Resolve the per-channel VPN proxy dispatcher (or undefined) for a publish.
+  // Non-fatal: any resolution failure falls back to direct egress so a VPN
+  // misconfig never blocks a post.
+  private async _resolveVpnDispatcher(
+    integration: Integration
+  ): Promise<Dispatcher | undefined> {
+    try {
+      const selection = await this._orgProviderConfigService.getVpnSelectionForIntegration(
+        integration.organizationId,
+        integration.providerConfigId,
+        integration.providerIdentifier
+      );
+      if (!selection) return undefined;
+
+      const resolved = await this._orgVpnConfigService.resolveProxyForChannel(
+        integration.organizationId,
+        selection.identifier,
+        selection.regionId,
+        selection.vpnVersion
+      );
+      if (!resolved) return undefined;
+
+      return this._vpnDispatcherService.get(
+        integration.organizationId,
+        selection.identifier,
+        resolved
+      );
+    } catch (err) {
+      this.logger.warn(
+        `VPN dispatcher resolution failed for integration ${integration.id}: ${(err as Error)?.message}`
+      );
+      return undefined;
+    }
+  }
 
   async getIntegrationById(orgId: string, id: string) {
     return this._integrationService.getIntegrationById(orgId, id);
@@ -169,7 +224,8 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
     return getIntegration.comment(
@@ -213,7 +269,8 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
     return getIntegration.comment(
@@ -241,6 +298,21 @@ export class PostActivity {
     );
   }
 
+  private async _maybeAppendUtm(content: string, campaignId: string | null, organizationId: string, providerIdentifier: string): Promise<string> {
+    if (!campaignId) return content;
+    const campaign = await this._campaignsRepository.findById(campaignId, organizationId);
+    if (!campaign?.utmEnabled) return content;
+
+    const slug = encodeURIComponent(campaign.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''));
+    const utm = `utm_campaign=${slug}&utm_source=${encodeURIComponent(providerIdentifier)}&utm_medium=social`;
+
+    return content.replace(/(https?:\/\/[^\s<"']+)/g, (url) => {
+      if (url.includes('utm_campaign')) return url;
+      const sep = url.includes('?') ? '&' : '?';
+      return `${url}${sep}${utm}`;
+    });
+  }
+
   async postSocial(integration: Integration, posts: Post[]) {
     if (process.env.STRIPE_SECRET_KEY) {
       const subscription = await this._subscriptionService.getSubscription(
@@ -263,21 +335,30 @@ export class PostActivity {
 
     const clientInformation = await this._integrationManager.requireClientInformation(
       integration.providerIdentifier,
-      integration.organizationId
+      integration.organizationId,
+      integration.providerConfigId
     ).catch(() => undefined);
 
-    const postNow = await getIntegration.post(
-      integration.internalId,
-      integration.token,
-      await Promise.all(
-        (newPosts || []).map(async (p) => ({
+    // If the channel has an enabled VPN selection, route every outbound request
+    // this provider makes through that region's proxy via AsyncLocalStorage.
+    const vpnDispatcher = await this._resolveVpnDispatcher(integration);
+
+    const postPayload = await Promise.all(
+      (newPosts || []).map(async (p) => {
+        const contentWithUtm = await this._maybeAppendUtm(
+          p.content,
+          p.campaignId,
+          integration.organizationId,
+          integration.providerIdentifier
+        );
+        return {
           id: p.id,
           message: stripHtmlValidation(
             getIntegration.editor,
-            p.content,
+            contentWithUtm,
             true,
             false,
-            !/<\/?[a-z][\s\S]*>/i.test(p.content),
+            !/<\/?[a-z][\s\S]*>/i.test(contentWithUtm),
             getIntegration.mentionFormat
           ),
           settings: JSON.parse(p.settings || '{}'),
@@ -287,11 +368,40 @@ export class PostActivity {
             getIntegration?.convertToJPEG || false,
             integration.organizationId
           ),
-        }))
-      ),
-      integration,
-      clientInformation
+        };
+      })
     );
+
+    // D2: short-circuit when this provider×org breaker is OPEN.
+    const breakerKey = `${integration.providerIdentifier}:${integration.organizationId}`;
+    if (!this._socialBreaker.canAttempt(breakerKey)) {
+      throw new Error(
+        `Provider ${integration.providerIdentifier} temporarily unavailable (circuit open) — skipping to retry later`
+      );
+    }
+
+    let postNow;
+    try {
+      postNow = await runWithVpnDispatcher(vpnDispatcher, () =>
+        getIntegration.post(
+          integration.internalId,
+          integration.token,
+          postPayload,
+          integration,
+          clientInformation
+        )
+      );
+      this._socialBreaker.recordSuccess(breakerKey);
+    } catch (err) {
+      // Only count infra-class failures (timeouts, 5xx, network) toward the breaker.
+      // A BadBodyError is a permanent per-post content/4xx rejection (NonRetriableError) —
+      // it does NOT mean the provider is down, so a batch of legitimately-bad posts must
+      // not open the breaker and delay this org's good posts. Leave the breaker untouched.
+      if (!(err instanceof BadBodyError)) {
+        this._socialBreaker.recordFailure(breakerKey);
+      }
+      throw err;
+    }
 
     await inngest.send({
       name: 'streak/start',
@@ -302,22 +412,78 @@ export class PostActivity {
     return postNow;
   }
 
-  async inAppNotification(
+  async notifyChannelError(
     orgId: string,
-    subject: string,
-    message: string,
-    sendEmail = false,
-    digest = false,
-    type: NotificationType = 'success'
+    integrationName: string,
+    providerIdentifier: string,
+    reason: 'refresh' | 'disabled',
+    postId?: string
   ) {
-    await this._notificationService.inAppNotification(
+    await this._notificationService.notifyChannelError(
       orgId,
-      subject,
-      message,
-      sendEmail,
-      digest,
-      type
+      integrationName,
+      providerIdentifier,
+      reason,
+      postId
     );
+  }
+
+  async notifyPostPublished(
+    orgId: string,
+    integrationName: string,
+    releaseURL: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyPostPublished(
+      orgId,
+      integrationName,
+      releaseURL,
+      postId
+    );
+  }
+
+  async notifyPostFailed(
+    orgId: string,
+    integrationName: string,
+    postId: string,
+    subStep?: string,
+    errMessage?: string
+  ) {
+    await this._notificationService.notifyPostPublishFailure(
+      orgId,
+      integrationName,
+      postId,
+      subStep,
+      errMessage
+    );
+  }
+
+  async notifyFirstCommentUnsupported(
+    orgId: string,
+    integrationName: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyFirstCommentUnsupported(
+      orgId,
+      integrationName,
+      postId
+    );
+  }
+
+  async notifyFirstCommentFailed(
+    orgId: string,
+    integrationName: string,
+    postId: string
+  ) {
+    await this._notificationService.notifyFirstCommentFailed(
+      orgId,
+      integrationName,
+      postId
+    );
+  }
+
+  async notifyStreakReminder(orgId: string) {
+    await this._notificationService.notifyStreakReminder(orgId);
   }
 
   async globalPlugs(integration: Integration) {
@@ -356,18 +522,54 @@ export class PostActivity {
     );
 
     const post = await this._postService.getPostByForWebhookId(postId);
+    const root = Array.isArray(post) ? post[0] : post;
+
+    // D4: stable, documented minimal subset — never ship the raw Prisma row.
+    const envelope = {
+      event: 'post.published',
+      timestamp: new Date().toISOString(),
+      data: {
+        postId: root?.id ?? postId,
+        integrationId,
+        providerIdentifier: root?.integration?.providerIdentifier ?? null,
+        integrationName: root?.integration?.name ?? null,
+        content: root?.content ?? null,
+        url: root?.releaseURL ?? null,
+        state: root?.state ?? null,
+        publishDate: root?.publishDate
+          ? new Date(root.publishDate).toISOString()
+          : null,
+      },
+    };
+    const body = JSON.stringify(envelope);
+    const signature = webhookSignature(body);
+
+    // D4: bounded per-delivery retry (3 attempts, backoff). A flaky receiver is
+    // retried without failing the others; final failure is swallowed so a bad
+    // webhook never fails the publish. The whole call already runs inside a
+    // durable Inngest `step.run('send-webhooks')`.
     await Promise.all(
       webhooks.map(async (webhook) => {
-        try {
-          await safeFetch(webhook.url, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(post),
-          });
-        } catch (e) {
-          /**empty**/
+        for (let attempt = 0; attempt < 3; attempt++) {
+          try {
+            const res = await safeFetch(webhook.url, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-Postmill-Signature': signature,
+              },
+              body,
+              signal: AbortSignal.timeout(webhookTimeoutMs()),
+            });
+            if (res.status >= 200 && res.status < 300) {
+              return;
+            }
+          } catch (e) {
+            /** retry below **/
+          }
+          if (attempt < 2) {
+            await timer(1000 * (attempt + 1));
+          }
         }
       })
     );

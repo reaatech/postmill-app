@@ -47,7 +47,7 @@ export const ProviderCard = ({ provider, onConfigure, onToggle }: ProviderCardPr
     <div className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[16px] flex flex-col gap-[12px]">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-[10px]">
-          <ProviderIcon identifier={provider.identifier} name={provider.name} size={28} />
+          <ProviderIcon identifier={provider.identifier} name={provider.name} size={36} />
           <span className="text-[15px] font-semibold">{provider.name}</span>
         </div>
         <span

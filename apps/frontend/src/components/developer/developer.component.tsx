@@ -5,7 +5,10 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useDecisionModal, useModals } from '@gitroom/frontend/components/layout/new-modal';
-import { FileBox } from '@gitroom/frontend/components/files/file.component';
+import {
+  MediaSelectorItem,
+  MediaSelectorModal,
+} from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import copy from 'copy-to-clipboard';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
@@ -77,6 +80,8 @@ export const DeveloperComponent: FC = () => {
   const [redirectUrl, setRedirectUrl] = useState('');
   const [pictureId, setPictureId] = useState<string | undefined>(undefined);
   const [picturePath, setPicturePath] = useState<string | undefined>(undefined);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   const startEditing = useCallback(() => {
     if (!app) return;
@@ -88,30 +93,51 @@ export const DeveloperComponent: FC = () => {
     setEditing(true);
   }, [app]);
 
-  const changeMedia = useCallback((selected: { id: string; path: string }[]) => {
-    const media = Array.isArray(selected) ? selected[0] : selected;
-    if (media) {
-      setPictureId(media.id);
-      setPicturePath(media.path);
-    }
-  }, []);
+  const handleSelect = useCallback(
+    async (item: MediaSelectorItem) => {
+      setPickerOpen(false);
+      if (item.source === 'file') {
+        setPictureId(item.fileId);
+        setPicturePath(item.url);
+        return;
+      }
+      setImporting(true);
+      try {
+        const res = await fetch('/files/import', {
+          method: 'POST',
+          body: JSON.stringify({
+            url: item.url,
+            name: item.name || 'stock-import',
+            type: item.type,
+            source: item.stockSource,
+            attribution: item.attribution,
+            ...(item.downloadLocation
+              ? { downloadLocation: item.downloadLocation }
+              : {}),
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => 'Import failed');
+          throw new Error(text);
+        }
+        const imported = (await res.json()) as { id: string; path: string };
+        setPictureId(imported.id);
+        setPicturePath(imported.path);
+      } catch (err) {
+        toaster.show(
+          `${t('import_failed', 'Import failed')}: ${(err as Error).message}`,
+          'warning'
+        );
+      } finally {
+        setImporting(false);
+      }
+    },
+    [fetch, t, toaster]
+  );
 
   const openMedia = useCallback(() => {
-    modals.openModal({
-      title: t('media_library', 'Media Library'),
-      askClose: false,
-      closeOnEscape: true,
-      fullScreen: true,
-      size: 'calc(100% - 80px)',
-      height: 'calc(100% - 80px)',
-      children: (close: () => void) => (
-        <FileBox
-          setMedia={changeMedia}
-          closeModal={close}
-        />
-      ),
-    });
-  }, [modals, t, changeMedia]);
+    setPickerOpen(true);
+  }, []);
 
   const createApp = useCallback(async () => {
     if (!name || !redirectUrl) {
@@ -326,7 +352,7 @@ export const DeveloperComponent: FC = () => {
                 {picturePath ? (
                   <img
                     src={picturePath}
-                    alt="App picture"
+                    alt="App logo"
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
@@ -337,9 +363,12 @@ export const DeveloperComponent: FC = () => {
                 <button
                   type="button"
                   onClick={openMedia}
-                  className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600]"
+                  disabled={importing}
+                  className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('choose_image', 'Choose Image')}
+                  {importing
+                    ? t('importing', 'Importing…')
+                    : t('choose_image', 'Choose Image')}
                 </button>
               </div>
             </div>
@@ -450,7 +479,7 @@ export const DeveloperComponent: FC = () => {
                 {picturePath ? (
                   <img
                     src={picturePath}
-                    alt="App picture"
+                    alt="App logo"
                     className="w-[48px] h-[48px] rounded-full object-cover"
                   />
                 ) : (
@@ -461,9 +490,12 @@ export const DeveloperComponent: FC = () => {
                 <button
                   type="button"
                   onClick={openMedia}
-                  className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600]"
+                  disabled={importing}
+                  className="cursor-pointer px-[16px] h-[36px] bg-btnSimple hover:bg-boxHover transition-colors rounded-[8px] text-[13px] font-[600] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {t('choose_image', 'Choose Image')}
+                  {importing
+                    ? t('importing', 'Importing…')
+                    : t('choose_image', 'Choose Image')}
                 </button>
               </div>
             </div>
@@ -600,6 +632,12 @@ export const DeveloperComponent: FC = () => {
           </div>
         </div>
       </div>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelect}
+        kinds={['image']}
+      />
     </div>
   );
 };

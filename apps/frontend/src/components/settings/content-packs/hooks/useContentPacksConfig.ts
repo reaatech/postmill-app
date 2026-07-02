@@ -1,8 +1,8 @@
 'use client';
 
-import { useCallback } from 'react';
-import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import useSWR from 'swr';
+// Shared response/types for the content-packs surface. The data is fetched via
+// the kit descriptor's `load` (see content-packs.descriptor.ts) on the
+// 'org-content-packs-config' SWR key; these interfaces type that payload.
 
 export interface ContentPackProviderInfo {
   identifier: string;
@@ -10,6 +10,7 @@ export interface ContentPackProviderInfo {
   capabilities: string[];
   isConfigured: boolean;
   isActive: boolean;
+  version: string;
   createdAt: string | null;
   updatedAt: string | null;
 }
@@ -22,27 +23,3 @@ export interface ContentPackConfigResponse {
   } | null;
   providers: ContentPackProviderInfo[];
 }
-
-export const useContentPacksConfig = () => {
-  const fetch = useFetch();
-  const load = useCallback(async () => {
-    const res = await fetch('/settings/content-packs/config');
-    if (!res.ok) throw new Error('Failed to load content pack settings');
-    return res.json();
-  }, [fetch]);
-  return useSWR<ContentPackConfigResponse>('org-content-packs-config', load, {
-    revalidateOnFocus: false,
-  });
-};
-
-export const useContentPackProviders = () => {
-  const fetch = useFetch();
-  const load = useCallback(async () => {
-    const res = await fetch('/settings/content-packs/providers');
-    if (!res.ok) throw new Error('Failed to load content pack providers');
-    return res.json();
-  }, [fetch]);
-  return useSWR<ContentPackProviderInfo[]>('org-content-packs-providers', load, {
-    revalidateOnFocus: false,
-  });
-};

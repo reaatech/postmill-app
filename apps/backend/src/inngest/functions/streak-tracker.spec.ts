@@ -14,8 +14,9 @@ import { createMockStep, captureFunctionHandler } from '../test/step.mock';
 describe('createStreakTracker', () => {
   let emailActivity: {
     setStreak: ReturnType<typeof vi.fn>;
-    getUserOrgs: ReturnType<typeof vi.fn>;
-    sendEmailAsync: ReturnType<typeof vi.fn>;
+  };
+  let postActivity: {
+    notifyStreakReminder: ReturnType<typeof vi.fn>;
   };
   let getHandler: () => any;
 
@@ -24,14 +25,13 @@ describe('createStreakTracker', () => {
 
     emailActivity = {
       setStreak: vi.fn().mockResolvedValue(undefined),
-      getUserOrgs: vi.fn().mockResolvedValue({
-        users: [{ user: { email: 'user@example.com' } }],
-      }),
-      sendEmailAsync: vi.fn().mockResolvedValue(undefined),
+    };
+    postActivity = {
+      notifyStreakReminder: vi.fn().mockResolvedValue(undefined),
     };
 
     getHandler = captureFunctionHandler(vi.mocked(inngest.createFunction));
-    createStreakTracker(emailActivity as any);
+    createStreakTracker(emailActivity as any, postActivity as any);
   });
 
   it('registers a streak/start event handler with cancelOn', () => {
@@ -62,12 +62,7 @@ describe('createStreakTracker', () => {
     expect(step.sleep).toHaveBeenCalledWith('wait-22h', '22h');
 
     expect(step.run).toHaveBeenCalledWith('send-reminder', expect.any(Function));
-    expect(emailActivity.sendEmailAsync).toHaveBeenCalledWith(
-      'user@example.com',
-      'Keep your streak alive!',
-      '<p>You have 2 hours left to keep your posting streak alive.</p>',
-      'top'
-    );
+    expect(postActivity.notifyStreakReminder).toHaveBeenCalledWith('org-1');
 
     expect(step.sleep).toHaveBeenCalledWith('wait-2h', '2h');
 

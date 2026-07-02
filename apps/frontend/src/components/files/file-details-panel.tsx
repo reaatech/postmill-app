@@ -1,11 +1,13 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useRef, useState } from 'react';
+import React, { FC, useCallback, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import clsx from 'clsx';
 import { AudioPlayer } from '@gitroom/frontend/components/media-tools/audio-player';
+import { CampaignSelector } from '@gitroom/frontend/components/campaigns/selector/campaign-selector';
 import type { FileItem } from './file-manager';
 
 const formatDate = (dateStr: string) => {
@@ -26,7 +28,8 @@ export const FileDetailsPanel: FC<{
   file: FileItem;
   onClose: () => void;
   onRefresh: () => void;
-}> = ({ file, onClose, onRefresh }) => {
+  drawerMode?: boolean;
+}> = ({ file, onClose, onRefresh, drawerMode }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const mediaDirectory = useMediaDirectory();
@@ -103,16 +106,15 @@ export const FileDetailsPanel: FC<{
     window.open(mediaDirectory.set(file.path), '_blank');
   }, [file, mediaDirectory]);
 
-  useEffect(() => {
-    setName(file.name);
-    setDescription(file.description || '');
-    setTags(file.tags ? JSON.parse(file.tags) : []);
-  }, [file]);
-
   return (
     <div
       ref={panelRef}
-      className="w-[340px] shrink-0 bg-newBgColorInner rounded-[12px] border border-newBorder flex flex-col overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent"
+      className={clsx(
+        'flex flex-col overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent',
+        drawerMode
+          ? 'flex-1 w-full bg-newBgColorInner'
+          : 'w-[340px] shrink-0 bg-newBgColorInner rounded-[12px] border border-newBorder'
+      )}
     >
       <div className="flex items-center justify-between px-[16px] py-[14px] border-b border-newBorder">
         <div className="text-[14px] font-[600] text-textColor">Details</div>
@@ -201,6 +203,11 @@ export const FileDetailsPanel: FC<{
                 className="flex-1 min-w-[80px] bg-transparent border-b border-newColColor text-[12px] text-textColor outline-none focus:border-[#2B5CD3] placeholder:text-textColor/30"
               />
             </div>
+          </div>
+
+          <div className="border-t border-newBorder pt-[14px]">
+            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500] block mb-[6px]">Campaigns</label>
+            <CampaignSelector entityType="file" entityId={file.id} compact />
           </div>
 
           <div className="border-t border-newBorder pt-[14px] space-y-[8px]">

@@ -13,11 +13,15 @@ const createMockInngestModule = (functionCount = 5) =>
     getFunctions: vi.fn().mockReturnValue(Array.from({ length: functionCount })),
   } as never);
 
+const runRepoMock = { getAllLatest: vi.fn() };
+const createMockRunRepo = () => runRepoMock as never;
+
 describe('HealthController', () => {
   const originalEnv = { ...process.env };
 
   beforeEach(() => {
     process.env = { ...originalEnv };
+    runRepoMock.getAllLatest.mockReset().mockResolvedValue([]);
     delete process.env.USE_INNGEST;
     delete process.env.INNGEST_DEV;
     delete process.env.INNGEST_EVENT_KEY;
@@ -38,7 +42,7 @@ describe('HealthController', () => {
     it('reports healthy when functions are registered and Inngest is not enabled', async () => {
       safeFetchMock.mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.status).toBe('ok');
@@ -57,12 +61,50 @@ describe('HealthController', () => {
       expect(result.timestamp).toBeDefined();
     });
 
+    it('surfaces per-function last runs and the probe latency', async () => {
+      const lastRuns = [
+        {
+          functionId: 'comments-collection',
+          startedAt: new Date('2026-01-01T00:00:00.000Z'),
+          completedAt: new Date('2026-01-01T00:00:01.000Z'),
+          durationMs: 1000,
+          status: 'completed',
+        },
+      ];
+      runRepoMock.getAllLatest.mockResolvedValue(lastRuns);
+      safeFetchMock.mockResolvedValue({ ok: true } as Response);
+
+      const controller = new HealthController(
+        createMockInngestModule(),
+        createMockRunRepo()
+      );
+      const result = await controller.getHealth();
+
+      expect(result.inngest.lastRuns).toEqual(lastRuns);
+      expect(typeof result.inngest.eventApiLatencyMs).toBe('number');
+      expect(result.inngest.eventApiLatencyMs).toBeGreaterThanOrEqual(0);
+    });
+
+    it('reports null probe latency and empty last runs when the probe fails', async () => {
+      process.env.USE_INNGEST = 'true';
+      safeFetchMock.mockRejectedValue(new Error('unreachable'));
+
+      const controller = new HealthController(
+        createMockInngestModule(),
+        createMockRunRepo()
+      );
+      const result = await controller.getHealth();
+
+      expect(result.inngest.eventApiLatencyMs).toBeNull();
+      expect(result.inngest.lastRuns).toEqual([]);
+    });
+
     it('reports healthy in dev mode without keys', async () => {
       process.env.INNGEST_DEV = '1';
       process.env.USE_INNGEST = 'true';
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest).toMatchObject({
@@ -83,7 +125,7 @@ describe('HealthController', () => {
       process.env.INNGEST_SIGNING_KEY = 'test-signing-key';
       safeFetchMock.mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest).toMatchObject({
@@ -102,7 +144,7 @@ describe('HealthController', () => {
       process.env.USE_INNGEST = 'true';
       safeFetchMock.mockRejectedValue(new Error('unreachable'));
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.healthy).toBe(false);
@@ -114,7 +156,7 @@ describe('HealthController', () => {
       process.env.INNGEST_DEV = '1';
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
       // Intentionally omit keys
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.signingKeyRequired).toBe(false);
@@ -125,7 +167,7 @@ describe('HealthController', () => {
       process.env.INNGEST_SIGNING_KEY_FALLBACK = 'fallback-key';
       safeFetchMock.mockRejectedValue(new Error('unreachable'));
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.fallbackKeyPresent).toBe(true);
@@ -134,7 +176,7 @@ describe('HealthController', () => {
     it('reports unhealthy when no functions are registered', async () => {
       safeFetchMock.mockRejectedValue(new Error('unreachable'));
 
-      const controller = new HealthController(createMockInngestModule(0));
+      const controller = new HealthController(createMockInngestModule(0), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.serveHandlerRegistered).toBe(false);
@@ -144,11 +186,14 @@ describe('HealthController', () => {
     it('handles getFunctions throwing gracefully', async () => {
       safeFetchMock.mockRejectedValue(new Error('unreachable'));
 
-      const controller = new HealthController({
-        getFunctions: vi.fn().mockImplementation(() => {
-          throw new Error('module not ready');
-        }),
-      } as never);
+      const controller = new HealthController(
+        {
+          getFunctions: vi.fn().mockImplementation(() => {
+            throw new Error('module not ready');
+          }),
+        } as never,
+        createMockRunRepo()
+      );
       const result = await controller.getHealth();
 
       expect(result.inngest.serveHandlerRegistered).toBe(false);
@@ -162,7 +207,7 @@ describe('HealthController', () => {
       process.env.INNGEST_SIGNING_KEY = 'test-signing-key';
       safeFetchMock.mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(safeFetchMock).toHaveBeenCalledWith(
@@ -178,7 +223,7 @@ describe('HealthController', () => {
       process.env.INNGEST_SIGNING_KEY = 'test-signing-key';
       safeFetchMock.mockRejectedValue(new Error('timeout'));
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.eventApiReachable).toBe(false);
@@ -191,7 +236,7 @@ describe('HealthController', () => {
       process.env.INNGEST_BASE_URL = 'http://inngest-dev.test';
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(vi.mocked(fetch)).toHaveBeenCalledWith(
@@ -206,7 +251,7 @@ describe('HealthController', () => {
       process.env.USE_INNGEST = 'true';
       vi.mocked(fetch).mockResolvedValue({ ok: true } as Response);
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(vi.mocked(fetch)).toHaveBeenCalledWith(
@@ -221,7 +266,7 @@ describe('HealthController', () => {
       process.env.USE_INNGEST = 'true';
       vi.mocked(fetch).mockRejectedValue(new Error('connection refused'));
 
-      const controller = new HealthController(createMockInngestModule());
+      const controller = new HealthController(createMockInngestModule(), createMockRunRepo());
       const result = await controller.getHealth();
 
       expect(result.inngest.eventApiReachable).toBe(false);

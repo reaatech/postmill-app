@@ -16,7 +16,7 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { Organization, StorageProviderType, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { AuditRepository } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.repository';
+import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -28,7 +28,7 @@ import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-p
 export class StorageController {
   constructor(
     private _storageService: StorageService,
-    private _auditRepository: AuditRepository
+    private _auditService: AuditService
   ) {}
 
   @Get('/')
@@ -54,6 +54,7 @@ export class StorageController {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: number;
+      version?: string;
     }
   ) {
     const created = await this._storageService.createConfig(
@@ -68,6 +69,7 @@ export class StorageController {
         publicUrl: body.publicUrl,
         quotaBytes:
           body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
+        version: body.version,
       },
       user.id
     );
@@ -100,6 +102,7 @@ export class StorageController {
       endpoint?: string;
       publicUrl?: string;
       quotaBytes?: number;
+      version?: string;
     }
   ) {
     return this.#stripBigInts(
@@ -115,6 +118,7 @@ export class StorageController {
           publicUrl: body.publicUrl,
           quotaBytes:
             body.quotaBytes !== undefined ? BigInt(body.quotaBytes) : undefined,
+          version: body.version,
         },
         user.id
       )
@@ -264,11 +268,11 @@ export class StorageController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string
   ) {
-    const logs = await this._auditRepository.findByOrg(org.id, {
+    const logs = await this._auditService.findByOrg(org.id, {
       limit: limit ? Math.min(parseInt(limit), 100) : 50,
       offset: offset ? parseInt(offset) : 0,
     });
-    const total = await this._auditRepository.countByOrg(org.id);
+    const total = await this._auditService.countByOrg(org.id);
     return {
       logs: logs.map((log) => ({
         id: log.id,

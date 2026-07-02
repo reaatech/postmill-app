@@ -161,13 +161,13 @@ export const TagsComponentInner: FC<{
     <div
       ref={ref}
       className={clsx(
-        'border rounded-[8px] justify-center flex items-center relative h-[44px] text-[15px] font-[600] select-none',
+        'border rounded-[8px] justify-center flex items-center relative h-[36px] lg:h-[44px] text-[13px] lg:text-[15px] font-[600] select-none',
         isOpen ? 'border-[#2B5CD3]' : 'border-newTextColor/10'
       )}
     >
       <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1"
+        className="px-[12px] lg:px-[16px] justify-center flex gap-[8px] items-center h-full select-none flex-1"
       >
         <div className="cursor-pointer">
           <TagIcon />

@@ -60,25 +60,32 @@ organisation:
 
 Connect and manage social media and chat channels.
 
-### Connecting providers
+### Named credential sets
 
-Each channel provider supports OAuth authentication. Click a provider row to expand its
-configuration:
+A **channel** here is a named OAuth-app credential set. Click **Add channel**, pick a provider,
+then fill in the configuration dialog:
 
-- Enter your own OAuth app credentials (Client ID, Client Secret) if using custom apps.
-- For providers that support it, use the platform's default OAuth flow to connect.
-- Each configured provider shows an **Active**, **No Credentials**, or **Disabled** status badge.
+- **Name** (required) — a label that identifies this credential set (e.g. "Marketing LinkedIn").
+- **Client ID / Client Secret** — your own OAuth app credentials.
+- **Scopes** and **Redirect URI** — optional; defaults apply when left blank.
+- **Enabled** — a set must have a Client ID before it can be enabled.
+
+You can add **many credential sets for the same provider**, each with a different name — useful when
+an org juggles several OAuth apps for one platform. Each named set has its **own auth**: a social
+account connected through a set uses that set's credentials for the OAuth handshake, token refresh,
+and API calls. The **Add channel** picker shows each provider's capability tags and offers a
+**search** box and a **Capabilities** filter dropdown (checkboxes) to find the right provider; the
+configured-channel list itself is searchable by name.
 
 ### Channel configuration
 
-Provider credentials are stored per-organisation in `OrgProviderConfiguration` records and
-encrypted at rest (AES-256-GCM). You can:
+Credential sets are stored per-organisation in `OrgProviderConfiguration` records and encrypted at
+rest (AES-256-GCM). From a set's dialog you can:
 
-- **Edit credentials** — update Client ID, Client Secret, scopes, and redirect URI for any
-  configured provider.
-- **Test connection** — validate that your credentials work by generating an auth URL.
-- **Clear credentials** — remove stored OAuth data for a provider, disconnecting all channels
-  of that type.
+- **Edit** — update the name, Client ID, Client Secret, scopes, and redirect URI.
+- **Test** — validate the credentials by generating an auth URL.
+- **Remove** — delete this credential set. Accounts that were connected through it fall back to the
+  org's primary set for that provider.
 
 ### Connection health status
 
@@ -91,12 +98,12 @@ Below the provider list, a **Connection Status** table shows every connected cha
 | **Refresh Needed** | Token requires a refresh cycle. Click **Reconnect**. |
 | **Disabled** | Channel has been manually disabled or the provider is turned off. |
 
-### Provider capabilities panel
+### Provider capabilities
 
-A reference matrix below the connection status shows what each provider supports. Capabilities
-include: analytics, comments, first comment, polls, video, carousel, alt text, max media count,
-link preview, and refresh token support. Use this to understand feature availability per channel
-before composing posts.
+The **Add channel** picker shows capability badges on each provider — analytics, comments, first
+comment, polls, video, carousel, alt text, link preview, refresh token, and watchlist support — and
+its **Capabilities** filter dropdown narrows the provider list to those supporting the selected
+features, so you can judge feature availability before configuring a provider.
 
 ## Shortlinks tab
 
@@ -326,6 +333,40 @@ media provider (and vice versa) — the key is shared, you don't re-enter it.
 When enabled, generated media files are signed with C2PA Content Authenticity Initiative
 metadata, embedding cryptographically verifiable provenance into output files.
 
+## VPN tab
+
+Configure VPN provider credentials for your organisation. This is a credential-only settings
+surface in v3.9.0 — it stores the credentials needed to connect to a provider but does not yet
+drive live VPN connections.
+
+- **Provider list** — mirrors the AI/Shortlinks pages: provider cards with real brand icons,
+  configured/enabled badges, and a **Configure / Remove** action per row. Supported providers:
+  **NordVPN**, **ExpressVPN**, **Surfshark**, **Proton VPN**, and **Mullvad**.
+- **Credential fields** — each provider exposes its required manual-setup credentials (for example,
+  service credentials, activation code, or account number) and an optional config-file URL.
+- **Enable toggle** — a configured provider can be enabled or disabled.
+- **Test connection** — validates the stored configuration (currently a no-op placeholder; future
+  releases may probe provider status).
+- **Credentials** — encrypted at rest in `OrgVpnConfig` and never returned to the browser.
+
+| Provider | Required credential | Optional field |
+|----------|---------------------|----------------|
+| NordVPN | Service credentials (`username:password`) | OpenVPN config URL |
+| ExpressVPN | Activation code | OpenVPN config URL |
+| Surfshark | Service credentials (`username:password`) | OpenVPN config URL |
+| Proton VPN | OpenVPN / IKEv2 credentials (`username:password`) | Config file URL |
+| Mullvad | 16-digit account number | WireGuard config URL |
+| CyberGhost | Service credentials (`username:password`) | OpenVPN config URL |
+| Private Internet Access | Service credentials (`username:password`) | OpenVPN config URL |
+| IPVanish | Service credentials (`username:password`) | OpenVPN config URL |
+| Windscribe | Service credentials (`username:password`) | OpenVPN / WireGuard config URL |
+| TunnelBear | Service credentials (`username:password`) | Config URL |
+| Hotspot Shield | Service credentials (`username:password`) | Hydra / OpenVPN config URL |
+| PureVPN | Service credentials (`username:password`) | OpenVPN config URL |
+| VyprVPN | Service credentials (`username:password`) | OpenVPN / Chameleon config URL |
+| hide.me | Service credentials (`username:password`) | WireGuard / OpenVPN config URL |
+| Mozilla VPN | Subscription / device key | WireGuard config URL |
+
 ## Storage tab
 
 Configure where uploaded media files are stored. See [Storage Setup](../operations-guide/storage.md)
@@ -481,8 +522,8 @@ Endpoints: `GET /user/approved-apps` lists apps; `DELETE /user/approved-apps/:id
 
 Settings access is permission-gated (v3.8.10): reading and changing the org-level settings tabs
 requires the `settings` permission, which the seeded **Owner** and **Admin** roles carry. The
-four provider surfaces (AI, Media, Storage, Shortlinks) and brand management are likewise gated
+five provider surfaces (AI, Media, Storage, Shortlinks, VPN) and brand management are likewise gated
 on their own permissions. A member whose role lacks the grant receives **HTTP 403**; an org can
 grant these permissions to a custom role.
 
-> Verified against v3.8.10
+> Verified against v3.9.0

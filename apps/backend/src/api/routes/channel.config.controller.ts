@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  Logger,
   Param,
   Put,
   UseGuards,
@@ -13,7 +14,7 @@ import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { ProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/provider-config.service';
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
-import { socialIntegrationList } from '@gitroom/nestjs-libraries/integrations/integration.manager';
+import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { Prisma } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
@@ -22,9 +23,11 @@ import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard
 @Controller('/admin/channel-configs')
 @UseGuards(OrgRbacGuard)
 export class ChannelConfigController {
+  private readonly _logger = new Logger(ChannelConfigController.name);
   constructor(
     private _providerConfigService: ProviderConfigService,
-    private _providerConfigManager: ProviderConfigManager
+    private _providerConfigManager: ProviderConfigManager,
+    private _integrationManager: IntegrationManager
   ) {}
 
   @Get('/')
@@ -33,7 +36,7 @@ export class ChannelConfigController {
     const dbConfigs = await this._providerConfigService.getAll();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
-    return socialIntegrationList.map((p) => {
+    return this._integrationManager.getSocialProviders().map((p) => {
       const dbConfig = dbConfigMap.get(p.identifier);
       const isConfigured = dbConfig
         ? (() => {
@@ -41,7 +44,11 @@ export class ChannelConfigController {
               const d = this._providerConfigService.decryptConfig(dbConfig);
               return !!(d.clientId || d.clientSecret);
             } catch (err) {
-              console.warn(`Failed to decrypt config for ${p.identifier}, treating as unconfigured`, err);
+              this._logger.warn(
+                `Failed to decrypt config for ${p.identifier}, treating as unconfigured: ${
+                  (err as Error)?.message ?? String(err)
+                }`
+              );
               return false;
             }
           })()
@@ -74,9 +81,8 @@ export class ChannelConfigController {
       identifier
     );
 
-    const provider = socialIntegrationList.find(
-      (p) => p.identifier === identifier
-    );
+    const provider =
+      this._integrationManager.getSocialIntegrationUnchecked(identifier);
 
     return {
       identifier,
@@ -140,9 +146,8 @@ export class ChannelConfigController {
         throw new BadRequestException('additionalConfig must be valid JSON');
       }
     }
-    const provider = socialIntegrationList.find(
-      (p) => p.identifier === identifier
-    );
+    const provider =
+      this._integrationManager.getSocialIntegrationUnchecked(identifier);
     if (!provider) {
       throw new BadRequestException('Unknown provider');
     }
@@ -161,7 +166,11 @@ export class ChannelConfigController {
     try {
       await this._providerConfigManager.refreshCache();
     } catch (err) {
-      console.warn('Failed to refresh cache after config upsert, stale cache will self-correct', err);
+      this._logger.warn(
+        `Failed to refresh cache after config upsert, stale cache will self-correct: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
     }
 
     const decrypted = this._providerConfigService.decryptConfig(result);
@@ -206,7 +215,11 @@ export class ChannelConfigController {
     try {
       await this._providerConfigManager.refreshCache();
     } catch (err) {
-      console.warn('Failed to refresh cache after config delete, stale cache will self-correct', err);
+      this._logger.warn(
+        `Failed to refresh cache after config delete, stale cache will self-correct: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
     }
     return { success: true };
   }

@@ -38,6 +38,7 @@ export default defineConfig({
           items: [
             { text: 'Introduction', link: '/developer-docs/' },
             { text: 'Architecture', link: '/developer-docs/architecture' },
+            { text: 'Provider Framework', link: '/developer-docs/provider-framework' },
             { text: 'Public API v1', link: '/developer-docs/public-api' },
             { text: 'Analytics API v2', link: '/developer-docs/analytics-api' },
             { text: 'MCP', link: '/developer-docs/mcp' },
@@ -65,6 +66,7 @@ export default defineConfig({
             { text: 'Introduction', link: '/operations-guide/' },
             { text: 'Requirements', link: '/operations-guide/requirements' },
             { text: 'Docker Deployment', link: '/operations-guide/docker' },
+            { text: 'Scaling & Deployment', link: '/operations-guide/scaling' },
             { text: 'Configuration', link: '/operations-guide/configuration' },
             { text: 'Inngest & Cron', link: '/operations-guide/inngest-and-cron' },
             { text: 'Storage Setup', link: '/operations-guide/storage' },
@@ -82,6 +84,7 @@ export default defineConfig({
             { text: 'Overview', link: '/reference/' },
             { text: 'Changes From Upstream', link: '/reference/changes-from-upstream' },
             { text: 'Provider Capabilities', link: '/reference/provider-capabilities' },
+            { text: 'Provider Versions', link: '/reference/provider-versions' },
             { text: 'Glossary', link: '/reference/glossary' },
           ],
         },

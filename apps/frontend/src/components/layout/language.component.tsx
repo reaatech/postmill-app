@@ -16,7 +16,7 @@ import countries from 'i18n-iso-countries';
 // Register required locales
 import countriesEn from 'i18n-iso-countries/langs/en.json';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { ModalWrapperComponent } from '../new-launch/modal.wrapper.component';
+import { ModalWrapperComponent } from '../composer/modal.wrapper.component';
 
 import clsx from 'clsx';
 countries.registerLocale(countriesEn);
@@ -119,6 +119,47 @@ export const ChangeLanguageComponent = () => {
         ))}
       </div>
     </div>
+  );
+};
+// Full-width menu row variant (flag + label) used inside the user avatar dropdown,
+// styled to match the other menu items. `onOpen` lets the host close the dropdown.
+export const LanguageMenuRow = ({ onOpen }: { onOpen?: () => void }) => {
+  const modal = useModals();
+  const currentLanguage = i18next.resolvedLanguage || fallbackLng;
+  const t = useT();
+  const openModal = () => {
+    onOpen?.();
+    modal.openModal({
+      title: t('change_language', 'Change Language'),
+      withCloseButton: true,
+      children: <ChangeLanguageComponent />,
+    });
+  };
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={openModal}
+      className="w-full flex items-center gap-[10px] px-[14px] py-[8px] text-[13px] text-textColor hover:bg-boxHover text-start"
+    >
+      <span className="rounded-full overflow-hidden h-[18px] w-[18px] relative shrink-0">
+        <ReactCountryFlag
+          countryCode={getCountryCodeForFlag(currentLanguage)}
+          svg
+          style={{
+            width: '18px',
+            height: '18px',
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            objectFit: 'cover',
+          }}
+          title={currentLanguage}
+        />
+      </span>
+      {t('language', 'Language')}
+    </button>
   );
 };
 export const LanguageComponent = () => {

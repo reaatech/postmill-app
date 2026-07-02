@@ -1,57 +1,73 @@
 'use client';
 
-import { FC, useCallback, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import useSWR from 'swr';
 import dayjs from 'dayjs';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
-import { CommentInboxFilters, InboxFilters } from './comment.inbox.filters';
+import { CommentCard, InboxComment } from './comment.card';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
-
-interface InboxComment {
-  id: string;
-  content: string;
-  authorName: string;
-  authorPicture?: string;
-  platformCreatedAt: string;
-  status?: string;
-  isOwn: boolean;
-  post?: {
-    id: string;
-    content?: string;
-    integration?: {
-      name: string;
-      providerIdentifier: string;
-      picture?: string;
-    };
-  };
-}
+import { RepliesFilterBar } from './filters/replies.filter.bar';
+import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
+import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
+import {
+  useTeamMembers,
+  TeamMemberItem,
+} from '@gitroom/frontend/components/settings/roles/hooks/use-roles';
 
 interface InboxResponse {
   comments: InboxComment[];
   nextCursor?: string;
 }
 
+// Inbox-local filter shape. Channels/campaigns are multi-select (arrays) — sent to the
+// server as comma-joined `integrationId` / `campaignId` (see buildParams). Distinct from the
+// campaign section's shared `InboxFilters` (single integrationId), which is left untouched.
+interface ReplyFilters {
+  status?: string;
+  assigneeId?: string;
+  integrationIds: string[];
+  campaignIds: string[];
+  unreadOnly: boolean;
+}
+
 export const CommentInbox: FC = () => {
   const t = useT();
   const fetch = useFetch();
-  const [filters, setFilters] = useState<InboxFilters>({ unreadOnly: false });
-  const [cursor, setCursor] = useState<string | undefined>(undefined);
+  const [filters, setFilters] = useState<ReplyFilters>({
+    integrationIds: [],
+    campaignIds: [],
+    unreadOnly: false,
+  });
   const [statusCode, setStatusCode] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [lastSynced, setLastSynced] = useState<string | null>(null);
+  // Page 1 comes from SWR; "Load more" appends further cursor pages here so the list
+  // accumulates instead of swapping (the cursor never enters the SWR key).
+  const [extraPages, setExtraPages] = useState<InboxResponse[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
 
-  const buildKey = useCallback(() => {
-    const params = new URLSearchParams();
-    if (filters.status) params.set('status', filters.status);
-    if (filters.unreadOnly) params.set('unreadOnly', 'true');
-    if (filters.assigneeId) params.set('assigneeId', filters.assigneeId);
-    if (cursor) params.set('cursor', cursor);
-    return `/posts/inbox?${params.toString()}`;
-  }, [filters, cursor]);
+  const updateFilters = useCallback((patch: Partial<ReplyFilters>) => {
+    setFilters((prev) => ({ ...prev, ...patch }));
+  }, []);
+
+  // Query string for the current filters, plus an optional pagination cursor.
+  const buildParams = useCallback(
+    (cursor?: string) => {
+      const params = new URLSearchParams();
+      if (filters.status) params.set('status', filters.status);
+      if (filters.unreadOnly) params.set('unreadOnly', 'true');
+      if (filters.assigneeId) params.set('assigneeId', filters.assigneeId);
+      if (filters.integrationIds.length) params.set('integrationId', filters.integrationIds.join(','));
+      if (filters.campaignIds.length) params.set('campaignId', filters.campaignIds.join(','));
+      if (cursor) params.set('cursor', cursor);
+      return params.toString();
+    },
+    [filters]
+  );
 
   const { data, isLoading, error, mutate } = useSWR<InboxResponse>(
-    buildKey(),
+    `/posts/inbox?${buildParams()}`,
     async (key: string) => {
       const res = await fetch(key);
       setStatusCode(res.status);
@@ -61,27 +77,53 @@ export const CommentInbox: FC = () => {
     { revalidateOnFocus: false }
   );
 
-  const handleMarkRead = useCallback(
-    async (commentId: string) => {
-      await fetch('/posts/inbox/bulk-read', {
-        method: 'POST',
-        body: JSON.stringify({ commentIds: [commentId] }),
-      });
-      mutate();
-    },
-    [fetch, mutate]
-  );
-
-  const loadMore = useCallback(() => {
-    if (data?.nextCursor) {
-      setCursor(data.nextCursor);
-    }
+  // A fresh page-1 payload (filters changed / revalidation) resets accumulated pages.
+  useEffect(() => {
+    setExtraPages([]);
   }, [data]);
 
-  const handleFiltersChange = useCallback((newFilters: InboxFilters) => {
-    setFilters(newFilters);
-    setCursor(undefined);
-  }, []);
+  // --- Filter option sources -------------------------------------------------
+  const { data: integrationsData } = useIntegrationList();
+  const integrations = useMemo(
+    () => (integrationsData || []) as Integrations[],
+    [integrationsData]
+  );
+  const { data: campaignData } = useSWR('/campaigns', (url: string) =>
+    fetch(url).then((r) => r.json())
+  );
+  const campaigns = useMemo(
+    () =>
+      ((campaignData as Array<{ id: string; name: string }>) || []).map((c) => ({
+        id: c.id,
+        name: c.name,
+      })),
+    [campaignData]
+  );
+  const { data: teamData } = useTeamMembers();
+  const teamMembers = useMemo(() => (teamData || []) as TeamMemberItem[], [teamData]);
+
+  // --- Pagination ------------------------------------------------------------
+  const comments = useMemo(
+    () => [...(data?.comments || []), ...extraPages.flatMap((p) => p.comments)],
+    [data, extraPages]
+  );
+  const moreCursor = extraPages.length
+    ? extraPages[extraPages.length - 1].nextCursor
+    : data?.nextCursor;
+
+  const loadMore = useCallback(async () => {
+    if (!moreCursor || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const res = await fetch(`/posts/inbox?${buildParams(moreCursor)}`);
+      if (res.ok) {
+        const page: InboxResponse = await res.json();
+        setExtraPages((prev) => [...prev, { comments: page.comments || [], nextCursor: page.nextCursor }]);
+      }
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [moreCursor, loadingMore, buildParams, fetch]);
 
   const handleSyncNow = useCallback(async () => {
     setSyncing(true);
@@ -118,6 +160,24 @@ export const CommentInbox: FC = () => {
     </div>
   );
 
+  const filterBar = (
+    <RepliesFilterBar
+      status={filters.status}
+      onStatusChange={(status) => updateFilters({ status })}
+      integrations={integrations}
+      selectedChannels={filters.integrationIds}
+      onChannelsChange={(ids) => updateFilters({ integrationIds: ids })}
+      campaigns={campaigns}
+      selectedCampaigns={filters.campaignIds}
+      onCampaignsChange={(ids) => updateFilters({ campaignIds: ids })}
+      teamMembers={teamMembers}
+      assigneeId={filters.assigneeId}
+      onAssigneeChange={(assigneeId) => updateFilters({ assigneeId })}
+      unreadOnly={filters.unreadOnly}
+      onUnreadChange={(unreadOnly) => updateFilters({ unreadOnly })}
+    />
+  );
+
   if (error && statusCode === 402) {
     return (
       <div className="flex flex-col items-center justify-center py-[48px] text-center">
@@ -128,10 +188,10 @@ export const CommentInbox: FC = () => {
           </svg>
         </div>
         <p className="text-textColor text-[14px] font-medium mb-[8px]">
-          {t('comment_inbox.upgrade_required', 'Comments not available on your current plan')}
+          {t('comment_inbox.upgrade_required', 'Replies not available on your current plan')}
         </p>
         <p className="text-newTableText text-[12px] mb-[16px] max-w-[360px]">
-          {t('comment_inbox.upgrade_description', 'Upgrade your plan to access the unified comment inbox across all your social channels.')}
+          {t('comment_inbox.upgrade_description', 'Upgrade your plan to access the unified reply inbox across all your social channels.')}
         </p>
         <a
           href="/billing"
@@ -162,10 +222,8 @@ export const CommentInbox: FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-[16px]">
-      <div className="flex items-center justify-between gap-[12px]">
-        <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
-      </div>
+      <div className="flex flex-col gap-[16px] min-w-0">
+        {filterBar}
         <div className="space-y-[8px] animate-pulse">
           {[1, 2, 3].map((i) => (
             <div key={i} className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]">
@@ -182,87 +240,39 @@ export const CommentInbox: FC = () => {
     );
   }
 
-  const comments = data?.comments || [];
-
   return (
-    <div className="flex flex-col gap-[16px]">
-      <PageHeader title="Inbox" description="Manage and respond to comments across channels" action={syncAction} />
+    <div className="flex flex-col gap-[16px] min-w-0">
+      <PageHeader title="Inbox" description="Manage and respond to replies across channels" action={syncAction} />
 
-      <div className="flex items-center justify-between gap-[12px]">
-        <CommentInboxFilters filters={filters} onChange={handleFiltersChange} />
-      </div>
+      {filterBar}
 
-      {!isLoading && comments.length === 0 && (
+      {comments.length === 0 && (
         <div className="flex items-center justify-center h-[200px] text-newTableText">
-          {t('comment_inbox.no_comments', 'No comments found matching your filters')}
+          {t('comment_inbox.no_comments', 'No replies found matching your filters')}
         </div>
       )}
 
       <div className="flex flex-col gap-[8px]">
         {comments.map((comment) => (
-          <div
+          <CommentCard
             key={comment.id}
-            className="bg-newBgColorInner rounded-[8px] border border-newTableBorder p-[16px] flex items-start gap-[12px]"
-          >
-            {comment.authorPicture ? (
-              <img
-                src={comment.authorPicture}
-                alt={comment.authorName}
-                className="w-[36px] h-[36px] rounded-full object-cover flex-shrink-0"
-              />
-            ) : (
-              <div className="w-[36px] h-[36px] rounded-full bg-btnPrimary flex items-center justify-center text-white text-[14px] font-bold flex-shrink-0">
-                {comment.authorName?.[0]?.toUpperCase() || '?'}
-              </div>
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-[8px] mb-[4px]">
-                <span className="text-[13px] font-semibold text-textColor">
-                  {comment.authorName}
-                </span>
-                {comment.post?.integration && (
-                  <span className="text-[11px] text-newTableText">
-                    {t('comment_inbox.on_platform', `on ${comment.post.integration.name}`)}
-                  </span>
-                )}
-                <span className="text-[11px] text-newTableText ml-auto">
-                  {dayjs(comment.platformCreatedAt).fromNow()}
-                </span>
-              </div>
-              <p className="text-[13px] text-textColor break-words mb-[8px]">
-                {comment.content}
-              </p>
-              {comment.post && (
-                <div className="text-[11px] text-newTableText mb-[8px]">
-                    {t('comment_inbox.post_label', `Post: ${comment.post.content?.substring(0, 100) || comment.post.id}`)}
-                </div>
-              )}
-              <div className="flex gap-[8px]">
-                {comment.status !== 'handled' && (
-                  <button
-                    onClick={() => handleMarkRead(comment.id)}
-                    className="text-[12px] text-textColor hover:underline"
-                  >
-                    {t('comment_inbox.mark_handled', 'Mark handled')}
-                  </button>
-                )}
-                {comment.status && (
-                  <span className="text-[11px] text-newTableText capitalize">
-                    {comment.status.replace(/_/g, ' ')}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+            comment={comment}
+            onChanged={mutate}
+            enableReply
+            enableLike
+            enableStatusCycle
+            teamMembers={teamMembers}
+          />
         ))}
       </div>
 
-      {data?.nextCursor && (
+      {moreCursor && (
         <button
           onClick={loadMore}
-          className="self-center px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:bg-btnPrimary/90"
+          disabled={loadingMore}
+          className="self-center px-[20px] py-[8px] bg-btnPrimary text-white text-[13px] font-medium rounded-[8px] transition-colors hover:bg-btnPrimary/90 disabled:opacity-50"
         >
-          {t('comment_inbox.load_more', 'Load more')}
+          {loadingMore ? t('loading', 'Loading…') : t('comment_inbox.load_more', 'Load more')}
         </button>
       )}
     </div>

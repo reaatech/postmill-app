@@ -17,8 +17,11 @@ export class SubscriptionExceptionFilter implements ExceptionFilter {
 
     const message = getErrorMessage(error);
 
+    // Unified error envelope: { statusCode, error, message, ...context }.
+    // `url` (the billing upsell link) is preserved as an extra context field.
     response.status(status).json({
       statusCode: status,
+      error: 'Payment Required',
       message,
       url: process.env.FRONTEND_URL + '/billing',
     });

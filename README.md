@@ -23,6 +23,22 @@ Everything else builds around that: persisted multi-channel analytics, a cross-c
 
 **Full changelog below (newest first):**
 
+**[v4.0.0]** — Unified, versioned provider framework. AI, Media, Storage, Short-link, Social, VPN,
+Content Packs, Email, and Auth now resolve through a single `ProviderKernel` with one workspace
+package per provider. Every config/ledger row pins its provider version (`v1` today); a future `v2`
+cannot silently change existing behavior. New `GET /providers/catalog` and `GET /admin/providers/health`
+endpoints expose the live catalog and per-version health. The old in-memory registries remain
+reachable via `PROVIDER_KERNEL=legacy` for the release window.
+
+**[v3.9.1]** — Per-organization AI Model Defaults and Media Defaults. Admins pick default models per
+AI category (`low-reasoning`, `high-reasoning`, `vision`, `workflow`) and per media category
+(text/image/video/audio generation, editing, captions, slides). Defaults resolve from enabled
+providers' live catalogs and are stored in `OrgDefaultModel`. The legacy `VideoManager`, `@Video`
+registry, `ImagesSlides`, `Veo3`, and `AiMediaGenerationService` are deleted; all AI media/text
+callers route through the defaults-resolved `AiDefaultsService`. AI-tab providers (e.g. OpenAI) now
+also appear under Media Defaults via the AI+Media candidate union. A kill switch
+`AI_MODEL_DEFAULTS_ENABLED=false` reverts AI model resolution to the legacy chain.
+
 **[v3.8.10]** — Identity, roles & provider-surface redesign. Full RBAC replaces the flat 3-role model: five seeded org roles (Owner/Admin/Editor/Member/Viewer) plus custom roles with fine-grained permissions (403s, orthogonal to billing 402s). User profiles split from auth (`UserProfile`), login sessions get refresh-token rotation with a per-device list and revoke, and a new super-admin `/admin` panel manages login providers (Google/GitHub/generic OIDC SSO) in the database — env vars stay as the bootstrap fallback. Organizations can now manage **multiple brands** with per-post brand selection, AI providers get a two-step config with a standard/reasoning model split, media generation moves to a pluggable 15-provider system with tenant-storage delivery, Storage/Shortlinks settings are rebuilt in the AI-page style (multi-account shortlinks, unique-account storage, real brand icons), and the composer moves from a modal to dedicated `/schedule/post` pages with a timezone-aware picker. The new **Replicate Studio** (`/media/replicate`) adds a native generative media workspace with 18 categories (image, video, audio, STT, inpaint, merge, meme) powered by your own Replicate token. Stock browsing expands to vectors (Pixabay), stickers (GIPHY), and icons (Iconify), and **Content Packs** bring per-organization BYOK premium stock from Magnific. The dead upstream marketplace/GitHub-stars tables were dropped (snapshot-guarded destructive push — see the upgrading guide).
 
 **[v3.8.9]** — Performance & dev-experience fixes: the per-request ~2s Redis stall (blocking RAG queue pop on the shared connection), analytics overview caching for the default dashboard range, negative-caching for failing live analytics fallbacks, a LinkedIn Page analytics crash fix, dev watch-restart orphan cleanup, and a Docker live-dev environment.

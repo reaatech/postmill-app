@@ -120,7 +120,7 @@ describe('OrgShortLinkSettingsRepository', () => {
         orderBy: { createdAt: 'desc' },
       });
       expect(config.model.orgShortLinkConfig.create).toHaveBeenCalledWith({
-        data: { organizationId: orgId, identifier, ...data },
+        data: { organizationId: orgId, identifier, version: 'v1', ...data },
       });
     });
 
@@ -146,13 +146,14 @@ describe('OrgShortLinkSettingsRepository', () => {
 
       expect(config.model.orgShortLinkConfig.upsert).toHaveBeenCalledWith({
         where: {
-          organizationId_identifier_accountFingerprint: {
+          organizationId_identifier_version_accountFingerprint: {
             organizationId: orgId,
             identifier,
+            version: 'v1',
             accountFingerprint: 'fp-1',
           },
         },
-        create: { organizationId: orgId, identifier, ...data },
+        create: { organizationId: orgId, identifier, version: 'v1', ...data },
         update: data,
       });
     });

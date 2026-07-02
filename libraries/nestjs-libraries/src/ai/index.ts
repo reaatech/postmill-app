@@ -1,4 +1,3 @@
-export { AIProviderRegistry } from './ai-provider.registry';
 export { AiModule } from './ai.module';
 export { AIModelProvider } from './ai-model.provider';
 export type {

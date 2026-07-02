@@ -1,9 +1,2 @@
-import { IsNumber, IsString } from 'class-validator';
-
-export class DevToTagsSettingsDto {
-  @IsNumber()
-  value: number;
-
-  @IsString()
-  label: string;
-}
+// Re-export shim — DTO relocated into @gitroom/provider-kernel (step 7.5.1).
+export { DevToTagsSettingsDto } from '@gitroom/provider-kernel/domains/social-dtos';

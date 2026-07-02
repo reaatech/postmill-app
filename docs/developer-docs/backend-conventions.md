@@ -139,6 +139,13 @@ All at-rest secrets are encrypted with AES-256-GCM via `EncryptionService`. Encr
 the `v2:` prefix. The service reads `ENCRYPTION_KEY` or falls back to deriving a key from
 `JWT_SECRET`.
 
+This is a **single-key model**: one deployment-wide key encrypts every secret, regardless of
+organization. There is no per-org crypto key — an `organizationId` column scopes *storage*, and
+cross-org isolation is enforced by query scoping, not by separate keys. `EncryptionService` (the
+per-org domain path) is a thin wrapper over `AuthService.fixedEncryption`/`fixedDecryption` (the
+global-row path); the split is an implementation detail — both derive the identical key and produce
+the identical `v2:` envelope, so never mix the two decrypt routes for the same row.
+
 ### No Secrets in Logs
 
 Use NestJS `Logger.warn(message)` / `Logger.error(message)` — never `console.log(err)`. Raw API

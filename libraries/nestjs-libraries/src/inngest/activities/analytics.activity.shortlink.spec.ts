@@ -66,11 +66,11 @@ vi.mock(
   }),
 );
 
-const mockRegistryGetAdapter = vi.fn();
+const mockResolveShortLink = vi.fn();
 
-vi.mock('@gitroom/nestjs-libraries/short-linking/short-link.registry', () => ({
-  ShortLinkRegistry: class {
-    getAdapter = mockRegistryGetAdapter;
+vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
+  ProviderResolutionService: class {
+    resolveShortLink = mockResolveShortLink;
   },
 }));
 
@@ -116,7 +116,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
     upsertSnapshotsBatch: ReturnType<typeof vi.fn>;
     pruneSnapshots: ReturnType<typeof vi.fn>;
   };
-  let shortLinkRegistry: { getAdapter: ReturnType<typeof vi.fn> };
+  let resolution: { resolveShortLink: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -129,7 +129,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
       upsertSnapshotsBatch: mockUpsertSnapshotsBatch,
       pruneSnapshots: mockPruneSnapshots,
     };
-    shortLinkRegistry = { getAdapter: mockRegistryGetAdapter };
+    resolution = { resolveShortLink: mockResolveShortLink };
 
     activity = new AnalyticsActivity(
       {} as any, // _prisma
@@ -142,7 +142,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
       {} as any, // _watchlistService
       shortLinkSettingsService as any,
       shortLinkSettingsRepository as any,
-      shortLinkRegistry as any,
+      resolution as any,
       {} as any, // _emailLogService
     );
   });
@@ -158,7 +158,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
 
       await activity.collectShortLinkSnapshots(orgId);
 
-      expect(mockRegistryGetAdapter).not.toHaveBeenCalled();
+      expect(mockResolveShortLink).not.toHaveBeenCalled();
       expect(mockGetLinksForOrg).not.toHaveBeenCalled();
     });
 
@@ -166,7 +166,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
       mockGetActiveProvider.mockResolvedValue({
         identifier: 'unknown-provider',
       });
-      mockRegistryGetAdapter.mockReturnValue(undefined);
+      mockResolveShortLink.mockReturnValue(undefined);
 
       await activity.collectShortLinkSnapshots(orgId);
 
@@ -181,7 +181,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
 
       await activity.collectShortLinkSnapshots(orgId);
 
@@ -197,7 +197,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
 
       await activity.collectShortLinkSnapshots(orgId);
 
@@ -211,7 +211,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         credentials: { apiKey: 'key' },
         customDomain: 'short.myco.com',
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue([]);
 
       await activity.collectShortLinkSnapshots(orgId);
@@ -234,7 +234,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         credentials: { apiKey: 'secret' },
         customDomain: 'short.myco.com',
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue(links);
       adapter.linkStatistics.mockResolvedValue([
         { short: 'https://bit.ly/abc', original: 'https://example.com/a', clicks: '150' },
@@ -271,7 +271,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue(links);
 
       const stats = links.map((l) => ({
@@ -301,7 +301,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue(links);
       adapter.linkStatistics.mockResolvedValue([
         { short: 'https://bit.ly/unknown', original: '', clicks: '99' },
@@ -323,7 +323,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue(links);
       adapter.linkStatistics.mockResolvedValue([
         { short: 'https://bit.ly/abc', original: '', clicks: 'not-a-number' },
@@ -343,7 +343,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: { apiKey: 'bad-key' },
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue([
         { id: 'link-1', shortUrl: 'https://bit.ly/abc' },
       ]);
@@ -363,7 +363,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(stubAdapter());
+      mockResolveShortLink.mockReturnValue(stubAdapter());
       mockGetLinksForOrg.mockRejectedValue(new Error('DB connection lost'));
 
       await expect(
@@ -383,7 +383,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: {},
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue(links);
       adapter.linkStatistics
         .mockRejectedValueOnce(new Error('first batch failed'))
@@ -409,7 +409,7 @@ describe('AnalyticsActivity — short-link snapshots', () => {
         identifier: 'bitly',
         credentials: null,
       });
-      mockRegistryGetAdapter.mockReturnValue(adapter);
+      mockResolveShortLink.mockReturnValue(adapter);
       mockGetLinksForOrg.mockResolvedValue([
         { id: 'link-1', shortUrl: 'https://bit.ly/abc' },
       ]);

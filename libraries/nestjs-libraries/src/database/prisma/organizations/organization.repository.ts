@@ -5,6 +5,10 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 
+// Terms-of-Service version recorded at account creation (I4 — consent tracking).
+// Bump when the ToS materially changes so re-acceptance can be detected.
+export const TOS_VERSION = '1.0';
+
 @Injectable()
 export class OrganizationRepository {
   constructor(
@@ -298,6 +302,8 @@ export class OrganizationRepository {
                 providerId: body.providerId || '',
                 ip,
                 agent: userAgent,
+                tosAcceptedAt: new Date(),
+                tosVersion: TOS_VERSION,
                 profile: {
                   create: {
                     name: body.name || null,
@@ -384,6 +390,34 @@ export class OrganizationRepository {
     return { id: user.id, email: user.email, role: appRole?.key ?? roleKey };
   }
 
+  // Tenant-guarded member profile: returns null when the user is not a member of
+  // this org (the findFirst scope is the access check), so callers cannot look up
+  // an arbitrary user across orgs.
+  async getMemberProfile(orgId: string, userId: string) {
+    return this._userOrg.model.userOrganization.findFirst({
+      where: { organizationId: orgId, userId, disabled: false },
+      select: {
+        createdAt: true,
+        roleRef: { select: { key: true, name: true } },
+        user: {
+          select: {
+            id: true,
+            email: true,
+            profile: {
+              select: {
+                name: true,
+                lastName: true,
+                bio: true,
+                avatarUrl: true,
+                picture: { select: { path: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+  }
+
   async getTeam(orgId: string) {
     return this._organization.model.organization.findUnique({
       where: {
@@ -401,11 +435,13 @@ export class OrganizationRepository {
                   select: {
                     name: true,
                     pictureId: true,
-                    sendSuccessEmails: true,
-                    sendFailureEmails: true,
-                    sendStreakEmails: true,
                   },
                 },
+              },
+            },
+            roleRef: {
+              select: {
+                key: true,
               },
             },
           },
@@ -428,8 +464,7 @@ export class OrganizationRepository {
                 id: true,
                 profile: {
                   select: {
-                    sendSuccessEmails: true,
-                    sendFailureEmails: true,
+                    name: true,
                   },
                 },
               },

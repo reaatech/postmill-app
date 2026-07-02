@@ -23,9 +23,9 @@ interface AuthProvider {
 }
 
 const useAuthProviders = () => {
-  const { backendUrl } = useVariables();
+  const fetch = useFetch();
   return useSWR<{ providers: AuthProvider[] }>('auth-providers', async () => {
-    const res = await fetch(`${backendUrl}/auth/providers`);
+    const res = await fetch('/auth/providers');
     if (!res.ok) throw new Error('Failed to fetch auth providers');
     return res.json();
   });

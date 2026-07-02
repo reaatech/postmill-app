@@ -1,7 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ProviderKernel } from '@gitroom/provider-kernel';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
-import { ShortLinkRegistry } from '@gitroom/nestjs-libraries/short-linking/short-link.registry';
+import { ShortLinkAdapter } from '@gitroom/nestjs-libraries/short-linking/short-link.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 
 @Injectable()
 export class OrgShortLinkSettingsService {
@@ -10,12 +13,50 @@ export class OrgShortLinkSettingsService {
   constructor(
     private _repository: OrgShortLinkSettingsRepository,
     private _encryption: EncryptionService,
-    private _registry: ShortLinkRegistry,
+    private _resolution: ProviderResolutionService,
+    @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
   ) {}
+
+  // Resolve a single short-link adapter through the kernel, or null when the
+  // provider is unknown/retired.
+  private _adapterFor(identifier: string, version?: string): ShortLinkAdapter | null {
+    try {
+      return this._resolution.resolveShortLink(identifier, {
+        version: version ?? 'v1',
+      });
+    } catch {
+      return null;
+    }
+  }
+
+  // The full catalog of registered short-link providers (one adapter per id),
+  // sourced from the kernel manifests now that the in-memory registry is gone.
+  private _listAdapters(): ShortLinkAdapter[] {
+    const byId = new Map<string, ShortLinkAdapter>();
+    for (const manifest of this._kernel.listManifests('shortlink')) {
+      if (byId.has(manifest.providerId)) continue;
+      const adapter = this._adapterFor(manifest.providerId, manifest.version);
+      if (adapter) byId.set(manifest.providerId, adapter);
+    }
+    return [...byId.values()];
+  }
+
+  // Static provider metadata (no org context) for the settings list route.
+  listProviderMetadata() {
+    return this._listAdapters().map((adapter) => ({
+      identifier: adapter.identifier,
+      name: adapter.name,
+      capabilities: adapter.capabilities,
+      credentialFields: adapter.credentialFields,
+      authType: adapter.authType,
+      defaultDomain: adapter.defaultDomain,
+      setupNotes: adapter.setupNotes,
+    }));
+  }
 
   async getProviders(orgId: string) {
     const configs = await this._repository.getByOrg(orgId);
-    const adapters = this._registry.list();
+    const adapters = this._listAdapters();
     return adapters.map((adapter) => {
       const dbConfigs = configs.filter((c) => c.identifier === adapter.identifier);
       const dbConfig = dbConfigs[dbConfigs.length - 1];
@@ -34,6 +75,7 @@ export class OrgShortLinkSettingsService {
         customDomain: dbConfig?.customDomain || '',
         configName: dbConfig?.name || '',
         accountFingerprint: dbConfig?.accountFingerprint || '',
+        version: dbConfig?.version ?? 'v1',
         createdAt: dbConfig?.createdAt || null,
         updatedAt: dbConfig?.updatedAt || null,
         configs: dbConfigs.map((c) => ({
@@ -42,6 +84,7 @@ export class OrgShortLinkSettingsService {
           accountFingerprint: c.accountFingerprint || '',
           isActive: c.isActive,
           customDomain: c.customDomain || '',
+          version: c.version ?? 'v1',
           createdAt: c.createdAt,
           updatedAt: c.updatedAt,
         })),
@@ -53,7 +96,7 @@ export class OrgShortLinkSettingsService {
     const config = await this._repository.getActive(orgId);
     if (!config) return null;
 
-    const adapter = this._registry.getAdapter(config.identifier);
+    const adapter = this._adapterFor(config.identifier, config.version ?? 'v1');
     if (!adapter) return null;
 
     const decrypted = this._decryptCredentials(config.credentials);
@@ -63,6 +106,7 @@ export class OrgShortLinkSettingsService {
       capabilities: adapter.capabilities,
       customDomain: config.customDomain,
       credentials: decrypted,
+      version: config.version ?? 'v1',
     };
   }
 
@@ -77,6 +121,7 @@ export class OrgShortLinkSettingsService {
       extraConfig?: Record<string, string>;
       name?: string;
       accountFingerprint?: string;
+      version?: string;
     },
   ) {
     const encryptedCredentials = data.credentials
@@ -87,6 +132,9 @@ export class OrgShortLinkSettingsService {
       ? this._encryption.encrypt(JSON.stringify(data.extraConfig))
       : undefined;
 
+    const version =
+      data.version ?? this._resolution.latestActiveVersion('shortlink', identifier) ?? 'v1';
+
     return this._repository.upsert(orgId, identifier, {
       ...data,
       credentials: encryptedCredentials,
@@ -94,16 +142,17 @@ export class OrgShortLinkSettingsService {
       customDomain: data.customDomain,
       name: data.name,
       accountFingerprint: data.accountFingerprint,
+      version,
     });
   }
 
-  async setActive(orgId: string, identifier: string) {
+  async setActive(orgId: string, identifier: string, version?: string) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config) {
       throw new Error(`Short-link provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._adapterFor(identifier, config.version ?? 'v1');
     if (!adapter) {
       throw new Error(`Unknown short-link provider: ${identifier}`);
     }
@@ -113,7 +162,10 @@ export class OrgShortLinkSettingsService {
       throw new Error(`Short-link provider "${identifier}" is not fully configured. Fill in all required credential fields first.`);
     }
 
-    return this._repository.setActive(orgId, identifier);
+    const pinnedVersion =
+      version ?? this._resolution.latestActiveVersion('shortlink', identifier) ?? 'v1';
+
+    return this._repository.setActive(orgId, identifier, pinnedVersion);
   }
 
   async delete(orgId: string, identifier: string) {
@@ -134,6 +186,19 @@ export class OrgShortLinkSettingsService {
     return this._repository.getAggregatedClicks(orgId, from, to);
   }
 
+  // Resolve the version pinned for this org+identifier (the same way upsert /
+  // set-active do): the stored config's version, else the latest active version,
+  // else v1. Used by the OAuth subroutes so authorize/callback resolve the same
+  // pinned version as the config.
+  async getPinnedVersion(orgId: string, identifier: string): Promise<string> {
+    const config = await this._repository.getByIdentifier(orgId, identifier);
+    return (
+      config?.version ??
+      this._resolution.latestActiveVersion('shortlink', identifier) ??
+      'v1'
+    );
+  }
+
   async getConfigForProvider(orgId: string, identifier: string) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
     if (!config) return null;
@@ -148,7 +213,7 @@ export class OrgShortLinkSettingsService {
       throw new Error(`Short-link provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._adapterFor(identifier, config.version ?? 'v1');
     if (!adapter) {
       throw new Error(`Unknown short-link provider: ${identifier}`);
     }

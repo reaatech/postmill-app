@@ -22,13 +22,27 @@ import { extend } from 'dayjs';
 import useCookie from 'react-use-cookie';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { timer } from '@gitroom/helpers/utils/timer';
-import { expandPostsList, expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
+import { expandPosts } from '@gitroom/helpers/utils/posts.list.minify';
 extend(isoWeek);
 extend(weekOfYear);
 
 export type ListStateFilter = 'all' | 'scheduled' | 'draft' | 'published';
 
 export type EngagementFilter = 'all' | 'has_comments' | 'errors' | 'top_performers';
+
+export type MetricOp = 'gt' | 'lt' | 'gte' | 'lte' | 'eq';
+export type MetricKey = 'views' | 'likes' | 'comments';
+export interface MetricConstraint {
+  op: MetricOp;
+  value: number | null;
+}
+export type MetricFilters = Record<MetricKey, MetricConstraint>;
+
+export const DEFAULT_METRIC_FILTERS: MetricFilters = {
+  views: { op: 'gte', value: null },
+  likes: { op: 'gte', value: null },
+  comments: { op: 'gte', value: null },
+};
 
 export const CalendarContext = createContext({
   startDate: newDayjs().startOf('isoWeek').format('YYYY-MM-DD'),
@@ -73,31 +87,84 @@ export const CalendarContext = createContext({
   changeDate: (id: string, date: dayjs.Dayjs) => {
     /** empty **/
   },
-  // List view specific
-  listPosts: [] as Array<
-    Post & {
-      integration: Integration;
-      tags: {
-        tag: Tags;
-      }[];
-      lastViews?: number | null;
-      lastLikes?: number | null;
-      lastComments?: number | null;
-      commentCount?: number;
-      unreadComments?: number;
-    }
-  >,
-  listPage: 0,
-  listTotalPages: 0,
-  setListPage: (page: number) => {
-    /** empty **/
-  },
+  // List view specific — the list renders the same date-range `posts` the
+  // calendar loads, so it shares the date navigator instead of paginating.
   listState: 'all' as ListStateFilter,
   setListState: (state: ListStateFilter) => {
     /** empty **/
   },
+  // The day/week/month window granularity used while in list view (the calendar
+  // views encode this in `display`; list keeps it here so the same nav drives both).
+  listRangeMode: 'week' as 'day' | 'week' | 'month',
+  setListRangeMode: (mode: 'day' | 'week' | 'month') => {
+    /** empty **/
+  },
   engagementFilter: 'all' as EngagementFilter,
   setEngagementFilter: (filter: EngagementFilter) => {
+    /** empty **/
+  },
+  // Multi-select channel filter (integration ids) — client-side over the loaded
+  // date-range posts, applies to both the calendar and the list view.
+  channelFilter: [] as string[],
+  setChannelFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Multi-select campaign filter (campaign ids), same client-side approach.
+  campaigns: [] as { id: string; name: string }[],
+  campaignFilter: [] as string[],
+  setCampaignFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Multi-select post-tag filter (tag ids) — post matches if it has any selected tag.
+  tags: [] as { id: string; name: string; color: string }[],
+  tagFilter: [] as string[],
+  setTagFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Per-metric operator+value filter for views/likes/comments.
+  metricFilter: DEFAULT_METRIC_FILTERS as MetricFilters,
+  setMetricFilter: (next: MetricFilters) => {
+    /** empty **/
+  },
+  // Free-text content search (HTML-stripped match on post content).
+  contentSearch: '' as string,
+  setContentSearch: (v: string) => {
+    /** empty **/
+  },
+  // Platform/network filter (provider identifiers), distinct from per-account channels.
+  platformFilter: [] as string[],
+  setPlatformFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Creation-method filter (WEB/API/AUTOPOST/MCP/CLI/UNKNOWN).
+  creationMethodFilter: [] as string[],
+  setCreationMethodFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Draft approval-status filter (pending/approved/rejected).
+  approvalFilter: [] as string[],
+  setApprovalFilter: (ids: string[]) => {
+    /** empty **/
+  },
+  // Media-type filter (all / none / image / video).
+  mediaTypeFilter: 'all' as 'all' | 'none' | 'image' | 'video',
+  setMediaTypeFilter: (v: 'all' | 'none' | 'image' | 'video') => {
+    /** empty **/
+  },
+  // Boolean toggles.
+  recurringOnly: false,
+  setRecurringOnly: (v: boolean) => {
+    /** empty **/
+  },
+  unreadOnly: false,
+  setUnreadOnly: (v: boolean) => {
+    /** empty **/
+  },
+  // Number of non-default filters currently applied (for the filter-button badge).
+  appliedFilterCount: 0,
+  // Whether the current window is a user-picked custom date range.
+  customRange: false,
+  applyCustomRange: (startDate: string, endDate: string) => {
     /** empty **/
   },
 });
@@ -164,15 +231,38 @@ export const CalendarWeekProvider: FC<{
   const [displaySaved, setDisplaySaved] = useCookie('calendar-display', 'week');
   const display = searchParams.get('display') || displaySaved;
 
-  // List view state
-  const [listPage, setListPage] = useState(0);
-  const [listState, setListStateRaw] = useState<ListStateFilter>('all');
-  const setListState = useCallback((next: ListStateFilter) => {
-    setListStateRaw(next);
-    setListPage(0);
-  }, []);
+  // List view state — the list now renders the same date-range posts as the
+  // calendar, so `listState` is a client-side filter over that window (no paging).
+  const [listState, setListState] = useState<ListStateFilter>('all');
+  const [listRangeSaved, setListRangeSaved] = useCookie(
+    'calendar-list-range',
+    'week'
+  );
+  const listRangeMode = (['day', 'week', 'month'].includes(listRangeSaved)
+    ? listRangeSaved
+    : 'week') as 'day' | 'week' | 'month';
+  const setListRangeMode = useCallback(
+    (mode: 'day' | 'week' | 'month') => setListRangeSaved(mode),
+    [setListRangeSaved]
+  );
 
   const [engagementFilter, setEngagementFilter] = useState<EngagementFilter>('all');
+  const [channelFilter, setChannelFilter] = useState<string[]>([]);
+  const [campaignFilter, setCampaignFilter] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [metricFilter, setMetricFilter] = useState<MetricFilters>(
+    DEFAULT_METRIC_FILTERS
+  );
+  const [contentSearch, setContentSearch] = useState('');
+  const [platformFilter, setPlatformFilter] = useState<string[]>([]);
+  const [creationMethodFilter, setCreationMethodFilter] = useState<string[]>([]);
+  const [approvalFilter, setApprovalFilter] = useState<string[]>([]);
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<
+    'all' | 'none' | 'image' | 'video'
+  >('all');
+  const [recurringOnly, setRecurringOnly] = useState(false);
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [customRange, setCustomRange] = useState(false);
 
   // Initialize with current date range based on URL params or defaults
   const initStartDate = searchParams.get('startDate');
@@ -182,7 +272,7 @@ export const CalendarWeekProvider: FC<{
   const initialRange =
     initStartDate && initEndDate
       ? { startDate: initStartDate, endDate: initEndDate }
-      : getDateRange(display);
+      : getDateRange(display === 'list' ? listRangeMode : display);
 
   const [filters, setFilters] = useState({
     startDate: initialRange.startDate,
@@ -213,52 +303,18 @@ export const CalendarWeekProvider: FC<{
     return expandPosts(data);
   }, [filters, params]);
 
-  // List view data fetcher
-  const listParams = useMemo(() => {
-    return new URLSearchParams({
-      page: listPage.toString(),
-      limit: '100',
-      customer: filters?.customer?.toString() || '',
-      state: listState,
-    }).toString();
-  }, [listPage, filters.customer, listState]);
-
-  const loadListData = useCallback(async () => {
-    const response = await fetch(`/posts/list?${listParams}`);
-    return expandPostsList(await response.json());
-  }, [listParams]);
-
-  // SWR for calendar view
+  // Single date-range fetch drives both the calendar and the list view (the list
+  // renders the same window as a chronological list).
   const {
     data: calendarData,
     isLoading: calendarIsLoading,
     mutate: mutateCalendar,
-  } = useSWR(
-    filters.display !== 'list' ? `/posts-${params}` : null,
-    loadData,
-    {
-      refreshInterval: 3600000,
-      refreshWhenOffline: false,
-      refreshWhenHidden: false,
-      revalidateOnFocus: false,
-    }
-  );
-
-  // SWR for list view
-  const {
-    data: listData,
-    isLoading: listIsLoading,
-    mutate: mutateList,
-  } = useSWR(
-    filters.display === 'list' ? `/posts-list-${listParams}` : null,
-    loadListData,
-    {
-      refreshInterval: 3600000,
-      refreshWhenOffline: false,
-      refreshWhenHidden: false,
-      revalidateOnFocus: false,
-    }
-  );
+  } = useSWR(`/posts-${params}`, loadData, {
+    refreshInterval: 3600000,
+    refreshWhenOffline: false,
+    refreshWhenHidden: false,
+    revalidateOnFocus: false,
+  });
 
   const defaultSign = useCallback(async () => {
     return await (await fetch('/signatures/default')).json();
@@ -266,6 +322,18 @@ export const CalendarWeekProvider: FC<{
 
   const setList = useCallback(async () => {
     return (await fetch('/sets')).json();
+  }, []);
+
+  const loadCampaigns = useCallback(async () => {
+    const r = await fetch('/campaigns');
+    if (!r.ok) return [];
+    return r.json();
+  }, []);
+
+  const loadTags = useCallback(async () => {
+    const r = await fetch('/posts/tags');
+    if (!r.ok) return { tags: [] };
+    return r.json();
   }, []);
 
   const { data: sets, mutate } = useSWR('sets', setList, {
@@ -284,6 +352,32 @@ export const CalendarWeekProvider: FC<{
     refreshWhenHidden: false,
     refreshWhenOffline: false,
   });
+  const { data: campaignList } = useSWR('/campaigns', loadCampaigns, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+  });
+  const campaigns = useMemo(
+    () =>
+      (campaignList || []).map((c: any) => ({ id: c.id, name: c.name })),
+    [campaignList]
+  );
+  const { data: tagsData } = useSWR('load-tags', loadTags, {
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+  });
+  const tags = useMemo(
+    () =>
+      (tagsData?.tags || []).map((tg: any) => ({
+        id: tg.id,
+        name: tg.name,
+        color: tg.color,
+      })),
+    [tagsData?.tags]
+  );
 
   const setFiltersWrapper = useCallback(
     (newFilters: {
@@ -295,11 +389,8 @@ export const CalendarWeekProvider: FC<{
       setDisplaySaved(newFilters.display);
       setFilters(newFilters);
       setInternalData([]);
-
-      // Reset page when switching to list view
-      if (newFilters.display === 'list') {
-        setListPage(0);
-      }
+      // Any standard window change clears a custom range.
+      setCustomRange(false);
 
       const path = [
         `startDate=${newFilters.startDate}`,
@@ -307,23 +398,144 @@ export const CalendarWeekProvider: FC<{
         `display=${newFilters.display}`,
         newFilters.customer ? `customer=${newFilters.customer}` : ``,
       ].filter((f) => f);
-      window.history.replaceState(null, '', `/schedule?${path.join('&')}`);
+      window.history.replaceState(null, '', `/posts?${path.join('&')}`);
     },
     []
+  );
+
+  // Arbitrary start/end date range chosen from the calendar picker. It renders in
+  // the list view (which paginates any range) and is flagged so the header/window
+  // controls show "Custom" instead of a day/week/month window.
+  const applyCustomRange = useCallback(
+    (startDate: string, endDate: string) => {
+      // Keep the list view if already there (it paginates any range); otherwise
+      // use a week-style grid (hourly columns) rendered by the RangeView.
+      const display = filters.display === 'list' ? 'list' : 'week';
+      setFiltersWrapper({
+        startDate,
+        endDate,
+        display,
+        customer: filters.customer,
+      });
+      setCustomRange(true);
+    },
+    [setFiltersWrapper, filters.display, filters.customer]
   );
 
   const posts = useMemo(() => calendarData?.posts || [], [calendarData?.posts]);
   const comments = useMemo(() => calendarData?.comments || [], [calendarData?.comments]);
 
-  // List view data
-  const listPosts = useMemo(() => listData?.posts || [], [listData?.posts]);
-  const listTotal = listData?.total || 0;
-  const listTotalPages = Math.ceil(listTotal / 100);
-
   const filteredPosts = useMemo(() => {
-    if (engagementFilter === 'all') return internalData;
+    // State filter (All/Scheduled/Draft/Published) applies to BOTH the calendar
+    // and the list, so it lives here on the shared post set.
+    let base = internalData;
+    if (listState !== 'all') {
+      const wanted =
+        listState === 'scheduled'
+          ? 'QUEUE'
+          : listState === 'draft'
+          ? 'DRAFT'
+          : 'PUBLISHED';
+      base = base.filter((post: any) => post.state === wanted);
+    }
 
-    let filtered = internalData.filter((post: any) => {
+    // Multi-select channel filter (integration ids).
+    if (channelFilter.length) {
+      const set = new Set(channelFilter);
+      base = base.filter((post: any) => set.has(post.integration?.id));
+    }
+
+    // Multi-select campaign filter (campaign ids).
+    if (campaignFilter.length) {
+      const set = new Set(campaignFilter);
+      base = base.filter((post: any) => set.has(post.campaignId));
+    }
+
+    // Multi-select post-tag filter — post matches if it has any selected tag.
+    if (tagFilter.length) {
+      const set = new Set(tagFilter);
+      base = base.filter((post: any) =>
+        (post.tags || []).some((tw: any) => set.has(tw?.tag?.id))
+      );
+    }
+
+    // Per-metric operator+value filter (views/likes/comments).
+    const metricKeys: MetricKey[] = ['views', 'likes', 'comments'];
+    if (metricKeys.some((k) => typeof metricFilter[k].value === 'number')) {
+      base = base.filter((post: any) => {
+        const values: Record<MetricKey, number> = {
+          views: post.lastViews || 0,
+          likes: post.lastLikes || 0,
+          comments: post.commentCount || post.lastComments || 0,
+        };
+        return metricKeys.every((k) => {
+          const { op, value } = metricFilter[k];
+          if (typeof value !== 'number') return true;
+          const v = values[k];
+          return op === 'gt'
+            ? v > value
+            : op === 'lt'
+            ? v < value
+            : op === 'lte'
+            ? v <= value
+            : op === 'eq'
+            ? v === value
+            : v >= value;
+        });
+      });
+    }
+
+    // Free-text content search (HTML-stripped).
+    if (contentSearch.trim()) {
+      const q = contentSearch.trim().toLowerCase();
+      base = base.filter((post: any) =>
+        (post.content || '')
+          .replace(/<[^>]*>/g, ' ')
+          .toLowerCase()
+          .includes(q)
+      );
+    }
+
+    // Platform / network (provider identifier).
+    if (platformFilter.length) {
+      const set = new Set(platformFilter);
+      base = base.filter((post: any) =>
+        set.has(post.integration?.providerIdentifier)
+      );
+    }
+
+    // Creation method.
+    if (creationMethodFilter.length) {
+      const set = new Set(creationMethodFilter);
+      base = base.filter((post: any) => set.has(post.creationMethod));
+    }
+
+    // Draft approval status.
+    if (approvalFilter.length) {
+      const set = new Set(approvalFilter);
+      base = base.filter((post: any) => set.has(post.approvalStatus));
+    }
+
+    // Media type.
+    if (mediaTypeFilter !== 'all') {
+      base = base.filter(
+        (post: any) => (post.mediaType || 'none') === mediaTypeFilter
+      );
+    }
+
+    // Recurring only.
+    if (recurringOnly) {
+      base = base.filter((post: any) => post.intervalInDays != null);
+    }
+
+    // Unread comments only.
+    if (unreadOnly) {
+      base = base.filter((post: any) => (post.unreadComments || 0) > 0);
+    }
+
+    if (engagementFilter === 'all') return base;
+
+    let filtered = base.filter((post: any) => {
       switch (engagementFilter) {
         case 'has_comments':
           return (post.commentCount || post.lastComments || 0) > 0;
@@ -345,7 +557,22 @@ export const CalendarWeekProvider: FC<{
     }
 
     return filtered;
-  }, [internalData, engagementFilter]);
+  }, [
+    internalData,
+    engagementFilter,
+    listState,
+    channelFilter,
+    campaignFilter,
+    tagFilter,
+    metricFilter,
+    contentSearch,
+    platformFilter,
+    creationMethodFilter,
+    approvalFilter,
+    mediaTypeFilter,
+    recurringOnly,
+    unreadOnly,
+  ]);
 
   const changeDate = useCallback(
     (id: string, date: dayjs.Dayjs) => {
@@ -370,14 +597,53 @@ export const CalendarWeekProvider: FC<{
     }
   }, [posts]);
 
-  // Combined reload function that handles both calendar and list views
+  // Count of non-default filters (date range / window are navigation, not counted;
+  // Metrics counts once if any of views/likes/comments has a value).
+  const appliedFilterCount = useMemo(() => {
+    let n = 0;
+    if (listState !== 'all') n++;
+    if (engagementFilter !== 'all') n++;
+    if (channelFilter.length) n++;
+    if (campaignFilter.length) n++;
+    if (tagFilter.length) n++;
+    if (contentSearch.trim()) n++;
+    if (platformFilter.length) n++;
+    if (creationMethodFilter.length) n++;
+    if (approvalFilter.length) n++;
+    if (mediaTypeFilter !== 'all') n++;
+    if (recurringOnly) n++;
+    if (unreadOnly) n++;
+    if (filters.customer) n++;
+    if (
+      (['views', 'likes', 'comments'] as MetricKey[]).some(
+        (k) => typeof metricFilter[k].value === 'number'
+      )
+    ) {
+      n++;
+    }
+    return n;
+  }, [
+    listState,
+    engagementFilter,
+    channelFilter,
+    campaignFilter,
+    tagFilter,
+    contentSearch,
+    platformFilter,
+    creationMethodFilter,
+    approvalFilter,
+    mediaTypeFilter,
+    recurringOnly,
+    unreadOnly,
+    filters.customer,
+    metricFilter,
+  ]);
+
   const reloadCalendarView = useCallback(() => {
     mutateCalendar();
-    mutateList();
-  }, [mutateCalendar, mutateList]);
+  }, [mutateCalendar]);
 
-  // Determine loading state based on current view
-  const loading = filters.display === 'list' ? listIsLoading : calendarIsLoading;
+  const loading = calendarIsLoading;
 
   return (
     <CalendarContext.Provider
@@ -394,14 +660,39 @@ export const CalendarWeekProvider: FC<{
         sets: sets || [],
         signature: sign,
         // List view specific
-        listPosts,
-        listPage,
-        listTotalPages,
-        setListPage,
         listState,
         setListState,
+        listRangeMode,
+        setListRangeMode,
         engagementFilter,
         setEngagementFilter,
+        channelFilter,
+        setChannelFilter,
+        campaigns,
+        campaignFilter,
+        setCampaignFilter,
+        tags,
+        tagFilter,
+        setTagFilter,
+        metricFilter,
+        setMetricFilter,
+        contentSearch,
+        setContentSearch,
+        platformFilter,
+        setPlatformFilter,
+        creationMethodFilter,
+        setCreationMethodFilter,
+        approvalFilter,
+        setApprovalFilter,
+        mediaTypeFilter,
+        setMediaTypeFilter,
+        recurringOnly,
+        setRecurringOnly,
+        unreadOnly,
+        setUnreadOnly,
+        appliedFilterCount,
+        customRange,
+        applyCustomRange,
       }}
     >
       {children}

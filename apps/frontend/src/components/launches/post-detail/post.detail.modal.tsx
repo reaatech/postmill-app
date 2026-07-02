@@ -386,10 +386,10 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
         </div>
       )}
 
-      {/* Comments Section */}
+      {/* Replies (synced social comments) Section */}
       <div className="flex flex-col gap-[8px]">
         <div className="text-[16px] font-[500]">
-          {t('comments', 'Comments')}
+          {t('replies', 'Replies')}
         </div>
         {state !== 'PUBLISHED' || !mainPost?.releaseId || mainPost.releaseId === 'missing' ? (
           <div className="bg-newTableHeader border border-newTableBorder rounded-[8px] p-[20px] text-center">

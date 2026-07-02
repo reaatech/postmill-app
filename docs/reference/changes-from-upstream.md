@@ -8,6 +8,86 @@ has the full per-commit detail.
 
 ---
 
+### Unreleased
+
+**AI Designer Foundations.** The server now owns the `DesignerDoc` contract with a single zod
+schema (`libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts`) shared as a
+type-only import by the frontend store and renderer. `DesignerDocService` provides `validate`,
+`validateStrict`, `applyOps`, and `assignIdsAndNormalize`; every design/template write validates
+and persists the clamped doc, and `Design.width/height` are reconciled from `doc.outputs[0]`. New
+endpoints: `POST /media/designs/validate` and `POST /media/designs/apply-ops`. `/copilot/agent`
+now carries the acting `user` in Mastra context, and the `designerDesign` Mastra tool creates/
+updates designs from a doc, template, or op sequence with image preview persistence. No Prisma
+migration is required.
+
+**Schedule renamed to Posts.** The main scheduling workspace is now **Posts** at `/posts` (was
+"Schedule" at `/schedule`; the composer pages move to `/posts/post` and `/posts/post/:id`). The
+sidebar label, page title, and docs use "Posts." Legacy `/schedule` (and sub-paths) and the older
+`/launches` both permanently redirect to `/posts`, so existing links keep working.
+
+**Plugs folded into the composer.** The provider "plugs" automations no longer have a standalone
+`/plugs` page — both types are configured in the composer's per-channel settings panel. Channel-wide
+**auto plugs** (`@Plug`) appear as an **Automations** section (still stored channel-scoped in the
+`Plugs` table, gated on `channels:update`); per-post **post plugs** (`@PostPlug`) keep their existing
+per-post section. The `/plugs` route/nav and `components/plugs/` are removed; backend plug routes and
+storage are unchanged. The orphaned `ExisingPlugData` dedup table (and its dead code) was dropped.
+
+**Campaign Discussion.** The campaign dashboard gains an internal, Jira-style **Discussion** thread
+(below the tabs) for org members to talk about a campaign — separate from the synced social
+**Comments**. Rich-text (TipTap) notes with embedded image/video, @mentions (notify), emoji
+reactions, one-level threaded replies, pin/resolve, and edit/delete-your-own. New additive tables
+`CampaignNote` / `CampaignNoteReaction`; new routes under `/campaigns/:id/notes`. Note HTML is
+sanitized on write and on render.
+
+### v4.0.0 (June 2026)
+
+**Unified, versioned provider framework.** All provider domains — AI, Media, Storage, Short-link,
+Social, VPN, Content Packs, Email, and Auth — now resolve through a single `ProviderKernel`
+(`libraries/providers/kernel`) with one workspace package per provider (`libraries/providers/<id>`).
+
+- Every provider config/ledger row carries a pinned `version` (`v1` for all current providers). A
+  future `v2` adapter cannot silently change an existing org's behavior.
+- `ProviderResolutionService` (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`)
+  is the single runtime bridge; the kernel is the sole resolution path.
+- New endpoints: `GET /providers/catalog?domain=` (public catalog) and
+  `GET /admin/providers/health?domain=` (super-admin, per-version health).
+- The `PROVIDER_KERNEL=legacy` kill switch and all legacy in-memory registries have been removed —
+  there is no fallback registry.
+
+See [Provider Framework](../developer-docs/provider-framework.md) and
+[Provider Versions](../reference/provider-versions.md).
+
+### v3.9.1 (June 2026)
+
+**Per-organization AI Model Defaults and Media Defaults.** Default model resolution is now
+category-driven and tenant-scoped instead of relying on the legacy scope/model hardcoding.
+
+- **AI Model Defaults** — four categories (`low-reasoning`, `high-reasoning`, `vision`, `workflow`)
+  configured under Settings → AI → Model Defaults. The legacy AI scopes (`utility`, `generator`,
+  `agent`, `mcp`) collapse onto these categories, and `reasoning:true` now resolves the
+  `high-reasoning` default.
+- **Media Defaults** — 16 categories covering image, video, audio, slide, and caption operations,
+  configured under Settings → Content → Media Defaults. Each category maps to a base media operation
+  (`image`, `video`, `audio`, `tts`, `upscale`, `bg-remove`, `inpaint`, `slide`, `caption`, `avatar`,
+  `video-bg`, `video-upscale`). AI-tab providers (e.g. OpenAI) now also appear under **Media
+  Defaults** via the AI+Media candidate union.
+- Defaults are stored in `OrgDefaultModel` (`domain`, `category`, `providerId`, `version`, `model`,
+  `settings`) and resolved lazily by `DefaultsResolutionService`. When no default is stored, the
+  resolver auto-picks from the org's enabled providers using provider `metadata.ts` category/capability
+  flags. Auto-picks are deterministic but may differ from the old hardcoded defaults when the active
+  provider is not the historical one.
+- New endpoints: `GET /settings/ai/defaults`, `PUT/DELETE /settings/ai/defaults/:category`,
+  `GET /settings/ai/defaults/catalog?category=`; media mirror under `/settings/content/media-defaults`.
+- Kill switch: `AI_MODEL_DEFAULTS_ENABLED=false` (default `true`) reverts AI model resolution to the
+  legacy `orgActive`/`SURFACE_DEFAULTS` chain.
+- Legacy deleted: `VideoManager`, the `@Video` registry, `ImagesSlides`, `Veo3`,
+  `AiMediaGenerationService`, and the `generate.video.options` chat tool. Composer AI media tools,
+  Designer media operations, and the video generator now route through `AiDefaultsService`/
+  `AiMediaService`.
+- Removed env vars: `KIEAI_API_KEY` (Veo3), `TRANSLOADIT_AUTH`, `TRANSLOADIT_SECRET`, and the legacy
+  `ELEVENSLABS_API_KEY` path (configure ElevenLabs as an AI Media provider instead). `FAL_KEY` remains
+  in use by the short-link adapter.
+
 ### v3.9.0 (June 2026)
 
 Temporal → Inngest migration — background jobs now run through Inngest Cloud (or the local dev
@@ -38,12 +118,33 @@ Files folder and complete through the Inngest poll sweep. The studio is intentio
 surface in v1: it does **not** participate in C2PA provenance signing or the shared media-pipeline
 cost ledger; accounting is tracked per job through `AIMediaJob.costUsd`/`creditType`.
 
+v3.9.0 also reworks **Settings → Channels** into *named credential sets*: an org can configure
+**multiple OAuth-app credential sets for the same provider**, each with a required name and its own
+auth. Configuration moved into a modal, the capability filter buttons were collapsed into a single
+checkbox dropdown, and the page heading was dropped. Schema-wise, `OrgProviderConfiguration` is now
+unique on `(organizationId, identifier, name)` (resolved by row `id`) and `Integration` gained a
+nullable `providerConfigId` FK binding each connected account to the set it used (fallback to the
+org's primary set when unbound). Additive and db-push-safe.
+
 Stock browsing was expanded with free vectors (Pixabay), stickers (GIPHY), and icons (Iconify),
 joining existing photos (Unsplash) and videos (Pexels). Results carry `source`, `license`, and
 `attribution` metadata through preview, Designer open, and `/files/import`. Premium Content Packs
 (BYOK) were added under **Settings → Content Packs**, with Magnific as the first supported pack
 (photos, vectors, icons, videos). An active pack takes precedence over the matching free catalog;
 credentials are encrypted at rest and never returned to the client.
+
+v3.9.0 introduces the **Campaign Hub** (`/campaigns/:id`). Campaigns now expose a dashboard with
+KPIs, recent changelog, a planning workspace, tagged items (tags, media, notes, tasks, personas,
+tone, messages, goals, KPIs), and a dedicated posts section. Draft approval gates promotion to
+scheduled posts; campaign-level UTM tagging appends `utm_campaign`, `utm_source`, and `utm_medium` to
+outbound links. Campaign copy clones draft posts with optional date shifting and re-tags all
+campaign items. Org members can export CSV/PDF reports, and a shareable public report
+(`/public/campaign-report/:token`) returns read-only JSON when enabled. A daily Inngest cron
+`campaign-tag-purge` removes stale campaign items after `CAMPAIGN_PURGE_DAYS` (default 30). The
+dashboard also embeds a **campaign-scoped comments view** (filter by status/channel/assignee/unread,
+reply, like, status, assign, bulk mark-handled) reusing the cross-channel inbox endpoint with new
+`campaignId`/`integrationId` filters; the **Comments KPI/goal count synced, replyable comments**
+rather than the platform-reported engagement total.
 
 ### v3.8.10 (June 2026)
 
@@ -161,7 +262,7 @@ base-plus-mounted model with no default provider.
 
 - **Calendar renamed to Schedule** — the route changes from `/launches` to `/schedule` (with a
   permanent redirect). All user-facing copy updated: the sidebar, page titles, and documentation
-  now use "Schedule."
+  now use "Schedule." (Later renamed again to **Posts** / `/posts` — see Unreleased.)
 - **Calendar stats live-fallback** — post cards now show views/likes/comments even when no
   `PostAnalyticsSnapshot` exists yet (fallback to live platform data). Previously the stats footer
   was hidden until the next cron sweep.

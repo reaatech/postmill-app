@@ -2,11 +2,11 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AIMediaJob } from '@prisma/client';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
-import { MediaProviderRegistry } from '@gitroom/nestjs-libraries/media/media-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { MediaArtifactMetadata } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-token';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
-import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
@@ -24,7 +24,7 @@ const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 // 'stt' jobs are created already-complete (transcript stored inline via
 // completeJobWithBuffer), so they never enter the async poll path — but the type must
 // admit them so the Deepgram studio can record transcript history as media jobs.
-type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image' | 'stt';
+type AsyncOperation = 'video' | 'audio' | 'avatar' | 'image' | 'stt' | 'slide' | 'caption' | 'video-bg' | 'video-upscale';
 
 const OPERATION_FOLDER: Record<string, string> = {
   image: 'images',
@@ -33,6 +33,10 @@ const OPERATION_FOLDER: Record<string, string> = {
   audio: 'audio',
   tts: 'audio',
   stt: 'documents',
+  slide: 'video',
+  caption: 'video',
+  'video-bg': 'video',
+  'video-upscale': 'video',
 };
 
 const OPERATION_MEDIA_TYPE: Record<string, string> = {
@@ -42,6 +46,10 @@ const OPERATION_MEDIA_TYPE: Record<string, string> = {
   audio: 'audio',
   tts: 'audio',
   stt: 'document',
+  slide: 'video',
+  caption: 'video',
+  'video-bg': 'video',
+  'video-upscale': 'video',
 };
 
 const MIME_EXT: Record<string, string> = {
@@ -71,9 +79,9 @@ export class MediaJobLifecycleService {
   constructor(
     private _aiSettings: AiSettingsService,
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
-    private _registry: MediaProviderRegistry,
+    private _resolution: ProviderResolutionService,
     private _storageService: StorageService,
-    private _fileRepository: FileRepository,
+    private _fileService: FileService,
     private _notificationService: NotificationService,
   ) {}
 
@@ -88,7 +96,7 @@ export class MediaJobLifecycleService {
     creditType?: string;
     folderId?: string | null;
     model?: string | null;
-    versionId?: string | null;
+    version?: string | null;
     inputJson?: string | null;
   }): Promise<AIMediaJob> {
     return this._aiSettings.createMediaJob({
@@ -101,7 +109,7 @@ export class MediaJobLifecycleService {
       creditType: params.creditType,
       folderId: params.folderId,
       model: params.model,
-      versionId: params.versionId,
+      version: params.version ?? 'v1',
       inputJson: params.inputJson,
     });
   }
@@ -164,18 +172,33 @@ export class MediaJobLifecycleService {
     const providerJobId = this.providerJobRef(job);
     if (!providerJobId) return 'skipped';
 
-    const adapter = this._registry.get(job.provider);
-    if (!adapter?.pollJob) {
-      await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
-      return 'failed';
-    }
-
     const config = await this._orgMediaProviderSettings.getConfigForProvider(
       job.organizationId,
       job.provider,
     );
     if (!config) {
       await this.failJob(job, `Provider "${job.provider}" is no longer configured`);
+      return 'failed';
+    }
+
+    let adapter;
+    try {
+      adapter = this._resolution.resolveMedia(job.provider, {
+        version: config.version ?? job.version ?? 'v1',
+        credentials: config.credentials,
+        orgId: job.organizationId,
+      });
+    } catch (err) {
+      // Unknown/retired provider version throws — fail the job cleanly instead of
+      // leaving it pending until the 24h timeout (and 500-ing the webhook path).
+      await this.failJob(
+        job,
+        `Provider "${job.provider}" could not be resolved: ${(err as Error).message}`,
+      );
+      return 'failed';
+    }
+    if (!adapter?.pollJob) {
+      await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
       return 'failed';
     }
 
@@ -195,6 +218,14 @@ export class MediaJobLifecycleService {
     }
     if (poll.status === 'completed' && poll.artifactUrl) {
       const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
+      // Land any additional artifacts from the SAME generation (e.g. Suno returns 2 clips) as
+      // sibling completed jobs. Done after the primary completes: once the primary flips to
+      // `completed`, processJob short-circuits to 'skipped' on later sweeps, so siblings are
+      // created exactly once. (Primary-first ordering means a mid-fan-out crash loses an extra
+      // clip rather than duplicating the set on the next retry.)
+      if (ok && poll.extraArtifactUrls?.length) {
+        await this._landExtraArtifacts(job, poll.extraArtifactUrls, poll.metadata);
+      }
       return ok ? 'completed' : 'failed';
     }
 
@@ -202,6 +233,36 @@ export class MediaJobLifecycleService {
       await this._aiSettings.updateMediaJob(job.id, { status: 'processing' });
     }
     return 'pending';
+  }
+
+  // Land extra artifacts from a single provider job (e.g. a music provider returning multiple
+  // takes) as independent sibling jobs, each already completed, so every clip becomes its own
+  // File row + render-queue card. Best-effort: a failed sibling is logged and never fails the
+  // primary job's completion.
+  private async _landExtraArtifacts(
+    primary: AIMediaJob,
+    urls: string[],
+    metadata?: MediaArtifactMetadata,
+  ): Promise<void> {
+    for (const url of urls) {
+      try {
+        const sibling = await this.createPendingJob({
+          organizationId: primary.organizationId,
+          userId: primary.userId ?? undefined,
+          provider: primary.provider,
+          operation: primary.operation as AsyncOperation,
+          folderId: primary.folderId,
+          model: primary.model,
+          version: primary.version,
+          inputJson: primary.inputJson,
+        });
+        await this.completeJob(sibling, url, metadata, primary.folderId);
+      } catch (err) {
+        this._logger.warn(
+          `Failed to land extra artifact for job ${primary.id}: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 
   // Download the artifact (provider URLs expire), land it in tenant storage under the
@@ -262,7 +323,7 @@ export class MediaJobLifecycleService {
       });
 
       if (thumbnailPath) {
-        await this._fileRepository.saveMediaInformation(job.organizationId, {
+        await this._fileService.saveMediaInformation(job.organizationId, {
           id: stored.mediaId,
           thumbnail: thumbnailPath,
           alt: '',
@@ -471,7 +532,7 @@ export class MediaJobLifecycleService {
         : null);
 
     const ext = MIME_EXT[params.mime] || 'bin';
-    const media = await this._fileRepository.saveGeneratedMedia(params.organizationId, {
+    const media = await this._fileService.saveGeneratedMedia(params.organizationId, {
       name: `${params.baseName}.${ext}`,
       path,
       type: OPERATION_MEDIA_TYPE[params.operation] || 'other',
@@ -490,14 +551,14 @@ export class MediaJobLifecycleService {
     message: string,
   ): Promise<void> {
     try {
-      await this._notificationService.inAppNotification(
-        job.organizationId,
-        subject,
+      await this._notificationService.notify({
+        orgId: job.organizationId,
+        category: 'media',
+        title: subject,
         message,
-        false,
-        false,
-        type,
-      );
+        metadata: { mediaJobId: job.id, operation: job.operation },
+        channels: { email: false, push: false, inApp: true },
+      });
     } catch (err) {
       this._logger.warn(`Media job notification failed: ${(err as Error).message}`);
     }

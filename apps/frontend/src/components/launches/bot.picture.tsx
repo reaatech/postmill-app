@@ -8,8 +8,12 @@ import { Input } from '@gitroom/react/form/input';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import { showFileBox } from '@gitroom/frontend/components/files/file.component';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import {
+  MediaSelectorItem,
+  MediaSelectorModal,
+} from '@gitroom/frontend/components/media-tools/media-selector-modal';
+
 export const BotPicture: FC<{
   integration: Integrations;
   canChangeProfilePicture: boolean;
@@ -23,6 +27,7 @@ export const BotPicture: FC<{
   const [picture, setPicture] = useState(
     props.integration.picture || '/no-picture.jpg'
   );
+  const [pickerOpen, setPickerOpen] = useState(false);
   const fetch = useFetch();
   const submitForm: FormEventHandler<HTMLFormElement> = useCallback(
     async (e) => {
@@ -38,12 +43,11 @@ export const BotPicture: FC<{
       toast.show(t('updated', 'Updated'), 'success');
       modal.closeAll();
     },
-    [nick, picture, props.mutate]
+    [nick, picture, props.mutate, props.integration.id]
   );
-  const openMedia = useCallback(() => {
-    showFileBox((values) => {
-      setPicture(values.path);
-    });
+  const handleSelect = useCallback((item: MediaSelectorItem) => {
+    setPickerOpen(false);
+    setPicture(item.url);
   }, []);
   return (
     <div className="rounded-[4px] border border-newTableBorder bg-newBgColorInner px-[16px] pb-[16px] relative w-full">
@@ -75,10 +79,10 @@ export const BotPicture: FC<{
             <div className="flex items-center gap-[20px]">
               <img
                 src={picture}
-                alt="Bot Picture"
+                alt="Bot avatar"
                 className="w-[100px] h-[100px] rounded-full"
               />
-              <Button type="button" onClick={openMedia}>
+              <Button type="button" onClick={() => setPickerOpen(true)}>
                 {t('upload', 'Upload')}
               </Button>
             </div>
@@ -99,6 +103,12 @@ export const BotPicture: FC<{
           </div>
         </form>
       </div>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        onSelect={handleSelect}
+        kinds={['image']}
+      />
     </div>
   );
 };

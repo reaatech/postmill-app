@@ -1,4 +1,5 @@
 import { IUploadProvider } from './upload.interface';
+import { Logger } from '@nestjs/common';
 import { mkdirSync, unlink, writeFileSync } from 'fs';
 import { randomBytes } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
@@ -23,6 +24,7 @@ const LOCAL_STORAGE_ALLOWED_MIME = new Set<string>([
   'font/woff2',
 ]);
 export class LocalStorage implements IUploadProvider {
+  private readonly _logger = new Logger(LocalStorage.name);
   constructor(private uploadDirectory: string) {}
 
   async uploadSimple(path: string) {
@@ -98,7 +100,11 @@ export class LocalStorage implements IUploadProvider {
         originalname: `${randomName}${safeExt}`,
       };
     } catch (err) {
-      console.error('Error uploading file to Local Storage:', err);
+      this._logger.error(
+        `Error uploading file to Local Storage: ${
+          (err as Error)?.message ?? String(err)
+        }`
+      );
       throw err;
     }
   }

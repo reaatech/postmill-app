@@ -4,12 +4,14 @@ import {
   Controller,
   Delete,
   Get,
+  Inject,
+  Optional,
   Param,
   Post,
   Put,
-  Query,
   HttpException,
   HttpStatus,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -17,23 +19,28 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
-import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
+import {
+  AiSettingsManager,
+  normalizeProviderId,
+  qualifyProviderId,
+} from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SaveGovernanceDto } from '@gitroom/nestjs-libraries/dtos/ai-settings/governance.dto';
-import { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ProviderHealthService } from '@gitroom/nestjs-libraries/ai/governance/provider-health.service';
 import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
-import { AIScope } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
+import { ProviderKernel, DEFAULT_VERSION, parseQualified, qualify } from '@gitroom/provider-kernel';
 
 @ApiTags('AI Settings')
 @Controller('/admin/ai-settings')
 @UseGuards(OrgRbacGuard)
 export class AiSettingsController {
-  private readonly VALID_SCOPES: AIScope[] = ['utility', 'generator', 'agent', 'mcp'];
   private readonly SENSITIVE_KEY_PATTERNS = [
     'apikey',
     'api_key',
@@ -50,13 +57,60 @@ export class AiSettingsController {
   constructor(
     private _aiSettingsService: AiSettingsService,
     private _aiSettingsManager: AiSettingsManager,
-    private _registry: AIProviderRegistry,
+    private _resolution: ProviderResolutionService,
     private _providerHealth: ProviderHealthService,
     private _guardrails: GuardrailService,
     private _budgetService: BudgetService,
     private _ragService: RagService,
     private _orgMediaProviderSettings: OrgMediaProviderSettingsService,
+    @Optional()
+    @Inject(PROVIDER_KERNEL)
+    private _kernel?: ProviderKernel,
   ) {}
+
+  // Resolve a single AI adapter through the ProviderKernel; undefined for an
+  // unknown/unregistered provider (mirrors the old registry.getAdapter).
+  private _resolveAdapter(identifier: string, version?: string): AIProviderAdapter | undefined {
+    try {
+      return this._resolution.resolveAI(identifier, version ? { version } : {});
+    } catch {
+      return undefined;
+    }
+  }
+
+  // Enumerate the registered AI adapters (one per provider id) — replaces the
+  // legacy in-memory registry enumeration.
+  private _listAdapters(): AIProviderAdapter[] {
+    const seen = new Set<string>();
+    const out: AIProviderAdapter[] = [];
+    for (const manifest of this._kernel?.listManifests('ai') ?? []) {
+      if (seen.has(manifest.providerId)) continue;
+      seen.add(manifest.providerId);
+      const adapter = this._resolveAdapter(manifest.providerId, manifest.version);
+      if (adapter) out.push(adapter);
+    }
+    return out;
+  }
+
+  private _aiVersionMeta(identifier: string, preferredVersion?: string) {
+    const manifests = this._kernel?.versions('ai', identifier) ?? [];
+    const selected = preferredVersion
+      ? manifests.find((m) => m.version === preferredVersion)
+      : this._kernel?.latestActive('ai', identifier)?.manifest;
+    const fallback = manifests[0];
+    const target = selected ?? fallback;
+
+    return {
+      version: target?.version ?? preferredVersion ?? DEFAULT_VERSION,
+      status: target?.status ?? 'active',
+      availableVersions: manifests.map((m) => ({
+        version: m.version,
+        status: m.status,
+        credentialFields: m.credentialFields,
+      })),
+      credentialFields: target?.credentialFields,
+    };
+  }
 
   private _isSensitiveKey(key: string) {
     const normalized = key.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -92,7 +146,7 @@ export class AiSettingsController {
   }
 
   private _isProviderConfigured(
-    adapter: ReturnType<AIProviderRegistry['getAdapter']>,
+    adapter: AIProviderAdapter | undefined,
     config: Awaited<ReturnType<AiSettingsService['getProviderConfigByIdentifier']>>,
   ) {
     if (!adapter || !config) return false;
@@ -114,13 +168,14 @@ export class AiSettingsController {
   @Get('/providers')
   @RequirePermission('ai-config', 'manage')
   async listProviders(@GetUserFromRequest() user: User) {
-    const adapters = this._registry.list();
+    const adapters = this._listAdapters();
     const dbConfigs = await this._aiSettingsService.getProviderConfigs();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
     return adapters.map((adapter) => {
       const dbConfig = dbConfigMap.get(adapter.identifier);
       const isConfigured = this._isProviderConfigured(adapter, dbConfig);
+      const meta = this._aiVersionMeta(adapter.identifier);
 
       return {
         identifier: adapter.identifier,
@@ -130,7 +185,8 @@ export class AiSettingsController {
         privacy: adapter.privacy,
         enabled: dbConfig?.enabled || false,
         isConfigured,
-        credentialFields: adapter.credentialFields,
+        credentialFields: meta.credentialFields ?? adapter.credentialFields,
+        ...meta,
       };
     });
   }
@@ -140,8 +196,9 @@ export class AiSettingsController {
   async getProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
+    @Query('version') version?: string,
   ) {
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier, version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     const config = await this._aiSettingsService.getProviderConfigByIdentifier(identifier);
@@ -155,6 +212,7 @@ export class AiSettingsController {
       } catch { /* use empty creds */ }
     }
     const models = await adapter.listModels(creds);
+    const meta = this._aiVersionMeta(identifier, version);
 
     return {
       identifier: adapter.identifier,
@@ -162,13 +220,14 @@ export class AiSettingsController {
       type: adapter.type,
       capabilities: adapter.capabilities,
       privacy: adapter.privacy,
-      credentialFields: adapter.credentialFields,
+      credentialFields: meta.credentialFields ?? adapter.credentialFields,
       enabled: config?.enabled || false,
       isConfigured,
       defaultModel: config?.defaultModel || '',
       reasoningModel: config?.reasoningModel || '',
       extraConfig: this._safeJson(config?.extraConfig),
       models,
+      ...meta,
     };
   }
 
@@ -186,7 +245,7 @@ export class AiSettingsController {
       extraConfig?: Record<string, any>;
     },
   ) {
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     const before = await this._aiSettingsService.getProviderConfigByIdentifier(identifier);
@@ -232,7 +291,7 @@ export class AiSettingsController {
     @Param('identifier') identifier: string,
     @Body() body: { credentials?: Record<string, string> },
   ) {
-    const adapter = this._registry.getAdapter(identifier);
+    const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     let creds = body.credentials || {};
@@ -272,31 +331,38 @@ export class AiSettingsController {
       return { activeProvider: null, activeModel: null };
     }
 
-    const adapter = this._registry.getAdapter(body.provider);
+    const { providerId, version: explicitVersion } = parseQualified(body.provider);
+    const adapter = this._resolveAdapter(providerId, explicitVersion);
     if (!adapter) throw new BadRequestException('Unknown provider');
     if (!body.model) throw new BadRequestException('model is required');
 
-    const config = await this._aiSettingsService.getProviderConfigByIdentifier(body.provider);
+    const config = await this._aiSettingsService.getProviderConfigByIdentifier(providerId);
     if (!config?.enabled || !this._isProviderConfigured(adapter, config)) {
       throw new BadRequestException(
         'Provider must be enabled and configured before it can be activated',
       );
     }
 
+    const version =
+      explicitVersion ??
+      this._kernel?.latestActive('ai', providerId)?.manifest.version ??
+      DEFAULT_VERSION;
+    const qualifiedProvider = qualify(providerId, version);
+
     await this._aiSettingsService.upsertSystemSettings({
-      activeProvider: body.provider,
+      activeProvider: qualifiedProvider,
       activeModel: body.model,
     });
 
     await this._aiSettingsService.createAuditLog({
       userId: user.id,
       action: 'set-active',
-      detail: JSON.stringify({ provider: body.provider, model: body.model }),
+      detail: JSON.stringify({ provider: qualifiedProvider, model: body.model }),
     });
 
     await this._aiSettingsManager.refreshCache();
 
-    return { activeProvider: body.provider, activeModel: body.model };
+    return { activeProvider: providerId, activeModel: body.model };
   }
 
   @Get('/governance')
@@ -320,9 +386,8 @@ export class AiSettingsController {
       observability: safeParse(settings.observability),
       mcpSettings: safeParse(settings.mcpSettings),
       ragSettings: safeParse(settings.ragSettings),
-      scopeModels: safeParse(settings.scopeModels),
-      fallbackProvider: settings.fallbackProvider,
-      fallbackImageProvider: settings.fallbackImageProvider,
+      fallbackProvider: normalizeProviderId(settings.fallbackProvider),
+      fallbackImageProvider: normalizeProviderId(settings.fallbackImageProvider),
     };
   }
 
@@ -339,9 +404,8 @@ export class AiSettingsController {
       observability: body.observability,
       mcpSettings: body.mcpSettings,
       ragSettings: body.ragSettings,
-      scopeModels: body.scopeModels,
-      fallbackProvider: body.fallbackProvider,
-      fallbackImageProvider: body.fallbackImageProvider,
+      fallbackProvider: qualifyProviderId(body.fallbackProvider),
+      fallbackImageProvider: qualifyProviderId(body.fallbackImageProvider),
     });
 
     await this._aiSettingsService.createAuditLog({
@@ -353,31 +417,6 @@ export class AiSettingsController {
     await this._aiSettingsManager.refreshCache();
 
     return { success: true };
-  }
-
-  @Get('/spend')
-  @RequirePermission('ai-config', 'manage')
-  async getSpend(
-    @GetUserFromRequest() user: User,
-    @Query('scope') scope?: string,
-    @Query('provider') provider?: string,
-    @Query('offset') offset?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const parsedOffset = offset ? parseInt(offset, 10) : undefined;
-    const parsedLimit = limit ? parseInt(limit, 10) : 100;
-    return this._aiSettingsService.getSpendLogs({
-      scope,
-      provider,
-      offset: parsedOffset !== undefined && parsedOffset < 0 ? 0 : parsedOffset,
-      limit: parsedLimit < 1 ? 1 : parsedLimit > 1000 ? 1000 : parsedLimit,
-    });
-  }
-
-  @Get('/spend/summary')
-  @RequirePermission('ai-config', 'manage')
-  async getSpendSummary(@GetUserFromRequest() user: User) {
-    return this._aiSettingsService.getSpendSummary();
   }
 
   @Get('/audit')
@@ -405,7 +444,7 @@ export class AiSettingsController {
     @Param('id') id: string,
     @Body() body: { prompt?: string },
   ) {
-    const adapter = this._registry.getAdapter(id);
+    const adapter = this._resolveAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     const budgetCheck = await this._budgetService.checkBudget('preview', undefined);
@@ -455,41 +494,6 @@ export class AiSettingsController {
     return { text: checked };
   }
 
-  @Put('/scope-models')
-  @RequirePermission('ai-config', 'manage')
-  async setScopeModels(
-    @GetUserFromRequest() user: User,
-    @Body() body: { scopeModels: Record<string, { provider?: string; model?: string }> },
-  ) {
-    const scopes = Object.keys(body.scopeModels);
-    for (const scope of scopes) {
-      if (!(this.VALID_SCOPES as string[]).includes(scope)) {
-        throw new BadRequestException(`Invalid scope: ${scope}. Valid scopes: ${this.VALID_SCOPES.join(', ')}`);
-      }
-    }
-
-    await this._aiSettingsService.upsertSystemSettings({ scopeModels: body.scopeModels });
-    await this._aiSettingsService.createAuditLog({
-      userId: user.id,
-      action: 'set-scope-models',
-      detail: JSON.stringify({ scopeModels: body.scopeModels }),
-    });
-    await this._aiSettingsManager.refreshCache();
-
-    return { success: true };
-  }
-
-  @Get('/scope-models')
-  @RequirePermission('ai-config', 'manage')
-  async getScopeModels(@GetUserFromRequest() user: User) {
-    const settings = await this._aiSettingsService.getSystemSettings();
-    if (!settings?.scopeModels) return {};
-    if (typeof settings.scopeModels === 'string') {
-      try { return JSON.parse(settings.scopeModels); } catch { return {}; }
-    }
-    return settings.scopeModels;
-  }
-
   @Get('/rag')
   @RequirePermission('ai-config', 'manage')
   async getRagSettings(@GetUserFromRequest() user: User) {
@@ -522,7 +526,7 @@ export class AiSettingsController {
   @Get('/media-providers')
   @RequirePermission('ai-config', 'manage')
   async listMediaProviders(@GetUserFromRequest() user: User) {
-    const adapters = this._registry.list().filter(
+    const adapters = this._listAdapters().filter(
       (a) =>
         typeof a.createImageModel === 'function' ||
         typeof a.createSpeechModel === 'function' ||
@@ -577,7 +581,7 @@ export class AiSettingsController {
     @Param('id') id: string,
     @Body() body: { enabled?: boolean; operations?: string[]; c2paAvailable?: boolean },
   ) {
-    const adapter = this._registry.getAdapter(id);
+    const adapter = this._resolveAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     const existing: { enabled?: boolean; operations?: string[]; c2paAvailable?: boolean } = {};

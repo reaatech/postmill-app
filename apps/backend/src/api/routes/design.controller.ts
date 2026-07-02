@@ -28,8 +28,16 @@ import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
 import { FRAME_RENDERER_SCRIPT } from '@gitroom/nestjs-libraries/media/design-render/frame-renderer-script';
 import { RenderDesignDto } from '@gitroom/nestjs-libraries/dtos/design/render.design.dto';
+import { RenderVideoDesignDto } from '@gitroom/nestjs-libraries/dtos/design/render-video.design.dto';
 import { BulkGenerateDesignDto } from '@gitroom/nestjs-libraries/dtos/design/bulk.generate.design.dto';
+import { CreateDesignDto } from '@gitroom/nestjs-libraries/dtos/design/create-design.dto';
+import { UpdateDesignDto } from '@gitroom/nestjs-libraries/dtos/design/update-design.dto';
+import { CreateTemplateDto } from '@gitroom/nestjs-libraries/dtos/design/create-template.dto';
+import { UpdateTemplateDto } from '@gitroom/nestjs-libraries/dtos/design/update-template.dto';
+import { ValidateDocDto } from '@gitroom/nestjs-libraries/dtos/design/validate-doc.dto';
+import { ApplyOpsDto } from '@gitroom/nestjs-libraries/dtos/design/apply-ops.dto';
 import type { DesignerDoc } from '@gitroom/nestjs-libraries/media/design-render/design-render.types';
+import { DesignerDocService } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.service';
 import type { Response } from 'express';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import {
@@ -46,6 +54,7 @@ export class DesignController {
     private _designRenderService: DesignRenderService,
     private _designBulkService: DesignBulkService,
     private _videoRenderService: VideoRenderService,
+    private _designerDocService: DesignerDocService,
   ) {}
 
   @Get('/')
@@ -75,15 +84,7 @@ export class DesignController {
   async create(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body() body: {
-      name: string;
-      doc: any;
-      width: number;
-      height: number;
-      previewDataUrl?: string;
-      previewFileId?: string;
-      campaignId?: string;
-    },
+    @Body() body: CreateDesignDto,
   ) {
     return this._designService.createDesign(org.id, user.id, body);
   }
@@ -94,14 +95,7 @@ export class DesignController {
   async update(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: {
-      name?: string;
-      doc?: any;
-      width?: number;
-      height?: number;
-      previewDataUrl?: string;
-      previewFileId?: string;
-    },
+    @Body() body: UpdateDesignDto,
   ) {
     return this._designService.updateDesign(org.id, id, body);
   }
@@ -125,7 +119,7 @@ export class DesignController {
     @Body() body: RenderDesignDto,
     @Res() res: Response,
   ): Promise<void> {
-    const doc = body.doc as unknown as DesignerDoc;
+    const doc = this._designerDocService.validate(body.doc);
     const opts = { pixelRatio: body.pixelRatio, transparent: body.transparent, orgId: org.id };
 
     if (body.format === 'pdf') {
@@ -150,11 +144,14 @@ export class DesignController {
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
   async bulkGenerate(
+    @GetOrgFromRequest() org: Organization,
     @Body() body: BulkGenerateDesignDto,
   ) {
-    const doc = body.doc as unknown as DesignerDoc;
+    const doc = this._designerDocService.validate(body.doc);
     const { images, truncated, totalRows } =
-      await this._designBulkService.generateBatch(doc, body.rows);
+      await this._designBulkService.generateBatch(doc, body.rows, {
+        orgId: org.id,
+      });
 
     return {
       images: images.map(
@@ -165,20 +162,40 @@ export class DesignController {
     };
   }
 
+  @Post('/validate')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  async validateDoc(
+    @Body() body: ValidateDocDto,
+  ) {
+    try {
+      this._designerDocService.validate(body.doc);
+      return { valid: true };
+    } catch (err: any) {
+      if (err?.getStatus?.() === 400) {
+        return { valid: false, errors: err.response?.issues ?? err.response?.message ?? err.message };
+      }
+      throw err;
+    }
+  }
+
+  @Post('/apply-ops')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async applyOps(
+    @Body() body: ApplyOpsDto,
+  ) {
+    const doc = this._designerDocService.validateStrict(body.doc);
+    const result = this._designerDocService.applyOps(doc, body.ops ?? []);
+    return { doc: result };
+  }
+
   @Post('/render-video')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
   async renderVideo(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: {
-      composition: any;
-      outputIndex?: number;
-      format?: string;
-      quality?: number;
-      bitrateKbps?: number;
-      posterUrl?: string;
-      folderId?: string;
-    },
+    @Body() body: RenderVideoDesignDto,
   ) {
     return this._videoRenderService.enqueueRender(org.id, body);
   }
@@ -223,8 +240,11 @@ export class DesignTemplateController {
   @Get('/:id')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   @RequirePermission('media', 'read')
-  async get(@Param('id') id: string) {
-    return this._designService.getTemplate(id);
+  async get(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    return this._designService.getTemplate(org.id, id);
   }
 
   @Put('/:id')
@@ -233,7 +253,7 @@ export class DesignTemplateController {
   async update(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
-    @Body() body: { name?: string; category?: string; doc?: any; thumbnailFileId?: string },
+    @Body() body: UpdateTemplateDto,
   ) {
     return this._designService.updateTemplate(org.id, id, body);
   }
@@ -243,7 +263,7 @@ export class DesignTemplateController {
   @RequirePermission('media', 'create')
   async create(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { name: string; category: string; doc: any },
+    @Body() body: CreateTemplateDto,
   ) {
     return this._designService.createTemplate({ organizationId: org.id, ...body });
   }
@@ -279,7 +299,7 @@ export class DesignerProxyController {
     if (fileId) {
       const file = await this._fileService.getFileById(fileId);
       if (!file || file.organizationId !== org.id) {
-        if (!res) return null;
+        if (!res) return;
         res.status(404).json({ error: 'File not found' });
         return;
       }
@@ -289,7 +309,7 @@ export class DesignerProxyController {
     }
 
     if (!targetUrl) {
-      if (!res) return null;
+      if (!res) return;
       res.status(400).json({ error: 'fileId or url required' });
       return;
     }
@@ -297,14 +317,14 @@ export class DesignerProxyController {
     try {
       const upstream = await safeFetch(targetUrl);
       if (!upstream.ok) {
-        if (!res) return null;
+        if (!res) return;
         res.status(upstream.status).json({ error: 'Upstream fetch failed' });
         return;
       }
 
       const contentType = upstream.headers.get('content-type') || '';
       if (!contentType.startsWith('image/')) {
-        if (!res) return null;
+        if (!res) return;
         res.status(400).json({ error: 'Not an image' });
         return;
       }
@@ -312,12 +332,12 @@ export class DesignerProxyController {
       const contentLength = upstream.headers.get('content-length');
       const maxSize = 20 * 1024 * 1024;
       if (contentLength && parseInt(contentLength) > maxSize) {
-        if (!res) return null;
+        if (!res) return;
         res.status(413).json({ error: 'Image too large' });
         return;
       }
 
-      if (!res) return null;
+      if (!res) return;
       res.setHeader('Content-Type', contentType);
       if (contentLength) {
         res.setHeader('Content-Length', contentLength);

@@ -49,8 +49,8 @@ vi.mock('@gitroom/react/toaster/toaster', () => ({
 vi.mock('@gitroom/frontend/components/launches/helpers/use.existing.data', () => ({
   ExistingDataContextProvider: ({ children }: any) => children,
 }));
-vi.mock('@gitroom/frontend/components/new-launch/add.edit.modal', () => ({
-  AddEditModal: () => <div data-testid="add-edit-modal" />,
+vi.mock('@gitroom/frontend/components/composer/composer', () => ({
+  Composer: () => <div data-testid="add-edit-modal" />,
 }));
 vi.mock('@gitroom/frontend/components/launches/statistics', () => ({
   StatisticsModal: () => <div data-testid="statistics-modal" />,
@@ -171,7 +171,7 @@ describe('CalendarItem card layout (C2)', () => {
 
       expect(container.querySelector('span[title="Views"]')).toBeTruthy();
       expect(container.querySelector('span[title="Likes"]')).toBeTruthy();
-      expect(container.querySelector('span[title="Comments"]')).toBeTruthy();
+      expect(container.querySelector('span[title="Replies"]')).toBeTruthy();
     });
   });
 
@@ -191,7 +191,7 @@ describe('CalendarItem card layout (C2)', () => {
 
       expect(container.querySelector('span[title="Views"]')).toBeNull();
       expect(container.querySelector('span[title="Likes"]')).toBeNull();
-      expect(container.querySelector('span[title="Comments"]')).toBeNull();
+      expect(container.querySelector('span[title="Replies"]')).toBeNull();
 
       // Content still renders in normal flow
       const content = screen.getByText('Hello card content');

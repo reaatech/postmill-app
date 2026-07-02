@@ -44,6 +44,11 @@ export interface DesignerActionCtx {
   showSafeZones: boolean;
   showRulers: boolean;
   aiActive: boolean;
+  // Per-operation media-tool availability (the single status signal). Optimistic/fail-open:
+  // returns true while loading or on a status outage, so a hiccup never greys every tool.
+  // Undefined ctx → treat as available. detect-subject deliberately stays on `aiActive`
+  // (it is AI-vision with a non-fatal center fallback, not a media-provider operation).
+  mediaOperationAvailable?: (operation: string) => boolean;
   canShare: boolean;
   collabEnabled: boolean;
   inModal: boolean; // setMedia/closeModal present
@@ -114,6 +119,9 @@ export const useDesignerActions = (
   ctx: DesignerActionCtx
 ): DesignerAction[] => {
   return useMemo(() => {
+    // Per-operation media availability (optimistic/fail-open default: available).
+    const mediaOp = (operation: string): boolean =>
+      ctx.mediaOperationAvailable?.(operation) ?? true;
     // Live derivation — call inside run/enabled/checked, never cache.
     const live = () => {
       const st = store.getState();
@@ -251,11 +259,11 @@ export const useDesignerActions = (
       { id: 'opt-brand', label: 'Brand Enforcement', menu: 'options', group: 'edit', keywords: ['brand'], checked: () => store.getState().brandEnforcement, run: () => { const st = store.getState(); st.setBrandEnforcement(!st.brandEnforcement); } },
 
       // ---------------- Tools ----------------
-      { id: 'ai-generate', label: 'Generate Image…', menu: 'tools', group: 'gen', keywords: ['ai', 'generate', 'image'], enabled: () => ctx.aiActive, run: ctx.onAiGenerate },
-      { id: 'ai-remove-bg', label: 'Remove Background', menu: 'tools', group: 'ai', keywords: ['ai', 'background', 'remove'], enabled: () => ctx.aiActive && live().singleImageSelected, run: ctx.onAiRemoveBg },
-      { id: 'ai-upscale-2x', label: '2×', menu: 'tools', submenu: 'Upscale', group: 'ai', keywords: ['ai', 'upscale'], enabled: () => ctx.aiActive && live().singleImageSelected, run: () => ctx.onAiUpscale(2) },
-      { id: 'ai-upscale-4x', label: '4×', menu: 'tools', submenu: 'Upscale', group: 'ai', keywords: ['ai', 'upscale'], enabled: () => ctx.aiActive && live().singleImageSelected, run: () => ctx.onAiUpscale(4) },
-      { id: 'ai-inpaint', label: 'Inpaint…', menu: 'tools', group: 'ai', keywords: ['ai', 'inpaint'], enabled: () => ctx.aiActive && live().singleImageSelected, run: ctx.onAiInpaint },
+      { id: 'ai-generate', label: 'Generate Image…', menu: 'tools', group: 'gen', keywords: ['ai', 'generate', 'image'], enabled: () => mediaOp('image'), run: ctx.onAiGenerate },
+      { id: 'ai-remove-bg', label: 'Remove Background', menu: 'tools', group: 'ai', keywords: ['ai', 'background', 'remove'], enabled: () => mediaOp('bg-remove') && live().singleImageSelected, run: ctx.onAiRemoveBg },
+      { id: 'ai-upscale-2x', label: '2×', menu: 'tools', submenu: 'Upscale', group: 'ai', keywords: ['ai', 'upscale'], enabled: () => mediaOp('upscale') && live().singleImageSelected, run: () => ctx.onAiUpscale(2) },
+      { id: 'ai-upscale-4x', label: '4×', menu: 'tools', submenu: 'Upscale', group: 'ai', keywords: ['ai', 'upscale'], enabled: () => mediaOp('upscale') && live().singleImageSelected, run: () => ctx.onAiUpscale(4) },
+      { id: 'ai-inpaint', label: 'Inpaint…', menu: 'tools', group: 'ai', keywords: ['ai', 'inpaint'], enabled: () => mediaOp('inpaint') && live().singleImageSelected, run: ctx.onAiInpaint },
       { id: 'ai-detect-subject', label: 'Auto-detect Subject', menu: 'tools', group: 'ai2', keywords: ['ai', 'subject', 'focal'], enabled: () => ctx.aiActive && live().singleImageSelected, run: ctx.onAiDetectSubject },
       { id: 'replace-image', label: 'Replace Image…', menu: 'tools', group: 'ai2', keywords: ['replace', 'image'], enabled: () => live().singleImageSelected, run: ctx.onOpenMedia },
 

@@ -13,22 +13,20 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.s
   },
 }));
 
-vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
-  AIProviderRegistry: class {
-    list = (): unknown[] => [];
-    getAdapter = (): null => null;
-  },
-}));
-
 import { OrgAiSettingsController } from './org-ai-settings.controller';
-import type { AIProviderRegistry } from '@gitroom/nestjs-libraries/ai/ai-provider.registry';
+import type { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
   return new OrgAiSettingsController(
     aiSvcMock as any,
-    { list: (): unknown[] => [], getAdapter: (): null => null } as unknown as AIProviderRegistry
+    { seedUnset: vi.fn() } as any,
+    { resolve: vi.fn(), resolveAll: vi.fn(), candidates: vi.fn() } as any,
+    { get: vi.fn(), upsert: vi.fn(), getAll: vi.fn(), remove: vi.fn() } as any,
+    { resolveAI: (): any => undefined } as unknown as ProviderResolutionService,
+    { validate: (_domain: any, _category: any, settings: any) => settings } as any,
+    undefined as any,
   ) as any;
 }
 

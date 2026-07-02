@@ -1,6 +1,6 @@
 /* eslint-disable */
 // One-shot UI-testing seed: a SUPERADMIN user, an org, 2 channels (X + LinkedIn page),
-// ~2 weeks of posts, channel + post analytics snapshots, and a comment inbox.
+// ~2 weeks of posts, channel + post analytics snapshots, campaign folders, and a comment inbox.
 // Idempotent: re-running wipes the previous seed for test@test.com and recreates it.
 // Run inside the app container:  node scripts/seed-test-data.js
 //
@@ -110,12 +110,21 @@ async function cleanup() {
     await prisma.analyticsSnapshot.deleteMany({ where: { organizationId: orgId } });
     await prisma.tagsPosts.deleteMany({ where: { postId: { in: postIds } } });
     await prisma.post.deleteMany({ where: { organizationId: orgId } });
+    await prisma.campaignItem.deleteMany({ where: { organizationId: orgId } });
+    await prisma.campaign.deleteMany({ where: { organizationId: orgId } });
     await prisma.integration.deleteMany({ where: { organizationId: orgId } });
+    await prisma.orgProviderConfiguration.deleteMany({ where: { organizationId: orgId } });
+    await prisma.aIBrandProfile.deleteMany({ where: { organizationId: orgId } });
+    await prisma.signatures.deleteMany({ where: { organizationId: orgId } });
+    await prisma.sets.deleteMany({ where: { organizationId: orgId } });
+    await prisma.file.deleteMany({ where: { organizationId: orgId } });
     await prisma.subscription.deleteMany({ where: { organizationId: orgId } });
     await prisma.userOrganization.deleteMany({ where: { organizationId: orgId } });
     await prisma.organization.delete({ where: { id: orgId } }).catch(() => {});
   }
-  await prisma.user.delete({ where: { id: user.id } }).catch(() => {});
+  // Keep the user row: other features now hold FK references to it (sessions, push
+  // tokens, notification prefs). The user is reused (reconnected to a fresh org) in
+  // main(), so deleting it is both unnecessary and FK-fragile.
   console.log(`  cleaned previous seed (${orgIds.length} org(s))`);
 }
 
@@ -133,6 +142,11 @@ async function main() {
   if (!ownerRole) {
     console.warn('  ⚠ no "owner" system role found — boot the backend once so RbacSeeder runs; continuing with null roleId');
   }
+  // Reuse the existing user if present (cleanup keeps it); otherwise create it.
+  const existingUser = await prisma.user.findFirst({
+    where: { email: EMAIL, providerName: 'LOCAL' },
+    select: { id: true },
+  });
   const org = await prisma.organization.create({
     data: {
       name: ORG_NAME,
@@ -141,16 +155,18 @@ async function main() {
       users: {
         create: {
           roleRef: ownerRole ? { connect: { id: ownerRole.id } } : undefined,
-          user: {
-            create: {
-              email: EMAIL,
-              password: hashSync(PASSWORD, 12),
-              providerName: 'LOCAL',
-              isSuperAdmin: true,
-              activated: true,
-              profile: { create: { name: 'Test', lastName: 'User', timezone: 'UTC' } },
-            },
-          },
+          user: existingUser
+            ? { connect: { id: existingUser.id } }
+            : {
+                create: {
+                  email: EMAIL,
+                  password: hashSync(PASSWORD, 12),
+                  providerName: 'LOCAL',
+                  isSuperAdmin: true,
+                  activated: true,
+                  profile: { create: { name: 'Test', lastName: 'User', timezone: 'UTC' } },
+                },
+              },
         },
       },
     },
@@ -158,7 +174,60 @@ async function main() {
   });
   const orgId = org.id;
   const userId = org.users[0].user.id;
-  console.log(`  user ${EMAIL} / org "${ORG_NAME}" created`);
+
+  // Give the primary user a richer profile so /profile/<id> looks real.
+  await prisma.userProfile.updateMany({
+    where: { userId },
+    data: { bio: 'Founder & social lead at Acme. Coffee-driven shipping. ☕' },
+  });
+
+  // --- extra team members (so "Created by" + the profile page show real people) ---
+  const editorRole = await prisma.appRole.findFirst({
+    where: { organizationId: null, key: 'editor', isSystem: true },
+  });
+  const memberRole = await prisma.appRole.findFirst({
+    where: { organizationId: null, key: 'member', isSystem: true },
+  });
+  async function ensureMember({ email, name, lastName, bio, roleId }) {
+    let u = await prisma.user.findFirst({
+      where: { email, providerName: 'LOCAL' },
+      select: { id: true },
+    });
+    if (!u) {
+      u = await prisma.user.create({
+        data: {
+          email,
+          password: hashSync(PASSWORD, 12),
+          providerName: 'LOCAL',
+          activated: true,
+          profile: { create: { name, lastName, bio, timezone: 'UTC' } },
+        },
+        select: { id: true },
+      });
+    } else {
+      await prisma.userProfile.upsert({
+        where: { userId: u.id },
+        create: { userId: u.id, name, lastName, bio, timezone: 'UTC' },
+        update: { name, lastName, bio },
+      });
+    }
+    await prisma.userOrganization.create({
+      data: { userId: u.id, organizationId: orgId, roleId: roleId || undefined },
+    });
+    return u.id;
+  }
+  const mayaId = await ensureMember({
+    email: 'maya@acme.test', name: 'Maya', lastName: 'Chen',
+    bio: 'Content strategist. Turns roadmaps into stories people actually read.',
+    roleId: editorRole?.id,
+  });
+  const jordanId = await ensureMember({
+    email: 'jordan@acme.test', name: 'Jordan', lastName: 'Blake',
+    bio: 'Community manager. Lives in the comments so you don\'t have to.',
+    roleId: memberRole?.id,
+  });
+  const creators = [userId, mayaId, jordanId];
+  console.log(`  user ${EMAIL} / org "${ORG_NAME}" created (+2 team members)`);
 
   // --- channels ---
   const channelDefs = [
@@ -173,6 +242,30 @@ async function main() {
       channelFlow: ['impressions', 'clicks', 'likes', 'comments', 'shares', 'engagement'],
       stock: 'followers',
       postMetrics: ['impressions', 'clicks', 'likes', 'comments', 'shares'],
+      posts: LI_POSTS },
+    { key: 'ig', name: 'Acme on Instagram', providerIdentifier: 'instagram', internalId: 'seed-instagram-acme',
+      followersStart: 15400, profile: JSON.stringify({ username: 'acme.hq' }),
+      channelFlow: ['impressions', 'reach', 'likes', 'comments', 'saves', 'engagement'],
+      stock: 'followers',
+      postMetrics: ['impressions', 'reach', 'likes', 'comments', 'saves'],
+      posts: X_POSTS },
+    { key: 'fb', name: 'Acme on Facebook', providerIdentifier: 'facebook', internalId: 'seed-facebook-acme',
+      followersStart: 8200, profile: JSON.stringify({ name: 'Acme Inc.' }),
+      channelFlow: ['impressions', 'reach', 'likes', 'comments', 'shares', 'engagement'],
+      stock: 'followers',
+      postMetrics: ['impressions', 'reach', 'likes', 'comments', 'shares'],
+      posts: LI_POSTS },
+    { key: 'tt', name: 'Acme on TikTok', providerIdentifier: 'tiktok', internalId: 'seed-tiktok-acme',
+      followersStart: 22100, profile: JSON.stringify({ username: 'acmehq' }),
+      channelFlow: ['views', 'likes', 'comments', 'shares', 'engagement'],
+      stock: 'followers',
+      postMetrics: ['views', 'likes', 'comments', 'shares'],
+      posts: X_POSTS },
+    { key: 'yt', name: 'Acme on YouTube', providerIdentifier: 'youtube', internalId: 'seed-youtube-acme',
+      followersStart: 6300, profile: JSON.stringify({ name: 'Acme' }),
+      channelFlow: ['views', 'likes', 'comments', 'engagement'],
+      stock: 'subscribers',
+      postMetrics: ['views', 'likes', 'comments'],
       posts: LI_POSTS },
   ];
 
@@ -194,7 +287,46 @@ async function main() {
     });
     integrations[c.key] = { id: integ.id, def: c };
   }
-  console.log(`  ${channelDefs.length} channels created (X, LinkedIn page)`);
+  console.log(`  ${channelDefs.length} channels created (X, LinkedIn, Instagram, Facebook, TikTok, YouTube)`);
+
+  // --- channel credential sets (Settings -> Channels) ---
+  // Named OrgProviderConfiguration rows so Settings -> Channels is populated.
+  // Credentials use the same AES-GCM scheme as EncryptionService (fixedEncryption),
+  // so they decrypt cleanly if a channel is later bound to the set.
+  const providerConfigDefs = [
+    { identifier: 'x', name: 'X (Acme app)', bindKey: 'x',
+      scopes: 'tweet.read tweet.write users.read offline.access',
+      setupNotes: 'Seeded credential set for local UI testing — not a real X app.' },
+    { identifier: 'linkedin-page', name: 'LinkedIn (Acme app)', bindKey: 'li',
+      scopes: 'openid profile email w_member_social r_organization_social w_organization_social',
+      setupNotes: 'Seeded credential set for local UI testing — not a real LinkedIn app.' },
+  ];
+
+  let providerConfigCount = 0;
+  for (const pc of providerConfigDefs) {
+    const cfg = await prisma.orgProviderConfiguration.create({
+      data: {
+        organizationId: orgId,
+        identifier: pc.identifier,
+        name: pc.name,
+        enabled: true,
+        clientId: fixedEncryption('seed-' + pc.identifier + '-client-id'),
+        clientSecret: fixedEncryption('seed-' + pc.identifier + '-client-secret'),
+        scopes: pc.scopes,
+        setupNotes: pc.setupNotes,
+      },
+      select: { id: true },
+    });
+    // Bind the matching seeded channel to its credential set (realistic linkage).
+    if (integrations[pc.bindKey]) {
+      await prisma.integration.update({
+        where: { id: integrations[pc.bindKey].id },
+        data: { providerConfigId: cfg.id },
+      });
+    }
+    providerConfigCount++;
+  }
+  console.log(`  ${providerConfigCount} channel credential sets created (Settings -> Channels)`);
 
   // --- channel-level analytics: 14 daily snapshots per metric per channel ---
   let chSnapRows = 0;
@@ -225,8 +357,8 @@ async function main() {
   const createdPosts = []; // {id, integrationId, key, def, publishDate, state, content}
   const channelKeys = Object.keys(integrations);
 
-  // 12 published across the last 14 days, alternating channels
-  for (let i = 0; i < 12; i++) {
+  // published across the last 14 days, alternating channels (≈3 per channel)
+  for (let i = 0; i < 18; i++) {
     const key = channelKeys[i % channelKeys.length];
     const { id: integrationId, def } = integrations[key];
     const d = atHour(dayOffset(-(DAYS - 1) + Math.floor(i * (DAYS - 1) / 12)), pick([9, 11, 13, 15, 17]), pick([0, 15, 30]));
@@ -243,8 +375,8 @@ async function main() {
     createdPosts.push({ id: p.id, integrationId, key, def, publishDate: d, state: 'PUBLISHED', content });
   }
 
-  // 4 scheduled in the next 5 days
-  for (let i = 0; i < 4; i++) {
+  // 6 scheduled in the next days (one per channel)
+  for (let i = 0; i < 6; i++) {
     const key = channelKeys[i % channelKeys.length];
     const { id: integrationId, def } = integrations[key];
     const d = atHour(dayOffset(1 + i), pick([10, 12, 14, 16]), pick([0, 30]));
@@ -272,7 +404,7 @@ async function main() {
       },
     });
   }
-  console.log(`  ${createdPosts.length + 1} posts (12 published, 4 scheduled, 1 draft)`);
+  console.log(`  ${createdPosts.length + 1} posts (18 published, 6 scheduled, 1 draft)`);
 
   // --- post-level analytics for published posts, + card-footer totals ---
   let postSnapRows = 0;
@@ -308,6 +440,180 @@ async function main() {
     });
   }
   console.log(`  ${postSnapRows} post analytics snapshots`);
+
+  // --- campaigns: group posts into folders so /campaigns is populated ---
+  // Each campaign aggregates its posts' lastViews/lastLikes/lastComments (set above),
+  // so engagement totals + top post render. A mix of active, ongoing, future, and
+  // archived campaigns shows the full surface.
+  const campaignDefs = [
+    { name: 'Summer Product Launch', color: '#2b5cd3',
+      description: 'Coordinated push for the v4 release across X and LinkedIn.',
+      client: 'Acme Inc.', project: 'v4 Launch', tags: ['paid', 'launch', 'priority'],
+      startOffset: -10, endOffset: 20, archived: false, take: 4, takeScheduled: 1,
+      goals: [{ metric: 'impressions', target: 50000 }, { metric: 'likes', target: 1000 }] },
+    { name: 'Weekly Tips Series', color: '#f59e0b',
+      description: 'Evergreen short-form tips — one per week, ongoing.',
+      client: 'Acme Inc.', project: 'Always-on', tags: ['organic', 'evergreen'],
+      startOffset: -14, endOffset: null, archived: false, take: 3, takeScheduled: 1, goals: [{ metric: 'posts', target: 12 }] },
+    { name: 'Customer Stories', color: '#db2777',
+      description: 'Social proof: quotes, case studies, and wins from real teams.',
+      client: 'Northwind Co.', project: 'Advocacy', tags: ['organic', 'video'],
+      startOffset: -7, endOffset: 14, archived: false, take: 3, takeScheduled: 1 },
+    { name: 'Q2 Brand Awareness', color: '#16a34a',
+      description: 'Top-of-funnel reach campaign that wrapped at the end of Q2.',
+      client: 'Northwind Co.', project: 'Brand', tags: ['paid', 'awareness'],
+      startOffset: -45, endOffset: -5, archived: true, take: 3 },
+    { name: 'Hiring Push', color: '#7c3aed',
+      description: 'Recruiting drive for the platform team — now closed.',
+      client: 'Acme Inc.', project: 'Recruiting', tags: ['organic', 'hiring'],
+      startOffset: -30, endOffset: -3, archived: true, take: 3 },
+    { name: 'Holiday Teasers', color: '#0ea5e9',
+      description: 'Upcoming end-of-year teasers — scheduled, not yet live.',
+      client: 'Globex', project: 'Q4 Holiday', tags: ['paid', 'seasonal', 'video'],
+      startOffset: 3, endOffset: 30, archived: false, take: 0, takeScheduled: 2 },
+  ];
+
+  const publishedForCampaigns = createdPosts.filter((p) => p.state === 'PUBLISHED');
+  const scheduledForCampaigns = createdPosts.filter((p) => p.state === 'QUEUE');
+  let pubCursor = 0, schedCursor = 0, assigned = 0, campaignIdx = 0;
+  let firstCampaignId = null;
+  const campaignRows = [];
+  for (const def of campaignDefs) {
+    const campaign = await prisma.campaign.create({
+      data: {
+        organizationId: orgId,
+        name: def.name,
+        color: def.color,
+        description: def.description,
+        client: def.client || null,
+        project: def.project || null,
+        tags: def.tags || [],
+        createdById: creators[campaignIdx % creators.length],
+        startDate: dateOnly(dayOffset(def.startOffset)),
+        endDate: def.endOffset == null ? null : dateOnly(dayOffset(def.endOffset)),
+        archived: def.archived,
+        goals: def.goals || [],
+      },
+      select: { id: true },
+    });
+    campaignIdx++;
+    campaignRows.push(campaign.id);
+    if (!firstCampaignId) firstCampaignId = campaign.id;
+    const slice = publishedForCampaigns.slice(pubCursor, pubCursor + (def.take || 0));
+    pubCursor += def.take || 0;
+    const schedSlice = scheduledForCampaigns.slice(schedCursor, schedCursor + (def.takeScheduled || 0));
+    schedCursor += def.takeScheduled || 0;
+    const ids = [...slice, ...schedSlice].map((p) => p.id);
+    if (ids.length) {
+      await prisma.post.updateMany({ where: { id: { in: ids } }, data: { campaignId: campaign.id } });
+      assigned += ids.length;
+    }
+  }
+
+  // Seed taggable entities (brands, files, signatures, sets) and tag a rotating spread
+  // onto every campaign so the Tagged Items tabs fill for the dashboard demo.
+  if (firstCampaignId) {
+    const firstChannel = await prisma.integration.findFirst({ where: { organizationId: orgId } });
+
+    const brandIds = [];
+    for (const name of ['Acme Master Brand', 'Northwind Sub-brand', 'Globex Seasonal']) {
+      const b = await prisma.aIBrandProfile.create({ data: { organizationId: orgId, name }, select: { id: true } });
+      brandIds.push(b.id);
+    }
+    const fileIds = [];
+    for (const f of [
+      { name: 'launch-hero.jpg', path: 'seed/launch-hero.jpg' },
+      { name: 'promo-teaser.mp4', path: 'seed/promo-teaser.mp4', type: 'video' },
+      { name: 'brand-logo.png', path: 'seed/brand-logo.png' },
+      { name: 'case-study.pdf', path: 'seed/case-study.pdf' },
+      { name: 'holiday-banner.jpg', path: 'seed/holiday-banner.jpg' },
+    ]) {
+      const file = await prisma.file.create({ data: { organizationId: orgId, name: f.name, path: f.path, type: f.type || 'image' }, select: { id: true } });
+      fileIds.push(file.id);
+    }
+    const sigIds = [];
+    for (const s of [
+      { name: 'Acme Standard', content: '— The Acme Team' },
+      { name: 'Support Sign-off', content: 'Questions? support@acme.com' },
+      { name: 'Launch CTA', content: 'Try it free → acme.com/launch' },
+    ]) {
+      const sig = await prisma.signatures.create({ data: { organizationId: orgId, name: s.name, content: s.content, autoAdd: false }, select: { id: true } });
+      sigIds.push(sig.id);
+    }
+    const tplContent = (text) =>
+      JSON.stringify({
+        posts: firstChannel
+          ? [{ integration: { id: firstChannel.id }, settings: {}, value: [{ content: text, delay: 0, image: [] }] }]
+          : [],
+      });
+    const setIds = [];
+    for (const s of [
+      { name: 'Product Launch Template', text: '🚀 Big news — [product] is here! Here is what is new and why it matters. Try it free → acme.com/launch' },
+      { name: 'Weekly Tip Template', text: '💡 Tip of the week: [one quick, actionable tip your audience can use today].' },
+      { name: 'Case Study Template', text: '📈 How [customer] achieved [result] with Acme — a short case study. 1/' },
+    ]) {
+      const st = await prisma.sets.create({ data: { organizationId: orgId, name: s.name, content: tplContent(s.text) }, select: { id: true } });
+      setIds.push(st.id);
+    }
+
+    const rotate = (arr, start, n) =>
+      arr.length ? arr.concat(arr).slice(start % arr.length, (start % arr.length) + n) : [];
+    for (let i = 0; i < campaignRows.length; i++) {
+      const cid = campaignRows[i];
+      const rows = [
+        ...rotate(brandIds, i, 2).map((id) => ({ entityType: 'AI_BRAND_PROFILE', entityId: id })),
+        ...rotate(fileIds, i, 3).map((id) => ({ entityType: 'FILE', entityId: id })),
+        ...rotate(sigIds, i, 2).map((id) => ({ entityType: 'SIGNATURES', entityId: id })),
+        ...rotate(setIds, i, 2).map((id) => ({ entityType: 'SETS', entityId: id })),
+      ];
+      if (i === 0 && firstChannel) rows.push({ entityType: 'INTEGRATION', entityId: firstChannel.id });
+      await prisma.campaignItem.createMany({
+        data: rows.map((r) => ({ campaignId: cid, organizationId: orgId, entityType: r.entityType, entityId: r.entityId })),
+        skipDuplicates: true,
+      });
+    }
+
+    // Tag an extra channel (YouTube) onto a couple campaigns so the Channels
+    // section shows the tagged-but-no-posts branch of the union, not just
+    // channels derived from posts.
+    const ytId = integrations['yt']?.id;
+    if (ytId) {
+      for (const cid of [campaignRows[2], campaignRows[5]].filter(Boolean)) {
+        await prisma.campaignItem
+          .create({ data: { campaignId: cid, organizationId: orgId, entityType: 'INTEGRATION', entityId: ytId } })
+          .catch(() => {});
+      }
+    }
+
+    // Enable public share link on the first campaign.
+    await prisma.campaign.update({
+      where: { id: firstCampaignId },
+      data: { shareEnabled: true, shareToken: crypto.randomBytes(32).toString('hex') },
+    });
+
+    // Create approved + pending drafts on the first campaign.
+    const draftIntegration = firstChannel || (await prisma.integration.findFirst({ where: { organizationId: orgId } }));
+    if (draftIntegration) {
+      const drafts = [
+        { content: 'Approved draft ready to promote 🚀', approvalStatus: 'approved', group: 'Launch Drafts' },
+        { content: 'Pending draft awaiting review', approvalStatus: 'pending', group: 'Launch Drafts' },
+      ];
+      for (const d of drafts) {
+        await prisma.post.create({
+          data: {
+            organizationId: orgId,
+            integrationId: draftIntegration.id,
+            content: d.content,
+            state: 'DRAFT',
+            publishDate: atHour(dayOffset(3), 10),
+            group: d.group,
+            campaignId: firstCampaignId,
+            approvalStatus: d.approvalStatus,
+          },
+        });
+      }
+    }
+  }
 
   // --- comment inbox: comments on ~7 published posts, some threaded/own/assigned ---
   let commentRows = 0, cId = 0;
@@ -358,6 +664,8 @@ async function main() {
 
   console.log('\n✅ Seed complete.');
   console.log(`   Login: ${EMAIL}  /  ${PASSWORD}`);
+  console.log('   Campaigns: /campaigns  (6 folders grouping the seeded posts)');
+  console.log('   Campaign dashboard: /campaigns/<id>  (tags, goals, drafts, share link)');
 }
 
 main()

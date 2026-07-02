@@ -78,7 +78,7 @@ export const WatchlistTab: FC = () => {
         )}
       </p>
 
-      <div className="flex gap-[8px] items-end">
+      <div className="flex gap-[8px] items-end mobile:flex-col mobile:items-stretch">
         <div className="flex flex-col gap-[4px]">
           <label className="text-[12px] text-newTableText">
             {t('provider', 'Provider')}
@@ -143,9 +143,9 @@ export const WatchlistTab: FC = () => {
           {accounts.map((account) => (
             <div
               key={account.id}
-              className="flex items-center justify-between p-[12px] bg-newBgColor border border-newTableBorder rounded-[8px]"
+              className="flex items-center justify-between gap-[8px] flex-wrap p-[12px] bg-newBgColor border border-newTableBorder rounded-[8px]"
             >
-              <div className="flex items-center gap-[12px]">
+              <div className="flex items-center gap-[12px] flex-wrap">
                 <div>
                   <span className="text-[14px] font-medium">
                     {account.displayName || account.handle}

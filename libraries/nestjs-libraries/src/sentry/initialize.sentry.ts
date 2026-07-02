@@ -1,6 +1,9 @@
 import * as Sentry from '@sentry/nestjs';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 import { capitalize } from 'lodash';
+import { Logger } from '@nestjs/common';
+
+const logger = new Logger('Sentry');
 
 const SENSITIVE_FIELDS = new Set([
   'Authorization', 'auth', 'cookie', 'showorg', 'impersonate',
@@ -173,7 +176,9 @@ export const initializeSentry = (appName: string, allowLogs = false) => {
       },
     });
   } catch (err) {
-    console.error('Failed to initialize Sentry:', err);
+    logger.error(
+      `Failed to initialize Sentry: ${(err as Error)?.message ?? String(err)}`
+    );
   }
   return true;
 };

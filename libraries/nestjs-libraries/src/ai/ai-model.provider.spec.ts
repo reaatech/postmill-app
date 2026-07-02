@@ -19,9 +19,11 @@ const mockDoGenerate = vi.fn().mockImplementation(async (opts: any) => {
 });
 const mockLanguageModel = { modelId: 'gpt-4.1', doGenerate: mockDoGenerate };
 
-vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
-  AIProviderRegistry: class {
-    getAdapter = vi.fn().mockImplementation((id: string) => {
+// The legacy AIProviderRegistry was deleted; the facade now resolves adapters through
+// ProviderResolutionService.resolveAI(id). Mock it with the same per-id adapter logic.
+vi.mock('@gitroom/nestjs-libraries/providers/provider-resolution.service', () => ({
+  ProviderResolutionService: class {
+    resolveAI = vi.fn().mockImplementation((id: string) => {
       if (id === 'openai') {
         return {
           identifier: 'openai',
@@ -43,6 +45,9 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-provider.registry', () => ({
   },
 }));
 
+// Minimal ProviderKernel stub — the facade only calls listManifests('ai') for an error message.
+const mockKernel = { listManifests: vi.fn().mockReturnValue([]) };
+
 const mockGetActiveProvider = vi.fn().mockResolvedValue({
   identifier: 'openai',
   defaultModel: 'gpt-4.1',
@@ -50,9 +55,20 @@ const mockGetActiveProvider = vi.fn().mockResolvedValue({
   credentials: { apiKey: 'sk-test-key' },
 });
 
+const mockGetByIdentifier = vi.fn().mockResolvedValue(null);
+
 vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service', () => ({
   OrgAiSettingsService: class MockOrgAiSettings {
     getActiveProvider = mockGetActiveProvider;
+    getByIdentifier = mockGetByIdentifier;
+  },
+}));
+
+vi.mock('@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service', () => ({
+  DefaultsResolutionService: class MockDefaultsResolutionService {
+    resolve = vi.fn().mockResolvedValue(null);
+    resolveAll = vi.fn().mockResolvedValue({});
+    candidates = vi.fn().mockResolvedValue([]);
   },
 }));
 
@@ -129,9 +145,11 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/guardrail.service', () => ({
   },
 }));
 
-import { AIProviderRegistry } from './ai-provider.registry';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
+
+import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { AiSettingsManager } from './ai-settings.manager';
 import { TelemetryService } from './governance/telemetry.service';
 import { ProviderHealthService } from './governance/provider-health.service';
@@ -149,7 +167,7 @@ import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 
 describe('AIModelProvider', () => {
   let provider: AIModelProvider;
-  let registry: AIProviderRegistry;
+  let resolution: ProviderResolutionService;
   let aiSettings: AiSettingsService;
   let orgAiSettings: OrgAiSettingsService;
   let settingsManager: AiSettingsManager;
@@ -158,6 +176,7 @@ describe('AIModelProvider', () => {
   let budget: BudgetService;
   let guardrails: GuardrailService;
   let brandsService: BrandsService;
+  let defaultsResolution: DefaultsResolutionService;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -169,8 +188,9 @@ describe('AIModelProvider', () => {
       imageModel: undefined,
       credentials: { apiKey: 'sk-test-key' },
     });
+    mockGetByIdentifier.mockResolvedValue(null);
 
-    registry = new (AIProviderRegistry as any)();
+    resolution = new (ProviderResolutionService as any)();
     aiSettings = new (AiSettingsService as any)();
     orgAiSettings = new (OrgAiSettingsService as any)();
     settingsManager = new (AiSettingsManager as any)();
@@ -179,9 +199,9 @@ describe('AIModelProvider', () => {
     budget = new (BudgetService as any)();
     guardrails = new (GuardrailService as any)();
     brandsService = new (BrandsService as unknown as new () => BrandsService)();
+    defaultsResolution = new (DefaultsResolutionService as any)();
 
     provider = new AIModelProvider(
-      registry as any,
       aiSettings as any,
       orgAiSettings as any,
       settingsManager as any,
@@ -190,6 +210,9 @@ describe('AIModelProvider', () => {
       budget as any,
       guardrails as any,
       brandsService,
+      resolution as any,
+      defaultsResolution as any,
+      mockKernel as any,
     );
   });
 
@@ -283,7 +306,7 @@ describe('AIModelProvider', () => {
         defaultModel: 'claude-sonnet-4-20250514',
         credentials: { apiKey: 'sk-anthropic' },
       });
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'openai') return mockOpenaiAdapter;
         if (id === 'anthropic') {
           return {
@@ -357,7 +380,7 @@ describe('AIModelProvider', () => {
         createImageModel: createFallbackImageModel,
       };
 
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'anthropic') return primaryAdapter;
         if (id === 'openai') return fallbackAdapter;
         return undefined;
@@ -421,7 +444,7 @@ describe('AIModelProvider', () => {
       };
       const createFallbackLanguageModel = vi.fn().mockReturnValue(fallbackModel);
 
-      (registry.getAdapter as any).mockImplementation((id: string) => {
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
         if (id === 'anthropic') {
           return {
             identifier: 'anthropic',
@@ -520,7 +543,6 @@ describe('AIModelProvider', () => {
     }
     function makeProvider(cache?: any, router?: any) {
       return new AIModelProvider(
-        registry as any,
         aiSettings as any,
         orgAiSettings as any,
         settingsManager as any,
@@ -529,6 +551,9 @@ describe('AIModelProvider', () => {
         budget as any,
         guardrails as any,
         brandsService,
+        resolution as any,
+        defaultsResolution as any,
+        mockKernel as any,
         cache,
         router,
       );
@@ -633,6 +658,165 @@ describe('AIModelProvider', () => {
     it('timeout injector has configurable delay', () => {
       const injector = new TimeoutInjector({ timeoutMs: 5000 });
       expect(injector).toBeDefined();
+    });
+  });
+
+  describe('category defaults (AI_MODEL_DEFAULTS_ENABLED)', () => {
+    it('uses a stored high-reasoning default for generator/agent/mcp scopes and reasoning:true', async () => {
+      (defaultsResolution.resolve as any).mockImplementation(
+        (_domain: string, category: string) => {
+          if (category === 'high-reasoning') {
+            return Promise.resolve({
+              providerId: 'openai',
+              version: 'v1',
+              model: 'gpt-5',
+              source: 'stored',
+            });
+          }
+          return Promise.resolve(null);
+        },
+      );
+
+      for (const scope of ['generator', 'agent', 'mcp'] as const) {
+        const resolved = await provider.resolveConfigForScope(scope, 'org-123');
+        expect(resolved?.providerId).toBe('openai');
+        expect(resolved?.modelId).toBe('gpt-5');
+      }
+
+      // resolveConfigForScope does not accept reasoning options, so exercise the
+      // private resolver directly for the reasoning:true branch.
+      const reasoningResolved = await (provider as any)._resolveConfig('utility', 'org-123', { reasoning: true });
+      expect(reasoningResolved?.providerId).toBe('openai');
+      expect(reasoningResolved?.modelId).toBe('gpt-5');
+    });
+
+    it('falls back to SURFACE_DEFAULTS when no candidate is resolved and flag is on', async () => {
+      (defaultsResolution.resolve as any).mockResolvedValue(null);
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'openai',
+        defaultModel: '',
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      const resolved = await provider.resolveConfigForScope('agent', 'org-123');
+      expect(resolved?.modelId).toBe('gpt-5.2');
+    });
+
+    it('does not read scopeModels when the flag is on', async () => {
+      (settingsManager.getSettings as any).mockResolvedValue({
+        ...mockSettings,
+        scopeModels: { utility: { model: 'scope-ignored-model' } },
+      });
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'openai',
+        defaultModel: 'gpt-4.1',
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      const resolved = await provider.resolveConfigForScope('utility', 'org-123');
+      expect(resolved?.modelId).toBe('gpt-4.1');
+    });
+
+    it('uses the legacy scopeModels path when the kill switch is off', async () => {
+      vi.stubEnv('AI_MODEL_DEFAULTS_ENABLED', 'false');
+      vi.resetModules();
+
+      // Re-import the provider module so the module-level kill-switch constant
+      // is re-evaluated with the env var set to false.
+      const { AIModelProvider: KillSwitchedProvider } = await import('./ai-model.provider');
+
+      (settingsManager.getSettings as any).mockResolvedValue({
+        ...mockSettings,
+        scopeModels: { utility: { model: 'legacy-scoped-model' } },
+      });
+      mockGetActiveProvider.mockResolvedValue({
+        identifier: 'openai',
+        defaultModel: 'gpt-4.1',
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      const ksProvider = new (KillSwitchedProvider as any)(
+        aiSettings as any,
+        orgAiSettings as any,
+        settingsManager as any,
+        telemetry as any,
+        health as any,
+        budget as any,
+        guardrails as any,
+        brandsService,
+        resolution as any,
+        defaultsResolution as any,
+        mockKernel as any,
+      );
+
+      const resolved = await ksProvider.resolveConfigForScope('utility', 'org-123');
+      expect(resolved?.modelId).toBe('legacy-scoped-model');
+
+      vi.unstubAllEnvs();
+    });
+  });
+
+  describe('generateTextWithModel / generateObjectWithModel', () => {
+    it('passes the explicit model id to createLanguageModel', async () => {
+      const createLanguageModel = vi.fn().mockReturnValue(mockLanguageModel);
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
+        if (id === 'openai') {
+          return {
+            identifier: 'openai',
+            credentialFields: [{ key: 'apiKey', required: true }],
+            createLanguageModel,
+          };
+        }
+        return undefined;
+      });
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      await provider.generateTextWithModel('org-123', 'openai', 'v1', 'custom-model-42', {
+        prompt: 'Hello',
+      });
+
+      expect(createLanguageModel).toHaveBeenCalledWith(
+        { apiKey: 'sk-test' },
+        'custom-model-42',
+        { temperature: undefined },
+      );
+    });
+
+    it('runs governance wrappers when generating text with an explicit model', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+
+      await provider.generateTextWithModel('org-123', 'openai', 'v1', 'gpt-4.1', {
+        prompt: 'Hello',
+      });
+
+      expect(budget.checkBudget).toHaveBeenCalledWith('utility', 'org-123');
+      expect(telemetry.startSpan).toHaveBeenCalled();
+      expect(guardrails.checkOutput).toHaveBeenCalled();
+      expect(health.recordSuccess).toHaveBeenCalledWith('openai');
+    });
+
+    it('runs governance wrappers when generating an object with an explicit model', async () => {
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+      mockDoGenerate.mockResolvedValueOnce({
+        content: [{ type: 'text', text: '{"title": "test"}' }],
+        usage: { inputTokens: 10, outputTokens: 20 },
+        finishReason: 'stop',
+      });
+
+      await provider.generateObjectWithModel('org-123', 'openai', 'v1', 'gpt-4.1', {
+        prompt: 'Extract data',
+      });
+
+      expect(budget.checkBudget).toHaveBeenCalledWith('utility', 'org-123');
+      expect(telemetry.startSpan).toHaveBeenCalled();
+      expect(guardrails.checkOutput).toHaveBeenCalled();
+      expect(health.recordSuccess).toHaveBeenCalledWith('openai');
     });
   });
 });

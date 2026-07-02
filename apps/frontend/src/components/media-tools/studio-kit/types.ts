@@ -1,4 +1,5 @@
 import type React from 'react';
+import type { ModelField } from '@gitroom/provider-kernel';
 
 // A media file reference produced by the media picker (MediaSelectorModal).
 export interface FileFieldValue {
@@ -17,36 +18,27 @@ interface StudioFieldBase {
 }
 
 export interface PromptField extends StudioFieldBase {
-  type: 'prompt' | 'text';
+  type: 'prompt';
   placeholder?: string;
-}
-export interface SelectField extends StudioFieldBase {
-  type: 'select';
-  options?: { value: string; label: string }[];
-  default?: string;
-  // When 'models', the dropdown is populated at runtime from
-  // GET /media/studio/:provider/models?operation=<tab operation> and rendered as a
-  // searchable combobox. Any static `options` act as a fallback when the catalog is
-  // empty/unavailable. Used for the hub studios' large, changing model catalogs.
-  source?: 'models';
-}
-export interface NumberField extends StudioFieldBase {
-  type: 'number';
-  min?: number;
-  max?: number;
-  step?: number;
-  default?: number;
-}
-export interface ToggleField extends StudioFieldBase {
-  type: 'toggle';
-  default?: boolean;
 }
 export interface MediaField extends StudioFieldBase {
   type: 'media';
   accept: 'image' | 'video' | 'audio';
 }
 
-export type StudioField = PromptField | SelectField | NumberField | ToggleField | MediaField;
+/**
+ * Runtime-facing superset of the kernel `ModelField`.
+ *
+ * - `source: 'models'` is a studio-only hint for dynamic model discovery.
+ * - `prompt` and `media` are generation-time inputs and never persisted as defaults.
+ */
+export type StudioField =
+  | (ModelField & { type: 'select'; source?: 'models' })
+  | (ModelField & { type: 'number' })
+  | (ModelField & { type: 'toggle' })
+  | (ModelField & { type: 'text' })
+  | PromptField
+  | MediaField;
 
 export interface StudioCustomProps {
   provider: string;

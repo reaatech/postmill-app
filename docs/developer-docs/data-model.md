@@ -68,8 +68,13 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `OrgProviderConfiguration` | Per-org channel provider OAuth credentials (encrypted); replaces `ProviderConfiguration` | FK → `Organization` |
+| `OrgProviderConfiguration` | Per-org channel provider OAuth credentials (encrypted). **Many named sets per provider** — unique on `(organizationId, identifier, name)`; resolved by row `id`. Replaces `ProviderConfiguration` | FK → `Organization`; back-ref → `Integration[]` |
 | `ProviderConfiguration` | **DEPRECATED v3.6.0** — global provider config; replaced by per-tenant `OrgProviderConfiguration` | Standalone |
+
+A connected `Integration` carries a nullable `providerConfigId` FK (`onDelete: SetNull`) binding it to
+the named credential set it was connected through, so OAuth handshake, token refresh, and API calls use
+that set's own auth. When `providerConfigId` is `NULL` (legacy / unbound connections), credential
+resolution falls back to the org's primary set for the provider identifier (enabled-first).
 
 ---
 
@@ -134,7 +139,14 @@ This page lists every model grouped by domain with a one-line purpose and key re
 
 | Model | Purpose | Key Relationships |
 |---|---|---|
-| `Campaign` | Grouping folder for posts — name, color, date range, archive state | FK → `Organization`; has many `Post` |
+| `Campaign` | Grouping folder for posts — name, color, date range, archive state, goals, public-share token/settings, UTM toggle | FK → `Organization`; has many `Post`, `CampaignNote` |
+| `CampaignItem` | Polymorphic tagged item (`entityType` + `entityId`) linking a campaign to one of 8 non-post entity types | FK → `Campaign` |
+| `CampaignItemResolver` | Internal resolver used by `CampaignTagService`/`CampaignsService` to load display names/icons for `CampaignItem` rows without generic Prisma relations | not a Prisma model; resolves per-type in batches |
+| `CampaignNote` | Internal **Discussion** thread note — sanitized rich HTML `content`, `parentId` (one-level threading), `mentions` (JSON userId[]), `pinned`, `resolvedAt`, `editedAt`, soft `deletedAt` | FK → `Campaign`; self-FK `parent`/`replies`; has many `CampaignNoteReaction` |
+| `CampaignNoteReaction` | Emoji reaction on a note, toggled | FK → `CampaignNote`; unique `(noteId, userId, emoji)` |
+
+`Post` carries `approvalStatus` / `approvedById` / `approvedAt` for the campaign draft-approval
+flow, and `Campaign.utmEnabled` drives automatic UTM append on publish.
 
 ---
 
@@ -200,6 +212,7 @@ through Prisma repositories — Mastra manages its own tables.
 | Enum | Values |
 |---|---|
 | `State` | `QUEUE`, `PUBLISHED`, `ERROR`, `DRAFT` |
+| `CampaignEntityType` | `POST`, `INTEGRATION`, `ORG_VPN_CONFIG`, `AI_ORG_PROVIDER_CONFIG`, `AI_BRAND_PROFILE`, `STORAGE_PROVIDER_CONFIG`, `FILE`, `SETS`, `SIGNATURES` |
 | `SubscriptionTier` | `STANDARD`, `PRO`, `TEAM`, `ULTIMATE` |
 | `Provider` | `LOCAL`, `GITHUB`, `GOOGLE`, `FARCASTER`, `WALLET`, `GENERIC` |
 | `ShortLinkPreference` | `ASK`, `YES`, `NO` |

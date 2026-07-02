@@ -31,10 +31,9 @@ const makePost = (overrides: any = {}) => ({
 
 describe('CommentsActivity', () => {
   let activity: CommentsActivity;
-  let prisma: any;
+  let organizationService: any;
   let providerConfigManager: any;
   let socialCommentsService: any;
-  let emailService: any;
   let webhooksService: any;
   let notificationService: any;
 
@@ -42,28 +41,27 @@ describe('CommentsActivity', () => {
     vi.resetAllMocks();
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => {});
 
-    prisma = {
-      socialComment: {
-        findMany: vi.fn().mockResolvedValue([]),
-        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-      },
-      post: { findMany: vi.fn().mockResolvedValue([]) },
-      userOrganization: { findMany: vi.fn().mockResolvedValue([]) },
-      organization: {
-        findMany: vi.fn().mockResolvedValue([{ id: 'org-1' }, { id: 'org-2' }]),
-      },
+    organizationService = {
+      getAllIds: vi
+        .fn()
+        .mockResolvedValue([{ id: 'org-1' }, { id: 'org-2' }]),
     };
     providerConfigManager = { ensureFresh: vi.fn().mockResolvedValue(undefined) };
-    socialCommentsService = { syncComments: vi.fn().mockResolvedValue(undefined) };
-    emailService = { sendEmailSync: vi.fn().mockResolvedValue(undefined) };
+    socialCommentsService = {
+      syncComments: vi.fn().mockResolvedValue(undefined),
+      getPublishedPostsForSync: vi.fn().mockResolvedValue([]),
+      getPostsWithRecentComments: vi.fn().mockResolvedValue([]),
+      findCommentsToPrune: vi.fn().mockResolvedValue([]),
+      softDeleteCommentsByIds: vi.fn().mockResolvedValue(undefined),
+      getPostsForCommentDigest: vi.fn().mockResolvedValue([]),
+    };
     webhooksService = { dispatchEvent: vi.fn().mockResolvedValue(undefined) };
-    notificationService = { notifyInboxBacklog: vi.fn().mockResolvedValue(undefined) };
+    notificationService = { notifyCommentDigest: vi.fn().mockResolvedValue(undefined) };
 
     activity = new CommentsActivity(
-      prisma,
+      organizationService as any,
       providerConfigManager,
       socialCommentsService,
-      emailService,
       webhooksService as any,
       notificationService as any
     );
@@ -91,26 +89,27 @@ describe('CommentsActivity', () => {
   describe('getAllOrganizationIds', () => {
     it('maps org rows to ids', async () => {
       expect(await activity.getAllOrganizationIds()).toEqual(['org-1', 'org-2']);
+      expect(organizationService.getAllIds).toHaveBeenCalled();
     });
   });
 
   describe('pruneComments', () => {
     it('soft-deletes comments older than the retention window', async () => {
-      prisma.socialComment.findMany.mockResolvedValueOnce([
-        { id: 'c1' },
-        { id: 'c2' },
-      ]).mockResolvedValueOnce([]);
+      socialCommentsService.findCommentsToPrune
+        .mockResolvedValueOnce([{ id: 'c1' }, { id: 'c2' }])
+        .mockResolvedValueOnce([]);
 
       await activity.pruneComments('org-1');
-      expect(prisma.socialComment.findMany).toHaveBeenCalled();
-      const updateCall = prisma.socialComment.updateMany.mock.calls[0][0];
-      expect(updateCall.where.id.in).toEqual(['c1', 'c2']);
-      expect(updateCall.data.deletedAt).toBeInstanceOf(Date);
+      expect(socialCommentsService.findCommentsToPrune).toHaveBeenCalled();
+      expect(socialCommentsService.softDeleteCommentsByIds).toHaveBeenCalledWith([
+        'c1',
+        'c2',
+      ]);
     });
 
     it('handles empty result without error', async () => {
       await activity.pruneComments('org-1');
-      expect(prisma.socialComment.updateMany).not.toHaveBeenCalled();
+      expect(socialCommentsService.softDeleteCommentsByIds).not.toHaveBeenCalled();
     });
   });
 
@@ -121,7 +120,7 @@ describe('CommentsActivity', () => {
     });
 
     it('skips posts with missing releaseId and delegates the rest to the service', async () => {
-      prisma.post.findMany.mockResolvedValue([
+      socialCommentsService.getPublishedPostsForSync.mockResolvedValue([
         makePost({ id: 'p1' }),
         makePost({ id: 'p2', releaseId: 'missing' }),
         makePost({ id: 'p3', releaseId: null }),
@@ -137,7 +136,7 @@ describe('CommentsActivity', () => {
     });
 
     it('isolates per-post failures so one channel cannot abort the org sweep', async () => {
-      prisma.post.findMany.mockResolvedValue([
+      socialCommentsService.getPublishedPostsForSync.mockResolvedValue([
         makePost({ id: 'p1' }),
         makePost({ id: 'p2' }),
       ]);
@@ -154,7 +153,7 @@ describe('CommentsActivity', () => {
 
   describe('notifyNewComments', () => {
     it('uses the notification stack for comment backlog alerts before sending email digests', async () => {
-      prisma.post.findMany.mockResolvedValue([
+      socialCommentsService.getPostsForCommentDigest.mockResolvedValue([
         {
           id: 'post-1',
           content: 'Published post',
@@ -162,17 +161,14 @@ describe('CommentsActivity', () => {
           integration: { name: 'Mastodon' },
         },
       ]);
-      prisma.userOrganization.findMany.mockResolvedValue([
-        { user: { id: 'u1', email: 'user@example.com', name: 'User' } },
-      ]);
 
       await activity.notifyNewComments('org-1');
 
-      expect(notificationService.notifyInboxBacklog).toHaveBeenCalledWith(
+      expect(notificationService.notifyCommentDigest).toHaveBeenCalledWith(
         'org-1',
-        6
+        6,
+        expect.any(Array)
       );
-      expect(emailService.sendEmailSync).toHaveBeenCalledTimes(1);
     });
   });
 });
