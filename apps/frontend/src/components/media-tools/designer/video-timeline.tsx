@@ -1,13 +1,16 @@
 'use client';
 
 import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { VideoClip, VideoTrack, VideoOutput } from './designer.store';
+import type { VideoClip, VideoTrack, VideoOutput, DesignerElement } from './designer.store';
 import { VideoPreviewEngine } from './video-preview';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 import { VoiceoverDialog } from './voiceover-dialog';
+import { addMediaToTimeline } from './add-media-to-timeline';
+import { isArtifactPath } from '@gitroom/frontend/components/launches/ai.video';
+import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 
 interface VideoTimelineProps {
   store: ReturnType<typeof import('./designer.store').createDesignerStore>;
@@ -133,17 +136,314 @@ const WaveformBars: FC<{ src: string | undefined; width: number }> = ({ src, wid
   );
 };
 
+interface AiVideoDialogProps {
+  fetch: ReturnType<typeof useFetch>;
+  toaster: ReturnType<typeof useToaster>;
+  selectedImageSrc?: string;
+  onResult: (type: 'video' | 'audio', idOrUrl: string | false) => Promise<void>;
+}
+
+const AiVideoDialog: FC<AiVideoDialogProps> = ({ fetch, toaster, selectedImageSrc, onResult }) => {
+  const modals = useModals();
+  const [prompt, setPrompt] = useState('');
+  const [useImage, setUseImage] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const generate = useCallback(async () => {
+    if (!prompt.trim()) {
+      toaster.show('Please enter a prompt', 'warning');
+      return;
+    }
+    setLoading(true);
+    modals.closeAll();
+    try {
+      const res = await fetch('/media/generate-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          imageUrl: useImage ? selectedImageSrc : undefined,
+        }),
+      });
+      if (!res.ok) throw new Error('Video generation failed');
+      const data = await res.json();
+      await onResult('video', data === false ? false : data.id);
+    } catch (e) {
+      toaster.show((e as Error).message || 'Video generation failed', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetch, prompt, useImage, selectedImageSrc, onResult, toaster, modals]);
+
+  return (
+    <div className="flex flex-col gap-3 min-w-[280px]">
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Describe the video you want to generate..."
+        className="w-full bg-newBgColor border border-newBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
+      />
+      {selectedImageSrc && (
+        <label className="flex items-center gap-2 text-[11px] text-textColor cursor-pointer">
+          <input
+            type="checkbox"
+            checked={useImage}
+            onChange={(e) => setUseImage(e.target.checked)}
+            className="accent-designerAccent w-3 h-3"
+          />
+          Use selected image
+        </label>
+      )}
+      <button
+        onClick={generate}
+        disabled={loading || !prompt.trim()}
+        className="px-3 py-1.5 rounded text-[12px] border border-newBorder text-textColor hover:bg-newColColor/30 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Generating…' : 'Generate'}
+      </button>
+    </div>
+  );
+};
+
+interface MusicDialogProps {
+  fetch: ReturnType<typeof useFetch>;
+  toaster: ReturnType<typeof useToaster>;
+  onResult: (type: 'video' | 'audio', idOrUrl: string | false) => Promise<void>;
+}
+
+const MusicDialog: FC<MusicDialogProps> = ({ fetch, toaster, onResult }) => {
+  const modals = useModals();
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const generate = useCallback(async () => {
+    if (!prompt.trim()) {
+      toaster.show('Please enter a prompt', 'warning');
+      return;
+    }
+    setLoading(true);
+    modals.closeAll();
+    try {
+      const res = await fetch('/media/generate-music', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt }),
+      });
+      if (!res.ok) throw new Error('Music generation failed');
+      const data = await res.json();
+      await onResult('audio', data === false ? false : data.id);
+    } catch (e) {
+      toaster.show((e as Error).message || 'Music generation failed', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetch, prompt, onResult, toaster, modals]);
+
+  return (
+    <div className="flex flex-col gap-3 min-w-[280px]">
+      <textarea
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Describe the music you want to generate..."
+        className="w-full bg-newBgColor border border-newBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
+      />
+      <button
+        onClick={generate}
+        disabled={loading || !prompt.trim()}
+        className="px-3 py-1.5 rounded text-[12px] border border-newBorder text-textColor hover:bg-newColColor/30 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Generating…' : 'Generate'}
+      </button>
+    </div>
+  );
+};
+
+interface AvatarDialogProps {
+  fetch: ReturnType<typeof useFetch>;
+  toaster: ReturnType<typeof useToaster>;
+  selectedImageSrc?: string;
+  onResult: (type: 'video' | 'audio', idOrUrl: string | false) => Promise<void>;
+}
+
+const AvatarDialog: FC<AvatarDialogProps> = ({ fetch, toaster, selectedImageSrc, onResult }) => {
+  const modals = useModals();
+  const [script, setScript] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const generate = useCallback(async () => {
+    if (!script.trim()) {
+      toaster.show('Please enter a script', 'warning');
+      return;
+    }
+    setLoading(true);
+    modals.closeAll();
+    try {
+      const res = await fetch('/media/generate-avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ script, imageUrl }),
+      });
+      if (!res.ok) throw new Error('Avatar generation failed');
+      const data = await res.json();
+      await onResult('video', data === false ? false : data.id);
+    } catch (e) {
+      toaster.show((e as Error).message || 'Avatar generation failed', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetch, script, imageUrl, onResult, toaster, modals]);
+
+  return (
+    <div className="flex flex-col gap-3 min-w-[280px]">
+      <textarea
+        value={script}
+        onChange={(e) => setScript(e.target.value)}
+        placeholder="Enter the script for the avatar..."
+        className="w-full bg-newBgColor border border-newBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none min-h-[80px]"
+      />
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setPickerOpen(true)}
+          className="px-2 py-1 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+        >
+          Pick portrait
+        </button>
+        {selectedImageSrc && (
+          <button
+            onClick={() => setImageUrl(selectedImageSrc)}
+            className="px-2 py-1 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+          >
+            Use selected image
+          </button>
+        )}
+      </div>
+      {imageUrl && (
+        <div className="text-[10px] text-textColor/60 truncate">Portrait: {imageUrl.split('/').pop()}</div>
+      )}
+      <button
+        onClick={generate}
+        disabled={loading || !script.trim()}
+        className="px-3 py-1.5 rounded text-[12px] border border-newBorder text-textColor hover:bg-newColColor/30 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Generating…' : 'Generate'}
+      </button>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        kinds={['image']}
+        onSelect={(item) => setImageUrl(item.url)}
+      />
+    </div>
+  );
+};
+
+interface SlideshowDialogProps {
+  fetch: ReturnType<typeof useFetch>;
+  toaster: ReturnType<typeof useToaster>;
+  onResult: (type: 'video' | 'audio', idOrUrl: string | false) => Promise<void>;
+}
+
+const SlideshowDialog: FC<SlideshowDialogProps> = ({ fetch, toaster, onResult }) => {
+  const modals = useModals();
+  const [prompt, setPrompt] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const generate = useCallback(async () => {
+    if (!prompt.trim()) {
+      toaster.show('Please enter a prompt', 'warning');
+      return;
+    }
+    setLoading(true);
+    modals.closeAll();
+    try {
+      const res = await fetch('/media/generate-slide', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, imageUrls: imageUrls.length ? imageUrls : undefined }),
+      });
+      if (!res.ok) throw new Error('Slideshow generation failed');
+      const data = await res.json();
+      await onResult('video', data === false ? false : data.id);
+    } catch (e) {
+      toaster.show((e as Error).message || 'Slideshow generation failed', 'warning');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetch, prompt, imageUrls, onResult, toaster, modals]);
+
+  return (
+    <div className="flex flex-col gap-3 min-w-[280px]">
+      <input
+        type="text"
+        value={prompt}
+        onChange={(e) => setPrompt(e.target.value)}
+        placeholder="Describe the slideshow..."
+        className="w-full bg-newBgColor border border-newBorder rounded p-2 text-[12px] text-textColor placeholder:text-textColor/40 outline-none"
+      />
+      <button
+        onClick={() => setPickerOpen(true)}
+        className="px-2 py-1 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30 self-start"
+      >
+        Add images
+      </button>
+      {imageUrls.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {imageUrls.map((url, i) => (
+            <div key={`${url}-${i}`} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-newBgColorInner border border-newBorder text-[10px] text-textColor">
+              <span className="truncate max-w-[120px]">{url.split('/').pop()}</span>
+              <button
+                onClick={() => setImageUrls((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-textColor/60 hover:text-textColor"
+                aria-label="Remove image"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={generate}
+        disabled={loading || !prompt.trim()}
+        className="px-3 py-1.5 rounded text-[12px] border border-newBorder text-textColor hover:bg-newColColor/30 disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        {loading ? 'Generating…' : 'Generate'}
+      </button>
+      <MediaSelectorModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        kinds={['image']}
+        multiple
+        onConfirm={(items) => setImageUrls((prev) => [...prev, ...items.map((i) => i.url)])}
+      />
+    </div>
+  );
+};
+
 export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAwareness }) => {
   // Voiceover (TTS) and Captions (STT) hit media-provider endpoints — gate them on the
   // shared status so we don't offer a generation the org has no provider for (it would
   // 409). Optimistic while loading / fail-open on error.
-  const { operationAvailable } = useMediaToolsStatus();
+  const { operationAvailable, toolAvailable, tool } = useMediaToolsStatus();
   const ttsAvailable = operationAvailable('tts');
   const sttAvailable = operationAvailable('stt');
+  const textToVideoAvailable = toolAvailable('text-to-video');
+  const imageToVideoAvailable = toolAvailable('image-to-video');
+  const videoUpscaleAvailable = toolAvailable('video-upscale');
+  const videoBackgroundAvailable = toolAvailable('video-background');
+  const videoToVideoAvailable = toolAvailable('video-to-video');
+  const textToMusicAvailable = toolAvailable('text-to-music');
+  const videoAvatarAvailable = toolAvailable('video-avatar');
+  const imageSlideAvailable = toolAvailable('image-slide');
   const doc = store((s) => s.doc);
   const currentOutput = store((s) => s.currentOutput);
   const playheadMs = store((s) => s.playheadMs);
   const selectedClip = store((s) => s.selectedClip);
+  const selectedIds = store((s) => s.selectedIds);
   const setPlayhead = useCallback(
     (ms: number) => store.getState().setPlayhead(ms),
     [store],
@@ -171,6 +471,15 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     x: number;
     y: number;
   } | null>(null);
+  const [clipMenu, setClipMenu] = useState<{
+    x: number;
+    y: number;
+    outputIndex: number;
+    trackId: string;
+    clipId: string;
+  } | null>(null);
+  const [clipTransformPrompt, setClipTransformPrompt] = useState('');
+  const [clipTransformMode, setClipTransformMode] = useState<'upscale' | 'remove-bg' | 'video-to-video' | null>(null);
   const [trackSettings, setTrackSettings] = useState<{
     trackId: string;
     x: number;
@@ -190,6 +499,16 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
 
   const pixelsPerMs = zoomPxPerMs;
   const totalPixels = isVideo ? vo.durationMs * pixelsPerMs : 0;
+
+  const selectedImageSrc = useMemo(() => {
+    const out = doc.outputs[currentOutput] as any;
+    if (!out?.children) return undefined;
+    const selected = (out.children as DesignerElement[]).filter(
+      (el) => selectedIds.includes(el.id) && el.type === 'image' && el.src
+    );
+    if (selected.length === 1) return selected[0].src;
+    return undefined;
+  }, [doc.outputs, currentOutput, selectedIds]);
 
   const sortedTrackClips = useMemo(() => {
     if (!isVideo || !vo) return {};
@@ -498,7 +817,8 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     (e: React.MouseEvent, trackId: string, clipId: string) => {
       e.preventDefault();
       e.stopPropagation();
-      setSelectedClip({ outputIndex: currentOutput, trackId, clipId: clipId });
+      setSelectedClip({ outputIndex: currentOutput, trackId, clipId });
+      setClipMenu({ x: e.clientX, y: e.clientY, outputIndex: currentOutput, trackId, clipId });
     },
     [currentOutput, setSelectedClip],
   );
@@ -657,6 +977,158 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     }
   }, [vo, currentOutput, store, fetch, toaster]);
 
+  const POLL_INTERVAL_MS = 3000;
+  const MAX_POLLS = 200;
+
+  const landOrPoll = useCallback(async (
+    type: 'video' | 'audio',
+    idOrUrl: string | false
+  ) => {
+    if (idOrUrl === false) {
+      toaster.show('Generation was blocked or returned empty.', 'warning');
+      return;
+    }
+    if (isArtifactPath(idOrUrl)) {
+      await addMediaToTimeline(store, { type, url: idOrUrl });
+      return;
+    }
+    let polls = 0;
+    const check = async (): Promise<string | null> => {
+      const res = await fetch(`/media/jobs/${idOrUrl}`);
+      if (!res.ok) throw new Error('Failed to check job status');
+      const job = await res.json();
+      if (job.status === 'completed') {
+        if (!job.artifactUrl) throw new Error('Job completed but no artifact');
+        return job.artifactUrl;
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Generation failed');
+      return null;
+    };
+    while (polls < MAX_POLLS) {
+      const artifactUrl = await check().catch((e) => {
+        toaster.show(e.message, 'warning');
+        return '__error__';
+      });
+      if (artifactUrl === '__error__') return;
+      if (artifactUrl) {
+        await addMediaToTimeline(store, { type, url: artifactUrl });
+        return;
+      }
+      polls++;
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+    }
+    toaster.show('Generation timed out', 'warning');
+  }, [fetch, store, toaster]);
+
+  const runClipTransform = useCallback(async (
+    endpoint: string,
+    body: Record<string, unknown>,
+    clearMenu = true
+  ) => {
+    if (!clipMenu) return;
+    const state = store.getState();
+    const vo = state.doc.outputs[clipMenu.outputIndex] as VideoOutput;
+    const track = vo.tracks.find((t) => t.id === clipMenu.trackId);
+    const clip = track?.clips.find((c) => c.id === clipMenu.clipId);
+    if (!clip?.src) {
+      toaster.show('Selected clip has no source', 'warning');
+      return;
+    }
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Transform failed');
+      const { id } = await res.json();
+      if (isArtifactPath(id)) {
+        state.updateClip(clipMenu.outputIndex, clipMenu.trackId, clipMenu.clipId, {
+          src: id,
+          fileId: undefined,
+        });
+        state.pushHistory();
+      } else {
+        let polls = 0;
+        while (polls < MAX_POLLS) {
+          const jobRes = await fetch(`/media/jobs/${id}`);
+          if (!jobRes.ok) throw new Error('Failed to check transform status');
+          const job = await jobRes.json();
+          if (job.status === 'completed') {
+            if (!job.artifactUrl) throw new Error('No artifact');
+            state.updateClip(clipMenu.outputIndex, clipMenu.trackId, clipMenu.clipId, {
+              src: job.artifactUrl,
+              fileId: undefined,
+            });
+            state.pushHistory();
+            break;
+          }
+          if (job.status === 'failed') throw new Error(job.error || 'Transform failed');
+          polls++;
+          await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        }
+      }
+    } catch (e) {
+      toaster.show((e as Error).message || 'Transform failed', 'warning');
+    } finally {
+      if (clearMenu) setClipMenu(null);
+    }
+  }, [clipMenu, fetch, store, toaster]);
+
+  const handleGenerateVideo = useCallback(() => {
+    modals.openModal({
+      title: 'AI Video',
+      children: (
+        <AiVideoDialog
+          fetch={fetch}
+          toaster={toaster}
+          selectedImageSrc={selectedImageSrc}
+          onResult={landOrPoll}
+        />
+      ),
+    });
+  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll]);
+
+  const handleGenerateMusic = useCallback(() => {
+    modals.openModal({
+      title: 'Generate Music',
+      children: (
+        <MusicDialog
+          fetch={fetch}
+          toaster={toaster}
+          onResult={landOrPoll}
+        />
+      ),
+    });
+  }, [modals, fetch, toaster, landOrPoll]);
+
+  const handleGenerateAvatar = useCallback(() => {
+    modals.openModal({
+      title: 'Generate Avatar Video',
+      children: (
+        <AvatarDialog
+          fetch={fetch}
+          toaster={toaster}
+          selectedImageSrc={selectedImageSrc}
+          onResult={landOrPoll}
+        />
+      ),
+    });
+  }, [modals, fetch, toaster, selectedImageSrc, landOrPoll]);
+
+  const handleGenerateSlideshow = useCallback(() => {
+    modals.openModal({
+      title: 'Generate Slideshow',
+      children: (
+        <SlideshowDialog
+          fetch={fetch}
+          toaster={toaster}
+          onResult={landOrPoll}
+        />
+      ),
+    });
+  }, [modals, fetch, toaster, landOrPoll]);
+
   if (!isVideo || !vo) {
     return null;
   }
@@ -732,6 +1204,59 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
           }
         >
           Captions
+        </button>
+        <button
+          onClick={handleGenerateVideo}
+          disabled={!textToVideoAvailable && !imageToVideoAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            textToVideoAvailable || imageToVideoAvailable
+              ? 'Generate AI video from a prompt (or selected image)'
+              : tool('text-to-video')?.reason ||
+                tool('image-to-video')?.reason ||
+                'Configure a video provider in Settings → Media'
+          }
+        >
+          AI Video
+        </button>
+        <button
+          onClick={handleGenerateMusic}
+          disabled={!textToMusicAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            textToMusicAvailable
+              ? 'Generate AI music'
+              : tool('text-to-music')?.reason ||
+                'Configure a music provider in Settings → Media'
+          }
+        >
+          Music
+        </button>
+        <button
+          onClick={handleGenerateAvatar}
+          disabled={!videoAvatarAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            videoAvatarAvailable
+              ? 'Generate avatar video'
+              : tool('video-avatar')?.reason ||
+                'Configure an avatar provider in Settings → Media'
+          }
+        >
+          Avatar
+        </button>
+        <button
+          onClick={handleGenerateSlideshow}
+          disabled={!imageSlideAvailable}
+          className="px-2 py-0.5 rounded text-[10px] border border-newBorder text-textColor/60 hover:text-textColor disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-textColor/60"
+          title={
+            imageSlideAvailable
+              ? 'Generate slideshow from prompt + images'
+              : tool('image-slide')?.reason ||
+                'Configure a slideshow provider in Settings → Media'
+          }
+        >
+          Slideshow
         </button>
       </div>
 
@@ -1037,6 +1562,137 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
                 </div>
               </div>
             )}
+          </div>
+        </>
+      )}
+
+      {/* Clip context menu */}
+      {clipMenu && (
+        <>
+          <div
+            className="fixed inset-0 z-50"
+            onClick={() => {
+              setClipMenu(null);
+              setClipTransformMode(null);
+            }}
+          />
+          <div
+            className="fixed z-[60] bg-newBgColor border border-newBorder rounded-lg p-2 shadow-xl min-w-[160px]"
+            style={{
+              left: clipMenu.x,
+              top: clipMenu.y + 8,
+              transform: 'translateX(-50%)',
+            }}
+          >
+            {(() => {
+              const track = vo.tracks.find((t) => t.id === clipMenu.trackId);
+              const clip = track?.clips.find((c) => c.id === clipMenu.clipId);
+              const clipSrc = clip?.src;
+              if (!clipSrc) {
+                return (
+                  <div className="text-[11px] text-textColor/60 px-1">
+                    Selected clip has no source
+                  </div>
+                );
+              }
+              if (clipTransformMode === 'upscale') {
+                return (
+                  <div className="flex flex-col gap-1">
+                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">Upscale video</div>
+                    <button
+                      onClick={() => runClipTransform('/media/upscale-video', { videoUrl: clipSrc })}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                    >
+                      Upscale video
+                    </button>
+                    <button
+                      onClick={() => setClipTransformMode(null)}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                    >
+                      Back
+                    </button>
+                  </div>
+                );
+              }
+              if (clipTransformMode === 'remove-bg') {
+                return (
+                  <div className="flex flex-col gap-1">
+                    <div className="text-[11px] font-medium text-textColor/60 mb-1 px-1">Remove background</div>
+                    <button
+                      onClick={() => runClipTransform('/media/remove-video-background', { videoUrl: clipSrc })}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                    >
+                      Remove background
+                    </button>
+                    <button
+                      onClick={() => setClipTransformMode(null)}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                    >
+                      Back
+                    </button>
+                  </div>
+                );
+              }
+              if (clipTransformMode === 'video-to-video') {
+                return (
+                  <div className="flex flex-col gap-1.5">
+                    <div className="text-[11px] font-medium text-textColor/60 px-1">Transform with prompt</div>
+                    <input
+                      type="text"
+                      value={clipTransformPrompt}
+                      onChange={(e) => setClipTransformPrompt(e.target.value)}
+                      placeholder="Describe the transformation..."
+                      className="w-full bg-newBgColor border border-newBorder rounded px-2 py-1 text-[11px] text-textColor placeholder:text-textColor/40 outline-none"
+                    />
+                    <button
+                      onClick={() => runClipTransform('/media/video-to-video', { videoUrl: clipSrc, prompt: clipTransformPrompt.trim() })}
+                      disabled={!clipTransformPrompt.trim()}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Transform
+                    </button>
+                    <button
+                      onClick={() => setClipTransformMode(null)}
+                      className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                    >
+                      Back
+                    </button>
+                  </div>
+                );
+              }
+              return (
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setClipTransformMode('upscale')}
+                    disabled={!videoUpscaleAvailable}
+                    className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Upscale
+                  </button>
+                  <button
+                    onClick={() => setClipTransformMode('remove-bg')}
+                    disabled={!videoBackgroundAvailable}
+                    className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Remove background
+                  </button>
+                  <button
+                    onClick={() => setClipTransformMode('video-to-video')}
+                    disabled={!videoToVideoAvailable}
+                    className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Transform with prompt
+                  </button>
+                  <div className="border-t border-newBorder my-1" />
+                  <button
+                    onClick={() => setClipMenu(null)}
+                    className="w-full text-left px-2 py-1 rounded text-[12px] hover:bg-newColColor/30 text-textColor"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              );
+            })()}
           </div>
         </>
       )}

@@ -13,7 +13,7 @@ const MAX_POLLS = 200; // ~10 minutes
 
 type VideoJobStatus = 'pending' | 'processing' | 'completed' | 'failed';
 
-const isArtifactPath = (id: string) =>
+export const isArtifactPath = (id: string) =>
   id.includes('/') || id.startsWith('http') || id.startsWith('data:');
 
 const AiVideoModal: FC<{

@@ -13,6 +13,7 @@ import {
   StockIconItem,
 } from './stock.types';
 import { SaveToFilesModal } from './save-to-files-modal';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
 // Premium BYOK content packs mint a licensed download URL from the item id at
 // import time (mint-then-ingest). Keep in sync with the backend registry.
@@ -36,40 +37,32 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
   const [item, setItem] = useState(initialItem);
   const [posting, setPosting] = useState(false);
 
-  // "Open in Designer" navigates to the full /media/designer page with the
-  // asset in the query string — there is no Designer modal. `w/h` are the chosen
-  // canvas size (drives the doc); `nw/nh` are the image's real pixel size so it
-  // is placed aspect-correct inside that canvas.
-  const openDesignerWith = useCallback(
-    (width: number, height: number) => {
-      const params = new URLSearchParams();
-      params.set('url', item.url);
-      params.set('type', type);
-      params.set('source', item.source);
-      params.set('w', String(width));
-      params.set('h', String(height));
-      params.set('nw', String(item.width));
-      params.set('nh', String(item.height));
-      if (item.author) params.set('author', item.author);
-      if (item.authorUrl) params.set('authorUrl', item.authorUrl);
-      if (item.attribution) params.set('attribution', JSON.stringify(item.attribution));
-      if (type === 'video' && (item as StockVideoItem).thumbUrl) {
-        // The canvas image is the POSTER (thumbUrl), never the .mp4.
-        params.set('thumbUrl', (item as StockVideoItem).thumbUrl);
-      }
-      if (type === 'photo' && (item as StockPhotoItem).downloadLocation) {
-        params.set('downloadLocation', (item as StockPhotoItem).downloadLocation!);
-      }
-      modal.closeAll();
-      router.push(`/media/designer?${params.toString()}`);
-    },
-    [router, modal, item, type]
-  );
-
-  // Straight to the Designer at the image's original size — no size picker.
+  // "Open in Designer" navigates to the full /media/designer page.
+  // Images land on the static canvas (with attribution + sizing metadata);
+  // video lands on the timeline.
   const handleOpenInDesigner = useCallback(() => {
-    openDesignerWith(item.width, item.height);
-  }, [openDesignerWith, item]);
+    const operation = type === 'video' ? 'video' : 'image';
+    modal.closeAll();
+    openInDesigner(
+      {
+        operation,
+        artifactUrl: item.url,
+        source: item.source,
+        author: item.author,
+        authorUrl: item.authorUrl,
+        downloadLocation:
+          type === 'photo'
+            ? (item as StockPhotoItem).downloadLocation || undefined
+            : undefined,
+        thumbUrl: type === 'video' ? (item as StockVideoItem).thumbUrl : item.thumbUrl,
+        width: item.width,
+        height: item.height,
+        naturalWidth: item.width,
+        naturalHeight: item.height,
+      },
+      router.push
+    );
+  }, [router, modal, item, type]);
 
   const relatedKey =
     type === 'photo'

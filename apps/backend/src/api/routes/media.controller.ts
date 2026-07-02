@@ -27,6 +27,13 @@ import { RemoveBackgroundDto } from '@gitroom/nestjs-libraries/dtos/ai/remove.ba
 import { DetectFocalPointDto } from '@gitroom/nestjs-libraries/dtos/ai/detect-focal-point.dto';
 import { UpscaleImageDto } from '@gitroom/nestjs-libraries/dtos/ai/upscale.image.dto';
 import { InpaintImageDto } from '@gitroom/nestjs-libraries/dtos/ai/inpaint.image.dto';
+import { ImageToImageDto } from '@gitroom/nestjs-libraries/dtos/ai/image-to-image.dto';
+import { UpscaleVideoDto } from '@gitroom/nestjs-libraries/dtos/ai/upscale-video.dto';
+import { RemoveVideoBackgroundDto } from '@gitroom/nestjs-libraries/dtos/ai/remove-video-background.dto';
+import { GenerateMusicDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-music.dto';
+import { VideoToVideoDto } from '@gitroom/nestjs-libraries/dtos/ai/video-to-video.dto';
+import { GenerateAvatarDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-avatar.dto';
+import { GenerateSlideDto } from '@gitroom/nestjs-libraries/dtos/ai/generate-slide.dto';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { BadRequestException } from '@nestjs/common';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
@@ -307,6 +314,151 @@ export class MediaController {
     await this._assertBudget(org.id);
     await this._subscriptionService.checkCredits(org);
     return { url: await this._aiMediaService.upscaleImage(body.imageUrl, { orgId: org.id, scale: body.scale }) };
+  }
+
+  @Post('/image-to-image')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async imageToImage(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: ImageToImageDto
+  ) {
+    await this._assertBudget(org.id);
+    await this._subscriptionService.checkCredits(org);
+    try {
+      return { url: await this._aiDefaults.imageToImage(org.id, body.prompt, body.imageUrl) };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/upscale-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async upscaleVideo(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: UpscaleVideoDto
+  ) {
+    await this._assertBudget(org.id);
+    await this._subscriptionService.checkCredits(org);
+    try {
+      const result = await this._aiDefaults.videoUpscale(org.id, body.videoUrl);
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/remove-video-background')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async removeVideoBackground(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: RemoveVideoBackgroundDto
+  ) {
+    await this._assertBudget(org.id);
+    await this._subscriptionService.checkCredits(org);
+    try {
+      const result = await this._aiDefaults.videoBackground(org.id, body.videoUrl);
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/video-to-video')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  @RequirePermission('media', 'create')
+  async videoToVideo(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: VideoToVideoDto
+  ) {
+    await this._assertBudget(org.id);
+    await this._subscriptionService.checkCredits(org);
+    try {
+      const result = await this._aiDefaults.videoToVideo(org.id, body.prompt, body.videoUrl);
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/generate-music')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  async generateMusic(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: GenerateMusicDto
+  ) {
+    await this._assertBudget(org.id);
+    const total = await this._subscriptionService.checkCredits(org);
+    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
+      return false;
+    }
+    try {
+      const result = await this._aiDefaults.textToMusic(org.id, body.prompt);
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/generate-avatar')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  async generateAvatar(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: GenerateAvatarDto
+  ) {
+    await this._assertBudget(org.id);
+    const total = await this._subscriptionService.checkCredits(org);
+    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
+      return false;
+    }
+    try {
+      const result = await this._aiDefaults.videoAvatar(org.id, body.script, { imageUrl: body.imageUrl });
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
+  }
+
+  @Post('/generate-slide')
+  @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
+  async generateSlide(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: GenerateSlideDto
+  ) {
+    await this._assertBudget(org.id);
+    const total = await this._subscriptionService.checkCredits(org);
+    if (process.env.STRIPE_PUBLISHABLE_KEY && total.credits <= 0) {
+      return false;
+    }
+    try {
+      const result = await this._aiDefaults.imageSlide(org.id, body.prompt, body.imageUrls);
+      return { id: result, status: 'pending' };
+    } catch (err) {
+      if (err instanceof DefaultNotConfiguredError) {
+        throw new HttpException({ error: err.message, category: err.category }, HttpStatus.CONFLICT);
+      }
+      throw err;
+    }
   }
 
   @Post('/stock/download')

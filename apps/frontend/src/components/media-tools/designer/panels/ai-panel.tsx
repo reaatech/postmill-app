@@ -3,9 +3,16 @@
 import React, { FC, useCallback, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useMediaToolsStatus } from '@gitroom/frontend/components/layout/use-media-tools-status';
 
 interface AiPanelProps {
   store: any;
+}
+
+interface GeneratedImage {
+  id: string;
+  path: string;
+  name: string;
 }
 
 // Explicit lifecycle states for an AI generation request (C7).
@@ -14,16 +21,19 @@ type GenStatus = 'idle' | 'queued' | 'generating' | 'failed';
 export const AiPanel: FC<AiPanelProps> = ({ store }) => {
   const fetch = useFetch();
   const toaster = useToaster();
+  const { toolAvailable } = useMediaToolsStatus();
+  const textToImageAvailable = toolAvailable('text-to-image');
+
   const [prompt, setPrompt] = useState('');
   const [status, setStatus] = useState<GenStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
-  const [results, setResults] = useState<string[]>([]);
+  const [results, setResults] = useState<GeneratedImage[]>([]);
   const abortRef = useRef<AbortController | null>(null);
 
   const inFlight = status === 'queued' || status === 'generating';
 
   const handleGenerate = useCallback(async () => {
-    if (!prompt.trim() || inFlight) return;
+    if (!prompt.trim() || inFlight || !textToImageAvailable) return;
     setErrorMessage('');
     setStatus('queued');
 
@@ -33,7 +43,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
     try {
       // Brief queued → generating transition so the user sees the request was accepted.
       setStatus('generating');
-      const res = await fetch('/media/generate-image', {
+      const res = await fetch('/media/generate-image-with-prompt', {
         method: 'POST',
         body: JSON.stringify({ prompt: prompt.trim() }),
         signal: controller.signal,
@@ -43,15 +53,16 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
         setErrorMessage('Image generation failed. Please try again.');
         return;
       }
-      const data = await res.json();
-      if (data?.output) {
-        setResults((prev) => [data.output, ...prev]);
-        setStatus('idle');
-        toaster.show('Image generated', 'success');
-      } else {
+      const data = (await res.json()) as GeneratedImage | false;
+      if (!data) {
+        // Credit-blocked or empty generation.
         setStatus('failed');
-        setErrorMessage('The model returned no image.');
+        setErrorMessage('Image generation was blocked or returned empty.');
+        return;
       }
+      setResults((prev) => [data, ...prev]);
+      setStatus('idle');
+      toaster.show('Image generated', 'success');
     } catch (e) {
       // Aborts are user-initiated cancels — return to idle silently.
       if (controller.signal.aborted) {
@@ -63,7 +74,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
     } finally {
       abortRef.current = null;
     }
-  }, [prompt, fetch, toaster, inFlight]);
+  }, [prompt, fetch, toaster, inFlight, textToImageAvailable]);
 
   const handleCancel = useCallback(() => {
     abortRef.current?.abort();
@@ -73,23 +84,41 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
   }, [toaster]);
 
   const handleAddToCanvas = useCallback(
-    (dataUrl: string) => {
-      const state = store.getState();
-      const out = state.doc.outputs[state.currentOutput];
-      state.addElement({
-        id: '',
-        type: 'image',
-        src: dataUrl,
-        x: 0,
-        y: 0,
-        width: Math.min(300, out.width),
-        height: Math.min(300, out.height),
-        rotation: 0,
-        opacity: 1,
-        locked: false,
-        hidden: false,
-      });
-      toaster.show('Image added to canvas', 'success');
+    (item: GeneratedImage) => {
+      const img = new Image();
+      img.onload = () => {
+        const state = store.getState();
+        const out = state.doc.outputs[state.currentOutput];
+        const naturalWidth = img.naturalWidth || out.width;
+        const naturalHeight = img.naturalHeight || out.height;
+        const maxW = out.width * 0.9;
+        const maxH = out.height * 0.9;
+        const scale = Math.min(1, maxW / naturalWidth, maxH / naturalHeight);
+        const width = naturalWidth * scale;
+        const height = naturalHeight * scale;
+
+        state.addElement({
+          id: '',
+          type: 'image',
+          src: item.path,
+          fileId: item.id,
+          x: (out.width - width) / 2,
+          y: (out.height - height) / 2,
+          width,
+          height,
+          rotation: 0,
+          opacity: 1,
+          locked: false,
+          hidden: false,
+          naturalWidth,
+          naturalHeight,
+        });
+        toaster.show('Image added to canvas', 'success');
+      };
+      img.onerror = () => {
+        toaster.show('Could not load generated image', 'warning');
+      };
+      img.src = item.path;
     },
     [store, toaster]
   );
@@ -103,6 +132,16 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
     },
     [handleGenerate]
   );
+
+  if (!textToImageAvailable) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 py-6 text-center">
+        <div className="text-[12px] text-newTextColor/60">
+          Configure an image-generation provider in Settings → Content → Media Defaults to use the AI panel.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-3">
@@ -177,16 +216,16 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
 
       {results.length > 0 && (
         <div className="grid grid-cols-2 gap-2">
-          {results.map((dataUrl, i) => (
+          {results.map((item) => (
             <button
-              key={i}
-              onClick={() => handleAddToCanvas(dataUrl)}
+              key={item.id}
+              onClick={() => handleAddToCanvas(item)}
               className="relative group rounded-[6px] overflow-hidden border border-newBorder hover:border-designerAccent transition-all"
               title="Click to add to canvas"
             >
               <img
-                src={dataUrl}
-                alt={`Generated ${i + 1}`}
+                src={item.path}
+                alt={item.name}
                 className="w-full aspect-square object-cover"
               />
               <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center">
@@ -198,21 +237,6 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           ))}
         </div>
       )}
-
-      <div className="flex gap-2 mt-2">
-        <button
-          onClick={() => toaster.show('Background removal coming soon', 'success')}
-          className="flex-1 h-[32px] rounded-[6px] border border-newBorder text-[12px] text-textColor hover:bg-boxHover transition-all"
-        >
-          Background Removal
-        </button>
-        <button
-          onClick={() => toaster.show('Upscale coming soon', 'success')}
-          className="flex-1 h-[32px] rounded-[6px] border border-newBorder text-[12px] text-textColor hover:bg-boxHover transition-all"
-        >
-          Upscale
-        </button>
-      </div>
     </div>
   );
 };

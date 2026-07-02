@@ -7,6 +7,7 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { useReplicateStore } from './replicate.store';
 import { EditorShell, toolbarBtn, toolbarPrimary } from './editor-shell';
+import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 import type { FileValue } from './fields/file';
 
 interface CustomFontEntry {
@@ -212,8 +213,7 @@ export function MemeEditor() {
 
   const handleOpenDesigner = useCallback(() => {
     if (savedPath) {
-      const params = new URLSearchParams({ url: savedPath, type: 'photo', w: '', h: '' });
-      window.open(`/media/designer?${params.toString()}`, '_blank');
+      openInDesigner({ operation: 'image', artifactUrl: savedPath });
     }
   }, [savedPath]);
 
