@@ -19,6 +19,7 @@ vi.mock('next/font/google', () => ({
 vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(''),
   usePathname: () => '/dashboard',
+  useRouter: () => ({ replace: vi.fn() }),
 }));
 
 vi.mock('@gitroom/helpers/utils/custom.fetch', () => ({
@@ -42,6 +43,7 @@ vi.mock('swr', () => ({
       email: 'test@example.com',
       picture: null,
       tier: { current: 'PRO' },
+      setupCompleted: true,
     },
     mutate: vi.fn(),
   }),
@@ -59,6 +61,7 @@ vi.mock('../layout/user.context', () => ({
     email: 'test@example.com',
     picture: null,
     tier: { current: 'PRO' },
+    setupCompleted: true,
   }),
   ContextWrapper: ({ children }: any) => children,
 }));

@@ -31,6 +31,7 @@ export const UserContext = createContext<
       allowTrial: boolean;
       isTrailing: boolean;
       streakSince: string | null;
+      setupCompleted?: boolean;
       profile: UserSelfProfile | null;
     })
 >(undefined);
@@ -40,6 +41,7 @@ export const ContextWrapper: FC<{
     tier: 'FREE' | 'STANDARD' | 'PRO' | 'ULTIMATE' | 'TEAM';
     role: string;
     totalChannels: number;
+    setupCompleted?: boolean;
     profile: UserSelfProfile | null;
   };
   children: ReactNode;

@@ -32,6 +32,8 @@ sidebar label, page title, and docs use "Posts." Legacy `/schedule` (and sub-pat
 per-post section. The `/plugs` route/nav and `components/plugs/` are removed; backend plug routes and
 storage are unchanged. The orphaned `ExisingPlugData` dedup table (and its dead code) was dropped.
 
+**Setup onboarding gate.** New organizations see a one-time `/setup` wizard that walks the first user through LLM → AI media → channels → content packs → storage → shortlinks → VPN. Completion persists in `Organization.setupCompletedAt`; existing orgs are backfilled as complete. `GET /user/self` exposes `setupCompleted`; `POST /settings/setup/complete` finalizes the wizard and requires an active LLM provider. The first LLM provider saved by an org is auto-activated so the wizard never dead-ends.
+
 **Campaign Discussion.** The campaign dashboard gains an internal, Jira-style **Discussion** thread
 (below the tabs) for org members to talk about a campaign — separate from the synced social
 **Comments**. Rich-text (TipTap) notes with embedded image/video, @mentions (notify), emoji

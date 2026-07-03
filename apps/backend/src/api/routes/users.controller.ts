@@ -109,6 +109,7 @@ export class UsersController {
       isTrailing: !process.env.STRIPE_PUBLISHABLE_KEY ? false : organization?.isTrailing,
       allowTrial: organization?.allowTrial,
       streakSince: organization?.streakSince || null,
+      setupCompleted: !!organization?.setupCompletedAt,
       profile: profile ? {
         name: profile.name,
         lastName: profile.lastName,

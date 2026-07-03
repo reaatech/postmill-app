@@ -131,6 +131,14 @@ export class OrgAiSettingsService {
     const { version: requestedVersion, ...payload } = data;
     const version = this._resolveVersion(identifier, requestedVersion);
 
+    // §3.5 — capture BEFORE the write whether this org has any provider configured yet.
+    // Only a first-time setup (the org's very first provider) auto-activates below, so the
+    // normal Settings flow on an established org (any existing config, active or not) is never
+    // touched — otherwise re-saving credentials could silently flip AI on and start billing
+    // the org's key.
+    const isFirstProvider =
+      !!payload.credentials && (await this._repository.getByOrg(orgId)).length === 0;
+
     const encryptedCredentials = payload.credentials
       ? this._encryption.encrypt(JSON.stringify(payload.credentials))
       : undefined;
@@ -148,6 +156,20 @@ export class OrgAiSettingsService {
     // §11.4 auto-config: OpenAI/MiniMax AI credentials live-link to the media surface.
     if (data.credentials && this._credentialLink) {
       await this._credentialLink.syncFromAiProvider(orgId, identifier, data.credentials);
+    }
+
+    // §3.5 auto-activate the org's first-ever LLM provider on save so the setup wizard's
+    // step-1 gate clears without a separate "Make Primary" click. Scoped to a first-time
+    // setup (see isFirstProvider above); an established org is never auto-activated.
+    if (isFirstProvider && payload.credentials) {
+      const adapter = this._resolveAdapter(identifier, version);
+      if (adapter && this._hasRequiredCredentials(adapter, payload.credentials)) {
+        try {
+          await this.setActive(orgId, identifier, version);
+        } catch (err) {
+          this._logger.warn(`Auto-activation of first LLM provider "${identifier}" failed: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     }
 
     return result;

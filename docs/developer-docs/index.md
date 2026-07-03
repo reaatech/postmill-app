@@ -50,6 +50,7 @@ job handler, Next.js frontend, shared libraries, Prisma).
 | [Adding a Provider](./adding-a-provider.md) | Step-by-step guide for adding a new social channel provider |
 | [Adding an AI Adapter](./adding-an-ai-adapter.md) | Guide for implementing a new AI provider adapter |
 | [Testing](./testing.md) | Vitest per-package configuration, co-located specs, single-threaded execution, CI workflow |
+| [Setup Gate](./setup-gate.md) | The `/setup` onboarding wizard and gate semantics |
 | [Contributing](./contributing.md) | Ground rules, invariants, PR workflow, review checklist |
 
 ---
@@ -82,4 +83,4 @@ libraries/
   react-shared-libraries/  Shared React components
 ```
 
-> Verified against v3.7.0
+> Verified against v3.9.0
