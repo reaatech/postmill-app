@@ -12,6 +12,13 @@ function makePrisma() {
     mastra_scorers: { deleteMany: del() },
     file: { findMany: findEmpty, deleteMany: del() },
     post: { findMany: findEmpty, deleteMany: del(), updateMany: del() },
+    aiDesignerSession: {
+      findMany: vi
+        .fn()
+        .mockResolvedValueOnce([{ id: 'stale-1' }, { id: 'stale-2' }])
+        .mockResolvedValue([]),
+      deleteMany: del(),
+    },
     user: { updateMany: del() },
     session: { updateMany: del() },
     tagsPosts: { deleteMany: del() },
@@ -40,6 +47,11 @@ describe('RetentionActivity', () => {
     expect(prisma.session.updateMany).toHaveBeenCalledTimes(1);
     expect(counts.errors).toBe(2);
     expect(counts.userIpAgent).toBe(2);
+    // Batched sweep: ids from findMany feed one capped deleteMany.
+    expect(prisma.aiDesignerSession.deleteMany).toHaveBeenCalledWith({
+      where: { id: { in: ['stale-1', 'stale-2'] } },
+    });
+    expect(counts.aiDesignerSessions).toBe(2);
   });
 
   it('is non-fatal: one prune throwing does not abort the rest', async () => {

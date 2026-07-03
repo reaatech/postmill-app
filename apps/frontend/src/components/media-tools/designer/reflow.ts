@@ -1,13 +1,19 @@
-import { fitWithin } from './panels/fit-within';
-import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
-import type { DesignerElement } from './designer.store';
+// Pure, safe-zone-aware geometry reflow + focal-point estimation now live in
+// the shared `designer-doc` layer so the server-side AI Composer can reuse them.
+export {
+  smartReflow,
+  estimateFocalPoint,
+  deriveAnchor,
+  getSafeZoneInset,
+} from '@gitroom/nestjs-libraries/media/designer-doc/reflow';
+export type { Anchor } from '@gitroom/nestjs-libraries/media/designer-doc/reflow';
 
 export const computeCoverCrop = (
   srcW: number,
   srcH: number,
   targetW: number,
   targetH: number,
-  focalPoint?: { x: number; y: number },
+  focalPoint?: { x: number; y: number }
 ): { x: number; y: number; width: number; height: number } => {
   const fp = focalPoint || { x: 0.5, y: 0.5 };
   const targetRatio = targetW / targetH;
@@ -24,138 +30,6 @@ export const computeCoverCrop = (
   const x = (srcW - sw) * Math.min(1, Math.max(0, fp.x));
   const y = (srcH - sh) * Math.min(1, Math.max(0, fp.y));
   return { x, y, width: sw, height: sh };
-};
-
-export type Anchor =
-  | 'top-left' | 'top-center' | 'top-right'
-  | 'center-left' | 'center' | 'center-right'
-  | 'bottom-left' | 'bottom-center' | 'bottom-right';
-
-export const deriveAnchor = (
-  el: DesignerElement,
-  source: { width: number; height: number }
-): Anchor => {
-  if (el.anchor) return el.anchor;
-  const cx = el.x + el.width / 2;
-  const cy = el.y + el.height / 2;
-  const h =
-    cx < source.width * 0.33 ? 'left' : cx > source.width * 0.67 ? 'right' : 'center';
-  const v =
-    cy < source.height * 0.33 ? 'top' : cy > source.height * 0.67 ? 'bottom' : 'center';
-  if (h === 'left' && v === 'top') return 'top-left';
-  if (h === 'center' && v === 'top') return 'top-center';
-  if (h === 'right' && v === 'top') return 'top-right';
-  if (h === 'left' && v === 'center') return 'center-left';
-  if (h === 'right' && v === 'center') return 'center-right';
-  if (h === 'left' && v === 'bottom') return 'bottom-left';
-  if (h === 'center' && v === 'bottom') return 'bottom-center';
-  if (h === 'right' && v === 'bottom') return 'bottom-right';
-  return 'center';
-};
-
-const anchorX = (anchor: Anchor, targetW: number, w: number): number => {
-  if (anchor.includes('left')) return 0;
-  if (anchor.includes('right')) return targetW - w;
-  return (targetW - w) / 2;
-};
-
-const anchorY = (anchor: Anchor, targetH: number, h: number): number => {
-  if (anchor.includes('top')) return 0;
-  if (anchor.includes('bottom')) return targetH - h;
-  return (targetH - h) / 2;
-};
-
-export const smartReflow = (
-  el: DesignerElement,
-  source: { width: number; height: number },
-  target: { width: number; height: number; formatId?: string },
-): Partial<DesignerElement> => {
-  const scaleX = target.width / source.width;
-  const scaleY = target.height / source.height;
-  const scale = Math.min(scaleX, scaleY);
-
-  const anchor = deriveAnchor(el, source);
-  let newW: number;
-  let newH: number;
-  const result: Partial<DesignerElement> = { anchor };
-
-  if (el.type === 'image') {
-    const mode = el.fitMode || 'cover';
-    if (mode === 'cover' || mode === 'contain') {
-      const { width: w, height: h } = fitWithin(
-        el.naturalWidth || el.width || source.width,
-        el.naturalHeight || el.height || source.height,
-        target.width,
-        target.height,
-      );
-      newW = mode === 'cover' ? target.width : w;
-      newH = mode === 'cover' ? target.height : h;
-      result.width = newW;
-      result.height = newH;
-      result.fitMode = mode;
-      result.focalPoint = el.focalPoint || { x: 0.5, y: 0.5 };
-    } else {
-      newW = Math.max(10, Math.round(el.width * scaleX));
-      newH = Math.max(10, Math.round(el.height * scaleY));
-      result.width = newW;
-      result.height = newH;
-    }
-  } else {
-    newW = Math.max(10, Math.round(el.width * scale));
-    newH = Math.max(10, Math.round(el.height * scale));
-    result.width = newW;
-    result.height = newH;
-
-    if (el.fontSize) {
-      const newFontSize = Math.round(el.fontSize * scale);
-      result.fontSize = Math.max(10, newFontSize);
-    }
-  }
-
-  let x = anchorX(anchor, target.width, newW);
-  let y = anchorY(anchor, target.height, newH);
-
-  // Keep text, images, and shapes inside the title-safe area so they remain
-  // readable / uncropped by platform overlays. For images and shapes we only
-  // nudge when the element actually overlaps a safe-zone edge, preserving the
-  // user's intentional edge-to-edge placements when possible.
-  if (el.type === 'text' || el.type === 'image' || el.type === 'shape') {
-    const safe = getSafeZoneInset(target.formatId || '', target.width, target.height);
-    if (el.type === 'text') {
-      // Text is fully constrained inside the safe zone.
-      if (x < safe.left) x = safe.left;
-      if (x + newW > safe.right) x = Math.max(safe.left, safe.right - newW);
-      if (y < safe.top) y = safe.top;
-      if (y + newH > safe.bottom) y = Math.max(safe.top, safe.bottom - newH);
-    } else {
-      // Images / shapes: nudge only the edge that crosses a safe boundary, and
-      // only when the element actually fits inside the safe area. A full-bleed
-      // element (wider/taller than the safe zone, e.g. a cover photo) is an
-      // intentional edge-to-edge placement and must be preserved.
-      const safeW = safe.right - safe.left;
-      const safeH = safe.bottom - safe.top;
-      if (newW <= safeW) {
-        if (x < safe.left) x = safe.left;
-        if (x + newW > safe.right) x = Math.max(safe.left, safe.right - newW);
-      }
-      if (newH <= safeH) {
-        if (y < safe.top) y = safe.top;
-        if (y + newH > safe.bottom) y = Math.max(safe.top, safe.bottom - newH);
-      }
-    }
-  }
-
-  result.x = x;
-  result.y = y;
-  return result;
-};
-
-export const estimateFocalPoint = (naturalWidth: number, naturalHeight: number): { x: number; y: number } => {
-  const ratio = naturalWidth / naturalHeight;
-  if (ratio < 1) {
-    return { x: 0.5, y: 0.35 };
-  }
-  return { x: 0.5, y: 0.5 };
 };
 
 /**
@@ -265,7 +139,7 @@ type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
  */
 export const detectFocalPoint = async (
   imageUrl: string,
-  fetch?: FetchLike,
+  fetch?: FetchLike
 ): Promise<{ x: number; y: number }> => {
   if (fetch) {
     try {
@@ -298,25 +172,4 @@ export const detectFocalPoint = async (
     }
   }
   return detectFocalPointClient(imageUrl);
-};
-
-export const getSafeZoneInset = (
-  formatId: string,
-  width: number,
-  height: number,
-) => {
-  const preset = CHANNEL_PRESETS.find((p) => p.id === formatId);
-  if (!preset?.safeZones?.length) {
-    return {
-      left: width * 0.05,
-      top: height * 0.05,
-      right: width * 0.95,
-      bottom: height * 0.95,
-    };
-  }
-  const minX = Math.min(...preset.safeZones.map((z) => z.x));
-  const minY = Math.min(...preset.safeZones.map((z) => z.y));
-  const maxX = Math.max(...preset.safeZones.map((z) => z.x + z.width));
-  const maxY = Math.max(...preset.safeZones.map((z) => z.y + z.height));
-  return { left: minX, top: minY, right: width - maxX, bottom: height - maxY };
 };

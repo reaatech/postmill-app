@@ -84,6 +84,9 @@ import { MediaStudioModule } from '@gitroom/nestjs-libraries/media/studio/studio
 import { MediaStudioController } from './routes/media-studio.controller';
 import { DeepgramModule } from '@gitroom/nestjs-libraries/media/deepgram/deepgram.module';
 import { DeepgramController } from './routes/deepgram.controller';
+import { AiDesignerModule } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.module';
+import { AiDesignerController } from './routes/ai-designer.controller';
+import { AiDesignerGateway } from './gateways/ai-designer.gateway';
 
 const authenticatedController = [
   UsersController,
@@ -134,10 +137,11 @@ const authenticatedController = [
   HeyGenController,
   MediaStudioController,
   DeepgramController,
+  AiDesignerController,
   AdminProvidersController,
 ];
 @Module({
-  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule],
+  imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule, AiDesignerModule],
   controllers: [
     RootController,
     HealthController,
@@ -172,6 +176,7 @@ const authenticatedController = [
     StockMediaService,
     AiGuardMiddleware,
     SessionCleanupService,
+    AiDesignerGateway,
   ],
   get exports() {
     return [...this.imports, ...this.providers];

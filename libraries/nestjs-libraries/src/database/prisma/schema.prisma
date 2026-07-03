@@ -68,6 +68,7 @@ model Organization {
   roles                AppRole[]
   designs              Design[]
   designTemplates      DesignTemplate[]
+  aiDesignerSessions   AiDesignerSession[]
 
   @@index([apiKey])
   @@index([streakSince])
@@ -134,6 +135,7 @@ model User {
   notificationPreference NotificationPreference?
   notificationDigestQueues NotificationDigestQueue[]
   pushTokens            PushToken[]
+  aiDesignerSessions    AiDesignerSession[]
 
   @@unique([email, providerName])
   @@index([lastReadNotifications])
@@ -1741,6 +1743,49 @@ model DesignTemplate {
   @@index([organizationId])
   @@index([category])
   @@index([deletedAt])
+}
+
+// AI Designer sessions — persistent chat threads that drive headless design generation
+model AiDesignerSession {
+  id              String   @id @default(cuid())
+  organizationId  String
+  userId          String
+  mode            String   // 'chat' | 'prompt'
+  format          String   @default("image") // 'image' in this plan; 'video' reserved
+  config          Json     // { channels[], customSizes[], savePath, brandProfileId?, variants, referenceFileIds[] }
+  brief           Json?    // Design Brief (partial during intake, accepted after) + questionsAsked[]
+  state           String   @default("intake") // intake|planning|awaiting_plan|executing|delivered|revising
+  activeDesignIds Json?    // string[] of Design ids (one per variant)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  organization    Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id])
+  messages        AiDesignerMessage[]
+
+  // (organizationId, userId) also serves organizationId-only lookups (left
+  // prefix); userId alone backs deleteUser teardown, updatedAt the prune cron.
+  @@index([organizationId, userId])
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+// AI Designer messages — persisted chat + form/plan/media/progress payloads
+model AiDesignerMessage {
+  id        String   @id @default(cuid())
+  sessionId String
+  seq       Int      // per-session monotonic
+  role      String   // 'user' | 'assistant' | 'system' | 'agent'
+  agent     String?  // which sub-agent emitted it
+  kind      String   // 'text' | 'markdown' | 'form' | 'media' | 'progress' | 'plan'
+  replyTo   String?  // user reply targets this message id
+  content   Json     // renderer payload
+  createdAt DateTime @default(now())
+
+  session AiDesignerSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // The (sessionId, seq) unique also serves sessionId-only lookups (left prefix).
+  @@unique([sessionId, seq])
 }
 
 model EmailLog {

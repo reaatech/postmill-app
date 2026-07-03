@@ -561,6 +561,93 @@ export class DesignRenderService {
     return out;
   }
 
+  async renderContactSheet(
+    doc: DesignerDoc,
+    opts?: RenderOptions & { labels?: boolean; pages?: Buffer[] }
+  ): Promise<Buffer> {
+    // `pages` lets a caller that already rendered the doc (the AI Designer
+    // saver) composite without re-rendering every output.
+    const pages = opts?.pages ?? (await this.renderAllPages(doc, opts));
+    const outputs = doc.outputs ?? [];
+    if (pages.length === 0) {
+      throw new Error('No outputs to composite');
+    }
+
+    const cols = Math.ceil(Math.sqrt(pages.length));
+    const rows = Math.ceil(pages.length / cols);
+
+    // Scale each page to a thumbnail while preserving aspect ratio.
+    const thumbMaxW = 400;
+    const thumbMaxH = 400;
+    const thumbs = pages.map((buf, i) => {
+      const out = outputs[i];
+      const ratio = out ? Math.min(thumbMaxW / out.width, thumbMaxH / out.height, 1) : 1;
+      return {
+        buffer: buf,
+        width: out ? Math.round(out.width * ratio) : thumbMaxW,
+        height: out ? Math.round(out.height * ratio) : thumbMaxH,
+        label: out ? `${out.name || out.formatId || `output-${i}`} (${out.width}×${out.height})` : `output-${i}`,
+      };
+    });
+
+    const pad = 24;
+    const colWidths: number[] = [];
+    const rowHeights: number[] = [];
+    for (let i = 0; i < cols; i++) {
+      colWidths[i] = Math.max(
+        pad,
+        ...thumbs.filter((_, idx) => idx % cols === i).map((t) => t.width)
+      );
+    }
+    for (let r = 0; r < rows; r++) {
+      rowHeights[r] = Math.max(
+        pad,
+        ...thumbs.filter((_, idx) => Math.floor(idx / cols) === r).map((t) => t.height)
+      );
+    }
+
+    const totalWidth = colWidths.reduce((a, b) => a + b, 0) + pad * (cols + 1);
+    const totalHeight = rowHeights.reduce((a, b) => a + b, 0) + pad * (rows + 1) + rows * 24;
+
+    const { createCanvas, loadImage } = await loadCanvasModule();
+    const canvas = createCanvas(totalWidth, totalHeight);
+    const ctx = canvas.getContext('2d');
+
+    // White backdrop.
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, totalWidth, totalHeight);
+
+    let y = pad;
+    for (let r = 0; r < rows; r++) {
+      let x = pad;
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        const thumb = thumbs[idx];
+        if (!thumb) break;
+
+        const cellW = colWidths[c];
+        const cellH = rowHeights[r];
+        const dx = x + (cellW - thumb.width) / 2;
+        const dy = y + (cellH - thumb.height) / 2;
+
+        const img = await loadImage(thumb.buffer);
+        ctx.drawImage(img, dx, dy, thumb.width, thumb.height);
+
+        if (opts?.labels !== false) {
+          ctx.fillStyle = '#111827';
+          ctx.font = 'bold 14px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText(thumb.label, x + cellW / 2, dy + thumb.height + 18);
+        }
+
+        x += cellW + pad;
+      }
+      y += rowHeights[r] + pad + 24;
+    }
+
+    return canvas.toBuffer('image/png');
+  }
+
   async renderPdf(doc: DesignerDoc, opts?: RenderOptions): Promise<Buffer> {
     const outputs = doc.outputs ?? [];
     const pdf = new PDFDocument({ margin: 0, autoFirstPage: false });

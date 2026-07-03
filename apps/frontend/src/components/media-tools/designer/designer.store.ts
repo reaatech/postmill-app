@@ -1,11 +1,14 @@
 import { create } from 'zustand';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
-import { smartReflow, estimateFocalPoint, detectFocalPoint } from './reflow';
+import { detectFocalPoint } from './reflow';
 import {
   migrateDoc,
   genId,
   matchPreset,
 } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.migrate';
+import { smartReflow } from '@gitroom/nestjs-libraries/media/designer-doc/reflow';
+import { seedCopy } from '@gitroom/nestjs-libraries/media/designer-doc/seed-copy';
+import { applyLinked, GEOMETRY_KEYS } from '@gitroom/nestjs-libraries/media/designer-doc/apply-linked';
 import type {
   DesignerDoc,
   DesignerElement,
@@ -142,66 +145,10 @@ const createEmptyDoc = (width = 1080, height = 1080, attribution?: DesignerAttri
   };
 };
 
-// Seed an element (positioned for the active output) into a target output, scaled + centered.
-// Uses smartReflow for sizing then adds id/originId/centering wrapping.
-const seedCopy = (
-  el: DesignerElement,
-  source: { width: number; height: number },
-  target: DesignerOutput,
-  originId: string,
-): DesignerElement => {
-  const smart = smartReflow(el, source, target);
-  const newW = smart.width ?? el.width;
-  const newH = smart.height ?? el.height;
-  const base: DesignerElement = JSON.parse(JSON.stringify(el));
-  const copy: DesignerElement = {
-    ...base,
-    id: genId(),
-    originId,
-  };
-  Object.assign(copy, smart);
-  if (copy.x === undefined) copy.x = (target.width - newW) / 2;
-  if (copy.y === undefined) copy.y = (target.height - newH) / 2;
-  if (copy.type === 'image' && (copy.fitMode === 'cover') && !copy.focalPoint && copy.naturalWidth && copy.naturalHeight) {
-    copy.focalPoint = estimateFocalPoint(copy.naturalWidth, copy.naturalHeight);
-  }
-  return copy;
-};
-
-// LINKED-BY-DEFAULT: Geometry is per-format and never propagates; everything
-// else (style/content) syncs to same-originId copies in the other outputs.
-const GEOMETRY_KEYS = new Set(['x', 'y', 'width', 'height', 'rotation', 'fitMode', 'focalPoint', 'crop', 'anchor']);
 const sharedUpdates = (updates: Partial<DesignerElement>): Partial<DesignerElement> => {
   const out: any = {};
   for (const k of Object.keys(updates)) if (!GEOMETRY_KEYS.has(k)) out[k] = (updates as any)[k];
   return out;
-};
-
-const applyLinked = (
-  doc: DesignerDoc, currentOutput: number, ids: Set<string>, full: Partial<DesignerElement>, editFormatOnly: boolean,
-): { outputs: (DesignerOutput | VideoOutput)[]; affected: number[] } => {
-  const children = (doc.outputs[currentOutput] as DesignerOutput).children;
-  const origins = new Set(
-    children.filter((el) => ids.has(el.id) && el.originId).map((el) => el.originId as string),
-  );
-  const shared = sharedUpdates(full);
-  const propagate = !editFormatOnly && origins.size > 0 && Object.keys(shared).length > 0;
-  const affected: number[] = [];
-  const outputs = doc.outputs.map((out, i) => {
-    if (i === currentOutput) return { ...out, children: (out as DesignerOutput).children.map((el) => (ids.has(el.id) ? { ...el, ...full } : el)) };
-    if (!propagate) return out;
-    let changed = false;
-    const newChildren = (out as DesignerOutput).children.map((el) => {
-      if (el.originId && origins.has(el.originId)) {
-        changed = true;
-        return { ...el, ...shared };
-      }
-      return el;
-    });
-    if (changed) affected.push(i);
-    return { ...out, children: newChildren };
-  });
-  return { outputs, affected };
 };
 
 type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;

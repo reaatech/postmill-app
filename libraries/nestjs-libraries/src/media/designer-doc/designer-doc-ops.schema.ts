@@ -55,6 +55,10 @@ const RemoveOutputOpSchema = z.object({
 const AddOutputOpSchema = z.object({
   op: z.literal('addOutput'),
   preset: AddOutputPresetSchema,
+  // Default (absent/true) seeds the new output from the primary output's
+  // children; `false` opts out and appends an empty white canvas (the
+  // pre-seeding behavior).
+  seed: z.boolean().optional(),
 });
 
 const ResizeOutputOpSchema = z
@@ -87,6 +91,7 @@ const UpdateElementOpSchema = z
     outputIndex: outputIndex,
     elementId: z.string().max(200),
     patch: UpdateElementPatchSchema,
+    scope: z.enum(['shared', 'format-only']).optional(),
   })
   .strict();
 

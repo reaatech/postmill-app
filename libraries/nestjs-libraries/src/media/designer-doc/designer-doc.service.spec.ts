@@ -274,4 +274,393 @@ describe('DesignerDocService', () => {
     expect(op.src).toBe('http://localhost:3000/uploads/test.png');
     expect(op.fileId).toBe('file-1');
   });
+
+  it('addOutput seeds children and copies the primary background', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-primary',
+          formatId: 'custom',
+          name: 'Primary',
+          width: 1080,
+          height: 1080,
+          background: '#ffcc00',
+          children: [
+            {
+              id: 'el-1',
+              type: 'text',
+              x: 490,
+              y: 490,
+              width: 100,
+              height: 50,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'Hello',
+              originId: 'slot-1',
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = service.applyOps(doc, [
+      {
+        op: 'addOutput',
+        preset: {
+          formatId: 'custom',
+          name: 'Half size',
+          width: 540,
+          height: 540,
+        },
+      },
+    ]);
+
+    expect(result.outputs).toHaveLength(2);
+    const added = result.outputs[1] as any;
+    expect(added.background).toBe('#ffcc00');
+    expect(added.children).toHaveLength(1);
+    expect(added.children[0].text).toBe('Hello');
+    expect(added.children[0].originId).toBe('slot-1');
+    // 540x540 = 0.5x scale; centered element stays centered.
+    expect(added.children[0].width).toBe(50);
+    expect(added.children[0].x).toBe(245);
+    expect(added.children[0].y).toBe(257.5);
+  });
+
+  it('addOutput backfills originId on primary children when missing', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-primary',
+          formatId: 'custom',
+          name: 'Primary',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-1',
+              type: 'text',
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'A',
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = service.applyOps(doc, [
+      {
+        op: 'addOutput',
+        preset: {
+          formatId: 'custom',
+          name: 'Double',
+          width: 200,
+          height: 200,
+        },
+      },
+    ]);
+
+    const primary = result.outputs[0] as any;
+    const added = result.outputs[1] as any;
+    expect(primary.children[0].originId).toBeDefined();
+    expect(added.children[0].originId).toBe(primary.children[0].originId);
+  });
+
+  it('shared-scope updateElement propagates non-geometry changes by originId', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-1',
+          formatId: 'custom',
+          name: 'One',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-1',
+              type: 'text',
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'A',
+              originId: 'slot-1',
+            },
+          ],
+        },
+        {
+          id: 'out-2',
+          formatId: 'custom',
+          name: 'Two',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-2',
+              type: 'text',
+              x: 50,
+              y: 50,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'A',
+              originId: 'slot-1',
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = service.applyOps(doc, [
+      {
+        op: 'updateElement',
+        outputIndex: 0,
+        elementId: 'el-1',
+        patch: { text: 'Updated' },
+        scope: 'shared',
+      },
+    ]);
+
+    expect((result.outputs[0] as any).children[0].text).toBe('Updated');
+    expect((result.outputs[1] as any).children[0].text).toBe('Updated');
+  });
+
+  it('shared-scope updateElement does not propagate geometry keys', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-1',
+          formatId: 'custom',
+          name: 'One',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-1',
+              type: 'text',
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              originId: 'slot-1',
+            },
+          ],
+        },
+        {
+          id: 'out-2',
+          formatId: 'custom',
+          name: 'Two',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-2',
+              type: 'text',
+              x: 50,
+              y: 50,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              originId: 'slot-1',
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = service.applyOps(doc, [
+      {
+        op: 'updateElement',
+        outputIndex: 0,
+        elementId: 'el-1',
+        patch: { x: 99 },
+        scope: 'shared',
+      },
+    ]);
+
+    expect((result.outputs[0] as any).children[0].x).toBe(99);
+    expect((result.outputs[1] as any).children[0].x).toBe(50);
+  });
+
+  it('unscoped updateElement stays format-only (back-compat default)', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-1',
+          formatId: 'custom',
+          name: 'One',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-1',
+              type: 'text',
+              x: 0,
+              y: 0,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'A',
+              originId: 'slot-1',
+            },
+          ],
+        },
+        {
+          id: 'out-2',
+          formatId: 'custom',
+          name: 'Two',
+          width: 100,
+          height: 100,
+          background: '#ffffff',
+          children: [
+            {
+              id: 'el-2',
+              type: 'text',
+              x: 50,
+              y: 50,
+              width: 10,
+              height: 10,
+              rotation: 0,
+              opacity: 1,
+              locked: false,
+              hidden: false,
+              text: 'A',
+              originId: 'slot-1',
+            },
+          ],
+        },
+      ],
+    });
+
+    // No `scope` — the pre-scope contract: only the addressed element changes,
+    // a linked copy (same originId) on another output must stay untouched.
+    const result = service.applyOps(doc, [
+      {
+        op: 'updateElement',
+        outputIndex: 0,
+        elementId: 'el-1',
+        patch: { text: 'Updated' },
+      },
+    ]);
+
+    expect((result.outputs[0] as any).children[0].text).toBe('Updated');
+    expect((result.outputs[1] as any).children[0].text).toBe('A');
+  });
+
+  it('addOutput after removing every output appends an unseeded canvas', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-1',
+          formatId: 'custom',
+          name: 'Only',
+          width: 100,
+          height: 100,
+          background: '#ffcc00',
+          children: [{ id: 'el-1', ...minimalImageElement }],
+        },
+      ],
+    });
+
+    // Previously-valid sequence: empty the doc, then add — nothing to seed.
+    const result = service.applyOps(doc, [
+      { op: 'removeOutput', outputIndex: 0 },
+      {
+        op: 'addOutput',
+        preset: { formatId: 'custom', name: 'Fresh', width: 200, height: 200 },
+      },
+    ]);
+
+    expect(result.outputs).toHaveLength(1);
+    const added = result.outputs[0] as any;
+    expect(added.background).toBe('#ffffff');
+    expect(added.children).toHaveLength(0);
+  });
+
+  it('addOutput with seed:false appends an empty white canvas, untouched primary', () => {
+    const service = makeService();
+    const doc = service.validate({
+      version: 2,
+      mode: 'image',
+      outputs: [
+        {
+          id: 'out-primary',
+          formatId: 'custom',
+          name: 'Primary',
+          width: 100,
+          height: 100,
+          background: '#ffcc00',
+          children: [{ id: 'el-1', ...minimalImageElement }],
+        },
+      ],
+    });
+
+    const result = service.applyOps(doc, [
+      {
+        op: 'addOutput',
+        preset: { formatId: 'custom', name: 'Blank', width: 200, height: 200 },
+        seed: false,
+      },
+    ]);
+
+    expect(result.outputs).toHaveLength(2);
+    const primary = result.outputs[0] as any;
+    const added = result.outputs[1] as any;
+    // Pre-seeding semantics: no children copied, no background inherited,
+    // and no fresh-UUID originId backfill on the primary output (the
+    // normalize pass still defaults originId to the element id).
+    expect(added.background).toBe('#ffffff');
+    expect(added.children).toHaveLength(0);
+    expect(primary.children[0].originId).toBe('el-1');
+  });
 });

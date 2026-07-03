@@ -39,6 +39,7 @@ export default defineConfig({
       'src/components/settings/roles/**/*.spec.{ts,tsx}',
       'src/components/new-layout/layout.component.spec.{ts,tsx}',
       'src/components/media-tools/designer/*.spec.{ts,tsx}',
+      'src/components/media-tools/ai-designer/*.spec.{ts,tsx}',
       'src/components/media-tools/*.spec.{ts,tsx}',
       'src/components/composer/picks.socials.component.spec.{ts,tsx}',
       'src/redirects.config.spec.ts',

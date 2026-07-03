@@ -18,6 +18,7 @@ const DesignerPage = dynamic(
 function DesignerWithParams() {
   const sp = useSearchParams();
   const url = sp.get('url') || undefined;
+  const designId = sp.get('designId') || undefined;
   const num = (k: string) => (sp.get(k) ? Number(sp.get(k)) : undefined);
 
   const initialAsset = url
@@ -100,6 +101,7 @@ function DesignerWithParams() {
   return (
     <DesignerPage
       key={
+        designId ||
         url ||
         (initialTimelineMedia
           ? `timeline-${initialTimelineMedia.type}`
@@ -109,6 +111,7 @@ function DesignerWithParams() {
           ? 'bulk'
           : 'blank')
       }
+      designId={designId}
       initialAsset={initialAsset}
       initialAssets={initialAssets}
       initialCaptionVideo={initialCaptionVideo}
