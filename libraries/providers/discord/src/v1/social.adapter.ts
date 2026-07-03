@@ -158,7 +158,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     form.append(
       'payload_json',
       JSON.stringify({
-        content: firstPost.message.replace(/\[\[\[(@.*?)]]]/g, (match, p1) => {
+        content: firstPost.message.replace(/\[\[\[(@[^\]]*)]]]/g, (match, p1) => {
           return `<${p1}>`;
         }),
         attachments: firstPost.media?.map((p, index) => ({
@@ -243,7 +243,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
     form.append(
       'payload_json',
       JSON.stringify({
-        content: firstPost.message.replace(/\[\[\[(@.*?)]]]/g, (match, p1) => {
+        content: firstPost.message.replace(/\[\[\[(@[^\]]*)]]]/g, (match, p1) => {
             return `<${p1}>`;
         }),
         attachments: firstPost.media?.map((p, index) => ({

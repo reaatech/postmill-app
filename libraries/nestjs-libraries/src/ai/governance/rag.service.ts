@@ -43,6 +43,7 @@ const isExternalStore = (v?: string): v is VectorStoreKind =>
 const DEFAULT_EMBEDDING_DIMENSION = 1536;
 const DEFAULT_CHUNK_SIZE = 500;
 const DEFAULT_CHUNK_OVERLAP = 100;
+const MAX_CHUNKS = 2000;
 const BACKFILL_BATCH_SIZE = 20;
 const SEARCH_DEFAULT_LIMIT = 5;
 
@@ -161,7 +162,7 @@ export class RagService implements OnModuleInit {
       chunks.push(current.trim());
     }
 
-    return chunks;
+    return chunks.slice(0, MAX_CHUNKS);
   }
 
   async indexContent(params: {

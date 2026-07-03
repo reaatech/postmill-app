@@ -116,6 +116,10 @@ export class AiRagRepository {
       formatVector,
     } = params;
 
+    if (chunks.length > 5000) {
+      throw new Error('Too many chunks for a single source');
+    }
+
     return this._raw.$transaction(async (tx: any) => {
       await tx.aIContentIndex.deleteMany({
         where: { organizationId, sourceType, sourceId },

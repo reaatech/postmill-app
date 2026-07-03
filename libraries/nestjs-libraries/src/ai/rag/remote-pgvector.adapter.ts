@@ -22,6 +22,9 @@ export class RemotePgVectorStoreAdapter implements VectorStoreAdapter {
 
   constructor(cfg: RemotePgConfig) {
     this._connectionString = cfg.connectionString;
+    if (!Number.isInteger(cfg.dimension) || cfg.dimension <= 0) {
+      throw new Error('Invalid pgvector dimension');
+    }
     this._dimension = cfg.dimension;
     // Identifier sanitised to defend against SQL injection in the table name.
     const t = (cfg.table || 'postmill_rag').replace(/[^a-zA-Z0-9_]/g, '');

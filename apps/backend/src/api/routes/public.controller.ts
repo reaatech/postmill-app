@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Logger,
   Param,
   Post,
   Query,
@@ -33,6 +34,8 @@ const pump = promisify(pipeline);
 @ApiTags('Public')
 @Controller('/public')
 export class PublicController {
+  private readonly _logger = new Logger(PublicController.name);
+
   constructor(
     private _trackService: TrackService,
     private _agentGraphInsertService: AgentGraphInsertService,
@@ -166,7 +169,7 @@ export class PublicController {
   ) {
     const { url } = query;
     if (!url.endsWith('mp4')) {
-      return res.status(400).send('Invalid video URL');
+      return res.status(400).type('text/plain').send('Invalid video URL');
     }
 
     const ac = new AbortController();
@@ -179,12 +182,13 @@ export class PublicController {
       r = await safeFetch(url, { signal: ac.signal });
     } catch (err: any) {
       if (err?.message === 'Blocked URL') {
-        return res.status(400).send('Blocked URL');
+        return res.status(400).type('text/plain').send('Blocked URL');
       }
       if (err?.message === 'Too many redirects') {
-        return res.status(508).send('Too many redirects');
+        return res.status(508).type('text/plain').send('Too many redirects');
       }
-      return res.status(502).send(err?.message || 'Upstream error');
+      this._logger.warn({ err }, 'Public stream upstream error');
+      return res.status(502).type('text/plain').send('Upstream error');
     }
 
     if (!r.ok && r.status !== 206) {

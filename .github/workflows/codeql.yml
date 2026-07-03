@@ -36,6 +36,12 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
+          config: |
+            paths-ignore:
+              - apps/frontend/public/**
+              - e2e/**
+              - '**/*.spec.ts'
+              - '**/*.spec.tsx'
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

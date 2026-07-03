@@ -77,7 +77,7 @@ export class OpenAICompatibleAdapter implements AiCapability {
   async listModels(creds: Record<string, string>): Promise<AiModelInfo[]> {
     if (creds.baseURL && creds.apiKey) {
       try {
-        const baseURL = creds.baseURL.replace(/\/+$/, '');
+        const baseURL = creds.baseURL.replace(/(?<![/])\/+$/, '');
         const response = await fetch(`${baseURL}/models`, {
           headers: { Authorization: `Bearer ${creds.apiKey}` },
         });
@@ -119,7 +119,7 @@ export class OpenAICompatibleAdapter implements AiCapability {
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
     try {
-      const baseURL = (creds.baseURL || '').replace(/\/+$/, '');
+      const baseURL = (creds.baseURL || '').replace(/(?<![/])\/+$/, '');
       if (baseURL) {
         const response = await fetch(`${baseURL}/models`, {
           headers: { Authorization: `Bearer ${creds.apiKey}` },

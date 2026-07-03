@@ -182,6 +182,24 @@ describe('AiRagRepository', () => {
 
       expect(model.$executeRawUnsafe).not.toHaveBeenCalled();
     });
+
+    it('rejects more than 5000 chunks as a hard backstop', async () => {
+      const chunks = new Array(5001).fill('chunk');
+      await expect(
+        repository.replaceSourceChunks({
+          organizationId: 'org-1',
+          sourceType: 'post',
+          sourceId: 'p1',
+          contentHash: 'hash-1',
+          chunks,
+          embeddings: [],
+          pgvectorAvailable: false,
+          formatVector: (arr) => '[' + arr.join(',') + ']',
+        }),
+      ).rejects.toThrow('Too many chunks for a single source');
+
+      expect(model.$transaction).not.toHaveBeenCalled();
+    });
   });
 
   describe('findChunksForBm25', () => {
