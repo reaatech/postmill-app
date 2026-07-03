@@ -149,10 +149,10 @@ export const stripHtmlValidation = (
     return striptags(value)
       .replace(/&gt;/gi, '>')
       .replace(/&lt;/gi, '<')
-      .replace(/&amp;/gi, '&')
       .replace(/&nbsp;/gi, ' ')
       .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'");
+      .replace(/&#39;/gi, "'")
+      .replace(/&amp;/gi, '&');
   }
 
   if (type === 'html') {
@@ -169,10 +169,10 @@ export const stripHtmlValidation = (
     ])
       .replace(/&gt;/gi, '>')
       .replace(/&lt;/gi, '<')
-      .replace(/&amp;/gi, '&')
       .replace(/&nbsp;/gi, ' ')
       .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'");
+      .replace(/&#39;/gi, "'")
+      .replace(/&amp;/gi, '&');
   }
 
   if (type === 'markdown') {
@@ -182,10 +182,10 @@ export const stripHtmlValidation = (
           .replace(/<h1>([.\s\S]*?)<\/h1>/g, (match, p1) => {
             return `<h1># ${p1}</h1>\n`;
           })
-          .replace(/&amp;/gi, '&')
           .replace(/&nbsp;/gi, ' ')
           .replace(/&quot;/gi, '"')
           .replace(/&#39;/gi, "'")
+          .replace(/&amp;/gi, '&')
           .replace(/<h2>([.\s\S]*?)<\/h2>/g, (match, p1) => {
             return `<h2>## ${p1}</h2>\n`;
           })
@@ -222,10 +222,10 @@ export const stripHtmlValidation = (
   }
 
   const html = (value || '')
-    .replace(/&amp;/gi, '&')
     .replace(/&nbsp;/gi, ' ')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;/gi, "'")
+    .replace(/&amp;/gi, '&')
     .replace(/^<p[^>]*>/i, '')
     .replace(/<p[^>]*>/gi, '\n')
     .replace(/<\/p>/gi, '');

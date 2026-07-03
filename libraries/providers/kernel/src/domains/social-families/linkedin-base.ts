@@ -484,7 +484,7 @@ export class LinkedinProvider extends SocialAbstract implements SocialProvider {
   }
 
   protected fixText(text: string) {
-    const pattern = /@\[.+?]\(urn:li:organization.+?\)/g;
+    const pattern = /@\[[^\]]+\]\(urn:li:organization[^)]+\)/g;
     const matches = text.match(pattern) || [];
     const splitAll = text.split(pattern);
     const splitTextReformat = splitAll.map((p) => {

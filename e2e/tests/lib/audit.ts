@@ -53,7 +53,10 @@ export class PageAuditor {
 
   private onRequestFailed = (req: Request) => {
     const u = req.url();
-    if (u.startsWith(BASE) || u.includes('/api/')) {
+    const sameOrigin =
+      (u.startsWith('http://') || u.startsWith('https://')) &&
+      new URL(u).origin === new URL(BASE).origin;
+    if (sameOrigin || u.includes('/api/')) {
       this.failedRequests.push(`${req.method()} ${u.replace(BASE, '')} (${req.failure()?.errorText || 'failed'})`);
     }
   };

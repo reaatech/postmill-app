@@ -408,7 +408,7 @@ export class FfmpegVideoEncoderService {
     if (contentType.includes('mp3') || contentType.includes('mpeg')) return 'mp3';
     if (contentType.includes('ogg')) return 'ogg';
     if (contentType.includes('m4a')) return 'm4a';
-    const match = url.match(/\.([a-z0-9]+)(?:\?.*)?$/i);
+    const match = url.match(/\.([a-z0-9]{1,16})(?:\?[^\r\n]*)?$/i);
     return match?.[1] || 'bin';
   }
 

@@ -826,6 +826,14 @@ describe('RagService', () => {
       expect(chunks.length).toBe(1);
       expect(chunks[0]).toBe('One sentence here.');
     });
+
+    it('caps the number of chunks at MAX_CHUNKS', () => {
+      const service = createService();
+      // Generate far more chunks than the cap by using many tiny sentences.
+      const content = new Array(2500).fill('A.').join(' ');
+      const chunks = (service as any)._chunkText(content, 1, 0);
+      expect(chunks.length).toBe(2000);
+    });
   });
 
   describe('_getRagSettings', () => {

@@ -256,7 +256,7 @@ export class FontLoaderService {
   }
 
   private _extractCssValue(block: string, property: string): string | undefined {
-    const regex = new RegExp(`${property}:\s*([^;]+);`);
+    const regex = new RegExp(`${property}:\\s*([^;]+);`);
     const match = block.match(regex);
     return match?.[1]?.trim();
   }

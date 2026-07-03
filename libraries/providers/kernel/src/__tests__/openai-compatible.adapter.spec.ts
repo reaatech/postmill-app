@@ -185,4 +185,48 @@ describe('OpenAICompatibleAdapter', () => {
       expect(model).toBeDefined();
     });
   });
+
+  describe('baseURL normalization', () => {
+    it('strips trailing slashes from baseURL before calling validateCredentials fetch', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+
+      await adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1//' });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        'https://api.example.com/v1/models',
+        expect.objectContaining({ headers: expect.anything() }),
+      );
+      fetchSpy.mockRestore();
+    });
+
+    it.each([
+      { input: 'a', expected: 'a/models' },
+      { input: 'a/', expected: 'a/models' },
+      { input: 'a///', expected: 'a/models' },
+    ])('normalizes baseURL "$input" to "$expected" in listModels', async ({ input, expected }) => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify({ data: [] }), { status: 200 }),
+      );
+
+      await adapter.listModels({ apiKey: 'test-key', baseURL: input });
+
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expected,
+        expect.objectContaining({ headers: expect.anything() }),
+      );
+      fetchSpy.mockRestore();
+    });
+
+    it.each([
+      { input: '', expected: '' },
+      { input: 'a', expected: 'a' },
+      { input: 'a/', expected: 'a' },
+      { input: 'a///', expected: 'a' },
+    ])('normalizes baseURL "$input" to "$expected" (regex sanity)', ({ input, expected }) => {
+      const normalized = (input || '').replace(/(?<![/])\/+$/, '');
+      expect(normalized).toBe(expected);
+    });
+  });
 });
