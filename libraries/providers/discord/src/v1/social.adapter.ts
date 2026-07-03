@@ -16,7 +16,7 @@ import { safeFetch } from '@gitroom/provider-kernel';
 
 import { metadata as providerMetadata } from './metadata';
 
-export const DISCORD_MENTION_MARKER_REGEX = /\[\[\[(@[^\]]*)]]]/g;
+export const DISCORD_MENTION_MARKER_REGEX = /\[\[\[(@[^\[\]]*)]]]/g;
 
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
   override maxConcurrentJob = 5; // Discord has generous rate limits for webhook posting

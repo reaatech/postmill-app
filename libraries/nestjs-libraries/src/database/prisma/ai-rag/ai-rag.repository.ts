@@ -1,6 +1,11 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 
+// Hard cap on chunks indexed for a single source. Chunks are already capped
+// upstream in RagService._chunkText; this bounds the per-source insert loop so an
+// oversized array can never drive unbounded DB writes inside one transaction.
+const MAX_INDEX_CHUNKS = 5000;
+
 interface RagRow {
   text: string;
   sourceType: string;
@@ -116,7 +121,7 @@ export class AiRagRepository {
       formatVector,
     } = params;
 
-    if (chunks.length > 5000) {
+    if (chunks.length > MAX_INDEX_CHUNKS) {
       throw new Error('Too many chunks for a single source');
     }
 
@@ -127,7 +132,10 @@ export class AiRagRepository {
 
       const indices: Array<{ id: string; chunkIndex: number; chunk: string }> = [];
 
-      for (let i = 0; i < chunks.length; i++) {
+      // Iterate a locally bounded copy so the loop bound is a provable constant
+      // (CodeQL js/loop-bound-injection is not satisfied by the throw-guard above).
+      const safeChunks = chunks.slice(0, MAX_INDEX_CHUNKS);
+      for (let i = 0; i < safeChunks.length; i++) {
         const record = await tx.aIContentIndex.create({
           data: {
             organizationId,
@@ -135,10 +143,10 @@ export class AiRagRepository {
             sourceId,
             chunkIndex: i,
             contentHash,
-            chunk: chunks[i],
+            chunk: safeChunks[i],
           },
         });
-        indices.push({ id: record.id, chunkIndex: i, chunk: chunks[i] });
+        indices.push({ id: record.id, chunkIndex: i, chunk: safeChunks[i] });
       }
 
       if (pgvectorAvailable && embeddings.length === indices.length) {
