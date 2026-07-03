@@ -553,4 +553,11 @@ export class OrganizationRepository {
       },
     });
   }
+
+  async markSetupCompleted(orgId: string) {
+    return this._organization.model.organization.update({
+      where: { id: orgId },
+      data: { setupCompletedAt: new Date() },
+    });
+  }
 }

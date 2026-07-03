@@ -30,6 +30,8 @@ cannot silently change existing behavior. New `GET /providers/catalog` and `GET 
 endpoints expose the live catalog and per-version health. The old in-memory registries remain
 reachable via `PROVIDER_KERNEL=legacy` for the release window.
 
+**[v3.9.0]** — First-run setup gate. New organizations land on a `/setup` wizard that walks the first user through LLM (required) and optional AI media, channels, content packs, storage, shortlinks, and VPN configuration. Completion persists in `Organization.setupCompletedAt`; existing orgs are backfilled as complete. The first saved LLM provider auto-activates so the wizard never dead-ends.
+
 **[v3.9.1]** — Per-organization AI Model Defaults and Media Defaults. Admins pick default models per
 AI category (`low-reasoning`, `high-reasoning`, `vision`, `workflow`) and per media category
 (text/image/video/audio generation, editing, captions, slides). Defaults resolve from enabled

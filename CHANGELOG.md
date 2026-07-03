@@ -11,6 +11,13 @@
 ## Unreleased
 
 ### Added
+- **Setup onboarding gate (`/setup`).** One-time wizard for new organizations that walks the first
+  user through provider configuration (LLM required; AI media, channels, content packs, storage,
+  shortlinks, VPN optional). Completion persists in `Organization.setupCompletedAt`; existing orgs
+  are backfilled as complete. The authenticated chrome gates incomplete users on `setupCompleted`;
+  the wizard mutates `/user/self` before navigating to `/dashboard` to avoid a re-gate loop. The
+  first LLM provider saved by an org is auto-activated so the LLM step can proceed without a
+  separate "Make Primary" click.
 - **AI Designer chatbot (`/media/ai-designer`).** A Socket.IO-based chat experience that plans,
   composes, and renders multi-channel social designs server-side. Users pick channels/sizes, a brand
   profile, reference images, and a variant count; the conductor then runs a deterministic pipeline of

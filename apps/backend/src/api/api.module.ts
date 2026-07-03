@@ -13,6 +13,7 @@ import { PermissionsService } from '@gitroom/backend/services/auth/permissions/p
 import { IntegrationsController } from '@gitroom/backend/api/routes/integrations.controller';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { SettingsController } from '@gitroom/backend/api/routes/settings.controller';
+import { SetupController } from '@gitroom/backend/api/routes/setup.controller';
 import { OrganizationsController } from '@gitroom/backend/api/routes/organizations.controller';
 import { PostsController } from '@gitroom/backend/api/routes/posts.controller';
 import { MediaController } from '@gitroom/backend/api/routes/media.controller';
@@ -92,6 +93,7 @@ const authenticatedController = [
   UsersController,
   IntegrationsController,
   SettingsController,
+  SetupController,
   OrganizationsController,
   SocialCommentsController,
   CampaignsController,

@@ -1,7 +1,8 @@
 import { CreateOrgUserDto } from '@gitroom/nestjs-libraries/dtos/auth/create.org.user.dto';
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service';
 import { AddTeamMemberDto } from '@gitroom/nestjs-libraries/dtos/settings/add.team.member.dto';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import dayjs from 'dayjs';
@@ -19,7 +20,8 @@ type OrganizationWithMembership = Organization & {
 export class OrganizationService {
   constructor(
     private _organizationRepository: OrganizationRepository,
-    private _notificationsService: NotificationService
+    private _notificationsService: NotificationService,
+    private _orgAiSettingsService: OrgAiSettingsService
   ) {}
   async createOrgAndUser(
     body: Omit<CreateOrgUserDto, 'providerToken'> & { providerId?: string },
@@ -175,5 +177,13 @@ export class OrganizationService {
       orgId,
       shortlink
     );
+  }
+
+  async completeSetup(orgId: string) {
+    const activeProvider = await this._orgAiSettingsService.getActiveProvider(orgId);
+    if (!activeProvider) {
+      throw new BadRequestException('An active LLM provider is required before completing setup.');
+    }
+    return this._organizationRepository.markSetupCompleted(orgId);
   }
 }
