@@ -96,6 +96,28 @@ export class RetentionActivity {
       return total;
     });
 
+    await this._safe('aiDesignerSessions', counts, async () => {
+      // Stale AI Designer chat sessions; messages cascade from the session.
+      // Batched like the Post/File purges — each deleted session cascades its
+      // message rows, so an unbatched first sweep could be one long DELETE.
+      const cutoff = before(this._days('AI_DESIGNER_SESSION_RETENTION_DAYS', 90));
+      let total = 0;
+      for (let i = 0; i < RetentionActivity.MAX_BATCHES; i++) {
+        const rows = await this._prisma.aiDesignerSession.findMany({
+          where: { updatedAt: { lt: cutoff } },
+          select: { id: true },
+          take: RetentionActivity.BATCH,
+        });
+        if (!rows.length) break;
+        const r = await this._prisma.aiDesignerSession.deleteMany({
+          where: { id: { in: rows.map((s) => s.id) } },
+        });
+        total += r.count;
+        if (rows.length < RetentionActivity.BATCH) break;
+      }
+      return total;
+    });
+
     // I4c — bound IP/agent retention: null personal network identifiers past N days.
     await this._safe('userIpAgent', counts, async () => {
       const cutoff = before(this._days('IP_RETENTION_DAYS', 90));

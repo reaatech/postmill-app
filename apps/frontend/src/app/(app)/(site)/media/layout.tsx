@@ -36,6 +36,16 @@ const tabs = [
     ),
   },
   {
+    href: '/media/ai-designer',
+    label: 'AI Designer',
+    section: 'Platform',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4L12 2z" />
+      </svg>
+    ),
+  },
+  {
     href: '/media/designer',
     label: 'Designer',
     section: 'Platform',

@@ -19,6 +19,8 @@ import {
 } from './designer-doc-ops.schema';
 import { DesignerDocOpError } from './designer-doc.errors';
 import { MAX_OPS_PER_REQUEST } from './designer-doc.limits';
+import { seedCopy } from './seed-copy';
+import { applyLinked } from './apply-linked';
 
 const isImageOutput = (
   out: DesignerOutput | VideoOutput
@@ -134,15 +136,44 @@ export class DesignerDocService {
       }
 
       case 'addOutput': {
+        // Use the primary (first) image output as the seed source so a
+        // headless Composer's `setDoc`+`addOutput` sequence matches the manual
+        // Designer's linked-by-default behavior. `seed: false` opts out
+        // (empty white canvas, no originId backfill); a doc left without
+        // outputs (removeOutput'd) has nothing to seed from.
+        const primary = doc.outputs[0];
+        const source =
+          op.seed !== false && primary && isImageOutput(primary)
+            ? primary
+            : undefined;
+
         const newOutput: DesignerOutput = {
           id: '', // assigned by assignIdsAndNormalize
           formatId: op.preset.formatId,
           name: op.preset.name,
           width: op.preset.width,
           height: op.preset.height,
-          background: '#ffffff',
+          background: source?.background ?? '#ffffff',
+          bg: source?.bg,
           children: [],
         };
+
+        if (source) {
+          const sourceChildren = source.children.map((el) =>
+            el.originId
+              ? el
+              : { ...el, originId: `origin-${randomUUID()}` }
+          );
+          newOutput.children = sourceChildren.map((el) =>
+            seedCopy(el, source, newOutput, el.originId as string)
+          );
+          const outputs = doc.outputs.map((out, i) =>
+            i === 0 ? { ...out, children: sourceChildren } : out
+          ) as DesignerDoc['outputs'];
+          outputs.push(newOutput);
+          return { ...doc, outputs } as DesignerDoc;
+        }
+
         return { ...doc, outputs: [...doc.outputs, newOutput] } as DesignerDoc;
       }
 
@@ -190,13 +221,16 @@ export class DesignerDocService {
       }
 
       case 'updateElement': {
-        const outputs = doc.outputs.map((out, i) => {
-          if (i !== op.outputIndex || !isImageOutput(out)) return out;
-          const children = out.children.map((el) =>
-            el.id === op.elementId ? { ...el, ...op.patch } : el
-          );
-          return { ...out, children };
-        });
+        // Target existence/mode already validated by the IMAGE_ONLY_OPS
+        // pre-check in applyOps (updateElement always carries outputIndex).
+        const isShared = op.scope === 'shared';
+        const { outputs } = applyLinked(
+          doc,
+          op.outputIndex,
+          new Set([op.elementId]),
+          op.patch as Partial<DesignerElement>,
+          !isShared
+        );
         return { ...doc, outputs } as DesignerDoc;
       }
 

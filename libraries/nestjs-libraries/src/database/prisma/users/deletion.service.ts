@@ -93,6 +93,8 @@ export class DeletionService {
       await tx.postCommentRead.deleteMany({ where: { userId } });
       await tx.oAuthAuthorization.deleteMany({ where: { userId } });
       await tx.apiKey.deleteMany({ where: { userId } });
+      // AiDesignerSession.userId is RESTRICT (messages cascade off the session).
+      await tx.aiDesignerSession.deleteMany({ where: { userId } });
 
       // Membership rows for shared orgs (the sole-owned ones are already gone).
       await tx.userOrganization.deleteMany({ where: { userId } });
@@ -193,6 +195,9 @@ export class DeletionService {
     await tx.sets.deleteMany({ where: org });
     await tx.usedCodes.deleteMany({ where: { orgId } });
     await tx.credits.deleteMany({ where: org });
+
+    // --- AI Designer sessions (messages cascade from the session)
+    await tx.aiDesignerSession.deleteMany({ where: org });
 
     // --- AI configuration & ledgers
     await tx.aISpendLog.deleteMany({ where: org });

@@ -17,6 +17,7 @@ process.env.TZ = 'UTC';
 import cookieParser from 'cookie-parser';
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
 
 import { SubscriptionExceptionFilter } from '@gitroom/backend/services/auth/permissions/subscription.exception';
@@ -84,6 +85,13 @@ async function start() {
   // Enabled before listen; the handler runs app.close() exactly once. This is additive to
   // the dev `ppid===1` watcher above (which handles the nest-watch orphan case separately).
   app.enableShutdownHooks();
+
+  // Socket.IO runs on the same HTTP server via the NestJS IoAdapter.
+  // The `/ai-designer` namespace is handled by AiDesignerGateway.
+  // `as any` works around a type-only mismatch between `@nestjs/platform-socket.io`
+  // and `@nestjs/websockets` bindMessageHandlers signatures; runtime is unaffected.
+  app.useWebSocketAdapter(new IoAdapter(app) as any);
+
   let shuttingDown = false;
   const gracefulShutdown = async (signal: string) => {
     if (shuttingDown) return;

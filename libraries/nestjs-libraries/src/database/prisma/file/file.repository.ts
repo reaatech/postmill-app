@@ -308,6 +308,13 @@ export class FileRepository {
     });
   }
 
+  findFolderByName(org: string, name: string, parentId: string | null) {
+    return this._fileFolder.model.fileFolder.findFirst({
+      where: { organizationId: org, name, parentId },
+      select: { id: true },
+    });
+  }
+
   createFolder(org: string, data: {
     name: string;
     parentId?: string;

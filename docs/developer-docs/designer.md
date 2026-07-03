@@ -1,6 +1,6 @@
 # Designer (native design editor)
 
-> Verified against v3.9.1 (AI Designer Foundations).
+> Verified against v3.9.2 (AI Designer chatbot).
 
 The Designer is the native, open-source design editor that replaced the proprietary Polotno SDK.
 It is built on **react-konva** (Konva.js, MIT) and lives under `/media/designer`. It reads input
@@ -74,7 +74,14 @@ Layering is Controller → Service → Repository (only repositories touch Prism
   separate `composition` object, not a `DesignerDoc`.
 - **Document ops / validation:** `POST /media/designs/validate` (lenient, `media:read`) returns
   `{ valid, errors? }`; `POST /media/designs/apply-ops` (strict, `media:create`) returns
-  `{ doc }` after applying a strict-parsed op sequence.
+  `{ doc }` after applying a strict-parsed op sequence. Two op behaviors changed with the AI
+  Designer release: `updateElement` accepts an optional `scope` (`'shared'` propagates the patch to
+  linked elements across outputs, `'format-only'`/absent keeps the previous single-element
+  behavior), and `addOutput` seeds the new output from the primary output's children (reflowed;
+  `originId` backfilled on the primary) instead of appending an empty white canvas — matching the
+  manual Designer's linked-by-default behavior. `addOutput` also accepts an optional `seed: false`
+  to keep the pre-change empty-canvas behavior, and appends an unseeded canvas when the doc has no
+  outputs at that point in the sequence (e.g. after `removeOutput`).
 - **Agent seam:** `/copilot/agent` now carries the acting `user` in the Mastra `requestContext` so
   user-attributed tools can fill `createdById`. The `designerDesign` Mastra tool
   (`libraries/nestjs-libraries/src/chat/tools/designer.design.tool.ts`) creates/updates designs from
@@ -83,6 +90,105 @@ Layering is Controller → Service → Repository (only repositories touch Prism
   the new schema is enforced at the service boundary.
 - **Brand kit:** `AIBrandProfile.logoFileIds` / `palette` / `fontFamilies` are read/written through
   the brand profile API.
+
+## AI Designer chatbot (`/media/ai-designer`)
+
+The AI Designer is a chat-first, server-rendered design assistant built on top of the Designer
+foundations. It is **image-only** in this release; video is out of scope.
+
+- **Realtime transport:** bespoke Socket.IO namespace `/ai-designer` registered in
+  `apps/backend/src/main.ts`. Cookie JWT + CSRF handshake, session rooms (`session:<id>`),
+  monotonic `seq` ordering, client `ack`, and Redis-backed nonce idempotency for every mutating
+  event (`start`/`message`/`form:submit`/`accept:plan`/`revise`); a nonce consumed by a rejected
+  operation (budget/guardrail/limit) — or by a handler that fails unexpectedly, which also emits
+  `internal_error` with the nonce — is released so a retry with the same nonce isn't locked out for
+  the TTL.
+  The gateway also enforces **per-user** rate limits on every mutating event (buckets keyed by user
+  id, so opening fresh sockets doesn't reset the window) plus a **per-IP budget on connection
+  attempts** (checked before any JWT/DB work — neither the HTTP throttler nor per-event limits
+  cover the handshake itself — and keyed on the transport address: the forgeable `X-Forwarded-For`
+  header is never trusted, matching the HTTP throttler's posture), caps stored sessions at 100 per
+  (org, user), re-checks
+  membership/RBAC/billing every 60s
+  for long-lived sockets (the `NOT_SECURED` dev toggle bypasses only CSRF, matching HTTP), validates
+  session ownership before any handler-side write, bounds `form:submit` values (32 KB serialized /
+  5 levels deep), and runs **all** user free-text — chat messages, form values (strings at **any**
+  nesting depth), and revise instructions — through the org's
+  input guardrail chain (`@reaatech/guardrail-chain` via the governance `GuardrailService`) exactly
+  once, at the gateway, before it is persisted or dispatched. Errors are emitted as
+  `{ code, message, nonce? }`; progress as `{ kind: 'progress', agent, phase, pct, note }`;
+  user-message echoes carry the client `nonce` for optimistic reconciliation.
+  **Deployment note:** the gateway uses Socket.IO's in-memory adapter and the conductor keeps its
+  pipeline mutex / prompt correlation / circuit breakers in-process — run the backend as a single
+  instance (or behind sticky sessions) until a Redis adapter + shared stores are added.
+- **Session model:** `AiDesignerSession` + `AiDesignerMessage` (additive Prisma tables). State
+  machine: `intake → planning → awaiting_plan → executing → delivered → revising`. Sessions are
+  pruned by the daily `retention-purge` cron after `AI_DESIGNER_SESSION_RETENTION_DAYS` (default 90;
+  messages cascade), and users can delete their own via `DELETE /ai-designer/sessions/:id`.
+  `deleteUser` tears sessions down explicitly (the `userId` FK is RESTRICT).
+- **Agents:** six in-process agents registered via `agent-mesh` v-next
+  (`libraries/nestjs-libraries/src/ai-designer/agent-mesh/`). The agent registry is **bundled TS
+  data** (`agent-registry.data.ts`, validated against `AgentRegistrySchema` at boot) — not a YAML
+  asset, which would not survive `nest build` — with `AI_DESIGNER_AGENT_REGISTRY` as an optional
+  directory-of-YAML override. The mesh session/breaker stores default to **Redis**;
+  `AI_DESIGNER_MESH_STORE=postgres` opts into the package's Postgres stores (runs its own DDL on a
+  second connection pool — deliberately not the default, and it requires a **dedicated**
+  `AI_DESIGNER_MESH_DATABASE_URL`: never the Prisma `DATABASE_URL`, where third-party DDL would
+  fail the CI schema-drift gate). `agent-mesh-env.shim.ts` (first import in every
+  agent-mesh-importing file) tames the package's import-time env handling: it seeds placeholder
+  `GOOGLE_CLOUD_PROJECT`/`API_KEY` (Postmill uses only the in-process transport; the package's LLM
+  classifier is never invoked), **forces the package's global circuit breaker off** (it is keyed by
+  agent id only, so one tenant's provider failures would open it for every org — the conductor's
+  per-`(org, agent)` breaker is the only breaker; the flag is `z.coerce.boolean()`, so the empty
+  string is the only disabling value), and stash-and-restores unrelated env values the package's
+  strict schema would otherwise `process.exit(1)` the backend on (e.g. `LOG_LEVEL=verbose`,
+  `NODE_ENV=staging`, a malformed `OTEL_EXPORTER_OTLP_ENDPOINT`). The restore is **synchronous with
+  zero exposure window**: `agent-mesh-env.stash.ts` stashes, the shim then imports the mesh package
+  (whose env parse runs at import), and restores in the same tick — no other module ever evaluates
+  with the stashed vars deleted. Mesh module setup is non-fatal: a
+  failure degrades AI Designer with a logged error, never blocks backend boot.
+  - **Conversationalist** — elicits intent via `form` messages and parses natural-language revisions.
+  - **Art Director** — routes the brief through a skill registry (meme, advertisement, greeting-card,
+    product-promo, announcement) and emits `DesignPlan[]` variants.
+  - **Copywriter** — fills text slots per plan/brand voice.
+  - **Asset** — generates/stocks imagery; degrades to a generated gradient fallback.
+  - **Composer** — builds validated `DesignerDocOp[]` using server-side `seedCopy`/`smartReflow`/
+    `applyLinked`; uses `@reaatech/structured-repair-core` to coerce raw LLM ops and falls back to a
+    safe layout.
+  - **Vision Critic** — holistic contact-sheet critique with tiered escalation to full-res per-output
+    review; also interprets reference/brand images.
+- **Conductor** (`ai-designer-conductor.service.ts`) runs a deterministic first-design pipeline and
+  an agentic revise loop. Every agent dispatch carries a `BudgetService` check, a per-dispatch
+  timeout (`AI_DESIGNER_AGENT_TIMEOUT_MS`, default 120s), and a per-`(org, agent)` circuit breaker
+  that half-opens after 60s with a 10-minute failure-count window (one tenant's broken provider
+  never disables other orgs, and stale failure counts decay/prune). Plans shown to
+  the user are persisted on the session brief (`lastPlans`) so accept executes exactly what was
+  presented; server-owned brief keys (`lastPlans`, `skillId`, `pendingReviseTarget`,
+  `questionsAsked`, `referenceCues`) are stripped from `form:submit` values before the brief merge
+  (`conductor/brief-values.ts`, which also drops delivery-form control values like
+  `action`/`variantId` so they never pollute the persisted brief), the executed plan list is
+  clamped to the session's requested `variants` (≤10) regardless of what the stored brief contains,
+  plan-requested asset generation is capped at 8 deduped asset needs per run, vision-critique
+  findings are capped at 10 per pass (plans/critiques are LLM-shaped JSON — the caps bound the
+  image-generation and note-fix LLM fan-out; typed fixes without a target slot are skipped rather
+  than applied output-wide), and the persisted brief is bounded (64 KB serialized, sliding
+  `questionsAsked` window). A per-session mutex rejects concurrent pipelines across **all** phases
+  (intake/planning as well as accept/revise); `cancel` aborts the in-flight pipeline via a
+  per-session `AbortController` (checked at every step boundary and raced against in-flight
+  dispatches — a cancel never trips the circuit breaker, and a cancelled planning run can never
+  write `awaiting_plan` afterwards). `accept:plan` executes only from `awaiting_plan`, a
+  vision-critique failure degrades to delivering the un-critiqued variants (rendered work is never
+  rolled back), and other failures roll the session back to a recoverable state with a sanitized
+  chat message. The composer returns docs without persisting — `AiDesignerSaverService` is the
+  single `Design` writer (revise re-saves update the same `Design` row rather than orphaning one
+  per fix pass).
+- **Delivery:** rendered previews + contact sheet are written to `/files` via
+  `AiDesignerSaverService`; `Design` rows are created and can be promoted to `DesignTemplate`. The
+  target folder is resolved once per run: a client-supplied `saveFolderId` counts only when the
+  folder belongs to the org, else the config's `savePath` (e.g. `/campaigns/summer-launch`) is
+  resolved find-or-create per segment via `FileService.resolveFolderPath`, else the `/files` root.
+  The delivery message supports variant selection, a "save as template" opt-out, and an **Open in
+  Designer** handoff to `/media/designer?designId=<id>`.
 
 ## Not yet implemented
 

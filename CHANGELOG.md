@@ -11,6 +11,65 @@
 ## Unreleased
 
 ### Added
+- **AI Designer chatbot (`/media/ai-designer`).** A Socket.IO-based chat experience that plans,
+  composes, and renders multi-channel social designs server-side. Users pick channels/sizes, a brand
+  profile, reference images, and a variant count; the conductor then runs a deterministic pipeline of
+  in-process agent-mesh agents (Conversationalist, Art Director, Copywriter, Asset, Composer, Vision
+  Critic) on the org's own model defaults (`low-reasoning`, `high-reasoning`, `vision`). The Asset
+  worker generates or stocks imagery, falls back to a generated gradient, and handles `data:` URLs
+  (raster-image MIME allowlist + 512 MB decoded cap).
+  The Composer uses `@reaatech/structured-repair-core` to coerce LLM-produced `DesignerDocOp[]` and
+  falls back to a safe centered layout; Vision Critic findings are mapped to `updateElement` ops for
+  the K=1 auto-revise loop and for user-requested revisions. Rendered previews and a contact sheet
+  are persisted to `/files` (into the folder resolved from the session's `saveFolderId` —
+  org-ownership-validated — or `savePath`, created find-or-create per segment), designs are saved as
+  `Design` rows, and accepted plans can be saved as reusable `DesignTemplate`s. The delivery message
+  supports variant selection, a "save as template" opt-out checkbox, and an **Open in Designer**
+  handoff to `/media/designer?designId=...`. Chat history, progress, and previews resume over the
+  socket via monotonic `seq` and `ack`. Gated by `Sections.AI`, RBAC `media:create`, and a hard
+  default gate requiring `vision`/`high-reasoning`/`low-reasoning` model defaults. Hardening beyond
+  the HTTP guards: per-user rate limits on every mutating event (buckets keyed by user id, so fresh
+  sockets don't reset the window) plus a per-IP budget on connection attempts (checked before any
+  JWT/DB work and keyed on the transport address — the forgeable `X-Forwarded-For` header is never
+  trusted), a 100-sessions-per-user cap on `start`, a periodic (60s)
+  membership/RBAC/billing re-check for long-lived sockets, session ownership validated before any
+  handler-side write, input guardrails (the org's `@reaatech/guardrail-chain`) on all user free-text
+  — chat messages, form values at any nesting depth (bounded to 32 KB serialized / 5 levels), and
+  revise instructions, each checked exactly once at the gateway —
+  before it is persisted or dispatched (every mutating event — `message` included — is
+  nonce-idempotent, and a nonce consumed by a rejected or unexpectedly-failing operation is released
+  so the client can retry immediately; unexpected handler errors surface as `internal_error` on the
+  documented error channel), server-owned brief keys and delivery-form control values stripped
+  from `form:submit` values
+  with the executed plan list clamped to the requested variant count (≤10), plan-requested asset
+  generation capped at 8 deduped needs per run, vision-critique findings capped at 10 per pass, and
+  the persisted brief bounded (64 KB serialized, sliding `questionsAsked` window), a per-(org, agent)
+  half-open circuit breaker with a 10-minute failure window (the mesh package's own global,
+  agent-id-keyed breaker is forced off —
+  one tenant's provider failures must never disable other orgs — and its strict import-time env
+  schema is neutralized so unrelated values like `LOG_LEVEL=verbose` can't crash the backend at
+  boot), per-dispatch timeouts (`AI_DESIGNER_AGENT_TIMEOUT_MS`), a per-session
+  pipeline mutex covering intake/planning as well as accept/revise, whose `cancel` genuinely aborts
+  the in-flight pipeline (per-session `AbortController` raced against dispatches; a cancel never
+  trips the breaker, and a cancelled planning run can never resurrect the session), a
+  vision-critique failure that degrades to delivering the un-critiqued variants (rendered work is
+  never rolled back), `accept:plan` executing only from `awaiting_plan` (a stale replay can't re-run
+  a delivered session), and a daily
+  retention prune (`AI_DESIGNER_SESSION_RETENTION_DAYS`, default 90; batched) plus
+  `DELETE /ai-designer/sessions/:id`. Agent-mesh session/breaker stores default to Redis;
+  `AI_DESIGNER_MESH_STORE=postgres` opts into the package's Postgres stores (its own DDL + a second
+  connection pool — never the default, and it requires a dedicated `AI_DESIGNER_MESH_DATABASE_URL`;
+  never the Prisma `DATABASE_URL`). Single-instance/sticky deployment assumed for the socket
+  layer (in-memory Socket.IO adapter + in-process conductor state).
+- **Designer ops API (`POST /media/designs/apply-ops`) — two behavior changes.** `updateElement`
+  gains an optional `scope` (`'shared' | 'format-only'`) controlling linked-element propagation
+  (absent = the previous single-element behavior, unchanged for existing clients), and `addOutput`
+  now seeds the new output from the primary output's children (reflowed via `seedCopy`/`smartReflow`,
+  backfilling `originId` on the primary) instead of appending an empty white canvas — converging the
+  server ops with the manual Designer's linked-by-default behavior. Clients that relied on
+  `addOutput` producing an empty output can pass the new optional `seed: false` to keep the
+  pre-change empty-canvas behavior; `addOutput` on a doc whose outputs were all removed mid-sequence
+  appends an unseeded canvas as before.
 - **AI Designer Foundations.** The server now owns the `DesignerDoc` contract: a single zod schema
   in `libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts` is the source of
   truth, while the frontend store and renderer `import type` from it and the dependency-free
@@ -49,6 +108,14 @@
   path (configure ElevenLabs as an AI Media provider instead). `FAL_KEY` remains in use by the
   short-link adapter. Run `pnpm run prisma-generate` after pulling; `BackfillService` seeds defaults
   for existing orgs on deploy.
+
+### Fixed
+- **Designer safe-zone insets on story formats.** `getSafeZoneInset` treated a preset's `safeZones`
+  (unsafe overlay rects, e.g. the IG story top bar / bottom UI strip) as if they were the safe area,
+  degenerating to a zero-size box on `ig-story`/`ig-reel`/`fb-story`/`tiktok` and clamping reflowed
+  text to the top-left corner. Edge-hugging zones now contribute proper insets (ig-story: top 80,
+  bottom 1780), so seeded/reflowed elements land inside the visible area — this affects both the
+  manual Designer's smart reflow and the AI Designer's server-side seeding.
 
 ### Changed
 - **"Schedule" renamed to "Posts" (`/schedule` → `/posts`).** The main scheduling workspace is now

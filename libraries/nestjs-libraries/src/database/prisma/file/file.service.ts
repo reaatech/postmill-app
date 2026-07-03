@@ -102,6 +102,40 @@ export class FileService {
     return folder;
   }
 
+  /**
+   * Resolve a "/a/b/c"-style path to a folder id, creating missing segments
+   * (find-or-create per level, org-scoped). Returns null for an empty path.
+   */
+  async resolveFolderPath(org: string, path: string): Promise<string | null> {
+    const segments = path
+      .split('/')
+      .map((s) => s.trim().slice(0, 200))
+      .filter(Boolean)
+      .slice(0, 10);
+    if (segments.length === 0) {
+      return null;
+    }
+
+    let parentId: string | null = null;
+    for (const name of segments) {
+      const existing = await this._fileRepository.findFolderByName(
+        org,
+        name,
+        parentId
+      );
+      if (existing) {
+        parentId = existing.id;
+        continue;
+      }
+      const created = await this._fileRepository.createFolder(org, {
+        name,
+        parentId: parentId ?? undefined,
+      });
+      parentId = created.id;
+    }
+    return parentId;
+  }
+
   async updateFolder(org: string, id: string, data: {
     name?: string;
     description?: string;
