@@ -132,10 +132,13 @@ export class AiRagRepository {
 
       const indices: Array<{ id: string; chunkIndex: number; chunk: string }> = [];
 
-      // Iterate a locally bounded copy so the loop bound is a provable constant
-      // (CodeQL js/loop-bound-injection is not satisfied by the throw-guard above).
-      const safeChunks = chunks.slice(0, MAX_INDEX_CHUNKS);
-      for (let i = 0; i < safeChunks.length; i++) {
+      // Loop bound is the literal constant MAX_INDEX_CHUNKS (not chunks.length),
+      // so iteration count can never be driven by user-influenced input; break once
+      // the real chunks are exhausted. (CodeQL js/loop-bound-injection is not
+      // satisfied by a preceding throw-guard or by slicing, which preserve taint.)
+      for (let i = 0; i < MAX_INDEX_CHUNKS; i++) {
+        const chunk = chunks[i];
+        if (chunk === undefined) break;
         const record = await tx.aIContentIndex.create({
           data: {
             organizationId,
@@ -143,10 +146,10 @@ export class AiRagRepository {
             sourceId,
             chunkIndex: i,
             contentHash,
-            chunk: safeChunks[i],
+            chunk,
           },
         });
-        indices.push({ id: record.id, chunkIndex: i, chunk: safeChunks[i] });
+        indices.push({ id: record.id, chunkIndex: i, chunk });
       }
 
       if (pgvectorAvailable && embeddings.length === indices.length) {
