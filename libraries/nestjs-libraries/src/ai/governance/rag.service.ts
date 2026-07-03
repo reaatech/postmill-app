@@ -150,6 +150,9 @@ export class RagService implements OnModuleInit {
     let current = '';
 
     for (const sentence of sentences) {
+      if (chunks.length >= MAX_CHUNKS) {
+        break;
+      }
       if (current.length + sentence.length + 1 > maxLen && current.length > 0) {
         chunks.push(current.trim());
         const overlapStart = Math.max(0, current.length - overlap);
@@ -158,11 +161,11 @@ export class RagService implements OnModuleInit {
       current += (current ? ' ' : '') + sentence;
     }
 
-    if (current.trim().length > 0) {
+    if (current.trim().length > 0 && chunks.length < MAX_CHUNKS) {
       chunks.push(current.trim());
     }
 
-    return chunks.slice(0, MAX_CHUNKS);
+    return chunks;
   }
 
   async indexContent(params: {

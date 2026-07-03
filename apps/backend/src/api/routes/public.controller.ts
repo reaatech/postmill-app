@@ -187,13 +187,13 @@ export class PublicController {
       if (err?.message === 'Too many redirects') {
         return res.status(508).type('text/plain').send('Too many redirects');
       }
-      this._logger.warn({ err }, 'Public stream upstream error');
+      this._logger.warn(`Public stream upstream error: ${err?.message || 'unknown'}`);
       return res.status(502).type('text/plain').send('Upstream error');
     }
 
     if (!r.ok && r.status !== 206) {
-      res.status(r.status);
-      throw new Error(`Upstream error: ${r.statusText}`);
+      this._logger.warn(`Public stream upstream status ${r.status}: ${r.statusText}`);
+      return res.status(r.status).type('text/plain').send('Upstream error');
     }
 
     const type = r.headers.get('content-type') ?? 'application/octet-stream';
