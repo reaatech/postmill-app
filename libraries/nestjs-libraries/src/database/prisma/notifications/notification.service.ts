@@ -337,6 +337,9 @@ export class NotificationService {
     orgId: string;
     integrationName: string;
     metric: string;
+    // R4.5: the canonical metric KEY (e.g. `unique_impressions`) for the deep
+    // link — distinct from `metric`, which is the human display label.
+    metricKey: string;
     direction: 'spike' | 'drop';
     value: number;
     baseline: number;
@@ -348,6 +351,7 @@ export class NotificationService {
       orgId,
       integrationName,
       metric,
+      metricKey,
       direction,
       value,
       baseline,
@@ -366,7 +370,9 @@ export class NotificationService {
       message += ` — likely driven by "${topPostTitle}"`;
     }
 
-    const link = `/analytics?tab=insights&integrations=${integrationId}&metric=${metric}`;
+    const link = `/analytics?tab=insights&integrations=${integrationId}&metric=${encodeURIComponent(
+      metricKey
+    )}`;
 
     await this.notify({
       orgId,

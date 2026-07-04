@@ -66,6 +66,44 @@ describe('AnalyticsRepository — campaign scope (1.1)', () => {
     expect(where.post).toEqual({ campaignId: { in: ['A', 'B'] }, deletedAt: null });
   });
 
+  it('getLatestPostSnapshotsBeforeByCampaigns reads latest-prior level per (post,metric) (R1.3)', async () => {
+    const { repo, findMany } = makeRepo();
+    const before = new Date('2024-02-01');
+
+    await repo.getLatestPostSnapshotsBeforeByCampaigns(
+      'org1',
+      ['A'],
+      before,
+      ['i1'],
+    );
+
+    const args = findMany.mock.calls[0][0];
+    expect(args.where.organizationId).toBe('org1');
+    expect(args.where.date).toEqual({ lt: before });
+    expect(args.where.integrationId).toEqual({ in: ['i1'] });
+    expect(args.where.post).toEqual({ campaignId: { in: ['A'] }, deletedAt: null });
+    // one latest-prior row per (post, metric): distinct + date-desc ordering
+    expect(args.distinct).toEqual(['postId', 'metric']);
+    expect(args.orderBy).toEqual([
+      { postId: 'asc' },
+      { metric: 'asc' },
+      { date: 'desc' },
+    ]);
+    expect(args.select).toEqual({ postId: true, metric: true, value: true });
+  });
+
+  it('getLatestPostSnapshotsBeforeByCampaigns omits the integration filter when absent (R1.3)', async () => {
+    const { repo, findMany } = makeRepo();
+
+    await repo.getLatestPostSnapshotsBeforeByCampaigns(
+      'org1',
+      ['A', 'B'],
+      new Date('2024-02-01'),
+    );
+
+    expect(findMany.mock.calls[0][0].where.integrationId).toBeUndefined();
+  });
+
   it('getPostsByCampaigns scopes by campaignId + org/date and includes integration', async () => {
     const findMany = vi.fn().mockResolvedValue([]);
     const repo = Object.create(AnalyticsRepository.prototype) as AnalyticsRepository;

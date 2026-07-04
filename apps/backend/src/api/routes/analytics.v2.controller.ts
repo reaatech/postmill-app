@@ -37,6 +37,7 @@ import dayjs from 'dayjs';
 import { WatchlistService } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
+import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { IsString, IsOptional, IsIn, MinLength, MaxLength, isUUID } from 'class-validator';
 
 export function validateDateRange(from: string, to: string) {
@@ -273,6 +274,7 @@ export class AnalyticsV2Controller {
   // ThrottlerBehindProxyGuard returns 429; provider failures surface as 502.
   @Throttle({ default: { limit: 6, ttl: 3600000 } })
   @Post('/refresh/:integrationId')
+  @RequirePermission('analytics', 'update')
   async refreshChannel(
     @GetOrgFromRequest() org: Organization,
     @Param('integrationId') integrationId: string,
@@ -291,6 +293,7 @@ export class AnalyticsV2Controller {
   // The no-provider rule is enforced in the service (standard "AI not
   // configured" error, no env-key fallback).
   @Post('/narrate')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   async narrate(
     @GetOrgFromRequest() org: Organization,
     @Query() query: AnalyticsDateRangeDto,
@@ -355,6 +358,7 @@ export class AnalyticsV2Controller {
   }
 
   @Post('/anomalies/:id/dismiss')
+  @RequirePermission('analytics', 'update')
   async dismissAnomaly(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -370,6 +374,7 @@ export class AnalyticsV2Controller {
   }
 
   @Post('/alert-rules')
+  @RequirePermission('analytics', 'update')
   async createAlertRule(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateAlertRuleDto,
@@ -378,6 +383,7 @@ export class AnalyticsV2Controller {
   }
 
   @Put('/alert-rules/:id')
+  @RequirePermission('analytics', 'update')
   async updateAlertRule(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -387,6 +393,7 @@ export class AnalyticsV2Controller {
   }
 
   @Delete('/alert-rules/:id')
+  @RequirePermission('analytics', 'update')
   async deleteAlertRule(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -402,6 +409,7 @@ export class AnalyticsV2Controller {
   }
 
   @Post('/share')
+  @RequirePermission('analytics', 'update')
   async mintShare(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AnalyticsShareDto,
@@ -414,6 +422,7 @@ export class AnalyticsV2Controller {
   }
 
   @Delete('/share')
+  @RequirePermission('analytics', 'update')
   async disableShare(@GetOrgFromRequest() org: Organization) {
     return this._shareService.disableShare(org.id);
   }
@@ -450,6 +459,7 @@ export class AnalyticsV2Controller {
   }
 
   @Post('/watchlist')
+  @RequirePermission('analytics', 'update')
   async addWatchlistEntry(
     @GetOrgFromRequest() org: Organization,
     @Body() body: AddWatchlistDto,
@@ -463,6 +473,7 @@ export class AnalyticsV2Controller {
   }
 
   @Put('/watchlist/:id')
+  @RequirePermission('analytics', 'update')
   async updateWatchlistEntry(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -475,6 +486,7 @@ export class AnalyticsV2Controller {
   }
 
   @Delete('/watchlist/:id')
+  @RequirePermission('analytics', 'update')
   async deleteWatchlistEntry(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,

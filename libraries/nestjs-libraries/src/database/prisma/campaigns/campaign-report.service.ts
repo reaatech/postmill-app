@@ -159,13 +159,19 @@ export class CampaignReportService {
           items.map(sanitizeItem),
         ])
       ),
-      // Explicit analytics whitelist (3.4): only the trend series, per-channel
-      // breakdown, and window — never the internal campaign fields.
+      // Explicit analytics whitelist (3.4 / R2.3): only the trend series, the
+      // per-channel display name + provider identifier + KPIs, and the window —
+      // never an integrationId, a picture, or any internal campaign field.
+      // Mirrors AnalyticsShareService.buildPublicReport's byChannel whitelist.
       ...(analytics
         ? {
             analytics: {
               series: analytics.series,
-              byChannel: analytics.byChannel,
+              byChannel: analytics.byChannel.map((c: any) => ({
+                name: c.name,
+                identifier: c.identifier,
+                kpis: c.kpis,
+              })),
               window: analytics.window,
             },
           }

@@ -15,10 +15,13 @@ import {
   SnapshotLike,
 } from './analytics.types';
 import {
+  aggregatePostSnapshotTotal,
   aggregateSnapshots,
   buildFilledDayMap,
+  buildPostSnapshotSeries,
   computePercentageChange,
   getMetricDef,
+  PostSnapshotLike,
   tagSeriesGranularity,
 } from './analytics-aggregation';
 import { AnalyticsLiveFallbackService } from './analytics-live-fallback';
@@ -47,6 +50,30 @@ export class AnalyticsDetailService {
     return this.analyticsRepository.getIntegrations(orgId, integrationIds);
   }
 
+  // R1.5: per-post baseline (level just before `before`) for ONE metric under
+  // campaign scope — Map<postId, value>. Missing (post, metric) ⇒ absent ⇒ the
+  // level helpers treat it as baseline 0.
+  private async postBaselines(
+    orgId: string,
+    campaignIds: string[],
+    before: Date,
+    integrationIds: string[] | undefined,
+    metric: string
+  ): Promise<Map<string, number>> {
+    const rows =
+      await this.analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns(
+        orgId,
+        campaignIds,
+        before,
+        integrationIds
+      );
+    const map = new Map<string, number>();
+    for (const r of rows) {
+      if (r.metric === metric) map.set(r.postId, r.value);
+    }
+    return map;
+  }
+
   async getMetricDetail(
     org: Organization,
     metric: string,
@@ -67,15 +94,56 @@ export class AnalyticsDetailService {
     const toDate = dayjs(to).endOf('day').toDate();
     let dbIntegrations = await this.getIntegrations(org.id, integrationIds);
     let ids = dbIntegrations.map((i) => i.id);
+    // R1.6: the explicit channel filter captured BEFORE `ids` is reassigned to
+    // the campaign's derived channel set, so the previous window is filtered by
+    // the same explicit filter (or none) the current window used — matching
+    // computeCampaignOverview, which passes the original filterIds both windows.
+    const explicitFilter = ids.length ? [...ids] : undefined;
+
+    // R1.5: per-post baselines (level just before each window) for level-
+    // semantics differencing under campaign scope. Single metric here, so a
+    // plain Map<postId, value>.
+    let baselines = new Map<string, number>();
+    let prevBaselines = new Map<string, number>();
+
+    // Level-aware aggregation strategy: campaign scope differences post-snapshot
+    // levels against a baseline; the channel path is byte-identical.
+    const sumOf = (rows: SnapshotLike[], base: Map<string, number>) =>
+      scoped
+        ? aggregatePostSnapshotTotal(
+            rows as unknown as PostSnapshotLike[],
+            base,
+            metric
+          )
+        : aggregateSnapshots(rows, metric);
+    const dayMapOf = (
+      rows: SnapshotLike[],
+      f: Date,
+      t: Date,
+      offset: number,
+      base: Map<string, number>
+    ) =>
+      scoped
+        ? buildPostSnapshotSeries(
+            rows as unknown as PostSnapshotLike[],
+            base,
+            metric,
+            f,
+            t,
+            offset
+          )
+        : buildFilledDayMap(rows, metric, f, t, def.kind, offset);
 
     let snapshots: SnapshotLike[];
     if (scoped) {
       // Campaign scope (1.3): post snapshots via Post.campaignId, no live
       // fallback. When no explicit channel filter is passed, derive the channel
       // set from the campaign's own snapshots.
-      const filterIds = ids.length ? ids : undefined;
       snapshots = await this.analyticsRepository.getPostSnapshotsByCampaigns(
-        org.id, campaignIds, fromDate, toDate, filterIds
+        org.id, campaignIds, fromDate, toDate, explicitFilter
+      );
+      baselines = await this.postBaselines(
+        org.id, campaignIds, fromDate, explicitFilter, metric
       );
       if (!ids.length) {
         const derived = [...new Set(snapshots.map((s) => s.integrationId))];
@@ -102,11 +170,16 @@ export class AnalyticsDetailService {
         .toDate();
 
       if (scoped) {
+        // R1.6: previous window uses explicitFilter (not the derived channel
+        // set), matching the current window and computeCampaignOverview.
         previousSnapshots = (
           await this.analyticsRepository.getPostSnapshotsByCampaigns(
-            org.id, campaignIds, prevFromDate, prevToDate, ids.length ? ids : undefined
+            org.id, campaignIds, prevFromDate, prevToDate, explicitFilter
           )
         ).filter((s) => s.metric === metric);
+        prevBaselines = await this.postBaselines(
+          org.id, campaignIds, prevFromDate, explicitFilter, metric
+        );
       } else {
         previousSnapshots = (
           await this.getSnapshots(org.id, ids, prevFromDate, prevToDate)
@@ -120,9 +193,9 @@ export class AnalyticsDetailService {
 
     const metricSnapshots = snapshots.filter((s) => s.metric === metric);
 
-    const total = aggregateSnapshots(snapshots, metric);
+    const total = sumOf(snapshots, baselines);
     const previousTotal = compare
-      ? aggregateSnapshots(previousSnapshots, metric)
+      ? sumOf(previousSnapshots, prevBaselines)
       : null;
     const percentageChange = computePercentageChange(
       total,
@@ -130,14 +203,7 @@ export class AnalyticsDetailService {
       def.format
     );
 
-    const currentMap = buildFilledDayMap(
-      snapshots,
-      metric,
-      fromDate,
-      toDate,
-      def.kind,
-      0
-    );
+    const currentMap = dayMapOf(snapshots, fromDate, toDate, 0, baselines);
 
     let prevOffsetMap: Record<string, number> = {};
     if (compare) {
@@ -150,13 +216,12 @@ export class AnalyticsDetailService {
         .startOf('day')
         .toDate();
       const dateOffset = windowSize + 1;
-      prevOffsetMap = buildFilledDayMap(
+      prevOffsetMap = dayMapOf(
         previousSnapshots,
-        metric,
         prevFromDate,
         prevToDate,
-        def.kind,
-        dateOffset
+        dateOffset,
+        prevBaselines
       );
     }
 
@@ -182,9 +247,9 @@ export class AnalyticsDetailService {
 
     const channelTotals: Record<string, number> = {};
     for (const int of dbIntegrations) {
-      channelTotals[int.id] = aggregateSnapshots(
+      channelTotals[int.id] = sumOf(
         metricSnapshots.filter((s) => s.integrationId === int.id),
-        metric
+        baselines
       );
     }
 
@@ -197,7 +262,7 @@ export class AnalyticsDetailService {
         ? previousSnapshots.filter((s) => s.integrationId === int.id)
         : [];
       const channelPrevious = compare
-        ? aggregateSnapshots(channelPrevSnapshots, metric)
+        ? sumOf(channelPrevSnapshots, prevBaselines)
         : null;
       return {
         integrationId: int.id,
@@ -236,13 +301,13 @@ export class AnalyticsDetailService {
     const movers: { up: any[]; down: any[] } = { up: [], down: [] };
     if (compare) {
       const changes = dbIntegrations.map((int) => {
-        const currentVal = aggregateSnapshots(
+        const currentVal = sumOf(
           metricSnapshots.filter((s) => s.integrationId === int.id),
-          metric
+          baselines
         );
-        const prevVal = aggregateSnapshots(
+        const prevVal = sumOf(
           previousSnapshots.filter((s) => s.integrationId === int.id),
-          metric
+          prevBaselines
         );
         const pctChange = computePercentageChange(
           currentVal,
@@ -304,20 +369,28 @@ export class AnalyticsDetailService {
     let dbIntegrations = await this.getIntegrations(org.id, integrationIds);
     let ids = dbIntegrations.map((i) => i.id);
 
+    const explicitFilter = ids.length ? [...ids] : undefined;
+    const def = getMetricDef(metric);
+
     // `valueRows` feeds day total + byChannel. Unscoped = channel
-    // AnalyticsSnapshot; campaign scope = post snapshots via Post.campaignId
-    // (channel metrics are not campaign-attributable, so they're excluded).
-    let valueRows: { integrationId: string; value: number }[];
+    // AnalyticsSnapshot (true dailies — summed as-is); campaign scope = post
+    // snapshots via Post.campaignId (LEVELS — R1.5-differenced against the level
+    // just before this day so the drilled day-value is a delta, not the running
+    // total). Channel metrics are not campaign-attributable, so they're excluded.
+    let valueRows: { integrationId: string; postId?: string; value: number }[];
     let postSnapshots: Awaited<
       ReturnType<AnalyticsRepository['getDayPostSnapshots']>
     >;
+    let dayBaselines = new Map<string, number>();
     if (scoped) {
-      const filterIds = ids.length ? ids : undefined;
       const campaignRows = (
         await this.analyticsRepository.getPostSnapshotsByCampaigns(
-          org.id, campaignIds, dateStart, dateEnd, filterIds
+          org.id, campaignIds, dateStart, dateEnd, explicitFilter
         )
       ).filter((s) => s.metric === metric);
+      dayBaselines = await this.postBaselines(
+        org.id, campaignIds, dateStart, explicitFilter, metric
+      );
       if (!ids.length) {
         const derived = [...new Set(campaignRows.map((s) => s.integrationId))];
         dbIntegrations = derived.length ? await this.getIntegrations(org.id, derived) : [];
@@ -339,12 +412,35 @@ export class AnalyticsDetailService {
       postSnapshots = ps;
     }
 
-    const totalValue = valueRows.reduce((a, b) => a + b.value, 0);
-
+    let totalValue: number;
     const channelTotals: Record<string, number> = {};
-    for (const snap of valueRows) {
-      channelTotals[snap.integrationId] =
-        (channelTotals[snap.integrationId] || 0) + snap.value;
+    if (scoped && def.format !== 'percent') {
+      // Level differencing: this day's contribution = max(0, level − baseline).
+      totalValue = 0;
+      for (const row of valueRows) {
+        const c = Math.max(0, row.value - (dayBaselines.get(row.postId!) ?? 0));
+        totalValue += c;
+        channelTotals[row.integrationId] =
+          (channelTotals[row.integrationId] || 0) + c;
+      }
+    } else if (scoped) {
+      // Percent metric: average the day's levels, never sum/difference.
+      totalValue = valueRows.length
+        ? valueRows.reduce((a, b) => a + b.value, 0) / valueRows.length
+        : 0;
+      const perInt: Record<string, number[]> = {};
+      for (const row of valueRows) {
+        (perInt[row.integrationId] ||= []).push(row.value);
+      }
+      for (const [intId, vals] of Object.entries(perInt)) {
+        channelTotals[intId] = vals.reduce((a, b) => a + b, 0) / vals.length;
+      }
+    } else {
+      totalValue = valueRows.reduce((a, b) => a + b.value, 0);
+      for (const snap of valueRows) {
+        channelTotals[snap.integrationId] =
+          (channelTotals[snap.integrationId] || 0) + snap.value;
+      }
     }
 
     const byChannel = dbIntegrations.map((int) => ({

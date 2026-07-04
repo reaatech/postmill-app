@@ -57,6 +57,13 @@ export interface WeeklyAnalyticsSummary {
 // a restart): ANALYTICS_DAILY_RETENTION_DAYS / ANALYTICS_POST_RETENTION_DAYS.
 const DEFAULT_DAILY_RETENTION_DAYS = 548; // ~18 months
 const DEFAULT_POST_RETENTION_DAYS = 90;
+// R1.8: the post rollup only re-reads/deletes/re-creates rows within this
+// window below the post-retention cutoff each sweep (instead of the org's entire
+// pre-cutoff history). Chronological aging guarantees every week receiving newly
+// aged dailies has its weekly row (dated startOf('isoWeek')) inside the window,
+// so bounded delete+recreate stays correct and — with R1.7 latest-wins —
+// idempotent. Rows that miss the window after a >30-day sweep outage stay daily.
+const POST_ROLLUP_LOOKBACK_DAYS = 30;
 
 function retentionDays(envKey: string, fallback: number): number {
   const raw = process.env[envKey];
@@ -345,13 +352,35 @@ export class AnalyticsActivity {
       .toDate();
 
     // 1. Roll up post snapshots older than the post-retention window into one
-    //    weekly row per (postId, metric, ISO week) — flow metrics summed, stock
-    //    metrics keep the week's latest — instead of deleting them, so a
-    //    post/campaign series extends past the window at weekly granularity (6.1).
-    //    Same atomic delete+createMany-in-$transaction machinery as the channel
-    //    rollup below.
+    //    weekly row per (postId, metric, ISO week) — always the week's LATEST
+    //    known level (R1.7), because PostAnalyticsSnapshot.value is a cumulative
+    //    lifetime level for every metric (not a per-window flow). A weekly row is
+    //    then simply the week's last level, and the read-time level-differencing
+    //    keeps working across the daily→weekly granularity seam with no special
+    //    cases. Bounded below by `postFloor` (R1.8) so the sweep only compacts a
+    //    fixed recent window, not the org's whole pre-cutoff history. Same atomic
+    //    delete+createMany-in-$transaction machinery as the channel rollup below.
+    const postFloor = dayjs(postCutoff)
+      .subtract(POST_ROLLUP_LOOKBACK_DAYS, 'day')
+      .startOf('day')
+      .toDate();
+
+    // No silent truncation: report rows aging past the bounded window (they stay
+    // daily and still aggregate correctly as levels — only compaction is missed).
+    const skippedBelowFloor =
+      await this._analyticsRepository.countPostSnapshotsBeforeFloor(
+        orgId,
+        postFloor
+      );
+    if (skippedBelowFloor > 0) {
+      this.logger.warn(
+        `AnalyticsActivity: ${skippedBelowFloor} post snapshot(s) older than the rollup floor were left un-compacted (org ${orgId})`
+      );
+    }
+
     const oldPostRows = await this._analyticsRepository.findPostSnapshotsBefore(
       orgId,
+      postFloor,
       postCutoff
     );
     if (oldPostRows.length) {
@@ -362,7 +391,6 @@ export class AnalyticsActivity {
           integrationId: string;
           metric: string;
           weekStart: Date;
-          sum: number;
           latestDate: Date;
           latestValue: number;
         }
@@ -381,34 +409,30 @@ export class AnalyticsActivity {
             integrationId: row.integrationId,
             metric: row.metric,
             weekStart,
-            sum: row.value,
             latestDate: row.date,
             latestValue: row.value,
           });
           continue;
         }
-        existing.sum += row.value;
         if (dayjs(row.date).isAfter(dayjs(existing.latestDate))) {
           existing.latestDate = row.date;
           existing.latestValue = row.value;
         }
       }
 
-      const weeklyPostRows = Array.from(postGroups.values()).map((g) => {
-        const def = METRIC_REGISTRY[g.metric];
-        const value = def?.kind === 'stock' ? g.latestValue : g.sum;
-        return {
-          organizationId: orgId,
-          postId: g.postId,
-          integrationId: g.integrationId,
-          metric: g.metric,
-          value,
-          date: g.weekStart,
-        };
-      });
+      const weeklyPostRows = Array.from(postGroups.values()).map((g) => ({
+        organizationId: orgId,
+        postId: g.postId,
+        integrationId: g.integrationId,
+        metric: g.metric,
+        // R1.7: levels — always the week's last known value, every metric.
+        value: g.latestValue,
+        date: g.weekStart,
+      }));
 
       await this._analyticsRepository.replaceRolledUpPostSnapshots(
         orgId,
+        postFloor,
         postCutoff,
         weeklyPostRows
       );
@@ -643,6 +667,25 @@ export class AnalyticsActivity {
             if (!evaluated) continue;
 
             firedRuleIds.add(rule.id);
+
+            // R4.3: a detector row may already be pending for the SAME
+            // @@unique([integrationId, metric, date]) key. Pushing a second row
+            // makes createAnomalies' skipDuplicates silently drop the rule row —
+            // losing the ruleId attribution while both notifications still fire.
+            // Instead, attach the rule to the existing row and ensure it notifies
+            // (a user-defined rule fire is always notify-worthy).
+            const existing = pending.find(
+              (pp) =>
+                pp.row.integrationId === g.integrationId &&
+                pp.row.metric === g.metric &&
+                dayjs(pp.row.date).isSame(dayjs(evaluated.date), 'day')
+            );
+            if (existing) {
+              existing.row.ruleId = rule.id;
+              existing.canNotify = true;
+              continue;
+            }
+
             pending.push({
               row: {
                 organizationId: orgId,
@@ -735,6 +778,7 @@ export class AnalyticsActivity {
             orgId,
             integrationName: p.integrationName,
             metric: METRIC_REGISTRY[p.row.metric]?.label || p.row.metric,
+            metricKey: p.row.metric,
             direction: p.row.direction as 'spike' | 'drop',
             value: p.row.value,
             baseline: p.row.baseline,

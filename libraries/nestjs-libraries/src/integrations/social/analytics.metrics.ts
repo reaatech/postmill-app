@@ -91,8 +91,11 @@ export const METRIC_REGISTRY: Record<string, MetricDef> = {
   // Reddit per-post metrics (7.1): net score and the upvote ratio are distinct
   // from likes/engagement — keep them on their own canonical keys so they
   // don't collapse onto a semantically different metric.
-  score: { label: 'Score', format: 'count', kind: 'flow' },
-  upvote_ratio: { label: 'Upvote Ratio', format: 'percent', kind: 'flow' },
+  // Levels even in isolation (net score, point-in-time ratio) — cumulative like
+  // total_likes (kind:'stock'), not per-window flows. Post-snapshot consumers
+  // difference them at read time.
+  score: { label: 'Score', format: 'count', kind: 'stock' },
+  upvote_ratio: { label: 'Upvote Ratio', format: 'percent', kind: 'stock' },
 };
 
 export const PROVIDER_METRIC_MAP: Record<string, Record<string, string>> = {

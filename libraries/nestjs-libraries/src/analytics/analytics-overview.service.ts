@@ -30,13 +30,16 @@ import {
   SnapshotLike,
 } from './analytics.types';
 import {
+  aggregatePostSnapshotTotal,
   aggregateSnapshots,
+  buildPostSnapshotSeries,
   buildPrevMap,
   buildSeries,
   buildSparkline,
   computeDerivedMetrics,
   computePercentageChange,
   getMetricDef,
+  PostSnapshotLike,
   tagSeriesGranularity,
 } from './analytics-aggregation';
 import { AnalyticsLiveFallbackService } from './analytics-live-fallback';
@@ -232,8 +235,47 @@ export class AnalyticsOverviewService {
     snapshots: SnapshotLike[],
     previousSnapshots: SnapshotLike[],
     compare: boolean,
-    scope?: 'campaign-posts'
+    scope?: 'campaign-posts',
+    baselines?: Map<string, Map<string, number>>,
+    prevBaselines?: Map<string, Map<string, number>>
   ): AnalyticsOverviewResponse {
+    // R1.4: under campaign scope the rows are PostAnalyticsSnapshot LEVELS, so
+    // totals difference against a per-post baseline (level just before the
+    // window) and series are per-day deltas of those levels. The channel path is
+    // left calling the exact same functions as before (byte-identical) — every
+    // branch is gated on `useLevel`.
+    const useLevel = scope === 'campaign-posts';
+    const EMPTY_BASE = new Map<string, number>();
+    const curBaselines = baselines ?? new Map<string, Map<string, number>>();
+    const prevBase = prevBaselines ?? new Map<string, Map<string, number>>();
+    const asPost = (rows: SnapshotLike[]) =>
+      rows as unknown as PostSnapshotLike[];
+
+    const totalOf = (
+      rows: SnapshotLike[],
+      metric: string,
+      base: Map<string, Map<string, number>>
+    ) =>
+      useLevel
+        ? aggregatePostSnapshotTotal(
+            asPost(rows),
+            base.get(metric) ?? EMPTY_BASE,
+            metric
+          )
+        : aggregateSnapshots(rows, metric);
+    const sparkOf = (rows: SnapshotLike[], metric: string) => {
+      if (!useLevel) return buildSparkline(rows, metric, fromDate, toDate);
+      const dayMap = buildPostSnapshotSeries(
+        asPost(rows),
+        curBaselines.get(metric) ?? EMPTY_BASE,
+        metric,
+        fromDate,
+        toDate,
+        0
+      );
+      return Object.entries(dayMap).map(([date, value]) => ({ date, value }));
+    };
+
     const metrics = [...new Set(snapshots.map((s) => s.metric))].filter(
       isKnownMetric
     );
@@ -242,9 +284,9 @@ export class AnalyticsOverviewService {
 
     const kpis: KpiItem[] = metrics.map((metric) => {
       const def = getMetricDef(metric);
-      const total = aggregateSnapshots(snapshots, metric);
+      const total = totalOf(snapshots, metric, curBaselines);
       const previousTotal = compare
-        ? aggregateSnapshots(previousSnapshots, metric)
+        ? totalOf(previousSnapshots, metric, prevBase)
         : null;
       const percentageChange = computePercentageChange(
         total,
@@ -259,7 +301,7 @@ export class AnalyticsOverviewService {
         total,
         previousTotal,
         percentageChange,
-        sparkline: buildSparkline(snapshots, metric, fromDate, toDate),
+        sparkline: sparkOf(snapshots, metric),
       };
     });
 
@@ -269,11 +311,12 @@ export class AnalyticsOverviewService {
       );
       const channelKpis = metrics.map((metric) => {
         const def = getMetricDef(metric);
-        const total = aggregateSnapshots(channelSnapshots, metric);
+        const total = totalOf(channelSnapshots, metric, curBaselines);
         const previousTotal = compare
-          ? aggregateSnapshots(
+          ? totalOf(
               previousSnapshots.filter((s) => s.integrationId === int.id),
-              metric
+              metric,
+              prevBase
             )
           : null;
         const percentageChange = computePercentageChange(
@@ -307,7 +350,7 @@ export class AnalyticsOverviewService {
     const platformBreakup: Record<string, number> = {};
     for (const int of dbIntegrations) {
       const intSnapshots = snapshots.filter((s) => s.integrationId === int.id);
-      const total = aggregateSnapshots(intSnapshots, primaryMetric);
+      const total = totalOf(intSnapshots, primaryMetric, curBaselines);
       if (total > 0) {
         platformBreakup[int.providerIdentifier] =
           (platformBreakup[int.providerIdentifier] || 0) + total;
@@ -318,7 +361,52 @@ export class AnalyticsOverviewService {
       range: { from, to },
       kpis,
       series: (() => {
-        const s = buildSeries(snapshots, fromDate, toDate);
+        // Level-aware series builders under campaign scope; the channel path
+        // keeps calling buildSeries/buildPrevMap unchanged (byte-identical).
+        const buildCampaignSeries = (): Record<string, MetricSeries[]> => {
+          const out: Record<string, MetricSeries[]> = {};
+          for (const m of [
+            ...new Set(snapshots.map((sn) => sn.metric)),
+          ].filter(isKnownMetric)) {
+            const dayMap = buildPostSnapshotSeries(
+              asPost(snapshots),
+              curBaselines.get(m) ?? EMPTY_BASE,
+              m,
+              fromDate,
+              toDate,
+              0
+            );
+            out[m] = Object.entries(dayMap).map(([date, value]) => ({
+              date,
+              value,
+            }));
+          }
+          return out;
+        };
+        const buildCampaignPrevMap = (
+          prevFrom: Date,
+          prevTo: Date,
+          offset: number
+        ): Record<string, Record<string, number>> => {
+          const out: Record<string, Record<string, number>> = {};
+          for (const m of [
+            ...new Set(previousSnapshots.map((sn) => sn.metric)),
+          ].filter(isKnownMetric)) {
+            out[m] = buildPostSnapshotSeries(
+              asPost(previousSnapshots),
+              prevBase.get(m) ?? EMPTY_BASE,
+              m,
+              prevFrom,
+              prevTo,
+              offset
+            );
+          }
+          return out;
+        };
+
+        const s = useLevel
+          ? buildCampaignSeries()
+          : buildSeries(snapshots, fromDate, toDate);
         if (compare && previousSnapshots.length > 0) {
           const prevToDate = dayjs(fromDate)
             .subtract(1, 'day')
@@ -329,12 +417,14 @@ export class AnalyticsOverviewService {
             .startOf('day')
             .toDate();
           const dateOffset = windowSize + 1;
-          const prevMap = buildPrevMap(
-            previousSnapshots,
-            prevFromDate,
-            prevToDate,
-            dateOffset
-          );
+          const prevMap = useLevel
+            ? buildCampaignPrevMap(prevFromDate, prevToDate, dateOffset)
+            : buildPrevMap(
+                previousSnapshots,
+                prevFromDate,
+                prevToDate,
+                dateOffset
+              );
           for (const [metric, points] of Object.entries(s)) {
             const prevMetric = prevMap[metric];
             if (!prevMetric) continue;
@@ -396,6 +486,15 @@ export class AnalyticsOverviewService {
         filterIds
       );
 
+    // R1.4: per-post baseline = level just before the window, so KPI totals are
+    // true window deltas rather than the cumulative running total.
+    const baselines = await this.getCampaignBaselines(
+      org.id,
+      campaignIds,
+      fromDate,
+      filterIds
+    );
+
     const derivedIds = filterIds ?? [
       ...new Set(snapshots.map((s) => s.integrationId)),
     ];
@@ -404,6 +503,7 @@ export class AnalyticsOverviewService {
       : [];
 
     let previousSnapshots: SnapshotLike[] = [];
+    let prevBaselines = new Map<string, Map<string, number>>();
     if (compare) {
       const windowSize = dayjs(toDate).diff(dayjs(fromDate), 'day');
       const prevToDate = dayjs(fromDate)
@@ -422,6 +522,12 @@ export class AnalyticsOverviewService {
           prevToDate,
           filterIds
         );
+      prevBaselines = await this.getCampaignBaselines(
+        org.id,
+        campaignIds,
+        prevFromDate,
+        filterIds
+      );
     }
 
     return this.assembleOverview(
@@ -433,8 +539,39 @@ export class AnalyticsOverviewService {
       snapshots,
       previousSnapshots,
       compare,
-      'campaign-posts'
+      'campaign-posts',
+      baselines,
+      prevBaselines
     );
+  }
+
+  // R1.4/R1.5 shared baseline reader. Returns metric → (postId → level just
+  // before `before`). The pure helpers take a per-metric `Map<postId, number>`,
+  // so callers select `baselines.get(metric)` for the metric being aggregated —
+  // a post's baseline is correctly metric-specific.
+  private async getCampaignBaselines(
+    orgId: string,
+    campaignIds: string[],
+    before: Date,
+    integrationIds?: string[]
+  ): Promise<Map<string, Map<string, number>>> {
+    const rows =
+      await this.analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns(
+        orgId,
+        campaignIds,
+        before,
+        integrationIds
+      );
+    const byMetric = new Map<string, Map<string, number>>();
+    for (const r of rows) {
+      let m = byMetric.get(r.metric);
+      if (!m) {
+        m = new Map<string, number>();
+        byMetric.set(r.metric, m);
+      }
+      m.set(r.postId, r.value);
+    }
+    return byMetric;
   }
 
   async getChannel(
@@ -679,8 +816,14 @@ export class AnalyticsOverviewService {
       toDate
     );
 
-    for (const row of rows) {
-      await this.analyticsRepository.upsertChannelSnapshot(row);
+    // R4.2: chunked concurrency instead of ~240 sequential upserts per click.
+    const CHUNK = 20;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      await Promise.all(
+        rows
+          .slice(i, i + CHUNK)
+          .map((row) => this.analyticsRepository.upsertChannelSnapshot(row))
+      );
     }
 
     return { integrationId, refreshed: true, persisted: rows.length };

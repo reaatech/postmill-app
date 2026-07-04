@@ -5,6 +5,9 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
 import { METRIC_REGISTRY } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 
@@ -26,7 +29,7 @@ const DIRECTIONS = ['up', 'down'] as const;
 // `integrationId` null = the rule applies to every channel.
 export class CreateAlertRuleDto {
   @IsOptional()
-  @IsString()
+  @IsUUID()
   integrationId?: string;
 
   @IsString()
@@ -42,6 +45,8 @@ export class CreateAlertRuleDto {
   comparator!: string;
 
   @IsNumber()
+  @Min(0)
+  @Max(1_000_000_000)
   threshold!: number;
 
   @IsOptional()
@@ -56,7 +61,7 @@ export class CreateAlertRuleDto {
 
 export class UpdateAlertRuleDto {
   @IsOptional()
-  @IsString()
+  @IsUUID()
   integrationId?: string;
 
   @IsOptional()
@@ -75,6 +80,8 @@ export class UpdateAlertRuleDto {
 
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(1_000_000_000)
   threshold?: number;
 
   @IsOptional()
@@ -97,6 +104,6 @@ export class AnalyticsShareDto {
   integrations?: string[];
 
   @IsOptional()
-  @IsString()
+  @IsIn(['7d', '30d', '90d'])
   rangePreset?: string;
 }

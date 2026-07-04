@@ -387,6 +387,135 @@ export function computeContentInsights(
   return { findings, totalPosts, orgMean };
 }
 
+// ── R1.2: post-snapshot LEVEL semantics ──
+// PostAnalyticsSnapshot.value is a cumulative lifetime level for EVERY metric
+// (that is what every provider postAnalytics() returns: X public_metrics,
+// Bluesky likeCount, Reddit score, YouTube statistics…). Channel-level
+// AnalyticsSnapshot semantics (true dailies for flow metrics) are untouched —
+// these helpers exist ONLY for the campaign/post-scoped path, which differences
+// levels at read time. `baselines` maps postId → the level just before the
+// window (missing ⇒ 0).
+export interface PostSnapshotLike {
+  postId: string;
+  integrationId: string;
+  metric: string;
+  value: number;
+  date: Date;
+}
+
+// Windowed total for one metric across a set of post snapshots. Per post the
+// contribution is `lastLevelInWindow − baseline(post)`, clamped ≥ 0 (a level can
+// dip on unlikes; a window total must not go negative). Percent-format metrics
+// (e.g. upvote_ratio) are the AVERAGE of each post's last level — never summed
+// or differenced.
+export function aggregatePostSnapshotTotal(
+  rows: PostSnapshotLike[],
+  baselines: Map<string, number>,
+  metric: string
+): number {
+  const def = getMetricDef(metric);
+  const lastByPost = new Map<string, { date: Date; value: number }>();
+  for (const row of rows) {
+    if (row.metric !== metric) continue;
+    const cur = lastByPost.get(row.postId);
+    // `>= cur.date` so equal-date rows keep the later-seen value (rows arrive
+    // ascending, so last-seen wins on a tie).
+    if (!cur || !dayjs(row.date).isBefore(dayjs(cur.date))) {
+      lastByPost.set(row.postId, { date: row.date, value: row.value });
+    }
+  }
+
+  if (lastByPost.size === 0) return 0;
+
+  if (def.format === 'percent') {
+    const lasts = [...lastByPost.values()].map((v) => v.value);
+    return lasts.reduce((a, b) => a + b, 0) / lasts.length;
+  }
+
+  let total = 0;
+  for (const [postId, last] of lastByPost) {
+    const baseline = baselines.get(postId) ?? 0;
+    total += Math.max(0, last.value - baseline);
+  }
+  return total;
+}
+
+// Per-day series for one metric under level semantics. Count metrics: per-day
+// value = Σ over posts of clamped `(levelOnDay − previousKnownLevel)`, carrying
+// the previous known level forward across gap days (previous level seeds from
+// the post's baseline). Percent metrics: per-day AVERAGE of that day's carried
+// levels. Returns the same zero-filled YYYY-MM-DD → value day-map that
+// buildFilledDayMap emits (with the same `dateOffset` shifting for prev-window
+// alignment), so it drops into the sparkline/series/prev-map wiring unchanged.
+export function buildPostSnapshotSeries(
+  rows: PostSnapshotLike[],
+  baselines: Map<string, number>,
+  metric: string,
+  from: Date,
+  to: Date,
+  dateOffset = 0
+): Record<string, number> {
+  const def = getMetricDef(metric);
+
+  // postId -> (YYYY-MM-DD -> level). Last write wins per (post, day).
+  const perPost: Record<string, Record<string, number>> = {};
+  for (const row of rows) {
+    if (row.metric !== metric) continue;
+    const key = dayjs(row.date).format('YYYY-MM-DD');
+    if (!perPost[row.postId]) perPost[row.postId] = {};
+    perPost[row.postId][key] = row.value;
+  }
+
+  const result: Record<string, number> = {};
+  const end = dayjs(to);
+
+  if (def.format === 'percent') {
+    const lastLevel: Record<string, number> = {};
+    let cursor = dayjs(from);
+    while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
+      const rawKey = cursor.format('YYYY-MM-DD');
+      const outKey = dateOffset
+        ? cursor.add(dateOffset, 'day').format('YYYY-MM-DD')
+        : rawKey;
+      const vals: number[] = [];
+      for (const postId of Object.keys(perPost)) {
+        if (perPost[postId][rawKey] !== undefined) {
+          lastLevel[postId] = perPost[postId][rawKey];
+        }
+        if (lastLevel[postId] !== undefined) vals.push(lastLevel[postId]);
+      }
+      result[outKey] =
+        vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+      cursor = cursor.add(1, 'day');
+    }
+    return result;
+  }
+
+  const prevKnown: Record<string, number> = {};
+  for (const postId of Object.keys(perPost)) {
+    prevKnown[postId] = baselines.get(postId) ?? 0;
+  }
+
+  let cursor = dayjs(from);
+  while (cursor.isBefore(end) || cursor.isSame(end, 'day')) {
+    const rawKey = cursor.format('YYYY-MM-DD');
+    const outKey = dateOffset
+      ? cursor.add(dateOffset, 'day').format('YYYY-MM-DD')
+      : rawKey;
+    let dayTotal = 0;
+    for (const postId of Object.keys(perPost)) {
+      const level = perPost[postId][rawKey];
+      if (level === undefined) continue; // gap day: carry prev forward, Δ 0
+      const delta = level - prevKnown[postId];
+      prevKnown[postId] = level;
+      dayTotal += Math.max(0, delta);
+    }
+    result[outKey] = dayTotal;
+    cursor = cursor.add(1, 'day');
+  }
+  return result;
+}
+
 export function buildPrevMap(
   snapshots: {
     date: Date;

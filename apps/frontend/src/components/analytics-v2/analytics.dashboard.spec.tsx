@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { AnalyticsDashboard } from './analytics.dashboard';
 import { useOverview } from './hooks/useOverview';
 import { usePosts } from './hooks/usePosts';
@@ -64,6 +64,17 @@ vi.mock('./views/insights.tab', () => ({
 // The filter drawer embeds the Mantine range calendar; stub it (no provider in tests).
 vi.mock('@mantine/dates', () => ({
   RangeCalendar: () => <div data-testid="range-calendar" />,
+}));
+
+// 6.1 — the focusPost deep-link drawer. Stub it so the spec tests wiring, not
+// the SWR-driven post detail internals.
+vi.mock('./post-analytics.drawer', () => ({
+  PostAnalyticsDrawer: ({ postId, open, onClose }: any) =>
+    open ? (
+      <div data-testid="post-drawer" data-post-id={postId}>
+        <button onClick={onClose}>close-drawer</button>
+      </div>
+    ) : null,
 }));
 
 const mockUseOverview = vi.mocked(useOverview);
@@ -226,6 +237,33 @@ describe('AnalyticsDashboard', () => {
   it('hides the campaign-scope note when the overview is unscoped', () => {
     render(<AnalyticsDashboard />);
     expect(screen.queryByText(/Post metrics only/i)).toBeNull();
+  });
+
+  it('renders the post drawer when ?focusPost is present (6.1)', () => {
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&focusPost=p1'
+    );
+    render(<AnalyticsDashboard />);
+    const drawer = screen.getByTestId('post-drawer');
+    expect(drawer).toBeTruthy();
+    expect(drawer.getAttribute('data-post-id')).toBe('p1');
+  });
+
+  it('does not render the post drawer without ?focusPost (6.1)', () => {
+    render(<AnalyticsDashboard />);
+    expect(screen.queryByTestId('post-drawer')).toBeNull();
+  });
+
+  it('clears focusPost and metric from the URL when the drawer closes (6.1)', () => {
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&focusPost=p1&metric=likes'
+    );
+    render(<AnalyticsDashboard />);
+    fireEvent.click(screen.getByText('close-drawer'));
+    expect(mockReplace).toHaveBeenCalled();
+    const url = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(url).not.toContain('focusPost');
+    expect(url).not.toContain('metric');
   });
 
   it('passes error state to the active tab', () => {

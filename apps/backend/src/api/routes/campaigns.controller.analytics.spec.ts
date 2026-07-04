@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 
 vi.mock('@gitroom/nestjs-libraries/analytics/analytics.service', () => ({
   AnalyticsService: class {
@@ -64,6 +64,37 @@ describe('CampaignsController.getAnalytics (1.5 — controller composition)', ()
     expect(res.byChannel[0].integrationId).toBe('i1');
     expect(res.window).toEqual({ from: '2024-01-01', to: '2024-01-31' });
     expect(res.scope).toBe('campaign-posts');
+  });
+
+  // R2.4 — date-range validation on the campaign-analytics route.
+  it('rejects a garbage from date with 400 (never calls analytics)', async () => {
+    const { ctrl, campaignsService, analyticsService } = make();
+    campaignsService.get.mockResolvedValue({ id: 'c-1', organizationId: 'org-1' });
+
+    await expect(ctrl.getAnalytics(org, 'c-1', 'garbage', '2024-01-31')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(analyticsService.getOverview).not.toHaveBeenCalled();
+  });
+
+  it('rejects to before from with 400', async () => {
+    const { ctrl, campaignsService, analyticsService } = make();
+    campaignsService.get.mockResolvedValue({ id: 'c-1', organizationId: 'org-1' });
+
+    await expect(ctrl.getAnalytics(org, 'c-1', '2024-02-01', '2024-01-01')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(analyticsService.getOverview).not.toHaveBeenCalled();
+  });
+
+  it('rejects a window wider than 400 days with 400', async () => {
+    const { ctrl, campaignsService, analyticsService } = make();
+    campaignsService.get.mockResolvedValue({ id: 'c-1', organizationId: 'org-1' });
+
+    await expect(ctrl.getAnalytics(org, 'c-1', '2020-01-01', '2024-01-01')).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(analyticsService.getOverview).not.toHaveBeenCalled();
   });
 
   it('defaults the window to a 90-day range when from/to are omitted', async () => {

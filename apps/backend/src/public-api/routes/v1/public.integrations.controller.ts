@@ -30,6 +30,10 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import {
+  validateDateRange,
+  validateToGteFrom,
+} from '@gitroom/backend/api/routes/analytics.v2.controller';
 import dayjs from 'dayjs';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -659,6 +663,14 @@ export class PublicIntegrationsController {
     const to = toStr || dayjs().format('YYYY-MM-DD');
     const from = fromStr || dayjs().subtract(90, 'day').format('YYYY-MM-DD');
 
+    // R2.4 — validate the resolved window before any downstream dayjs use, and
+    // cap it (public route) so a large range can't blow up query cost.
+    validateDateRange(from, to);
+    validateToGteFrom(from, to);
+    if (dayjs(to).diff(dayjs(from), 'day') > 400) {
+      throw new HttpException({ msg: 'date range must not exceed 400 days' }, 400);
+    }
+
     const overview = await this._analyticsService.getOverview(
       org,
       from,
@@ -688,26 +700,11 @@ export class PublicIntegrationsController {
     });
   }
 
-  @Get('/analytics/:integration')
-  async getAnalytics(
-    @GetOrgFromRequest() org: Organization,
-    @Param('integration') integration: string,
-    @Query('date') date: string
-  ) {
-    Sentry.metrics.count('public_api-request', 1);
-    return this._integrationService.checkAnalytics(org, integration, date);
-  }
-
-  @Get('/analytics/post/:postId')
-  async getPostAnalytics(
-    @GetOrgFromRequest() org: Organization,
-    @Param('postId') postId: string,
-    @Query('date') date: string
-  ) {
-    Sentry.metrics.count('public_api-request', 1);
-    return this._postsService.checkPostAnalytics(org.id, postId, +date);
-  }
-
+  // R2.7 (M9): the static `/analytics/overview` route MUST be registered BEFORE
+  // the single-segment `/analytics/:integration` param route — Express resolves by
+  // registration order, so declared after it `overview` was captured as
+  // integration='overview' and 500'd (its @Throttle + docs were dead). Same
+  // pattern the branch already applied to `/analytics/anomalies` above.
   @Get('/analytics/overview')
   // 0.8: kept ungated by @CheckPolicies to match its legacy siblings (:636/:646,
   // n8n/Zapier compat) — API-key read routes carry no entitlement gate. Instead it
@@ -729,6 +726,26 @@ export class PublicIntegrationsController {
       integrations ? integrations.split(',') : [],
       compare === 'true'
     );
+  }
+
+  @Get('/analytics/:integration')
+  async getAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Param('integration') integration: string,
+    @Query('date') date: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._integrationService.checkAnalytics(org, integration, date);
+  }
+
+  @Get('/analytics/post/:postId')
+  async getPostAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Param('postId') postId: string,
+    @Query('date') date: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._postsService.checkPostAnalytics(org.id, postId, +date);
   }
 
   @Post('/integration-trigger/:id')

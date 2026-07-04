@@ -16,15 +16,44 @@ import {
 describe('resolveCampaignAnalyticsRange', () => {
   const today = dayjs().format('YYYY-MM-DD');
 
-  it('ongoing campaign (no endDate) → last 30 days', () => {
+  it('ongoing campaign (no endDate) → start date through today', () => {
     const { from, to } = resolveCampaignAnalyticsRange('2020-01-01', null);
     expect(to).toBe(today);
-    expect(from).toBe(dayjs().subtract(30, 'day').format('YYYY-MM-DD'));
+    expect(from).toBe('2020-01-01');
   });
 
-  it('clamps a start earlier than the 90-day snapshot window to the floor', () => {
-    const { from } = resolveCampaignAnalyticsRange('2000-01-01', dayjs().add(5, 'day').format('YYYY-MM-DD'));
-    expect(from).toBe(dayjs().subtract(CAMPAIGN_SNAPSHOT_WINDOW_DAYS, 'day').format('YYYY-MM-DD'));
+  it('ongoing campaign with no start date → default 90-day lookback to today', () => {
+    const { from, to } = resolveCampaignAnalyticsRange(null, null);
+    expect(to).toBe(today);
+    expect(from).toBe(
+      dayjs().subtract(CAMPAIGN_SNAPSHOT_WINDOW_DAYS, 'day').format('YYYY-MM-DD')
+    );
+  });
+
+  it('keeps a start earlier than 90 days (rows survive via weekly rollup)', () => {
+    const { from } = resolveCampaignAnalyticsRange(
+      '2000-01-01',
+      dayjs().add(5, 'day').format('YYYY-MM-DD')
+    );
+    expect(from).toBe('2000-01-01');
+  });
+
+  it('campaign ended >90 days ago → from ≤ to, not an inverted empty range', () => {
+    const start = dayjs().subtract(150, 'day').format('YYYY-MM-DD');
+    const end = dayjs().subtract(120, 'day').format('YYYY-MM-DD');
+    const { from, to } = resolveCampaignAnalyticsRange(start, end);
+    expect(to).toBe(end);
+    expect(from).toBe(start);
+    expect(dayjs(from).isAfter(dayjs(to))).toBe(false);
+  });
+
+  it('clamps from down to to when the start is after the (past) end', () => {
+    // Pathological: start after end. from must collapse to to, never invert.
+    const start = dayjs().subtract(100, 'day').format('YYYY-MM-DD');
+    const end = dayjs().subtract(120, 'day').format('YYYY-MM-DD');
+    const { from, to } = resolveCampaignAnalyticsRange(start, end);
+    expect(to).toBe(end);
+    expect(from).toBe(end);
   });
 
   it('clamps an end in the future down to today', () => {

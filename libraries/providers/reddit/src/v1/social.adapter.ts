@@ -697,10 +697,17 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
     date: number
   ): Promise<AnalyticsData[]> {
     try {
-      const cleanPostId = postId.startsWith('t3_') ? postId.slice(3) : postId;
+      // A multi-subreddit publish stores its `releaseId` comma-joined, so
+      // prefix each id with `t3_` (if not already) and re-join for /api/info.
+      const ids = postId
+        .split(',')
+        .map((raw) => raw.trim())
+        .filter(Boolean)
+        .map((raw) => (raw.startsWith('t3_') ? raw : `t3_${raw}`))
+        .join(',');
       const info = (await (
         await this.fetch(
-          `https://oauth.reddit.com/api/info?id=t3_${cleanPostId}`,
+          `https://oauth.reddit.com/api/info?id=${ids}`,
           {
             headers: {
               Authorization: `Bearer ${accessToken}`,
@@ -709,9 +716,29 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         )
       ).json()) as any;
 
-      const data = info?.data?.children?.[0]?.data;
-      if (!data) {
+      const children: any[] = (info?.data?.children ?? [])
+        .map((c: any) => c?.data)
+        .filter(Boolean);
+      if (!children.length) {
         return [];
+      }
+
+      // Aggregate across all children: score / comments sum, ratio averages.
+      let score = 0;
+      let numComments = 0;
+      let ratioSum = 0;
+      let ratioCount = 0;
+      for (const data of children) {
+        if (data.score !== undefined && data.score !== null) {
+          score += Number(data.score) || 0;
+        }
+        if (data.num_comments !== undefined && data.num_comments !== null) {
+          numComments += Number(data.num_comments) || 0;
+        }
+        if (data.upvote_ratio !== undefined && data.upvote_ratio !== null) {
+          ratioSum += Number(data.upvote_ratio) || 0;
+          ratioCount += 1;
+        }
       }
 
       const today = dayjs().format('YYYY-MM-DD');
@@ -722,9 +749,12 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         }
       };
 
-      push('Score', data.score);
-      push('Upvote Ratio', data.upvote_ratio);
-      push('Comments', data.num_comments);
+      push('Score', score);
+      push(
+        'Upvote Ratio',
+        ratioCount ? Math.round((ratioSum / ratioCount) * 10000) / 10000 : undefined
+      );
+      push('Comments', numComments);
 
       return result;
     } catch (err) {

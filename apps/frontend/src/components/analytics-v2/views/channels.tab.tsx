@@ -68,7 +68,7 @@ export const ChannelsTab: FC<ChannelsTabProps> = ({
         return (
           <div
             key={ch.integrationId}
-            className="w-full flex items-center gap-[12px] px-[16px] py-[12px] bg-newTableHeader border border-newTableBorder rounded-[10px] hover:border-newTableText/30 transition-colors"
+            className="w-full flex items-center gap-[12px] px-[16px] py-[12px] bg-newTableHeader border border-newTableBorder rounded-[10px] hover:border-newTableText transition-colors"
           >
             <button
               type="button"

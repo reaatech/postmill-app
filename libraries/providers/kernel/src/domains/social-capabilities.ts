@@ -53,6 +53,11 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'reddit': {
+    // `analytics: true` here means "the provider feeds the analytics surface"
+    // — post-level only (score / upvote ratio / comments via postAnalytics());
+    // Reddit exposes no per-account channel analytics() (see the adapter's own
+    // comment). This single boolean can't express post-vs-channel; splitting it
+    // into separate post/channel flags is a tracked follow-up, not this branch.
     analytics: true,
     comments: true,
     firstComment: true,
@@ -235,6 +240,21 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'mastodon': {
+    analytics: true,
+    comments: true,
+    firstComment: true,
+    poll: false,
+    video: true,
+    carousel: false,
+    altText: true,
+    maxMedia: 4,
+    linkPreview: false,
+    refreshToken: false,
+    watchlist: false,
+  },
+  // Custom Mastodon instances inherit the base MastodonProvider behavior
+  // (analytics()/postAnalytics()/comments), so mirror the `mastodon` entry.
+  'mastodon-custom': {
     analytics: true,
     comments: true,
     firstComment: true,

@@ -1,6 +1,7 @@
 'use client';
 
 import { FC } from 'react';
+import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useContentInsights, ContentFinding } from '../hooks/useContentInsights';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
@@ -9,12 +10,11 @@ import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 // sample size always shown; each finding deep-links the posts tab filtered to
 // its bucket (best-effort query params). Zero-post org → EmptyState.
 
-// Best-effort deep-link into the posts tab for a finding's bucket. The posts
-// tab reads whatever filter params it understands; unknown params are ignored.
-function bucketLink(f: ContentFinding): string {
+// Deep-link into the posts tab. The mediaType/bucket filter params aren't
+// consumed by the posts tab yet (follow-up scope), so the honest effect is
+// switching tabs; we only set `tab=posts`.
+function bucketLink(_f: ContentFinding): string {
   const params = new URLSearchParams({ tab: 'posts' });
-  if (f.dimension) params.set(f.dimension, f.bucket);
-  else params.set('bucket', f.bucket);
   return `/analytics?${params.toString()}`;
 }
 
@@ -25,7 +25,7 @@ const FindingCard: FC<{ finding: ContentFinding }> = ({ finding }) => {
   const ratioColor = outperforms ? 'text-[var(--positive,#32d583)]' : 'text-amber-600';
 
   return (
-    <a
+    <Link
       href={bucketLink(finding)}
       className="flex items-center justify-between gap-[12px] p-[16px] bg-newBgColorInner border border-newTableBorder rounded-[12px] hover:border-designerAccent/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
     >
@@ -40,7 +40,7 @@ const FindingCard: FC<{ finding: ContentFinding }> = ({ finding }) => {
       <div className={`text-[18px] font-semibold tabular-nums shrink-0 ${ratioColor}`}>
         {multiple}×
       </div>
-    </a>
+    </Link>
   );
 };
 

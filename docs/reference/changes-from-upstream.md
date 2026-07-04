@@ -29,6 +29,18 @@ channels emit `analytics/backfill` for instant history, post-snapshots roll up w
 `ANALYTICS_ANOMALY_Z` (default 3) and `ANALYTICS_ANOMALY_COOLDOWN_DAYS` (default 3). See
 [Analytics](../user-guide/analytics.md) and [Analytics API](../developer-docs/analytics-api.md).
 
+**Analytics review remediation (`feat/stats-upgrade`).** `PostAnalyticsSnapshot.value` is a
+**cumulative lifetime level** for every metric, and campaign-scoped aggregation now differences
+levels at read time against a per-post baseline (level just before the window) — fixing 10–20×
+inflated campaign KPIs/series (overview, drill, Campaign Hub, public report, public API). The weekly
+post rollup keeps the **week's latest level** for every metric (was summing ~7 cumulative dailies →
+~7× inflation) and only compacts a bounded 30-day window per sweep. All mutating `/analytics/v2`
+routes require the `analytics:update` RBAC permission and `POST /analytics/v2/narrate` is
+AI-billing-gated; the public campaign report no longer leaks `integrationId`/`picture` in
+`byChannel`; campaign `from`/`to` are validated (400) and window-capped; the legacy public
+`GET /analytics/overview` is un-shadowed. The public `/share/analytics/[token]` and
+`/share/campaign/[token]` pages render again (public root layout + proxy exemption).
+
 **AI Designer Foundations.** The server now owns the `DesignerDoc` contract with a single zod
 schema (`libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts`) shared as a
 type-only import by the frontend store and renderer. `DesignerDocService` provides `validate`,

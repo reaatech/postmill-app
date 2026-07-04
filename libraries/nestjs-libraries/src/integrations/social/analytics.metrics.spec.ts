@@ -28,6 +28,12 @@ describe('METRIC_REGISTRY', () => {
     }
   });
 
+  it('classifies score and upvote_ratio as stock (cumulative levels, R1.1)', () => {
+    expect(METRIC_REGISTRY['score'].kind).toBe('stock');
+    expect(METRIC_REGISTRY['upvote_ratio'].kind).toBe('stock');
+    expect(METRIC_REGISTRY['upvote_ratio'].format).toBe('percent');
+  });
+
   it('has no duplicate labels', () => {
     const labels = Object.values(METRIC_REGISTRY).map((d) => d.label);
     expect(new Set(labels).size).toBe(labels.length);

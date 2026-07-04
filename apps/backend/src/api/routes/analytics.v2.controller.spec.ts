@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import 'reflect-metadata';
 import { BadRequestException, ValidationPipe } from '@nestjs/common';
 import { UpdateWatchlistDto } from '@gitroom/nestjs-libraries/dtos/analytics/analytics.query.dto';
+import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { CHECK_POLICIES_KEY } from '@gitroom/backend/services/auth/permissions/permissions.ability';
+import {
+  AuthorizationActions,
+  Sections,
+} from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 
 vi.mock('@gitroom/nestjs-libraries/analytics/analytics.service', () => ({
   AnalyticsService: class MockAnalyticsService {
@@ -616,6 +623,49 @@ describe('AnalyticsV2Controller', () => {
 
       expect(result).toEqual([]);
     });
+  });
+});
+
+describe('AuthZ decorator metadata (R2.1 / R2.2)', () => {
+  const proto = AnalyticsV2Controller.prototype as any;
+  const requirePerm = (m: string) =>
+    Reflect.getMetadata(REQUIRE_PERMISSION_KEY, proto[m]);
+  const checkPolicies = (m: string) =>
+    Reflect.getMetadata(CHECK_POLICIES_KEY, proto[m]);
+
+  // R2.1 — every mutating route carries @RequirePermission('analytics','update').
+  const RBAC_GATED = [
+    'refreshChannel',
+    'dismissAnomaly',
+    'createAlertRule',
+    'updateAlertRule',
+    'deleteAlertRule',
+    'mintShare',
+    'disableShare',
+    'addWatchlistEntry',
+    'updateWatchlistEntry',
+    'deleteWatchlistEntry',
+  ];
+
+  for (const m of RBAC_GATED) {
+    it(`${m} requires analytics:update`, () => {
+      expect(requirePerm(m)).toEqual({ resource: 'analytics', action: 'update' });
+    });
+  }
+
+  // R2.2 — narrate is AI-billing-gated, NOT rbac-gated.
+  it('narrate is gated by CheckPolicies([Create, AI]) and not RBAC', () => {
+    expect(checkPolicies('narrate')).toEqual([
+      [AuthorizationActions.Create, Sections.AI],
+    ]);
+    expect(requirePerm('narrate')).toBeUndefined();
+  });
+
+  // GET routes stay on the org-scope default (no RequirePermission).
+  it('read routes are not RBAC-gated', () => {
+    for (const m of ['getOverview', 'getChannel', 'listAnomalies', 'listAlertRules', 'getShare', 'listWatchlist']) {
+      expect(requirePerm(m)).toBeUndefined();
+    }
   });
 });
 

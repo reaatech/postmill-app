@@ -36,6 +36,10 @@ import {
 import { IsString, IsOptional, IsBoolean, IsDateString, IsArray, ValidateNested, ArrayMaxSize, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import {
+  validateDateRange,
+  validateToGteFrom,
+} from '@gitroom/backend/api/routes/analytics.v2.controller';
 
 class CreateCampaignDto {
   @IsString()
@@ -325,6 +329,14 @@ export class CampaignsController {
     // narrow it with from/to.
     const to = toStr || dayjs().format('YYYY-MM-DD');
     const from = fromStr || dayjs().subtract(90, 'day').format('YYYY-MM-DD');
+
+    // R2.4 — validate the resolved window before any downstream dayjs use, and
+    // cap it so a public/large range can't blow up query cost.
+    validateDateRange(from, to);
+    validateToGteFrom(from, to);
+    if (dayjs(to).diff(dayjs(from), 'day') > 400) {
+      throw new BadRequestException('date range must not exceed 400 days');
+    }
 
     const overview = await this._analyticsService.getOverview(
       org,

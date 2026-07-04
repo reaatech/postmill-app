@@ -215,7 +215,9 @@ describe('NotificationService', () => {
     await service.notifyAnalyticsAnomaly({
       orgId: 'org-1',
       integrationName: 'Instagram',
-      metric: 'impressions',
+      // R4.5: human display label vs canonical key — the link must use the key.
+      metric: 'Unique Impressions',
+      metricKey: 'unique_impressions',
       direction: 'spike',
       value: 5000,
       baseline: 1200,
@@ -229,11 +231,13 @@ describe('NotificationService', () => {
         orgId: 'org-1',
         category: 'analytics',
         digest: true,
-        link: '/analytics?tab=insights&integrations=int-1&metric=impressions',
+        // R4.5: the deep link carries the URI-encoded metric KEY, not the label
+        // ("Unique Impressions" would be an invalid, un-matchable query string).
+        link: '/analytics?tab=insights&integrations=int-1&metric=unique_impressions',
         channels: { email: true, push: false, inApp: true },
         metadata: {
           integrationId: 'int-1',
-          metric: 'impressions',
+          metric: 'Unique Impressions',
           direction: 'spike',
           deviation: 3.2,
         },
@@ -242,7 +246,7 @@ describe('NotificationService', () => {
 
     const payload = notifySpy.mock.calls[0][0];
     expect(payload.title).toContain('Spike');
-    expect(payload.title).toContain('impressions');
+    expect(payload.title).toContain('Unique Impressions');
     expect(payload.message).toContain('Best post ever');
   });
 

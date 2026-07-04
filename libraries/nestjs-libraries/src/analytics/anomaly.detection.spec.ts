@@ -102,4 +102,20 @@ describe('detectAnomaly — stock (differenced)', () => {
   it('returns null for a stock series with < 2 points', () => {
     expect(detectAnomaly([{ date: 'x', value: 1 }], 'stock', { floor })).toBeNull();
   });
+
+  it('reports a signed non-zero deviation for a drop off a flat (μ=0) baseline (R4.4)', () => {
+    // Constant followers → all day-over-day deltas 0 (μ=0, σ=0), then a real
+    // drop on the last day. Old code clamped deviation to 0 (ranked the drop
+    // last); R4.4 keeps the signed candidate delta.
+    const series = Array.from({ length: 12 }, (_, i) => ({
+      date: `2024-06-${String(i + 1).padStart(2, '0')}`,
+      value: 1000,
+    }));
+    series.push({ date: '2024-06-13', value: 900 }); // last delta = -100
+    const r = detectAnomaly(series, 'stock', { floor, z: 3 });
+    expect(r).not.toBeNull();
+    expect(r!.direction).toBe('drop');
+    expect(r!.value).toBe(-100);
+    expect(r!.deviation).toBe(-100); // signed, non-zero — not the clamped 0
+  });
 });

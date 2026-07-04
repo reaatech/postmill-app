@@ -2,11 +2,12 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
+const { mockT } = vi.hoisted(() => ({ mockT: vi.fn() }));
+// Default: return the English fallback (with {{var}} interpolation).
+const defaultT = (_k: string, d: string, vars?: Record<string, unknown>) =>
+  vars ? d.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k])) : d;
 vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
-  useT:
-    () =>
-    (_k: string, d: string, vars?: Record<string, unknown>) =>
-      vars ? d.replace(/\{\{(\w+)\}\}/g, (_m, k) => String(vars[k])) : d,
+  useT: () => mockT,
 }));
 
 const mockToasterShow = vi.fn();
@@ -68,6 +69,7 @@ const selects = (c: HTMLElement) =>
 describe('AlertRulesModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockT.mockImplementation(defaultT);
     mockUseIntegrationList.mockReturnValue({ data: INTEGRATIONS });
   });
 
@@ -101,6 +103,19 @@ describe('AlertRulesModal', () => {
     expect(screen.getAllByText(/is at or above/).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/increase/).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Enabled' })).toBeTruthy();
+  });
+
+  it('translates the comparator label in the rules list, not the raw fallback (6.6)', () => {
+    // Translate only the gte comparator key; everything else keeps its fallback.
+    mockT.mockImplementation((k: string, d: string) =>
+      k === 'alert_cmp_gte' ? 'AT_OR_ABOVE_XLATED' : d
+    );
+    stub({ data: [RULE] }); // RULE.comparator === 'gte'
+    render(<AlertRulesModal />);
+    // The list row shows the translated label...
+    expect(screen.getAllByText(/AT_OR_ABOVE_XLATED/).length).toBeGreaterThan(0);
+    // ...and the raw English fallback is no longer rendered anywhere.
+    expect(screen.queryByText(/is at or above/)).toBeNull();
   });
 
   it('labels a null-integration rule as "Any channel" and % for change_pct', () => {

@@ -23,6 +23,7 @@ import { CampaignBand } from './charts/line.chart';
 import { InsightsTab } from './views/insights.tab';
 import { WatchlistTab } from './views/watchlist.tab';
 import { ShortlinksTab } from './views/shortlinks.tab';
+import { PostAnalyticsDrawer } from './post-analytics.drawer';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 function getDefaultFrom(): string {
@@ -263,6 +264,13 @@ export const AnalyticsDashboard: FC = () => {
     [updateParams]
   );
 
+  // 6.1 — the post drawer is opened by a `focusPost` deep-link (alert "View top
+  // post" / anomaly notification). Closing it clears `focusPost`; `metric` only
+  // ever rides in via that same link, so drop it too.
+  const handleCloseFocusPost = useCallback(() => {
+    updateParams({ focusPost: undefined, metric: undefined });
+  }, [updateParams]);
+
   const handleReset = useCallback(() => {
     updateParams({
       metric: undefined,
@@ -490,6 +498,13 @@ export const AnalyticsDashboard: FC = () => {
           )}
         </div>
       </div>
+      {focusPost && (
+        <PostAnalyticsDrawer
+          postId={focusPost}
+          open
+          onClose={handleCloseFocusPost}
+        />
+      )}
     </ErrorBoundary>
   );
 };

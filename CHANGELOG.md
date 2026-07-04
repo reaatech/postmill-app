@@ -151,6 +151,26 @@
   for existing orgs on deploy.
 
 ### Fixed
+- **Analytics post-snapshot level semantics + `feat/stats-upgrade` review remediation.**
+  `PostAnalyticsSnapshot.value` is now treated as a **cumulative lifetime level** for every metric
+  (matching what every provider `postAnalytics()` returns), and all post-scoped consumers difference
+  levels at read time: campaign overview/detail KPIs and series subtract a per-post baseline (the
+  level just before the window) instead of summing the running totals — fixing 10–20× inflated
+  campaign KPIs on `/campaigns/:id/analytics`, `?campaigns=`, the Campaign Hub, the public report,
+  and the public API. `score`/`upvote_ratio` are reclassified as stock. The weekly post rollup now
+  keeps the **week's latest level** for every metric (was summing ~7 cumulative dailies → ~7×
+  inflation past the 90-day cliff) and only re-reads/re-writes a bounded 30-day window per sweep
+  (was the org's entire pre-cutoff history in one transaction; skipped-row counts are logged, never
+  silently truncated). Also: all mutating `/analytics/v2` routes (share mint/disable, alert-rule
+  CRUD, dismiss, refresh, watchlist CUD) now require the `analytics:update` RBAC permission and
+  `POST /analytics/v2/narrate` is AI-billing-gated; the public campaign report whitelists
+  `analytics.byChannel` to `{ name, identifier, kpis }` (no `integrationId`/`picture` leak);
+  campaign-analytics `from`/`to` are validated (400, not 500) and window-capped; alert-rule
+  `threshold`/`integrationId`/`rangePreset` are bounded and org-checked; the legacy public
+  `GET /analytics/overview` is un-shadowed from `GET /analytics/:integration`. The public
+  `/share/analytics/[token]` and `/share/campaign/[token]` pages render again (public root layout +
+  proxy exemption + backend `baseUrl`), the alerts "View top post" link opens the post drawer, and
+  the anomaly notification deep link carries the URI-encoded metric **key** (not the display label).
 - **Designer safe-zone insets on story formats.** `getSafeZoneInset` treated a preset's `safeZones`
   (unsafe overlay rects, e.g. the IG story top bar / bottom UI strip) as if they were the safe area,
   degenerating to a zero-size box on `ig-story`/`ig-reel`/`fb-story`/`tiktok` and clamping reflowed

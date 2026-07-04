@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
 import { Organization } from '@prisma/client';
@@ -328,7 +328,19 @@ export class AnalyticsService {
     return this.analyticsRepository.listAlertRules(orgId);
   }
 
-  createAlertRule(
+  // Reject a provided integrationId that isn't one of the org's live channels
+  // (a typo'd id would otherwise persist a rule that silently never fires).
+  private async assertIntegrationInOrg(orgId: string, integrationId?: string) {
+    if (!integrationId) return;
+    const found = await this.analyticsRepository.getIntegrations(orgId, [
+      integrationId,
+    ]);
+    if (!found.length) {
+      throw new BadRequestException('integrationId is not a channel of this organization');
+    }
+  }
+
+  async createAlertRule(
     orgId: string,
     data: {
       integrationId?: string;
@@ -339,6 +351,7 @@ export class AnalyticsService {
       enabled?: boolean;
     },
   ) {
+    await this.assertIntegrationInOrg(orgId, data.integrationId);
     return this.analyticsRepository.createAlertRule({
       organizationId: orgId,
       integrationId: data.integrationId ?? null,
@@ -362,6 +375,7 @@ export class AnalyticsService {
       enabled?: boolean;
     },
   ) {
+    await this.assertIntegrationInOrg(orgId, data.integrationId);
     const res = await this.analyticsRepository.updateAlertRule(orgId, id, data);
     // updateMany over (id, orgId) — 0 rows means the rule isn't this org's.
     if (res.count === 0) {

@@ -126,12 +126,22 @@ export class AnalyticsLiveFallbackService {
       const providerIdentifier = integrationMap[integrationId] || '';
 
       for (const item of data) {
+        // R4.1(a): skip items without a usable label — a `label: undefined`
+        // otherwise throws TypeError on `.toLowerCase()`, surfacing as an
+        // uncaught 500 through refreshChannel (which only try/catches the
+        // provider call, not this conversion).
+        if (typeof item?.label !== 'string' || !item.label) continue;
+
         const normalized =
           normalizeMetric(providerIdentifier, item.label) ||
           item.label.toLowerCase().replace(/\s+/g, '_');
 
         for (const dp of item.data || []) {
-          const dpDate = dayjs(dp.date).toDate();
+          // R4.1(b): normalize to midnight so a refresh persists on the same
+          // (integrationId, metric, date) key the daily sweep uses — otherwise a
+          // raw timestamp adds a second same-day row buildFilledDayMap
+          // double-counts forever.
+          const dpDate = dayjs(dp.date).startOf('day').toDate();
           if (dpDate >= from && dpDate <= to) {
             rows.push({
               organizationId: orgId,

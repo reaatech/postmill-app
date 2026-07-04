@@ -310,7 +310,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                       setDrillMetric(kpi.metric);
                     }
                   }}
-                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
+                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
                 >
                   <div className="flex items-center justify-between mb-[8px]">
                     <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">

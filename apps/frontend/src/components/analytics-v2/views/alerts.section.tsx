@@ -1,6 +1,7 @@
 'use client';
 
 import { FC } from 'react';
+import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useAnomalies, AnomalyRow } from '../hooks/useAnomalies';
 import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
@@ -57,7 +58,7 @@ const AlertCard: FC<{ anomaly: AnomalyRow; onDismiss: (id: string) => void }> = 
                 {dirLabel}
               </span>
               {anomaly.ruleId && (
-                <span className="text-[10px] font-semibold uppercase tracking-wide text-btnPrimary border border-btnPrimary/40 rounded-full px-[6px] py-[1px]">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-btnPrimary border border-btnPrimary rounded-full px-[6px] py-[1px]">
                   {t('analytics_alert_rule_badge', 'Rule')}
                 </span>
               )}
@@ -99,19 +100,19 @@ const AlertCard: FC<{ anomaly: AnomalyRow; onDismiss: (id: string) => void }> = 
       </div>
 
       <div className="flex flex-wrap items-center gap-[12px]">
-        <a
+        <Link
           href={bellLink(anomaly)}
           className="text-[13px] font-medium text-btnPrimary hover:opacity-80 transition-opacity"
         >
           {t('analytics_alert_view_metric', 'View metric')}
-        </a>
+        </Link>
         {anomaly.topPostId && (
-          <a
+          <Link
             href={`/analytics?focusPost=${anomaly.topPostId}&metric=${anomaly.metric}`}
             className="text-[13px] font-medium text-newTableText hover:text-textColor transition-colors"
           >
             {t('analytics_alert_view_post', 'View top post')}
-          </a>
+          </Link>
         )}
       </div>
     </div>
@@ -172,7 +173,7 @@ export const AlertsSection: FC = () => {
         <button
           type="button"
           onClick={openRules}
-          className="inline-flex items-center gap-[6px] px-[12px] py-[6px] text-[13px] font-medium rounded-[8px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-textColor hover:border-newTableText/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
+          className="inline-flex items-center gap-[6px] px-[12px] py-[6px] text-[13px] font-medium rounded-[8px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-textColor hover:border-newTableText transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
@@ -196,7 +197,7 @@ export const AnomalyOverviewStrip: FC = () => {
   if (!count) return null;
 
   return (
-    <a
+    <Link
       href="/analytics?tab=insights&section=alerts"
       className="flex items-center gap-[8px] px-[14px] py-[10px] rounded-[10px] bg-newTableHeader border border-newTableBorder text-[13px] text-textColor hover:border-amber-600/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
     >
@@ -209,6 +210,6 @@ export const AnomalyOverviewStrip: FC = () => {
       <span className="text-newTableText ml-auto">
         {t('analytics_alert_strip_cta', 'Review')}
       </span>
-    </a>
+    </Link>
   );
 };

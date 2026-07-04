@@ -135,7 +135,10 @@ export const AlertRulesModal: FC = () => {
                   {channelName(rule.integrationId)} · {metricLabel(rule.metric)}
                 </div>
                 <div className="text-[12px] text-newTableText">
-                  {COMPARATORS.find((c) => c.value === rule.comparator)?.fallback}{' '}
+                  {(() => {
+                    const c = COMPARATORS.find((c) => c.value === rule.comparator);
+                    return c ? t(c.labelKey, c.fallback) : rule.comparator;
+                  })()}{' '}
                   {rule.threshold}
                   {rule.comparator === 'change_pct' ? '%' : ''} ·{' '}
                   {rule.direction === 'up'

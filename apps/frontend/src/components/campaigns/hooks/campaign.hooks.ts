@@ -89,29 +89,31 @@ export interface CampaignAnalytics {
   window?: { from: string; to: string };
 }
 
-// Post snapshots are retained for 90 days (D5 — until the Phase-6 weekly rollup),
-// so a campaign's default analytics window is clamped to that floor.
+// Default lookback (in days) when a campaign has no start date. Post rows now
+// survive past 90 days at weekly granularity (R1.7 rollup), so this is a default
+// window, not a hard floor clamp.
 export const CAMPAIGN_SNAPSHOT_WINDOW_DAYS = 90;
 
-// Default analytics range for a campaign: its start→end clamped to the snapshot
-// window; ongoing campaigns (no endDate) default to the last 30 days.
+// Default analytics range for a campaign:
+//   to   = min(endDate ?? today, today)   — never in the future
+//   from = startDate ?? to − 90d
+//   from = min(from, to)                  — never an inverted (empty) range,
+//          even for a campaign that ended more than 90 days ago.
 export const resolveCampaignAnalyticsRange = (
   startDate?: string | null,
   endDate?: string | null
 ): { from: string; to: string } => {
   const today = dayjs();
-  const windowFloor = today.subtract(CAMPAIGN_SNAPSHOT_WINDOW_DAYS, 'day');
-  if (!endDate) {
-    return {
-      from: today.subtract(30, 'day').format('YYYY-MM-DD'),
-      to: today.format('YYYY-MM-DD'),
-    };
-  }
-  const end = dayjs(endDate);
-  const to = (end.isAfter(today) ? today : end).format('YYYY-MM-DD');
-  const start = startDate ? dayjs(startDate) : windowFloor;
-  const from = (start.isBefore(windowFloor) ? windowFloor : start).format('YYYY-MM-DD');
-  return { from, to };
+  const end = endDate ? dayjs(endDate) : today;
+  const to = end.isAfter(today) ? today : end;
+  let from = startDate
+    ? dayjs(startDate)
+    : to.subtract(CAMPAIGN_SNAPSHOT_WINDOW_DAYS, 'day');
+  if (from.isAfter(to)) from = to;
+  return {
+    from: from.format('YYYY-MM-DD'),
+    to: to.format('YYYY-MM-DD'),
+  };
 };
 
 export const useCampaignAnalytics = (

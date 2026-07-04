@@ -68,6 +68,30 @@ export class AnalyticsRepository {
     });
   }
 
+  // R1.3: latest post-snapshot LEVEL strictly before `before`, one row per
+  // (postId, metric), for the same campaign/integration scoping as
+  // getPostSnapshotsByCampaigns. This is the per-post baseline the level-
+  // differencing aggregation subtracts so an in-window total is a true window
+  // delta, not the cumulative running total. Missing (post, metric) ⇒ baseline 0.
+  getLatestPostSnapshotsBeforeByCampaigns(
+    orgId: string,
+    campaignIds: string[],
+    before: Date,
+    integrationIds?: string[],
+  ) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: {
+        organizationId: orgId,
+        date: { lt: before },
+        ...(integrationIds ? { integrationId: { in: integrationIds } } : {}),
+        post: { campaignId: { in: campaignIds }, deletedAt: null },
+      },
+      orderBy: [{ postId: 'asc' }, { metric: 'asc' }, { date: 'desc' }],
+      distinct: ['postId', 'metric'],
+      select: { postId: true, metric: true, value: true },
+    });
+  }
+
   // Campaign-scoped post list (1.1) — mirrors findPosts but scopes by
   // Post.campaignId instead of channel.
   getPostsByCampaigns(
@@ -527,10 +551,12 @@ export class AnalyticsRepository {
 
   // Per-post analog of findChannelSnapshotsBefore — the rows to be rolled up
   // into weekly aggregates (6.1). postId is carried through so the weekly row
-  // stays attributable to its post/campaign.
-  findPostSnapshotsBefore(orgId: string, cutoff: Date) {
+  // stays attributable to its post/campaign. R1.8: bounded below by `floor` so
+  // each sweep only touches a fixed recent window (chronological aging keeps the
+  // re-roll correct), instead of re-reading the org's entire pre-cutoff history.
+  findPostSnapshotsBefore(orgId: string, floor: Date, cutoff: Date) {
     return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
-      where: { organizationId: orgId, date: { lt: cutoff } },
+      where: { organizationId: orgId, date: { gte: floor, lt: cutoff } },
       orderBy: { date: 'asc' },
       select: {
         postId: true,
@@ -539,6 +565,15 @@ export class AnalyticsRepository {
         value: true,
         date: true,
       },
+    });
+  }
+
+  // R1.8 guard: rows older than the rollup floor that the bounded sweep no longer
+  // compacts (they simply stay daily — still aggregate correctly as levels). A
+  // non-zero count is logged, never silently truncated.
+  countPostSnapshotsBeforeFloor(orgId: string, floor: Date) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.count({
+      where: { organizationId: orgId, date: { lt: floor } },
     });
   }
 
@@ -570,6 +605,7 @@ export class AnalyticsRepository {
   // makes the createMany idempotent via skipDuplicates.
   replaceRolledUpPostSnapshots(
     orgId: string,
+    floor: Date,
     cutoff: Date,
     weeklyRows: {
       organizationId: string;
@@ -582,7 +618,7 @@ export class AnalyticsRepository {
   ) {
     return this._prisma.$transaction([
       this._prisma.postAnalyticsSnapshot.deleteMany({
-        where: { organizationId: orgId, date: { lt: cutoff } },
+        where: { organizationId: orgId, date: { gte: floor, lt: cutoff } },
       }),
       this._prisma.postAnalyticsSnapshot.createMany({
         data: weeklyRows,

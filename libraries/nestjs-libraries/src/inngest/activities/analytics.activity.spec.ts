@@ -109,6 +109,7 @@ describe('AnalyticsActivity', () => {
       updatePostCounters: vi.fn().mockResolvedValue({}),
       deletePostSnapshotsBefore: vi.fn().mockResolvedValue({ count: 0 }),
       findPostSnapshotsBefore: vi.fn().mockResolvedValue([]),
+      countPostSnapshotsBeforeFloor: vi.fn().mockResolvedValue(0),
       replaceRolledUpPostSnapshots: vi.fn().mockResolvedValue([]),
       findChannelSnapshotsBefore: vi.fn().mockResolvedValue([]),
       replaceRolledUpSnapshots: vi.fn().mockResolvedValue([]),
@@ -1265,16 +1266,19 @@ describe('AnalyticsActivity', () => {
       date: new Date(date),
     });
 
-    it('reads old post snapshots to roll up beyond the retention window', async () => {
+    it('reads old post snapshots in a bounded window to roll up (R1.8)', async () => {
       await activity.pruneAndRollupSnapshots('org-1');
 
       const call = (analyticsRepository.findPostSnapshotsBefore as any).mock
         .calls[0];
       expect(call[0]).toBe('org-1');
-      // ~90 days back
-      const cutoff = dayjs(call[1]);
+      // R1.8: signature is (orgId, floor, cutoff). cutoff ~90 days back;
+      // floor is POST_ROLLUP_LOOKBACK_DAYS (30) earlier (~120 days back).
+      const floor = dayjs(call[1]);
+      const cutoff = dayjs(call[2]);
       expect(dayjs().diff(cutoff, 'day')).toBeGreaterThanOrEqual(89);
       expect(dayjs().diff(cutoff, 'day')).toBeLessThanOrEqual(91);
+      expect(cutoff.diff(floor, 'day')).toBe(30);
       // Post snapshots are rolled up now, not deleted.
       expect(analyticsRepository.deletePostSnapshotsBefore).not.toHaveBeenCalled();
     });
@@ -1289,7 +1293,7 @@ describe('AnalyticsActivity', () => {
         await activity.pruneAndRollupSnapshots('org-1');
 
         const postCutoff = dayjs(
-          (analyticsRepository.findPostSnapshotsBefore as any).mock.calls[0][1]
+          (analyticsRepository.findPostSnapshotsBefore as any).mock.calls[0][2]
         );
         expect(dayjs().diff(postCutoff, 'day')).toBe(7);
 
@@ -1382,7 +1386,7 @@ describe('AnalyticsActivity', () => {
       expect(data).toHaveLength(3);
     });
 
-    it('rolls up old post snapshots into one weekly row per (postId, metric): flow summed, stock latest', async () => {
+    it('rolls up old post snapshots into one weekly row per (postId, metric): LATEST level for every metric (R1.7)', async () => {
       // ~100-day-old daily rows for one post in a single ISO week
       // (Mon 2023-01-02 .. Sun 2023-01-08).
       (analyticsRepository.findPostSnapshotsBefore as any).mockResolvedValue([
@@ -1398,20 +1402,39 @@ describe('AnalyticsActivity', () => {
       expect(analyticsRepository.deletePostSnapshotsBefore).not.toHaveBeenCalled();
       expect(analyticsRepository.replaceRolledUpPostSnapshots).toHaveBeenCalledOnce();
 
-      const [orgArg, , weeklyRows] = (
+      // R1.8: signature is (orgId, floor, cutoff, weeklyRows).
+      const [orgArg, floorArg, cutoffArg, weeklyRows] = (
         analyticsRepository.replaceRolledUpPostSnapshots as any
       ).mock.calls[0];
       expect(orgArg).toBe('org-1');
+      expect(dayjs(cutoffArg).diff(dayjs(floorArg), 'day')).toBe(30);
       expect(weeklyRows).toHaveLength(2);
 
+      // R1.7: post-snapshot values are cumulative LEVELS, so a weekly row is the
+      // week's LAST known level for EVERY metric — never the sum (which was the
+      // ~7×-inflated B2 bug).
       const impressions = weeklyRows.find((r: any) => r.metric === 'impressions');
       expect(impressions.postId).toBe('p1');
       expect(impressions.integrationId).toBe('int-1');
-      expect(impressions.value).toBe(30); // flow: 10 + 20
+      expect(impressions.value).toBe(20); // latest in-week level (Jan 6), not 10+20
       expect(dayjs(impressions.date).format('YYYY-MM-DD')).toBe('2023-01-02'); // Monday
 
       const followers = weeklyRows.find((r: any) => r.metric === 'followers');
-      expect(followers.value).toBe(540); // stock: latest in-week value (Jan 6)
+      expect(followers.value).toBe(540); // latest in-week level (Jan 6)
+    });
+
+    it('warns (never silently truncates) when rows age past the rollup floor (R1.8)', async () => {
+      (analyticsRepository.countPostSnapshotsBeforeFloor as any).mockResolvedValue(
+        42
+      );
+      const warnSpy = vi.spyOn(Logger.prototype, 'warn');
+
+      await activity.pruneAndRollupSnapshots('org-1');
+
+      expect(analyticsRepository.countPostSnapshotsBeforeFloor).toHaveBeenCalled();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('42 post snapshot(s) older than the rollup floor')
+      );
     });
   });
 
@@ -1494,6 +1517,10 @@ describe('AnalyticsActivity', () => {
         orgId: 'org-1',
         direction: 'spike',
         integrationId: 'i1',
+        // R4.5: the human `metric` is the display label; `metricKey` carries the
+        // canonical key for the (URI-encoded) deep link.
+        metric: 'Impressions',
+        metricKey: 'impressions',
       });
     });
 
@@ -1618,6 +1645,44 @@ describe('AnalyticsActivity', () => {
 
       expect(analyticsRepository.updateAlertRule).not.toHaveBeenCalled();
       expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+    });
+
+    it('merges a rule firing onto a detector row sharing the same key (R4.3)', async () => {
+      // Detector spikes on i1/impressions day-29; a user rule on the SAME
+      // (integration, metric, day) also fires. Expect ONE persisted row carrying
+      // the ruleId, and ONE notification — not a duplicate skipDuplicates drops.
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(spikeSeries());
+      analyticsRepository.getEnabledAlertRules.mockResolvedValue([
+        {
+          id: 'rule-42',
+          integrationId: null,
+          metric: 'impressions',
+          comparator: 'gte',
+          threshold: 500,
+          direction: 'up',
+          enabled: true,
+          lastFiredAt: null,
+        },
+      ]);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      const impressionRows = rows.filter(
+        (r: any) => r.integrationId === 'i1' && r.metric === 'impressions'
+      );
+      // exactly one row for the shared key, and it carries the rule attribution
+      expect(impressionRows).toHaveLength(1);
+      expect(impressionRows[0].ruleId).toBe('rule-42');
+      // exactly one notification
+      expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
+      // the rule still stamps lastFiredAt
+      expect(analyticsRepository.updateAlertRule).toHaveBeenCalledWith(
+        'org-1',
+        'rule-42',
+        { lastFiredAt: expect.any(Date) }
+      );
     });
   });
 

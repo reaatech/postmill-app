@@ -94,8 +94,10 @@ export function detectAnomaly(
   const zScore = sigma === 0 ? (candidate === mu ? 0 : Infinity) : absDelta / sigma;
   if (zScore < z) return null;
 
-  const deviation =
-    mu !== 0 ? (candidate - mu) / Math.abs(mu) : candidate > 0 ? candidate : 0;
+  // R4.4: off a flat (μ=0) baseline the deviation IS the candidate delta — keep
+  // its sign. The old `candidate > 0 ? candidate : 0` clamp reported 0 for a real
+  // drop, sinking it to last in the |deviation| notification ranking.
+  const deviation = mu !== 0 ? (candidate - mu) / Math.abs(mu) : candidate;
 
   return {
     direction: candidate >= mu ? 'spike' : 'drop',

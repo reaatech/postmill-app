@@ -16,9 +16,11 @@ import { Integration } from '@prisma/client';
 import striptags from 'striptags';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 import { ClientInformation } from '@gitroom/provider-kernel';
+import { Logger } from '@nestjs/common';
 
 import { metadata as providerMetadata } from './metadata';
 export class TelegramProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(TelegramProvider.name);
   override maxConcurrentJob = 3; // Telegram has moderate bot API limits
   identifier = 'telegram';
   name = 'Telegram';
@@ -465,6 +467,7 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
         },
       ];
     } catch (err) {
+      this.logger.warn('Telegram analytics failed');
       return [];
     }
   }

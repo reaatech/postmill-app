@@ -72,6 +72,23 @@ describe('CampaignReportService.toPublicJson (3.4 whitelist)', () => {
     expect(out.analytics).toBeDefined();
     expect(Object.keys(out.analytics).sort()).toEqual(['byChannel', 'series', 'window']);
     expect(out.analytics.series.views[0].value).toBe(5);
+
+    // R2.3 — byChannel is whitelisted to { name, identifier, kpis }; the source
+    // integrationId + picture must NOT survive on the public report.
+    expect(Object.keys(out.analytics.byChannel[0]).sort()).toEqual([
+      'identifier',
+      'kpis',
+      'name',
+    ]);
+    expect(out.analytics.byChannel[0].integrationId).toBeUndefined();
+    expect(out.analytics.byChannel[0].picture).toBeUndefined();
+    expect(out.analytics.byChannel[0].name).toBe('X');
+    expect(out.analytics.byChannel[0].identifier).toBe('@x');
+
+    // Deep scan: no integrationId/picture anywhere in the public payload.
+    const serialized = JSON.stringify(out);
+    expect(serialized).not.toContain('integrationId');
+    expect(serialized).not.toContain('picture');
   });
 
   it('omits the analytics block when none is passed', async () => {

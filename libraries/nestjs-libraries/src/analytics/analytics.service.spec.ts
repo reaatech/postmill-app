@@ -6,7 +6,7 @@ import {
   bestTimeConfidence,
 } from './analytics-aggregation';
 import { METRIC_REGISTRY, isKnownMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import dayjs from 'dayjs';
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository', () => {
@@ -21,6 +21,7 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repositor
       getSnapshots = mkMock();
       getPostSnapshots = mkMock();
       getPostSnapshotsByCampaigns = mkMock();
+      getLatestPostSnapshotsBeforeByCampaigns = mkMock();
       getPostsByCampaigns = mkMock();
       countPostsByCampaigns = (() => { const fn = vi.fn(); fn.mockResolvedValue(0); return fn; })();
       getIntegrations = mkMock();
@@ -705,6 +706,32 @@ describe('AnalyticsService', () => {
       expect(integrationService.checkAnalytics).not.toHaveBeenCalled();
     });
 
+    it('differences cumulative post LEVELS against a prior baseline (R1.4)', async () => {
+      // One post, cumulative lifetime levels 100→150→220 across the 3-day
+      // window, with a prior level of 90 just before it. The KPI total must be
+      // the WINDOW DELTA 220−90 = 130 (the old bug summed the in-window rows =
+      // 470), and the trend the per-day deltas [10, 50, 70].
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 150, date: d(2024, 1, 2), createdAt: new Date() },
+        { id: 'ps3', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 220, date: d(2024, 1, 3), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([
+        { postId: 'p1', metric: 'impressions', value: 90 },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+
+      const r = await service.getOverview(mockOrg as any, from, to, [], false, { campaignIds: ['A'] });
+
+      expect(r.kpis[0]).toMatchObject({ metric: 'impressions', total: 130 });
+      expect(r.series.impressions.map((p: any) => p.value)).toEqual([10, 50, 70]);
+      expect(r.byChannel[0].kpis[0]).toMatchObject({ total: 130 });
+      // baseline was read for the current window (before = window start).
+      expect(analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns).toHaveBeenCalledWith(
+        'org1', ['A'], expect.any(Date), undefined,
+      );
+    });
+
     it('leaves the unscoped overview output unchanged (no scope field)', async () => {
       (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
       (analyticsRepository.checkCoverage as any).mockResolvedValueOnce([{ date: d(2024, 1, 1) }, { date: d(2024, 1, 2) }, { date: d(2024, 1, 3) }]);
@@ -1016,6 +1043,61 @@ describe('AnalyticsService', () => {
       expect(r.previousTotal).toBeNull();
       expect(r.series).toHaveLength(3);
       expect(r.movers).toEqual({ up: [], down: [] });
+    });
+
+    it('campaign scope: total is the window delta of post LEVELS, matching the overview KPI (R1.5)', async () => {
+      // Same fixture as the overview R1.4 test: cumulative levels 100→150→220
+      // with a prior baseline of 90 ⇒ total 130, series [10,50,70].
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 150, date: d(2024, 1, 2), createdAt: new Date() },
+        { id: 'ps3', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 220, date: d(2024, 1, 3), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([
+        { postId: 'p1', metric: 'impressions', value: 90 },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getMetricDetailTopPosts as any).mockResolvedValue([]);
+
+      const r = await service.getMetricDetail(
+        mockOrg as any, 'impressions', from, to, [], false, { campaignIds: ['A'] }
+      );
+
+      expect(r.total).toBe(130);
+      expect(r.series.map((p: any) => p.value)).toEqual([10, 50, 70]);
+      expect(r.byChannel[0].value).toBe(130);
+      // no live fallback under campaign scope
+      expect(integrationService.checkAnalytics).not.toHaveBeenCalled();
+    });
+
+    it('campaign scope: previous window uses the explicit filter (or none), not the derived channel set (R1.6)', async () => {
+      // No explicit integration filter passed. Current window derives channels
+      // from its own snapshots; the previous window must still pass `undefined`
+      // so a channel that only posted in the prior window is included.
+      (analyticsRepository.getPostSnapshotsByCampaigns as any)
+        .mockResolvedValueOnce([
+          { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 3), createdAt: new Date() },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'ps2', organizationId: 'org1', postId: 'p2', integrationId: 'i2', metric: 'impressions', value: 80, date: d(2023, 12, 30), createdAt: new Date() },
+        ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([]);
+      // No explicit filter → getIntegrations([]) returns [] (Prisma `in: []`);
+      // the derived-channel lookup then resolves the campaign's channels.
+      (analyticsRepository.getIntegrations as any)
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getMetricDetailTopPosts as any).mockResolvedValue([]);
+
+      await service.getMetricDetail(
+        mockOrg as any, 'impressions', from, to, [], true, { campaignIds: ['A'] }
+      );
+
+      const calls = (analyticsRepository.getPostSnapshotsByCampaigns as any).mock.calls;
+      // current window (call 0) and previous window (call 1) both pass the
+      // explicit filter — here `undefined` — as the 5th arg.
+      expect(calls[0][4]).toBeUndefined();
+      expect(calls[1][4]).toBeUndefined();
     });
 
     it('returns with compare=true and movers (up)', async () => {
@@ -1674,6 +1756,64 @@ describe('AnalyticsService', () => {
         'utility', expect.any(String), expect.objectContaining({ orgId: 'org1' }),
       );
       expect(r.narrative).toBe('Your impressions grew.');
+    });
+  });
+
+  // R2.5 — a provided alert-rule integrationId must belong to the org.
+  describe('alert-rule integrationId org-ownership (R2.5)', () => {
+    const UUID = '11111111-1111-4111-8111-111111111111';
+
+    it('createAlertRule throws 400 when integrationId is not the org\'s channel', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([]);
+      (analyticsRepository as any).createAlertRule = vi.fn();
+
+      await expect(
+        service.createAlertRule('org1', {
+          integrationId: UUID,
+          metric: 'followers',
+          comparator: 'gte',
+          threshold: 100,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(analyticsRepository.getIntegrations).toHaveBeenCalledWith('org1', [UUID]);
+      expect((analyticsRepository as any).createAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('createAlertRule persists when the integrationId belongs to the org', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository as any).createAlertRule = vi.fn().mockResolvedValue({ id: 'r1' });
+
+      const res = await service.createAlertRule('org1', {
+        integrationId: mockIntegration.id,
+        metric: 'followers',
+        comparator: 'gte',
+        threshold: 100,
+      });
+      expect(res).toEqual({ id: 'r1' });
+      expect((analyticsRepository as any).createAlertRule).toHaveBeenCalledOnce();
+    });
+
+    it('createAlertRule skips the ownership check when no integrationId is given', async () => {
+      (analyticsRepository as any).createAlertRule = vi.fn().mockResolvedValue({ id: 'r2' });
+      const spy = analyticsRepository.getIntegrations as any;
+
+      await service.createAlertRule('org1', {
+        metric: 'followers',
+        comparator: 'gte',
+        threshold: 100,
+      });
+      expect(spy).not.toHaveBeenCalled();
+      expect((analyticsRepository as any).createAlertRule).toHaveBeenCalledOnce();
+    });
+
+    it('updateAlertRule throws 400 for a foreign integrationId before touching the row', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([]);
+      (analyticsRepository as any).updateAlertRule = vi.fn();
+
+      await expect(
+        service.updateAlertRule('org1', 'r1', { integrationId: UUID }),
+      ).rejects.toThrow(BadRequestException);
+      expect((analyticsRepository as any).updateAlertRule).not.toHaveBeenCalled();
     });
   });
 });

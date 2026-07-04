@@ -57,7 +57,10 @@ describe('ContentInsightsSection', () => {
     expect(screen.getByText('2.3×')).toBeTruthy();
     expect(screen.getByText(/based on 12 posts/i)).toBeTruthy();
     const link = screen.getByText('Videos').closest('a') as HTMLAnchorElement;
+    // 6.5 — the link only switches to the posts tab; the mediaType/bucket filter
+    // params were dropped (nothing consumed them).
     expect(link.getAttribute('href')).toContain('tab=posts');
-    expect(link.getAttribute('href')).toContain('mediaType=video');
+    expect(link.getAttribute('href')).not.toContain('mediaType');
+    expect(link.getAttribute('href')).not.toContain('bucket');
   });
 });

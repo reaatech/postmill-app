@@ -32,7 +32,7 @@ export const StatTile: FC<StatTileProps> = ({ kpi, label, value, accent, onClick
   }
   return (
     <div
-      className="group relative flex-1 overflow-hidden bg-newBgColorInner border border-newTableBorder rounded-[12px] px-[16px] py-[14px] flex flex-col gap-[6px] transition-all duration-200 hover:border-newTableText/30"
+      className="group relative flex-1 overflow-hidden bg-newBgColorInner border border-newTableBorder rounded-[12px] px-[16px] py-[14px] flex flex-col gap-[6px] transition-all duration-200 hover:border-newTableText"
     >
       {accent && (
         <>
@@ -96,7 +96,7 @@ const RichTile: FC<{ kpi: KPI; color: string; onClick?: () => void }> = ({
   return (
     <div
       {...interactiveProps}
-      className={`group bg-newBgColorInner border border-newTableBorder rounded-[12px] overflow-hidden transition-all duration-200 hover:border-newTableText/30 flex flex-col ${
+      className={`group bg-newBgColorInner border border-newTableBorder rounded-[12px] overflow-hidden transition-all duration-200 hover:border-newTableText flex flex-col ${
         onClick
           ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60'
           : ''

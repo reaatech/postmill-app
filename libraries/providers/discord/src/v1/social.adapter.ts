@@ -15,12 +15,14 @@ import { DiscordDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 import { safeFetch } from '@gitroom/provider-kernel';
+import { Logger } from '@nestjs/common';
 
 import { metadata as providerMetadata } from './metadata';
 
 export const DISCORD_MENTION_MARKER_REGEX = /\[\[\[(@[^\[\]]*)]]]/g;
 
 export class DiscordProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(DiscordProvider.name);
   override maxConcurrentJob = 5; // Discord has generous rate limits for webhook posting
   identifier = 'discord';
   name = 'Discord';
@@ -541,6 +543,7 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
+      this.logger.warn('Discord analytics failed');
       return [];
     }
   }
