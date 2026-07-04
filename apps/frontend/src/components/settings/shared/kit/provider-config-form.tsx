@@ -27,6 +27,8 @@ export interface ProviderConfigFormProps<Meta = any> {
   isConfigured: boolean;
   initialVersion?: string;
   meta: Meta;
+  /** Provider homepage — surfaces a "where to get your keys" info hint. */
+  website?: string;
   onClose: () => void;
   onSaved: () => void;
   onRemoved?: () => void;
@@ -41,6 +43,7 @@ export function ProviderConfigForm<Meta = any>({
   isConfigured,
   initialVersion,
   meta,
+  website,
   onClose,
   onSaved,
   onRemoved,
@@ -147,6 +150,35 @@ export function ProviderConfigForm<Meta = any>({
           {t('close', 'Close')}
         </button>
       </div>
+
+      {website && (
+        <div className="text-[13px] leading-[1.5] text-textColor bg-btnPrimary/10 border border-btnPrimary/30 rounded-[8px] p-[12px] flex items-start gap-[10px]">
+          <svg
+            viewBox="0 0 20 20"
+            width="16"
+            height="16"
+            fill="currentColor"
+            className="text-btnPrimary shrink-0 mt-[1px]"
+            aria-hidden="true"
+          >
+            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 4a1 1 0 110 2 1 1 0 010-2zm1.25 9h-2.5v-1.25H9.5v-2.5H8.75V10h1.75a.75.75 0 01.75.75v3h.75V15z" />
+          </svg>
+          <span>
+            {t(
+              'config_key_hint',
+              'New here? Create an account and get your API key from the provider, then paste it below.',
+            )}{' '}
+            <a
+              href={website}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-btnPrimary hover:underline whitespace-nowrap"
+            >
+              {t('visit_website', 'Visit website')} ↗
+            </a>
+          </span>
+        </div>
+      )}
 
       {instanceNameFields.map((spec) => (
         <ExtraField key={spec.key} spec={spec} {...fieldProps} />

@@ -37,7 +37,7 @@ describe('GatewayAdapter', () => {
       expect(adapter.type).toBe('hub');
     });
 
-    it('has credentialFields for apiKey and baseURL (both required)', () => {
+    it('has credentialFields for apiKey (required) and baseURL (optional)', () => {
       const keys = adapter.credentialFields.map((f) => f.key);
       expect(keys).toContain('apiKey');
       expect(keys).toContain('baseURL');
@@ -45,8 +45,9 @@ describe('GatewayAdapter', () => {
       const apiKeyField = adapter.credentialFields.find((f) => f.key === 'apiKey');
       expect(apiKeyField?.required).toBe(true);
 
+      // baseURL is optional — the AI Gateway SDK defaults the endpoint when omitted.
       const baseField = adapter.credentialFields.find((f) => f.key === 'baseURL');
-      expect(baseField?.required).toBe(true);
+      expect(baseField?.required).toBe(false);
     });
 
     it('has all capabilities enabled', () => {

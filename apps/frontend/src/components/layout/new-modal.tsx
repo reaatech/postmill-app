@@ -22,6 +22,8 @@ interface OpenModalInterface {
   removeLayout?: boolean;
   fullScreen?: boolean;
   top?: string | number;
+  /** Vertically center the modal (content-sized; no fixed height required). */
+  center?: boolean;
   closeOnEscape?: boolean;
   withCloseButton?: boolean;
   askClose?: boolean;
@@ -194,7 +196,7 @@ export const Component: FC<{
                   ? ''
                   : 'min-h-full pt-[40px] pb-[40px] md:pt-[100px] md:pb-[100px]'
                 : 'h-screen',
-              modal.size && modal.height
+              (modal.size && modal.height) || modal.center
                 ? 'flex justify-center items-center'
                 : 'top-0 left-0'
             )}

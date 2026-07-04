@@ -27,11 +27,14 @@ const PlatformAvatar: FC<{
 // checklist, icon-row when few channels), but wired to the calendar channel
 // filter instead of the launch store. The dropdown opens inline (not absolute)
 // so it renders correctly inside the filter drawer's scroll container.
+// `menuAbsolute` floats the popover (absolute, top-full) instead — for hosts
+// like the agent toolbar where an in-flow popover would push the layout.
 export const ChannelFilterSelect: FC<{
   integrations: Integrations[];
   selectedIds: string[];
   onToggle: (integration: Integrations) => void;
-}> = ({ integrations, selectedIds, onToggle }) => {
+  menuAbsolute?: boolean;
+}> = ({ integrations, selectedIds, onToggle, menuAbsolute = false }) => {
   const t = useT();
   const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -159,7 +162,12 @@ export const ChannelFilterSelect: FC<{
           <div
             role="listbox"
             aria-label={t('channels', 'Channels')}
-            className="mt-[8px] w-full max-h-[300px] bg-newBgColor border border-newBorder rounded-[12px] shadow-lg flex flex-col"
+            className={clsx(
+              'w-full max-h-[300px] bg-newBgColor border border-newBorder rounded-[12px] shadow-lg flex flex-col',
+              menuAbsolute
+                ? 'absolute top-full left-0 mt-[8px] z-[50]'
+                : 'mt-[8px]'
+            )}
           >
             <div className="p-[12px] border-b border-newBorder">
               <div className="relative">

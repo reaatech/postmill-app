@@ -2,6 +2,7 @@
 
 import React, { ReactNode, useCallback, useState, useRef, useEffect } from 'react';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
+import { Wordmark } from '@gitroom/frontend/components/new-layout/wordmark';
 import { UserAvatarMenu } from '@gitroom/frontend/components/new-layout/user-avatar-menu';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 const ModeComponent = dynamic(
@@ -15,7 +16,7 @@ import clsx from 'clsx';
 import dynamic from 'next/dynamic';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import useSWR, { useSWRConfig } from 'swr';
 import { CheckPayment } from '@gitroom/frontend/components/layout/check.payment';
@@ -86,7 +87,14 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
   });
 
   const router = useRouter();
-  const mustSetup = !user?.setupCompleted;
+  const pathname = usePathname();
+  // The header wordmark shows ONLY on the dashboard route (other pages show their
+  // own <Title/> in the header instead).
+  const isDashboard = pathname === '/dashboard';
+  // Only gate once `user` has loaded. `!user?.setupCompleted` is truthy while the
+  // SWR request is still in flight (user === undefined), which would redirect to
+  // /setup on every reload before we even know the real value.
+  const mustSetup = !!user && !user.setupCompleted;
 
   useEffect(() => {
     if (mustSetup) {
@@ -140,13 +148,32 @@ export const LayoutComponent = ({ children }: { children: ReactNode }) => {
                       </div>
                     </div>
                     <div className="flex-1 min-w-0 bg-newBgLineColor rounded-[12px] overflow-hidden flex flex-col gap-[1px] blurMe">
-                      <div className="flex bg-newBgColorInner h-[80px] px-[20px] items-center">
+                      <div className="flex bg-newBgColorInner h-[56px] lg:h-[80px] px-[20px] items-center">
                         <div className="text-[24px] font-[600] flex flex-1 items-center gap-[10px] min-w-0">
-                          {/* Brand mark — only on mobile, where the left rail
-                              (which normally shows the logo) is hidden. */}
-                          <Link href="/" aria-label="Home" className="mobile:flex hidden shrink-0">
+                          {/* Mobile: the left rail is hidden, so always show the
+                              icon; add the wordmark only on the dashboard. */}
+                          <Link
+                            href="/"
+                            aria-label="Home"
+                            className="mobile:flex hidden items-center gap-[8px] shrink-0"
+                          >
                             <Logo size={34} className="" />
+                            {isDashboard && (
+                              <Wordmark height={26} className="text-textColor" />
+                            )}
                           </Link>
+                          {/* Desktop: the icon lives in the left rail; show the
+                              wordmark only on the dashboard (other pages show the
+                              <Title/> instead). */}
+                          {isDashboard && (
+                            <Link
+                              href="/"
+                              aria-label="Home"
+                              className="mobile:hidden flex shrink-0"
+                            >
+                              <Wordmark height={34} className="text-textColor" />
+                            </Link>
+                          )}
                           <Title />
                         </div>
                         <div className="flex gap-[20px] text-textItemBlur items-center">

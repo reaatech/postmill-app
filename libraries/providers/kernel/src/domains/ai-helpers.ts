@@ -34,6 +34,7 @@ export class OpenAICompatibleAdapter implements AiCapability {
     description: 'Generic OpenAI-compatible API provider',
   };
   private readonly _defaultModels: AiModelInfo[];
+  private readonly _defaultBaseURL: string;
   private _providerCache = new Map<string, ReturnType<typeof createOpenAI>>();
 
   constructor(
@@ -47,9 +48,12 @@ export class OpenAICompatibleAdapter implements AiCapability {
     this.identifier = identifier;
     this.name = name;
     this.type = type;
+    // The provider's canonical endpoint. Used as the default when the org didn't
+    // set a custom baseURL, so Base URL is not a required user setting.
+    this._defaultBaseURL = baseURL;
     this.credentialFields = [
       { key: 'apiKey', label: 'API Key', type: 'password', required: true, placeholder: 'Enter API key' },
-      { key: 'baseURL', label: 'Base URL', type: 'string', required: true, placeholder: baseURL },
+      { key: 'baseURL', label: 'Base URL', type: 'string', required: false, placeholder: baseURL },
     ];
     this.capabilities = {
       text: true,
@@ -65,19 +69,21 @@ export class OpenAICompatibleAdapter implements AiCapability {
   }
 
   private _getProvider(creds: Record<string, string>) {
-    const key = `${creds.apiKey}||${creds.baseURL || ''}`;
+    const baseURL = creds.baseURL || this._defaultBaseURL;
+    const key = `${creds.apiKey}||${baseURL}`;
     let provider = this._providerCache.get(key);
     if (!provider) {
-      provider = createOpenAI({ apiKey: creds.apiKey, baseURL: creds.baseURL || undefined });
+      provider = createOpenAI({ apiKey: creds.apiKey, baseURL: baseURL || undefined });
       this._providerCache.set(key, provider);
     }
     return provider;
   }
 
   async listModels(creds: Record<string, string>): Promise<AiModelInfo[]> {
-    if (creds.baseURL && creds.apiKey) {
+    const resolvedBaseURL = creds.baseURL || this._defaultBaseURL;
+    if (resolvedBaseURL && creds.apiKey) {
       try {
-        const baseURL = creds.baseURL.replace(/(?<![/])\/+$/, '');
+        const baseURL = resolvedBaseURL.replace(/(?<![/])\/+$/, '');
         const response = await fetch(`${baseURL}/models`, {
           headers: { Authorization: `Bearer ${creds.apiKey}` },
         });
@@ -119,7 +125,7 @@ export class OpenAICompatibleAdapter implements AiCapability {
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
     try {
-      const baseURL = (creds.baseURL || '').replace(/(?<![/])\/+$/, '');
+      const baseURL = (creds.baseURL || this._defaultBaseURL || '').replace(/(?<![/])\/+$/, '');
       if (baseURL) {
         const response = await fetch(`${baseURL}/models`, {
           headers: { Authorization: `Bearer ${creds.apiKey}` },
@@ -145,7 +151,7 @@ export class OpenAICompatibleAdapter implements AiCapability {
   createLangchainModel(creds: Record<string, string>, modelId: string, opts?: AiModelOptions): BaseChatModel {
     return new ChatOpenAI({
       openAIApiKey: creds.apiKey,
-      configuration: { baseURL: creds.baseURL || undefined },
+      configuration: { baseURL: creds.baseURL || this._defaultBaseURL || undefined },
       model: modelId,
       temperature: opts?.temperature,
       topP: opts?.topP,

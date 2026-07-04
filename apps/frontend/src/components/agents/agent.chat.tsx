@@ -107,9 +107,9 @@ export const AgentChat: FC = () => {
               
 I can schedule a post or multiple posts to multiple channels and generate pictures and videos.
 
-You can select the channels you want to use from the left menu.
+You can select the channels you want to use from the channel selector in the top toolbar.
 
-You can see your previous conversations from the right menu.
+You can see your previous conversations in the menu on the left (use the toolbar button to open it).
 
 You can also use me as an MCP Server, check Settings >> Public API
 `),

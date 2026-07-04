@@ -4,6 +4,7 @@ import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useDecisionModal } from '@gitroom/frontend/components/layout/new-modal';
 import useSWR from 'swr';
 import { ProviderSurfaceDescriptor } from './provider-surface.types';
 
@@ -19,6 +20,7 @@ export function useProviderSurface<Meta = any>(
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
+  const decision = useDecisionModal();
 
   const swr = useSWR(
     descriptor.swrKey,
@@ -67,11 +69,16 @@ export function useProviderSurface<Meta = any>(
 
   const remove = useCallback(
     async (id: string) => {
-      if (
-        !confirm(
-          t('confirm_remove', 'Are you sure you want to remove this configuration?'),
-        )
-      ) {
+      const approved = await decision.open({
+        title: t('remove_configuration', 'Remove configuration?'),
+        description: t(
+          'confirm_remove',
+          'Are you sure you want to remove this configuration?',
+        ),
+        approveLabel: t('remove', 'Remove'),
+        cancelLabel: t('cancel', 'Cancel'),
+      });
+      if (!approved) {
         return false;
       }
       const res = await fetch(`${base}/config/${id}`, { method: 'DELETE' });
@@ -83,7 +90,7 @@ export function useProviderSurface<Meta = any>(
       mutate();
       return true;
     },
-    [fetch, base, mutate, toaster, t],
+    [fetch, base, mutate, toaster, t, decision],
   );
 
   const save = useCallback(

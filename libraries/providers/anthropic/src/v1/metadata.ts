@@ -1,6 +1,10 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
+  "website": "https://www.anthropic.com",
+  "description": {
+    "en": "Maker of Claude — a family of frontier AI models known for strong reasoning, long context windows, and reliable, safe responses."
+  },
   "id": "anthropic",
   "displayName": "anthropic",
   "kind": "hub",

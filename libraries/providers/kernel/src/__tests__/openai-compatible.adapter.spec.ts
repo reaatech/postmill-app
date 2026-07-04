@@ -108,10 +108,13 @@ describe('OpenAICompatibleAdapter', () => {
       expect(result.error).toBe('API key is required');
     });
 
-    it('returns error when baseURL is missing', async () => {
+    it('falls back to the default baseURL when none is provided', async () => {
+      // baseURL is optional: with no creds.baseURL the adapter validates against
+      // its canonical endpoint rather than erroring that a base URL is required.
       const result = await adapter.validateCredentials({ apiKey: 'test-key' });
       expect(result.ok).toBe(false);
-      expect(result.error).toBe('Base URL is required to validate credentials');
+      expect(result.error).toBeDefined();
+      expect(result.error).not.toBe('Base URL is required to validate credentials');
     });
 
     it('returns error on network failure', async () => {

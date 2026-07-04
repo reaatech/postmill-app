@@ -7,6 +7,8 @@ import ProviderListShell, {
   ProviderConfigItem,
 } from '@gitroom/frontend/components/settings/shared/provider-list-shell';
 import { useProviderCatalog } from '@gitroom/frontend/components/settings/shared/use-provider-catalog';
+import { ProviderInfoModal } from '@gitroom/frontend/components/settings/shared/provider-info-modal';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { ProviderSurfaceDescriptor, ProviderRow } from './provider-surface.types';
 import { useProviderSurface } from './use-provider-surface';
 import { ProviderSearchToolbar } from './provider-search-toolbar';
@@ -32,6 +34,9 @@ export interface ProviderSettingsPanelProps<Meta = any> {
   hideHeader?: boolean;
   /** Initial search query (e.g. a `?search=` deep-link prefill). */
   initialSearch?: string;
+  /** Fired whenever a provider is saved / removed / activated / toggled — lets a
+   *  parent (e.g. the setup wizard) react without polling. */
+  onChange?: () => void;
 }
 
 export function ProviderSettingsPanel<Meta = any>({
@@ -39,17 +44,54 @@ export function ProviderSettingsPanel<Meta = any>({
   children,
   hideHeader,
   initialSearch,
+  onChange,
 }: ProviderSettingsPanelProps<Meta>) {
   const t = useT();
   const surface = useProviderSurface<Meta>(descriptor);
   const { data, error, mutate, setPrimary, toggle, remove, save, test } = surface;
+
+  // Revalidate the local list AND notify the parent (event-driven — no polling).
+  const refresh = useCallback(() => {
+    mutate();
+    onChange?.();
+  }, [mutate, onChange]);
   const { data: catalog } = useProviderCatalog(descriptor.catalogDomain);
+  const { openModal } = useModals();
+
+  // Clicking a provider name opens a minimal "what is this?" modal with the
+  // provider's localized description + website link (from the catalog).
+  const openProviderInfo = useCallback(
+    (item: ProviderConfigItem) => {
+      const entry = catalog?.find(
+        (e) => e.providerId === item.identifier && e.version === item.version,
+      );
+      const href = descriptor.getProviderHref?.(item.meta as ProviderRow<Meta>);
+      openModal({
+        title: t('about_provider', 'About this provider'),
+        withCloseButton: true,
+        center: true,
+        children: <ProviderInfoModal entry={entry} href={href} />,
+      });
+    },
+    [catalog, descriptor, openModal, t],
+  );
 
   const [search, setSearch] = useState(initialSearch ?? '');
   const [selectedCaps, setSelectedCaps] = useState<string[]>([]);
   const [configuring, setConfiguring] = useState<string | null>(null);
 
   const rows = useMemo(() => data?.rows ?? [], [data]);
+
+  // Platform-curated "featured" providers (from the catalog projection), keyed by
+  // providerId → sortOrder. The catalog is already scoped to this surface's domain,
+  // so providerId is an unambiguous key here.
+  const featuredById = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const e of catalog ?? []) {
+      if (e.featured) m.set(e.providerId, e.featuredSortOrder ?? 0);
+    }
+    return m;
+  }, [catalog]);
 
   const matchesCap = useCallback(
     (row: ProviderRow<Meta>, key: string) =>
@@ -59,14 +101,24 @@ export function ProviderSettingsPanel<Meta = any>({
     [descriptor],
   );
 
+  // Tier order: configured (primary first) → featured (by sortOrder) → alphabetical.
   const sorted = useMemo(
     () =>
       [...rows].sort((a, b) => {
         if (a.isConfigured !== b.isConfigured) return a.isConfigured ? -1 : 1;
-        if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+        if (a.isConfigured) {
+          if (a.isPrimary !== b.isPrimary) return a.isPrimary ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        }
+        const fa = featuredById.has(a.identifier);
+        const fb = featuredById.has(b.identifier);
+        if (fa !== fb) return fa ? -1 : 1;
+        if (fa && fb) {
+          return featuredById.get(a.identifier)! - featuredById.get(b.identifier)!;
+        }
         return a.name.localeCompare(b.name);
       }),
-    [rows],
+    [rows, featuredById],
   );
 
   const filtered = useMemo(() => {
@@ -86,12 +138,30 @@ export function ProviderSettingsPanel<Meta = any>({
     });
   }, [sorted, search, selectedCaps, matchesCap]);
 
+  // Tier of a rendered row: configured → featured → rest. Used to draw a thin
+  // divider that brackets the featured group (above it only when configured rows
+  // precede it; below it before the alphabetized rest).
+  const tierOf = useCallback(
+    (p: ProviderRow<Meta>): 'configured' | 'featured' | 'rest' =>
+      p.isConfigured
+        ? 'configured'
+        : featuredById.has(p.identifier)
+          ? 'featured'
+          : 'rest',
+    [featuredById],
+  );
+
   const shellItems: ProviderConfigItem[] = useMemo(
     () =>
-      filtered.map((p) => {
+      filtered.map((p, i) => {
         const catalogEntry = catalog?.find(
           (e) => e.providerId === p.identifier && e.version === p.version,
         );
+        const tier = tierOf(p);
+        const prevTier = i > 0 ? tierOf(filtered[i - 1]) : undefined;
+        const separatorBefore =
+          (tier === 'featured' && prevTier === 'configured') ||
+          (tier === 'rest' && prevTier === 'featured');
         return {
           id: p.id,
           identifier: p.identifier,
@@ -105,11 +175,14 @@ export function ProviderSettingsPanel<Meta = any>({
           versionStatus: p.versionStatus ?? catalogEntry?.status ?? 'active',
           // Beta badge (workstream E24): false = built without a live key.
           verified: catalogEntry?.verified,
+          // Featured badge (gold star) on the name line — platform curation.
+          featured: featuredById.has(p.identifier),
+          separatorBefore,
           sunsetAt: p.sunsetAt ?? catalogEntry?.sunsetAt,
           meta: p,
         };
       }),
-    [filtered, catalog],
+    [filtered, catalog, featuredById, tierOf],
   );
 
   const rowByIdentifier = useCallback(
@@ -143,6 +216,9 @@ export function ProviderSettingsPanel<Meta = any>({
 
   if (configuring) {
     const row = rowByIdentifier(configuring);
+    const configEntry = catalog?.find(
+      (e) => e.providerId === configuring && e.version === row?.version,
+    );
     return (
       <div className="flex flex-col gap-[16px]">
         {children}
@@ -152,14 +228,15 @@ export function ProviderSettingsPanel<Meta = any>({
           isConfigured={row?.isConfigured ?? false}
           initialVersion={row?.version}
           meta={row?.meta}
+          website={configEntry?.website}
           onClose={() => setConfiguring(null)}
           onSaved={() => {
             setConfiguring(null);
-            mutate();
+            refresh();
           }}
           onRemoved={() => {
             setConfiguring(null);
-            mutate();
+            refresh();
           }}
           save={save}
           test={test}
@@ -204,7 +281,7 @@ export function ProviderSettingsPanel<Meta = any>({
         }
         providers={shellItems}
         onConfigure={(id) => setConfiguring(id)}
-        onRemove={(id) => remove(id).then((ok) => ok && mutate())}
+        onRemove={(id) => remove(id).then((ok) => ok && refresh())}
         ProviderIconComponent={ProviderIcon}
         getProviderHref={
           descriptor.getProviderHref
@@ -212,6 +289,7 @@ export function ProviderSettingsPanel<Meta = any>({
                 descriptor.getProviderHref!((item.meta as ProviderRow<Meta>) ?? (item as any))
             : undefined
         }
+        onProviderNameClick={openProviderInfo}
         renderBadges={(item) => {
           const row = item.meta as ProviderRow<Meta>;
           return (
@@ -244,7 +322,11 @@ export function ProviderSettingsPanel<Meta = any>({
                 !row?.isPrimary && (
                   <button
                     className="text-[12px] text-btnPrimary hover:underline"
-                    onClick={() => setPrimary(item.identifier, row?.version)}
+                    onClick={() =>
+                      setPrimary(item.identifier, row?.version).then(
+                        (ok) => ok && onChange?.(),
+                      )
+                    }
                   >
                     {t('make_primary', 'Make Primary')}
                   </button>
@@ -263,14 +345,18 @@ export function ProviderSettingsPanel<Meta = any>({
                     type="checkbox"
                     className="accent-btnPrimary w-[14px] h-[14px]"
                     checked={row.enabled}
-                    onChange={(e) => toggle(item.identifier, e.target.checked)}
+                    onChange={(e) =>
+                      toggle(item.identifier, e.target.checked).then(
+                        (ok) => ok && onChange?.(),
+                      )
+                    }
                   />
                 </label>
               )}
               {row?.isConfigured && descriptor.features.remove !== false && (
                 <button
                   className="text-[12px] text-red-500 hover:underline"
-                  onClick={() => remove(item.identifier).then((ok) => ok && mutate())}
+                  onClick={() => remove(item.identifier).then((ok) => ok && refresh())}
                 >
                   {t('remove', 'Remove')}
                 </button>

@@ -69,6 +69,8 @@ import { ProviderConfigRepository } from '@gitroom/nestjs-libraries/database/pri
 import { ProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/provider-config.manager';
 import { OrgProviderConfigService } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.service';
 import { OrgProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.repository';
+import { FeaturedProviderRepository } from '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.repository';
+import { FeaturedProviderService } from '@gitroom/nestjs-libraries/database/prisma/featured-providers/featured-provider.service';
 import { OrgProviderConfigManager } from '@gitroom/nestjs-libraries/integrations/org-provider-config.manager';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
@@ -172,6 +174,8 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     ProviderConfigManager,
     ProviderConfigService,
     ProviderConfigRepository,
+    FeaturedProviderRepository,
+    FeaturedProviderService,
     SocialCommentsService,
     SocialCommentsRepository,
     AiSettingsService,

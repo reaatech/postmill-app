@@ -4,6 +4,7 @@ import React, { ReactNode, useCallback } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
+import { Wordmark } from '@gitroom/frontend/components/new-layout/wordmark';
 import { UserAvatarMenu } from '@gitroom/frontend/components/new-layout/user-avatar-menu';
 import { ContextWrapper } from '@gitroom/frontend/components/layout/user.context';
 import { ToolTip } from '@gitroom/frontend/components/layout/top.tip';
@@ -46,7 +47,10 @@ export function SetupShell({ children }: { children: ReactNode }) {
         <Toaster />
         <div className="flex flex-col h-screen min-w-full text-newTextColor bg-primary overflow-hidden">
           <header className="flex items-center justify-between h-[60px] px-[20px] border-b border-newBorder shrink-0">
-            <Logo size={28} />
+            <div className="flex items-center gap-[10px]">
+              <Logo size={28} className="" />
+              <Wordmark height={26} className="text-newTextColor" />
+            </div>
             <div className="flex items-center gap-[16px]">
               <ModeComponent />
               <UserAvatarMenu />

@@ -1,6 +1,10 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
+  "website": "https://mistral.ai",
+  "description": {
+    "en": "European AI lab offering the Mistral family of efficient open and commercial language models."
+  },
   "id": "mistral",
   "displayName": "mistral",
   "kind": "hub",

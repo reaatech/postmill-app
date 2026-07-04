@@ -3,6 +3,7 @@ import { SWRConfig } from 'swr';
 
 const mockFetchFn = vi.fn();
 const mockToasterShow = vi.fn();
+const mockDecisionOpen = vi.fn();
 const mockT = vi.fn((_key: string, fallback?: string, opts?: Record<string, any>) => {
   if (!fallback) return _key;
   if (opts?.count !== undefined) return fallback.replace('{{count}}', String(opts.count));
@@ -19,6 +20,14 @@ vi.mock('@gitroom/react/toaster/toaster', () => ({
 
 vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
   useT: () => mockT,
+}));
+
+// The delete flow now confirms through the bespoke decision modal
+// (useDecisionModal) instead of window.confirm. Keep the rest of new-modal real
+// (provider-settings-panel uses useModals) and only stub the decision hook.
+vi.mock('@gitroom/frontend/components/layout/new-modal', async (importOriginal) => ({
+  ...((await importOriginal()) as any),
+  useDecisionModal: () => ({ open: mockDecisionOpen }),
 }));
 
 vi.mock('@gitroom/frontend/components/shared/provider-icon', () => ({
@@ -181,7 +190,8 @@ describe('ShortlinksTab', () => {
 
   describe('Delete Provider', () => {
     it('shows confirm dialog before deleting', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+      // User dismisses the decision modal → no delete request.
+      mockDecisionOpen.mockResolvedValue(false);
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
@@ -189,15 +199,21 @@ describe('ShortlinksTab', () => {
       const removeButtons = await screen.findAllByText('Remove');
       fireEvent.click(removeButtons[0]);
 
-      expect(confirmSpy).toHaveBeenCalledWith('Are you sure you want to remove this configuration?');
+      await waitFor(() => {
+        expect(mockDecisionOpen).toHaveBeenCalledWith(
+          expect.objectContaining({
+            description: 'Are you sure you want to remove this configuration?',
+          }),
+        );
+      });
       expect(mockFetchFn).not.toHaveBeenCalledWith('/settings/shortlinks/config/rebrandly', {
         method: 'DELETE',
       });
-      confirmSpy.mockRestore();
     });
 
     it('calls delete endpoint by identifier after confirm', async () => {
-      const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+      // User approves the decision modal → delete request fires.
+      mockDecisionOpen.mockResolvedValue(true);
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
       render(<ShortlinksTab />, { wrapper });
@@ -214,7 +230,6 @@ describe('ShortlinksTab', () => {
       await waitFor(() => {
         expect(mockToasterShow).toHaveBeenCalledWith('Configuration deleted', 'success');
       });
-      confirmSpy.mockRestore();
     });
   });
 
