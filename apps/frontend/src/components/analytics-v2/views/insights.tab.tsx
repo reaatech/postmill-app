@@ -6,6 +6,7 @@ import { BestTimeTab } from './best-time.tab';
 import { RecommendationsTab } from './recommendations.tab';
 import { AlertsSection } from './alerts.section';
 import { ContentInsightsSection } from './content-insights.section';
+import { HealthSection } from './health.section';
 
 interface InsightsTabProps {
   integrations?: string[];
@@ -25,6 +26,7 @@ export const InsightsTab: FC<InsightsTabProps> = ({ integrations, section }) => 
     { id: 'recommendations', label: t('analytics_tab_recommendations', 'Recommendations') },
     { id: 'content', label: t('analytics_insights_content', 'What works') },
     { id: 'alerts', label: t('analytics_insights_alerts', 'Alerts') },
+    { id: 'health', label: t('analytics_insights_health', 'Channel health') },
   ];
 
   useEffect(() => {
@@ -72,6 +74,14 @@ export const InsightsTab: FC<InsightsTabProps> = ({ integrations, section }) => 
           {t('analytics_insights_alerts', 'Alerts')}
         </h2>
         <AlertsSection />
+      </section>
+
+      {/* Data-health / trust surface (6.6). */}
+      <section id="insights-health" className="scroll-mt-[80px]">
+        <h2 className="text-[18px] font-semibold mb-[16px]">
+          {t('analytics_insights_health', 'Channel health')}
+        </h2>
+        <HealthSection />
       </section>
     </div>
   );

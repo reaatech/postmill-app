@@ -38,6 +38,11 @@ export interface MetricSeries {
   date: string;
   value: number;
   previousValue?: number;
+  // 6.1 — under campaign scope, series can span past the post-snapshot
+  // retention window: recent points are daily, older ones come from weekly
+  // rollup rows. Labeled per point so charts render the daily/weekly seam
+  // honestly. Absent (undefined) for the unscoped org overview series.
+  granularity?: 'daily' | 'weekly';
 }
 
 export interface AnalyticsOverviewResponse {

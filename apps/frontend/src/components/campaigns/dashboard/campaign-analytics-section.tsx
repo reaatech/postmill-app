@@ -59,13 +59,26 @@ export const CampaignAnalyticsSection: FC<CampaignAnalyticsSectionProps> = ({
     return `${dayjs(data.window.from).format('MMM D')} – ${dayjs(data.window.to).format('MMM D, YYYY')}`;
   }, [data]);
 
+  // 6.1 — weekly rollup lets the series extend past the 90-day daily window, so
+  // the label is honest: plain "last 90 days" only while every point is daily,
+  // otherwise it names the daily/weekly seam.
+  const hasWeekly = useMemo(
+    () =>
+      Object.values(data?.series || {}).some((points) =>
+        points?.some((p) => p.granularity === 'weekly')
+      ),
+    [data]
+  );
+
   const header = (
     <div className="flex flex-wrap items-baseline justify-between gap-[8px]">
       <h3 className="text-[14px] font-semibold text-textColor">
         {t('campaign_performance', 'Performance')}
       </h3>
       <span className="text-[12px] text-newTableText">
-        {t('campaign_analytics_window', 'post metrics · last 90 days')}
+        {hasWeekly
+          ? t('campaign_analytics_window_rollup', 'post metrics · daily ≤90d · weekly beyond')
+          : t('campaign_analytics_window', 'post metrics · last 90 days')}
         {windowLabel ? ` · ${windowLabel}` : ''}
       </span>
     </div>

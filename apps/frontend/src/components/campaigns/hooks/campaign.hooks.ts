@@ -58,6 +58,10 @@ export interface CampaignAnalyticsSeriesPoint {
   date: string;
   value: number;
   previousValue?: number;
+  // 6.1 — points within the post-snapshot retention window are 'daily';
+  // older points come from weekly rollup rows. Lets the chart/label render
+  // the daily/weekly seam honestly.
+  granularity?: 'daily' | 'weekly';
 }
 export interface CampaignAnalyticsKpi {
   metric: string;

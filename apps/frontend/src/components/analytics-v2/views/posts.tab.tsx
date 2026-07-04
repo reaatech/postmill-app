@@ -8,6 +8,7 @@ import { Drawer } from '../kit/drawer';
 import { ChannelAvatar } from '../kit/channel-avatar';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
+import { TabSkeleton } from '../kit/states';
 
 interface PostsTabProps {
   posts?: Post[];
@@ -119,6 +120,12 @@ export const PostsTab: FC<PostsTabProps> = ({
 
     return base;
   }, [selectedColumns]);
+
+  // Initial load: show the shared skeleton (matching the other tabs) before any
+  // rows exist. Subsequent paginated loads keep the DataTable's own loading row.
+  if (loading && !posts) {
+    return <TabSkeleton variant="list" />;
+  }
 
   return (
     <div>

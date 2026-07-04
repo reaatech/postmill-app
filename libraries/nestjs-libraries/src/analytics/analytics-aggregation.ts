@@ -192,6 +192,32 @@ export function buildSeries(
   return result;
 }
 
+// ── 6.1: campaign-series granularity labelling ──
+// Mirrors ANALYTICS_POST_RETENTION_DAYS (analytics.activity.ts). Post snapshots
+// older than this are rolled up into weekly rows instead of deleted, so a
+// campaign series is daily within the window and weekly beyond it.
+export function postSnapshotRetentionDays(): number {
+  const raw = process.env.ANALYTICS_POST_RETENTION_DAYS;
+  if (raw === undefined || raw === '') return 90;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 90;
+  return Math.floor(parsed);
+}
+
+// Label each series point 'daily' (within the retention window from now) or
+// 'weekly' (older — sourced from rollup rows). Additive/behaviour-neutral: it
+// only sets the optional `granularity` field, never touches dates or values.
+export function tagSeriesGranularity(
+  series: MetricSeries[],
+  now: dayjs.Dayjs = dayjs()
+): MetricSeries[] {
+  const cutoff = now.subtract(postSnapshotRetentionDays(), 'day').startOf('day');
+  for (const point of series) {
+    point.granularity = dayjs(point.date).isBefore(cutoff) ? 'weekly' : 'daily';
+  }
+  return series;
+}
+
 // ── 6.2: engagement-rate derived metrics (pure, NEVER stored) ──
 // Computed on read from the same snapshot rows; both ratios are null when their
 // denominator is missing/zero so the UI hides the tile instead of showing 0.

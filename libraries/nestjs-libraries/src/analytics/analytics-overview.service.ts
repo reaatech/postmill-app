@@ -37,6 +37,7 @@ import {
   computeDerivedMetrics,
   computePercentageChange,
   getMetricDef,
+  tagSeriesGranularity,
 } from './analytics-aggregation';
 import { AnalyticsLiveFallbackService } from './analytics-live-fallback';
 
@@ -340,6 +341,15 @@ export class AnalyticsOverviewService {
             for (const point of points) {
               point.previousValue = prevMetric[point.date] || 0;
             }
+          }
+        }
+        // 6.1 — the campaign series can span past the post-snapshot retention
+        // window (weekly rollup rows beyond it); label each point's granularity
+        // so charts render the daily/weekly seam. Unscoped org overview stays
+        // unlabeled.
+        if (scope === 'campaign-posts') {
+          for (const points of Object.values(s)) {
+            tagSeriesGranularity(points);
           }
         }
         return s;

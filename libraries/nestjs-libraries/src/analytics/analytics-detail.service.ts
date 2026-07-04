@@ -19,6 +19,7 @@ import {
   buildFilledDayMap,
   computePercentageChange,
   getMetricDef,
+  tagSeriesGranularity,
 } from './analytics-aggregation';
 import { AnalyticsLiveFallbackService } from './analytics-live-fallback';
 
@@ -170,6 +171,13 @@ export class AnalyticsDetailService {
         ...(compare ? { previousValue: prevOffsetMap[key] || 0 } : {}),
       });
       cursor = cursor.add(1, 'day');
+    }
+
+    // 6.1 — under campaign scope this series can span past the post-snapshot
+    // retention window (weekly rollup rows beyond it); label each point's
+    // granularity so charts render the daily/weekly seam.
+    if (scoped) {
+      tagSeriesGranularity(series);
     }
 
     const channelTotals: Record<string, number> = {};

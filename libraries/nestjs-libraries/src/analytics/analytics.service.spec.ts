@@ -716,7 +716,34 @@ describe('AnalyticsService', () => {
 
       expect(r.scope).toBeUndefined();
       expect(r.kpis[0]).toMatchObject({ metric: 'impressions', total: 100 });
+      // 6.1 — granularity is a campaign-scope-only label; the org overview
+      // series stays unlabeled.
+      expect(r.series.impressions[0].granularity).toBeUndefined();
       expect(analyticsRepository.getPostSnapshotsByCampaigns).not.toHaveBeenCalled();
+    });
+
+    it('labels each series point daily (≤90d) or weekly (>90d) under campaign scope (6.1)', async () => {
+      const oldDay = dayjs().subtract(200, 'day');
+      const recentDay = dayjs().subtract(1, 'day');
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: oldDay.toDate(), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p2', integrationId: 'i1', metric: 'impressions', value: 200, date: recentDay.toDate(), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+
+      const r = await service.getOverview(
+        mockOrg as any,
+        oldDay.format('YYYY-MM-DD'),
+        recentDay.format('YYYY-MM-DD'),
+        [],
+        false,
+        { campaignIds: ['A'] },
+      );
+
+      const points = r.series.impressions;
+      // oldest point (>90d) rides a weekly rollup row; newest (≤90d) is daily.
+      expect(points[0].granularity).toBe('weekly');
+      expect(points[points.length - 1].granularity).toBe('daily');
     });
   });
 

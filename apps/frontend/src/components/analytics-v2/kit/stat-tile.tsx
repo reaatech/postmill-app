@@ -1,10 +1,11 @@
 'use client';
 
-import { FC } from 'react';
+import { FC, KeyboardEvent } from 'react';
 import { KPI } from '../utils';
 import { useCountUp } from '../hooks/useCountUp';
 import { AreaChart } from '../charts/area.chart';
 import { ACCENT } from './palette';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 // One KPI tile, merging the former `KPICard` (rich: animated value + trend +
 // sparkline) and `KpiCard` (plain label/value) into a single component (F4).
@@ -60,6 +61,7 @@ const RichTile: FC<{ kpi: KPI; color: string; onClick?: () => void }> = ({
   color,
   onClick,
 }) => {
+  const t = useT();
   const animatedTotal = useCountUp(kpi.total, 800, true);
   const isPositive = kpi.percentageChange >= 0;
 
@@ -74,11 +76,30 @@ const RichTile: FC<{ kpi: KPI; color: string; onClick?: () => void }> = ({
     return new Intl.NumberFormat().format(Math.round(animatedTotal));
   })();
 
+  const interactiveProps = onClick
+    ? {
+        role: 'button' as const,
+        tabIndex: 0,
+        'aria-label': t('view_metric_details', 'View {{label}} details', {
+          label: kpi.label,
+        }),
+        onClick,
+        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            onClick();
+          }
+        },
+      }
+    : {};
+
   return (
     <div
-      onClick={onClick}
+      {...interactiveProps}
       className={`group bg-newBgColorInner border border-newTableBorder rounded-[12px] overflow-hidden transition-all duration-200 hover:border-newTableText/30 flex flex-col ${
-        onClick ? 'cursor-pointer' : ''
+        onClick
+          ? 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60'
+          : ''
       }`}
     >
       <div className="px-[16px] pt-[14px] pb-[8px] mobile:px-[12px] mobile:pt-[10px] mobile:pb-[4px] flex items-center justify-between gap-[6px]">

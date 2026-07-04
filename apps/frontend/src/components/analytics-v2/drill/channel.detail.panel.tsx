@@ -8,6 +8,7 @@ import { CHART_PALETTE } from '../kit/palette';
 import { Drawer } from '../kit/drawer';
 import { ChannelAvatar } from '../kit/channel-avatar';
 import { RefreshButton } from '../kit/refresh-button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ChannelDetailPanelProps {
   channel: {
@@ -33,6 +34,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
   to,
   compare,
 }) => {
+  const t = useT();
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
   const { data: metricData, isLoading: metricLoading } = useChannelMetric({
@@ -296,8 +298,19 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
               return (
                 <div
                   key={kpi.metric}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('view_metric_details', 'View {{label}} details', {
+                    label: kpi.label,
+                  })}
                   onClick={() => setDrillMetric(kpi.metric)}
-                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText/30 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setDrillMetric(kpi.metric);
+                    }
+                  }}
+                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
                 >
                   <div className="flex items-center justify-between mb-[8px]">
                     <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">

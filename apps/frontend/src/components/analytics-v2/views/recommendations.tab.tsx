@@ -4,6 +4,7 @@ import { FC } from 'react';
 import { useRouter } from 'next/navigation';
 import { useRecommendations, RecommendationItem } from '../hooks/useRecommendations';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
 
 const PRIORITY_COLORS: Record<number, string> = {
   1: 'text-[#F97066] border-[#F97066]',
@@ -14,7 +15,7 @@ const PRIORITY_COLORS: Record<number, string> = {
 export const RecommendationsTab: FC = () => {
   const t = useT();
   const router = useRouter();
-  const { data, isLoading, error } = useRecommendations();
+  const { data, isLoading, error, mutate } = useRecommendations();
   const priorityLabels: Record<number, string> = {
     1: t('priority_high', 'High'),
     2: t('priority_medium', 'Medium'),
@@ -22,18 +23,15 @@ export const RecommendationsTab: FC = () => {
   };
 
   if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[200px] text-textColor">
-        {t('recommendations_loading', 'Loading recommendations...')}
-      </div>
-    );
+    return <TabSkeleton variant="list" />;
   }
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-[200px] text-[#F97066]">
-        {t('recommendations_load_error', 'Failed to load recommendations')}
-      </div>
+      <ErrorState
+        title={t('recommendations_load_error', 'Failed to load recommendations')}
+        onRetry={() => mutate()}
+      />
     );
   }
 
@@ -41,12 +39,13 @@ export const RecommendationsTab: FC = () => {
 
   if (items.length === 0) {
     return (
-      <div className="flex items-center justify-center h-[200px] text-newTableText">
-        {t(
+      <EmptyState
+        title={t('recommendations_empty_title', 'No recommendations yet')}
+        description={t(
           'recommendations_empty',
-          'No recommendations yet. Connect more channels and publish posts to get actionable insights.'
+          'Connect more channels and publish posts to get actionable insights.'
         )}
-      </div>
+      />
     );
   }
 
