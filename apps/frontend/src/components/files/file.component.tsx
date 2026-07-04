@@ -29,6 +29,11 @@ import { AiBestTime } from '@gitroom/frontend/components/launches/ai.best-time';
 import { AiContentTools } from '@gitroom/frontend/components/launches/ai.content.tools';
 import { AiPromptLibraryInsert } from '@gitroom/frontend/components/launches/ai.prompt-library.insert';
 import { AiSearch } from '@gitroom/frontend/components/launches/ai.search';
+import {
+  ToolbarDropdown,
+  MenuItem,
+  SparkleIcon,
+} from '@gitroom/frontend/components/composer/toolbar-dropdown';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import {
   ChevronLeftIcon,
@@ -37,7 +42,6 @@ import {
   DragHandleIcon,
   MediaSettingsIcon,
   InsertMediaIcon,
-  DesignMediaIcon,
   VerticalDividerIcon,
 } from '@gitroom/frontend/components/ui/icons';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
@@ -386,19 +390,6 @@ export const MultiFileComponent: FC<{
     []
   );
 
-  const designMedia = useCallback(() => {
-    if (!dummy && permissions.hasPermission('media', 'read')) {
-      modals.openModal({
-        askClose: false,
-        title: t('design_media', 'Design Media'),
-        size: '80%',
-        children: (close) => (
-          <Designer setMedia={changeMedia} closeModal={close} />
-        ),
-      });
-    }
-  }, [changeMedia, t, permissions, dummy]);
-
   return (
     <>
       <div className="b1 flex flex-col gap-[8px] rounded-bl-[8px] select-none w-full">
@@ -492,9 +483,9 @@ export const MultiFileComponent: FC<{
             </ReactSortable>
           )}
         </div>
-        <div className="flex flex-wrap gap-[8px] px-[12px] border-t border-newColColor w-full b1 text-textColor">
+        <div className="flex flex-nowrap items-center gap-[8px] px-[12px] border-t border-newColColor w-full b1 text-textColor overflow-x-auto scrollbar-none">
           {!mediaNotAvailable && (
-            <div className="flex flex-wrap py-[10px] b2 items-center gap-[4px]">
+            <div className="flex flex-nowrap shrink-0 py-[10px] b2 items-center gap-[4px]">
               <div
                 onClick={() => setPickerOpen(true)}
                 className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
@@ -508,39 +499,38 @@ export const MultiFileComponent: FC<{
                   </div>
                 </div>
               </div>
-              {permissions.hasPermission('media', 'read') && (
-                <div
-                  onClick={designMedia}
-                  className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
-                >
-                  <div className="flex gap-[5px] items-center">
-                    <div>
-                      <DesignMediaIcon />
-                    </div>
-                    <div className="text-[10px] font-[600] iconBreak:hidden block">
-                      {t('design_media', 'Design Media')}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {!!user?.tier?.ai && (
-                <>
-                  <AiImage
-                    value={text}
-                    onChange={changeMedia}
-                    disabled={!operationAvailable('image')}
-                  />
-                  <AiVideo
-                    value={text}
-                    onChange={changeMedia}
-                    disabled={!operationAvailable('video')}
-                  />
-                  <AiContentTools />
-                  <AiBestTime />
-                  <AiPromptLibraryInsert />
-                  <AiSearch />
-                </>
+                <ToolbarDropdown
+                  label={t('ai_tools', 'AI')}
+                  icon={<SparkleIcon />}
+                >
+                  <MenuItem nested label={t('ai_image', 'AI Image')}>
+                    <AiImage
+                      value={text}
+                      onChange={changeMedia}
+                      disabled={!operationAvailable('image')}
+                    />
+                  </MenuItem>
+                  <MenuItem nested label={t('ai_video', 'AI Video')}>
+                    <AiVideo
+                      value={text}
+                      onChange={changeMedia}
+                      disabled={!operationAvailable('video')}
+                    />
+                  </MenuItem>
+                  <MenuItem nested label={t('content_tools', 'Content Tools')}>
+                    <AiContentTools />
+                  </MenuItem>
+                  <MenuItem nested label={t('best_time', 'Best Time to Post')}>
+                    <AiBestTime />
+                  </MenuItem>
+                  <MenuItem nested label={t('prompt_library', 'Prompt Library')}>
+                    <AiPromptLibraryInsert />
+                  </MenuItem>
+                  <MenuItem nested label={t('ai_search', 'AI Search')}>
+                    <AiSearch />
+                  </MenuItem>
+                </ToolbarDropdown>
               )}
             </div>
           )}
@@ -550,7 +540,7 @@ export const MultiFileComponent: FC<{
             </div>
           )}
           {!!toolBar && (
-            <div className="flex flex-wrap py-[10px] b2 items-center gap-[4px]">
+            <div className="flex flex-nowrap shrink-0 py-[10px] b2 items-center gap-[4px]">
               {toolBar}
             </div>
           )}

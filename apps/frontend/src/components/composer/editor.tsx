@@ -11,6 +11,7 @@ import React, {
   forwardRef,
   useImperativeHandle,
 } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import EmojiPicker from 'emoji-picker-react';
@@ -25,6 +26,11 @@ import {
 } from '@gitroom/frontend/components/composer/store';
 import { useShallow } from 'zustand/react/shallow';
 import { AddPostButton } from '@gitroom/frontend/components/composer/add.post.button';
+import {
+  ToolbarDropdown,
+  MenuItem,
+  FormatIcon,
+} from '@gitroom/frontend/components/composer/toolbar-dropdown';
 import { MultiFileComponent } from '@gitroom/frontend/components/files/file.component';
 import { UpDownArrow } from '@gitroom/frontend/components/launches/up.down.arrow';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
@@ -546,6 +552,43 @@ export const Editor: FC<{
   } = props;
   const [id] = useState(makeId(10));
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  // The emoji picker is portaled to <body> (fixed) so the horizontally-scrolling
+  // toolbar's overflow can't clip it.
+  const emojiBtnRef = useRef<HTMLDivElement>(null);
+  const emojiPopRef = useRef<HTMLDivElement>(null);
+  const [emojiPos, setEmojiPos] = useState<{ left: number; bottom: number } | null>(
+    null
+  );
+  const toggleEmoji = useCallback(() => {
+    if (!emojiPickerOpen && emojiBtnRef.current) {
+      const r = emojiBtnRef.current.getBoundingClientRect();
+      setEmojiPos({
+        left: Math.max(8, Math.min(r.left - 50, window.innerWidth - 360)),
+        bottom: window.innerHeight - r.top + 8,
+      });
+    }
+    setEmojiPickerOpen((o) => !o);
+  }, [emojiPickerOpen]);
+  useEffect(() => {
+    if (!emojiPickerOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (
+        emojiBtnRef.current?.contains(target) ||
+        emojiPopRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setEmojiPickerOpen(false);
+    };
+    const onResize = () => setEmojiPickerOpen(false);
+    document.addEventListener('mousedown', onDown);
+    window.addEventListener('resize', onResize);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [emojiPickerOpen]);
   const t = useT();
   const toaster = useToaster();
   const editorRef = useRef<undefined | { editor: any }>(undefined);
@@ -762,71 +805,91 @@ export const Editor: FC<{
                     />
                   }
                   toolBar={
-                    <div className="flex gap-[5px]">
+                    <div className="flex gap-[5px] items-center">
                       <SignatureBox
                         editor={editorRef?.current?.editor}
                         appendImages={appendImages}
                       />
                       {editorType !== 'none' && (
-                        <>
-                          <UText
-                            editor={editorRef?.current?.editor}
-                            currentValue={props.value!}
-                          />
-                          <BoldText
-                            editor={editorRef?.current?.editor}
-                            currentValue={props.value!}
-                          />
-                        </>
+                        <ToolbarDropdown
+                          label={t('format', 'Format')}
+                          icon={<FormatIcon />}
+                        >
+                          <MenuItem label={t('underline', 'Underline')}>
+                            <UText
+                              editor={editorRef?.current?.editor}
+                              currentValue={props.value!}
+                            />
+                          </MenuItem>
+                          <MenuItem label={t('bold', 'Bold')}>
+                            <BoldText
+                              editor={editorRef?.current?.editor}
+                              currentValue={props.value!}
+                            />
+                          </MenuItem>
+                          {(editorType === 'markdown' ||
+                            editorType === 'html') &&
+                            identifier !== 'telegram' && (
+                              <>
+                                <MenuItem label={t('link', 'Link')}>
+                                  <AComponent
+                                    editor={editorRef?.current?.editor}
+                                    currentValue={props.value!}
+                                  />
+                                </MenuItem>
+                                <MenuItem label={t('bullets', 'Bullets')}>
+                                  <Bullets
+                                    editor={editorRef?.current?.editor}
+                                    currentValue={props.value!}
+                                  />
+                                </MenuItem>
+                                <MenuItem label={t('heading', 'Heading')}>
+                                  <HeadingComponent
+                                    editor={editorRef?.current?.editor}
+                                    currentValue={props.value!}
+                                  />
+                                </MenuItem>
+                              </>
+                            )}
+                        </ToolbarDropdown>
                       )}
-                      {(editorType === 'markdown' || editorType === 'html') &&
-                        identifier !== 'telegram' && (
-                          <>
-                            <AComponent
-                              editor={editorRef?.current?.editor}
-                              currentValue={props.value!}
-                            />
-                            <Bullets
-                              editor={editorRef?.current?.editor}
-                              currentValue={props.value!}
-                            />
-                            <HeadingComponent
-                              editor={editorRef?.current?.editor}
-                              currentValue={props.value!}
-                            />
-                          </>
-                        )}
                       <div
+                        ref={emojiBtnRef}
                         data-tooltip-id="tooltip"
                         data-tooltip-content={t('insert_emoji', 'Insert Emoji')}
-                        className="select-none cursor-pointer rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center"
-                        onClick={() => setEmojiPickerOpen(!emojiPickerOpen)}
+                        className="select-none cursor-pointer rounded-[6px] w-[30px] h-[30px] bg-newColColor flex justify-center items-center shrink-0"
+                        onClick={toggleEmoji}
                       >
                         <EmojiIcon />
                       </div>
-                      <div className="relative">
-                        <div
-                          className={clsx(
-                            'absolute z-[500] -start-[50px]',
-                            num === 0 && allValues?.length > 1
-                              ? 'top-[35px]'
-                              : 'bottom-[35px]'
-                          )}
-                        >
-                          <EmojiPicker
-                            height={400}
-                            theme={
-                              (localStorage.getItem('mode') as Theme) ||
-                              Theme.DARK
-                            }
-                            onEmojiClick={(e) => {
-                              addText(e.emoji);
-                              setEmojiPickerOpen(false);
+                      {emojiPickerOpen &&
+                        emojiPos &&
+                        typeof document !== 'undefined' &&
+                        createPortal(
+                          <div
+                            ref={emojiPopRef}
+                            style={{
+                              position: 'fixed',
+                              left: emojiPos.left,
+                              bottom: emojiPos.bottom,
+                              zIndex: 500,
                             }}
-                            open={emojiPickerOpen}
-                          />
-                        </div>
-                      </div>
+                          >
+                            <EmojiPicker
+                              height={400}
+                              theme={
+                                (localStorage.getItem('mode') as Theme) ||
+                                Theme.DARK
+                              }
+                              onEmojiClick={(e) => {
+                                addText(e.emoji);
+                                setEmojiPickerOpen(false);
+                              }}
+                              open={true}
+                            />
+                          </div>,
+                          document.body
+                        )}
                     </div>
                   }
                   onChange={(value) => {

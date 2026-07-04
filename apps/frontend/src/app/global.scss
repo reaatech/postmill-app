@@ -825,6 +825,36 @@ html[dir='rtl'] [dir='ltr'] {
   width: 100% !important;
 }
 
+/* Composer toolbar overflow menu: restyle each existing icon-button child into a
+   full-width labeled row without editing the child components. The child's own
+   clickable box is stretched to fill the row (transparent; the row wrapper owns
+   the hover highlight) so the whole row remains its native click target, and a
+   pointer-events-none label is overlaid beside the icon. `data-nested="true"`
+   is for children wrapped in a positioning `<div className="relative">` (the AI
+   buttons), where the clickable box is one level deeper. */
+.tb-menu-item {
+  position: relative;
+  width: 100%;
+}
+.tb-menu-item[data-nested='true'] > *:first-child {
+  width: 100% !important;
+}
+.tb-menu-item:not([data-nested='true']) > *:first-child,
+.tb-menu-item[data-nested='true'] > *:first-child > *:first-child {
+  width: 100% !important;
+  min-width: 100% !important;
+  height: 36px !important;
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  background: transparent !important;
+  border-radius: 6px !important;
+  cursor: pointer;
+}
+
 .btnSub:disabled .arrow-change {
   display: none !important;
 }
