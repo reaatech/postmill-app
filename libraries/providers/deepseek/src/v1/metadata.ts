@@ -1,8 +1,10 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
-  website: "https://www.deepseek.com",
-  description: { en: "AI lab behind the DeepSeek open models, offering strong reasoning and coding performance at very low cost." },
+  "website": "https://www.deepseek.com",
+  "description": {
+    "en": "AI lab behind the DeepSeek open models, offering strong reasoning and coding performance at very low cost."
+  },
   "id": "deepseek",
   "displayName": "deepseek",
   "kind": "hub",

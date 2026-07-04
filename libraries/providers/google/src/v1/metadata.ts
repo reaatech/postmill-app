@@ -1,8 +1,10 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
-  website: "https://ai.google.dev",
-  description: { en: "Google's Gemini models via the Gemini Developer API — multimodal AI for text, images, and video using your Google AI Studio key." },
+  "website": "https://ai.google.dev",
+  "description": {
+    "en": "Google's Gemini models via the Gemini Developer API — multimodal AI for text, images, and video using your Google AI Studio key."
+  },
   "id": "google",
   "displayName": "google",
   "kind": "hub",

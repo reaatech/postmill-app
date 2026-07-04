@@ -1,8 +1,10 @@
 import { ProviderMetadata } from '@gitroom/provider-kernel';
 
 export const metadata: ProviderMetadata = {
-  website: "https://cohere.com",
-  description: { en: "Enterprise AI platform offering the Command language models plus best-in-class embeddings and reranking for search and RAG." },
+  "website": "https://cohere.com",
+  "description": {
+    "en": "Enterprise AI platform offering the Command language models plus best-in-class embeddings and reranking for search and RAG."
+  },
   "id": "cohere",
   "displayName": "cohere",
   "kind": "hub",
