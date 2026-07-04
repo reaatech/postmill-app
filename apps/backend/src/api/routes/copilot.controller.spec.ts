@@ -532,4 +532,60 @@ describe('CopilotController', () => {
       spy.mockRestore();
     });
   });
+
+  describe('_reflectCredentialedCors', () => {
+    const ORIGIN = 'https://app.example.com';
+
+    it('rewrites a wildcard ACAO to the request origin (via setHeader) and asserts credentials', () => {
+      const setHeader = vi.fn();
+      const res = { setHeader, writeHead: vi.fn() } as any;
+      const req = { headers: { origin: ORIGIN } } as any;
+
+      (controller as any)._reflectCredentialedCors(req, res);
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      expect(setHeader).toHaveBeenCalledWith('Access-Control-Allow-Origin', ORIGIN);
+      expect(setHeader).toHaveBeenCalledWith('Access-Control-Allow-Credentials', 'true');
+    });
+
+    it('passes non-wildcard headers through setHeader untouched (no credentials header)', () => {
+      const setHeader = vi.fn();
+      const res = { setHeader, writeHead: vi.fn() } as any;
+      const req = { headers: { origin: ORIGIN } } as any;
+
+      (controller as any)._reflectCredentialedCors(req, res);
+      res.setHeader('Content-Type', 'text/plain');
+
+      expect(setHeader).toHaveBeenCalledWith('Content-Type', 'text/plain');
+      expect(setHeader).not.toHaveBeenCalledWith('Access-Control-Allow-Credentials', 'true');
+    });
+
+    it('rewrites a wildcard ACAO in a writeHead headers object and adds credentials', () => {
+      const writeHead = vi.fn();
+      const res = { setHeader: vi.fn(), writeHead } as any;
+      const req = { headers: { origin: ORIGIN } } as any;
+
+      (controller as any)._reflectCredentialedCors(req, res);
+      res.writeHead(200, { 'access-control-allow-origin': '*', 'content-type': 'text/plain' });
+
+      const [status, headers] = writeHead.mock.calls.at(-1)!;
+      expect(status).toBe(200);
+      expect(headers['access-control-allow-origin']).toBe(ORIGIN);
+      expect(headers['Access-Control-Allow-Credentials']).toBe('true');
+      expect(headers['content-type']).toBe('text/plain');
+    });
+
+    it('does nothing when the request has no Origin header', () => {
+      const setHeader = vi.fn();
+      const writeHead = vi.fn();
+      const res = { setHeader, writeHead } as any;
+      const req = { headers: {} } as any;
+
+      (controller as any)._reflectCredentialedCors(req, res);
+
+      // No wrapping installed — the originals are left in place.
+      expect(res.setHeader).toBe(setHeader);
+      expect(res.writeHead).toBe(writeHead);
+    });
+  });
 });
