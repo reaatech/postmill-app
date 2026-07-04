@@ -20,6 +20,15 @@ now carries the acting `user` in Mastra context, and the `designerDesign` Mastra
 updates designs from a doc, template, or op sequence with image preview persistence. No Prisma
 migration is required.
 
+**Agent UX Phase 5.** The `/agents` chat surface now requires explicit user confirmation for
+`commentReply` and `mediaStudioGenerate` via inline cards, shows tool-call visibility cards in the
+chat stream (including live media-studio job polling), and injects compact cross-page UI context
+(calendar week, visible post ids, selected campaign, customer/group, current post id) into the agent
+instructions. Channel selection and media attachments moved from inline text markers to structured
+CopilotKit `properties` with a one-release backward-compat parse path. New documentation:
+`docs/developer-docs/agent-architecture.md` and `docs/user-guide/agent.md`.
+The agent is a Postmill fork addition; upstream Postiz does not ship this agent surface.
+
 **Schedule renamed to Posts.** The main scheduling workspace is now **Posts** at `/posts` (was
 "Schedule" at `/schedule`; the composer pages move to `/posts/post` and `/posts/post/:id`). The
 sidebar label, page title, and docs use "Posts." Legacy `/schedule` (and sub-paths) and the older

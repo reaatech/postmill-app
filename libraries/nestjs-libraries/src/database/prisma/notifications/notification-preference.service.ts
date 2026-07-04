@@ -25,6 +25,7 @@ export const DEFAULT_CATEGORY_TOGGLES: Record<NotificationCategory, ChannelToggl
   media: { email: false, push: false, inApp: true },
   announcements: { email: true, push: false, inApp: true },
   streak: { email: true, push: false, inApp: true },
+  agent: { email: false, push: false, inApp: false },
 };
 
 export const DEFAULT_MASTERS: ChannelToggles = {
@@ -140,6 +141,37 @@ export class NotificationPreferenceService {
   ): Promise<boolean> {
     const prefs = await this.getPreferences(userId);
     return prefs.masters[channel] && prefs.categories[category][channel];
+  }
+
+  async orgHasCategoryEnabled(
+    orgId: string,
+    category: NotificationCategory
+  ): Promise<boolean> {
+    const rows = await this._preferences.model.notificationPreference.findMany({
+      where: {
+        user: {
+          organizations: {
+            some: {
+              organizationId: orgId,
+              disabled: false,
+            },
+          },
+        },
+      },
+    });
+
+    for (const row of rows) {
+      const prefs = this.toData(row);
+      const cat = prefs.categories[category];
+      if (!cat) continue;
+      for (const channel of Object.keys(prefs.masters) as Array<keyof ChannelToggles>) {
+        if (prefs.masters[channel] && cat[channel]) {
+          return true;
+        }
+      }
+    }
+
+    return false;
   }
 
   async getDigestFrequencies(userIds: string[]): Promise<

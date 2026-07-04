@@ -26,7 +26,9 @@ The profile page (avatar menu → Profile) has three tabs:
 - **Security** — change your password, and an **Active Sessions** device list (browser, IP, last
   used). Revoke any session individually, or log out all other sessions at once. Logging out
   revokes all of your sessions.
-- **Notifications** — email notification preferences (success / failure / streak emails).
+- **Notifications** — per-category notification preferences across email, push, and in-app
+  channels (post published/failed, channels, comments, budget, media, announcements, streak, and
+  **Agent briefs** — the opt-in weekly proactive agent digest, off by default).
 
 ## Teams tab
 

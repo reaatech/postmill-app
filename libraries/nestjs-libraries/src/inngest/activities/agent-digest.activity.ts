@@ -1,0 +1,121 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { RequestContext } from '@mastra/core/di';
+import { Organization } from '@prisma/client';
+import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
+import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
+
+type AgentDigestContext = {
+  organization: string;
+  user: string;
+  ui: string;
+  access: string;
+};
+
+export interface AgentDigestResult {
+  threadId: string;
+  notified: boolean;
+  skipped?: boolean;
+  reason?: string;
+}
+
+@Injectable()
+export class AgentDigestActivity {
+  private readonly _logger = new Logger(AgentDigestActivity.name);
+
+  constructor(
+    private _preferenceService: NotificationPreferenceService,
+    private _budgetService: BudgetService,
+    private _mastraService: MastraService,
+    private _notificationService: NotificationService,
+    private _organizationRepository: OrganizationRepository,
+  ) {}
+
+  async run(orgId: string): Promise<AgentDigestResult> {
+    const threadId = randomUUID();
+
+    const categoryEnabled = await this._preferenceService.orgHasCategoryEnabled(
+      orgId,
+      'agent'
+    );
+    if (!categoryEnabled) {
+      this._logger.debug(`Skipping agent digest for ${orgId}: no opted-in members`);
+      return { threadId, notified: false, skipped: true, reason: 'no_opt_in' };
+    }
+
+    const budgetCheck = await this._budgetService.checkBudget('agent', orgId);
+    if (!budgetCheck.allowed) {
+      this._logger.warn(
+        `Skipping agent digest for ${orgId}: budget exceeded - ${budgetCheck.reason}`
+      );
+      return { threadId, notified: false, skipped: true, reason: 'budget_exceeded' };
+    }
+
+    const organization = await this._organizationRepository.getOrgById(orgId);
+    if (!organization) {
+      this._logger.warn(`Skipping agent digest for ${orgId}: organization not found`);
+      return { threadId, notified: false, skipped: true, reason: 'org_not_found' };
+    }
+
+    const requestContext = this._buildRequestContext(organization);
+
+    const digestPrompt = this._buildDigestPrompt();
+
+    const mastra = await this._mastraService.mastra();
+    await mastra.getAgent('postmill').generate(digestPrompt, {
+      memory: {
+        resource: orgId,
+        thread: threadId,
+      },
+      requestContext,
+      maxSteps: 20,
+    });
+
+    try {
+      await this._notificationService.notify({
+        orgId,
+        category: 'agent',
+        title: 'Weekly agent brief ready',
+        message:
+          'Your agent has drafted a next-week plan based on last week\'s performance.',
+        link: `/agents/${threadId}`,
+      });
+    } catch (err) {
+      this._logger.warn(
+        `Agent digest notification failed for ${orgId}: ${(err as Error).message}`
+      );
+    }
+
+    return { threadId, notified: true };
+  }
+
+  private _buildRequestContext(organization: Organization): RequestContext<AgentDigestContext> {
+    const requestContext = new RequestContext<AgentDigestContext>();
+    requestContext.set('organization', JSON.stringify(organization));
+    requestContext.set('user', JSON.stringify({ id: 'system' }));
+    requestContext.set('ui', 'false');
+    requestContext.set('access', JSON.stringify({ mode: 'headless' }));
+    return requestContext;
+  }
+
+  private _buildDigestPrompt(): string {
+    return `You are running the weekly agent digest for this organization.
+This is a headless, read-only run. Do not schedule, create, update, delete, or publish anything.
+
+Use only the following read-only tools to gather context:
+- analyticsOverview
+- recommendations
+- commentsInbox
+- bestTime
+
+Then produce a concise next-week content plan:
+1. Summarize last week's performance in 2-3 sentences.
+2. Identify 2-4 content opportunities or themes for the coming week.
+3. Describe each proposed post in text (channel, timing, and angle). Do not execute any tool that would write to the calendar or create media jobs.
+
+End with a brief note that these are draft suggestions and can be scheduled by opening this thread.`;
+  }
+}

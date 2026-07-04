@@ -78,6 +78,11 @@ export type InngestEvents = {
       op: 'design' | 'merge';
     };
   };
+  'agent/digest-org': {
+    data: {
+      organizationId: string;
+    };
+  };
 
 };
 

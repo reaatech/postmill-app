@@ -13,6 +13,10 @@ const eslintConfig = [
       '**/coverage/**',
       '**/build/**',
       '**/*.min.js',
+      // Generated reports and vendored/CommonJS build scripts — not app source.
+      'e2e/playwright-report/**',
+      'apps/frontend/public/**',
+      '**/*.cjs',
     ],
   },
   ...nextCoreWebVitals,

@@ -10,6 +10,7 @@ import { MediaJobsActivity } from './activities/media-jobs.activity';
 import { DigestActivity } from './activities/digest.activity';
 import { CampaignActivity } from './activities/campaign.activity';
 import { RetentionActivity } from './activities/retention.activity';
+import { AgentDigestActivity } from './activities/agent-digest.activity';
 import { InngestService } from './inngest.service';
 
 @Module({
@@ -25,6 +26,7 @@ import { InngestService } from './inngest.service';
     DigestActivity,
     CampaignActivity,
     RetentionActivity,
+    AgentDigestActivity,
     InngestService,
   ],
   exports: [
@@ -38,6 +40,7 @@ import { InngestService } from './inngest.service';
     DigestActivity,
     CampaignActivity,
     RetentionActivity,
+    AgentDigestActivity,
     InngestService,
   ],
 })

@@ -10,7 +10,9 @@ import { MediaJobsActivity } from './activities/media-jobs.activity';
 import { DigestActivity } from './activities/digest.activity';
 import { CampaignActivity } from './activities/campaign.activity';
 import { RetentionActivity } from './activities/retention.activity';
+import { AgentDigestActivity } from './activities/agent-digest.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import { createFunctions } from '@gitroom/backend/inngest/functions';
 import { InngestFunction } from 'inngest';
 
@@ -29,7 +31,9 @@ export class InngestService {
     digestActivity: DigestActivity,
     campaignActivity: CampaignActivity,
     retentionActivity: RetentionActivity,
-    inngestRunRepository: InngestRunRepository
+    agentDigestActivity: AgentDigestActivity,
+    inngestRunRepository: InngestRunRepository,
+    organizationRepository: OrganizationRepository
   ) {
     // Built in the constructor (not onModuleInit) so consumers that read
     // getFunctions() in their own constructor — e.g. InngestController, which
@@ -46,7 +50,9 @@ export class InngestService {
       digestActivity,
       campaignActivity,
       retentionActivity,
+      agentDigestActivity,
       inngestRunRepository,
+      organizationRepository,
     });
   }
 

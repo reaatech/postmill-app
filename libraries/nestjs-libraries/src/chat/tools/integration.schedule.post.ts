@@ -9,6 +9,12 @@ import { AllProvidersSettings } from '@gitroom/nestjs-libraries/dtos/posts/provi
 import { Integration } from '@prisma/client';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import {
+  guardOutbound,
+  parseUser,
+  requireWrite,
+} from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
+import {
   ValidUrlExtension,
   ValidUrlPath,
 } from '@gitroom/helpers/utils/valid.url.path';
@@ -31,7 +37,8 @@ const attachmentUrl = z
 export class IntegrationSchedulePostTool implements AgentToolInterface {
   constructor(
     private _postsService: PostsService,
-    private _integrationService: IntegrationService
+    private _integrationService: IntegrationService,
+    private _guardrailService: GuardrailService
   ) {}
   name = 'integrationSchedulePostTool';
 
@@ -132,10 +139,24 @@ If the tools return errors, you would need to rerun it with the right parameters
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
+        const toolContext = context as any;
+        requireWrite(toolContext);
         const organizationId = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
+          toolContext?.requestContext?.get('organization') as string
         ).id;
+        const userId = parseUser(toolContext).id;
         const finalOutput = [];
+
+        // Apply configured output guardrails to all outbound post/comment content.
+        for (const post of inputData.socialPost) {
+          for (const item of post.postsAndComments) {
+            item.content = await guardOutbound(
+              this._guardrailService,
+              item.content,
+              { userId, orgId: organizationId }
+            );
+          }
+        }
 
         const integrations = {} as Record<string, Integration>;
         for (const platform of inputData.socialPost) {
