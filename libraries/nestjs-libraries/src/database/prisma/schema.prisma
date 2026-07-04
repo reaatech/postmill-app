@@ -292,6 +292,7 @@ model Integration {
   posts                     Post[]
   analyticsSnapshots        AnalyticsSnapshot[]
   postAnalyticsSnapshots    PostAnalyticsSnapshot[]
+  analyticsAnomalies        AnalyticsAnomaly[]
   socialComments            SocialComment[]
 
   @@unique([organizationId, internalId])
@@ -340,6 +341,61 @@ model PostAnalyticsSnapshot {
   @@index([organizationId, postId, date])
   @@index([integrationId, date])
   @@index([organizationId, integrationId, date])
+}
+
+// Detected metric anomalies (spikes/drops) — a persisted ledger so Inngest
+// retries are idempotent (unique key), cooldown/dedup works, and the dashboard
+// Alerts strip has a source. Written by the daily sweep's detect-anomalies step.
+model AnalyticsAnomaly {
+  id              String   @id @default(uuid())
+  organizationId  String
+  integrationId   String
+  integration     Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  metric          String
+  date            DateTime @db.Date
+  value           Float
+  baseline        Float
+  deviation       Float    // signed ratio
+  direction       String   // 'spike' | 'drop'
+  topPostId       String?  // root-cause hint (4.9): dominant post on the anomalous day
+  ruleId          String?  // 7.3: set when a user-defined AnalyticsAlertRule fired this row
+  notifiedAt      DateTime?
+  dismissedAt     DateTime?
+  createdAt       DateTime @default(now())
+
+  @@unique([integrationId, metric, date])
+  @@index([organizationId, createdAt])
+}
+
+// User-defined alert rules (7.3). integrationId null = any channel. Evaluated
+// daily inside the detect-anomalies step; a fired rule writes an AnalyticsAnomaly
+// row (with ruleId) reusing the same ledger/notification plumbing.
+model AnalyticsAlertRule {
+  id              String   @id @default(uuid())
+  organizationId  String
+  integrationId   String?  // null = any channel
+  metric          String
+  comparator      String   // 'gte' | 'lte' | 'change_pct'
+  threshold       Float
+  direction       String   @default("up") // for change_pct: 'up' | 'down'
+  enabled         Boolean  @default(true)
+  lastFiredAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([organizationId, enabled])
+}
+
+// Org-level public share dashboard config (7.6). One row per org; token is a
+// CSPRNG 64-hex string minted/rotated on demand (the campaign share pattern).
+model AnalyticsShare {
+  id              String   @id @default(uuid())
+  organizationId  String   @unique
+  token           String   @unique
+  enabled         Boolean  @default(false)
+  config          Json?    // { integrations?: string[], rangePreset?: string }
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 // DEPRECATED (v3.6.0): ProviderConfiguration is replaced by OrgProviderConfiguration (above).

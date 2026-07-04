@@ -53,7 +53,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'reddit': {
-    analytics: false,
+    analytics: true,
     comments: true,
     firstComment: true,
     poll: false,
@@ -183,7 +183,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'discord': {
-    analytics: false,
+    analytics: true,
     comments: true,
     firstComment: true,
     poll: false,
@@ -235,7 +235,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'mastodon': {
-    analytics: false,
+    analytics: true,
     comments: true,
     firstComment: true,
     poll: false,
@@ -248,7 +248,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'bluesky': {
-    analytics: false,
+    analytics: true,
     comments: true,
     firstComment: true,
     poll: false,
@@ -287,7 +287,7 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     watchlist: false,
   },
   'telegram': {
-    analytics: false,
+    analytics: true,
     comments: true,
     firstComment: true,
     poll: false,

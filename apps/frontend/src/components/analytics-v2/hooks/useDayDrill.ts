@@ -9,6 +9,8 @@ interface DayDrillParams {
   date: string;
   metric: string;
   integrations: string[];
+  /** Campaign filter (1.6) — server-scopes the day drill to these campaigns' posts. */
+  campaigns?: string[];
 }
 
 function serializeParams(p: DayDrillParams): string {
@@ -17,6 +19,9 @@ function serializeParams(p: DayDrillParams): string {
     metric: p.metric,
     integrations: p.integrations.join(','),
   });
+  if (p.campaigns?.length) {
+    params.set('campaigns', p.campaigns.join(','));
+  }
   return `/analytics/v2/day?${params.toString()}`;
 }
 

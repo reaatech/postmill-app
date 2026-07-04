@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PostDetails,
   PostResponse,
@@ -843,6 +844,74 @@ export class BlueskyProvider extends SocialAbstract implements SocialProvider {
 
   mentionFormat(idOrHandle: string, name: string) {
     return `@${idOrHandle}`;
+  }
+
+  // Unauthenticated public appview agent for read-only analytics. Known proxy
+  // gap: @atproto/api owns its HTTP client and cannot accept a custom undici
+  // dispatcher, so this read bypasses ssrfSafeDispatcher + per-channel VPN
+  // egress — the same documented gap as the posting agent. Fixed first-party
+  // host, public API only (no credentials).
+  private getPublicAgent(): AtpAgent {
+    return new AtpAgent({ service: 'https://public.api.bsky.app' });
+  }
+
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    try {
+      const agent = this.getPublicAgent();
+      const profile = await agent.app.bsky.actor.getProfile({ actor: id });
+      const followers = profile?.data?.followersCount;
+      if (followers === undefined || followers === null) {
+        return [];
+      }
+      return [
+        {
+          label: 'Followers',
+          data: [
+            { total: String(followers), date: dayjs().format('YYYY-MM-DD') },
+          ],
+        },
+      ];
+    } catch (err) {
+      this.logger.warn('Bluesky analytics failed');
+      return [];
+    }
+  }
+
+  async postAnalytics(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    try {
+      const agent = this.getPublicAgent();
+      const res = await agent.app.bsky.feed.getPosts({ uris: [postId] });
+      const post = res?.data?.posts?.[0] as any;
+      if (!post) {
+        return [];
+      }
+
+      const today = dayjs().format('YYYY-MM-DD');
+      const result: AnalyticsData[] = [];
+      const push = (label: string, value: unknown) => {
+        if (value !== undefined && value !== null) {
+          result.push({ label, data: [{ total: String(value), date: today }] });
+        }
+      };
+
+      push('Likes', post.likeCount);
+      push('Reposts', post.repostCount);
+      push('Replies', post.replyCount);
+
+      return result;
+    } catch (err) {
+      this.logger.warn('Bluesky postAnalytics failed');
+      return [];
+    }
   }
 }
 

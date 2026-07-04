@@ -382,6 +382,20 @@ export class IntegrationRepository {
     });
   }
 
+  // Lightweight existence probe used to tell a brand-new channel connect apart
+  // from a re-auth/token-refresh (the createOrUpdateIntegration upsert can't).
+  existsByInternalId(org: string, internalId: string) {
+    return this._integration.model.integration.findUnique({
+      where: {
+        organizationId_internalId: {
+          organizationId: org,
+          internalId,
+        },
+      },
+      select: { id: true },
+    });
+  }
+
   async getIntegrationById(org: string, id: string) {
     const result = await this._integration.model.integration.findFirst({
       where: {

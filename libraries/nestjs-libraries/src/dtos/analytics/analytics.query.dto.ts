@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Min, Max, IsNumber } from 'class-validator';
+import { IsIn, IsOptional, IsString, Min, Max, IsNumber, IsBoolean, Length } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { METRIC_REGISTRY } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
 
@@ -20,6 +20,13 @@ export class AnalyticsDateRangeDto {
   @IsOptional()
   @IsString()
   compare?: string;
+
+  // Comma-separated campaign uuid list (1.2). Each id is validated in the
+  // controller's parseCampaigns helper. Inherited by AnalyticsPostsQueryDto and
+  // AnalyticsExportQueryDto.
+  @IsOptional()
+  @IsString()
+  campaigns?: string;
 }
 
 export class AnalyticsPostsQueryDto extends AnalyticsDateRangeDto {
@@ -58,4 +65,15 @@ export class AnalyticsExportQueryDto extends AnalyticsDateRangeDto {
     message: 'format must be csv or json',
   })
   format?: string;
+}
+
+export class UpdateWatchlistDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  displayName?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  enabled?: boolean;
 }

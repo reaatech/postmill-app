@@ -19,6 +19,18 @@ vi.mock('../hooks/useDayDrill', () => ({
   useDayDrill: (...args: any[]) => mockUseDayDrill(...args),
 }));
 
+// OverviewTab renders the AnomalyOverviewStrip, which reads useAnomalies — stub
+// it empty so the strip stays hidden and no real fetch runs in these tests.
+vi.mock('../hooks/useAnomalies', () => ({
+  useAnomalies: () => ({
+    data: [],
+    isLoading: false,
+    error: undefined,
+    dismiss: vi.fn(),
+    mutate: vi.fn(),
+  }),
+}));
+
 vi.mock('chart.js/auto', () => ({
   default: class {
     destroy() {}

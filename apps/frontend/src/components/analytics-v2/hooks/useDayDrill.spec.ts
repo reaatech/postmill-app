@@ -56,6 +56,18 @@ describe('useDayDrill', () => {
     expect(key).toContain('integrations=i1%2Ci2');
   });
 
+  it('appends campaigns to the key when present, and omits it when absent (1.6)', () => {
+    stubSwr({ isLoading: true });
+
+    renderHook(() => useDayDrill({ ...params, campaigns: ['c1', 'c2'] }));
+    expect(mockUseSWR.mock.calls[0][0] as string).toContain(
+      'campaigns=c1%2Cc2'
+    );
+
+    renderHook(() => useDayDrill(params));
+    expect(mockUseSWR.mock.calls[1][0] as string).not.toContain('campaigns=');
+  });
+
   it('returns empty (not loading) when date is empty string', () => {
     stubSwr({});
 

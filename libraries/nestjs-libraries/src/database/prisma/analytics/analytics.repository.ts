@@ -8,6 +8,7 @@ export class AnalyticsRepository {
     private _postAnalyticsSnapshot: PrismaRepository<'postAnalyticsSnapshot'>,
     private _integration: PrismaRepository<'integration'>,
     private _post: PrismaRepository<'post'>,
+    private _analyticsAnomaly: PrismaRepository<'analyticsAnomaly'>,
     private _prisma: PrismaService,
   ) {}
 
@@ -43,6 +44,71 @@ export class AnalyticsRepository {
     });
   }
 
+  // Campaign-scoped post snapshots (1.1): post metrics joined through
+  // Post.campaignId (posts are single-campaign). Rows are a superset of
+  // SnapshotLike (integrationId/metric/value/date), so they feed the same
+  // aggregation/day-map machinery the channel path uses. Channel-level
+  // AnalyticsSnapshot metrics are intentionally NOT included — they are not
+  // attributable to a campaign.
+  getPostSnapshotsByCampaigns(
+    orgId: string,
+    campaignIds: string[],
+    from: Date,
+    to: Date,
+    integrationIds?: string[],
+  ) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: {
+        organizationId: orgId,
+        date: { gte: from, lte: to },
+        ...(integrationIds ? { integrationId: { in: integrationIds } } : {}),
+        post: { campaignId: { in: campaignIds }, deletedAt: null },
+      },
+      orderBy: { date: 'asc' },
+    });
+  }
+
+  // Campaign-scoped post list (1.1) — mirrors findPosts but scopes by
+  // Post.campaignId instead of channel.
+  getPostsByCampaigns(
+    orgId: string,
+    campaignIds: string[],
+    from: Date,
+    to: Date,
+    skip?: number,
+    take?: number,
+  ) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        campaignId: { in: campaignIds },
+        publishDate: { gte: from, lte: to },
+        deletedAt: null,
+      },
+      include: { integration: true },
+      orderBy: { publishDate: 'desc' },
+      ...(skip !== undefined ? { skip } : {}),
+      ...(take !== undefined ? { take } : {}),
+    });
+  }
+
+  // Campaign-scoped post count (1.1) — pagination total for getPostsByCampaigns.
+  countPostsByCampaigns(
+    orgId: string,
+    campaignIds: string[],
+    from: Date,
+    to: Date,
+  ) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        campaignId: { in: campaignIds },
+        publishDate: { gte: from, lte: to },
+        deletedAt: null,
+      },
+    });
+  }
+
   getIntegrations(orgId: string, integrationIds: string[]) {
     return this._integration.model.integration.findMany({
       where: {
@@ -54,6 +120,8 @@ export class AnalyticsRepository {
     });
   }
 
+  // Coverage is measured as distinct (integrationId, date) pairs so that one
+  // metric on one channel no longer masks entirely-missing channels (0.6).
   checkCoverage(orgId: string, integrationIds: string[], from: Date, to: Date) {
     return this._analyticsSnapshot.model.analyticsSnapshot.findMany({
       where: {
@@ -61,9 +129,78 @@ export class AnalyticsRepository {
         integrationId: { in: integrationIds },
         date: { gte: from, lte: to },
       },
-      select: { date: true },
-      distinct: ['date'],
+      select: { integrationId: true, date: true },
+      distinct: ['integrationId', 'date'],
     });
+  }
+
+  // Most recent snapshot date per integration (6.6 data-health). groupBy _max so
+  // one query covers every channel; integrations with no snapshot are absent.
+  async getLastSnapshotDates(
+    orgId: string,
+    integrationIds: string[],
+  ): Promise<{ integrationId: string; date: Date | null }[]> {
+    if (integrationIds.length === 0) return [];
+    const rows = await this._analyticsSnapshot.model.analyticsSnapshot.groupBy({
+      by: ['integrationId'],
+      where: {
+        organizationId: orgId,
+        integrationId: { in: integrationIds },
+      },
+      _max: { date: true },
+    });
+    return rows.map((r) => ({ integrationId: r.integrationId, date: r._max.date }));
+  }
+
+  // 90-day published posts + the denormalized engagement counters written by the
+  // sweep, in one query (7.4 content-attribute intelligence). image/campaignId
+  // ride along for the attribute derivation.
+  getContentInsightPosts(orgId: string, from: Date) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        releaseId: { not: null },
+        publishDate: { gte: from },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        content: true,
+        image: true,
+        campaignId: true,
+        publishDate: true,
+        lastViews: true,
+        lastLikes: true,
+        lastComments: true,
+      },
+      orderBy: { publishDate: 'desc' },
+      take: 2000,
+    });
+  }
+
+  // Per-integration sum of a flow metric over a window — the real
+  // previous-window baseline for recommendations/anomaly work (0.1).
+  async sumFlowMetric(
+    orgId: string,
+    integrationIds: string[],
+    metric: string,
+    from: Date,
+    to: Date,
+  ): Promise<Record<string, number>> {
+    if (integrationIds.length === 0) return {};
+    const rows = await this._analyticsSnapshot.model.analyticsSnapshot.groupBy({
+      by: ['integrationId'],
+      where: {
+        organizationId: orgId,
+        integrationId: { in: integrationIds },
+        metric,
+        date: { gte: from, lte: to },
+      },
+      _sum: { value: true },
+    });
+    return Object.fromEntries(
+      rows.map((r) => [r.integrationId, r._sum.value || 0]),
+    );
   }
 
   findPosts(
@@ -192,12 +329,15 @@ export class AnalyticsRepository {
     });
   }
 
-  getLatestPostSnapshotsByPostIds(orgId: string, postIds: string[]) {
+  // Single latest-post-snapshot reader (0.5). Callers pass the metric list they
+  // care about; rows come newest-first so a first-seen-wins reduce yields the
+  // latest value per (postId, metric).
+  getLatestPostSnapshots(orgId: string, postIds: string[], metrics: string[]) {
     return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
       where: {
         organizationId: orgId,
         postId: { in: postIds },
-        metric: { in: ['views', 'likes', 'comments'] },
+        metric: { in: metrics },
       },
       orderBy: { date: 'desc' },
       select: { postId: true, metric: true, value: true },
@@ -365,19 +505,6 @@ export class AnalyticsRepository {
     });
   }
 
-  getLatestPostSnapshotsForCounters(postId: string) {
-    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
-      where: {
-        postId,
-        metric: {
-          in: ['views', 'likes', 'comments', 'impressions', 'reactions', 'replies'],
-        },
-      },
-      orderBy: { date: 'desc' },
-      select: { metric: true, value: true },
-    });
-  }
-
   updatePostCounters(
     postId: string,
     data: { lastViews?: number; lastLikes?: number; lastComments?: number },
@@ -395,6 +522,23 @@ export class AnalyticsRepository {
     return this._analyticsSnapshot.model.analyticsSnapshot.findMany({
       where: { organizationId: orgId, date: { lt: cutoff } },
       orderBy: { date: 'asc' },
+    });
+  }
+
+  // Per-post analog of findChannelSnapshotsBefore — the rows to be rolled up
+  // into weekly aggregates (6.1). postId is carried through so the weekly row
+  // stays attributable to its post/campaign.
+  findPostSnapshotsBefore(orgId: string, cutoff: Date) {
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: { organizationId: orgId, date: { lt: cutoff } },
+      orderBy: { date: 'asc' },
+      select: {
+        postId: true,
+        integrationId: true,
+        metric: true,
+        value: true,
+        date: true,
+      },
     });
   }
 
@@ -421,9 +565,211 @@ export class AnalyticsRepository {
     ]);
   }
 
+  // Atomic delete+create replacement for the per-post daily→weekly rollup (6.1),
+  // mirroring replaceRolledUpSnapshots. The @@unique([postId, metric, date]) key
+  // makes the createMany idempotent via skipDuplicates.
+  replaceRolledUpPostSnapshots(
+    orgId: string,
+    cutoff: Date,
+    weeklyRows: {
+      organizationId: string;
+      postId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[],
+  ) {
+    return this._prisma.$transaction([
+      this._prisma.postAnalyticsSnapshot.deleteMany({
+        where: { organizationId: orgId, date: { lt: cutoff } },
+      }),
+      this._prisma.postAnalyticsSnapshot.createMany({
+        data: weeklyRows,
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
   findIntegrationByIdRaw(integrationId: string) {
     return this._integration.model.integration.findUnique({
       where: { id: integrationId },
+    });
+  }
+
+  // ── Anomaly ledger (Phase 4) ──
+
+  // All channel snapshots for an org since `from` — the detect-anomalies input,
+  // grouped by (integrationId, metric) in the activity.
+  getSnapshotsForOrgSince(orgId: string, from: Date) {
+    return this._analyticsSnapshot.model.analyticsSnapshot.findMany({
+      where: { organizationId: orgId, date: { gte: from } },
+      orderBy: { date: 'asc' },
+      select: { integrationId: true, metric: true, value: true, date: true },
+    });
+  }
+
+  // Cooldown check (4.3): most recent anomaly for this (integration, metric,
+  // direction) on/after `sinceDate` — null means "outside cooldown, may notify".
+  getRecentAnomaly(
+    integrationId: string,
+    metric: string,
+    direction: string,
+    sinceDate: Date,
+  ) {
+    return this._analyticsAnomaly.model.analyticsAnomaly.findFirst({
+      where: { integrationId, metric, direction, date: { gte: sinceDate } },
+      orderBy: { date: 'desc' },
+    });
+  }
+
+  // Idempotent bulk insert — the @@unique([integrationId,metric,date]) key makes
+  // sweep retries a no-op via skipDuplicates.
+  createAnomalies(
+    rows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      date: Date;
+      value: number;
+      baseline: number;
+      deviation: number;
+      direction: string;
+      topPostId?: string | null;
+      ruleId?: string | null;
+      notifiedAt?: Date | null;
+    }[],
+  ) {
+    if (rows.length === 0) return Promise.resolve({ count: 0 });
+    return this._analyticsAnomaly.model.analyticsAnomaly.createMany({
+      data: rows,
+      skipDuplicates: true,
+    });
+  }
+
+  listAnomalies(
+    orgId: string,
+    opts: { limit?: number; includeDismissed?: boolean } = {},
+  ) {
+    return this._analyticsAnomaly.model.analyticsAnomaly.findMany({
+      where: {
+        organizationId: orgId,
+        ...(opts.includeDismissed ? {} : { dismissedAt: null }),
+      },
+      include: {
+        integration: {
+          select: { id: true, name: true, providerIdentifier: true, picture: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: opts.limit ?? 50,
+    });
+  }
+
+  // Org-scoped dismiss — updateMany so a cross-org id updates 0 rows (→ 404).
+  dismissAnomaly(orgId: string, id: string) {
+    return this._analyticsAnomaly.model.analyticsAnomaly.updateMany({
+      where: { id, organizationId: orgId },
+      data: { dismissedAt: new Date() },
+    });
+  }
+
+  // ── 7.3: user-defined alert rules ──
+
+  listAlertRules(orgId: string) {
+    return this._prisma.analyticsAlertRule.findMany({
+      where: { organizationId: orgId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  getAlertRule(orgId: string, id: string) {
+    return this._prisma.analyticsAlertRule.findFirst({
+      where: { id, organizationId: orgId },
+    });
+  }
+
+  getEnabledAlertRules(orgId: string) {
+    return this._prisma.analyticsAlertRule.findMany({
+      where: { organizationId: orgId, enabled: true },
+    });
+  }
+
+  createAlertRule(data: {
+    organizationId: string;
+    integrationId?: string | null;
+    metric: string;
+    comparator: string;
+    threshold: number;
+    direction?: string;
+    enabled?: boolean;
+  }) {
+    return this._prisma.analyticsAlertRule.create({ data });
+  }
+
+  // Org-scoped update — updateMany so a cross-org id updates 0 rows (→ 404).
+  updateAlertRule(
+    orgId: string,
+    id: string,
+    data: {
+      integrationId?: string | null;
+      metric?: string;
+      comparator?: string;
+      threshold?: number;
+      direction?: string;
+      enabled?: boolean;
+      lastFiredAt?: Date | null;
+    },
+  ) {
+    return this._prisma.analyticsAlertRule.updateMany({
+      where: { id, organizationId: orgId },
+      data,
+    });
+  }
+
+  // Org-scoped delete — deleteMany so a cross-org id deletes 0 rows.
+  deleteAlertRule(orgId: string, id: string) {
+    return this._prisma.analyticsAlertRule.deleteMany({
+      where: { id, organizationId: orgId },
+    });
+  }
+
+  // ── 7.6: org-level public share ──
+
+  getShareByOrg(orgId: string) {
+    return this._prisma.analyticsShare.findUnique({
+      where: { organizationId: orgId },
+    });
+  }
+
+  getShareByToken(token: string) {
+    return this._prisma.analyticsShare.findUnique({ where: { token } });
+  }
+
+  upsertShare(
+    orgId: string,
+    data: { token: string; config: Record<string, unknown>; enabled: boolean },
+  ) {
+    return this._prisma.analyticsShare.upsert({
+      where: { organizationId: orgId },
+      create: {
+        organizationId: orgId,
+        token: data.token,
+        config: data.config as any,
+        enabled: data.enabled,
+      },
+      update: {
+        token: data.token,
+        config: data.config as any,
+        enabled: data.enabled,
+      },
+    });
+  }
+
+  disableShare(orgId: string) {
+    return this._prisma.analyticsShare.updateMany({
+      where: { organizationId: orgId },
+      data: { enabled: false },
     });
   }
 }

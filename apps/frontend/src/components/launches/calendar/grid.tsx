@@ -84,7 +84,7 @@ export const CalendarColumn: FC<{
   const modal = useModals();
   const fetch = useFetch();
 
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor, postAnalyticsDrawer } = usePostActions();
   const postList = useMemo(() => {
     return posts.filter((post) => {
       const pList = newDayjs(post.publishDate);
@@ -292,6 +292,7 @@ export const CalendarColumn: FC<{
       )}
       ref={drop as any}
     >
+      {postAnalyticsDrawer}
       {display === 'month' && (
         <div className={clsx('pt-[6px] text-[14px]')}>{getDate.date()}</div>
       )}

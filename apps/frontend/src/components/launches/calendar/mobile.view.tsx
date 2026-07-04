@@ -29,6 +29,7 @@ export const MobileView = () => {
     openMissingRelease,
     openPostDetail,
     changeColor,
+    postAnalyticsDrawer,
   } = usePostActions();
 
   const emptyMessage =
@@ -142,6 +143,7 @@ export const MobileView = () => {
 
   return (
     <div className="flex flex-col gap-[8px] flex-1 relative min-h-0">
+      {postAnalyticsDrawer}
       {/* Fixed floating date·time label — lives ABOVE the scroll area (fixed height,
           never reflows); only its text changes as you scroll. Replaces static headers. */}
       <div className="shrink-0 h-[36px] flex items-center px-[10px]">

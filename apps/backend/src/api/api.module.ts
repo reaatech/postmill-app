@@ -8,6 +8,12 @@ import { StripeController } from '@gitroom/backend/api/routes/stripe.controller'
 import { StripeService } from '@gitroom/nestjs-libraries/services/stripe.service';
 import { AnalyticsV2Controller } from '@gitroom/backend/api/routes/analytics.v2.controller';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AnalyticsLiveFallbackService } from '@gitroom/nestjs-libraries/analytics/analytics-live-fallback';
+import { AnalyticsOverviewService } from '@gitroom/nestjs-libraries/analytics/analytics-overview.service';
+import { AnalyticsDetailService } from '@gitroom/nestjs-libraries/analytics/analytics-detail.service';
+import { AnalyticsInsightsService } from '@gitroom/nestjs-libraries/analytics/analytics-insights.service';
+import { AnalyticsExportService } from '@gitroom/nestjs-libraries/analytics/analytics-export.service';
+import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analytics-share.service';
 import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
 import { PermissionsService } from '@gitroom/backend/services/auth/permissions/permissions.service';
 import { IntegrationsController } from '@gitroom/backend/api/routes/integrations.controller';
@@ -175,6 +181,12 @@ const authenticatedController = [
     ShortLinkService,
     AuthProviderManager,
     AnalyticsService,
+    AnalyticsLiveFallbackService,
+    AnalyticsOverviewService,
+    AnalyticsDetailService,
+    AnalyticsInsightsService,
+    AnalyticsExportService,
+    AnalyticsShareService,
     StockMediaService,
     AiGuardMiddleware,
     SessionCleanupService,

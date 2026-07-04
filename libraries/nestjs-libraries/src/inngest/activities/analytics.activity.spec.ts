@@ -92,6 +92,7 @@ describe('AnalyticsActivity', () => {
   let refreshIntegrationService: Mocked<RefreshIntegrationService>;
   let webhooksService: any;
   let watchlistService: any;
+  let notificationService: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -104,12 +105,24 @@ describe('AnalyticsActivity', () => {
       upsertChannelSnapshot: vi.fn().mockResolvedValue({}),
       findPostsForSnapshots: vi.fn().mockResolvedValue([]),
       upsertPostSnapshot: vi.fn().mockResolvedValue({}),
-      getLatestPostSnapshotsForCounters: vi.fn().mockResolvedValue([]),
+      getLatestPostSnapshots: vi.fn().mockResolvedValue([]),
       updatePostCounters: vi.fn().mockResolvedValue({}),
       deletePostSnapshotsBefore: vi.fn().mockResolvedValue({ count: 0 }),
+      findPostSnapshotsBefore: vi.fn().mockResolvedValue([]),
+      replaceRolledUpPostSnapshots: vi.fn().mockResolvedValue([]),
       findChannelSnapshotsBefore: vi.fn().mockResolvedValue([]),
       replaceRolledUpSnapshots: vi.fn().mockResolvedValue([]),
       findIntegrationByIdRaw: vi.fn().mockResolvedValue(null),
+      getSnapshotsForOrgSince: vi.fn().mockResolvedValue([]),
+      getBestTimeIntegrations: vi.fn().mockResolvedValue([]),
+      getDayPostSnapshots: vi.fn().mockResolvedValue([]),
+      getRecentAnomaly: vi.fn().mockResolvedValue(null),
+      createAnomalies: vi.fn().mockResolvedValue({ count: 0 }),
+      getSnapshots: vi.fn().mockResolvedValue([]),
+      getMetricDetailTopPosts: vi.fn().mockResolvedValue([]),
+      listAnomalies: vi.fn().mockResolvedValue([]),
+      getEnabledAlertRules: vi.fn().mockResolvedValue([]),
+      updateAlertRule: vi.fn().mockResolvedValue({ count: 1 }),
     };
 
     integrationManager = {
@@ -134,6 +147,10 @@ describe('AnalyticsActivity', () => {
     } as any;
 
     webhooksService = { dispatchEvent: vi.fn().mockResolvedValue(undefined) };
+    notificationService = {
+      notifyAnalyticsAnomaly: vi.fn().mockResolvedValue(undefined),
+      notifyWeeklyAnalyticsSummary: vi.fn().mockResolvedValue(undefined),
+    };
     watchlistService = {
       getEnabledAccounts: vi.fn().mockResolvedValue([]),
       probeAndRecord: vi.fn().mockResolvedValue(undefined),
@@ -160,7 +177,8 @@ describe('AnalyticsActivity', () => {
       } as unknown as ProviderResolutionService,
       {
         recordSent: vi.fn().mockResolvedValue(undefined),
-      } as unknown as EmailLogService
+      } as unknown as EmailLogService,
+      notificationService as any
     );
   });
 
@@ -1247,16 +1265,18 @@ describe('AnalyticsActivity', () => {
       date: new Date(date),
     });
 
-    it('prunes old post snapshots beyond the retention window', async () => {
+    it('reads old post snapshots to roll up beyond the retention window', async () => {
       await activity.pruneAndRollupSnapshots('org-1');
 
-      const call = (analyticsRepository.deletePostSnapshotsBefore as any).mock
+      const call = (analyticsRepository.findPostSnapshotsBefore as any).mock
         .calls[0];
       expect(call[0]).toBe('org-1');
       // ~90 days back
       const cutoff = dayjs(call[1]);
       expect(dayjs().diff(cutoff, 'day')).toBeGreaterThanOrEqual(89);
       expect(dayjs().diff(cutoff, 'day')).toBeLessThanOrEqual(91);
+      // Post snapshots are rolled up now, not deleted.
+      expect(analyticsRepository.deletePostSnapshotsBefore).not.toHaveBeenCalled();
     });
 
     it('honors env overrides for the retention windows', async () => {
@@ -1269,7 +1289,7 @@ describe('AnalyticsActivity', () => {
         await activity.pruneAndRollupSnapshots('org-1');
 
         const postCutoff = dayjs(
-          (analyticsRepository.deletePostSnapshotsBefore as any).mock.calls[0][1]
+          (analyticsRepository.findPostSnapshotsBefore as any).mock.calls[0][1]
         );
         expect(dayjs().diff(postCutoff, 'day')).toBe(7);
 
@@ -1361,6 +1381,38 @@ describe('AnalyticsActivity', () => {
         .calls[0][2];
       expect(data).toHaveLength(3);
     });
+
+    it('rolls up old post snapshots into one weekly row per (postId, metric): flow summed, stock latest', async () => {
+      // ~100-day-old daily rows for one post in a single ISO week
+      // (Mon 2023-01-02 .. Sun 2023-01-08).
+      (analyticsRepository.findPostSnapshotsBefore as any).mockResolvedValue([
+        { postId: 'p1', integrationId: 'int-1', metric: 'impressions', value: 10, date: new Date('2023-01-03') },
+        { postId: 'p1', integrationId: 'int-1', metric: 'impressions', value: 20, date: new Date('2023-01-06') },
+        { postId: 'p1', integrationId: 'int-1', metric: 'followers', value: 500, date: new Date('2023-01-03') },
+        { postId: 'p1', integrationId: 'int-1', metric: 'followers', value: 540, date: new Date('2023-01-06') },
+      ]);
+
+      await activity.pruneAndRollupSnapshots('org-1');
+
+      // Post snapshots are rolled up atomically, not deleted.
+      expect(analyticsRepository.deletePostSnapshotsBefore).not.toHaveBeenCalled();
+      expect(analyticsRepository.replaceRolledUpPostSnapshots).toHaveBeenCalledOnce();
+
+      const [orgArg, , weeklyRows] = (
+        analyticsRepository.replaceRolledUpPostSnapshots as any
+      ).mock.calls[0];
+      expect(orgArg).toBe('org-1');
+      expect(weeklyRows).toHaveLength(2);
+
+      const impressions = weeklyRows.find((r: any) => r.metric === 'impressions');
+      expect(impressions.postId).toBe('p1');
+      expect(impressions.integrationId).toBe('int-1');
+      expect(impressions.value).toBe(30); // flow: 10 + 20
+      expect(dayjs(impressions.date).format('YYYY-MM-DD')).toBe('2023-01-02'); // Monday
+
+      const followers = weeklyRows.find((r: any) => r.metric === 'followers');
+      expect(followers.value).toBe(540); // stock: latest in-week value (Jan 6)
+    });
   });
 
   describe('probeWatchedAccounts', () => {
@@ -1401,6 +1453,274 @@ describe('AnalyticsActivity', () => {
         'org-1',
         'provider rejected probe'
       );
+    });
+  });
+
+  describe('detectAnomalies (4.6)', () => {
+    // 28 flat baseline days for i1/impressions, then a large spike on day 29.
+    const spikeSeries = () => {
+      const rows = Array.from({ length: 28 }, (_, i) => ({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 100,
+        date: new Date(2024, 5, i + 1),
+      }));
+      rows.push({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 900,
+        date: new Date(2024, 5, 29),
+      });
+      return rows;
+    };
+
+    beforeEach(() => {
+      analyticsRepository.getBestTimeIntegrations.mockResolvedValue([
+        { id: 'i1', name: 'IG', providerIdentifier: 'instagram', picture: null },
+      ]);
+    });
+
+    it('persists and notifies once on a fresh spike', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(spikeSeries());
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(rows).toHaveLength(1);
+      expect(rows[0].direction).toBe('spike');
+      expect(rows[0].notifiedAt).toBeInstanceOf(Date);
+      expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
+      expect(notificationService.notifyAnalyticsAnomaly.mock.calls[0][0]).toMatchObject({
+        orgId: 'org-1',
+        direction: 'spike',
+        integrationId: 'i1',
+      });
+    });
+
+    it('persists but does NOT notify when a recent anomaly is within cooldown', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(spikeSeries());
+      analyticsRepository.getRecentAnomaly.mockResolvedValue({ id: 'prev' });
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(rows[0].notifiedAt).toBeUndefined();
+      expect(notificationService.notifyAnalyticsAnomaly).not.toHaveBeenCalled();
+    });
+
+    it('attaches a top-post root-cause hint for a post-attributable metric', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(spikeSeries());
+      analyticsRepository.getDayPostSnapshots.mockResolvedValue([
+        { postId: 'p-lo', value: 10, post: { content: 'meh' } },
+        { postId: 'p-hi', value: 800, post: { content: '<p>Launch day!</p>' } },
+      ]);
+      await activity.detectAnomalies('org-1');
+
+      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(rows[0].topPostId).toBe('p-hi');
+      expect(notificationService.notifyAnalyticsAnomaly.mock.calls[0][0].topPostTitle).toContain('Launch day!');
+    });
+
+    it('is a no-op (no throw) when there are no snapshots', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue([]);
+      await expect(activity.detectAnomalies('org-1')).resolves.toBeUndefined();
+      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+    });
+
+    // ── 7.3: user-defined alert rules ──
+
+    // A flat, non-anomalous followers series (no auto-anomaly) so only the rule
+    // can fire — followers is a stock metric, well below the 3σ detector here.
+    const flatFollowers = (value: number) =>
+      Array.from({ length: 10 }, (_, i) => ({
+        integrationId: 'i1',
+        metric: 'followers',
+        value,
+        date: new Date(2024, 5, i + 1),
+      }));
+
+    it('fires a gte rule once, writes an anomaly with ruleId, and stamps lastFiredAt', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(
+        flatFollowers(12000),
+      );
+      analyticsRepository.getEnabledAlertRules.mockResolvedValue([
+        {
+          id: 'rule-1',
+          integrationId: null,
+          metric: 'followers',
+          comparator: 'gte',
+          threshold: 10000,
+          direction: 'up',
+          enabled: true,
+          lastFiredAt: null,
+        },
+      ]);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
+      const rows = analyticsRepository.createAnomalies.mock.calls[0][0];
+      const ruleRow = rows.find((r: any) => r.ruleId === 'rule-1');
+      expect(ruleRow).toBeDefined();
+      expect(ruleRow.integrationId).toBe('i1');
+      expect(ruleRow.metric).toBe('followers');
+      expect(ruleRow.direction).toBe('spike');
+      expect(analyticsRepository.updateAlertRule).toHaveBeenCalledWith(
+        'org-1',
+        'rule-1',
+        { lastFiredAt: expect.any(Date) },
+      );
+      expect(notificationService.notifyAnalyticsAnomaly).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT fire a gte rule that is within its lastFiredAt cooldown', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(
+        flatFollowers(12000),
+      );
+      analyticsRepository.getEnabledAlertRules.mockResolvedValue([
+        {
+          id: 'rule-1',
+          integrationId: null,
+          metric: 'followers',
+          comparator: 'gte',
+          threshold: 10000,
+          direction: 'up',
+          enabled: true,
+          lastFiredAt: new Date(), // fired just now → inside cooldown
+        },
+      ]);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.updateAlertRule).not.toHaveBeenCalled();
+      // No auto-anomaly on a flat stock series and the rule is suppressed → nothing persisted.
+      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+    });
+
+    it('does NOT fire a gte rule when the latest value is below threshold', async () => {
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(
+        flatFollowers(500),
+      );
+      analyticsRepository.getEnabledAlertRules.mockResolvedValue([
+        {
+          id: 'rule-1',
+          integrationId: null,
+          metric: 'followers',
+          comparator: 'gte',
+          threshold: 10000,
+          direction: 'up',
+          enabled: true,
+          lastFiredAt: null,
+        },
+      ]);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.updateAlertRule).not.toHaveBeenCalled();
+      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('buildWeeklySummary (6.9)', () => {
+    beforeEach(() => {
+      analyticsRepository.getBestTimeIntegrations.mockResolvedValue([
+        { id: 'i1', name: 'Instagram', providerIdentifier: 'instagram', picture: null },
+        { id: 'i2', name: 'Facebook', providerIdentifier: 'facebook', picture: null },
+      ]);
+    });
+
+    const snap = (integrationId: string, metric: string, value: number) => ({
+      integrationId,
+      metric,
+      value,
+      date: new Date(),
+    });
+
+    it('composes correct week-over-week flow totals, best channel and top post, and fires once', async () => {
+      // This week (first getSnapshots call) then last week (second call).
+      analyticsRepository.getSnapshots
+        .mockResolvedValueOnce([
+          snap('i1', 'impressions', 100),
+          snap('i1', 'impressions', 50),
+          snap('i2', 'impressions', 40),
+          snap('i1', 'followers', 9999), // stock — excluded from sums
+        ])
+        .mockResolvedValueOnce([
+          snap('i1', 'impressions', 60),
+          snap('i2', 'impressions', 40),
+        ]);
+      analyticsRepository.getMetricDetailTopPosts.mockResolvedValue([
+        { postId: 'p-top', value: 120, post: { content: '<p>Launch week!</p>' } },
+      ]);
+
+      const summary = await activity.buildWeeklySummary('org-1');
+
+      // this week impressions = 190, last week = 100 → +90%
+      expect(summary).not.toBeNull();
+      const impressions = summary!.metrics.find((m) => m.metric === 'impressions');
+      expect(impressions).toMatchObject({ thisWeek: 190, lastWeek: 100, changePct: 90 });
+      // stock metric (followers) never enters the metric list
+      expect(summary!.metrics.find((m) => m.metric === 'followers')).toBeUndefined();
+
+      // best channel = i1 (150 vs i2's 40)
+      expect(summary!.bestChannel).toMatchObject({ integrationId: 'i1', name: 'Instagram', total: 150 });
+
+      // top post derived from the headline metric
+      expect(summary!.topPost).toMatchObject({ postId: 'p-top', metric: 'impressions', value: 120 });
+      expect(summary!.topPost!.title).toContain('Launch week!');
+
+      expect(summary!.hasData).toBe(true);
+      expect(notificationService.notifyWeeklyAnalyticsSummary).toHaveBeenCalledTimes(1);
+      const payload = notificationService.notifyWeeklyAnalyticsSummary.mock.calls[0][0];
+      expect(payload).toMatchObject({ orgId: 'org-1', bestChannelName: 'Instagram' });
+      expect(payload.metrics[0]).toMatchObject({ label: 'Impressions', thisWeek: 190, changePct: 90 });
+    });
+
+    it('yields null changePct when last week has no data', async () => {
+      analyticsRepository.getSnapshots
+        .mockResolvedValueOnce([snap('i1', 'impressions', 200)])
+        .mockResolvedValueOnce([]);
+
+      const summary = await activity.buildWeeklySummary('org-1');
+
+      const impressions = summary!.metrics.find((m) => m.metric === 'impressions');
+      expect(impressions).toMatchObject({ thisWeek: 200, lastWeek: 0, changePct: null });
+    });
+
+    it('adds an anomaly recap line when anomalies were flagged this week', async () => {
+      analyticsRepository.getSnapshots
+        .mockResolvedValueOnce([snap('i1', 'impressions', 100)])
+        .mockResolvedValueOnce([snap('i1', 'impressions', 100)]);
+      analyticsRepository.listAnomalies.mockResolvedValue([
+        { id: 'a1', createdAt: new Date() },
+        { id: 'a2', createdAt: new Date() },
+      ]);
+
+      const summary = await activity.buildWeeklySummary('org-1');
+
+      expect(summary!.anomalyRecap).toBe('2 analytics alerts flagged this week');
+      const payload = notificationService.notifyWeeklyAnalyticsSummary.mock.calls[0][0];
+      expect(payload.anomalyRecap).toBe('2 analytics alerts flagged this week');
+    });
+
+    it('returns null and does NOT notify when the org has no integrations', async () => {
+      analyticsRepository.getBestTimeIntegrations.mockResolvedValue([]);
+
+      const summary = await activity.buildWeeklySummary('org-1');
+
+      expect(summary).toBeNull();
+      expect(notificationService.notifyWeeklyAnalyticsSummary).not.toHaveBeenCalled();
+    });
+
+    it('does not notify (no throw) when there is no flow data this week', async () => {
+      analyticsRepository.getSnapshots
+        .mockResolvedValueOnce([]) // this week
+        .mockResolvedValueOnce([]); // last week
+
+      const summary = await activity.buildWeeklySummary('org-1');
+
+      expect(summary!.hasData).toBe(false);
+      expect(notificationService.notifyWeeklyAnalyticsSummary).not.toHaveBeenCalled();
     });
   });
 });

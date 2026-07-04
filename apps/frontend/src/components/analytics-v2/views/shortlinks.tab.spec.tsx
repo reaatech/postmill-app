@@ -17,8 +17,8 @@ let mockLoading = false;
 let mockError: Error | null = null;
 let mockConfigData: any = null;
 
-vi.mock('../cards/kpi.card', () => ({
-  KpiCard: ({ label, value }: { label: string; value: string }) => (
+vi.mock('../kit/stat-tile', () => ({
+  StatTile: ({ label, value }: { label: string; value: string }) => (
     <div data-testid="kpi-card">
       <span>{label}</span>
       <span>{value}</span>
@@ -69,9 +69,9 @@ describe('Analytics ShortlinksTab', () => {
       mockLoading = true;
 
       const { ShortlinksTab } = await import('./shortlinks.tab');
-      render(<ShortlinksTab from="2026-01-01" to="2026-01-31" />, { wrapper });
+      const { container } = render(<ShortlinksTab from="2026-01-01" to="2026-01-31" />, { wrapper });
 
-      expect(screen.getByText('Loading...')).toBeDefined();
+      expect(container.querySelector('.animate-pulse')).toBeTruthy();
     });
   });
 

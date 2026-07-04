@@ -11,6 +11,8 @@ interface MetricDrillParams {
   to: string;
   integrations: string[];
   compare: boolean;
+  /** Campaign filter (1.6) — server-scopes the drill to these campaigns' posts. */
+  campaigns?: string[];
 }
 
 function serializeParams(p: MetricDrillParams): string {
@@ -20,6 +22,9 @@ function serializeParams(p: MetricDrillParams): string {
     integrations: p.integrations.join(','),
     compare: String(p.compare),
   });
+  if (p.campaigns?.length) {
+    params.set('campaigns', p.campaigns.join(','));
+  }
   return `/analytics/v2/metric/${encodeURIComponent(p.metric)}?${params.toString()}`;
 }
 

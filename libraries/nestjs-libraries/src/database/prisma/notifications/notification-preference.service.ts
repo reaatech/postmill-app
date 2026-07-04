@@ -26,6 +26,7 @@ export const DEFAULT_CATEGORY_TOGGLES: Record<NotificationCategory, ChannelToggl
   announcements: { email: true, push: false, inApp: true },
   streak: { email: true, push: false, inApp: true },
   agent: { email: false, push: false, inApp: false },
+  analytics: { email: true, push: false, inApp: true },
 };
 
 export const DEFAULT_MASTERS: ChannelToggles = {

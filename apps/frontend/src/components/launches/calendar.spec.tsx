@@ -118,8 +118,9 @@ vi.mock('@gitroom/frontend/components/launches/helpers/use.existing.data', () =>
   ExistingDataContextProvider: ({ children }: any) => children,
 }));
 
-vi.mock('@gitroom/frontend/components/launches/statistics', () => ({
-  StatisticsModal: () => <div data-testid="statistics-modal" />,
+vi.mock('@gitroom/frontend/components/analytics-v2/post-analytics.drawer', () => ({
+  PostAnalyticsDrawer: () => <div data-testid="post-analytics-drawer" />,
+  PostDetailBody: () => <div data-testid="post-detail-body" />,
 }));
 
 vi.mock('@gitroom/frontend/components/launches/missing-release.modal', () => ({

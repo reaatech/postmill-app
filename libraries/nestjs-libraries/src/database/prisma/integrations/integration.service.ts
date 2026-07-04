@@ -25,7 +25,10 @@ import { uniq } from 'lodash';
 import utc from 'dayjs/plugin/utc';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
-import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
+import {
+  inngest,
+  isInngestEnabled,
+} from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 
 dayjs.extend(utc);
@@ -152,6 +155,13 @@ export class IntegrationService {
       ? await (await this._storageService.getLocalAdapterForOrg(org, true)).uploadSimple(picture)
       : undefined;
 
+    // Detect a brand-new social channel connect (vs a re-auth / token refresh of
+    // an existing row) so we only kick off the 90-day analytics backfill once.
+    const existing =
+      type === 'social'
+        ? await this._integrationRepository.existsByInternalId(org, internalId)
+        : null;
+
     const result = await this._integrationRepository.createOrUpdateIntegration(
       additionalSettings,
       oneTimeToken,
@@ -186,6 +196,26 @@ export class IntegrationService {
         entityName: name,
         details: JSON.stringify({ provider, internalId }),
       });
+    }
+
+    // On a brand-new social channel connect, enqueue a 90-day analytics backfill
+    // (Track A / STATS_UPGRADE 0.4). Non-fatal: a send failure must never break
+    // integration creation. The consumer no-ops for no-analytics providers.
+    if (type === 'social' && !existing && result?.id) {
+      try {
+        if (isInngestEnabled()) {
+          await inngest.send({
+            name: 'analytics/backfill',
+            data: { integrationId: result.id, organizationId: org },
+          });
+        }
+      } catch (err) {
+        this._logger.warn(
+          `Failed to enqueue analytics/backfill for integration ${result?.id}: ${
+            (err as any)?.message
+          }`
+        );
+      }
     }
 
     return result;

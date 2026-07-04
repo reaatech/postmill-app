@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
+import { UpdateWatchlistDto } from '@gitroom/nestjs-libraries/dtos/analytics/analytics.query.dto';
 
 vi.mock('@gitroom/nestjs-libraries/analytics/analytics.service', () => ({
   AnalyticsService: class MockAnalyticsService {
@@ -10,15 +11,26 @@ vi.mock('@gitroom/nestjs-libraries/analytics/analytics.service', () => ({
     getMetricDetail = vi.fn();
     getDayDetail = vi.fn();
     getChannelMetric = vi.fn();
+    getBestTimeData = vi.fn();
     exportData = vi.fn();
     getLinksForOrg = vi.fn();
     getAggregatedClicks = vi.fn();
+    getDataHealth = vi.fn();
+    refreshChannel = vi.fn();
+    getContentInsights = vi.fn();
+    narrate = vi.fn();
+    getFollowerSeries = vi.fn();
+    listAlertRules = vi.fn();
+    createAlertRule = vi.fn();
+    updateAlertRule = vi.fn();
+    deleteAlertRule = vi.fn();
   },
 }));
 
 import {
   AnalyticsV2Controller,
   parseIntegrations,
+  parseCampaigns,
   parsePage,
   parseLimit,
   parseCompare,
@@ -56,19 +68,33 @@ function dq(overrides: Partial<AnalyticsDateRangeDto & AnalyticsPostsQueryDto & 
 describe('AnalyticsV2Controller', () => {
   let controller: AnalyticsV2Controller;
   let service: AnalyticsService;
+  let watchlistService: any;
+  let budgetService: any;
+  let shareService: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
     service = new (AnalyticsService as any)();
-    const watchlistService = {
+    watchlistService = {
       list: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
       remove: vi.fn(),
+      getSeries: vi.fn(),
+    } as any;
+    budgetService = {
+      checkBudget: vi.fn().mockResolvedValue({ allowed: true }),
+    } as any;
+    shareService = {
+      getShare: vi.fn(),
+      mintShare: vi.fn(),
+      disableShare: vi.fn(),
     } as any;
     controller = new AnalyticsV2Controller(
       service as unknown as AnalyticsService,
       watchlistService,
+      budgetService,
+      shareService,
     );
   });
 
@@ -78,7 +104,7 @@ describe('AnalyticsV2Controller', () => {
 
     const result = await controller.getOverview(mockOrg, dq({ integrations: 'i1,i2', compare: 'true' }));
 
-    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1', 'i2'], true);
+    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1', 'i2'], true, { campaignIds: [] });
     expect(result).toBe(mockResult);
   });
 
@@ -87,7 +113,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getOverview(mockOrg, dq({ integrations: undefined, compare: undefined }));
 
-    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false);
+    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false, { campaignIds: [] });
   });
 
   it('getChannel delegates correctly', async () => {
@@ -103,7 +129,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getPosts(mockOrg, dq({ sort: 'impressions', dir: 'desc', page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'impressions', 'desc', 1, 20);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'impressions', 'desc', 1, 20, { campaignIds: [] });
   });
 
   it('getMetric delegates correctly', async () => {
@@ -111,7 +137,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getMetric(mockOrg, 'impressions', dq({ integrations: 'i1,i2', compare: 'false' }));
 
-    expect(service.getMetricDetail).toHaveBeenCalledWith(mockOrg, 'impressions', '2024-01-01', '2024-01-07', ['i1', 'i2'], false);
+    expect(service.getMetricDetail).toHaveBeenCalledWith(mockOrg, 'impressions', '2024-01-01', '2024-01-07', ['i1', 'i2'], false, { campaignIds: [] });
   });
 
   it('getDay delegates correctly', async () => {
@@ -119,7 +145,43 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getDay(mockOrg, '2024-01-01', 'impressions', 'i1');
 
-    expect(service.getDayDetail).toHaveBeenCalledWith(mockOrg, '2024-01-01', 'impressions', ['i1']);
+    expect(service.getDayDetail).toHaveBeenCalledWith(mockOrg, '2024-01-01', 'impressions', ['i1'], { campaignIds: [] });
+  });
+
+  it('getDay throws 400 on invalid date', async () => {
+    await expect(
+      controller.getDay(mockOrg, 'not-a-date', 'impressions', 'i1')
+    ).rejects.toThrow(BadRequestException);
+    expect(service.getDayDetail).not.toHaveBeenCalled();
+  });
+
+  it('getDay throws 400 on missing date', async () => {
+    await expect(
+      controller.getDay(mockOrg, '', 'impressions', 'i1')
+    ).rejects.toThrow(BadRequestException);
+    expect(service.getDayDetail).not.toHaveBeenCalled();
+  });
+
+  it('getDay throws 400 on unknown metric', async () => {
+    await expect(
+      controller.getDay(mockOrg, '2024-01-01', 'not-a-metric', 'i1')
+    ).rejects.toThrow(BadRequestException);
+    expect(service.getDayDetail).not.toHaveBeenCalled();
+  });
+
+  it('updateWatchlistEntry delegates dto fields to the service', async () => {
+    (watchlistService.update as any).mockResolvedValue({ id: 'w1' });
+
+    const dto = new UpdateWatchlistDto();
+    dto.displayName = 'New Name';
+    dto.enabled = false;
+
+    await controller.updateWatchlistEntry(mockOrg, 'w1', dto);
+
+    expect(watchlistService.update).toHaveBeenCalledWith('w1', 'test-org-id', {
+      displayName: 'New Name',
+      enabled: false,
+    });
   });
 
   it('getChannelMetric delegates correctly', async () => {
@@ -176,7 +238,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getOverview(mockOrg, dq({ integrations: '' }));
 
-    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false);
+    expect(service.getOverview).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], false, { campaignIds: [] });
   });
 
   it('getPosts uses defaults when no sort/dir/page/limit provided', async () => {
@@ -184,7 +246,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getPosts(mockOrg, dq({ sort: undefined, dir: undefined, page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 20);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 20, { campaignIds: [] });
   });
 
   it('getPosts passes dir=asc when provided', async () => {
@@ -192,7 +254,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getPosts(mockOrg, dq({ sort: undefined, dir: 'asc', page: undefined, limit: undefined }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'asc', 1, 20);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'asc', 1, 20, { campaignIds: [] });
   });
 
   it('getPosts delegates with explicit page and limit', async () => {
@@ -200,7 +262,7 @@ describe('AnalyticsV2Controller', () => {
 
     await controller.getPosts(mockOrg, dq({ integrations: 'i1', sort: 'impressions', dir: 'desc', page: 3, limit: 10 }));
 
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1'], 'impressions', 'desc', 3, 10);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', ['i1'], 'impressions', 'desc', 3, 10, { campaignIds: [] });
   });
 
   it('exportData with csv format sets correct headers and returns data', async () => {
@@ -210,7 +272,7 @@ describe('AnalyticsV2Controller', () => {
 
     const result = await controller.exportData(mockOrg, dq({ format: 'csv' }), res as any);
 
-    expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'csv', false);
+    expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'csv', false, { campaignIds: [] });
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'text/csv');
     expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="analytics-export.csv"');
     expect(result).toBe(csvData);
@@ -223,7 +285,7 @@ describe('AnalyticsV2Controller', () => {
 
     const result = await controller.exportData(mockOrg, dq({ format: 'json' }), res as any);
 
-    expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'json', false);
+    expect(service.exportData).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], 'json', false, { campaignIds: [] });
     expect(res.setHeader).toHaveBeenCalledWith('Content-Type', 'application/json');
     expect(res.setHeader).toHaveBeenCalledWith('Content-Disposition', 'attachment; filename="analytics-export.json"');
     expect(result).toBe(jsonData);
@@ -284,7 +346,217 @@ describe('AnalyticsV2Controller', () => {
   it('getPosts caps limit at 100', async () => {
     (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
     await controller.getPosts(mockOrg, dq({ limit: 999 }));
-    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 100);
+    expect(service.getPosts).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 100, { campaignIds: [] });
+  });
+
+  describe('campaign scope (1.4)', () => {
+    const CID = '11111111-1111-4111-8111-111111111111';
+
+    it('parseCampaigns returns [] when absent and validates uuids', () => {
+      expect(parseCampaigns(undefined)).toEqual([]);
+      expect(parseCampaigns('')).toEqual([]);
+      expect(parseCampaigns(CID)).toEqual([CID]);
+      expect(parseCampaigns(`${CID}, ${CID}`)).toEqual([CID, CID]);
+    });
+
+    it('parseCampaigns throws on a malformed id', () => {
+      expect(() => parseCampaigns('not-a-uuid')).toThrow(BadRequestException);
+      expect(() => parseCampaigns(`${CID},bad`)).toThrow(BadRequestException);
+    });
+
+    it('getOverview forwards the parsed campaign array to the service', async () => {
+      (service.getOverview as any).mockResolvedValue({ kpis: [] });
+
+      await controller.getOverview(mockOrg, dq({ campaigns: CID }));
+
+      expect(service.getOverview).toHaveBeenCalledWith(
+        mockOrg, '2024-01-01', '2024-01-07', [], false, { campaignIds: [CID] }
+      );
+    });
+
+    it('getPosts forwards the parsed campaign array to the service', async () => {
+      (service.getPosts as any).mockResolvedValue({ posts: [], total: 0 });
+
+      await controller.getPosts(mockOrg, dq({ campaigns: CID }));
+
+      expect(service.getPosts).toHaveBeenCalledWith(
+        mockOrg, '2024-01-01', '2024-01-07', [], undefined, 'desc', 1, 20, { campaignIds: [CID] }
+      );
+    });
+
+    it('getMetric forwards the parsed campaign array to the service', async () => {
+      (service.getMetricDetail as any).mockResolvedValue({ metric: 'impressions' });
+
+      await controller.getMetric(mockOrg, 'impressions', dq({ campaigns: CID }));
+
+      expect(service.getMetricDetail).toHaveBeenCalledWith(
+        mockOrg, 'impressions', '2024-01-01', '2024-01-07', [], false, { campaignIds: [CID] }
+      );
+    });
+
+    it('getDay forwards the parsed campaign array to the service', async () => {
+      (service.getDayDetail as any).mockResolvedValue({ metric: 'impressions' });
+
+      await controller.getDay(mockOrg, '2024-01-01', 'impressions', 'i1', CID);
+
+      expect(service.getDayDetail).toHaveBeenCalledWith(
+        mockOrg, '2024-01-01', 'impressions', ['i1'], { campaignIds: [CID] }
+      );
+    });
+
+    it('getDay rejects a malformed campaign id', async () => {
+      await expect(
+        controller.getDay(mockOrg, '2024-01-01', 'impressions', 'i1', 'bad')
+      ).rejects.toThrow(BadRequestException);
+      expect(service.getDayDetail).not.toHaveBeenCalled();
+    });
+
+    it('exportData forwards the parsed campaign array to the service', async () => {
+      const res = mockResponse();
+      (service.exportData as any).mockResolvedValue({ contentType: 'application/json', data: '[]' });
+
+      await controller.exportData(mockOrg, dq({ format: 'json', campaigns: CID }), res as any);
+
+      expect(service.exportData).toHaveBeenCalledWith(
+        mockOrg, '2024-01-01', '2024-01-07', [], 'json', false, { campaignIds: [CID] }
+      );
+    });
+  });
+
+  describe('best-time (6.4)', () => {
+    it('passes tz and single integration through', async () => {
+      (service.getBestTimeData as any).mockResolvedValue({ heatmap: [], bestSlots: [] });
+      await controller.getBestTime(mockOrg, '', 'ch1', 'America/New_York');
+      expect(service.getBestTimeData).toHaveBeenCalledWith('test-org-id', ['ch1'], 'America/New_York');
+    });
+
+    it('falls back to comma-separated integrations when no single integration', async () => {
+      (service.getBestTimeData as any).mockResolvedValue({ heatmap: [], bestSlots: [] });
+      await controller.getBestTime(mockOrg, 'i1,i2', undefined, undefined);
+      expect(service.getBestTimeData).toHaveBeenCalledWith('test-org-id', ['i1', 'i2'], undefined);
+    });
+  });
+
+  describe('data-health (6.6)', () => {
+    it('delegates to getDataHealth', async () => {
+      const rows = [{ integrationId: 'i1', supportsAnalytics: false }];
+      (service.getDataHealth as any).mockResolvedValue(rows);
+      const result = await controller.getHealth(mockOrg);
+      expect(service.getDataHealth).toHaveBeenCalledWith(mockOrg);
+      expect(result).toBe(rows);
+    });
+  });
+
+  describe('on-demand refresh (6.7)', () => {
+    it('delegates to refreshChannel', async () => {
+      (service.refreshChannel as any).mockResolvedValue({ integrationId: 'i1', persisted: 3 });
+      const result = await controller.refreshChannel(mockOrg, 'i1');
+      expect(service.refreshChannel).toHaveBeenCalledWith(mockOrg, 'i1');
+      expect(result).toEqual({ integrationId: 'i1', persisted: 3 });
+    });
+  });
+
+  describe('content-insights (7.4)', () => {
+    it('delegates to getContentInsights', async () => {
+      (service.getContentInsights as any).mockResolvedValue({ findings: [], totalPosts: 0, orgMean: 0 });
+      await controller.getContentInsights(mockOrg);
+      expect(service.getContentInsights).toHaveBeenCalledWith(mockOrg);
+    });
+  });
+
+  describe('narrate (7.5)', () => {
+    it('checks budget then delegates to narrate', async () => {
+      (service.narrate as any).mockResolvedValue({ narrative: 'text' });
+      const result = await controller.narrate(mockOrg, dq());
+      expect(budgetService.checkBudget).toHaveBeenCalledWith('utility', 'test-org-id');
+      expect(service.narrate).toHaveBeenCalledWith(mockOrg, '2024-01-01', '2024-01-07');
+      expect(result).toEqual({ narrative: 'text' });
+    });
+
+    it('returns 429 when budget is exceeded and does NOT call narrate', async () => {
+      budgetService.checkBudget.mockResolvedValue({ allowed: false, reason: 'over cap' });
+      await expect(controller.narrate(mockOrg, dq())).rejects.toMatchObject({
+        status: 429,
+      });
+      expect(service.narrate).not.toHaveBeenCalled();
+    });
+
+    it('validates the date range before the budget check', async () => {
+      await expect(controller.narrate(mockOrg, dq({ from: '' }))).rejects.toThrow(BadRequestException);
+      expect(budgetService.checkBudget).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('watchlist series (6.3)', () => {
+    const CID = '11111111-1111-4111-8111-111111111111';
+
+    it('returns watched series plus own followers when a range is given', async () => {
+      watchlistService.getSeries.mockResolvedValue({ id: CID, metric: 'followers', series: [{ date: '2024-01-01', value: 10 }] });
+      (service.getFollowerSeries as any).mockResolvedValue([{ date: '2024-01-01', value: 500 }]);
+
+      const result = await controller.getWatchlistSeries(mockOrg, CID, undefined, '2024-01-01', '2024-01-07');
+
+      expect(watchlistService.getSeries).toHaveBeenCalledWith(CID, 'test-org-id', 'followers');
+      expect(service.getFollowerSeries).toHaveBeenCalledWith('test-org-id', '2024-01-01', '2024-01-07');
+      expect(result.watched.series).toHaveLength(1);
+      expect(result.own).toHaveLength(1);
+    });
+
+    it('omits own followers (empty) when no range provided', async () => {
+      watchlistService.getSeries.mockResolvedValue({ id: CID, metric: 'followers', series: [] });
+
+      const result = await controller.getWatchlistSeries(mockOrg, CID);
+
+      expect(service.getFollowerSeries).not.toHaveBeenCalled();
+      expect(result.own).toEqual([]);
+    });
+  });
+
+  describe('alert rules (7.3)', () => {
+    it('list/create/update/delete are org-scoped through the service', async () => {
+      (service.listAlertRules as any).mockResolvedValue([{ id: 'r1' }]);
+      expect(await controller.listAlertRules(mockOrg)).toEqual([{ id: 'r1' }]);
+      expect(service.listAlertRules).toHaveBeenCalledWith('test-org-id');
+
+      const body = { metric: 'followers', comparator: 'gte', threshold: 10000 } as any;
+      (service.createAlertRule as any).mockResolvedValue({ id: 'r2', ...body });
+      await controller.createAlertRule(mockOrg, body);
+      expect(service.createAlertRule).toHaveBeenCalledWith('test-org-id', body);
+
+      const upd = { enabled: false } as any;
+      (service.updateAlertRule as any).mockResolvedValue({ id: 'r1', enabled: false });
+      await controller.updateAlertRule(mockOrg, 'r1', upd);
+      expect(service.updateAlertRule).toHaveBeenCalledWith('test-org-id', 'r1', upd);
+
+      (service.deleteAlertRule as any).mockResolvedValue({ success: true });
+      expect(await controller.deleteAlertRule(mockOrg, 'r1')).toEqual({ success: true });
+      expect(service.deleteAlertRule).toHaveBeenCalledWith('test-org-id', 'r1');
+    });
+  });
+
+  describe('share (7.6)', () => {
+    it('getShare delegates org-scoped', async () => {
+      (shareService.getShare as any).mockResolvedValue({ token: 't', enabled: true });
+      expect(await controller.getShare(mockOrg)).toEqual({ token: 't', enabled: true });
+      expect(shareService.getShare).toHaveBeenCalledWith('test-org-id');
+    });
+
+    it('mintShare returns only token/enabled/config', async () => {
+      (shareService.mintShare as any).mockResolvedValue({
+        id: 'x', organizationId: 'test-org-id', token: 'abc', enabled: true, config: { rangePreset: '30d' },
+      });
+      const result = await controller.mintShare(mockOrg, { integrations: ['i1'], rangePreset: '30d' } as any);
+      expect(shareService.mintShare).toHaveBeenCalledWith('test-org-id', { integrations: ['i1'], rangePreset: '30d' });
+      expect(result).toEqual({ token: 'abc', enabled: true, config: { rangePreset: '30d' } });
+      expect(result).not.toHaveProperty('id');
+      expect(result).not.toHaveProperty('organizationId');
+    });
+
+    it('disableShare delegates org-scoped', async () => {
+      (shareService.disableShare as any).mockResolvedValue({ success: true });
+      expect(await controller.disableShare(mockOrg)).toEqual({ success: true });
+      expect(shareService.disableShare).toHaveBeenCalledWith('test-org-id');
+    });
   });
 
   describe('getShortLinks', () => {
@@ -437,5 +709,46 @@ describe('validateToGteFrom', () => {
 
   it('passes when to is after from', () => {
     expect(() => validateToGteFrom('2024-01-01', '2024-01-07')).not.toThrow();
+  });
+});
+
+describe('UpdateWatchlistDto (global validation pipe)', () => {
+  // Mirrors the global pipe config in main.ts
+  const pipe = new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  });
+  const metadata = {
+    type: 'body' as const,
+    metatype: UpdateWatchlistDto,
+  };
+
+  it('rejects an extra (non-whitelisted) field', async () => {
+    await expect(
+      pipe.transform({ displayName: 'ok', isSuperAdmin: true }, metadata)
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts valid displayName + enabled', async () => {
+    await expect(
+      pipe.transform({ displayName: 'ok', enabled: true }, metadata)
+    ).resolves.toEqual({ displayName: 'ok', enabled: true });
+  });
+
+  it('accepts an empty body (both fields optional)', async () => {
+    await expect(pipe.transform({}, metadata)).resolves.toEqual({});
+  });
+
+  it('rejects displayName longer than 100 chars', async () => {
+    await expect(
+      pipe.transform({ displayName: 'a'.repeat(101) }, metadata)
+    ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects a non-boolean enabled', async () => {
+    await expect(
+      pipe.transform({ enabled: 'yes' }, metadata)
+    ).rejects.toThrow(BadRequestException);
   });
 });

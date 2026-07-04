@@ -21,10 +21,34 @@ import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { EmailLogService } from '@gitroom/nestjs-libraries/database/prisma/emails/email-log.service';
+import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
+import {
+  detectAnomaly,
+  DEFAULT_ANOMALY_FLOORS,
+  MetricKind,
+} from '@gitroom/nestjs-libraries/analytics/anomaly.detection';
 
 dayjs.extend(isoWeek);
 
 const CHANNEL_DAYS_BACK = 7;
+
+// 6.9: structured "your week in numbers" summary returned by buildWeeklySummary.
+export interface WeeklyAnalyticsSummary {
+  orgId: string;
+  weekStart: Date;
+  weekEnd: Date;
+  metrics: {
+    metric: string;
+    label: string;
+    thisWeek: number;
+    lastWeek: number;
+    changePct: number | null;
+  }[];
+  topPost: { postId: string; title: string; metric: string; value: number } | null;
+  bestChannel: { integrationId: string; name: string; total: number } | null;
+  anomalyRecap: string | null;
+  hasData: boolean;
+}
 
 // Retention defaults: keep raw daily channel snapshots for ~18 months, then
 // roll them up to one weekly row per (integration, metric). Per-post daily
@@ -49,6 +73,20 @@ function retentionDays(envKey: string, fallback: number): number {
   return Math.floor(parsed);
 }
 
+// Float env reader (for ANALYTICS_ANOMALY_Z) — invalid/≤0 falls back.
+function envFloat(envKey: string, fallback: number): number {
+  const raw = process.env[envKey];
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    Logger.warn(
+      `AnalyticsActivity: invalid ${envKey}="${raw}", falling back to ${fallback}`
+    );
+    return fallback;
+  }
+  return parsed;
+}
+
 @Injectable()
 export class AnalyticsActivity {
   private readonly logger = new Logger(AnalyticsActivity.name);
@@ -66,6 +104,7 @@ export class AnalyticsActivity {
     private readonly _shortLinkSettingsRepository: OrgShortLinkSettingsRepository,
     private readonly _resolution: ProviderResolutionService,
     private readonly _emailLogService: EmailLogService,
+    private readonly _notificationService: NotificationService,
   ) {}
 
   async getAllOrganizationIds(): Promise<string[]> {
@@ -237,9 +276,14 @@ export class AnalyticsActivity {
 
         // Update denormalized counters on the Post record
         const latestSnapshots =
-          await this._analyticsRepository.getLatestPostSnapshotsForCounters(
-            post.id
-          );
+          await this._analyticsRepository.getLatestPostSnapshots(orgId, [post.id], [
+            'views',
+            'likes',
+            'comments',
+            'impressions',
+            'reactions',
+            'replies',
+          ]);
 
         const latestByMetric: Record<string, number> = {};
         for (const snap of latestSnapshots) {
@@ -300,9 +344,75 @@ export class AnalyticsActivity {
       .startOf('day')
       .toDate();
 
-    // 1. Prune post snapshots beyond the tracking window — per-post daily
-    //    detail is not worth archiving.
-    await this._analyticsRepository.deletePostSnapshotsBefore(orgId, postCutoff);
+    // 1. Roll up post snapshots older than the post-retention window into one
+    //    weekly row per (postId, metric, ISO week) — flow metrics summed, stock
+    //    metrics keep the week's latest — instead of deleting them, so a
+    //    post/campaign series extends past the window at weekly granularity (6.1).
+    //    Same atomic delete+createMany-in-$transaction machinery as the channel
+    //    rollup below.
+    const oldPostRows = await this._analyticsRepository.findPostSnapshotsBefore(
+      orgId,
+      postCutoff
+    );
+    if (oldPostRows.length) {
+      const postGroups = new Map<
+        string,
+        {
+          postId: string;
+          integrationId: string;
+          metric: string;
+          weekStart: Date;
+          sum: number;
+          latestDate: Date;
+          latestValue: number;
+        }
+      >();
+
+      for (const row of oldPostRows) {
+        const weekStart = dayjs(row.date)
+          .startOf('isoWeek')
+          .startOf('day')
+          .toDate();
+        const key = `${row.postId}|${row.metric}|${weekStart.getTime()}`;
+        const existing = postGroups.get(key);
+        if (!existing) {
+          postGroups.set(key, {
+            postId: row.postId,
+            integrationId: row.integrationId,
+            metric: row.metric,
+            weekStart,
+            sum: row.value,
+            latestDate: row.date,
+            latestValue: row.value,
+          });
+          continue;
+        }
+        existing.sum += row.value;
+        if (dayjs(row.date).isAfter(dayjs(existing.latestDate))) {
+          existing.latestDate = row.date;
+          existing.latestValue = row.value;
+        }
+      }
+
+      const weeklyPostRows = Array.from(postGroups.values()).map((g) => {
+        const def = METRIC_REGISTRY[g.metric];
+        const value = def?.kind === 'stock' ? g.latestValue : g.sum;
+        return {
+          organizationId: orgId,
+          postId: g.postId,
+          integrationId: g.integrationId,
+          metric: g.metric,
+          value,
+          date: g.weekStart,
+        };
+      });
+
+      await this._analyticsRepository.replaceRolledUpPostSnapshots(
+        orgId,
+        postCutoff,
+        weeklyPostRows
+      );
+    }
 
     // 2. Roll up channel snapshots older than the daily-retention window into
     //    a single weekly row per (integration, metric, ISO week): flow metrics
@@ -379,6 +489,515 @@ export class AnalyticsActivity {
       });
     } catch (err) {
       this.logger.error('notifySnapshotComplete error:', { error: (err as Error)?.message });
+    }
+  }
+
+  // ── Anomaly detection (Phase 4) ──
+  // Loads 35d of channel snapshots, runs the pure detector per (integration,
+  // metric), persists anomaly rows idempotently, and fires notifications
+  // (cooldown-gated, capped 3/org/day). Never throws — a detection failure must
+  // not fail the sweep (same posture as notifySnapshotComplete).
+  async detectAnomalies(orgId: string): Promise<void> {
+    try {
+      const z = envFloat('ANALYTICS_ANOMALY_Z', 3);
+      const cooldownDays = retentionDays('ANALYTICS_ANOMALY_COOLDOWN_DAYS', 3);
+
+      const since = dayjs().subtract(35, 'day').startOf('day').toDate();
+      const snapshots =
+        await this._analyticsRepository.getSnapshotsForOrgSince(orgId, since);
+      if (snapshots.length === 0) return;
+
+      const integrations =
+        await this._analyticsRepository.getBestTimeIntegrations(orgId);
+      const intById = new Map(integrations.map((i) => [i.id, i]));
+
+      // Group by (integrationId, metric).
+      const groups = new Map<
+        string,
+        { integrationId: string; metric: string; series: { date: Date; value: number }[] }
+      >();
+      for (const s of snapshots) {
+        const key = `${s.integrationId}::${s.metric}`;
+        let g = groups.get(key);
+        if (!g) {
+          g = { integrationId: s.integrationId, metric: s.metric, series: [] };
+          groups.set(key, g);
+        }
+        g.series.push({ date: s.date, value: s.value });
+      }
+
+      const cooldownFrom = dayjs()
+        .subtract(cooldownDays, 'day')
+        .startOf('day')
+        .toDate();
+
+      type Pending = {
+        row: {
+          organizationId: string;
+          integrationId: string;
+          metric: string;
+          date: Date;
+          value: number;
+          baseline: number;
+          deviation: number;
+          direction: string;
+          topPostId?: string | null;
+          ruleId?: string | null;
+          notifiedAt?: Date | null;
+        };
+        canNotify: boolean;
+        integrationName: string;
+        topPostTitle?: string;
+      };
+      const pending: Pending[] = [];
+
+      for (const g of groups.values()) {
+        const def = METRIC_REGISTRY[g.metric];
+        const kind: MetricKind = def?.kind === 'stock' ? 'stock' : 'flow';
+        const result = detectAnomaly(g.series, kind, {
+          z,
+          floor: DEFAULT_ANOMALY_FLOORS[kind],
+        });
+        if (!result) continue;
+
+        const candidateDate = g.series[g.series.length - 1].date;
+
+        // Root-cause hint (4.9): for post-attributable metrics, find the top
+        // post on the anomalous day. Channel-level metrics (followers) → null.
+        let topPostId: string | null = null;
+        let topPostTitle: string | undefined;
+        try {
+          const dayStart = dayjs(candidateDate).startOf('day').toDate();
+          const dayEnd = dayjs(candidateDate).endOf('day').toDate();
+          const dayPosts = await this._analyticsRepository.getDayPostSnapshots(
+            orgId,
+            [g.integrationId],
+            g.metric,
+            dayStart,
+            dayEnd,
+          );
+          if (dayPosts.length > 0) {
+            const top = dayPosts.reduce((a, b) => (b.value > a.value ? b : a));
+            topPostId = top.postId;
+            const content = (top as any).post?.content as string | undefined;
+            if (content) {
+              topPostTitle = content.replace(/<[^>]*>/g, '').slice(0, 80).trim();
+            }
+          }
+        } catch {
+          // root-cause is best-effort; never block an anomaly on it
+        }
+
+        const recent = await this._analyticsRepository.getRecentAnomaly(
+          g.integrationId,
+          g.metric,
+          result.direction,
+          cooldownFrom,
+        );
+
+        pending.push({
+          row: {
+            organizationId: orgId,
+            integrationId: g.integrationId,
+            metric: g.metric,
+            date: candidateDate,
+            value: result.value,
+            baseline: result.baseline,
+            deviation: result.deviation,
+            direction: result.direction,
+            topPostId,
+          },
+          canNotify: !recent,
+          integrationName: intById.get(g.integrationId)?.name || 'a channel',
+          topPostTitle,
+        });
+      }
+
+      // ── 7.3: evaluate user-defined alert rules against the SAME loaded
+      //    snapshots, after the automatic detector. A fired rule writes an
+      //    AnalyticsAnomaly row (ruleId set) and folds into the same
+      //    notification cap+cooldown pipeline below. Cooldown is the rule's own
+      //    `lastFiredAt` (reusing the anomaly cooldown window) so a rule can't
+      //    re-fire day after day; firing sets `lastFiredAt`. Non-fatal: a rule
+      //    read/eval failure must not abort the sweep.
+      const firedRuleIds = new Set<string>();
+      try {
+        const rules =
+          await this._analyticsRepository.getEnabledAlertRules(orgId);
+        for (const rule of rules) {
+          // Cooldown gate: skip firing while inside the window.
+          if (
+            rule.lastFiredAt &&
+            dayjs(rule.lastFiredAt).isAfter(dayjs(cooldownFrom))
+          ) {
+            continue;
+          }
+
+          for (const g of groups.values()) {
+            if (g.metric !== rule.metric) continue;
+            if (rule.integrationId && rule.integrationId !== g.integrationId) {
+              continue;
+            }
+
+            const evaluated = this.evaluateAlertRule(rule, g.series);
+            if (!evaluated) continue;
+
+            firedRuleIds.add(rule.id);
+            pending.push({
+              row: {
+                organizationId: orgId,
+                integrationId: g.integrationId,
+                metric: g.metric,
+                date: evaluated.date,
+                value: evaluated.value,
+                baseline: evaluated.baseline,
+                deviation: evaluated.deviation,
+                direction: evaluated.direction,
+                topPostId: null,
+                ruleId: rule.id,
+              },
+              canNotify: true,
+              integrationName:
+                intById.get(g.integrationId)?.name || 'a channel',
+            });
+          }
+        }
+      } catch (err) {
+        this.logger.warn('alert-rule evaluation failed', {
+          error: (err as Error)?.message,
+        });
+      }
+
+      if (pending.length === 0) return;
+
+      // Notification cap: 3/org/day, highest |deviation| first. Non-notified
+      // anomalies still persist their rows.
+      const notifiable = pending
+        .filter((p) => p.canNotify)
+        .sort((a, b) => Math.abs(b.row.deviation) - Math.abs(a.row.deviation))
+        .slice(0, 3);
+      const now = new Date();
+      for (const p of notifiable) p.row.notifiedAt = now;
+
+      await this._analyticsRepository.createAnomalies(pending.map((p) => p.row));
+
+      // 7.3: stamp lastFiredAt on rules that fired this run so the cooldown gate
+      // above suppresses a daily re-fire. Non-fatal per rule.
+      if (firedRuleIds.size > 0) {
+        for (const ruleId of firedRuleIds) {
+          try {
+            await this._analyticsRepository.updateAlertRule(orgId, ruleId, {
+              lastFiredAt: now,
+            });
+          } catch (err) {
+            this.logger.warn('alert-rule lastFiredAt update failed', {
+              error: (err as Error)?.message,
+              ruleId,
+            });
+          }
+        }
+      }
+
+      // 6.8: dispatch an `analytics.anomaly_detected` webhook for the persisted
+      // batch so n8n/Zapier users can automate on spikes/drops. Guarded with the
+      // same error-swallowed posture as notifySnapshotComplete — a webhook
+      // failure must not skip the in-app notifications below. Only fires when at
+      // least one anomaly persisted (pending is non-empty here).
+      try {
+        await this._webhooksService.dispatchEvent(
+          orgId,
+          'analytics.anomaly_detected',
+          {
+            orgId,
+            anomalies: pending.map((p) => ({
+              integrationId: p.row.integrationId,
+              integrationName: p.integrationName,
+              metric: p.row.metric,
+              direction: p.row.direction,
+              value: p.row.value,
+              baseline: p.row.baseline,
+              deviation: p.row.deviation,
+              date: p.row.date,
+              topPostId: p.row.topPostId ?? null,
+            })),
+            timestamp: new Date().toISOString(),
+          }
+        );
+      } catch (err) {
+        this.logger.warn('anomaly_detected webhook dispatch failed', {
+          error: (err as Error)?.message,
+        });
+      }
+
+      for (const p of notifiable) {
+        try {
+          await this._notificationService.notifyAnalyticsAnomaly({
+            orgId,
+            integrationName: p.integrationName,
+            metric: METRIC_REGISTRY[p.row.metric]?.label || p.row.metric,
+            direction: p.row.direction as 'spike' | 'drop',
+            value: p.row.value,
+            baseline: p.row.baseline,
+            deviation: p.row.deviation,
+            integrationId: p.row.integrationId,
+            topPostTitle: p.topPostTitle,
+          });
+        } catch (err) {
+          this.logger.warn('notifyAnalyticsAnomaly failed', {
+            error: (err as Error)?.message,
+            integrationId: p.row.integrationId,
+            metric: p.row.metric,
+          });
+        }
+      }
+    } catch (err) {
+      this.logger.error('detectAnomalies error:', {
+        error: (err as Error)?.message,
+      });
+    }
+  }
+
+  // 7.3: evaluate a single alert rule against one (integration, metric) series
+  // (ascending by date). Returns the anomaly-row fields on a fire, else null.
+  //   - gte/lte: compare the LATEST value against threshold.
+  //   - change_pct: trailing-7-day SUM vs prior-7-day SUM; fires when the signed
+  //     percentage change crosses threshold in the rule's direction. A zero
+  //     prior window yields an undefined percent → no fire.
+  private evaluateAlertRule(
+    rule: { comparator: string; threshold: number; direction: string },
+    series: { date: Date; value: number }[],
+  ): {
+    date: Date;
+    value: number;
+    baseline: number;
+    deviation: number;
+    direction: string;
+  } | null {
+    if (series.length === 0) return null;
+    const latest = series[series.length - 1];
+    const t = rule.threshold;
+
+    if (rule.comparator === 'gte' || rule.comparator === 'lte') {
+      const fires =
+        rule.comparator === 'gte' ? latest.value >= t : latest.value <= t;
+      if (!fires) return null;
+      return {
+        date: latest.date,
+        value: latest.value,
+        baseline: t,
+        deviation: t !== 0 ? (latest.value - t) / t : 0,
+        direction: rule.comparator === 'gte' ? 'spike' : 'drop',
+      };
+    }
+
+    // change_pct: trailing-7-day sum vs the prior-7-day sum.
+    const trailingFrom = dayjs(latest.date).subtract(6, 'day').startOf('day');
+    const priorFrom = dayjs(latest.date).subtract(13, 'day').startOf('day');
+    const priorTo = dayjs(latest.date).subtract(7, 'day').endOf('day');
+
+    let trailing = 0;
+    let prior = 0;
+    for (const p of series) {
+      const d = dayjs(p.date);
+      if (!d.isBefore(trailingFrom)) {
+        trailing += p.value;
+      } else if (!d.isBefore(priorFrom) && !d.isAfter(priorTo)) {
+        prior += p.value;
+      }
+    }
+
+    if (prior <= 0) return null; // no meaningful percent off a zero baseline
+    const changePct = ((trailing - prior) / prior) * 100;
+    const fires =
+      rule.direction === 'down' ? changePct <= -t : changePct >= t;
+    if (!fires) return null;
+
+    return {
+      date: latest.date,
+      value: trailing,
+      baseline: prior,
+      deviation: changePct / 100,
+      direction: rule.direction === 'down' ? 'drop' : 'spike',
+    };
+  }
+
+  // ── Weekly "your week in numbers" summary (6.9) ──
+  // Composes this-week-vs-last-week FLOW-metric totals from two non-overlapping
+  // 7-day windows of channel snapshots (grouped/summed here — never through
+  // AnalyticsService), plus a top post, the best channel, and a one-line anomaly
+  // recap, then fires the weekly `analytics`-category digest notification. Only
+  // reads existing repo methods. Non-fatal: never throws, so it can ride the
+  // daily sweep as a swallowed step.
+  async buildWeeklySummary(
+    orgId: string
+  ): Promise<WeeklyAnalyticsSummary | null> {
+    try {
+      const integrations =
+        await this._analyticsRepository.getBestTimeIntegrations(orgId);
+      if (integrations.length === 0) return null;
+      const integrationIds = integrations.map((i) => i.id);
+      const nameById = new Map(
+        integrations.map((i) => [i.id, i.name || 'a channel'])
+      );
+
+      // Two non-overlapping 7-day windows: the trailing week vs the week before.
+      const thisFrom = dayjs().subtract(6, 'day').startOf('day').toDate();
+      const thisTo = dayjs().endOf('day').toDate();
+      const lastFrom = dayjs().subtract(13, 'day').startOf('day').toDate();
+      const lastTo = dayjs().subtract(7, 'day').endOf('day').toDate();
+
+      const [thisWeekRows, lastWeekRows] = await Promise.all([
+        this._analyticsRepository.getSnapshots(
+          orgId,
+          integrationIds,
+          thisFrom,
+          thisTo
+        ),
+        this._analyticsRepository.getSnapshots(
+          orgId,
+          integrationIds,
+          lastFrom,
+          lastTo
+        ),
+      ]);
+
+      // Sum FLOW metrics only — stock metrics (followers) aren't meaningfully
+      // summed across a window.
+      const isFlow = (metric: string) =>
+        (METRIC_REGISTRY[metric]?.kind ?? 'flow') !== 'stock';
+
+      const sumByMetric = (
+        rows: { metric: string; value: number }[]
+      ): Map<string, number> => {
+        const m = new Map<string, number>();
+        for (const r of rows) {
+          if (!isFlow(r.metric)) continue;
+          m.set(r.metric, (m.get(r.metric) || 0) + r.value);
+        }
+        return m;
+      };
+
+      const thisByMetric = sumByMetric(thisWeekRows);
+      const lastByMetric = sumByMetric(lastWeekRows);
+
+      const metrics = Array.from(thisByMetric.entries())
+        .map(([metric, thisWeek]) => {
+          const lastWeek = lastByMetric.get(metric) || 0;
+          const changePct =
+            lastWeek > 0
+              ? Math.round(((thisWeek - lastWeek) / lastWeek) * 100)
+              : null;
+          return {
+            metric,
+            label: METRIC_REGISTRY[metric]?.label || metric,
+            thisWeek,
+            lastWeek,
+            changePct,
+          };
+        })
+        .sort((a, b) => b.thisWeek - a.thisWeek);
+
+      // Best channel: largest summed flow value this week.
+      const byIntegration = new Map<string, number>();
+      for (const r of thisWeekRows) {
+        if (!isFlow(r.metric)) continue;
+        byIntegration.set(
+          r.integrationId,
+          (byIntegration.get(r.integrationId) || 0) + r.value
+        );
+      }
+      let bestChannel: WeeklyAnalyticsSummary['bestChannel'] = null;
+      for (const [integrationId, total] of byIntegration.entries()) {
+        if (!bestChannel || total > bestChannel.total) {
+          bestChannel = {
+            integrationId,
+            name: nameById.get(integrationId) || 'a channel',
+            total,
+          };
+        }
+      }
+
+      // Top post on the headline metric (largest this-week total).
+      let topPost: WeeklyAnalyticsSummary['topPost'] = null;
+      const headline = metrics[0]?.metric;
+      if (headline) {
+        try {
+          const topPosts =
+            await this._analyticsRepository.getMetricDetailTopPosts(
+              orgId,
+              integrationIds,
+              headline,
+              thisFrom,
+              thisTo
+            );
+          const top = topPosts[0];
+          if (top) {
+            const content = (top as any).post?.content as string | undefined;
+            const title = content
+              ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+              : '';
+            topPost = { postId: top.postId, title, metric: headline, value: top.value };
+          }
+        } catch {
+          // top post is best-effort — never block the summary on it
+        }
+      }
+
+      // One-line anomaly recap (best-effort; skip gracefully on any read failure).
+      let anomalyRecap: string | null = null;
+      try {
+        const anomalies = await this._analyticsRepository.listAnomalies(orgId, {
+          limit: 5,
+        });
+        const weekAnoms = anomalies.filter((a: any) =>
+          dayjs(a.createdAt).isAfter(dayjs(thisFrom))
+        );
+        if (weekAnoms.length > 0) {
+          anomalyRecap = `${weekAnoms.length} analytics alert${
+            weekAnoms.length === 1 ? '' : 's'
+          } flagged this week`;
+        }
+      } catch {
+        // anomaly recap is optional — a missing/failing read just drops the line
+      }
+
+      const summary: WeeklyAnalyticsSummary = {
+        orgId,
+        weekStart: thisFrom,
+        weekEnd: thisTo,
+        metrics,
+        topPost,
+        bestChannel,
+        anomalyRecap,
+        hasData: metrics.length > 0,
+      };
+
+      if (summary.hasData) {
+        try {
+          await this._notificationService.notifyWeeklyAnalyticsSummary({
+            orgId,
+            metrics: metrics.slice(0, 3).map((m) => ({
+              label: m.label,
+              thisWeek: m.thisWeek,
+              changePct: m.changePct,
+            })),
+            topPostTitle: topPost?.title || undefined,
+            bestChannelName: bestChannel?.name,
+            anomalyRecap: anomalyRecap || undefined,
+          });
+        } catch (err) {
+          this.logger.warn('notifyWeeklyAnalyticsSummary failed', {
+            error: (err as Error)?.message,
+          });
+        }
+      }
+
+      return summary;
+    } catch (err) {
+      this.logger.error('buildWeeklySummary error:', {
+        error: (err as Error)?.message,
+      });
+      return null;
     }
   }
 

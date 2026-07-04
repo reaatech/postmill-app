@@ -27,7 +27,9 @@ The profile page (avatar menu → Profile) has three tabs:
   used). Revoke any session individually, or log out all other sessions at once. Logging out
   revokes all of your sessions.
 - **Notifications** — per-category notification preferences across email, push, and in-app
-  channels (post published/failed, channels, comments, budget, media, announcements, streak, and
+  channels (post published/failed, channels, comments, budget, media, announcements, streak,
+  **Analytics alerts** — anomaly spike/drop notifications from the analytics sweep, email and in-app
+  on by default; see [Analytics → Anomaly alerts](analytics.md#anomaly-alerts) — and
   **Agent briefs** — the opt-in weekly proactive agent digest, off by default).
 
 ## Teams tab
@@ -528,4 +530,4 @@ five provider surfaces (AI, Media, Storage, Shortlinks, VPN) and brand managemen
 on their own permissions. A member whose role lacks the grant receives **HTTP 403**; an org can
 grant these permissions to a custom role.
 
-> Verified against v3.9.0
+> Verified against v4.5.0

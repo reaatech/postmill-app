@@ -3,7 +3,9 @@
 import { FC, useCallback, useMemo, useState } from 'react';
 import { Post, CANONICAL_METRICS } from '../utils';
 import { usePostDetail } from '../hooks/usePostDetail';
-import { PostDetailChart } from '../post.detail.chart';
+import { PostDetailBody } from '../post-analytics.drawer';
+import { Drawer } from '../kit/drawer';
+import { ChannelAvatar } from '../kit/channel-avatar';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
 
@@ -81,7 +83,13 @@ export const PostsTab: FC<PostsTabProps> = ({
         header: 'Channel',
         render: (post: Post) => (
           <div className="flex items-center gap-[6px]">
-            <img src={post.integration.picture} alt="" className="w-[16px] h-[16px] rounded-[4px]" />
+            <ChannelAvatar
+              src={post.integration.picture}
+              name={post.integration.name}
+              identifier={post.integration.identifier}
+              size={16}
+              className="rounded-[4px] object-cover"
+            />
             <span className="text-[12px]">{post.integration.name}</span>
           </div>
         ),
@@ -178,112 +186,18 @@ export const PostsTab: FC<PostsTabProps> = ({
         emptyState={{ title: 'No posts found in this period' }}
       />
 
-      {selectedPostId && (
-        <div
-          className="fixed inset-0 z-[100] flex justify-end"
-          onClick={() => setSelectedPostId(null)}
-        >
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" />
-          <div
-            className="relative w-full max-w-[520px] bg-newBgColorInner border-l border-newTableBorder h-full overflow-y-auto animate-fadeIn"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="sticky top-0 bg-newBgColorInner border-b border-newTableBorder px-[20px] py-[14px] flex items-center justify-between z-10">
-              <h3 className="text-[16px] font-semibold truncate">
-                {postDetailLoading
-                  ? 'Loading...'
-                  : postDetail?.content || 'Post Detail'}
-              </h3>
-              <button
-                onClick={() => setSelectedPostId(null)}
-                className="p-[6px] hover:bg-boxHover rounded-[6px] shrink-0"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M4 4L12 12M12 4L4 12"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-            </div>
-            <div className="p-[20px] space-y-[16px]">
-              {postDetailLoading && (
-                <div className="animate-pulse space-y-[12px]">
-                  <div className="flex items-center gap-[8px]">
-                    <div className="w-[24px] h-[24px] rounded-[6px] bg-newTableHeader" />
-                    <div className="space-y-[6px]">
-                      <div className="w-[120px] h-[14px] bg-newTableHeader rounded-[4px]" />
-                      <div className="w-[180px] h-[11px] bg-newTableHeader rounded-[4px]" />
-                    </div>
-                  </div>
-                  <div className="space-y-[8px]">
-                    <div className="w-full h-[14px] bg-newTableHeader rounded-[4px]" />
-                    <div className="w-3/4 h-[14px] bg-newTableHeader rounded-[4px]" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-[8px]">
-                    {[1, 2, 3, 4].map((i) => (
-                      <div
-                        key={i}
-                        className="h-[64px] bg-newTableHeader rounded-[8px]"
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-              {postDetailError && (
-                <div className="flex flex-col items-center justify-center py-[24px] text-center">
-                  <p className="text-[var(--negative,#f97066)] text-[14px] mb-[4px]">
-                    Failed to load post details
-                  </p>
-                  <p className="text-[12px] text-newTableText/60">
-                    {postDetailError.message}
-                  </p>
-                </div>
-              )}
-              {postDetail && (
-                <>
-                  <div className="flex items-center gap-[8px]">
-                    <img
-                      src={postDetail.integration.picture}
-                      alt=""
-                      className="w-[24px] h-[24px] rounded-[6px]"
-                    />
-                    <div>
-                      <div className="text-[14px] font-medium">
-                        {postDetail.integration.name}
-                      </div>
-                      <div className="text-[11px] text-newTableText">
-                        {new Date(postDetail.publishedAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-[13px] leading-relaxed whitespace-pre-wrap max-h-[200px] overflow-y-auto">
-                    {postDetail.content}
-                  </div>
-                  <div className="grid grid-cols-2 gap-[8px]">
-                    {Object.entries(postDetail.metrics).map(([key, value]) => (
-                      <div
-                        key={key}
-                        className="px-[12px] py-[10px] bg-newTableHeader rounded-[8px]"
-                      >
-                        <div className="text-[11px] text-newTableText capitalize">
-                          {key}
-                        </div>
-                        <div className="text-[18px] font-semibold tabular-nums">
-                          {new Intl.NumberFormat().format(Math.round(value))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <PostDetailChart series={postDetail.series} />
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <Drawer
+        open={!!selectedPostId}
+        onClose={() => setSelectedPostId(null)}
+        ariaLabel={postDetail?.content || 'Post Detail'}
+      >
+        <PostDetailBody
+          postDetail={postDetail}
+          isLoading={postDetailLoading}
+          error={postDetailError as Error | undefined}
+          onClose={() => setSelectedPostId(null)}
+        />
+      </Drawer>
     </div>
   );
 };

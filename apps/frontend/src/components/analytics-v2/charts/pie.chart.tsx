@@ -2,29 +2,7 @@
 
 import { FC, useEffect, useRef, useState } from 'react';
 import DrawChart from 'chart.js/auto';
-
-function resolveCSSVar(value: string): string {
-  if (typeof document === 'undefined') return value;
-  const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
-  if (match) {
-    const cssVar = `--${match[1]}`;
-    const computed = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-    return computed || match[2]?.trim() || value;
-  }
-  return value;
-}
-
-function useCSSToken(token: string, fallback: string): string {
-  const [resolved, setResolved] = useState(() => resolveCSSVar(token) || fallback);
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setResolved(resolveCSSVar(token) || fallback);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, [token, fallback]);
-  return resolved;
-}
+import { resolveCSSVar, useCSSToken } from '../kit/chart-theme';
 
 function resolveChartColors(): string[] {
   return [
@@ -64,10 +42,11 @@ export const PieChart: FC<PieChartProps> = ({
   const [chartColors, setChartColors] = useState(resolveChartColors);
 
   useEffect(() => {
+    const target = document.body || document.documentElement;
     const observer = new MutationObserver(() => {
       setChartColors(resolveChartColors());
     });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(target, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
 

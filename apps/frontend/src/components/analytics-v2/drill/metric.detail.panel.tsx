@@ -1,8 +1,11 @@
 'use client';
 
-import { FC, useEffect, useRef } from 'react';
+import { FC } from 'react';
 import { MetricDetailResponse } from '../utils';
 import { AreaChart } from '../charts/area.chart';
+import { CHART_PALETTE } from '../kit/palette';
+import { Drawer } from '../kit/drawer';
+import { ChannelAvatar } from '../kit/channel-avatar';
 
 interface MetricDetailPanelProps {
   data?: MetricDetailResponse;
@@ -11,17 +14,7 @@ interface MetricDetailPanelProps {
 }
 
 export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onClose }) => {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (open) document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
-
-  if (!open || !data) return null;
+  if (!data) return null;
 
   const isPositive = data.percentageChange >= 0;
 
@@ -32,12 +25,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
   })();
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-[520px] bg-newBgColorInner border-l border-newTableBorder h-full overflow-y-auto animate-fadeIn"
-      >
+    <Drawer open={open} onClose={onClose} ariaLabel={data.label}>
         <div className="sticky top-0 bg-newBgColorInner border-b border-newTableBorder px-[20px] py-[14px] flex items-center justify-between z-10">
           <div>
             <h3 className="text-[16px] font-semibold">{data.label}</h3>
@@ -65,7 +53,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
 
           {data.series.length > 1 && (
             <div className="h-[200px]">
-              <AreaChart data={data.series} height={200} format={data.format === 'percent' ? 'percent' : 'number'} />
+              <AreaChart data={data.series} color={CHART_PALETTE[0]} height={200} format={data.format === 'percent' ? 'percent' : 'number'} />
             </div>
           )}
 
@@ -75,7 +63,7 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
               <div className="space-y-[6px]">
                 {data.byChannel.map((ch) => (
                   <div key={ch.integrationId} className="flex items-center gap-[10px] px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
-                    <img src={ch.picture} alt="" className="w-[24px] h-[24px] rounded-[6px]" />
+                    <ChannelAvatar src={ch.picture} name={ch.name} identifier={ch.identifier} size={24} className="rounded-[6px] object-cover" />
                     <span className="flex-1 text-[13px] truncate">{ch.name}</span>
                     <span className="text-[14px] font-semibold tabular-nums">
                       {new Intl.NumberFormat().format(Math.round(ch.value || 0))}
@@ -125,7 +113,6 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 };

@@ -1,44 +1,8 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef } from 'react';
 import DrawChart from 'chart.js/auto';
-
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace('#', '');
-  if (clean.length === 3) {
-    const r = parseInt(clean[0] + clean[0], 16);
-    const g = parseInt(clean[1] + clean[1], 16);
-    const b = parseInt(clean[2] + clean[2], 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function resolveCSSVar(value: string): string {
-  if (typeof document === 'undefined') return value;
-  const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
-  if (match) {
-    const cssVar = `--${match[1]}`;
-    const computed = getComputedStyle(document.documentElement).getPropertyValue(cssVar).trim();
-    return computed || match[2]?.trim() || value;
-  }
-  return value;
-}
-
-function useCSSToken(token: string, fallback: string): string {
-  const [resolved, setResolved] = useState(() => resolveCSSVar(token) || fallback);
-  useEffect(() => {
-    const observer = new MutationObserver(() => {
-      setResolved(resolveCSSVar(token) || fallback);
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, [token, fallback]);
-  return resolved;
-}
+import { hexToRgba, resolveCSSVar, useCSSToken } from '../kit/chart-theme';
 
 interface AreaChartProps {
   data: { date: string; value: number }[];
@@ -136,5 +100,5 @@ export const AreaChart: FC<AreaChartProps> = ({
     };
   }, [data, color, height, format, bgColor, textColor, tableText, borderColor]);
 
-  return <canvas ref={ref} style={{ width: '100%', height }} />;
+  return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 };

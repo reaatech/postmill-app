@@ -1,48 +1,19 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef } from 'react';
 import DrawChart from 'chart.js/auto';
 import { SeriesPoint } from '../utils';
+import { hexToRgba, resolveCSSVar, useCSSToken } from '../kit/chart-theme';
 
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace('#', '');
-  if (clean.length === 3) {
-    const r = parseInt(clean[0] + clean[0], 16);
-    const g = parseInt(clean[1] + clean[1], 16);
-    const b = parseInt(clean[2] + clean[2], 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function resolveCSSVar(value: string, fallback?: string): string {
-  if (typeof document === 'undefined') return fallback ?? value;
-  const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
-  if (match) {
-    const cssVar = `--${match[1]}`;
-    // Theme class (.dark/.light) lives on <body>, and the --new-* tokens are
-    // scoped there — resolve against <body>, not <html>, or they come back empty.
-    const scope = document.body || document.documentElement;
-    const computed = getComputedStyle(scope).getPropertyValue(cssVar).trim();
-    return computed || match[2]?.trim() || fallback || value;
-  }
-  return value;
-}
-
-function useCSSToken(token: string, fallback: string): string {
-  const [resolved, setResolved] = useState(() => resolveCSSVar(token, fallback));
-  useEffect(() => {
-    const target = document.body || document.documentElement;
-    const observer = new MutationObserver(() => {
-      setResolved(resolveCSSVar(token, fallback));
-    });
-    observer.observe(target, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, [token, fallback]);
-  return resolved;
+/** A campaign shaded band drawn over the overview chart (6.5). */
+export interface CampaignBand {
+  name: string;
+  /** Inclusive YYYY-MM-DD start (clamp to first visible label if earlier). */
+  from: string;
+  /** Inclusive YYYY-MM-DD end (clamp to last visible label if later). */
+  to: string;
+  /** Optional hex accent (campaign colour); defaults to the brand accent. */
+  color?: string;
 }
 
 interface LineChartProps {
@@ -53,6 +24,12 @@ interface LineChartProps {
   height?: number;
   format?: 'number' | 'percent' | 'currency' | 'time';
   onPointClick?: (date: string) => void;
+  /**
+   * Campaign annotations (6.5). Only bands intersecting the visible date range
+   * are drawn; passing an empty/undefined array (the toggle-off state) draws
+   * none. The tooltip/data are unaffected — this is a pure background layer.
+   */
+  campaignBands?: CampaignBand[];
 }
 
 export const LineChart: FC<LineChartProps> = ({
@@ -63,6 +40,7 @@ export const LineChart: FC<LineChartProps> = ({
   height = 300,
   format = 'number',
   onPointClick,
+  campaignBands,
 }) => {
   const ref = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<DrawChart | null>(null);
@@ -126,8 +104,47 @@ export const LineChart: FC<LineChartProps> = ({
           fill: true,
       });
 
+      // 6.5 — inline plugin drawing shaded x-ranges for campaigns intersecting
+      // the visible range. No new npm dep; behind the overview toggle (empty
+      // `campaignBands` = off). Labels are YYYY-MM-DD, so lexical compare works.
+      const campaignBandPlugin = {
+        id: 'campaignBands',
+        beforeDatasetsDraw(chart: DrawChart) {
+          const bands = campaignBands;
+          if (!bands?.length || !labels.length) return;
+          const xScale = (chart.scales as any).x;
+          const area = chart.chartArea;
+          if (!xScale || !area) return;
+          const ctx2 = chart.ctx;
+          bands.forEach((band) => {
+            let startIdx = labels.findIndex((l) => l >= band.from);
+            if (startIdx === -1) return; // starts after the visible range
+            let endIdx = -1;
+            for (let j = labels.length - 1; j >= 0; j--) {
+              if (labels[j] <= band.to) {
+                endIdx = j;
+                break;
+              }
+            }
+            if (endIdx === -1 || startIdx > endIdx) return; // no intersection
+            const left = xScale.getPixelForValue(startIdx);
+            const right = xScale.getPixelForValue(endIdx);
+            const bandColor = band.color || '#2b5cd3';
+            ctx2.save();
+            ctx2.fillStyle = hexToRgba(bandColor, 0.1);
+            ctx2.fillRect(left, area.top, Math.max(right - left, 2), area.bottom - area.top);
+            ctx2.fillStyle = hexToRgba(bandColor, 0.9);
+            ctx2.font = '10px sans-serif';
+            ctx2.textBaseline = 'top';
+            ctx2.fillText(band.name, left + 4, area.top + 2);
+            ctx2.restore();
+          });
+        },
+      };
+
       chartRef.current = new DrawChart(ref.current, {
         type: 'line',
+        plugins: [campaignBandPlugin],
         data: {
           labels,
           datasets: datasets as any[],
@@ -216,7 +233,7 @@ export const LineChart: FC<LineChartProps> = ({
     return () => {
       chartRef.current?.destroy();
     };
-  }, [series, comparisonSeries, color, comparisonColor, height, format, onPointClick, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor, gridDottedColor]);
+  }, [series, comparisonSeries, color, comparisonColor, height, format, onPointClick, campaignBands, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor, gridDottedColor]);
 
-  return <canvas ref={ref} style={{ width: '100%', height }} />;
+  return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 };

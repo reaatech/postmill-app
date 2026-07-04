@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   ClientInformation,
   PostDetails,
@@ -7,6 +8,7 @@ import {
   SocialProvider,
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
+import dayjs from 'dayjs';
 import { RedditSettingsDto } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { decodeHtmlEntities } from '@gitroom/helpers/utils/html.to.text';
@@ -682,6 +684,52 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         content: message,
         createdAt: new Date().toISOString(),
       };
+    }
+  }
+
+  // Reddit exposes no per-account channel analytics, so there is no analytics();
+  // per-post metrics come from the public /api/info listing (score / upvote
+  // ratio / comment count), subreddit-agnostic — same fetch path as fetchComments.
+  async postAnalytics(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    try {
+      const cleanPostId = postId.startsWith('t3_') ? postId.slice(3) : postId;
+      const info = (await (
+        await this.fetch(
+          `https://oauth.reddit.com/api/info?id=t3_${cleanPostId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json()) as any;
+
+      const data = info?.data?.children?.[0]?.data;
+      if (!data) {
+        return [];
+      }
+
+      const today = dayjs().format('YYYY-MM-DD');
+      const result: AnalyticsData[] = [];
+      const push = (label: string, value: unknown) => {
+        if (value !== undefined && value !== null) {
+          result.push({ label, data: [{ total: String(value), date: today }] });
+        }
+      };
+
+      push('Score', data.score);
+      push('Upvote Ratio', data.upvote_ratio);
+      push('Comments', data.num_comments);
+
+      return result;
+    } catch (err) {
+      this.logger.error('Reddit postAnalytics error:', err);
+      return [];
     }
   }
 }

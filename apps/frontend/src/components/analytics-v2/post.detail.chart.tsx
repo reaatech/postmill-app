@@ -3,19 +3,11 @@
 import { FC } from 'react';
 import { SeriesPoint } from './utils';
 import { LineChart } from './charts/line.chart';
+import { CHART_PALETTE } from './kit/palette';
 
 interface PostDetailChartProps {
   series: Record<string, SeriesPoint[]>;
 }
-
-const CHART_COLORS = [
-  'var(--chart-1, #2b5cd3)',
-  'var(--chart-2, #32d583)',
-  'var(--chart-3, #1d9bf0)',
-  'var(--chart-4, #f97066)',
-  'var(--chart-5, #ffac30)',
-  'var(--chart-6, #8b90ff)',
-];
 
 export const PostDetailChart: FC<PostDetailChartProps> = ({ series }) => {
   const entries = Object.entries(series).filter(
@@ -48,7 +40,7 @@ export const PostDetailChart: FC<PostDetailChartProps> = ({ series }) => {
             <div className="h-[120px]">
               <LineChart
                 series={points}
-                color={CHART_COLORS[i % CHART_COLORS.length]}
+                color={CHART_PALETTE[i % CHART_PALETTE.length]}
                 height={120}
                 format="number"
               />

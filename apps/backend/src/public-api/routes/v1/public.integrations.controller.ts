@@ -22,12 +22,15 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { parseQualified } from '@gitroom/provider-kernel';
+import { Throttle } from '@nestjs/throttler';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { Organization } from '@prisma/client';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
+import dayjs from 'dayjs';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
@@ -91,7 +94,8 @@ export class PublicIntegrationsController {
     private _storageService: StorageService,
     private _subscriptionService: SubscriptionService,
     private _aiDefaults: AiDefaultsService,
-    private _aiMediaService: AiMediaService
+    private _aiMediaService: AiMediaService,
+    private _campaignsService: CampaignsService
   ) {}
 
   @Post('/upload')
@@ -633,6 +637,57 @@ export class PublicIntegrationsController {
     return this._postsService.updateReleaseId(org.id, id, releaseId);
   }
 
+  // 6.8: public v2 campaign analytics. Registered BEFORE the single-segment
+  // `/analytics/:integration` legacy route so the static two-segment path isn't
+  // captured by the param route. Gated like `/analytics/overview` — the public
+  // per-minute @Throttle, no @CheckPolicies (API-key read parity with the legacy
+  // siblings). Org-ownership is enforced by CampaignsService.get (→ 404).
+  @Get('/analytics/campaign/:id')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async getCampaignAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    const campaign = await this._campaignsService.get(id, org.id);
+    if (!campaign) {
+      throw new HttpException({ msg: 'Campaign not found' }, 404);
+    }
+
+    const to = toStr || dayjs().format('YYYY-MM-DD');
+    const from = fromStr || dayjs().subtract(90, 'day').format('YYYY-MM-DD');
+
+    const overview = await this._analyticsService.getOverview(
+      org,
+      from,
+      to,
+      [],
+      false,
+      { campaignIds: [id] }
+    );
+
+    return { ...overview, window: { from, to } };
+  }
+
+  // 6.8: public v2 anomaly feed. Static single-segment path — registered before
+  // `/analytics/:integration` so it resolves to this route, not the param one.
+  // Same gating as `/analytics/overview` (@Throttle, no @CheckPolicies).
+  @Get('/analytics/anomalies')
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async getAnomalies(
+    @GetOrgFromRequest() org: Organization,
+    @Query('limit') limit?: string,
+    @Query('includeDismissed') includeDismissed?: string
+  ) {
+    Sentry.metrics.count('public_api-request', 1);
+    return this._analyticsService.listAnomalies(org.id, {
+      limit: limit ? Math.min(Math.max(+limit || 0, 1), 100) : undefined,
+      includeDismissed: includeDismissed === 'true',
+    });
+  }
+
   @Get('/analytics/:integration')
   async getAnalytics(
     @GetOrgFromRequest() org: Organization,
@@ -654,6 +709,11 @@ export class PublicIntegrationsController {
   }
 
   @Get('/analytics/overview')
+  // 0.8: kept ungated by @CheckPolicies to match its legacy siblings (:636/:646,
+  // n8n/Zapier compat) — API-key read routes carry no entitlement gate. Instead it
+  // carries the documented public per-minute @Throttle (org-scoped via the guard's
+  // getTracker on req.org.id) since the overview can fan out to live provider analytics.
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
   async getAnalyticsOverview(
     @GetOrgFromRequest() org: Organization,
     @Query('from') from: string,

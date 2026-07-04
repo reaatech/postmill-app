@@ -1,24 +1,23 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC, useMemo, useState } from 'react';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { OverviewResponse } from '../utils';
-import { KPICard } from '../cards/kpi.card';
-import { LineChart } from '../charts/line.chart';
+import { StatTile } from '../kit/stat-tile';
+import { TabSkeleton, EmptyState, ErrorState } from '../kit/states';
+import { LineChart, CampaignBand } from '../charts/line.chart';
 import { PieChart } from '../charts/pie.chart';
 import { BarChart } from '../charts/bar.chart';
 import { MetricDetailPanel } from '../drill/metric.detail.panel';
 import { useMetricDrill } from '../hooks/useMetricDrill';
 import { DayDetailPanel } from '../drill/day.detail.panel';
 import { useDayDrill } from '../hooks/useDayDrill';
-
-const KPI_COLORS = [
-  'var(--chart-1, #2b5cd3)',
-  'var(--chart-2, #32d583)',
-  'var(--chart-3, #1d9bf0)',
-  'var(--chart-4, #f97066)',
-  'var(--chart-5, #ffac30)',
-  'var(--chart-6, #8b90ff)',
-];
+import { CHART_PALETTE } from '../kit/palette';
+import { AnomalyOverviewStrip } from './alerts.section';
+import { DerivedMetricTiles } from '../kit/derived-metrics';
+import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
+import { NarrateModal } from './narrate.modal';
 
 interface OverviewTabProps {
   data?: OverviewResponse;
@@ -28,6 +27,10 @@ interface OverviewTabProps {
   to: string;
   integrations: string[];
   compare: boolean;
+  /** Campaign filter (1.6) — threaded into the metric/day drills so they stay scoped. */
+  campaigns?: string[];
+  /** Campaign date ranges for the overview chart annotations (6.5). */
+  campaignBands?: CampaignBand[];
   selectedMetric?: string;
   selectedDate?: string;
   focusIntegration?: string;
@@ -44,6 +47,8 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   to,
   integrations,
   compare,
+  campaigns,
+  campaignBands,
   selectedMetric,
   selectedDate,
   focusIntegration,
@@ -51,18 +56,34 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   onSelectDate,
   onSelectChannel,
 }) => {
+  const t = useT();
+  const modal = useModals();
+  const aiActive = useAiActive();
+  // Campaign annotations toggle (6.5) — default on when any band intersects.
+  const [showBands, setShowBands] = useState(true);
+
+  const openNarrate = () => {
+    modal.openModal({
+      title: t('analytics_explain_period', 'Explain this period'),
+      withCloseButton: true,
+      children: <NarrateModal from={from} to={to} />,
+    });
+  };
+
   const { data: metricDrillData } = useMetricDrill({
     metric: selectedMetric || '',
     from,
     to,
     integrations,
     compare,
+    campaigns,
   });
 
   const { data: dayDrillData } = useDayDrill({
     date: selectedDate || '',
     metric: selectedMetric || '',
     integrations,
+    campaigns,
   });
 
   const mainMetric = useMemo(() => {
@@ -111,110 +132,70 @@ export const OverviewTab: FC<OverviewTabProps> = ({
   }, [data]);
 
   if (loading) {
-    return (
-      <div className="space-y-[16px] animate-pulse">
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] mobile:gap-[8px]">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="h-[180px] mobile:h-[112px] bg-newTableHeader rounded-[12px]"
-            />
-          ))}
-        </div>
-        <div className="h-[320px] bg-newTableHeader rounded-[12px]" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[12px]">
-          <div className="h-[280px] bg-newTableHeader rounded-[12px]" />
-          <div className="h-[280px] bg-newTableHeader rounded-[12px]" />
-        </div>
-      </div>
-    );
+    return <TabSkeleton variant="cards" />;
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-[48px] text-center">
-        <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-[var(--negative,#f97066)]/10 flex items-center justify-center">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            className="text-[var(--negative,#f97066)]"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 8v4m0 4h.01" />
-          </svg>
-        </div>
-        <p className="text-newTableText text-[14px] mb-[12px]">
-          Failed to load analytics data
-        </p>
-        <p className="text-[12px] text-newTableText/60">{error.message}</p>
-      </div>
+      <ErrorState
+        title={t('analytics_load_failed', 'Failed to load analytics data')}
+        message={error.message}
+      />
     );
   }
 
   if (!data) {
     return (
-      <div className="flex flex-col items-center justify-center py-[48px] text-center">
-        <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-newTableHeader flex items-center justify-center">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="text-newTableText"
-          >
-            <path d="M3 3v18h18M7 16l4-8 4 4 4-6" />
-          </svg>
-        </div>
-        <p className="text-newTableText text-[14px] mb-[8px]">
-          No data available yet
-        </p>
-        <p className="text-[12px] text-newTableText/60">
-          Analytics will appear once snapshots start accumulating.
-        </p>
-      </div>
+      <EmptyState
+        title={t('analytics_no_data_title', 'No data available yet')}
+        description={t(
+          'analytics_no_data_desc',
+          'Analytics will appear once snapshots start accumulating.'
+        )}
+      />
     );
   }
 
   if (!data.kpis?.length && !data.byChannel?.length && !data.series) {
     return (
-      <div className="flex flex-col items-center justify-center py-[48px] text-center">
-        <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-newTableHeader flex items-center justify-center">
-          <svg
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            className="text-newTableText"
-          >
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-          </svg>
-        </div>
-        <p className="text-newTableText text-[14px] mb-[8px]">
-          No channels connected
-        </p>
-        <p className="text-[12px] text-newTableText/60">
-          Connect social media channels to see analytics.
-        </p>
-      </div>
+      <EmptyState
+        title={t('analytics_no_channels_title', 'No channels connected')}
+        description={t(
+          'analytics_no_channels_desc',
+          'Connect social media channels to see analytics.'
+        )}
+      />
     );
   }
 
+  const hasBands = !!campaignBands?.length;
+
   return (
     <div className="space-y-[16px]">
+      <AnomalyOverviewStrip />
+
+      {/* 7.5 — "Explain this period" is only rendered when AI is configured. */}
+      {aiActive === true && (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={openNarrate}
+            className="inline-flex items-center gap-[6px] px-[12px] py-[6px] text-[13px] font-medium rounded-[8px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-textColor hover:border-newTableText/30 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 3v3m0 12v3M3 12h3m12 0h3M5.6 5.6l2.1 2.1m8.6 8.6 2.1 2.1m0-12.8-2.1 2.1m-8.6 8.6-2.1 2.1" strokeLinecap="round" />
+            </svg>
+            {t('analytics_explain_period', 'Explain this period')}
+          </button>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] mobile:gap-[8px]">
         {data.kpis.map((kpi, i) => (
-          <KPICard
+          <StatTile
             key={kpi.metric}
             kpi={kpi}
-            color={KPI_COLORS[i % KPI_COLORS.length]}
+            accent={CHART_PALETTE[i % CHART_PALETTE.length]}
             onClick={() => {
               onSelectMetric(kpi.metric);
             }}
@@ -222,14 +203,35 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         ))}
       </div>
 
+      {/* 6.2 — derived secondary metrics (engagement rate, reach/follower). */}
+      <DerivedMetricTiles derived={data.derived} />
+
       <div className="bg-newTableHeader border border-newTableBorder rounded-[12px] p-[16px]">
-        <div className="h-[320px]">
+        {hasBands && (
+          <div className="flex justify-end mb-[8px]">
+            <button
+              type="button"
+              onClick={() => setShowBands((v) => !v)}
+              aria-pressed={showBands}
+              className="inline-flex items-center gap-[6px] px-[10px] py-[5px] text-[12px] font-medium rounded-[8px] border border-newTableBorder text-newTableText hover:text-textColor transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
+            >
+              <span
+                className={`inline-block w-[10px] h-[10px] rounded-[2px] ${
+                  showBands ? 'bg-btnPrimary' : 'bg-newTableBorder'
+                }`}
+              />
+              {t('analytics_campaign_bands', 'Campaign bands')}
+            </button>
+          </div>
+        )}
+        <div className="w-full aspect-[16/10] sm:aspect-[21/9] max-h-[360px]">
           <LineChart
             series={series}
             comparisonSeries={comparisonSeries}
             height={320}
             format={mainMetric?.format}
             onPointClick={(date) => onSelectDate?.(date)}
+            campaignBands={showBands ? campaignBands : undefined}
           />
         </div>
       </div>
@@ -258,7 +260,7 @@ export const OverviewTab: FC<OverviewTabProps> = ({
             <h3 className="text-[13px] font-medium text-newTableText mb-[12px]">
               Channel Comparison
             </h3>
-            <div className="h-[250px]">
+            <div className="w-full aspect-[4/3] max-h-[260px]">
               <BarChart
                 labels={channelBarData.labels}
                 values={channelBarData.values}

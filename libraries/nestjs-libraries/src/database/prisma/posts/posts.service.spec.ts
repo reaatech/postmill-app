@@ -84,7 +84,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
     vi.clearAllMocks();
 
     analyticsRepository = {
-      getLatestPostSnapshotsByPostIds: vi.fn().mockResolvedValue([]),
+      getLatestPostSnapshots: vi.fn().mockResolvedValue([]),
     };
 
     service = new PostsService(
@@ -113,7 +113,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('backfills lastViews/lastLikes/lastComments from snapshots', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([
       { postId: 'post-1', metric: 'views', value: 150 },
       { postId: 'post-1', metric: 'likes', value: 25 },
       { postId: 'post-1', metric: 'comments', value: 7 },
@@ -128,7 +128,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('only takes the latest snapshot per metric (first seen = latest by desc date)', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([
       { postId: 'post-1', metric: 'views', value: 150 },
       { postId: 'post-1', metric: 'views', value: 100 },
     ]);
@@ -140,7 +140,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('does not change post when no snapshot exists', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
 
     const posts = [publishedPost()];
     await service.enrichPostsWithLatestStats('org-1', posts);
@@ -154,32 +154,32 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
     const posts = [publishedPost({ lastViews: 10, lastLikes: 2, lastComments: 1 })];
     await service.enrichPostsWithLatestStats('org-1', posts);
 
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
   });
 
   it('skips non-PUBLISHED posts', async () => {
     const posts = [publishedPost({ state: 'DRAFT' })];
     await service.enrichPostsWithLatestStats('org-1', posts);
 
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
   });
 
   it('skips posts with releaseId === "missing"', async () => {
     const posts = [publishedPost({ releaseId: 'missing' })];
     await service.enrichPostsWithLatestStats('org-1', posts);
 
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
   });
 
   it('skips posts with null releaseId', async () => {
     const posts = [publishedPost({ releaseId: null })];
     await service.enrichPostsWithLatestStats('org-1', posts);
 
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
   });
 
   it('never throws on snapshot query failure', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockRejectedValue(new Error('DB down'));
+    analyticsRepository.getLatestPostSnapshots.mockRejectedValue(new Error('DB down'));
 
     const posts = [publishedPost()];
     await expect(
@@ -196,7 +196,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
     const posts = [publishedPost({ integration: { providerIdentifier: 'x' } })];
     await service.enrichPostsWithLatestStats('org-1', posts);
 
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
 
     process.env.DISABLE_X_ANALYTICS = prev;
   });
@@ -205,7 +205,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
     const prev = process.env.DISABLE_X_ANALYTICS;
     delete process.env.DISABLE_X_ANALYTICS;
 
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([
       { postId: 'post-1', metric: 'likes', value: 50 },
     ]);
 
@@ -219,13 +219,13 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
 
   it('does nothing for empty posts array', async () => {
     await service.enrichPostsWithLatestStats('org-1', []);
-    expect(analyticsRepository.getLatestPostSnapshotsByPostIds).not.toHaveBeenCalled();
+    expect(analyticsRepository.getLatestPostSnapshots).not.toHaveBeenCalled();
   });
 
   // ── M4: Live-fallback tier for posts missing metrics after snapshot pass ──
 
   it('calls checkPostAnalytics for posts with no snapshot metrics (live fallback)', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
     // Real AnalyticsData shape ({ label, data: [{ total, date }] }); provider 'youtube'
     // maps labels Views/Likes -> canonical views/likes via PROVIDER_METRIC_MAP.
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockResolvedValue([
@@ -243,7 +243,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('picks the latest data point per metric in the live fallback', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockResolvedValue([
       {
         label: 'Views',
@@ -263,7 +263,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('ignores unmappable labels and non-numeric totals in the live fallback', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockResolvedValue([
       { label: 'Some Unknown Metric', data: [{ total: '999', date: '2026-06-09' }] },
       { label: 'Views', data: [{ total: 'not-a-number', date: '2026-06-09' }] },
@@ -277,7 +277,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('does not call live fallback when snapshot metrics are present', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([
       { postId: 'post-1', metric: 'views', value: 150 },
       { postId: 'post-1', metric: 'likes', value: 25 },
     ]);
@@ -291,7 +291,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('skips live fallback for posts that have any snapshot metric (not fully missing)', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([
       { postId: 'post-1', metric: 'views', value: 100 },
     ]);
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockResolvedValue([]);
@@ -306,7 +306,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('caps live fallback fan-out at 10 posts', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockResolvedValue([]);
 
     const posts = Array.from({ length: 15 }, (_, i) => publishedPost({ id: `post-${i + 10}` }));
@@ -317,7 +317,7 @@ describe('PostsService.enrichPostsWithLatestStats', () => {
   });
 
   it('does not reject batch when a single live fallback throws', async () => {
-    analyticsRepository.getLatestPostSnapshotsByPostIds.mockResolvedValue([]);
+    analyticsRepository.getLatestPostSnapshots.mockResolvedValue([]);
     let callCount = 0;
     const checkSpy = vi.spyOn(service as any, 'checkPostAnalytics').mockImplementation(async () => {
       callCount++;

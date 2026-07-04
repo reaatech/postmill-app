@@ -4,6 +4,7 @@ import {
   Controller,
   Delete,
   Get,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -12,6 +13,8 @@ import {
 } from '@nestjs/common';
 import { Organization, User } from '@prisma/client';
 import { Response } from 'express';
+import dayjs from 'dayjs';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ApiTags } from '@nestjs/swagger';
@@ -181,6 +184,10 @@ export class CampaignsController {
     private _postsService: PostsService,
     private _reportService: CampaignReportService,
     private _noteService: CampaignNoteService,
+    // Controller composition (1.5): AnalyticsService is provided only in
+    // api.module.ts (no nestjs-libraries module exports it), so CampaignsService
+    // must not inject it. The controller composes the two services instead.
+    private _analyticsService: AnalyticsService,
   ) {}
 
   private _parseGoals(goals?: CampaignGoalDto[]): any {
@@ -299,6 +306,38 @@ export class CampaignsController {
     return this._campaignsService.getDashboard(id, org.id);
   }
 
+  // Campaign-hub analytics (1.5): real post-snapshot analytics for the campaign
+  // via controller composition — org-ownership check on CampaignsService, then
+  // AnalyticsService scoped to this campaign's posts.
+  @Get('/:id/analytics')
+  @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
+  async getAnalytics(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+    @Query('from') fromStr?: string,
+    @Query('to') toStr?: string,
+  ) {
+    const campaign = await this._campaignsService.get(id, org.id);
+    if (!campaign) throw new NotFoundException('Campaign not found');
+
+    // Default window: last 90 days (D5 — until the Phase-6 weekly rollup lands,
+    // series are bounded to the 90-day post-snapshot retention). Callers may
+    // narrow it with from/to.
+    const to = toStr || dayjs().format('YYYY-MM-DD');
+    const from = fromStr || dayjs().subtract(90, 'day').format('YYYY-MM-DD');
+
+    const overview = await this._analyticsService.getOverview(
+      org,
+      from,
+      to,
+      [],
+      false,
+      { campaignIds: [id] },
+    );
+
+    return { ...overview, window: { from, to } };
+  }
+
   @Get('/:id/files')
   @CheckPolicies([AuthorizationActions.Read, Sections.POSTS_PER_MONTH])
   async getCampaignFiles(
@@ -328,7 +367,25 @@ export class CampaignsController {
       res.setHeader('Content-Disposition', `attachment; filename="campaign-${id}.pdf"`);
       return pdf;
     }
-    return this._reportService.toJson(id, org.id);
+    const analytics = await this.computeCampaignAnalytics(org, id);
+    return this._reportService.toJson(id, org.id, analytics);
+  }
+
+  // Compose campaign analytics (post-snapshot trend + per-channel breakdown) for
+  // the report — controller composition (AnalyticsService is not injected into
+  // CampaignReportService). Non-fatal: a failure yields a report without the
+  // analytics block rather than failing the whole report.
+  private async computeCampaignAnalytics(org: Organization, id: string) {
+    try {
+      const to = dayjs().format('YYYY-MM-DD');
+      const from = dayjs().subtract(90, 'day').format('YYYY-MM-DD');
+      const overview = await this._analyticsService.getOverview(org, from, to, [], false, {
+        campaignIds: [id],
+      });
+      return { series: overview.series, byChannel: overview.byChannel, window: { from, to } };
+    } catch {
+      return undefined;
+    }
   }
 
   @Post('/:id/copy')

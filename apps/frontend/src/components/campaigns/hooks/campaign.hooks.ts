@@ -51,6 +51,87 @@ export const useCampaignsForEntity = (entityType: string, entityId?: string) => 
   );
 };
 
+// ── Campaign analytics (Phase 3.1) ──
+// Post-snapshot analytics for a campaign, from GET /campaigns/:id/analytics.
+// Shape mirrors AnalyticsService.getOverview + a `window` field.
+export interface CampaignAnalyticsSeriesPoint {
+  date: string;
+  value: number;
+  previousValue?: number;
+}
+export interface CampaignAnalyticsKpi {
+  metric: string;
+  label: string;
+  format: 'number' | 'percent' | 'currency' | 'time';
+  total: number;
+  previousTotal: number;
+  percentageChange: number;
+  sparkline: { date: string; value: number }[];
+}
+export interface CampaignAnalyticsChannel {
+  integrationId: string;
+  name: string;
+  identifier: string;
+  picture: string;
+  kpis: { metric: string; label: string; format: string; total: number }[];
+}
+export interface CampaignAnalytics {
+  range: { from: string; to: string };
+  kpis: CampaignAnalyticsKpi[];
+  series: Record<string, CampaignAnalyticsSeriesPoint[]>;
+  byChannel: CampaignAnalyticsChannel[];
+  breakdown?: { byPlatform: { identifier: string; value: number }[] };
+  scope?: string;
+  window?: { from: string; to: string };
+}
+
+// Post snapshots are retained for 90 days (D5 — until the Phase-6 weekly rollup),
+// so a campaign's default analytics window is clamped to that floor.
+export const CAMPAIGN_SNAPSHOT_WINDOW_DAYS = 90;
+
+// Default analytics range for a campaign: its start→end clamped to the snapshot
+// window; ongoing campaigns (no endDate) default to the last 30 days.
+export const resolveCampaignAnalyticsRange = (
+  startDate?: string | null,
+  endDate?: string | null
+): { from: string; to: string } => {
+  const today = dayjs();
+  const windowFloor = today.subtract(CAMPAIGN_SNAPSHOT_WINDOW_DAYS, 'day');
+  if (!endDate) {
+    return {
+      from: today.subtract(30, 'day').format('YYYY-MM-DD'),
+      to: today.format('YYYY-MM-DD'),
+    };
+  }
+  const end = dayjs(endDate);
+  const to = (end.isAfter(today) ? today : end).format('YYYY-MM-DD');
+  const start = startDate ? dayjs(startDate) : windowFloor;
+  const from = (start.isBefore(windowFloor) ? windowFloor : start).format('YYYY-MM-DD');
+  return { from, to };
+};
+
+export const useCampaignAnalytics = (
+  campaignId?: string,
+  from?: string,
+  to?: string
+) => {
+  const fetch = useFetch();
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  const suffix = params.toString() ? `?${params.toString()}` : '';
+  const loader = useCallback(async () => {
+    const r = await fetch(`/campaigns/${campaignId}/analytics${suffix}`);
+    if (!r.ok) throw new Error('Failed to load campaign analytics');
+    return r.json();
+  }, [fetch, campaignId, suffix]);
+  return useSWR<CampaignAnalytics>(
+    campaignId ? `campaign-analytics-${campaignId}${suffix}` : null,
+    loader,
+    { revalidateOnFocus: false }
+  );
+};
+
 export const useCampaignDashboard = (id?: string) => {
   const fetch = useFetch();
   const loader = useCallback(async () => {

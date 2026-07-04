@@ -2,12 +2,15 @@
 
 import { FC, useRef, useState } from 'react';
 import { useExport } from './hooks/useExport';
+import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ExportButtonProps {
   from: string;
   to: string;
   integrations?: string[];
   compare?: boolean;
+  campaigns?: string[];
 }
 
 export const ExportButton: FC<ExportButtonProps> = ({
@@ -15,7 +18,10 @@ export const ExportButton: FC<ExportButtonProps> = ({
   to,
   integrations,
   compare,
+  campaigns,
 }) => {
+  const t = useT();
+  const toaster = useToaster();
   const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -25,9 +31,9 @@ export const ExportButton: FC<ExportButtonProps> = ({
     setExporting(true);
     setOpen(false);
     try {
-      await download({ from, to, format, integrations, compare });
+      await download({ from, to, format, integrations, compare, campaigns });
     } catch {
-      // export failed silently
+      toaster.show(t('export_failed', 'Export failed. Please try again.'), 'warning');
     } finally {
       setExporting(false);
     }

@@ -11,6 +11,24 @@
 ## Unreleased
 
 ### Added
+- **Analytics anomaly alerts + Insights tab + true campaign scope.** The `/analytics` dashboard
+  merges Best time, Recommendations, and a new Alerts section into a single **Insights** tab (tabs
+  are now Overview | Channels | Posts | Insights | Links | Watchlist; the kebab overflow is gone).
+  The daily Inngest sweep gains a `detect-anomalies` step: a pure detector
+  (`analytics/anomaly.detection.ts` — trailing-28-day mean/σ, flow-vs-stock differencing, z-threshold
+  plus an absolute floor) persists idempotent `AnalyticsAnomaly` rows (migration
+  `20260704120000_analytics_anomaly`), cooldown-deduped and capped at 3 per org per day, and fires a
+  new **Analytics alerts** notification category (`analytics`; email + in-app on by default).
+  Anomalies show as an Overview strip and in Insights → Alerts. The dashboard **campaign filter** now
+  scopes aggregation to a campaign's posts server-side (post-snapshot-scoped, live-fallback skipped,
+  `scope: 'campaign-posts'`), and campaign analytics (trend + per-channel breakdown) appear in the
+  Campaign Hub dashboard and public report. New endpoints `GET /analytics/v2/anomalies`,
+  `POST /analytics/v2/anomalies/:id/dismiss`, `GET /campaigns/:id/analytics`, and public-API parity
+  `GET /analytics/campaign/:id` + `GET /analytics/anomalies`; date-range endpoints accept a
+  `campaigns` param. Newly connected social channels emit `analytics/backfill` for instant history;
+  post-snapshots roll up weekly past the 90-day cliff; the live-fallback coverage heuristic is now
+  per-integration. New env vars `ANALYTICS_ANOMALY_Z` (default 3) and
+  `ANALYTICS_ANOMALY_COOLDOWN_DAYS` (default 3).
 - **Setup onboarding gate (`/setup`).** One-time wizard for new organizations that walks the first
   user through provider configuration (LLM required; AI media, channels, content packs, storage,
   shortlinks, VPN optional). Completion persists in `Organization.setupCompletedAt`; existing orgs

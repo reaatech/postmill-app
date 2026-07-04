@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   ClientInformation,
   PostDetails,
@@ -8,6 +9,7 @@ import {
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
 import { SocialAbstract } from '@gitroom/provider-kernel';
+import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { DiscordDto } from '@gitroom/provider-kernel';
 import { Tool } from '@gitroom/provider-kernel';
@@ -501,6 +503,45 @@ export class DiscordProvider extends SocialAbstract implements SocialProvider {
       return { liked: like };
     } catch (err) {
       return { liked: like };
+    }
+  }
+
+  // Channel-level analytics: guild member counts via the bot token. `id` is the
+  // guild id (internalId) and the bot token rides on clientInformation.token
+  // (same as post()). Discord messages carry no per-post view metric, so there
+  // is no postAnalytics().
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number,
+    clientInformation?: ClientInformation
+  ): Promise<AnalyticsData[]> {
+    try {
+      const botToken = clientInformation?.token || '';
+      const guild = (await (
+        await this.fetch(
+          `https://discord.com/api/guilds/${id}?with_counts=true`,
+          {
+            headers: {
+              Authorization: `Bot ${botToken}`,
+            },
+          }
+        )
+      ).json()) as any;
+
+      const today = dayjs().format('YYYY-MM-DD');
+      const result: AnalyticsData[] = [];
+      const push = (label: string, value: unknown) => {
+        if (value !== undefined && value !== null) {
+          result.push({ label, data: [{ total: String(value), date: today }] });
+        }
+      };
+
+      push('Members', guild?.approximate_member_count);
+
+      return result;
+    } catch (err) {
+      return [];
     }
   }
 

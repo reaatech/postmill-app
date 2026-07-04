@@ -1,48 +1,8 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useRef } from 'react';
 import DrawChart from 'chart.js/auto';
-
-function hexToRgba(hex: string, alpha: number): string {
-  const clean = hex.replace('#', '');
-  if (clean.length === 3) {
-    const r = parseInt(clean[0] + clean[0], 16);
-    const g = parseInt(clean[1] + clean[1], 16);
-    const b = parseInt(clean[2] + clean[2], 16);
-    return `rgba(${r},${g},${b},${alpha})`;
-  }
-  const r = parseInt(clean.slice(0, 2), 16);
-  const g = parseInt(clean.slice(2, 4), 16);
-  const b = parseInt(clean.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
-}
-
-function resolveCSSVar(value: string, fallback?: string): string {
-  if (typeof document === 'undefined') return fallback ?? value;
-  const match = value.match(/^var\(--([^,]+)(?:,\s*([^)]+))?\)$/);
-  if (match) {
-    const cssVar = `--${match[1]}`;
-    // Theme class (.dark/.light) lives on <body>, and the --new-* tokens are
-    // scoped there — resolve against <body>, not <html>, or they come back empty.
-    const scope = document.body || document.documentElement;
-    const computed = getComputedStyle(scope).getPropertyValue(cssVar).trim();
-    return computed || match[2]?.trim() || fallback || value;
-  }
-  return value;
-}
-
-function useCSSToken(token: string, fallback: string): string {
-  const [resolved, setResolved] = useState(() => resolveCSSVar(token, fallback));
-  useEffect(() => {
-    const target = document.body || document.documentElement;
-    const observer = new MutationObserver(() => {
-      setResolved(resolveCSSVar(token, fallback));
-    });
-    observer.observe(target, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, [token, fallback]);
-  return resolved;
-}
+import { hexToRgba, resolveCSSVar, useCSSToken } from '../kit/chart-theme';
 
 interface BarChartProps {
   labels: string[];
@@ -172,5 +132,5 @@ export const BarChart: FC<BarChartProps> = ({
     };
   }, [labels, values, color, height, format, horizontal, bgColor, textColor, tableText, gridColor, borderColor, resolvedColor, gridDottedColor]);
 
-  return <canvas ref={ref} style={{ width: '100%', height }} />;
+  return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 };

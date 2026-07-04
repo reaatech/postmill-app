@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { KPICard } from './kpi.card';
+import { StatTile } from './stat-tile';
 import { KPI } from '../utils';
 
 vi.mock('../hooks/useCountUp', () => ({
@@ -24,45 +24,47 @@ const baseKpi: KPI = {
   sparkline: [],
 };
 
-describe('KPICard', () => {
+describe('StatTile (rich / kpi variant)', () => {
   it('renders metric label', () => {
-    render(<KPICard kpi={baseKpi} />);
+    render(<StatTile kpi={baseKpi} />);
     expect(screen.getByText('Impressions')).toBeTruthy();
   });
 
   it('renders formatted number value', () => {
-    render(<KPICard kpi={baseKpi} />);
+    render(<StatTile kpi={baseKpi} />);
     expect(screen.getByText('12,345')).toBeTruthy();
   });
 
   it('renders positive percentage change', () => {
-    render(<KPICard kpi={baseKpi} />);
-    expect(screen.getByText((content) => content.startsWith('23.4') && content.includes('%'))).toBeTruthy();
+    render(<StatTile kpi={baseKpi} />);
+    expect(
+      screen.getByText((content) => content.startsWith('23.4') && content.includes('%'))
+    ).toBeTruthy();
   });
 
   it('renders negative percentage change', () => {
-    render(<KPICard kpi={{ ...baseKpi, percentageChange: -15.3 }} />);
+    render(<StatTile kpi={{ ...baseKpi, percentageChange: -15.3 }} />);
     expect(screen.getByText('15.3%')).toBeTruthy();
   });
 
   it('hides trend block when percentage change is zero', () => {
-    render(<KPICard kpi={{ ...baseKpi, percentageChange: 0 }} />);
+    render(<StatTile kpi={{ ...baseKpi, percentageChange: 0 }} />);
     expect(screen.queryByText('0.0%')).toBeFalsy();
   });
 
   it('renders percent format correctly', () => {
-    render(<KPICard kpi={{ ...baseKpi, format: 'percent', total: 45.67 }} />);
+    render(<StatTile kpi={{ ...baseKpi, format: 'percent', total: 45.67 }} />);
     expect(screen.getByText('45.7%')).toBeTruthy();
   });
 
   it('renders currency format correctly', () => {
-    render(<KPICard kpi={{ ...baseKpi, format: 'currency', total: 5000 }} />);
+    render(<StatTile kpi={{ ...baseKpi, format: 'currency', total: 5000 }} />);
     expect(screen.getByText('$5,000')).toBeTruthy();
   });
 
   it('renders sparkline canvas when data has multiple points', () => {
     const { container } = render(
-      <KPICard
+      <StatTile
         kpi={{
           ...baseKpi,
           sparkline: [
@@ -77,20 +79,32 @@ describe('KPICard', () => {
 
   it('does not render sparkline for single data point', () => {
     const { container } = render(
-      <KPICard
-        kpi={{
-          ...baseKpi,
-          sparkline: [{ date: '2024-01-01', value: 10 }],
-        }}
-      />
+      <StatTile kpi={{ ...baseKpi, sparkline: [{ date: '2024-01-01', value: 10 }] }} />
     );
     expect(container.querySelector('canvas')).toBeFalsy();
   });
 
   it('calls onClick when card is clicked', () => {
     const onClick = vi.fn();
-    render(<KPICard kpi={baseKpi} onClick={onClick} />);
-    (screen.getByText('Impressions').closest('[class*="cursor-pointer"]') as HTMLElement)!.click();
+    render(<StatTile kpi={baseKpi} onClick={onClick} />);
+    (
+      screen.getByText('Impressions').closest('[class*="cursor-pointer"]') as HTMLElement
+    )!.click();
     expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe('StatTile (plain / label-value variant)', () => {
+  it('renders label and value', () => {
+    render(<StatTile label="Total Clicks" value="150" />);
+    expect(screen.getByText('Total Clicks')).toBeTruthy();
+    expect(screen.getByText('150')).toBeTruthy();
+  });
+
+  it('renders an accent bar when accent is passed', () => {
+    const { container } = render(
+      <StatTile label="Channels" value="4" accent="var(--chart-3, #1d9bf0)" />
+    );
+    expect(container.querySelectorAll('.pointer-events-none').length).toBe(2);
   });
 });

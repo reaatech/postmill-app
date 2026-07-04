@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PostDetails,
   PostResponse,
@@ -437,6 +438,35 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   ): Promise<{ liked: boolean; likeCount?: number }> {
     // Platform does not support native comment likes
     return { liked: like };
+  }
+
+  // Channel-level analytics: subscriber (member) count via the Bot API's
+  // getChatMemberCount. `accessToken` is the chat id (see authenticate()).
+  // Per-post `views` are NOT retrievable through the Bot API (they require
+  // MTProto) — see su-provider-analytics.md, so there is no postAnalytics().
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number,
+    clientInformation?: ClientInformation
+  ): Promise<AnalyticsData[]> {
+    try {
+      const bot = this.createBot(clientInformation?.client_id || '');
+      const count = await bot.getChatMemberCount(accessToken);
+      if (count === undefined || count === null) {
+        return [];
+      }
+      return [
+        {
+          label: 'Followers',
+          data: [
+            { total: String(count), date: dayjs().format('YYYY-MM-DD') },
+          ],
+        },
+      ];
+    } catch (err) {
+      return [];
+    }
   }
 
   async botIsAdmin(chatId: number, botId: number, orgId?: string): Promise<boolean> {

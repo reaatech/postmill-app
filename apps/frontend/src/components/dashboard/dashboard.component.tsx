@@ -7,7 +7,7 @@ import { useDashboardSummary } from './hooks/useDashboardSummary';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { PageHeader } from '@gitroom/frontend/components/ui/page-header';
 import { DashboardSetup } from './dashboard.setup';
-import { KpiCard } from '@gitroom/frontend/components/analytics-v2/cards/kpi.card';
+import { StatTile } from '@gitroom/frontend/components/analytics-v2/kit/stat-tile';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
 import { useOverview } from '@gitroom/frontend/components/analytics-v2/hooks/useOverview';
@@ -78,10 +78,10 @@ export const DashboardComponent = () => {
       <DashboardSetup />
 
       <div className="grid grid-cols-2 xs:grid-cols-1 md:grid-cols-4 gap-[16px] mb-[24px]">
-        <KpiCard label="Total Posts" value={summaryLoading ? '...' : String(summary?.totalPosts ?? 0)} color="var(--chart-1, #2b5cd3)" />
-        <KpiCard label="Scheduled" value={summaryLoading ? '...' : String(summary?.scheduledPosts ?? 0)} color="var(--chart-5, #ffac30)" />
-        <KpiCard label="Published (7d)" value={summaryLoading ? '...' : String(summary?.publishedNext7 ?? 0)} color="var(--chart-2, #32d583)" />
-        <KpiCard label="Channels" value={String(summary?.channelsConnected ?? integrations?.length ?? 0)} color="var(--chart-3, #1d9bf0)" />
+        <StatTile label="Total Posts" value={summaryLoading ? '...' : String(summary?.totalPosts ?? 0)} accent="var(--chart-1, #2b5cd3)" />
+        <StatTile label="Scheduled" value={summaryLoading ? '...' : String(summary?.scheduledPosts ?? 0)} accent="var(--chart-5, #ffac30)" />
+        <StatTile label="Published (7d)" value={summaryLoading ? '...' : String(summary?.publishedNext7 ?? 0)} accent="var(--chart-2, #32d583)" />
+        <StatTile label="Channels" value={String(summary?.channelsConnected ?? integrations?.length ?? 0)} accent="var(--chart-3, #1d9bf0)" />
       </div>
 
       {overviewLoading ? (

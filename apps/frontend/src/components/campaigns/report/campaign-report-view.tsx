@@ -7,6 +7,9 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { Button } from '@gitroom/react/form/button';
 import dayjs from 'dayjs';
 import clsx from 'clsx';
+import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
+import { BarChart } from '@gitroom/frontend/components/analytics-v2/charts/bar.chart';
+import { metricLabel } from '@gitroom/frontend/components/campaigns/metric-labels';
 
 const stripHtml = (html?: string | null): string =>
   (html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -64,6 +67,20 @@ interface ReportCampaign {
   endDate?: string | Date | null;
 }
 
+interface ReportAnalyticsSeriesPoint {
+  date: string;
+  value: number;
+}
+interface ReportAnalyticsChannel {
+  name: string;
+  kpis?: { metric: string; total: number }[];
+}
+interface ReportAnalytics {
+  series?: Record<string, ReportAnalyticsSeriesPoint[]>;
+  byChannel?: ReportAnalyticsChannel[];
+  window?: { from: string; to: string };
+}
+
 interface CampaignReport {
   campaign: ReportCampaign;
   engagement: ReportEngagement;
@@ -71,7 +88,10 @@ interface CampaignReport {
   channelBreakdown: Record<string, ReportChannelStats>;
   itemInventory: Record<string, ReportItem[]>;
   goals: ReportGoal[];
+  analytics?: ReportAnalytics;
 }
+
+const PRIMARY_METRIC_ORDER = ['views', 'impressions', 'video_views', 'likes', 'comments', 'clicks'];
 
 const formatNumber = (value: number | null | undefined): string => {
   const n = typeof value === 'number' ? value : 0;
@@ -81,18 +101,6 @@ const formatNumber = (value: number | null | undefined): string => {
 const formatDate = (value: string | Date | null | undefined): string => {
   if (!value) return '—';
   return dayjs(value).format('MMM D, YYYY');
-};
-
-const metricLabel = (metric: string): string => {
-  const labels: Record<string, string> = {
-    impressions: 'Impressions',
-    likes: 'Likes',
-    comments: 'Comments',
-    clicks: 'Clicks',
-    posts: 'Posts',
-    followers: 'Followers',
-  };
-  return labels[metric] || metric;
 };
 
 const DownloadIcon: FC<{ className?: string }> = ({ className }) => (
@@ -146,6 +154,28 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
       return db - da;
     });
   }, [report.posts]);
+
+  // Trend chart (3.4): rendered for both authed and public reports when the
+  // pre-computed analytics block is present.
+  const trend = useMemo(() => {
+    const series = report.analytics?.series || {};
+    const keys = Object.keys(series);
+    if (!keys.length) return null;
+    const pick =
+      PRIMARY_METRIC_ORDER.find((m) => (series[m]?.length ?? 0) > 0) ||
+      keys.find((k) => (series[k]?.length ?? 0) > 0);
+    if (!pick) return null;
+    return { metric: pick, series: series[pick] };
+  }, [report.analytics]);
+
+  const analyticsChannelBars = useMemo(() => {
+    const byChannel = report.analytics?.byChannel || [];
+    if (!byChannel.length) return { labels: [] as string[], values: [] as number[] };
+    return {
+      labels: byChannel.map((c) => c.name),
+      values: byChannel.map((c) => c.kpis?.[0]?.total || 0),
+    };
+  }, [report.analytics]);
 
   const downloadBlob = useCallback(
     async (format: 'csv' | 'pdf') => {
@@ -268,6 +298,30 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
           </div>
         ))}
       </div>
+
+      {trend && (
+        <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex flex-col gap-[16px]">
+          <div className="flex flex-wrap items-baseline justify-between gap-[8px]">
+            <h2 className="text-[16px] font-[600] text-textColor">{t('performance', 'Performance')}</h2>
+            <span className="text-[12px] text-newTableText">
+              {t('post_metrics_trend', 'Post metrics')} · {metricLabel(trend.metric)}
+            </span>
+          </div>
+          <div className="w-full aspect-[16/9] sm:aspect-[21/9] max-h-[320px]">
+            <LineChart series={trend.series} height={300} />
+          </div>
+          {analyticsChannelBars.labels.length > 0 && (
+            <div>
+              <div className="text-[12px] font-medium text-newTableText mb-[8px]">
+                {t('by_channel', 'By channel')}
+              </div>
+              <div className="w-full aspect-[4/3] max-h-[260px]">
+                <BarChart labels={analyticsChannelBars.labels} values={analyticsChannelBars.values} height={250} />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {!publicMode && (
         <div className="no-print flex flex-wrap items-center gap-[12px]">

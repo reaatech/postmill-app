@@ -16,12 +16,19 @@ import { ExtractContentService } from '@gitroom/nestjs-libraries/openai/extract.
 import { CodesService } from '@gitroom/nestjs-libraries/services/codes.service';
 import { PublicIntegrationsController } from '@gitroom/backend/public-api/routes/v1/public.integrations.controller';
 import { PublicCampaignController } from '@gitroom/backend/public-api/routes/public.campaign.controller';
+import { PublicAnalyticsController } from '@gitroom/backend/public-api/routes/public.analytics.controller';
 import { PublicAuthMiddleware } from '@gitroom/backend/services/auth/public.auth.middleware';
 import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
+import { AnalyticsShareService } from '@gitroom/nestjs-libraries/analytics/analytics-share.service';
+import { AnalyticsLiveFallbackService } from '@gitroom/nestjs-libraries/analytics/analytics-live-fallback';
+import { AnalyticsOverviewService } from '@gitroom/nestjs-libraries/analytics/analytics-overview.service';
+import { AnalyticsDetailService } from '@gitroom/nestjs-libraries/analytics/analytics-detail.service';
+import { AnalyticsInsightsService } from '@gitroom/nestjs-libraries/analytics/analytics-insights.service';
+import { AnalyticsExportService } from '@gitroom/nestjs-libraries/analytics/analytics-export.service';
 import { IdempotencyFactory } from '@gitroom/nestjs-libraries/ai/governance/idempotency.factory';
 
 const authenticatedController = [PublicIntegrationsController];
-const publicController = [PublicCampaignController];
+const publicController = [PublicCampaignController, PublicAnalyticsController];
 @Module({
   imports: [UploadModule],
   controllers: [...authenticatedController, ...publicController],
@@ -35,6 +42,12 @@ const publicController = [PublicCampaignController];
     CodesService,
     IntegrationManager,
     AnalyticsService,
+    AnalyticsLiveFallbackService,
+    AnalyticsOverviewService,
+    AnalyticsDetailService,
+    AnalyticsInsightsService,
+    AnalyticsExportService,
+    AnalyticsShareService,
     IdempotencyFactory,
   ],
   get exports() {

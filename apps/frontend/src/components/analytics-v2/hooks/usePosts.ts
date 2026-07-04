@@ -13,6 +13,8 @@ interface PostsParams {
   dir: 'asc' | 'desc';
   page: number;
   limit: number;
+  /** Campaign filter (1.6) — server-scopes posts to these campaigns. */
+  campaigns?: string[];
 }
 
 function serializeParams(p: PostsParams): string {
@@ -25,6 +27,9 @@ function serializeParams(p: PostsParams): string {
     page: String(p.page),
     limit: String(p.limit),
   });
+  if (p.campaigns?.length) {
+    params.set('campaigns', p.campaigns.join(','));
+  }
   return `/analytics/v2/posts?${params.toString()}`;
 }
 

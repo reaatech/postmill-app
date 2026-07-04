@@ -53,6 +53,14 @@ vi.mock('./views/posts.tab', () => ({
   ),
 }));
 
+vi.mock('./views/insights.tab', () => ({
+  InsightsTab: ({ section }: any) => (
+    <div data-testid="insights-tab" data-section={section || ''}>
+      Insights Content
+    </div>
+  ),
+}));
+
 // The filter drawer embeds the Mantine range calendar; stub it (no provider in tests).
 vi.mock('@mantine/dates', () => ({
   RangeCalendar: () => <div data-testid="range-calendar" />,
@@ -112,15 +120,39 @@ describe('AnalyticsDashboard', () => {
     expect(screen.getByRole('button', { name: /^Filter/ })).toBeTruthy();
   });
 
-  it('renders analytics tab buttons', () => {
+  it('renders the six inline analytics tab buttons (no kebab)', () => {
     render(<AnalyticsDashboard />);
 
     expect(screen.getByRole('button', { name: 'Overview' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Channels' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Posts' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Best time' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Recommendations' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Insights' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Links' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Watchlist' })).toBeTruthy();
+    // Best time / Recommendations are now Insights sections, not top-level tabs.
+    expect(screen.queryByRole('button', { name: 'Best time' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Recommendations' })).toBeNull();
+  });
+
+  it('shows InsightsTab when tab=insights', () => {
+    mockSearchParams = new URLSearchParams('from=2024-01-01&to=2024-01-07&tab=insights');
+    render(<AnalyticsDashboard />);
+    expect(screen.getByTestId('insights-tab')).toBeTruthy();
+  });
+
+  it('maps legacy ?tab=best-time to the Insights tab with a section anchor', () => {
+    mockSearchParams = new URLSearchParams('from=2024-01-01&to=2024-01-07&tab=best-time');
+    render(<AnalyticsDashboard />);
+    const insights = screen.getByTestId('insights-tab');
+    expect(insights).toBeTruthy();
+    expect(insights.getAttribute('data-section')).toBe('best-time');
+  });
+
+  it('maps legacy ?tab=recommendations to the Insights tab with a section anchor', () => {
+    mockSearchParams = new URLSearchParams('from=2024-01-01&to=2024-01-07&tab=recommendations');
+    render(<AnalyticsDashboard />);
+    const insights = screen.getByTestId('insights-tab');
+    expect(insights.getAttribute('data-section')).toBe('recommendations');
   });
 
   it('shows OverviewTab by default', () => {
@@ -165,6 +197,35 @@ describe('AnalyticsDashboard', () => {
     const tab = screen.getByTestId('overview-tab');
     expect(tab.getAttribute('data-loading')).toBe('true');
     expect(tab.textContent).toContain('Loading overview...');
+  });
+
+  it('threads selected campaigns into the overview fetch (1.6)', () => {
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&campaigns=c1,c2'
+    );
+
+    render(<AnalyticsDashboard />);
+
+    const call = mockUseOverview.mock.calls[mockUseOverview.mock.calls.length - 1][0] as any;
+    expect(call.campaigns).toEqual(['c1', 'c2']);
+  });
+
+  it('shows the campaign-scope note when the overview reports campaign-posts scope (1.6)', () => {
+    mockUseOverview.mockReturnValue({
+      data: { ...overviewData, scope: 'campaign-posts' },
+      isLoading: false,
+      error: undefined,
+      isValidating: false,
+      mutate: vi.fn(),
+    } as any);
+
+    render(<AnalyticsDashboard />);
+    expect(screen.getByText(/Post metrics only/i)).toBeTruthy();
+  });
+
+  it('hides the campaign-scope note when the overview is unscoped', () => {
+    render(<AnalyticsDashboard />);
+    expect(screen.queryByText(/Post metrics only/i)).toBeNull();
   });
 
   it('passes error state to the active tab', () => {

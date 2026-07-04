@@ -285,7 +285,7 @@ export class PostsService {
     const latestByPost: Record<string, Record<string, number>> = {};
 
     try {
-      const snapshots = await this._analyticsRepository.getLatestPostSnapshotsByPostIds(orgId, postIds);
+      const snapshots = await this._analyticsRepository.getLatestPostSnapshots(orgId, postIds, ['views', 'likes', 'comments']);
 
       for (const snap of snapshots) {
         if (!latestByPost[snap.postId]) {

@@ -6,7 +6,6 @@ import clsx from 'clsx';
 import dayjs from 'dayjs';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { KebabMenu } from '@gitroom/frontend/components/ui/kebab-menu';
 import { useOverview } from './hooks/useOverview';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
@@ -19,8 +18,9 @@ import { DrillState, OverviewResponse } from './utils';
 import { usePosts } from './hooks/usePosts';
 import { ErrorBoundary } from './error.boundary';
 import { ExportButton } from './export.button';
-import { BestTimeTab } from './views/best-time.tab';
-import { RecommendationsTab } from './views/recommendations.tab';
+import { ShareButton } from './share.button';
+import { CampaignBand } from './charts/line.chart';
+import { InsightsTab } from './views/insights.tab';
 import { WatchlistTab } from './views/watchlist.tab';
 import { ShortlinksTab } from './views/shortlinks.tab';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -49,7 +49,14 @@ export const AnalyticsDashboard: FC = () => {
   const from = searchParams.get('from') || getDefaultFrom();
   const to = searchParams.get('to') || getDefaultTo();
   const compare = searchParams.get('compare') !== 'false';
-  const tab = (searchParams.get('tab') as DrillState['tab']) || 'overview';
+  const rawTab = searchParams.get('tab') || 'overview';
+  // Legacy compat: old ?tab=best-time|recommendations deep-links now resolve to
+  // the Insights tab, scrolled to the matching section (2.10).
+  const legacyInsights = rawTab === 'best-time' || rawTab === 'recommendations';
+  const tab = (legacyInsights ? 'insights' : rawTab) as DrillState['tab'];
+  const insightsSection = legacyInsights
+    ? rawTab
+    : searchParams.get('section') || undefined;
   const drillMetric = searchParams.get('metric') || undefined;
   const focusIntegration = searchParams.get('focusIntegration') || undefined;
   const focusDate = searchParams.get('focusDate') || undefined;
@@ -99,12 +106,31 @@ export const AnalyticsDashboard: FC = () => {
         id: string;
         name: string;
         integrationIds?: string[];
+        startDate?: string | null;
+        endDate?: string | null;
+        color?: string | null;
       }>) || [],
     [campaignData]
   );
   const campaigns = useMemo(
     () => campaignList.map((c) => ({ id: c.id, name: c.name })),
     [campaignList]
+  );
+
+  // 6.5 — campaign date ranges for the overview chart annotations. The chart
+  // plugin filters to intersecting bands + clamps, so we pass all dated
+  // campaigns (ongoing ones extend to the visible end).
+  const campaignBands = useMemo<CampaignBand[]>(
+    () =>
+      campaignList
+        .filter((c) => c.startDate)
+        .map((c) => ({
+          name: c.name,
+          from: (c.startDate as string).slice(0, 10),
+          to: c.endDate ? (c.endDate as string).slice(0, 10) : to,
+          color: c.color || undefined,
+        })),
+    [campaignList, to]
   );
 
   // Selected campaigns narrow the channel set to the channels they publish to,
@@ -131,7 +157,12 @@ export const AnalyticsDashboard: FC = () => {
     to,
     integrations: activeIntegrations,
     compare,
+    campaigns: selectedCampaigns,
   });
+
+  // Campaign scope (1.6): the overview response flags itself `campaign-posts`
+  // when campaign-filtered, so metrics derive from post snapshots only.
+  const campaignScoped = overviewData?.scope === 'campaign-posts';
 
   const {
     data: postsData,
@@ -147,6 +178,7 @@ export const AnalyticsDashboard: FC = () => {
           dir: (searchParams.get('dir') as 'asc' | 'desc') || 'desc',
           page: +(searchParams.get('page') || 1),
           limit: 25,
+          campaigns: selectedCampaigns,
         }
       : undefined
   );
@@ -266,39 +298,25 @@ export const AnalyticsDashboard: FC = () => {
     overview: t('analytics_tab_overview', 'Overview'),
     channels: t('analytics_tab_channels', 'Channels'),
     posts: t('analytics_tab_posts', 'Posts'),
-    'best-time': t('analytics_tab_best_time', 'Best time'),
-    recommendations: t('analytics_tab_recommendations', 'Recommendations'),
-    watchlist: t('analytics_tab_watchlist', 'Watchlist'),
+    insights: t('analytics_tab_insights', 'Insights'),
     shortlinks: t('analytics_tab_shortlinks', 'Links'),
+    watchlist: t('analytics_tab_watchlist', 'Watchlist'),
   };
 
-  // Tabs — first 3 inline; the rest fold into a right-aligned kebab on mobile
-  // (inline on desktop). The kebab sits OUTSIDE the scrolling track so its menu
-  // isn't clipped. Mirrors the /campaigns dashboard pattern.
+  // Tabs — all inline (D4 / 2.10): Insights absorbs Best time + Recommendations,
+  // so the kebab overflow is gone.
   const tabItems = (
-    [
-      'overview',
-      'channels',
-      'posts',
-      'best-time',
-      'recommendations',
-      'watchlist',
-      'shortlinks',
-    ] as const
+    ['overview', 'channels', 'posts', 'insights', 'shortlinks', 'watchlist'] as const
   ).map((key) => ({ key, label: tabLabels[key] }));
-  const primaryTabs = tabItems.slice(0, 3);
-  const overflowTabs = tabItems.slice(3);
-  const overflowActive = overflowTabs.some((o) => o.key === tab);
 
-  const renderTab = (item: { key: string; label: string }, extra = '') => (
+  const renderTab = (item: { key: string; label: string }) => (
     <button
       key={item.key}
       type="button"
       onClick={() => handleTabChange(item.key)}
       aria-current={tab === item.key ? 'page' : undefined}
       className={clsx(
-        'px-[16px] py-[10px] text-[14px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors',
-        extra,
+        'px-[16px] py-[10px] text-[14px] font-[500] whitespace-nowrap border-b-2 -mb-[1px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-designerAccent/60',
         tab === item.key
           ? 'border-btnPrimary text-textColor'
           : 'border-transparent text-newTableText hover:text-textColor'
@@ -326,17 +344,35 @@ export const AnalyticsDashboard: FC = () => {
             selectedCampaigns={selectedCampaigns}
             onCampaignsChange={handleCampaignsChange}
             exportSlot={
-              <ExportButton
-                from={from}
-                to={to}
-                integrations={activeIntegrations}
-                compare={compare}
-              />
+              <div className="flex items-center gap-[8px]">
+                <ShareButton />
+                <ExportButton
+                  from={from}
+                  to={to}
+                  integrations={activeIntegrations}
+                  compare={compare}
+                  campaigns={selectedCampaigns}
+                />
+              </div>
             }
           />
         </div>
 
         <div className="flex-1 min-w-0 overflow-y-auto px-[24px] py-[16px] mobile:px-[16px]">
+          {campaignScoped && (
+            <div className="flex items-center gap-[8px] mb-[16px] px-[14px] py-[10px] rounded-[10px] bg-newTableHeader border border-newTableBorder text-[13px] text-newTableText">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-amber-600 shrink-0">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4m0 4h.01" strokeLinecap="round" />
+              </svg>
+              <span>
+                {t(
+                  'analytics_campaign_scope_note',
+                  "Post metrics only — channel metrics like followers aren't campaign-scoped."
+                )}
+              </span>
+            </div>
+          )}
           <DrillBreadcrumb
             drill={drill}
             onReset={handleReset}
@@ -346,27 +382,13 @@ export const AnalyticsDashboard: FC = () => {
           />
 
           <div className="flex items-stretch border-b border-newTableBorder mb-[16px]">
-            <div className="flex-1 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
+            <div
+              className="flex-1 overflow-x-auto overflow-y-hidden [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+              role="tablist"
+            >
               <div className="flex items-center gap-[2px] min-w-max">
-                {primaryTabs.map((item) => renderTab(item))}
-                {overflowTabs.map((item) => renderTab(item, 'hidden lg:block'))}
+                {tabItems.map((item) => renderTab(item))}
               </div>
-            </div>
-            <div className="lg:hidden flex items-center shrink-0 ps-[8px]">
-              <KebabMenu
-                ariaLabel={t('more_tabs', 'More tabs')}
-                active={overflowActive}
-                align="right"
-                items={overflowTabs.map((item) => ({
-                  label:
-                    tab === item.key ? (
-                      <span className="text-btnPrimary">{item.label}</span>
-                    ) : (
-                      item.label
-                    ),
-                  onClick: () => handleTabChange(item.key),
-                }))}
-              />
             </div>
           </div>
 
@@ -396,61 +418,75 @@ export const AnalyticsDashboard: FC = () => {
           )}
 
           {tab === 'overview' && (
-            <OverviewTab
-              data={overviewData}
-              loading={overviewLoading}
-              error={overviewError}
-              from={from}
-              to={to}
-              integrations={activeIntegrations}
-              compare={compare}
-              selectedMetric={drillMetric}
-              selectedDate={focusDate}
-              focusIntegration={focusIntegration}
-              onSelectMetric={handleSelectMetric}
-              onSelectDate={handleSelectDate}
-              onSelectChannel={handleSelectChannel}
-            />
+            <ErrorBoundary>
+              <OverviewTab
+                data={overviewData}
+                loading={overviewLoading}
+                error={overviewError}
+                from={from}
+                to={to}
+                integrations={activeIntegrations}
+                compare={compare}
+                campaigns={selectedCampaigns}
+                campaignBands={campaignBands}
+                selectedMetric={drillMetric}
+                selectedDate={focusDate}
+                focusIntegration={focusIntegration}
+                onSelectMetric={handleSelectMetric}
+                onSelectDate={handleSelectDate}
+                onSelectChannel={handleSelectChannel}
+              />
+            </ErrorBoundary>
           )}
           {tab === 'channels' && (
-            <ChannelsTab
-              data={overviewData}
-              loading={overviewLoading}
-              error={overviewError}
-              focusIntegration={focusIntegration}
-              from={from}
-              to={to}
-              compare={compare}
-              integrations={activeIntegrations}
-              channels={channels}
-              onSelectChannel={handleSelectChannel}
-            />
+            <ErrorBoundary>
+              <ChannelsTab
+                data={overviewData}
+                loading={overviewLoading}
+                error={overviewError}
+                focusIntegration={focusIntegration}
+                from={from}
+                to={to}
+                compare={compare}
+                integrations={activeIntegrations}
+                channels={channels}
+                onSelectChannel={handleSelectChannel}
+              />
+            </ErrorBoundary>
           )}
-          {tab === 'best-time' && (
-            <BestTimeTab integrations={activeIntegrations} />
-          )}
-          {tab === 'recommendations' && (
-            <RecommendationsTab />
+          {tab === 'insights' && (
+            <ErrorBoundary>
+              <InsightsTab
+                integrations={activeIntegrations}
+                section={insightsSection}
+              />
+            </ErrorBoundary>
           )}
           {tab === 'watchlist' && (
-            <WatchlistTab />
+            <ErrorBoundary>
+              <WatchlistTab />
+            </ErrorBoundary>
           )}
           {tab === 'shortlinks' && (
-            <ShortlinksTab from={from} to={to} />
+            <ErrorBoundary>
+              <ShortlinksTab from={from} to={to} />
+            </ErrorBoundary>
           )}
           {tab === 'posts' && (
-            <PostsTab
-              posts={postsData?.posts}
-              total={postsData?.total || 0}
-              loading={postsLoading}
-              error={postsError}
-              page={+(searchParams.get('page') || 1)}
-              limit={25}
-              sort={searchParams.get('sort') || 'publishedAt'}
-              dir={(searchParams.get('dir') as 'asc' | 'desc') || 'desc'}
-              onPageChange={handlePageChange}
-              onSortChange={handleSortChange}
-            />
+            <ErrorBoundary>
+              <PostsTab
+                posts={postsData?.posts}
+                total={postsData?.total || 0}
+                loading={postsLoading}
+                error={postsError}
+                page={+(searchParams.get('page') || 1)}
+                limit={25}
+                sort={searchParams.get('sort') || 'publishedAt'}
+                dir={(searchParams.get('dir') as 'asc' | 'desc') || 'desc'}
+                onPageChange={handlePageChange}
+                onSortChange={handleSortChange}
+              />
+            </ErrorBoundary>
           )}
         </div>
       </div>
