@@ -20,8 +20,10 @@ describe('RecommendationsTab', () => {
 
   it('renders the loading state', () => {
     mockUseRecommendations.mockReturnValue({ data: undefined, isLoading: true, error: undefined });
-    render(<RecommendationsTab />);
-    expect(screen.getByText(/Loading recommendations/i)).toBeTruthy();
+    // Now uses the shared kit TabSkeleton (F5) — assert the pulsing placeholder,
+    // matching the sibling tab specs (best-time, channels, content-insights).
+    const { container } = render(<RecommendationsTab />);
+    expect(container.querySelector('.animate-pulse')).toBeTruthy();
   });
 
   it('renders the error state', () => {

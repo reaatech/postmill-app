@@ -6,6 +6,7 @@ import { AreaChart } from '../charts/area.chart';
 import { CHART_PALETTE } from '../kit/palette';
 import { Drawer } from '../kit/drawer';
 import { ChannelAvatar } from '../kit/channel-avatar';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface MetricDetailPanelProps {
   data?: MetricDetailResponse;
@@ -14,6 +15,7 @@ interface MetricDetailPanelProps {
 }
 
 export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onClose }) => {
+  const t = useT();
   if (!data) return null;
 
   const isPositive = data.percentageChange >= 0;
@@ -31,7 +33,11 @@ export const MetricDetailPanel: FC<MetricDetailPanelProps> = ({ data, open, onCl
             <h3 className="text-[16px] font-semibold">{data.label}</h3>
             <p className="text-[12px] text-newTableText">{data.metric}</p>
           </div>
-          <button onClick={onClose} className="p-[6px] hover:bg-boxHover rounded-[6px] transition-colors">
+          <button
+            onClick={onClose}
+            aria-label={t('close', 'Close')}
+            className="p-[6px] hover:bg-boxHover rounded-[6px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
+          >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>

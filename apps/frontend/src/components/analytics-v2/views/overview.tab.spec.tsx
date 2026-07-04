@@ -203,12 +203,11 @@ describe('OverviewTab', () => {
         onSelectMetric={onSelectMetric}
       />
     );
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBeGreaterThanOrEqual(1);
-    const closeBtn = buttons.find((b) => b.querySelector('svg'));
-    if (closeBtn) {
-      closeBtn.click();
-      expect(onSelectMetric).toHaveBeenCalledWith('');
-    }
+    // Target the panel's labelled close button directly — clickable StatTiles
+    // are now role="button" (a11y), so the old "first button with an svg"
+    // heuristic would match a KPI tile instead.
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    closeBtn.click();
+    expect(onSelectMetric).toHaveBeenCalledWith('');
   });
 });
