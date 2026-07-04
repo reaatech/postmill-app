@@ -36,12 +36,16 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 
 export type ChannelsContext = {
-  integrations: string;
+  integrations: unknown[];
+  media?: unknown[];
+  'ag-ui'?: string;
   organization: string;
   user: string;
   ui: string;
+  access: string;
 };
 
 @Controller('/copilot')
@@ -51,6 +55,7 @@ export class CopilotController {
     private _mastraService: MastraService,
     private _aiModelProvider: AIModelProvider,
     private _budgetService: BudgetService,
+    private _featureFlagsService: FeatureFlagsService,
   ) {}
 
   // The CopilotKit runtime (GraphQL Yoga under the hood) writes its own
@@ -201,6 +206,10 @@ export class CopilotController {
     @Res() res: Response,
     @GetOrgFromRequest() organization?: Organization,
   ) {
+    if (this._featureFlagsService.isDisabled('agent')) {
+      return res.status(422).json({ error: 'AI agent is disabled' });
+    }
+
     const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
     if (!inDevMode && organization) {
       const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
@@ -234,6 +243,10 @@ export class CopilotController {
     @GetOrgFromRequest() organization: Organization,
     @GetUserFromRequest() user: User
   ) {
+    if (this._featureFlagsService.isDisabled('agent')) {
+      return res.status(422).json({ error: 'AI agent is disabled' });
+    }
+
     const inDevMode = process.env.NOT_SECURED && process.env.NODE_ENV === 'development';
     if (!inDevMode && organization) {
       const budgetCheck = await this._budgetService.checkBudget('agent', organization.id);
@@ -245,14 +258,20 @@ export class CopilotController {
       const serviceAdapter = await this._serviceAdapterOrEmpty(organization.id);
       const mastra = await this._mastraService.mastra();
       const requestContext = new RequestContext<ChannelsContext>();
+      const properties = req?.body?.variables?.properties || {};
+      requestContext.set('integrations', properties.integrations || []);
       requestContext.set(
-        'integrations',
-        req?.body?.variables?.properties?.integrations || []
+        'media',
+        Array.isArray(properties.media) ? properties.media : []
       );
+      if (properties.agUiContext) {
+        requestContext.set('ag-ui', JSON.stringify(properties.agUiContext));
+      }
 
       requestContext.set('organization', JSON.stringify(organization));
       requestContext.set('user', JSON.stringify({ id: user.id }));
       requestContext.set('ui', 'true');
+      requestContext.set('access', JSON.stringify({ mode: 'user' }));
 
       const agents = MastraAgent.getLocalAgents({
         resourceId: organization.id,
@@ -297,6 +316,9 @@ export class CopilotController {
     @GetOrgFromRequest() organization: Organization,
     @Param('thread') threadId: string
   ): Promise<any> {
+    if (this._featureFlagsService.isDisabled('agent')) {
+      return { messages: [] };
+    }
     const mastra = await this._mastraService.mastra();
     const memory = await mastra.getAgent('postmill').getMemory();
     try {
@@ -315,6 +337,9 @@ export class CopilotController {
     @GetOrgFromRequest() organization: Organization,
     @Query('perPage') perPage?: string
   ) {
+    if (this._featureFlagsService.isDisabled('agent')) {
+      return { threads: [] };
+    }
     const mastra = await this._mastraService.mastra();
     const memory = await mastra.getAgent('postmill').getMemory();
     const list = await memory.listThreads({

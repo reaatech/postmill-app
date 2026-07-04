@@ -52,6 +52,8 @@ Without this, the analytics dashboard, comment inbox, and watchlist data will re
 | `comments-collection` | Every minute (sleeps 30 min between sweeps) | Fetch new comments from connected platforms, update read state, prune old comments |
 | `missing-post-finder` | Hourly | Detect posts that should have published but are stuck |
 | `media-jobs-poll` | Every minute | Poll external media-generation jobs to completion |
+| `agent-digest` | Mondays at 07:00 America/New_York | Per-org weekly AI brief; fans out to `agent/digest-org` |
+| `agent-digest-org` | `agent/digest-org` event | Runs the headless read-only agent for one organisation |
 
 ### Event-triggered functions
 
@@ -111,5 +113,33 @@ In the Inngest dashboard (Cloud or local dev server) you should see:
 - `post-publish` / `autopost-process` / `refresh-token` / `streak-tracker` / `send-email` / `digest-email` / `analytics-backfill` — as triggered
 
 If scheduled functions are not running, check that `USE_INNGEST=true` is set and the backend `/api/inngest` endpoint returns HTTP 200.
+
+## Agent digest
+
+The weekly agent digest (`agent-digest` → `agent/digest-org`) is **disabled by
+default**.
+
+| Variable | Purpose |
+|----------|---------|
+| `AGENT_DIGEST_ENABLED` | Set to `true` to enable the Monday 07:00 ET agent digest cron. |
+
+Behaviour:
+
+- The main cron fans out one `agent/digest-org` event per organisation.
+- The per-org handler (`concurrency: 2`) runs only if at least one organisation
+  member has enabled the **Agent briefs** notification category in
+  Settings → Notifications.
+- The run is skipped if the organisation's AI budget is exhausted.
+- The agent runs in **headless, read-only mode** (`access.mode: 'headless'`):
+  it can only call analytics/comments/read tools and cannot schedule posts or
+  create media jobs.
+- A finished digest creates a thread and sends an in-app notification linking to
+  `/agents/<threadId>`.
+
+Enable in `.env`:
+
+```bash
+AGENT_DIGEST_ENABLED=true
+```
 
 > Verified against v3.9.0

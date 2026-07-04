@@ -1,4 +1,8 @@
-import { getAuth } from '@gitroom/nestjs-libraries/chat/async.storage';
+import {
+  getAuth,
+  getAccess,
+  getUserId,
+} from '@gitroom/nestjs-libraries/chat/async.storage';
 
 export const checkAuth = (
   inputData: any,
@@ -12,5 +16,15 @@ export const checkAuth = (
       JSON.stringify(authInfo)
     );
     (context.requestContext as any).set('ui', 'false');
+    // Bridge the resolved user id (from the MCP/A2A auth layer) into the tool
+    // context so write/ownership tools can resolve the acting user. Only the
+    // copilot path sets 'user' itself; without this, parseUser() throws over
+    // MCP/A2A. Never overwrite a 'user' the caller already provided.
+    const userId = getUserId();
+    if (userId && !(context.requestContext as any).get('user')) {
+      (context.requestContext as any).set('user', JSON.stringify({ id: userId }));
+    }
+    const access = getAccess() ?? { mode: 'headless' };
+    (context.requestContext as any).set('access', JSON.stringify(access));
   }
 };

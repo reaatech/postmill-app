@@ -8,7 +8,9 @@ import { MediaJobsActivity } from '@gitroom/nestjs-libraries/inngest/activities/
 import { DigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/digest.activity';
 import { CampaignActivity } from '@gitroom/nestjs-libraries/inngest/activities/campaign.activity';
 import { RetentionActivity } from '@gitroom/nestjs-libraries/inngest/activities/retention.activity';
+import { AgentDigestActivity } from '@gitroom/nestjs-libraries/inngest/activities/agent-digest.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
+import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 import {
   createAnalyticsCollection,
   createAnalyticsSyncOrg,
@@ -20,6 +22,7 @@ import { createMediaRender } from './media-render';
 import { createSendEmail } from './send-email';
 import { createDigestEmailDaily } from './digest-email-daily';
 import { createDigestEmailWeekly } from './digest-email-weekly';
+import { createAgentDigest, createAgentDigestOrg } from './agent-digest';
 import { createCampaignTagPurge } from './campaign-tag-purge';
 import { createRetentionPurge } from './retention-purge';
 import { createAutopostProcess } from './autopost-process';
@@ -39,7 +42,9 @@ export interface InngestActivities {
   digestActivity: DigestActivity;
   campaignActivity: CampaignActivity;
   retentionActivity: RetentionActivity;
+  agentDigestActivity: AgentDigestActivity;
   inngestRunRepository: InngestRunRepository;
+  organizationRepository: OrganizationRepository;
 }
 
 export const createFunctions = (activities: InngestActivities) => [
@@ -53,6 +58,8 @@ export const createFunctions = (activities: InngestActivities) => [
   createSendEmail(activities.emailActivity),
   createDigestEmailDaily(activities.digestActivity),
   createDigestEmailWeekly(activities.digestActivity),
+  createAgentDigest(activities.agentDigestActivity, activities.organizationRepository),
+  createAgentDigestOrg(activities.agentDigestActivity),
   createCampaignTagPurge(activities.campaignActivity, activities.inngestRunRepository),
   createRetentionPurge(activities.retentionActivity, activities.inngestRunRepository),
   createAutopostProcess(activities.autopostActivity),

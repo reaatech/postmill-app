@@ -9,6 +9,7 @@ import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf
 import { fetch as undiciFetch } from 'undici';
 import { Readable } from 'stream';
 import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
+import { requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 const ALLOWED_MIME = new Set<string>([
   'image/jpeg',
@@ -56,6 +57,7 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
+        requireWrite(context as any);
         const org = JSON.parse(
           (context?.requestContext as any)?.get('organization') as string
         );

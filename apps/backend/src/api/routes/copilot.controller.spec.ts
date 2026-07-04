@@ -153,6 +153,12 @@ vi.mock('@gitroom/nestjs-libraries/ai/governance/budget.service', () => ({
   },
 }));
 
+vi.mock('@gitroom/nestjs-libraries/feature-flags', () => ({
+  FeatureFlagsService: class {
+    isDisabled = vi.fn().mockReturnValue(false);
+  },
+}));
+
 vi.mock('@ag-ui/mastra', () => ({
   MastraAgent: {
     getLocalAgents: vi.fn().mockReturnValue({}),
@@ -176,6 +182,7 @@ import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/s
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { RequestContext } from '@mastra/core/di';
 
 describe('CopilotController', () => {
@@ -197,11 +204,13 @@ describe('CopilotController', () => {
     aiModelProvider = new (AIModelProvider as any)();
 
     const budgetService = new (BudgetService as any)();
+    const featureFlagsService = new (FeatureFlagsService as any)();
     controller = new CopilotController(
       subscriptionService,
       mastraService,
       aiModelProvider,
       budgetService,
+      featureFlagsService,
     );
   });
 
@@ -503,6 +512,37 @@ describe('CopilotController', () => {
       const userCall = setSpy.mock.calls.find((c) => c[0] === 'user');
       expect(orgCall?.[1]).toBe(JSON.stringify(org));
       expect(userCall?.[1]).toBe(JSON.stringify({ id: user.id }));
+      setSpy.mockRestore();
+    });
+
+    it('sets media and ag-ui context from CopilotKit properties', async () => {
+      process.env.OPENAI_API_KEY = 'sk-agent-test';
+      mockResolveConfigForScope.mockResolvedValue({
+        adapter: mockOpenaiAdapter,
+        modelId: 'gpt-5.2',
+        creds: { apiKey: 'sk-agent-test' },
+        providerId: 'openai',
+      });
+      const media = [{ id: 'file-1', path: 'https://example.com/img.png' }];
+      const agUiContext = { view: 'launches', currentPostId: 'post-1' };
+      const req = {
+        body: {
+          variables: {
+            properties: { integrations: [], media, agUiContext },
+          },
+        },
+      } as any;
+      const res = { status: vi.fn().mockReturnThis(), json: vi.fn() } as any;
+      const org = { id: 'org-agent-ctx2' } as any;
+      const user = { id: 'user-agent-ctx2' } as any;
+      const setSpy = vi.spyOn(RequestContext.prototype, 'set');
+
+      await controller.agent(req, res, org, user);
+
+      const mediaCall = setSpy.mock.calls.find((c) => c[0] === 'media');
+      const agUiCall = setSpy.mock.calls.find((c) => c[0] === 'ag-ui');
+      expect(mediaCall?.[1]).toEqual(media);
+      expect(agUiCall?.[1]).toBe(JSON.stringify(agUiContext));
       setSpy.mockRestore();
     });
   });

@@ -18,6 +18,22 @@
   the wizard mutates `/user/self` before navigating to `/dashboard` to avoid a re-gate loop. The
   first LLM provider saved by an org is auto-activated so the LLM step can proceed without a
   separate "Make Primary" click.
+- **Weekly agent digest (`agent-digest`).** New `agent` notification category (default off) that,
+  when enabled by at least one org member, runs a headless read-only agent every Monday at 07:00
+  America/New_York. The agent calls analyticsOverview, recommendations, commentsInbox, and bestTime,
+  then drafts a next-week content plan saved as a thread. A notification links to `/agents/<threadId>`.
+  Gated by `AGENT_DIGEST_ENABLED=true`, the org AI budget, and per-member opt-in.
+- **Agent UX Phase 5 (human-in-the-loop, structured params, context, docs).**
+  `commentReply` and `mediaStudioGenerate` now show confirmation cards in `/agents` before the
+  action is finalized. Channel selection and media attachments are sent as structured CopilotKit
+  `properties` instead of inline text markers; the backend reads them from request context and the
+  message renderer keeps a backward-compat parse path for older threads. Tool-call visibility cards
+  now appear in the chat stream, including live polling for media-studio job progress. A new
+  `agent-context-bridge.tsx` exposes compact UI context (calendar week, visible post ids, selected
+  campaign, customer/group, current post id) as CopilotKit readables; the backend instructions append
+  a "Current view" preamble when present. New docs:
+  `docs/developer-docs/agent-architecture.md`, `docs/user-guide/agent.md`. Documents the
+  `DEV_DISABLE_AGENT` and `AGENT_SUPERVISOR_ENABLED` feature flags.
 - **AI Designer chatbot (`/media/ai-designer`).** A Socket.IO-based chat experience that plans,
   composes, and renders multi-channel social designs server-side. Users pick channels/sizes, a brand
   profile, reference images, and a variant count; the conductor then runs a deterministic pipeline of

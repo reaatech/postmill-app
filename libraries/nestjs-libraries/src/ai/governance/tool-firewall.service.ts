@@ -1,4 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { SpanStatusCode } from '@opentelemetry/api';
+import { TelemetryService } from '@gitroom/nestjs-libraries/ai/governance/telemetry.service';
 
 /**
  * Tool-use firewall (section 5 / section 8 / decision #8).
@@ -55,7 +57,11 @@ export class ToolFirewallService {
 
   // @Optional so Nest can instantiate this as a provider — `ToolFirewallOptions` is an
   // interface (no DI token), so without @Optional the container would fail to resolve it.
-  constructor(@Optional() private _options: ToolFirewallOptions = DEFAULT_OPTIONS) {}
+  // `_telemetry` is optional so the service works (unchanged) when telemetry is not wired.
+  constructor(
+    @Optional() private _options: ToolFirewallOptions = DEFAULT_OPTIONS,
+    @Optional() private _telemetry?: TelemetryService,
+  ) {}
 
   configure(options: Partial<ToolFirewallOptions>) {
     this._options = { ...this._options, ...options };
@@ -102,6 +108,10 @@ export class ToolFirewallService {
    * Wraps a Mastra-style tool so its `execute` is firewalled. The tool's input args are
    * passed to `execute` as the first argument's `.context` (Mastra convention); we check
    * that before delegating. Tools without an `execute` fn are returned untouched.
+   *
+   * When a `TelemetryService` is injected, each execution is recorded as an
+   * `agent.tool.<toolName>` span with success/failure status and the serialized input
+   * size in bytes. If telemetry is absent or unconfigured, behavior is unchanged.
    */
   wrap<T extends { execute?: (...args: any[]) => any }>(toolName: string, tool: T): T {
     if (!tool || typeof tool.execute !== 'function') return tool;
@@ -115,7 +125,32 @@ export class ToolFirewallService {
           this._logger.warn(`blocked tool "${toolName}": ${verdict.reason}`);
           throw new ToolFirewallBlocked(toolName, verdict.reason || 'blocked');
         }
-        return original(...args);
+
+        if (!this._telemetry) {
+          return original(...args);
+        }
+
+        const serialized = typeof input === 'string' ? input : JSON.stringify(input ?? '');
+        const inputBytes = Buffer.byteLength(serialized, 'utf8');
+
+        return this._telemetry.startSpan(
+          `agent.tool.${toolName}`,
+          async (span) => {
+            span.setAttribute('inputBytes', inputBytes);
+            try {
+              const result = await original(...args);
+              span.setStatus({ code: SpanStatusCode.OK });
+              return result;
+            } catch (err) {
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: (err as Error).message,
+              });
+              throw err;
+            }
+          },
+          { tool: toolName },
+        );
       },
     };
   }

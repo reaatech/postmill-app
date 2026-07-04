@@ -184,6 +184,10 @@ export const startMcp = async (app: INestApplication) => {
       new Logger('startMcp').log('MCP is disabled via DEV_DISABLE_MCP; skipping MCP/A2A startup');
       return;
     }
+    if (flags?.isDisabled('agent')) {
+      new Logger('startMcp').log('Agent is disabled via DEV_DISABLE_AGENT; skipping MCP/A2A agent surface');
+      return;
+    }
   } catch {
     // FeatureFlagsService may not be available in some test contexts — proceed normally.
   }
@@ -225,6 +229,7 @@ export const startMcp = async (app: INestApplication) => {
       if (!authorization) return null;
       return {
         auth: authorization.organization,
+        userId: (authorization as any).user?.id,
         scopes: DEFAULT_MCP_SCOPES,
       };
     }
@@ -258,13 +263,31 @@ export const startMcp = async (app: INestApplication) => {
   // ── Boot-time tool snapshot (hot provider/model changes are OK; tool-set changes need restart) ──
   const mastra = await mastraService.mastra();
   const agent = mastra.getAgent('postmill');
-  const tools = await agent.listTools();
+
+  // Supervisor mode exposes only integrationList/groupList on postmill itself;
+  // specialists hold the rest. Preserve the pre-refactor flat surface by unioning
+  // every specialist's static tools into the MCP/A2A tool list.
+  const postmillTools = await agent.listTools();
+  const staticAgents = ((agent as any).__getStaticAgents?.() ?? {}) as Record<string, any>;
+  const specialistTools: Record<string, any> = {};
+  for (const sub of Object.values(staticAgents)) {
+    const subTools = await (sub as any).listTools?.();
+    if (subTools) {
+      Object.assign(specialistTools, subTools);
+    }
+  }
+  const tools = { ...postmillTools, ...specialistTools };
+
+  const mcpAgents: Record<string, any> = { postmill: agent };
+  for (const [key, sub] of Object.entries(staticAgents)) {
+    mcpAgents[key] = sub;
+  }
 
   const serverConfig = {
     name: 'Postmill MCP',
     version: '1.0.0',
     tools,
-    agents: { postmill: agent },
+    agents: mcpAgents,
   };
 
   const server = new MCPServer(serverConfig);
@@ -414,20 +437,28 @@ export const startMcp = async (app: INestApplication) => {
     }
 
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token, auth: auth.org }, async () => {
-      await server.startHTTP({
-        url: url,
-        httpPath: url.pathname,
-        options: {
-          sessionIdGenerator: () => {
-            return randomUUID();
+    await runWithContext(
+      {
+        requestId: token,
+        auth: auth.org,
+        userId: auth.userId,
+        access: { mode: 'mcp', scopes: authResult.scopes },
+      },
+      async () => {
+        await server.startHTTP({
+          url: url,
+          httpPath: url.pathname,
+          options: {
+            sessionIdGenerator: () => {
+              return randomUUID();
+            },
+            enableJsonResponse: true,
           },
-          enableJsonResponse: true,
-        },
-        req,
-        res,
-      });
-    });
+          req,
+          res,
+        });
+      }
+    );
   });
 
   // ── Entrypoint 2: /mcp (Bearer token via Authorization header) ──
@@ -519,20 +550,28 @@ export const startMcp = async (app: INestApplication) => {
     const url = new URL('/mcp', process.env.NEXT_PUBLIC_BACKEND_URL);
 
     fixAcceptHeader(req);
-    await runWithContext({ requestId: token, auth: req.auth.org }, async () => {
-      await server.startHTTP({
-        url,
-        httpPath: url.pathname,
-        options: {
-          sessionIdGenerator: () => {
-            return randomUUID();
+    await runWithContext(
+      {
+        requestId: token,
+        auth: req.auth.org,
+        userId: req.auth.userId,
+        access: { mode: 'mcp', scopes: authResult.scopes },
+      },
+      async () => {
+        await server.startHTTP({
+          url,
+          httpPath: url.pathname,
+          options: {
+            sessionIdGenerator: () => {
+              return randomUUID();
+            },
+            enableJsonResponse: true,
           },
-          enableJsonResponse: true,
-        },
-        req,
-        res,
-      });
-    });
+          req,
+          res,
+        });
+      }
+    );
   });
 
   // ── Entrypoint 3: /mcp/:id (API key in path param) ──
@@ -619,7 +658,12 @@ export const startMcp = async (app: INestApplication) => {
 
     fixAcceptHeader(req);
     await runWithContext(
-      { requestId: id, auth: req.auth.org },
+      {
+        requestId: id,
+        auth: req.auth.org,
+        userId: req.auth.userId,
+        access: { mode: 'mcp', scopes: authResult.scopes },
+      },
       async () => {
         await server.startHTTP({
           url,
@@ -719,7 +763,12 @@ export const startMcp = async (app: INestApplication) => {
     const url = new URL(req.originalUrl, process.env.NEXT_PUBLIC_BACKEND_URL);
 
     await runWithContext(
-      { requestId: id, auth: req.auth.org },
+      {
+        requestId: id,
+        auth: req.auth.org,
+        userId: req.auth.userId,
+        access: { mode: 'mcp', scopes: authResult.scopes },
+      },
       async () => {
         await server.startSSE({
           url,
@@ -884,12 +933,24 @@ export const startMcp = async (app: INestApplication) => {
         const ctx = await resolveAuthContext(token);
         return ctx?.auth ?? null;
       };
-      const toolAdapter = new McpToolAdapter(agent, { serverName: 'postmill', auth: resolveOrgAuth });
+      // A2A bridge: the adapter is built from the agent object. After the supervisor
+      // refactor that object only exposes supervisor tools, so feed it a facade that
+      // presents the full union surface (generate/listTools/stream) while keeping the
+      // same agent identity.
+      const a2aAgentFacade = {
+        id: agent.id,
+        name: agent.name,
+        description: 'Postmill agent with full tool surface',
+        generate: (agent as any).generate?.bind(agent),
+        stream: (agent as any).stream?.bind(agent),
+        listTools: async () => tools,
+      };
+      const toolAdapter = new McpToolAdapter(a2aAgentFacade as any, { serverName: 'postmill', auth: resolveOrgAuth } as any);
       const a2aServer = new A2aAsMcpServer({
         tools: toolAdapter,
         auth: resolveOrgAuth,
         serverInfo: { name: 'Postmill A2A', version: '1.0.0' },
-      });
+      } as any);
 
       app.use('/a2a', async (req: Request, res: Response) => {
         setCorsHeaders(res, req);
