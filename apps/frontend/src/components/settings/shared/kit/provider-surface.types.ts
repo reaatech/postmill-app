@@ -67,7 +67,6 @@ export type ProviderExtraFieldType =
   | 'instance-name'
   | 'custom-domain'
   | 'region-checklist'
-  | 'ai-models'
   | 'storage-binding'
   | 'oauth-block'
   | 'text'

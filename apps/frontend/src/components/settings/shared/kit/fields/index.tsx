@@ -5,7 +5,6 @@ import { ExtraFieldProps } from './extra-field.types';
 import { InstanceNameField } from './instance-name.field';
 import { CustomDomainField } from './custom-domain.field';
 import { RegionChecklistField } from './region-checklist.field';
-import { AiModelsField } from './ai-models.field';
 import { OAuthBlockField } from './oauth-block.field';
 
 /** Generic text/password/select extra field writing into `extra[spec.key]`. */
@@ -53,8 +52,6 @@ export const ExtraField: React.FC<ExtraFieldProps> = (props) => {
       return <CustomDomainField {...props} />;
     case 'region-checklist':
       return <RegionChecklistField {...props} />;
-    case 'ai-models':
-      return <AiModelsField {...props} />;
     case 'oauth-block':
       return <OAuthBlockField {...props} />;
     default:

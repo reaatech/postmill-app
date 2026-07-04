@@ -6,7 +6,11 @@ import { ProviderSettingsPanel } from '@gitroom/frontend/components/settings/sha
 import { aiDescriptor } from '@gitroom/frontend/components/settings/shared/kit/descriptors/ai.descriptor';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
-export function StepLlm() {
+export function StepLlm({
+  onProviderChange,
+}: {
+  onProviderChange?: () => void;
+}) {
   const t = useT();
   return (
     <StepFrame
@@ -16,7 +20,11 @@ export function StepLlm() {
         'Pick a Large Language Model provider to power AI features. This step is required before you can finish setup.'
       )}
     >
-      <ProviderSettingsPanel descriptor={aiDescriptor} hideHeader />
+      <ProviderSettingsPanel
+        descriptor={aiDescriptor}
+        hideHeader
+        onChange={onProviderChange}
+      />
     </StepFrame>
   );
 }

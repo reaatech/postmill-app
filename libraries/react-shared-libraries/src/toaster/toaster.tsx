@@ -33,7 +33,7 @@ export const Toaster = () => {
   return (
     <div
       className={clsx(
-        'animate-fadeDown rounded-[8px] gap-[18px] flex items-center overflow-hidden bg-customColor8 p-[16px] min-w-[319px] fixed start-[50%] text-white z-[900] top-[32px] -translate-x-[50%] h-[56px] relative before:content-[""] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px]',
+        'animate-fadeDown rounded-[8px] gap-[18px] flex items-center overflow-hidden bg-customColor8 p-[16px] min-w-[319px] fixed start-[50%] text-white z-[900] top-[32px] -translate-x-[50%] h-[56px] before:content-[""] before:absolute before:left-0 before:top-0 before:bottom-0 before:w-[4px]',
         toasterType === 'success' ? 'shadow-greenToast before:bg-[#6CE9A6]' : toasterType === 'warning' ? 'shadow-yellowToast before:bg-[#EF4444]' : 'shadow-greenToast before:bg-[#3B82F6]'
       )}
     >

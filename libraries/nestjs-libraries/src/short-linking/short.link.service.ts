@@ -45,6 +45,40 @@ export class ShortLinkService {
     }
   }
 
+  // Member-facing provider list for the composer's short-link picker. Returns
+  // only providers the org has configured + enabled, plus which one is active.
+  async listSelectableProviders(orgId: string): Promise<{
+    providers: {
+      identifier: string;
+      name: string;
+      customDomain: string;
+      version: string;
+    }[];
+    activeIdentifier: string | null;
+  }> {
+    const all = await this._settingsService.getProviders(orgId);
+    const selectable = (all || []).filter(
+      (p: any) => p.enabled && p.isConfigured
+    );
+    return {
+      providers: selectable.map((p: any) => ({
+        identifier: p.identifier,
+        name: p.name,
+        customDomain: p.customDomain || '',
+        version: p.version ?? 'v1',
+      })),
+      activeIdentifier:
+        selectable.find((p: any) => p.isActive)?.identifier ?? null,
+    };
+  }
+
+  // Sets the org's active short-link provider (used by the composer picker).
+  // Delegates to the settings service, which throws if the provider is not
+  // configured or is missing required credentials.
+  async setActiveProvider(orgId: string, identifier: string) {
+    return this._settingsService.setActive(orgId, identifier);
+  }
+
   async shouldShortlink(
     orgId: string,
     messages: string[]

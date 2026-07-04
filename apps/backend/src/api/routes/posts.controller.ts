@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -29,6 +30,7 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
 import { SetPostColorDto } from '@gitroom/nestjs-libraries/dtos/posts/set.post.color.dto';
+import { ShortlinkActiveDto } from '@gitroom/nestjs-libraries/dtos/posts/shortlink-active.dto';
 import {
   AuthorizationActions,
   Sections,
@@ -77,6 +79,33 @@ export class PostsController {
     @Body() body: { messages: string[] }
   ) {
     return this._shortLinkService.shouldShortlink(org.id, body.messages);
+  }
+
+  // Member-safe list of the org's configured short-link providers + the active
+  // one, for the composer's provider picker (the /settings/shortlinks routes are
+  // admin-gated). Read-only — org-scoped by the guard, no extra permission.
+  @Get('/shortlink-providers')
+  async shortlinkProviders(@GetOrgFromRequest() org: Organization) {
+    return this._shortLinkService.listSelectableProviders(org.id);
+  }
+
+  // Sets the org's active short-link provider from the composer. Gated to the
+  // compose capability (posts:update), not admin — note this changes the active
+  // provider org-wide.
+  @Post('/shortlink-active')
+  @RequirePermission('posts', 'update')
+  async setShortlinkActive(
+    @GetOrgFromRequest() org: Organization,
+    @Body() body: ShortlinkActiveDto
+  ) {
+    try {
+      return await this._shortLinkService.setActiveProvider(
+        org.id,
+        body.identifier
+      );
+    } catch (err) {
+      throw new BadRequestException((err as Error).message);
+    }
   }
 
   @Post('/:id/comments')

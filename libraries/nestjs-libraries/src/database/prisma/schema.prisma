@@ -363,6 +363,24 @@ model ProviderConfiguration {
   @@index([enabled])
 }
 
+// Platform-wide (super-admin curated) list of "featured" providers. A provider
+// present here is surfaced at the top of its domain's provider-configuration
+// list (below the tenant's configured providers, above the alphabetized rest),
+// ordered by sortOrder, with a gold-star "Featured" badge. Keyed by
+// (domain, providerId) because providerId is only unique within a domain;
+// version-agnostic (a provider is featured regardless of adapter version).
+model FeaturedProvider {
+  id         String   @id @default(cuid())
+  domain     String
+  providerId String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([domain, providerId])
+  @@index([domain, sortOrder])
+}
+
 model Signatures {
   id             String       @id @default(uuid())
   organizationId String

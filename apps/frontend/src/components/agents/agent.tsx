@@ -4,24 +4,22 @@ import React, {
   createContext,
   FC,
   useCallback,
+  useEffect,
   useMemo,
   useState,
   ReactNode,
 } from 'react';
 import clsx from 'clsx';
-import useCookie from 'react-use-cookie';
 import useSWR from 'swr';
-import { orderBy } from 'lodash';
-import { SVGLine } from '@gitroom/frontend/components/launches/launches.component';
-import ImageWithFallback from '@gitroom/react/helpers/image.with.fallback';
-import SafeImage from '@gitroom/react/helpers/safe.image';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useWaitForClass } from '@gitroom/helpers/utils/use.wait.for.class';
 import { MultiFileComponent } from '@gitroom/frontend/components/files/file.component';
-import { Integration } from '@prisma/client';
 import Link from 'next/link';
-import { useParams, usePathname, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
+import { ChannelFilterSelect } from '@gitroom/frontend/components/launches/channel-filter-select';
+import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
 
 export const MediaPortal: FC<{
   media: { path: string; id: string }[];
@@ -60,215 +58,210 @@ export const MediaPortal: FC<{
   );
 };
 
-export const AgentList: FC<{ onChange: (arr: any[]) => void }> = ({
-  onChange,
-}) => {
-  const fetch = useFetch();
-  const t = useT();
-  const [selected, setSelected] = useState([]);
+export const PropertiesContext = createContext({ properties: [] });
 
-  const load = useCallback(async () => {
-    return (await (await fetch('/integrations/list')).json()).integrations;
+export const Agent: FC<{ children: ReactNode }> = ({ children }) => {
+  const { data: integrations } = useIntegrationList();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  // Drawer default differs by breakpoint (open on desktop, closed on mobile) and
+  // there is no useMediaQuery hook in the app. Rather than flip state in an effect
+  // (SSR-unsafe + cascading renders), keep an `override` that is null until the
+  // user acts — CSS resolves the default per breakpoint, and the toggle reads
+  // matchMedia in the event handler to flip the correct mode.
+  //   desktop docked open  ⇔ override !== false
+  //   mobile overlay open   ⇔ override === true
+  const [drawerOverride, setDrawerOverride] = useState<boolean | null>(null);
+
+  const toggleDrawer = useCallback(() => {
+    const isMobile = window.matchMedia('(max-width: 1025px)').matches;
+    setDrawerOverride((prev) =>
+      isMobile ? (prev === true ? null : true) : (prev === false ? null : false)
+    );
   }, []);
 
-  const [collapseMenu, setCollapseMenu] = useCookie('collapseMenu', '0');
+  // Backdrop / Escape / mobile navigation → back to defaults (mobile closed,
+  // desktop still open).
+  const closeDrawer = useCallback(() => setDrawerOverride(null), []);
 
-  const { data } = useSWR('integrations', load, {
-    revalidateOnFocus: false,
-    revalidateOnReconnect: false,
-    revalidateIfStale: false,
-    revalidateOnMount: true,
-    refreshWhenHidden: false,
-    refreshWhenOffline: false,
-    fallbackData: [],
-  });
+  const onToggle = useCallback((integration: Integrations) => {
+    setSelectedIds((ids) =>
+      ids.includes(integration.id)
+        ? ids.filter((x) => x !== integration.id)
+        : [...ids, integration.id]
+    );
+  }, []);
 
-  const setIntegration = useCallback(
-    (integration: Integration) => () => {
-      if (selected.some((p) => p.id === integration.id)) {
-        onChange(selected.filter((p) => p.id !== integration.id));
-        setSelected(selected.filter((p) => p.id !== integration.id));
-      } else {
-        onChange([...selected, integration]);
-        setSelected([...selected, integration]);
-      }
-    },
-    [selected]
+  // `properties` keeps its exact runtime shape (full integration objects) so
+  // agent.chat.tsx stays unchanged — it reads id/identifier/picture/
+  // additionalSettings/name off each entry.
+  const properties = useMemo(
+    () =>
+      ((integrations as Integrations[]) || []).filter((i) =>
+        selectedIds.includes(i.id)
+      ),
+    [integrations, selectedIds]
   );
 
-  const sortedIntegrations = useMemo(() => {
-    return orderBy(
-      data || [],
-      ['type', 'disabled', 'identifier'],
-      ['desc', 'asc', 'asc']
-    );
-  }, [data]);
-
   return (
-    <div
-      className={clsx(
-        'trz bg-newBgColorInner flex flex-col gap-[15px] transition-all relative',
-        collapseMenu === '1' ? 'group sidebar w-[100px]' : 'w-[260px]'
-      )}
-    >
-      <div className="absolute top-0 start-0 w-full h-full p-[20px] overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
-        <div className="flex items-center">
-          <h2 className="group-[.sidebar]:hidden flex-1 text-[20px] font-[500] mb-[15px]">
-            {t('select_channels', 'Select Channels')}
-          </h2>
-          <div
-            onClick={() => setCollapseMenu(collapseMenu === '1' ? '0' : '1')}
-            className="-mt-3 group-[.sidebar]:rotate-[180deg] group-[.sidebar]:mx-auto text-btnText bg-btnSimple rounded-[6px] w-[24px] h-[24px] flex items-center justify-center cursor-pointer select-none"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="7"
-              height="13"
-              viewBox="0 0 7 13"
-              fill="none"
-            >
-              <path
-                d="M6 11.5L1 6.5L6 1.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
+    <PropertiesContext.Provider value={{ properties }}>
+      <div className="flex flex-1 min-w-0 relative bg-newBgColorInner">
+        <ChatDrawer override={drawerOverride} onClose={closeDrawer} />
+        <div className="flex flex-1 flex-col min-w-0">
+          <AgentToolbar
+            onToggleDrawer={toggleDrawer}
+            integrations={(integrations as Integrations[]) || []}
+            selectedIds={selectedIds}
+            onToggle={onToggle}
+          />
+          <div className="flex flex-1 min-w-0">{children}</div>
         </div>
-        <div className={clsx('flex flex-col gap-[15px]')}>
-          {sortedIntegrations.map((integration, index) => (
-            <div
-              onClick={setIntegration(integration)}
-              key={integration.id}
-              className={clsx(
-                'flex gap-[12px] items-center group/profile justify-center hover:bg-boxHover rounded-e-[8px] hover:opacity-100 cursor-pointer',
-                !selected.some((p) => p.id === integration.id) && 'opacity-20'
-              )}
-            >
-              <div
-                className={clsx(
-                  'relative rounded-full flex justify-center items-center gap-[6px]',
-                  integration.disabled && 'opacity-50'
-                )}
-              >
-                {(integration.inBetweenSteps || integration.refreshNeeded) && (
-                  <div className="absolute start-0 top-0 w-[39px] h-[46px] cursor-pointer">
-                    <div className="bg-red-500 w-[15px] h-[15px] rounded-full start-0 -top-[5px] absolute z-[200] text-[10px] flex justify-center items-center">
-                      !
-                    </div>
-                    <div className="bg-primary/60 w-[39px] h-[46px] start-0 top-0 absolute rounded-full z-[199]" />
-                  </div>
-                )}
-                <div className="h-full w-[4px] -ms-[12px] rounded-s-[3px] opacity-0 group-hover/profile:opacity-100 transition-opacity">
-                  <SVGLine />
-                </div>
-                <ImageWithFallback
-                  fallbackSrc={`/icons/platforms/${integration.identifier}.png`}
-                  src={integration.picture}
-                  className="rounded-[8px]"
-                  alt={integration.identifier}
-                  width={36}
-                  height={36}
-                />
-                <SafeImage
-                  src={`/icons/platforms/${integration.identifier}.png`}
-                  className="rounded-[8px] absolute z-10 bottom-[5px] -end-[5px] border border-newTableBorder"
-                  alt={integration.identifier}
-                  width={18.41}
-                  height={18.41}
-                />
-              </div>
-              <div
-                className={clsx(
-                  'flex-1 whitespace-nowrap text-ellipsis overflow-hidden group-[.sidebar]:hidden',
-                  integration.disabled && 'opacity-50'
-                )}
-              >
-                {integration.name}
-              </div>
-            </div>
-          ))}
-        </div>
+      </div>
+    </PropertiesContext.Provider>
+  );
+};
+
+const AgentToolbar: FC<{
+  onToggleDrawer: () => void;
+  integrations: Integrations[];
+  selectedIds: string[];
+  onToggle: (integration: Integrations) => void;
+}> = ({ onToggleDrawer, integrations, selectedIds, onToggle }) => {
+  const t = useT();
+  return (
+    <div className="h-[52px] shrink-0 border-b border-newBorder flex items-center gap-[12px] px-[16px] bg-newBgColorInner">
+      <button
+        type="button"
+        onClick={onToggleDrawer}
+        aria-label={t('toggle_menu', 'Toggle menu')}
+        className="w-[36px] h-[36px] shrink-0 rounded-[8px] flex items-center justify-center hover:bg-boxHover text-textColor"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <path d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      <div className="w-[280px] max-w-[60vw]">
+        <ChannelFilterSelect
+          integrations={integrations}
+          selectedIds={selectedIds}
+          onToggle={onToggle}
+          menuAbsolute
+        />
       </div>
     </div>
   );
 };
 
-export const PropertiesContext = createContext({ properties: [] });
-export const Agent: FC<{ children: ReactNode }> = ({ children }) => {
-  const [properties, setProperties] = useState([]);
+const ChatDrawer: FC<{ override: boolean | null; onClose: () => void }> = ({
+  override,
+  onClose,
+}) => {
+  const overlayOpen = override === true; // only ever true on mobile
+
+  // Escape closes the mobile overlay (never fires on desktop — the docked
+  // drawer never sets override to true).
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [overlayOpen, onClose]);
 
   return (
-    <PropertiesContext.Provider value={{ properties }}>
-      <AgentList onChange={setProperties} />
-      <div className="bg-newBgColorInner flex flex-1">{children}</div>
-      <Threads />
-    </PropertiesContext.Provider>
+    <>
+      {/* Desktop: docked, collapsible column (open unless explicitly closed) */}
+      <div
+        className={clsx(
+          'mobile:hidden shrink-0 overflow-hidden transition-[width] duration-200',
+          override === false ? 'w-0' : 'w-[260px]'
+        )}
+      >
+        <div className="w-[260px] h-full">
+          <DrawerContent />
+        </div>
+      </div>
+
+      {/* Mobile: left overlay drawer */}
+      {overlayOpen && (
+        <div className="hidden mobile:flex fixed inset-0 z-[100] justify-start">
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm"
+            onClick={onClose}
+          />
+          <div className="relative w-[280px] max-w-[85%] h-full border-r border-newTableBorder bg-newBgColorInner animate-fadeIn">
+            <DrawerContent onNavigate={onClose} />
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
-const Threads: FC = () => {
+const DrawerContent: FC<{ onNavigate?: () => void }> = ({ onNavigate }) => {
   const fetch = useFetch();
-  const router = useRouter();
-  const pathname = usePathname();
   const t = useT();
+  const { id } = useParams<{ id: string }>();
+
   const threads = useCallback(async () => {
     return (await fetch('/copilot/list')).json();
-  }, []);
-  const { id } = useParams<{ id: string }>();
+  }, [fetch]);
 
   const { data } = useSWR('threads', threads);
 
   return (
-    <div
-      className={clsx(
-        'trz bg-newBgColorInner flex flex-col gap-[15px] transition-all relative',
-        'w-[260px]'
-      )}
-    >
-      <div className="absolute top-0 start-0 w-full h-full p-[20px] overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
-        <div className="mb-[15px] justify-center flex group-[.sidebar]:pb-[15px]">
-          <Link
-            href={`/agents`}
-            className="text-white whitespace-nowrap flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] group-[.sidebar]:p-0 min-h-[44px] max-h-[44px] rounded-md bg-btnPrimary flex justify-center items-center gap-[5px] outline-none"
+    <div className="w-full h-full flex flex-col p-[20px] overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
+      <div className="mb-[15px] flex">
+        <Link
+          href={`/agents`}
+          onClick={onNavigate}
+          className="text-white whitespace-nowrap flex-1 pt-[12px] pb-[14px] ps-[16px] pe-[20px] min-h-[44px] max-h-[44px] rounded-md bg-btnPrimary flex justify-center items-center gap-[5px] outline-none"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="21"
+            height="20"
+            viewBox="0 0 21 20"
+            fill="none"
+            className="min-w-[21px] min-h-[20px]"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="21"
-              height="20"
-              viewBox="0 0 21 20"
-              fill="none"
-              className="min-w-[21px] min-h-[20px]"
-            >
-              <path
-                d="M10.5001 4.16699V15.8337M4.66675 10.0003H16.3334"
-                stroke="white"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div className="flex-1 text-start text-[16px] group-[.sidebar]:hidden">
-              {t('start_a_new_chat', 'Start a new chat')}
-            </div>
+            <path
+              d="M10.5001 4.16699V15.8337M4.66675 10.0003H16.3334"
+              stroke="white"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <div className="flex-1 text-start text-[16px]">
+            {t('start_a_new_chat', 'Start a new chat')}
+          </div>
+        </Link>
+      </div>
+      <div className="flex flex-col gap-[1px]">
+        {data?.threads?.map((p: any) => (
+          <Link
+            className={clsx(
+              'overflow-ellipsis overflow-hidden whitespace-nowrap hover:bg-newBgColor px-[10px] py-[6px] rounded-[10px] cursor-pointer',
+              p.id === id && 'bg-newBgColor'
+            )}
+            href={`/agents/${p.id}`}
+            onClick={onNavigate}
+            key={p.id}
+          >
+            {p.title}
           </Link>
-        </div>
-        <div className="flex flex-col gap-[1px]">
-          {data?.threads?.map((p: any) => (
-            <Link
-              className={clsx(
-                'overflow-ellipsis overflow-hidden whitespace-nowrap hover:bg-newBgColor px-[10px] py-[6px] rounded-[10px] cursor-pointer',
-                p.id === id && 'bg-newBgColor'
-              )}
-              href={`/agents/${p.id}`}
-              key={p.id}
-            >
-              {p.title}
-            </Link>
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );

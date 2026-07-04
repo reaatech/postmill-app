@@ -170,12 +170,14 @@ export const aiDescriptor: ProviderSurfaceDescriptor<AiMeta> = {
   },
 
   form: {
-    extraFields: [{ type: 'ai-models', key: 'models' }],
-    credentialFieldsFromMeta: (m) => m?.credentialFields ?? [],
+    extraFields: [],
+    // Base URL is not a user setting — every AI adapter defaults its own
+    // canonical endpoint (see OpenAICompatibleAdapter / gateway). Hide it.
+    credentialFieldsFromMeta: (m) =>
+      (m?.credentialFields ?? []).filter((f) => f.key !== 'baseURL'),
+    // Model selection lives in Settings → AI → Model Defaults, not here.
     buildBody: (state) => ({
       credentials: state.credentials,
-      defaultModel: state.extra.defaultModel || undefined,
-      reasoningModel: state.extra.reasoningModel || undefined,
       version: state.version || undefined,
     }),
     buildTestBody: (state) => ({ credentials: state.credentials }),

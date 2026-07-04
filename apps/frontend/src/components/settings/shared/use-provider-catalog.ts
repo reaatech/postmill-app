@@ -31,6 +31,13 @@ export interface ProviderCatalogEntry {
   credentialFields?: CatalogCredentialField[];
   deprecatedAt?: string;
   sunsetAt?: string;
+  /** Platform-curated "featured" flag + order (super-admin managed). */
+  featured?: boolean;
+  featuredSortOrder?: number | null;
+  /** Official provider homepage (for the info modal "Visit website" link). */
+  website?: string;
+  /** Localized one-line provider description (keyed by language code, `en` required). */
+  description?: Partial<Record<string, string>>;
 }
 
 /**

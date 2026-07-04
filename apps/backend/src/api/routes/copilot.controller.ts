@@ -53,6 +53,40 @@ export class CopilotController {
     private _budgetService: BudgetService,
   ) {}
 
+  // The CopilotKit runtime (GraphQL Yoga under the hood) writes its own
+  // permissive `Access-Control-Allow-Origin: *`, overriding Nest's global CORS.
+  // A wildcard is INVALID for credentialed (cookie) requests — the browser
+  // blocks the response ("blocked by CORS policy"), which is exactly what the
+  // frontend's `<CopilotKit credentials="include">` handshake sends. Reflect the
+  // request origin + credentials so the credentialed request is allowed. Yoga
+  // sets the header via res.setHeader / res.writeHead, so intercept both.
+  private _reflectCredentialedCors(req: Request, res: Response) {
+    const origin = req.headers.origin as string | undefined;
+    if (!origin) return;
+    const setHeader = res.setHeader.bind(res);
+    const rewrite = (name: any, value: any): any =>
+      String(name).toLowerCase() === 'access-control-allow-origin' && value === '*'
+        ? origin
+        : value;
+    // Yoga may set the header via setHeader(...) or via a writeHead(status, {...})
+    // headers object — cover both, swapping the wildcard for the request origin
+    // and always asserting Allow-Credentials.
+    (res as any).setHeader = (name: string, value: any) => {
+      const v = rewrite(name, value);
+      if (v !== value) setHeader('Access-Control-Allow-Credentials', 'true');
+      return setHeader(name, v);
+    };
+    const writeHead = res.writeHead.bind(res);
+    (res as any).writeHead = (statusCode: number, ...rest: any[]) => {
+      const headers = rest.find((a) => a && typeof a === 'object');
+      if (headers) {
+        for (const k of Object.keys(headers)) headers[k] = rewrite(k, headers[k]);
+        headers['Access-Control-Allow-Credentials'] = 'true';
+      }
+      return writeHead(statusCode, ...(rest as [any]));
+    };
+  }
+
   private async _buildServiceAdapter(orgId?: string) {
     const resolved = await this._aiModelProvider.resolveConfigForScope('agent', orgId);
 
@@ -182,6 +216,7 @@ export class CopilotController {
         serviceAdapter,
       });
 
+      this._reflectCredentialedCors(req, res);
       return copilotRuntimeHandler(req, res);
     } catch (err) {
       if (err instanceof HttpException) throw err;
@@ -235,6 +270,7 @@ export class CopilotController {
         serviceAdapter,
       });
 
+      this._reflectCredentialedCors(req, res);
       return copilotRuntimeHandler(req, res);
     } catch (err) {
       if (err instanceof HttpException) throw err;

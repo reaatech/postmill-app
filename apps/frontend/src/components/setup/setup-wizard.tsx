@@ -15,7 +15,9 @@ import { StepStorage } from '@gitroom/frontend/components/setup/steps/step-stora
 import { StepShortlinks } from '@gitroom/frontend/components/setup/steps/step-shortlinks';
 import { StepVpn } from '@gitroom/frontend/components/setup/steps/step-vpn';
 
-const STEP_COMPONENTS = [
+// Only StepLlm consumes `onProviderChange`; the others are no-arg components and
+// remain assignable to this prop type (extra optional props are ignored).
+const STEP_COMPONENTS: React.FC<{ onProviderChange?: () => void }>[] = [
   StepLlm,
   StepAiMedia,
   StepChannels,
@@ -59,17 +61,22 @@ export function SetupWizard() {
     [t]
   );
 
-  // Poll the dashboard summary while on the LLM step so Next enables as soon as
-  // the first provider auto-activates (§3.5).
-  const { data: summary } = useSWR(
+  // The LLM step's first provider auto-activates synchronously on save (§3.5).
+  // Rather than poll (which hammers the throttled /dashboard/summary), we
+  // revalidate this once whenever the step reports a provider change — see
+  // `handleProviderChange` passed into the active step below.
+  const { data: summary, mutate: mutateSummary } = useSWR(
     '/dashboard/summary',
     useCallback(async (url: string) => (await fetch(url)).json(), [fetch]),
     {
-      revalidateOnFocus: false,
-      revalidateOnReconnect: false,
-      refreshInterval: currentStep === 0 ? 2000 : 0,
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
     }
   );
+
+  const handleProviderChange = useCallback(() => {
+    mutateSummary();
+  }, [mutateSummary]);
 
   // Persist the active step so it survives an OAuth round-trip / gate remount (see above).
   useEffect(() => {
@@ -137,6 +144,25 @@ export function SetupWizard() {
 
   return (
     <div className="flex flex-col h-full">
+      <div className="shrink-0 px-[24px] pt-[20px] pb-[16px] border-b border-newBorder">
+        <h1 className="text-[22px] font-[700] text-btnPrimary">
+          {t('setup_title', "Welcome — let's set up your workspace")}
+        </h1>
+        <p className="text-[13px] text-newTableText mt-[6px] max-w-[720px] leading-[1.5]">
+          {t(
+            'setup_intro',
+            'A quick one-time setup to get Postmill ready. Only the'
+          )}{' '}
+          <span className="text-textColor font-[600]">
+            {t('setup_step_llm', 'LLM')}
+          </span>{' '}
+          {t(
+            'setup_intro_2',
+            'step is required — connect an AI provider to continue. Everything else is optional: skip any step and change it later in Settings.'
+          )}
+        </p>
+      </div>
+
       <SetupStepper
         steps={steps}
         currentStep={currentStep}
@@ -146,7 +172,7 @@ export function SetupWizard() {
       />
 
       <div className="flex-1 min-h-0 overflow-hidden">
-        <ActiveStepComponent />
+        <ActiveStepComponent onProviderChange={handleProviderChange} />
       </div>
 
       {finishError && (

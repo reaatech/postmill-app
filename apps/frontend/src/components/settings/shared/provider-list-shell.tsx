@@ -24,6 +24,10 @@ export interface ProviderConfigItem {
    * was built without a live key and renders a "Beta" badge (plan E24).
    */
   verified?: boolean;
+  /** Platform-curated "featured" provider — renders a gold-star badge on the name line. */
+  featured?: boolean;
+  /** Render a thin divider above this row (tier boundary, e.g. above/below the featured group). */
+  separatorBefore?: boolean;
   /**
    * Passthrough of the full original provider object so `renderBadges`/
    * `renderActions` receive it directly via `provider.meta` — kills the
@@ -47,6 +51,8 @@ export interface ProviderListShellProps {
   description?: string;
   ProviderIconComponent: React.FC<{ identifier: string; name: string; size?: number }>;
   getProviderHref?: (provider: ProviderConfigItem) => string | undefined;
+  /** When set, the provider name becomes a button that opens an info modal. */
+  onProviderNameClick?: (provider: ProviderConfigItem) => void;
   renderBadges?: (provider: ProviderConfigItem) => ReactNode;
   renderActions?: (provider: ProviderConfigItem) => ReactNode;
   addProviderButton?: ReactNode;
@@ -86,6 +92,7 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
   description,
   ProviderIconComponent,
   getProviderHref,
+  onProviderNameClick,
   renderBadges,
   renderActions,
   addProviderButton,
@@ -118,11 +125,12 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
           </div>
         ) : (
           providers.map((provider) => (
-            <div
-              key={provider.id || provider.identifier}
-              className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex items-center gap-[12px]"
-            >
-              <ProviderIconComponent
+            <React.Fragment key={provider.id || provider.identifier}>
+              {provider.separatorBefore && (
+                <hr className="my-[8px] border-0 border-t border-newTableBorder" />
+              )}
+              <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex items-center gap-[12px]">
+                <ProviderIconComponent
                 identifier={provider.identifier}
                 name={provider.name}
                 size={36}
@@ -132,6 +140,18 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                 <div className="flex items-center gap-[8px] flex-wrap">
                   {(() => {
                     const href = getProviderHref?.(provider);
+                    if (onProviderNameClick) {
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => onProviderNameClick(provider)}
+                          className="text-[14px] font-semibold truncate hover:text-btnPrimary hover:underline transition-colors text-left"
+                          title="What is this?"
+                        >
+                          {provider.name}
+                        </button>
+                      );
+                    }
                     return href ? (
                       <Link
                         href={href}
@@ -145,6 +165,23 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                       </span>
                     );
                   })()}
+                  {provider.featured && (
+                    <span
+                      className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-500/15 text-amber-400 inline-flex items-center gap-[4px]"
+                      title="Featured provider"
+                    >
+                      <svg
+                        viewBox="0 0 20 20"
+                        width="10"
+                        height="10"
+                        fill="currentColor"
+                        aria-hidden="true"
+                      >
+                        <path d="M10 1.5l2.6 5.27 5.82.846-4.21 4.104.994 5.795L10 14.86l-5.204 2.735.994-5.795L1.58 7.616l5.82-.846L10 1.5z" />
+                      </svg>
+                      Featured
+                    </span>
+                  )}
                   {provider.verified === false && (
                     <span
                       className="text-[11px] rounded-[4px] px-[8px] py-[2px] font-medium bg-amber-900/20 text-amber-600"
@@ -296,7 +333,8 @@ const ProviderListShell: React.FC<ProviderListShellProps> = ({
                   </>
                 )}
               </div>
-            </div>
+              </div>
+            </React.Fragment>
           ))
         )}
       </div>

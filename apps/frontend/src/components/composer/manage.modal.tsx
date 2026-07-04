@@ -29,7 +29,8 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { capitalize } from 'lodash';
 import { SelectCustomer } from '@gitroom/frontend/components/launches/select.customer';
-import { CopilotPopup } from '@copilotkit/react-ui';
+import { CopilotChat } from '@copilotkit/react-ui';
+import { createPortal } from 'react-dom';
 import { useAiActive } from '@gitroom/frontend/components/layout/use-ai-active';
 import { DummyCodeComponent } from '@gitroom/frontend/components/composer/dummy.code.component';
 import { CreationMethodBadge } from '@gitroom/frontend/components/launches/creation.method.badge';
@@ -46,6 +47,7 @@ import {
 import { useHasScroll } from '@gitroom/frontend/components/ui/is.scroll.hook';
 import { useShortlinkPreference } from '@gitroom/frontend/components/settings/shortlink-preference.component';
 import { BrandPicker } from '@gitroom/frontend/components/launches/brand-picker';
+import { ShortlinkPicker } from '@gitroom/frontend/components/composer/shortlink-picker';
 import { usePreflight, PreflightResponse } from '@gitroom/frontend/components/composer/content-qa/usePreflight';
 import { PreflightPanel } from '@gitroom/frontend/components/composer/content-qa/preflight.panel';
 import dayjs from 'dayjs';
@@ -79,16 +81,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   const modal = useModals();
   const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
+  const [assistantOpen, setAssistantOpen] = useState(false);
   const [showPreflight, setShowPreflight] = useState(false);
   const [pendingScheduleType, setPendingScheduleType] = useState<'draft' | 'now' | 'schedule' | 'update' | null>(null);
   const [preflightData, setPreflightData] = useState<PreflightResponse | null>(null);
   const [mobileTab, setMobileTab] = useState<'compose' | 'preview'>('compose');
   const { data: shortlinkPreferenceData } = useShortlinkPreference();
-  const [shortlinkInfo, setShortlinkInfo] = useState<{
-    ask: boolean;
-    providerName?: string;
-    domain?: string;
-  } | null>(null);
   const [shortLinkEnabled, setShortLinkEnabled] = useState(false);
   const shortlinkUserToggled = useRef(false);
   const { runPreflight, loading: preflightLoading, reset: resetPreflight } = usePreflight();
@@ -167,48 +165,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     }
   }, [hide, setHide]);
 
-  const allContent = useMemo(
-    () =>
-      [
-        ...global.map((v) => v.content),
-        ...internal.flatMap((i) => i.integrationValue.map((v) => v.content)),
-      ].join(' '),
-    [global, internal]
-  );
-
+  // Default the short-link picker from the org's saved preference (YES = on)
+  // until the user explicitly chooses in the composer.
   useEffect(() => {
-    if (dummy || addEditSets) return;
-
-    const text = allContent;
-    if (!text.trim()) {
-      setShortlinkInfo(null);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch('/posts/should-shortlink', {
-          method: 'POST',
-          body: JSON.stringify({ messages: [text] }),
-        });
-        const data = await res.json();
-        setShortlinkInfo(data);
-        if (data.ask && !shortlinkUserToggled.current) {
-          setShortLinkEnabled(shortlinkPreferenceData?.shortlink === 'YES');
-        }
-      } catch {
-        setShortlinkInfo(null);
-      }
-    }, 400);
-
-    return () => clearTimeout(timer);
-  }, [
-    allContent,
-    shortlinkPreferenceData,
-    dummy,
-    addEditSets,
-    fetch,
-  ]);
+    if (dummy || addEditSets || shortlinkUserToggled.current) return;
+    setShortLinkEnabled(shortlinkPreferenceData?.shortlink === 'YES');
+  }, [shortlinkPreferenceData, dummy, addEditSets]);
 
   const currentIntegrationText = useMemo(() => {
     if (current === 'global') {
@@ -622,9 +584,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         }
       }
 
-      // The footer toggle (WS6) now decides short-link application. The
-      // debounced `/posts/should-shortlink` call supplies `shortlinkInfo.ask`.
-      const shortLink = !dummy && shortLinkEnabled && !!shortlinkInfo?.ask;
+      // The composer's short-link provider picker decides application; publish
+      // still only rewrites foreign URLs, so this flag is intent, not presence.
+      const shortLink = !dummy && shortLinkEnabled;
 
       const data = {
         type,
@@ -696,7 +658,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       addEditSets,
       dummy,
       shortLinkEnabled,
-      shortlinkInfo,
       brandId,
       campaignId,
       customClose,
@@ -712,9 +673,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   );
 
   return (
-    <div className={clsx('w-full h-full flex-1 flex relative', props.padding ?? 'p-[16px] lg:p-[40px]')}>
+    <div className={clsx('w-full h-full flex-1 flex relative', props.padding ?? 'p-[8px] lg:p-[40px]')}>
       <div className="flex flex-1 bg-newBgColorInner rounded-[20px] flex-col overflow-hidden">
-        <div className="lg:hidden flex items-center justify-center p-[12px] border-b border-newBorder bg-newBgColor">
+        <div className="lg:hidden flex items-center justify-center p-[8px] border-b border-newBorder bg-newBgColor">
           <div className="flex bg-newBgColorInner border border-newBorder rounded-[8px] overflow-hidden">
             <button
               type="button"
@@ -762,7 +723,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
               >
                 <div
                   id="social-content"
-                  className="gap-[16px] md:gap-[32px] flex flex-col pe-[8px] pt-[16px] md:pt-[20px] ps-[20px] absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-scroll scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
+                  className="gap-[12px] md:gap-[32px] flex flex-col pe-[8px] pt-[12px] md:pt-[20px] ps-[20px] absolute top-0 left-0 w-full h-full overflow-x-hidden overflow-y-scroll scrollbar scrollbar-thumb-newColColor scrollbar-track-newBgColorInner"
                 >
                   <div className="flex w-full items-center gap-[8px] flex-wrap">
                     <div className="flex flex-1 min-w-0">
@@ -789,6 +750,34 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                         className="border border-newTableBorder bg-btnSimple text-textColor rounded-[8px] px-[14px] h-[40px] text-[13px] font-[500] hover:bg-boxHover"
                       >
                         {t('start_from', 'Start from…')}
+                      </button>
+                    )}
+                    {aiActive && (
+                      <button
+                        type="button"
+                        onClick={() => setAssistantOpen(true)}
+                        aria-label={t('your_assistant', 'Your Assistant')}
+                        data-tooltip-id="tooltip"
+                        data-tooltip-content={t('your_assistant', 'Your Assistant')}
+                        className="border border-newTableBorder bg-btnSimple text-textColor rounded-[8px] px-[12px] h-[40px] flex items-center gap-[6px] text-[13px] font-[500] hover:bg-boxHover"
+                      >
+                        <svg
+                          width="18"
+                          height="18"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="text-[#2B5CD3]"
+                        >
+                          <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z" />
+                          <path d="M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
+                        </svg>
+                        <span className="hidden sm:inline">
+                          {t('assistant', 'Assistant')}
+                        </span>
                       </button>
                     )}
                     <div>
@@ -880,7 +869,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             </div>
           </div>
         </div>
-        <div className="select-none h-auto lg:h-[84px] py-[16px] lg:py-[20px] border-t border-newBorder flex flex-col lg:flex-row items-start lg:items-center gap-[12px] lg:gap-0">
+        <div className="select-none h-auto lg:h-[84px] py-[10px] lg:py-[20px] border-t border-newBorder flex flex-col lg:flex-row items-start lg:items-center gap-[8px] lg:gap-0">
           <div className="flex-1 flex ps-[20px] gap-[8px] flex-wrap">
             {!dummy && (
               <TagsComponent
@@ -916,7 +905,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                     ),
                   })
                 }
-                className="flex items-center gap-[8px] border border-newTableBorder bg-btnSimple text-textColor rounded-[8px] px-[12px] h-[40px] text-[13px] font-[500] hover:bg-boxHover"
+                className="border rounded-[8px] border-newTextColor/10 h-[36px] lg:h-[44px] px-[12px] lg:px-[16px] flex items-center gap-[8px] text-[13px] lg:text-[15px] font-[600] text-textColor select-none"
               >
                 <span
                   className="w-[16px] h-[16px] rounded-full border border-newTableBorder"
@@ -925,40 +914,17 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
                 {t('color', 'Color')}
               </button>
             )}
+            {!dummy && !addEditSets && (
+              <ShortlinkPicker
+                enabled={shortLinkEnabled}
+                onChange={(v) => {
+                  shortlinkUserToggled.current = true;
+                  setShortLinkEnabled(v);
+                }}
+              />
+            )}
           </div>
           <div className="pe-[20px] flex items-center justify-start lg:justify-end gap-[8px] flex-wrap w-full lg:w-auto">
-            {!dummy && !addEditSets && shortlinkInfo && (
-              <>
-                {shortlinkInfo.ask && shortlinkInfo.providerName && (
-                  <label className="flex items-center gap-[8px] cursor-pointer text-[13px] text-textColor select-none">
-                    <input
-                      type="checkbox"
-                      checked={shortLinkEnabled}
-                      onChange={() => {
-                        shortlinkUserToggled.current = true;
-                        setShortLinkEnabled((v) => !v);
-                      }}
-                      className="w-[16px] h-[16px] rounded-[4px] accent-btnPrimary"
-                    />
-                    <span>
-                      {t('shorten_links_via', 'Shorten links via')}{' '}
-                      {shortlinkInfo.domain || shortlinkInfo.providerName}
-                    </span>
-                  </label>
-                )}
-                {!shortlinkInfo.providerName && !shortlinkInfo.domain && (
-                  <a
-                    href="/settings/shortlinks"
-                    className="text-[13px] text-btnPrimary hover:underline"
-                  >
-                    {t(
-                      'connect_shortlink_provider',
-                      'Connect a short-link provider to track clicks'
-                    )}
-                  </a>
-                )}
-              </>
-            )}
             {existingData?.integration && (
               <button
                 onClick={deletePost}
@@ -1104,11 +1070,64 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           }}
         />
       )}
-      {aiActive && (
-      <CopilotPopup
-        hitEscapeToClose={false}
-        clickOutsideToClose={true}
-        instructions={`
+      {aiActive &&
+        assistantOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[300] flex items-center justify-center p-[16px]">
+            <div
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+              onClick={() => setAssistantOpen(false)}
+            />
+            <div className="relative w-[600px] max-w-full h-[80vh] max-h-[720px] bg-newBgColorInner border border-newBorder rounded-[16px] shadow-xl flex flex-col overflow-hidden">
+              <div className="h-[52px] shrink-0 border-b border-newBorder flex items-center justify-between px-[16px]">
+                <div className="flex items-center gap-[8px] text-[16px] font-[600] text-textColor">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-[#2B5CD3]"
+                  >
+                    <path d="M12 3l1.9 4.6L18.5 9.5 13.9 11.4 12 16l-1.9-4.6L5.5 9.5l4.6-1.9L12 3Z" />
+                    <path d="M19 15l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7.7-1.8Z" />
+                  </svg>
+                  {t('your_assistant', 'Your Assistant')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAssistantOpen(false)}
+                  aria-label={t('close', 'Close')}
+                  className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center hover:bg-boxHover text-textColor"
+                >
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
+                </button>
+              </div>
+              <div
+                className="flex-1 min-h-0"
+                style={
+                  {
+                    '--copilot-kit-primary-color': 'var(--new-btn-text)',
+                    '--copilot-kit-background-color': 'var(--new-bg-color)',
+                  } as React.CSSProperties
+                }
+              >
+                <CopilotChat
+                  className="h-full"
+                  instructions={`
 You are an assistant that help the user to schedule their social media posts,
 Here are the things you can do:
 - Add a new comment / post to the list of posts
@@ -1119,15 +1138,19 @@ Here are the things you can do:
 Post content can be added using the addPostContentFor{num} function.
 After using the addPostFor{num} it will create a new addPostContentFor{num+ 1} function.
 `}
-        labels={{
-          title: t('your_assistant', 'Your Assistant'),
-          initial: t(
-            'assistant_initial_message',
-            'Hi! I can help you to refine your social media posts.'
-          ),
-        }}
-      />
-      )}
+                  labels={{
+                    title: t('your_assistant', 'Your Assistant'),
+                    initial: t(
+                      'assistant_initial_message',
+                      'Hi! I can help you to refine your social media posts.'
+                    ),
+                  }}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
