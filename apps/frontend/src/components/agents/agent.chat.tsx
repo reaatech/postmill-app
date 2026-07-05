@@ -24,7 +24,8 @@ import {
   PropertiesContext,
 } from '@gitroom/frontend/components/agents/agent';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { TextMessage } from '@copilotkit/runtime-client-gql';
 import { Composer } from '@gitroom/frontend/components/composer/composer';
@@ -40,13 +41,8 @@ import {
   AI_SETUP_HREF,
 } from '@gitroom/frontend/components/layout/use-ai-active';
 import { useToaster } from '@gitroom/react/toaster/toaster';
-import useSWR from 'swr';
-import {
-  AgentContextBridge,
-  getAgentUiContext,
-  subscribeAgentUiContext,
-  type AgentUiContextValue,
-} from '@gitroom/frontend/components/agent/agent-context-bridge';
+import useSWR, { useSWRConfig } from 'swr';
+import { AgentContextBridge } from '@gitroom/frontend/components/agent/agent-context-bridge';
 
 export interface MediaAttachment {
   id: string;
@@ -63,15 +59,9 @@ export const AgentChat: FC = () => {
   const params = useParams<{ id: string }>();
   const { properties } = useContext(PropertiesContext);
   const t = useT();
+  const router = useRouter();
   const aiActive = useAiActive();
   const [media, setMedia] = useState<MediaAttachment[]>([]);
-  const [agUiContext, setAgUiContext] = useState<AgentUiContextValue>(() => getAgentUiContext());
-
-  // Subscribe to cross-page agent UI context updates so CopilotKit properties
-  // always carry the latest view context.
-  useEffect(() => {
-    return subscribeAgentUiContext(() => setAgUiContext(getAgentUiContext()));
-  }, []);
 
   // No AI provider configured → CopilotKit's /copilot/agent handshake would
   // 403 and the "postmill" agent wouldn't resolve. Send the user to set one up.
@@ -87,12 +77,9 @@ export const AgentChat: FC = () => {
             'Configure an AI provider to use the assistant and build agents.'
           )}
         </div>
-        <Link
-          href={AI_SETUP_HREF}
-          className="bg-newColorBtn text-newColorText rounded-[8px] px-[16px] py-[10px] text-[14px] font-[600]"
-        >
+        <Button onClick={() => router.push(AI_SETUP_HREF)}>
           {t('configure_ai_provider', 'Configure AI provider')}
-        </Link>
+        </Button>
       </div>
     );
   }
@@ -113,13 +100,13 @@ export const AgentChat: FC = () => {
       properties={{
         integrations: properties,
         media,
-        agUiContext,
       }}
     >
       <MediaAttachmentContext.Provider value={{ media, setMedia }}>
         <Hooks />
         <AgentContextBridge />
         <LoadMessages id={params.id} />
+        <ThreadListRefresher id={params.id} />
         <div
           style={
             {
@@ -155,29 +142,63 @@ You can also use me as an MCP Server, check Settings >> Public API
   );
 };
 
-const LoadMessages: FC<{ id: string }> = ({ id }) => {
+export const LoadMessages: FC<{ id: string }> = ({ id }) => {
   const { setMessages } = useCopilotMessagesContext();
   const fetch = useFetch();
-
-  const loadMessages = useCallback(async (idToSet: string) => {
-    const data = await (await fetch(`/copilot/${idToSet}/list`)).json();
-    setMessages(
-      data.messages.map((p: any) => {
-        return new TextMessage({
-          content: p.content.content,
-          role: p.role,
-        });
-      })
-    );
-  }, [fetch, setMessages]);
 
   useEffect(() => {
     if (id === 'new') {
       setMessages([]);
       return;
     }
-    loadMessages(id);
-  }, [id, loadMessages, setMessages]);
+    // App Router keeps this component mounted across `/agents/A → /agents/B`, so
+    // a slow response for the previous thread must never overwrite the current
+    // one. Guard with a cancel flag and swallow rejections (the fetch aborts on
+    // sign-out / navigation) so a stale load can't clobber a fresh thread.
+    let cancelled = false;
+    (async () => {
+      const data = await (await fetch(`/copilot/${id}/list`)).json();
+      if (cancelled) {
+        return;
+      }
+      setMessages(
+        data.messages.map((p: any) => {
+          return new TextMessage({
+            content: p.content.content,
+            role: p.role,
+          });
+        })
+      );
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [id, fetch, setMessages]);
+
+  return null;
+};
+
+// A brand-new conversation (`/agents/new`) gets a persisted server thread once
+// its first exchange completes, but the left-hand thread list (`useSWR('threads')`
+// in agent.tsx) won't reflect it until revalidated. Refresh that key once per new
+// session so the new conversation appears without a manual reload.
+const ThreadListRefresher: FC<{ id: string }> = ({ id }) => {
+  const { messages } = useCopilotMessagesContext();
+  const { mutate } = useSWRConfig();
+  const refreshedRef = useRef(false);
+  const lastIdRef = useRef(id);
+
+  useEffect(() => {
+    if (lastIdRef.current !== id) {
+      lastIdRef.current = id;
+      refreshedRef.current = false;
+    }
+    // Wait for the first round-trip (user + assistant) so the thread row exists.
+    if (id === 'new' && !refreshedRef.current && messages.length >= 2) {
+      refreshedRef.current = true;
+      mutate('threads');
+    }
+  }, [id, messages.length, mutate]);
 
   return null;
 };
@@ -189,14 +210,19 @@ const Message: FC<UserMessageProps> = (props) => {
     // Backward-compat: messages created before structured media properties may
     // still contain inline Image:/Video: markers or [--Media--] wrappers. Render
     // them and strip the legacy integration marker block.
+    // Escape `"` in interpolated URLs so a crafted url can't break out of the
+    // src attribute and inject class/style attributes (DOMPurify strips scripts
+    // but not attribute injection). Regexes are non-greedy so a second marker on
+    // the same line / block isn't swallowed into the first match.
+    const safeUrl = (u: string) => u.trim().replace(/"/g, '%22');
     return contentStr
-      .replace(/Video: (http.*mp4\n)/g, (match: string, p1: string) => {
-        return `<video controls class="h-[150px] w-[150px] rounded-[8px] mb-[10px]"><source src="${p1.trim()}" type="video/mp4">Your browser does not support the video tag.</video>`;
+      .replace(/Video: (http.*?mp4)\n/g, (match: string, p1: string) => {
+        return `<video controls class="h-[150px] w-[150px] rounded-[8px] mb-[10px]"><source src="${safeUrl(p1)}" type="video/mp4">Your browser does not support the video tag.</video>`;
       })
-      .replace(/Image: (http.*\n)/g, (match: string, p1: string) => {
-        return `<img src="${p1.trim()}" class="h-[150px] w-[150px] max-w-full border border-newBgColorInner" />`;
+      .replace(/Image: (http.*?)\n/g, (match: string, p1: string) => {
+        return `<img src="${safeUrl(p1)}" class="h-[150px] w-[150px] max-w-full border border-newBgColorInner" />`;
       })
-      .replace(/\[\-\-Media\-\-\](.*)\[\-\-Media\-\-\]/g, (match: string, p1: string) => {
+      .replace(/\[\-\-Media\-\-\](.*?)\[\-\-Media\-\-\]/g, (match: string, p1: string) => {
         return `<div class="flex justify-center mt-[20px]">${p1}</div>`;
       })
       .replace(
@@ -421,11 +447,16 @@ const ConfirmCommentReplyCard: FC<{
         : `/posts/${postId}/social-comments`;
       const res = await fetch(url, {
         method: 'POST',
-        body: JSON.stringify({ message }),
+        // The org output guardrail is always enforced server-side on approve; the
+        // human approval is the trust boundary. `guardrail` is deprecated/ignored but
+        // sent for wire back-compat (see commentReply tool: ui sessions only draft).
+        body: JSON.stringify({ message, guardrail: true }),
       });
       if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(text || t('failed_to_send', 'Failed to send reply'));
+        // Extract the 422 GuardrailViolation reason from the JSON body, not statusText.
+        throw new Error(
+          await errorMessageFromResponse(res, t('failed_to_send', 'Failed to send reply'))
+        );
       }
       toaster.show(t('reply_sent', 'Reply sent'), 'success');
       onRespond({ sent: true });
@@ -576,43 +607,143 @@ const ConfirmMediaStudioGenerateCard: FC<{
   );
 };
 
-const SPECIALIST_BY_TOOL: Record<string, string> = {
-  generateContent: 'content',
+// Keyed by the tool `name` the stream actually emits. These MUST stay in lockstep
+// with the backend tool-name arrays (`CONTENT/MEDIA/ANALYTICS/OPS_TOOL_NAMES` in
+// `@gitroom/nestjs-libraries/chat/agents/*.agent` and `SUPERVISOR_TOOL_NAMES` in
+// `load.tools.service`) — those modules pull heavy server deps, so we can't import
+// them into the client bundle; `agent.chat.spec.tsx` reads them off disk and fails
+// on any drift instead. Under the supervisor the top-level stream emits the
+// delegation tools `agent-<specialist>` (Mastra names sub-agent tools
+// `agent-${agentName}`), so those are mapped too.
+export const SPECIALIST_BY_TOOL: Record<string, string> = {
+  // content (CONTENT_TOOL_NAMES)
+  generatePostContent: 'content',
   runGenerator: 'content',
+  runContentPipeline: 'content',
   ragSearch: 'content',
   brandMemorySearch: 'content',
   brandProfile: 'content',
   brandMemoryReindex: 'content',
-  generateImage: 'media',
-  generateVideo: 'media',
-  mediaStudioGenerate: 'media',
-  mediaJobStatus: 'media',
+  // media (MEDIA_TOOL_NAMES)
   listMediaProviders: 'media',
   listMediaModels: 'media',
-  stockSearch: 'media',
-  filesSearch: 'media',
-  uploadFromUrl: 'media',
+  mediaStudioGenerate: 'media',
+  mediaJobStatus: 'media',
+  generateImageTool: 'media',
+  generateVideoTool: 'media',
+  uploadFromUrlTool: 'media',
   designerDesign: 'media',
+  filesSearch: 'media',
+  stockSearch: 'media',
+  // analytics (ANALYTICS_TOOL_NAMES)
   analyticsOverview: 'analytics',
-  analyticsBestTime: 'analytics',
-  analyticsRecommendations: 'analytics',
+  bestTime: 'analytics',
+  recommendations: 'analytics',
   analyticsPost: 'analytics',
-  analyticsWatchlist: 'analytics',
-  integrationSchedulePost: 'ops',
-  manualPosting: 'ops',
-  postsList: 'ops',
-  postsGet: 'ops',
-  postsReschedule: 'ops',
-  postsDelete: 'ops',
-  postsApprove: 'ops',
+  watchlist: 'analytics',
+  // ops (OPS_TOOL_NAMES)
+  integrationSchema: 'ops',
+  triggerTool: 'ops',
+  schedulePostTool: 'ops',
+  listPosts: 'ops',
+  getPost: 'ops',
+  reschedulePost: 'ops',
+  deletePost: 'ops',
+  approveDraft: 'ops',
   campaignCreate: 'ops',
   campaignUpdate: 'ops',
   campaignDashboard: 'ops',
   campaignTag: 'ops',
   commentsInbox: 'ops',
   commentReply: 'ops',
+  // supervisor-held (SUPERVISOR_TOOL_NAMES) + the frontend-only manual composer
   integrationList: 'ops',
   groupList: 'ops',
+  manualPosting: 'ops',
+  // delegation tools emitted by the supervisor
+  'agent-content': 'content',
+  'agent-media': 'media',
+  'agent-analytics': 'analytics',
+  'agent-ops': 'ops',
+};
+
+// Delegation tools (`agent-<specialist>`) return `{ text, subAgentToolResults }`,
+// where each entry is `{ toolName, result, args }` — the useful ids live on those
+// inner results. Kept as module-level pure helpers so the memos that call them
+// stay simple enough for the React Compiler to preserve their memoization.
+type ToolSummary = { label: string; value: string } | null;
+
+const delegatedIdSummary = (
+  result: any,
+  t: (key: string, fallback: string) => string
+): ToolSummary => {
+  const subResults = Array.isArray(result?.subAgentToolResults)
+    ? result.subAgentToolResults
+    : [];
+  for (const sub of subResults) {
+    const r = sub?.result;
+    if (r?.jobId) return { label: t('media_job', 'Media job'), value: r.jobId };
+    if (r?.platformCommentId) {
+      return { label: t('comment_id', 'Comment id'), value: r.platformCommentId };
+    }
+    if (r?.id) return { label: t('id', 'Id'), value: r.id };
+  }
+  return null;
+};
+
+const resolveMediaJob = (
+  name: string,
+  result: any,
+  args: any
+): { provider: string; jobId: string } | null => {
+  if (name === 'mediaStudioGenerate' && result?.jobId) {
+    return { provider: args?.provider, jobId: result.jobId as string };
+  }
+  const subResults = Array.isArray(result?.subAgentToolResults)
+    ? result.subAgentToolResults
+    : [];
+  for (const sub of subResults) {
+    if (sub?.toolName === 'mediaStudioGenerate' && sub?.result?.jobId) {
+      return { provider: sub?.args?.provider, jobId: sub.result.jobId as string };
+    }
+  }
+  return null;
+};
+
+// A draft awaiting human approval. Outward tools (commentReply / mediaStudioGenerate)
+// NEVER dispatch in a UI session — they return `{ needsConfirmation, draft }`. Under
+// the supervisor topology those calls are delegated, so the draft arrives nested in
+// `subAgentToolResults` where CopilotKit's `renderAndWaitForResponse` cards can't
+// fire. Surface every such draft here with an out-of-band approve/reject that
+// dispatches via the REST route (the human click is the trust boundary).
+type PendingDraft =
+  | { key: string; kind: 'comment'; draft: { action: string; postId: string; commentId?: string; message: string } }
+  | { key: string; kind: 'media'; draft: { provider: string; operation: string; model?: string; input?: Record<string, unknown>; mediaInputs?: Record<string, string>; folderId?: string } };
+
+const asPendingDraft = (raw: any, idx: number): PendingDraft | null => {
+  if (!raw || raw.needsConfirmation !== true || !raw.draft) return null;
+  const d = raw.draft;
+  if (typeof d.provider === 'string' && typeof d.operation === 'string') {
+    return { key: `media:${d.provider}:${d.operation}:${idx}`, kind: 'media', draft: d };
+  }
+  if (typeof d.postId === 'string' && typeof d.message === 'string') {
+    return { key: `comment:${d.postId}:${d.commentId ?? ''}:${idx}`, kind: 'comment', draft: d };
+  }
+  return null;
+};
+
+const extractPendingDrafts = (result: any): PendingDraft[] => {
+  const out: PendingDraft[] = [];
+  const top = asPendingDraft(result, 0);
+  if (top) out.push(top);
+  const subResults = Array.isArray(result?.subAgentToolResults)
+    ? result.subAgentToolResults
+    : [];
+  subResults.forEach((sub: any, i: number) => {
+    const p = asPendingDraft(sub?.result, i + 1);
+    if (p) out.push(p);
+  });
+  return out;
 };
 
 const ToolCallCard: FC<{
@@ -624,6 +755,8 @@ const ToolCallCard: FC<{
   const t = useT();
   const [expanded, setExpanded] = useState(false);
   const specialist = SPECIALIST_BY_TOOL[name];
+
+  const pendingDrafts = useMemo(() => extractPendingDrafts(result), [result]);
 
   const summary = useMemo(() => {
     if (name === 'mediaStudioGenerate' && result?.jobId) {
@@ -644,8 +777,15 @@ const ToolCallCard: FC<{
     if (result?.id) {
       return { label: t('id', 'Id'), value: result.id };
     }
-    return null;
+    // Surface the first meaningful id from a delegated specialist's tool calls.
+    return delegatedIdSummary(result, t);
   }, [name, result, t]);
+
+  // A media job may be produced directly (flat mode) or inside a delegated run.
+  const mediaJob = useMemo(
+    () => resolveMediaJob(name, result, args),
+    [name, result, args]
+  );
 
   return (
     <div className="rounded-[10px] border border-newBorder bg-newBgColor p-[12px] my-[6px] max-w-[520px]">
@@ -675,9 +815,12 @@ const ToolCallCard: FC<{
           {summary.label}: <span className="text-textColor font-mono">{summary.value}</span>
         </div>
       )}
-      {name === 'mediaStudioGenerate' && result?.jobId && (
-        <MediaJobStatusCard provider={args.provider} jobId={result.jobId} />
+      {mediaJob && (
+        <MediaJobStatusCard provider={mediaJob.provider} jobId={mediaJob.jobId} />
       )}
+      {pendingDrafts.map((p) => (
+        <PendingApprovalCard key={p.key} pending={p} />
+      ))}
       <button
         type="button"
         onClick={() => setExpanded((e) => !e)}
@@ -692,6 +835,166 @@ const ToolCallCard: FC<{
           </pre>
         </div>
       )}
+    </div>
+  );
+};
+
+// Out-of-band approval for a delegated draft. The agent's turn is already complete
+// (the sub-agent returned the draft as its result); approving here dispatches the
+// outward action via its REST route — the human click, not any model output, is the
+// authorization. Local state resolves the card so it can't be double-submitted.
+// Pull a human message out of a Nest error Response body ({message}/{error}),
+// falling back to raw text then a generic label — so a 422 GuardrailViolation shows
+// its reason (from the JSON body, not the generic statusText) instead of "Action
+// failed" (3.1).
+const errorMessageFromResponse = async (
+  res: Response,
+  fallback: string,
+): Promise<string> => {
+  const text = await res.text().catch(() => '');
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    const msg = body?.message ?? body?.error;
+    if (Array.isArray(msg)) return msg.join(', ') || fallback;
+    if (typeof msg === 'string' && msg) return msg;
+  } catch {
+    /* not JSON — fall through to raw text */
+  }
+  return text || fallback;
+};
+
+// `crypto.randomUUID` only exists in a secure context (https or localhost); fall
+// back so the approve card never crashes on a plain-http dev origin. An idempotency
+// key needs uniqueness, not cryptographic strength.
+function makeIdempotencyKey(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fall through to the non-crypto fallback */
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
+  const fetch = useFetch();
+  const toaster = useToaster();
+  const t = useT();
+  const [loading, setLoading] = useState(false);
+  const [resolved, setResolved] = useState<'sent' | 'rejected' | null>(null);
+  // One idempotency key per card: a retry after an ambiguous failure (the POST
+  // succeeded server-side but the client saw a timeout) re-sends the SAME key, so
+  // the server short-circuits and cannot double-dispatch a comment / start a second
+  // paid media job (3.2). Stable for this card's whole lifetime.
+  const idempotencyKey = useRef(makeIdempotencyKey()).current;
+
+  const approve = async () => {
+    setLoading(true);
+    try {
+      if (pending.kind === 'comment') {
+        const d = pending.draft;
+        const url = d.commentId
+          ? `/posts/${d.postId}/social-comments/${d.commentId}/reply`
+          : `/posts/${d.postId}/social-comments`;
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-Idempotency-Key': idempotencyKey },
+          // The org output guardrail is now always enforced server-side; the
+          // deprecated `guardrail` flag is ignored but sent for wire back-compat.
+          body: JSON.stringify({ message: d.message, guardrail: true }),
+        });
+        if (!res.ok) {
+          throw new Error(
+            await errorMessageFromResponse(res, t('action_failed', 'Action failed'))
+          );
+        }
+        toaster.show(t('reply_sent', 'Reply sent'), 'success');
+      } else {
+        const d = pending.draft;
+        const res = await fetch(`/media/studio/${d.provider}/generate`, {
+          method: 'POST',
+          headers: { 'X-Idempotency-Key': idempotencyKey },
+          body: JSON.stringify({
+            operation: d.operation,
+            model: d.model,
+            input: (d.input || {}) as Record<string, unknown>,
+            mediaInputs: d.mediaInputs,
+            folderId: d.folderId,
+          }),
+        });
+        if (!res.ok) {
+          throw new Error(
+            await errorMessageFromResponse(res, t('action_failed', 'Action failed'))
+          );
+        }
+        toaster.show(t('generation_submitted', 'Generation submitted'), 'success');
+      }
+      setResolved('sent');
+    } catch (err: any) {
+      toaster.show(err.message || t('action_failed', 'Action failed'), 'warning');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (resolved) {
+    return (
+      <div className="mt-[8px] text-[11px] text-newTableText">
+        {resolved === 'sent'
+          ? t('approved_and_sent', 'Approved and sent')
+          : t('rejected', 'Rejected')}
+      </div>
+    );
+  }
+
+  const title =
+    pending.kind === 'comment'
+      ? t('confirm_comment_reply', 'Confirm comment reply')
+      : t('confirm_media_generation', 'Confirm media generation');
+
+  return (
+    <div className="mt-[8px] rounded-[8px] border border-amber-500/40 bg-amber-500/5 p-[10px]">
+      <div className="text-[12px] font-[600] text-textColor mb-[6px]">{title}</div>
+      {pending.kind === 'comment' ? (
+        <div className="rounded-[6px] border border-newTableBorder bg-newBgColorInner p-[8px] text-[12px] text-textColor mb-[8px] whitespace-pre-wrap">
+          {pending.draft.message}
+        </div>
+      ) : (
+        <>
+          {typeof pending.draft.input?.prompt === 'string' &&
+            pending.draft.input.prompt && (
+              // Show the prompt the user is approving — a paid generation must not
+              // be approved blind on just provider·operation·model (3.2).
+              <div className="rounded-[6px] border border-newTableBorder bg-newBgColorInner p-[8px] text-[12px] text-textColor mb-[8px] whitespace-pre-wrap">
+                {pending.draft.input.prompt as string}
+              </div>
+            )}
+          <div className="text-[12px] text-newTableText mb-[8px]">
+            {pending.draft.provider} · {pending.draft.operation}
+            {pending.draft.model ? ` · ${pending.draft.model}` : ''}
+          </div>
+        </>
+      )}
+      <div className="flex gap-[8px] justify-end">
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => setResolved('rejected')}
+          className="text-[12px] text-newTableText hover:text-textColor px-[10px] py-[5px] disabled:opacity-50"
+        >
+          {t('reject', 'Reject')}
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={approve}
+          className="bg-btnPrimary text-white text-[12px] rounded-[6px] px-[12px] py-[5px] disabled:opacity-50"
+        >
+          {loading ? t('sending', 'Sending...') : t('approve', 'Approve')}
+        </button>
+      </div>
     </div>
   );
 };
@@ -771,9 +1074,30 @@ const OpenModal: FC<{
 }> = ({ args, respond }) => {
   const modals = useModals();
   const { properties } = useContext(PropertiesContext);
+  const t = useT();
+
+  // CopilotKit can re-render the executing tool; the fallback div and the modal
+  // sequence both call respond — guard so only the first wins (a double respond
+  // corrupts the run).
+  const respondedRef = useRef(false);
+  const safeRespond = useCallback(
+    (value: any) => {
+      if (respondedRef.current) {
+        return;
+      }
+      respondedRef.current = true;
+      respond(value);
+    },
+    [respond]
+  );
+
   const startModal = useCallback(async () => {
+    let scheduled = 0;
     for (const integration of args.list) {
-      await new Promise((res) => {
+      // `mutate` fires only when the composer actually schedules; `customClose`
+      // fires on dismiss. Track the difference so we don't tell the model
+      // "scheduled" when the user simply closed the modal.
+      const didSchedule = await new Promise<boolean>((res) => {
         const group = makeId(10);
         modals.openModal({
           id: 'add-edit-modal',
@@ -832,16 +1156,25 @@ const OpenModal: FC<{
                 }))}
                 reopenModal={() => {}}
                 mutate={() => res(true)}
-                customClose={() => res(true)}
+                customClose={() => res(false)}
               />
             </ExistingDataContextProvider>
           ),
         });
       });
+      if (didSchedule) {
+        scheduled += 1;
+      }
     }
 
-    respond('User scheduled all the posts');
-  }, [args, respond, properties, modals]);
+    if (scheduled === 0) {
+      safeRespond('User closed the composer without scheduling any posts.');
+    } else if (scheduled === args.list.length) {
+      safeRespond('User scheduled all the posts.');
+    } else {
+      safeRespond(`User scheduled ${scheduled} of ${args.list.length} posts.`);
+    }
+  }, [args, safeRespond, properties, modals]);
 
   // The modal sequence must start exactly once on mount — guard with a ref so
   // the dependency list can stay exhaustive without reopening the modals.
@@ -857,15 +1190,15 @@ const OpenModal: FC<{
     <div
       role="button"
       tabIndex={0}
-      onClick={() => respond('continue')}
+      onClick={() => safeRespond('continue')}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          respond('continue');
+          safeRespond('continue');
         }
       }}
     >
-      Opening manually ${JSON.stringify(args)}
+      {t('opening_composer', 'Opening the composer…')}
     </div>
   );
 };

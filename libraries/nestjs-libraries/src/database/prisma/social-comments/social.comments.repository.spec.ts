@@ -95,6 +95,66 @@ describe('SocialCommentsRepository', () => {
     });
   });
 
+  describe('getInbox pagination (1.1)', () => {
+    const rows = (n: number) =>
+      Array.from({ length: n }, (_, i) => ({
+        id: `c${i}`,
+        postId: 'p1',
+        // strictly-descending timestamps so the cursor is deterministic
+        platformCreatedAt: new Date(2024, 0, 1, 0, 0, n - i),
+      }));
+
+    it('threads limit → take pageSize+1 and derives cursor from the last RETURNED item', async () => {
+      const data = rows(26); // one more than the page size
+      mockSocialComment.findMany.mockResolvedValue(data);
+
+      const result = await repository.getInbox('org1', 'u1', { limit: 25 } as any);
+
+      // take is pageSize + 1
+      expect(mockSocialComment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 26 })
+      );
+      // only pageSize items surface
+      expect(result.comments).toHaveLength(25);
+      // cursor is the 25th (last returned) item, NOT the 26th
+      expect(result.nextCursor).toBe(data[24].platformCreatedAt.toISOString());
+    });
+
+    it('clamps limit into [1,50]', async () => {
+      mockSocialComment.findMany.mockResolvedValue([]);
+      await repository.getInbox('org1', 'u1', { limit: 999 } as any);
+      expect(mockSocialComment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 51 })
+      );
+
+      mockSocialComment.findMany.mockClear();
+      await repository.getInbox('org1', 'u1', { limit: 0 } as any);
+      expect(mockSocialComment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 2 })
+      );
+    });
+
+    it('absent limit keeps the byte-identical 50/51 math', async () => {
+      const data = rows(51);
+      mockSocialComment.findMany.mockResolvedValue(data);
+
+      const result = await repository.getInbox('org1', 'u1', {} as any);
+
+      expect(mockSocialComment.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 51 })
+      );
+      expect(result.comments).toHaveLength(50);
+      expect(result.nextCursor).toBe(data[49].platformCreatedAt.toISOString());
+    });
+
+    it('no cursor when the result fits in one page', async () => {
+      mockSocialComment.findMany.mockResolvedValue(rows(10));
+      const result = await repository.getInbox('org1', 'u1', { limit: 25 } as any);
+      expect(result.comments).toHaveLength(10);
+      expect(result.nextCursor).toBeUndefined();
+    });
+  });
+
   describe('isOrganizationMember', () => {
     it('returns true when the user belongs to the organization', async () => {
       mockUserOrganization.findFirst.mockResolvedValue({ userId: 'u1' });

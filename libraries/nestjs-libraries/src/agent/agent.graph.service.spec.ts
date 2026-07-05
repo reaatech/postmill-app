@@ -22,6 +22,9 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
       generate: vi.fn().mockResolvedValue('https://cdn.example.com/agent-image.png'),
     });
     languageModel = vi.fn().mockResolvedValue(mockLanguageModel);
+    resolveConfigForScope = vi
+      .fn()
+      .mockResolvedValue({ providerId: 'openai', modelId: 'gpt-x' });
   },
 }));
 
@@ -128,6 +131,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { AgentGraphService } from './agent.graph.service';
 import type { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.service';
 
@@ -138,6 +142,8 @@ describe('AgentGraphService', () => {
   let fileService: FileService;
   let storageService: StorageService;
   let aiMediaService: { generateImage: ReturnType<typeof vi.fn> };
+  let budget: { checkBudget: ReturnType<typeof vi.fn>; recordSpend: ReturnType<typeof vi.fn> };
+  let guardrails: { checkOutput: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -148,12 +154,21 @@ describe('AgentGraphService', () => {
     aiMediaService = {
       generateImage: vi.fn().mockResolvedValue('https://cdn.example.com/agent-image.png'),
     };
+    budget = {
+      checkBudget: vi.fn().mockResolvedValue({ allowed: true }),
+      recordSpend: vi.fn().mockResolvedValue(undefined),
+    };
+    guardrails = {
+      checkOutput: vi.fn().mockImplementation((c: string) => Promise.resolve(c)),
+    };
     service = new AgentGraphService(
       postsService,
       fileService,
       aiModelProvider,
       storageService,
       aiMediaService as unknown as AiMediaService,
+      budget as any,
+      guardrails as any,
     );
   });
 
@@ -213,16 +228,31 @@ describe('AgentGraphService', () => {
       expect(result).toEqual({});
     });
 
+    it('caps the image fan-out at 10 items (bounds model-driven spend)', async () => {
+      const state = {
+        isPicture: true,
+        orgId: 'org-cap',
+        content: Array.from({ length: 15 }, (_, i) => ({ prompt: `p${i}` })),
+      } as any;
+
+      const result = await service.generatePictures(state);
+
+      expect(aiMediaService.generateImage).toHaveBeenCalledTimes(10);
+      expect(result.content).toHaveLength(10);
+    });
+
     it('handles image generation failure gracefully', async () => {
       const failingMedia = {
         generateImage: vi.fn().mockRejectedValue(new Error('Image gen failed')),
       };
       const svc = new AgentGraphService(
         postsService,
-      fileService,
+        fileService,
         aiModelProvider,
         storageService,
         failingMedia as unknown as AiMediaService,
+        budget as any,
+        guardrails as any,
       );
 
       const state = {
@@ -238,17 +268,25 @@ describe('AgentGraphService', () => {
   });
 
   describe('start', () => {
-    it('creates a graph invocation with streamEvents', async () => {
-      const body = {
-        research: 'Write about AI trends',
-        isPicture: false,
-        format: 'one_short' as const,
-        tone: 'company' as const,
-      };
+    const body = {
+      research: 'Write about AI trends',
+      isPicture: false,
+      format: 'one_short' as const,
+      tone: 'company' as const,
+    };
 
+    it('creates a graph invocation with streamEvents', async () => {
       const result = await service.start('org-99', body);
 
+      expect(budget.checkBudget).toHaveBeenCalledWith('agent', 'org-99');
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('rejects up-front when the org budget is exceeded, before any model call', async () => {
+      budget.checkBudget.mockResolvedValueOnce({ allowed: false, reason: 'Daily cap reached' });
+
+      await expect(service.start('org-broke', body)).rejects.toThrow('Daily cap reached');
+      expect(aiModelProvider.langchainModel).not.toHaveBeenCalled();
     });
 
     it('builds the full graph with all nodes', () => {
@@ -397,6 +435,128 @@ describe('AgentGraphService', () => {
 
       expect(postsService.findFreeDateTime).toHaveBeenCalledWith('org-42');
       expect(result.date).toBeInstanceOf(Date);
+    });
+  });
+
+  // 1.2 — real spend attribution + one coherent 'agent' scope.
+  describe('spend attribution (1.2)', () => {
+    it('records spend under the real provider/model and scope "agent"', async () => {
+      const cb = (service as any)._spendCallback('org-x', {
+        providerId: 'openai',
+        modelId: 'gpt-x',
+      });
+      await cb.handleLLMEnd({
+        llmOutput: { tokenUsage: { promptTokens: 10, completionTokens: 5 } },
+      });
+
+      expect(budget.recordSpend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: 'org-x',
+          provider: 'openai',
+          model: 'gpt-x',
+          scope: 'agent',
+          inputTokens: 10,
+          outputTokens: 5,
+          costUsd: 0,
+        })
+      );
+    });
+
+    it('falls back to the "generator" sentinel when attribution is absent', async () => {
+      const cb = (service as any)._spendCallback('org-y');
+      await cb.handleLLMEnd({
+        llmOutput: { usage: { input_tokens: 3, output_tokens: 2 } },
+      });
+
+      expect(budget.recordSpend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          provider: 'generator',
+          model: 'generator',
+          scope: 'agent',
+        })
+      );
+    });
+
+    it('resolves attribution once via resolveConfigForScope in start()', async () => {
+      await service.start('org-99', {
+        research: 'x',
+        isPicture: false,
+        format: 'one_short',
+        tone: 'company',
+      } as any);
+
+      expect(aiModelProvider.resolveConfigForScope).toHaveBeenCalledWith(
+        'generator',
+        'org-99'
+      );
+    });
+  });
+
+  // 2.1 — output guardrail redaction return value is applied, not discarded.
+  describe('guardrail redaction (2.1)', () => {
+    it('applies redacted content back onto every generated item', async () => {
+      guardrails.checkOutput.mockResolvedValue('[REDACTED]');
+      const invoke = vi.fn().mockResolvedValue({
+        content: [{ content: 'raw pii' }, { content: 'more pii' }],
+      });
+      (ChatPromptTemplate.fromTemplate as any).mockReturnValueOnce({
+        pipe: () => ({ invoke }),
+      });
+
+      const state = {
+        orgId: 'o',
+        isPicture: false,
+        format: 'thread_short',
+        tone: 'company',
+        hook: 'h',
+        messages: [{ content: 'req' }],
+        fresearch: '',
+      } as any;
+
+      const result = await service.generateContent(state);
+
+      expect(result.content[0].content).toBe('[REDACTED]');
+      expect(result.content[1].content).toBe('[REDACTED]');
+    });
+
+    it('applies redaction to the generated hook', async () => {
+      guardrails.checkOutput.mockResolvedValue('[REDACTED-HOOK]');
+      const invoke = vi.fn().mockResolvedValue({ hook: 'raw hook' });
+      (ChatPromptTemplate.fromTemplate as any).mockReturnValueOnce({
+        pipe: () => ({ invoke }),
+      });
+
+      const state = {
+        orgId: 'o',
+        tone: 'company',
+        popularPosts: [{ hook: 'x' }],
+        messages: [{ content: 'req' }],
+        fresearch: '',
+      } as any;
+
+      const result = await service.generateHook(state);
+
+      expect(result.hook).toBe('[REDACTED-HOOK]');
+    });
+
+    it('block-mode: a throwing checkOutput aborts generateContent', async () => {
+      guardrails.checkOutput.mockRejectedValueOnce(new Error('blocked by policy'));
+      const invoke = vi.fn().mockResolvedValue({ content: { content: 'bad' } });
+      (ChatPromptTemplate.fromTemplate as any).mockReturnValueOnce({
+        pipe: () => ({ invoke }),
+      });
+
+      const state = {
+        orgId: 'o',
+        isPicture: false,
+        format: 'one_short',
+        tone: 'company',
+        hook: 'h',
+        messages: [{ content: 'req' }],
+        fresearch: '',
+      } as any;
+
+      await expect(service.generateContent(state)).rejects.toThrow('blocked by policy');
     });
   });
 });

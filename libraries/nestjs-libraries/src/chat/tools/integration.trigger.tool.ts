@@ -8,7 +8,10 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { timer } from '@gitroom/helpers/utils/timer';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
-import { requireRead } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+import {
+  parseOrg,
+  requireRead,
+} from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class IntegrationTriggerTool implements AgentToolInterface {
@@ -18,6 +21,8 @@ export class IntegrationTriggerTool implements AgentToolInterface {
     private _refreshIntegrationService: RefreshIntegrationService
   ) {}
   private readonly _logger = new Logger(IntegrationTriggerTool.name);
+  private static readonly MAX_REFRESH_ATTEMPTS = 2;
+  private static readonly MAX_OUTPUT_CHARS = 100_000;
   name = 'triggerTool';
 
   run() {
@@ -48,16 +53,20 @@ export class IntegrationTriggerTool implements AgentToolInterface {
           })
         ),
       }),
-      outputSchema: z.object({
-        output: z.array(z.record(z.string(), z.any())),
-      }),
+      // Provider payloads are NOT uniformly arrays; @mastra/core `validateToolOutput`
+      // replaces non-conforming returns with a validation error AND strips undeclared
+      // keys, so the schema must accept BOTH the plain-string error leg and any success
+      // shape (array/object/scalar) — otherwise real successes get swallowed.
+      outputSchema: z.union([
+        z.object({ output: z.string() }),
+        z.object({ output: z.any() }),
+      ]),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        requireRead(context as any);
+        const ctx = context as any;
+        requireRead(ctx);
         this._logger.debug(`triggerTool ${JSON.stringify(inputData)}`);
-        const organizationId = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        ).id;
+        const organizationId = parseOrg(ctx).id;
 
         const getIntegration =
           await this._integrationService.getIntegrationById(
@@ -94,7 +103,11 @@ export class IntegrationTriggerTool implements AgentToolInterface {
           return { output: 'tool not found' };
         }
 
-        while (true) {
+        for (
+          let attempt = 1;
+          attempt <= IntegrationTriggerTool.MAX_REFRESH_ATTEMPTS;
+          attempt++
+        ) {
           try {
             // @ts-ignore
             const load = await integrationProvider[inputData.methodName](
@@ -110,9 +123,34 @@ export class IntegrationTriggerTool implements AgentToolInterface {
               getIntegration
             );
 
+            // Cap uncapped provider payloads: only oversized ones get serialized +
+            // truncated (a small array/object passes through untouched).
+            const serialized = JSON.stringify(load);
+            if (
+              serialized &&
+              serialized.length > IntegrationTriggerTool.MAX_OUTPUT_CHARS
+            ) {
+              return {
+                output:
+                  serialized.slice(
+                    0,
+                    IntegrationTriggerTool.MAX_OUTPUT_CHARS
+                  ) + '…[truncated]',
+              };
+            }
+
             return { output: load };
           } catch (err) {
             if (err instanceof RefreshToken) {
+              // Bound the refresh-retry loop: after the last attempt still throwing
+              // RefreshToken, stop instead of spinning forever (10s per lap).
+              if (attempt >= IntegrationTriggerTool.MAX_REFRESH_ATTEMPTS) {
+                return {
+                  output:
+                    'The integration token kept expiring after a refresh; please reconnect the channel.',
+                };
+              }
+
               const data = await this._refreshIntegrationService.refresh(
                 getIntegration
               );
@@ -138,12 +176,21 @@ export class IntegrationTriggerTool implements AgentToolInterface {
                 }
 
                 continue;
-              } else {
               }
+
+              // A refresh that yields no accessToken must not fall through to the
+              // generic "Unexpected error" — surface it explicitly.
+              return {
+                output:
+                  'Token refresh did not return a new access token; please reconnect the channel.',
+              };
             }
             return { output: 'Unexpected error' };
           }
         }
+
+        // Unreachable safety net (the loop returns on every path).
+        return { output: 'Unexpected error' };
       },
     });
   }

@@ -51,10 +51,14 @@ export class SocialCommentsRepository {
       where.platformCreatedAt = { lt: new Date(filters.cursor) };
     }
 
+    // Page size is caller-controllable (the MCP inbox tool asks for smaller pages);
+    // absent → 50 keeps the REST route byte-identical to the old fixed behaviour.
+    const pageSize = Math.min(Math.max(filters.limit ?? 50, 1), 50);
+
     const comments = await this._socialComment.model.socialComment.findMany({
       where,
       orderBy: [{ platformCreatedAt: 'desc' }, { id: 'desc' }],
-      take: 51,
+      take: pageSize + 1,
       include: {
         post: {
           select: {
@@ -67,8 +71,10 @@ export class SocialCommentsRepository {
       },
     });
 
-    const hasMore = comments.length > 50;
-    const items = hasMore ? comments.slice(0, 50) : comments;
+    const hasMore = comments.length > pageSize;
+    const items = hasMore ? comments.slice(0, pageSize) : comments;
+    // nextCursor is derived from the last RETURNED item, so it's correct by
+    // construction for any pageSize (no more skipped items 26-50).
     const nextCursor = hasMore && items.length
       ? items[items.length - 1].platformCreatedAt.toISOString()
       : undefined;

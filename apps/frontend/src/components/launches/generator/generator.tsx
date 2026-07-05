@@ -19,12 +19,14 @@ import {
 } from '@gitroom/frontend/components/launches/calendar.context';
 import dayjs from 'dayjs';
 import { Select } from '@gitroom/react/form/select';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 const FirstStep: FC = (props) => {
   const router = useRouter();
   const { integrations, reloadCalendarView } = useCalendar();
   const fetch = useFetch();
+  const toaster = useToaster();
   const [loading, setLoading] = useState(false);
   const [showStep, setShowStep] = useState('');
   const t = useT();
@@ -52,7 +54,14 @@ const FirstStep: FC = (props) => {
       let lastResponse = {} as any;
       while (true) {
         const { done, value } = await reader.read();
-        if (done) return lastResponse.data.output;
+        if (done) {
+          if (!lastResponse?.data?.output) {
+            throw new Error(
+              t('generator_no_output', 'Generator returned no output')
+            );
+          }
+          return lastResponse.data.output;
+        }
 
         // Convert chunked binary data to string
         const chunkStr = decoder.decode(value, {
@@ -61,8 +70,23 @@ const FirstStep: FC = (props) => {
         for (const chunk of chunkStr
           .split('\n')
           .filter((f) => f && f.indexOf('{') > -1)) {
+          // Parse in its own guard: a partial/invalid chunk must be skipped, but a
+          // successfully-parsed error line must NOT be swallowed (that hung the
+          // wizard). So only JSON.parse is inside the try.
+          let data: any;
           try {
-            const data = JSON.parse(chunk);
+            data = JSON.parse(chunk);
+          } catch (e) {
+            /** partial/invalid chunk — skip **/
+            continue;
+          }
+          {
+            // Mid-stream error line from the controller's new NDJSON error contract.
+            // Surface it as an exception so onSubmit's catch shows it and re-enables
+            // the form (do NOT store it as lastResponse — that would hang the wizard).
+            if (data.error) {
+              throw new Error(data.error);
+            }
             switch (data.name) {
               case 'agent':
                 setShowStep(t('agent_starting', 'Agent starting'));
@@ -110,8 +134,6 @@ const FirstStep: FC = (props) => {
                 break;
             }
             lastResponse = data;
-          } catch (e) {
-            /** don't do anything **/
           }
         }
       }
@@ -123,43 +145,58 @@ const FirstStep: FC = (props) => {
   }> = useCallback(
     async (value) => {
       setLoading(true);
-      const response = await fetch('/posts/generator', {
-        method: 'POST',
-        body: JSON.stringify(value),
-      });
-      if (!response.body) {
-        return;
-      }
-      const reader = response.body.getReader();
-      const load = await generateStep(reader);
-      const messages = load.content.map((p: any, index: number) => {
-        if (index === 0) {
+      try {
+        const response = await fetch('/posts/generator', {
+          method: 'POST',
+          body: JSON.stringify(value),
+        });
+        // The controller now returns pre-flight 429/500 JSON {error} (e.g. an org
+        // over its AI budget). Surface it instead of streaming a null body.
+        if (!response.ok) {
+          const err = await response.json().catch(() => null);
+          throw new Error(err?.error || t('generation_failed', 'Generation failed'));
+        }
+        if (!response.body) {
+          throw new Error(t('generation_failed', 'Generation failed'));
+        }
+        const reader = response.body.getReader();
+        const load = await generateStep(reader);
+        const messages = load.content.map((p: any, index: number) => {
+          if (index === 0) {
+            return {
+              content: load.hook + '\n' + p.content,
+              ...(p?.image?.path
+                ? {
+                    image: [p.image],
+                  }
+                : {}),
+            };
+          }
           return {
-            content: load.hook + '\n' + p.content,
+            content: p.content,
             ...(p?.image?.path
               ? {
                   image: [p.image],
                 }
               : {}),
           };
-        }
-        return {
-          content: p.content,
-          ...(p?.image?.path
-            ? {
-                image: [p.image],
-              }
-            : {}),
-        };
-      });
-      setShowStep('');
-      const params = new URLSearchParams();
-      params.set('date', dayjs.utc(load.date).local().format('YYYY-MM-DDTHH:mm:ss'));
-      params.set('content', encodeURIComponent(messages[0]?.content || ''));
-      router.push(`/posts/post?${params.toString()}`);
-      setLoading(false);
+        });
+        setShowStep('');
+        const params = new URLSearchParams();
+        params.set('date', dayjs.utc(load.date).local().format('YYYY-MM-DDTHH:mm:ss'));
+        params.set('content', encodeURIComponent(messages[0]?.content || ''));
+        router.push(`/posts/post?${params.toString()}`);
+      } catch (err: any) {
+        setShowStep('');
+        toaster.show(
+          err?.message || t('generation_failed', 'Generation failed'),
+          'warning'
+        );
+      } finally {
+        setLoading(false);
+      }
     },
-    [fetch, generateStep, router]
+    [fetch, generateStep, router, toaster, t]
   );
   return (
     <form

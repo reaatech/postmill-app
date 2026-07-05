@@ -67,6 +67,7 @@ describe('MediaJobStatusTool', () => {
         operation: 'image',
         status: 'failed',
         error: 'Provider error',
+        organizationId: org.id,
       }),
     };
     const tool = new MediaJobStatusTool(mediaStudio as any, lifecycle as any);
@@ -89,6 +90,42 @@ describe('MediaJobStatusTool', () => {
         error: 'Provider error',
       },
     ]);
+  });
+
+  it('does not leak another tenant job (foreign organizationId → not found)', async () => {
+    const lifecycle = {
+      getJob: vi.fn().mockResolvedValue({
+        id: 'job-foreign',
+        operation: 'image',
+        status: 'failed',
+        error: 'Provider error',
+        organizationId: 'org-someone-else',
+      }),
+    };
+    const tool = new MediaJobStatusTool({ listJobs: vi.fn() } as any, lifecycle as any);
+
+    const result = await executeTool(tool, {
+      inputData: { jobId: 'job-foreign' },
+      organization: org,
+      user,
+      access: { mode: 'user' },
+    });
+
+    expect(result).toEqual({ error: 'Job job-foreign not found' });
+  });
+
+  it('returns the same not-found error for a missing and a foreign job (no oracle)', async () => {
+    const missing = new MediaJobStatusTool(
+      { listJobs: vi.fn() } as any,
+      { getJob: vi.fn().mockResolvedValue(null) } as any
+    );
+    const result = await executeTool(missing, {
+      inputData: { jobId: 'job-x' },
+      organization: org,
+      user,
+      access: { mode: 'user' },
+    });
+    expect(result).toEqual({ error: 'Job job-x not found' });
   });
 
   it('returns an error when neither provider nor jobId is given', async () => {

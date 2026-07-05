@@ -8,6 +8,21 @@ vi.mock('@gitroom/nestjs-libraries/chat/mastra.service', () => ({
   MastraService: class MockMastraService {},
 }));
 
+// start.mcp now statically imports LoadToolsService (for the in-repo tool union),
+// which transitively pulls mastra.store's eager PostgresStore. Stub both so the
+// suite doesn't need a live DATABASE_URL at import time.
+vi.mock('@gitroom/nestjs-libraries/chat/mastra.store', () => ({
+  pStore: { _type: 'mock.mastra.store' },
+}));
+vi.mock('@gitroom/nestjs-libraries/chat/load.tools.service', () => ({
+  LoadToolsService: class MockLoadToolsService {
+    async loadTools() {
+      return {};
+    }
+  },
+  SUPERVISOR_TOOL_NAMES: ['integrationList', 'groupList'],
+}));
+
 vi.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.service', () => ({
   OrganizationService: class MockOrganizationService {},
 }));
@@ -47,7 +62,7 @@ vi.mock('./oauth-types', () => ({
   extractBearerToken: vi.fn(),
 }));
 
-import { createMcpScopeStrategy, requireScopes } from './start.mcp';
+import { createMcpScopeStrategy, requireScopes, mapPersistedScopes } from './start.mcp';
 
 describe('startMcp auth helpers', () => {
   it('does not grant configured scopes to a token that does not have them', async () => {
@@ -88,5 +103,27 @@ describe('startMcp auth helpers', () => {
   it('requires every requested scope', () => {
     expect(requireScopes({ authenticated: true, scopes: ['mcp:read'] }, ['mcp:read'])).toBe(true);
     expect(requireScopes({ authenticated: true, scopes: ['mcp:read'] }, ['mcp:read', 'mcp:admin'])).toBe(false);
+  });
+});
+
+describe('mapPersistedScopes (OAuth granted-scope mapping)', () => {
+  it('floors an empty/absent scope to mcp:read (legacy rows)', () => {
+    expect(mapPersistedScopes(null)).toEqual(['mcp:read']);
+    expect(mapPersistedScopes('')).toEqual(['mcp:read']);
+    expect(mapPersistedScopes(undefined)).toEqual(['mcp:read']);
+  });
+
+  it('maps a granted write scope through (space or comma separated)', () => {
+    expect(mapPersistedScopes('mcp:read mcp:posts:write')).toContain('mcp:posts:write');
+    expect(mapPersistedScopes('mcp:posts:write,mcp:admin')).toEqual(
+      expect.arrayContaining(['mcp:read', 'mcp:posts:write', 'mcp:admin'])
+    );
+  });
+
+  it('drops unknown scopes and always keeps the mcp:read floor', () => {
+    const result = mapPersistedScopes('bogus:scope mcp:posts:write');
+    expect(result).toContain('mcp:read');
+    expect(result).toContain('mcp:posts:write');
+    expect(result).not.toContain('bogus:scope');
   });
 });

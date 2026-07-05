@@ -9,6 +9,7 @@ import {
   Req,
   Res,
   StreamableFile,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -50,7 +51,7 @@ export class PublicController {
       !process.env.AGENT_API_KEY ||
       body.apiKey !== process.env.AGENT_API_KEY
     ) {
-      return;
+      throw new UnauthorizedException();
     }
     return this._agentGraphInsertService.newPost(body.text);
   }

@@ -4,7 +4,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { resolveOrgIdFromModelContext } from '@gitroom/nestjs-libraries/chat/agents/resolve-org-context';
 import { pickTools } from '@gitroom/nestjs-libraries/chat/agents/specialist-tool-subset';
 
-const MEDIA_TOOL_NAMES = [
+export const MEDIA_TOOL_NAMES = [
   'listMediaProviders',
   'listMediaModels',
   'mediaStudioGenerate',

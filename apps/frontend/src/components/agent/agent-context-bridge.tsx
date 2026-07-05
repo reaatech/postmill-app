@@ -27,6 +27,13 @@ export interface AgentUiContextValue {
   currentGroupId?: string;
   /** Post id when a post detail modal is open. */
   currentPostId?: string;
+  /**
+   * ISO timestamp set when the last producer for this snapshot unmounted (2.3).
+   * Present => the user has navigated away, so these ids are a *last-viewed*
+   * snapshot (possibly stale), not the live view. Cleared when a fresh producer
+   * mounts.
+   */
+  leftViewAt?: string;
 }
 
 let currentAgentUiContext: AgentUiContextValue = {};
@@ -51,6 +58,35 @@ export function setAgentUiContext(
 export function subscribeAgentUiContext(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);
+}
+
+/**
+ * Scoped producer helper with last-view semantics (2.3). The producers
+ * (`/launches`, `/campaigns`, post-detail modal) never co-mount with the
+ * `AgentContextBridge` (which lives only under `/agents`), so a disposer that
+ * *deleted* its keys would always leave the store empty by the time the user
+ * reaches the chat — the feature would be inert. Instead:
+ *  - On mount: merge `partial` and clear `leftViewAt` for the whole store, so a
+ *    freshly-mounted view wins over a previous last-view snapshot. Sibling merge
+ *    semantics are preserved (the modal contributes `currentPostId` on top of
+ *    launches' keys).
+ *  - On unmount: KEEP the contributed keys and stamp `leftViewAt` so the backend
+ *    preamble can word it as "most recently viewed (may be stale)".
+ * Wire it from an effect: `useEffect(() => pushAgentUiContext({...}), […])`.
+ */
+export function pushAgentUiContext(partial: AgentUiContextValue): () => void {
+  setAgentUiContext((prev) => {
+    // A fresh view is live now: drop any stale marker from a prior snapshot.
+    const next = { ...prev, ...partial };
+    delete next.leftViewAt;
+    return next;
+  });
+  return () => {
+    setAgentUiContext((prev) => ({
+      ...prev,
+      leftViewAt: new Date().toISOString(),
+    }));
+  };
 }
 
 /**

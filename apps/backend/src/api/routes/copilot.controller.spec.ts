@@ -515,7 +515,7 @@ describe('CopilotController', () => {
       setSpy.mockRestore();
     });
 
-    it('sets media and ag-ui context from CopilotKit properties', async () => {
+    it('sets media context from CopilotKit properties and does NOT set ag-ui from properties', async () => {
       process.env.OPENAI_API_KEY = 'sk-agent-test';
       mockResolveConfigForScope.mockResolvedValue({
         adapter: mockOpenaiAdapter,
@@ -524,6 +524,9 @@ describe('CopilotController', () => {
         providerId: 'openai',
       });
       const media = [{ id: 'file-1', path: 'https://example.com/img.png' }];
+      // agUiContext in properties is a DEAD leg: `@ag-ui/mastra` overwrites the
+      // `ag-ui` request-context key from the CopilotKit readable unconditionally,
+      // so the controller no longer reads or sets it (see the controller's note).
       const agUiContext = { view: 'launches', currentPostId: 'post-1' };
       const req = {
         body: {
@@ -542,7 +545,8 @@ describe('CopilotController', () => {
       const mediaCall = setSpy.mock.calls.find((c) => c[0] === 'media');
       const agUiCall = setSpy.mock.calls.find((c) => c[0] === 'ag-ui');
       expect(mediaCall?.[1]).toEqual(media);
-      expect(agUiCall?.[1]).toBe(JSON.stringify(agUiContext));
+      // The controller must not set ag-ui from properties.agUiContext anymore.
+      expect(agUiCall).toBeUndefined();
       setSpy.mockRestore();
     });
   });

@@ -43,8 +43,19 @@ export class StrategistService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context: ContextPacket
   ): Promise<AgentResponse> => {
-    const input = JSON.parse(context.raw_input) as StrategistInput;
+    let input: StrategistInput;
+    try {
+      input = JSON.parse(context.raw_input) as StrategistInput;
+    } catch (err) {
+      this._logger.warn(
+        `Strategist received invalid input: ${(err as Error).message}`,
+        StrategistService.name
+      );
+      throw err;
+    }
     const orgId = (context.metadata?.orgId as string | undefined) ?? undefined;
+    const userId =
+      (context.metadata?.userId as string | undefined) ?? undefined;
 
     const [brand, memory] = await Promise.all([
       orgId
@@ -67,6 +78,7 @@ export class StrategistService implements OnModuleInit {
       const raw = await this._ai.generateText('agent', prompt, {
         system,
         orgId,
+        userId,
       });
       const plan = this._parsePlan(raw, input.platforms);
       return {
@@ -74,19 +86,14 @@ export class StrategistService implements OnModuleInit {
         workflow_complete: false,
       };
     } catch (err) {
+      // Rethrow so the conductor's per-(org, agent) circuit breaker records the
+      // failure. Swallowing here returns success-shaped empty output and keeps
+      // the breaker permanently closed for AI failures.
       this._logger.warn(
         `Strategist generation failed: ${(err as Error).message}`,
         StrategistService.name
       );
-      return {
-        content: JSON.stringify({
-          platforms: input.platforms,
-          angles: [],
-          hooks: [],
-          structure: 'Single post per platform.',
-        }),
-        workflow_complete: false,
-      };
+      throw err;
     }
   };
 
@@ -125,10 +132,15 @@ export class StrategistService implements OnModuleInit {
   private _parsePlan(raw: string, fallbackPlatforms: string[]): StrategistPlan {
     const parsed = this._safeJson(raw) as Partial<StrategistPlan> | undefined;
     return {
-      platforms: parsed?.platforms ?? fallbackPlatforms,
-      angles: parsed?.angles ?? [],
-      hooks: parsed?.hooks ?? [],
-      structure: parsed?.structure ?? 'Single post per platform.',
+      platforms: Array.isArray(parsed?.platforms)
+        ? parsed.platforms
+        : fallbackPlatforms,
+      angles: Array.isArray(parsed?.angles) ? parsed.angles : [],
+      hooks: Array.isArray(parsed?.hooks) ? parsed.hooks : [],
+      structure:
+        typeof parsed?.structure === 'string'
+          ? parsed.structure
+          : 'Single post per platform.',
     };
   }
 

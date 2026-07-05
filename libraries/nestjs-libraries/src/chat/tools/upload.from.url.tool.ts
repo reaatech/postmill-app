@@ -5,11 +5,16 @@ import { Injectable } from '@nestjs/common';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
-import { ssrfSafeDispatcher } from '@gitroom/nestjs-libraries/dtos/webhooks/ssrf.safe.dispatcher';
-import { fetch as undiciFetch } from 'undici';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { Readable } from 'stream';
 import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
-import { requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+import {
+  parseOrg,
+  requireWrite,
+} from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+
+// Mirror FileService's MAX_IMPORT_SIZE (not exported) — cap remote reads at 512 MB.
+const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
 
 const ALLOWED_MIME = new Set<string>([
   'image/jpeg',
@@ -52,25 +57,33 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
           .describe('The public URL of the image or video to upload'),
       }),
       outputSchema: z.object({
-        id: z.string(),
-        path: z.string(),
+        id: z.string().optional(),
+        path: z.string().optional(),
+        error: z.string().optional(),
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        requireWrite(context as any);
-        const org = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        );
+        const ctx = context as any;
+        requireWrite(ctx);
+        const org = parseOrg(ctx);
 
-        const response = (await undiciFetch(inputData.url, {
-          dispatcher: ssrfSafeDispatcher,
-        })) as unknown as Response;
+        const response = await safeFetch(inputData.url);
 
         if (!response.ok) {
           throw new Error('Failed to fetch URL');
         }
 
+        // Cap the read at 512 MB — reject on a declared oversized content-length
+        // before buffering, and again after reading (a lying/absent header).
+        const declared = Number(response.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > MAX_UPLOAD_BYTES) {
+          return { error: 'File exceeds the 512 MB upload limit' };
+        }
+
         const buffer = Buffer.from(await response.arrayBuffer());
+        if (buffer.byteLength > MAX_UPLOAD_BYTES) {
+          return { error: 'File exceeds the 512 MB upload limit' };
+        }
         const detected = await fromBuffer(buffer);
         if (!detected || !ALLOWED_MIME.has(detected.mime)) {
           throw new Error('Unsupported file type.');

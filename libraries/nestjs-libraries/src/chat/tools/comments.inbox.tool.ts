@@ -49,6 +49,13 @@ export class CommentsInboxTool implements AgentToolInterface {
           .array(z.string())
           .optional()
           .describe('Filter by one or more channel/integration ids'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe('Max comments to return this page (1-50, default 25)'),
       }),
       outputSchema: z.object({
         comments: z.array(
@@ -99,6 +106,8 @@ export class CommentsInboxTool implements AgentToolInterface {
         const org = parseOrg(ctx);
         const user = parseUser(ctx);
 
+        // Thread limit into the repo so nextCursor is derived from the last item
+        // we actually return (slicing here would skip items 26-50 of every page).
         const filters = {
           status: inputData.status,
           assigneeId: inputData.assigneeId,
@@ -106,6 +115,7 @@ export class CommentsInboxTool implements AgentToolInterface {
           unreadOnly: inputData.unreadOnly,
           campaignIds: inputData.campaignIds,
           integrationIds: inputData.integrationIds,
+          limit: inputData.limit ?? 25,
         };
 
         const { comments, nextCursor } =

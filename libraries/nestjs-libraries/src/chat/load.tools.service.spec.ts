@@ -84,10 +84,11 @@ import { LoadToolsService, AgentState } from './load.tools.service';
 import { ToolFirewallService } from '@gitroom/nestjs-libraries/ai/governance/tool-firewall.service';
 import { toolList as mockToolList } from '@gitroom/nestjs-libraries/chat/tools/tool.list';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
-import { ContentAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/content.agent';
-import { MediaAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/media.agent';
-import { AnalyticsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/analytics.agent';
-import { OpsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/ops.agent';
+import { ContentAgentBuilder, CONTENT_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/content.agent';
+import { MediaAgentBuilder, MEDIA_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/media.agent';
+import { AnalyticsAgentBuilder, ANALYTICS_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/analytics.agent';
+import { OpsAgentBuilder, OPS_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/ops.agent';
+import { SUPERVISOR_TOOL_NAMES } from './load.tools.service';
 
 describe('LoadToolsService', () => {
   let service: LoadToolsService;
@@ -328,11 +329,32 @@ describe('LoadToolsService', () => {
 
       const instructions = await agent.instructions({ requestContext: mockRequestContext });
 
-      expect(instructions).toContain('Current view:');
+      expect(instructions).toContain('The user is currently viewing:');
       expect(instructions).toContain('view: launches');
       expect(instructions).toContain('calendarWeek: 2026-06-01/2026-06-07');
       expect(instructions).toContain('visiblePostIds: post-1, post-2');
       expect(instructions).toContain('selectedCampaignId: campaign-1');
+      expect(instructions).toContain('currentPostId: post-1');
+    });
+
+    it('instructions function words the preamble as stale when leftViewAt is set (2.3)', async () => {
+      vi.spyOn(service, 'loadTools').mockResolvedValue({});
+
+      const agent = await service.agent();
+      const mockRequestContext = new Map();
+      mockRequestContext.set(
+        'ag-ui',
+        JSON.stringify({
+          view: 'launches',
+          currentPostId: 'post-1',
+          leftViewAt: '2026-07-05T00:00:00.000Z',
+        })
+      );
+
+      const instructions = await agent.instructions({ requestContext: mockRequestContext });
+
+      expect(instructions).toContain('The user most recently viewed (may be stale');
+      expect(instructions).not.toContain('The user is currently viewing:');
       expect(instructions).toContain('currentPostId: post-1');
     });
 
@@ -361,7 +383,7 @@ describe('LoadToolsService', () => {
         requestContext: mockRequestContext,
       });
 
-      expect(instructions).toContain('Current view:');
+      expect(instructions).toContain('The user is currently viewing:');
       expect(instructions).toContain('view: launches');
       expect(instructions).toContain('calendarWeek: 2026-06-01/2026-06-07');
       expect(instructions).toContain('currentPostId: post-9');
@@ -375,7 +397,8 @@ describe('LoadToolsService', () => {
 
       const instructions = await agent.instructions({ requestContext: mockRequestContext });
 
-      expect(instructions).not.toContain('Current view:');
+      expect(instructions).not.toContain('The user is currently viewing:');
+      expect(instructions).not.toContain('The user most recently viewed');
     });
 
     it('instructions function resolves org id and prepends brand voice', async () => {
@@ -449,11 +472,18 @@ describe('LoadToolsService', () => {
 
     it('builds supervisor with only integrationList/groupList as direct tools by default', async () => {
       process.env.AGENT_SUPERVISOR_ENABLED = 'true';
-      const mockTools = {
-        integrationList: { id: 'integrationList' },
-        groupList: { id: 'groupList' },
-        schedulePostTool: { id: 'schedulePostTool' },
-      };
+      // pickTools now THROWS on an unresolved name, and the real specialist builders
+      // run here — so the map must contain every specialist tool name, not just three.
+      const allNames = [
+        ...SUPERVISOR_TOOL_NAMES,
+        ...CONTENT_TOOL_NAMES,
+        ...MEDIA_TOOL_NAMES,
+        ...ANALYTICS_TOOL_NAMES,
+        ...OPS_TOOL_NAMES,
+      ];
+      const mockTools = Object.fromEntries(
+        allNames.map((n) => [n, { id: n }])
+      ) as Record<string, any>;
       vi.spyOn(service, 'loadTools').mockResolvedValue(mockTools);
 
       const agent = await service.agent();

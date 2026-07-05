@@ -16,6 +16,11 @@ import { MediaAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/media.a
 import { AnalyticsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/analytics.agent';
 import { OpsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/ops.agent';
 
+// The supervisor holds only these two tools directly; specialists partition the
+// rest. Exported so the MCP/A2A tool-union and the parity eval can build the full
+// surface from in-repo sources instead of reflecting a private Mastra internal.
+export const SUPERVISOR_TOOL_NAMES = ['integrationList', 'groupList'];
+
 export const AgentState = object({
   brandVoice: string().optional(),
   preferredPlatforms: array(string()).default([]),
@@ -61,9 +66,20 @@ export class LoadToolsService {
     try {
       const brand = await this._brandsService.getDefaultBrand(orgId);
       if (this._brandCache.size >= this._brandCacheMaxEntries) {
-        const oldest = this._brandCache.keys().next().value;
-        if (oldest !== undefined) {
-          this._brandCache.delete(oldest);
+        // Prefer evicting an already-expired entry; fall back to oldest-inserted.
+        const now = Date.now();
+        let evict: string | undefined;
+        for (const [k, v] of this._brandCache) {
+          if (now >= v.expiry) {
+            evict = k;
+            break;
+          }
+        }
+        if (evict === undefined) {
+          evict = this._brandCache.keys().next().value;
+        }
+        if (evict !== undefined) {
+          this._brandCache.delete(evict);
         }
       }
       this._brandCache.set(orgId, {
@@ -158,7 +174,15 @@ export class LoadToolsService {
       }
       if (ctx.currentPostId) parts.push(`currentPostId: ${ctx.currentPostId}`);
       if (parts.length === 0) return '';
-      return `\n      Current view:\n        - ${parts.join('\n        - ')}\n`;
+      // Word by staleness (2.3): the producers never co-mount with the agent
+      // chat, so `leftViewAt` (stamped on producer unmount) means this is a
+      // last-viewed snapshot, not the live view. Never treat stale ids as
+      // implicit targets — the Confirmations section below already requires the
+      // model to confirm before outward actions.
+      const header = ctx.leftViewAt
+        ? 'The user most recently viewed (may be stale — confirm the intended target before acting on these ids):'
+        : 'The user is currently viewing:';
+      return `\n      ${header}\n        - ${parts.join('\n        - ')}\n`;
     } catch {
       return '';
     }
@@ -239,6 +263,9 @@ ${brandVoice}${currentView}
 
   async agent() {
     const tools = await this.loadTools();
+    // Read once at agent-build time. The built agent is frozen into the Mastra
+    // singleton (mastra.service), so flipping AGENT_SUPERVISOR_ENABLED requires a
+    // process restart to take effect — intended (tool-set topology is boot-fixed).
     const supervisorEnabled = process.env.AGENT_SUPERVISOR_ENABLED !== 'false';
 
     if (!supervisorEnabled) {
@@ -266,7 +293,7 @@ ${brandVoice}${currentView}
       });
     }
 
-    const supervisorTools = pickTools(tools, ['integrationList', 'groupList']);
+    const supervisorTools = pickTools(tools, SUPERVISOR_TOOL_NAMES);
 
     return new Agent({
       id: 'postmill',

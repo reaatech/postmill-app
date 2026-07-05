@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
+import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { ApiTags } from '@nestjs/swagger';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
@@ -58,20 +59,56 @@ export class MediaStudioController {
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
   @Throttle({ default: { limit: 15, ttl: 60000 } })
-  generate(
+  async generate(
     @Param('provider') provider: string,
     @Body() body: MediaStudioGenerateDto,
+    @Headers('x-idempotency-key') idempotencyKey: string | undefined,
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Query('version') version?: string,
   ) {
-    return this._studio.generate(org.id, user.id, provider, {
-      operation: body.operation,
-      model: body.model,
-      input: body.input,
-      mediaInputs: body.mediaInputs,
-      folderId: body.folderId,
-      version,
-    });
+    // Optional idempotency: a retry after an ambiguous client-side timeout re-sends
+    // the same X-Idempotency-Key and cannot start a second PAID media job. Absent
+    // key → unchanged behaviour. Header-based so no DTO/whitelist change. The claim
+    // fails OPEN on a Redis outage (never fail the generate) and is RELEASED if the
+    // dispatch throws, so a definite failure is retryable while a successful start
+    // still dedups an ambiguous timeout. (3.2)
+    if (idempotencyKey) {
+      let claimed = true;
+      try {
+        const res = await ioRedis.set(
+          `idem:${org.id}:${idempotencyKey}`,
+          '1',
+          'EX',
+          86400,
+          'NX',
+        );
+        claimed = res === 'OK';
+      } catch {
+        claimed = true; // Redis down → fail open
+      }
+      if (!claimed) {
+        return { duplicate: true };
+      }
+    }
+    try {
+      return await this._studio.generate(org.id, user.id, provider, {
+        operation: body.operation,
+        model: body.model,
+        input: body.input,
+        mediaInputs: body.mediaInputs,
+        folderId: body.folderId,
+        version,
+      });
+    } catch (e) {
+      if (idempotencyKey) {
+        try {
+          await ioRedis.del(`idem:${org.id}:${idempotencyKey}`);
+        } catch {
+          // best-effort release — a stale key just expires at the 24h TTL
+        }
+      }
+      throw e;
+    }
   }
 }

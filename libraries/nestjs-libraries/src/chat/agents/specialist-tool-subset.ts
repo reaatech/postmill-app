@@ -17,9 +17,15 @@ export const pickTools = (
   const picked: Record<string, any> = {};
   for (const name of names) {
     const key = tools[name] ? name : byId.get(name);
-    if (key) {
-      picked[key] = tools[key];
+    if (!key) {
+      // Fail loud instead of silently dropping: a name that no longer resolves
+      // (a renamed/removed tool) would otherwise vanish from the specialist's —
+      // and, via the union, the MCP/A2A — surface with every test still green.
+      throw new Error(
+        `pickTools: tool '${name}' does not resolve to any registered tool (name or id)`
+      );
     }
+    picked[key] = tools[key];
   }
   return picked;
 };

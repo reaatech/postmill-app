@@ -27,6 +27,7 @@ export default defineConfig({
       'src/components/launches/post-detail/*.spec.{ts,tsx}',
       'src/components/launches/calendar.spec.{ts,tsx}',
       'src/components/launches/calendar/**/*.spec.{ts,tsx}',
+      'src/components/launches/generator/**/*.spec.{ts,tsx}',
       'src/components/dashboard/**/*.spec.{ts,tsx}',
       'src/components/settings/media-providers/**/*.spec.{ts,tsx}',
       'src/components/ai/**/*.spec.{ts,tsx}',
@@ -45,7 +46,10 @@ export default defineConfig({
       'src/components/media-tools/*.spec.{ts,tsx}',
       'src/components/composer/picks.socials.component.spec.{ts,tsx}',
       'src/components/campaigns/**/*.spec.{ts,tsx}',
+      'src/components/agent/**/*.spec.{ts,tsx}',
+      'src/components/agents/**/*.spec.{ts,tsx}',
       'src/redirects.config.spec.ts',
+      'src/app/**/*.spec.{ts,tsx}',
     ],
     coverage: {
       provider: 'v8',

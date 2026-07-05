@@ -39,8 +39,19 @@ export class BrandCriticService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context: ContextPacket
   ): Promise<AgentResponse> => {
-    const input = JSON.parse(context.raw_input) as BrandCriticInput;
+    let input: BrandCriticInput;
+    try {
+      input = JSON.parse(context.raw_input) as BrandCriticInput;
+    } catch (err) {
+      this._logger.warn(
+        `Brand critic received invalid input: ${(err as Error).message}`,
+        BrandCriticService.name
+      );
+      throw err;
+    }
     const orgId = (context.metadata?.orgId as string | undefined) ?? undefined;
+    const userId =
+      (context.metadata?.userId as string | undefined) ?? undefined;
 
     const brand = orgId
       ? await this._brands.getDefaultBrand(orgId).catch(() => null)
@@ -59,6 +70,7 @@ export class BrandCriticService implements OnModuleInit {
       const raw = await this._ai.generateText('utility', prompt, {
         system,
         orgId,
+        userId,
       });
       const result = this._parseCritique(raw);
       return {
@@ -66,14 +78,14 @@ export class BrandCriticService implements OnModuleInit {
         workflow_complete: false,
       };
     } catch (err) {
+      // Rethrow so the conductor's circuit breaker records the failure. A
+      // swallowed `pass: true` would silently skip the revision loop and ship
+      // unreviewed copy on every critic outage.
       this._logger.warn(
         `Brand critic generation failed: ${(err as Error).message}`,
         BrandCriticService.name
       );
-      return {
-        content: JSON.stringify({ pass: true, fixes: [] }),
-        workflow_complete: false,
-      };
+      throw err;
     }
   };
 

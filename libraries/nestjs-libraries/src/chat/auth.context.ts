@@ -9,7 +9,12 @@ export const checkAuth = (
   context: any
 ) => {
   const auth = getAuth();
-  const authInfo = context?.mcp?.extra?.authInfo || auth;
+  // The MCP SDK forwards `req.auth` verbatim as `authInfo`. The raw MCP
+  // entrypoints store a wrapper `{ org, userId, role }` there, so unwrap to the
+  // bare org before it is stringified as 'organization'. A bare org (the
+  // copilot/ALS path) passes through unchanged.
+  const raw = context?.mcp?.extra?.authInfo || auth;
+  const authInfo = (raw as any)?.org ?? raw;
   if (authInfo && context?.requestContext) {
     (context.requestContext as any).set(
       'organization',

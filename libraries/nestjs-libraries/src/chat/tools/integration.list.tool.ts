@@ -6,6 +6,7 @@ import { Injectable } from '@nestjs/common';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import z from 'zod';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { parseOrg, requireRead } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class IntegrationListTool implements AgentToolInterface {
@@ -40,14 +41,21 @@ export class IntegrationListTool implements AgentToolInterface {
             name: z.string(),
             picture: z.string(),
             platform: z.string(),
+            // Without these, @mastra/core `validateToolOutput` silently STRIPS the
+            // fields the `.map` emits (and the group `.filter` relies on `customer`).
+            disabled: z.boolean().optional(),
+            display: z.string().optional(),
+            type: z.string().optional(),
+            customer: z
+              .object({ id: z.string(), name: z.string() })
+              .optional(),
           })
         ),
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        const organizationId = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        ).id;
+        requireRead(context as any);
+        const organizationId = parseOrg(context as any).id;
 
         return {
           output: (

@@ -40,16 +40,19 @@ export class PostsGetTool implements AgentToolInterface {
         group: z.string().optional(),
         integrationId: z.string().optional(),
         integrationPicture: z.string().optional(),
-        settings: z.record(z.any()),
-        posts: z.array(
-          z.object({
-            id: z.string(),
-            contentPreview: z.string(),
-            state: z.string().optional(),
-            publishDate: z.any().optional(),
-            imageCount: z.number(),
-          })
-        ),
+        settings: z.record(z.any()).optional(),
+        posts: z
+          .array(
+            z.object({
+              id: z.string(),
+              contentPreview: z.string(),
+              state: z.string().optional(),
+              publishDate: z.any().optional(),
+              imageCount: z.number(),
+            })
+          )
+          .optional(),
+        error: z.string().optional(),
       }),
       mcp: {
         annotations: {
@@ -65,7 +68,19 @@ export class PostsGetTool implements AgentToolInterface {
         const toolContext = context as any;
         requireRead(toolContext);
         const org = parseOrg(toolContext);
-        const post = await this._postsService.getPost(org.id, inputData.id);
+
+        // An unknown/foreign id yields an empty org-scoped result; the service
+        // dereferences posts[0] on that empty array and throws a TypeError.
+        // Guard here so the model gets a clean not-found instead of a raw error.
+        let post: Awaited<ReturnType<PostsService['getPost']>>;
+        try {
+          post = await this._postsService.getPost(org.id, inputData.id);
+        } catch {
+          return { error: 'Post not found' };
+        }
+        if (!post?.posts?.length) {
+          return { error: 'Post not found' };
+        }
 
         return {
           group: post.group,

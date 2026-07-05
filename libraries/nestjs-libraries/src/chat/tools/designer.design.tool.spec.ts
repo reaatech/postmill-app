@@ -51,11 +51,12 @@ const makeVideoDoc = () => ({
   ],
 });
 
-const makeContext = () => ({
+const makeContext = (access: Record<string, any> = { mode: 'user' }) => ({
   requestContext: {
     get: (key: string) => {
       if (key === 'organization') return JSON.stringify({ id: 'org-1' });
       if (key === 'user') return JSON.stringify({ id: 'user-1' });
+      if (key === 'access') return JSON.stringify(access);
       return undefined;
     },
   },
@@ -212,6 +213,7 @@ describe('DesignerDesignTool', () => {
         requestContext: {
           get: (key: string) => {
             if (key === 'organization') return JSON.stringify({ id: 'org-1' });
+            if (key === 'access') return JSON.stringify({ mode: 'user' });
             return undefined;
           },
         },
@@ -219,5 +221,27 @@ describe('DesignerDesignTool', () => {
     );
 
     expect(res).toEqual({ error: 'User context missing', code: 'MISSING_USER' });
+  });
+
+  it('denies write in headless mode (returns structured error, no persist)', async () => {
+    const t = tool.run();
+    const res = await t.execute(
+      { name: 'Denied', doc: makeImageDoc() } as any,
+      makeContext({ mode: 'headless' }) as any
+    );
+
+    expect(res.error).toMatch(/headless runs are read-only/);
+    expect(designService.createDesign).not.toHaveBeenCalled();
+  });
+
+  it('denies write for an mcp token lacking mcp:posts:write', async () => {
+    const t = tool.run();
+    const res = await t.execute(
+      { name: 'Denied', doc: makeImageDoc() } as any,
+      makeContext({ mode: 'mcp', scopes: ['mcp:read'] }) as any
+    );
+
+    expect(res.error).toMatch(/mcp:posts:write scope required/);
+    expect(designService.createDesign).not.toHaveBeenCalled();
   });
 });

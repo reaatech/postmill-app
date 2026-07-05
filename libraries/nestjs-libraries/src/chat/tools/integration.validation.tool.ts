@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import { getValidationSchemas } from '@gitroom/nestjs-libraries/chat/validation.schemas.helper';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { requireRead } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class IntegrationValidationTool implements AgentToolInterface {
@@ -80,6 +81,7 @@ export class IntegrationValidationTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
+        requireRead(context as any);
         const integration =
           this._integrationManager.getSocialIntegrationUnchecked(
             inputData.platform

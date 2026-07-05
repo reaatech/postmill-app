@@ -4,7 +4,7 @@ import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider'
 import { resolveOrgIdFromModelContext } from '@gitroom/nestjs-libraries/chat/agents/resolve-org-context';
 import { pickTools } from '@gitroom/nestjs-libraries/chat/agents/specialist-tool-subset';
 
-const CONTENT_TOOL_NAMES = [
+export const CONTENT_TOOL_NAMES = [
   'generatePostContent',
   'runGenerator',
   'runContentPipeline',
