@@ -115,11 +115,14 @@ You are an assistant that get a social media post and extract the hook, the hook
   }
 
   newPost(post: string) {
+    // This insert graph deliberately resolves the GLOBAL AI provider (no orgId):
+    // it runs behind the operator-owned, AGENT_API_KEY-gated /public/agent route, so
+    // the work is operator-billed rather than tenant-billed (per the repo's billing posture).
     const state = AgentGraphInsertService.state();
     const workflow = state
-      .addNode('find-category', this.findCategory)
-      .addNode('find-topic', this.findTopic)
-      .addNode('find-hook', this.findHook)
+      .addNode('find-category', this.findCategory.bind(this))
+      .addNode('find-topic', this.findTopic.bind(this))
+      .addNode('find-hook', this.findHook.bind(this))
       .addNode('save-post', this.savePost.bind(this))
       .addEdge(START, 'find-category')
       .addEdge('find-category', 'find-topic')

@@ -24,11 +24,18 @@ export function parseOrg(context?: any): { id: string; [key: string]: any } {
   if (!raw) {
     throw new Error('Organization context missing');
   }
+  let parsed: any;
   try {
-    return JSON.parse(raw);
+    parsed = JSON.parse(raw);
   } catch {
     throw new Error('Organization context is not valid JSON');
   }
+  // Fail closed: without a concrete id, Prisma 6 omits `where: { organizationId:
+  // undefined }` and every org-scoped query goes cross-tenant. Mirror parseUser.
+  if (!parsed?.id) {
+    throw new Error('Organization context missing id');
+  }
+  return parsed;
 }
 
 export function parseUser(context?: any): { id: string } {

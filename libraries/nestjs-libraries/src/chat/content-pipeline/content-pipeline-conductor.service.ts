@@ -1,4 +1,5 @@
 import '@gitroom/nestjs-libraries/ai-designer/agent-mesh/agent-mesh-env.shim';
+import { randomUUID } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { dispatchToAgent } from '@reaatech/agent-mesh-router';
 import type { AgentResponse } from '@reaatech/agent-mesh';
@@ -46,6 +47,11 @@ export class ContentPipelineConductorService {
   private static readonly BREAKER_THRESHOLD = 5;
   private static readonly BREAKER_RESET_MS = 60_000;
   private static readonly BREAKER_FAILURE_WINDOW_MS = 10 * 60_000;
+
+  // One overall wall-clock budget for the whole 4-to-5-stage run. The per-stage
+  // timeout still bounds a single stage, but a single deadline stops the
+  // per-stage 120s timeouts from compounding into a ~10-minute worst case.
+  private static readonly DEFAULT_TOTAL_TIMEOUT_MS = 5 * 60_000;
   private readonly _breakers = new Map<
     string,
     { failures: number; openedAt: number; lastFailureAt: number }
@@ -95,7 +101,10 @@ export class ContentPipelineConductorService {
         ? brief.platforms
         : ['x', 'linkedin'];
 
-    const plan = await this._runStrategist(orgId, userId, {
+    // Single wall-clock budget shared by every stage of this run.
+    const deadline = Date.now() + this._totalTimeoutMs();
+
+    const plan = await this._runStrategist(orgId, userId, deadline, {
       brief: brief.brief,
       platforms,
       tone: brief.tone,
@@ -103,13 +112,13 @@ export class ContentPipelineConductorService {
 
     const platformLimits = this._buildPlatformLimits(platforms);
 
-    const perPlatform = await this._runCopywriter(orgId, userId, {
+    const perPlatform = await this._runCopywriter(orgId, userId, deadline, {
       plan,
       platformLimits,
       tone: brief.tone,
     });
 
-    const critique = await this._runBrandCritic(orgId, userId, {
+    const initialCritique = await this._runBrandCritic(orgId, userId, deadline, {
       perPlatform,
       platforms,
       tone: brief.tone,
@@ -117,54 +126,70 @@ export class ContentPipelineConductorService {
 
     // K=1 revision loop: if the critic fails, run the copywriter once more
     // with the fixes, then proceed to finalization.
-    if (!critique.pass) {
-      const revised = await this._runCopywriter(orgId, userId, {
+    if (!initialCritique.pass) {
+      const revised = await this._runCopywriter(orgId, userId, deadline, {
         plan,
         platformLimits,
         tone: brief.tone,
         existingCopy: perPlatform,
-        fixes: critique.fixes,
+        fixes: initialCritique.fixes,
       });
-      // Update the critique for the final result; the finalizer receives the
+      // Update the copy for the final result; the finalizer receives the
       // revised copy regardless of a second critique.
       Object.assign(perPlatform, revised);
     }
 
-    const finalized = await this._runFinalizer(orgId, userId, {
+    const finalized = await this._runFinalizer(orgId, userId, deadline, {
       perPlatform,
       plan,
     });
 
+    // A total failure that survived the handlers as empty output must surface
+    // as an error, not a success-shaped `{ content: [], perPlatform: {} }`.
+    if (
+      !finalized.perPlatform ||
+      Object.keys(finalized.perPlatform).length === 0
+    ) {
+      throw new Error('Content pipeline produced no output');
+    }
+
     return {
       content: finalized.content,
       perPlatform: finalized.perPlatform,
-      critique,
+      critique: initialCritique,
     };
   }
 
   private async _runStrategist(
     orgId: string,
     userId: string,
+    deadline: number,
     payload: { brief: string; platforms: string[]; tone?: string }
   ): Promise<StrategistPlan> {
     const response = await this._dispatch(CONTENT_PIPELINE_AGENT_IDS.strategist, payload, {
       orgId,
       userId,
+      deadline,
     });
     const parsed = this._safeJson(response.content) as
       | Partial<StrategistPlan>
       | undefined;
+    // Coerce wrong-typed LLM output to safe defaults so downstream stages (e.g.
+    // the copywriter's `plan.angles.map`) never crash on a non-array shape.
     return {
-      platforms: parsed?.platforms ?? payload.platforms,
-      angles: parsed?.angles ?? [],
-      hooks: parsed?.hooks ?? [],
-      structure: parsed?.structure ?? '',
+      platforms: Array.isArray(parsed?.platforms)
+        ? parsed.platforms
+        : payload.platforms,
+      angles: Array.isArray(parsed?.angles) ? parsed.angles : [],
+      hooks: Array.isArray(parsed?.hooks) ? parsed.hooks : [],
+      structure: typeof parsed?.structure === 'string' ? parsed.structure : '',
     };
   }
 
   private async _runCopywriter(
     orgId: string,
     userId: string,
+    deadline: number,
     payload: {
       plan: StrategistPlan;
       platformLimits: PlatformLimit[];
@@ -176,6 +201,7 @@ export class ContentPipelineConductorService {
     const response = await this._dispatch(CONTENT_PIPELINE_AGENT_IDS.copywriter, payload, {
       orgId,
       userId,
+      deadline,
     });
     const parsed = this._safeJson(response.content) as
       | { perPlatform?: Record<string, string> }
@@ -186,6 +212,7 @@ export class ContentPipelineConductorService {
   private async _runBrandCritic(
     orgId: string,
     userId: string,
+    deadline: number,
     payload: {
       perPlatform: Record<string, string>;
       platforms: string[];
@@ -195,6 +222,7 @@ export class ContentPipelineConductorService {
     const response = await this._dispatch(CONTENT_PIPELINE_AGENT_IDS.brandCritic, payload, {
       orgId,
       userId,
+      deadline,
     });
     const parsed = this._safeJson(response.content) as
       | Partial<{ pass: boolean; fixes: unknown }>
@@ -208,6 +236,7 @@ export class ContentPipelineConductorService {
   private async _runFinalizer(
     orgId: string,
     userId: string,
+    deadline: number,
     payload: {
       perPlatform: Record<string, string>;
       plan: StrategistPlan;
@@ -216,6 +245,7 @@ export class ContentPipelineConductorService {
     const response = await this._dispatch(CONTENT_PIPELINE_AGENT_IDS.finalizer, payload, {
       orgId,
       userId,
+      deadline,
     });
     const parsed = this._safeJson(response.content) as
       | Partial<{
@@ -235,30 +265,46 @@ export class ContentPipelineConductorService {
   private async _dispatch(
     agentId: string,
     payload: Record<string, unknown>,
-    ctx: { orgId: string; userId: string }
+    ctx: { orgId: string; userId: string; deadline: number }
   ): Promise<AgentResponse> {
+    const now = Date.now();
+
+    // Opportunistically prune breaker entries whose last failure has aged out
+    // of the failure window. The lazy per-key prune only ran when a broken key
+    // was re-dispatched, so entries for never-retried (org, agent) pairs leaked
+    // forever; sweep on any dispatch instead.
+    this._sweepBreakers(now);
+
     const breakerKey = `${ctx.orgId}:${agentId}`;
     const breaker = this._breakers.get(breakerKey);
-    if (breaker) {
-      if (
-        Date.now() - breaker.lastFailureAt >
-        ContentPipelineConductorService.BREAKER_FAILURE_WINDOW_MS
-      ) {
-        // Stale: no recent failure — prune so counts do not accumulate.
-        this._breakers.delete(breakerKey);
-      } else if (
-        breaker.failures >=
-          ContentPipelineConductorService.BREAKER_THRESHOLD &&
-        Date.now() - breaker.openedAt <
-          ContentPipelineConductorService.BREAKER_RESET_MS
-      ) {
-        throw new Error(`Circuit open for agent ${agentId}`);
-      }
+    if (
+      breaker &&
+      breaker.failures >=
+        ContentPipelineConductorService.BREAKER_THRESHOLD &&
+      now - breaker.openedAt <
+        ContentPipelineConductorService.BREAKER_RESET_MS
+    ) {
+      throw new Error(`Circuit open for agent ${agentId}`);
     }
 
-    const budget = await this._budget.checkBudget('agent', ctx.orgId);
-    if (!budget.allowed) {
-      throw new Error(budget.reason || 'AI budget exceeded');
+    // Single wall-clock budget across all stages. Reject before doing any work
+    // once the overall deadline has passed instead of letting each stage burn
+    // its own 120s timeout.
+    const remaining = ctx.deadline - now;
+    if (remaining <= 0) {
+      throw new Error(
+        `Content pipeline deadline exceeded before agent ${agentId}`
+      );
+    }
+
+    // The finalizer makes no LLM call, so it has no spend to gate. The critic
+    // spends under the 'utility' scope; everything else under 'agent'.
+    const budgetScope = this._budgetScopeFor(agentId);
+    if (budgetScope) {
+      const budget = await this._budget.checkBudget(budgetScope, ctx.orgId);
+      if (!budget.allowed) {
+        throw new Error(budget.reason || 'AI budget exceeded');
+      }
     }
 
     const agent = ContentPipelineConductorService._agentMap.get(agentId);
@@ -266,12 +312,12 @@ export class ContentPipelineConductorService {
       throw new Error(`Agent ${agentId} not found in registry`);
     }
 
-    const timeoutMs = this._agentTimeoutMs();
+    const timeoutMs = Math.min(this._agentTimeoutMs(), remaining);
     let timer: NodeJS.Timeout | undefined;
     try {
       const response = await Promise.race([
         dispatchToAgent(agent, {
-          sessionId: `content-pipeline:${ctx.orgId}:${Date.now()}`,
+          sessionId: `content-pipeline:${ctx.orgId}:${randomUUID()}`,
           employeeId: ctx.userId,
           displayName: 'Content Pipeline User',
           rawInput: JSON.stringify(payload),
@@ -344,6 +390,34 @@ export class ContentPipelineConductorService {
   private _agentTimeoutMs(): number {
     const raw = Number(process.env.CONTENT_PIPELINE_AGENT_TIMEOUT_MS);
     return Number.isFinite(raw) && raw > 0 ? raw : 120_000;
+  }
+
+  private _totalTimeoutMs(): number {
+    const raw = Number(process.env.CONTENT_PIPELINE_TOTAL_TIMEOUT_MS);
+    return Number.isFinite(raw) && raw > 0
+      ? raw
+      : ContentPipelineConductorService.DEFAULT_TOTAL_TIMEOUT_MS;
+  }
+
+  private _budgetScopeFor(agentId: string): string | null {
+    if (agentId === CONTENT_PIPELINE_AGENT_IDS.finalizer) {
+      return null;
+    }
+    if (agentId === CONTENT_PIPELINE_AGENT_IDS.brandCritic) {
+      return 'utility';
+    }
+    return 'agent';
+  }
+
+  private _sweepBreakers(now: number): void {
+    for (const [key, breaker] of this._breakers) {
+      if (
+        now - breaker.lastFailureAt >
+        ContentPipelineConductorService.BREAKER_FAILURE_WINDOW_MS
+      ) {
+        this._breakers.delete(key);
+      }
+    }
   }
 
   private _safeJson(raw: string): unknown {

@@ -12,7 +12,13 @@ import { createAgentDigest, createAgentDigestOrg } from './agent-digest';
 import { createMockStep, captureFunctionHandler } from '../test/step.mock';
 
 const makeActivity = () => ({
-  run: vi.fn().mockResolvedValue({ threadId: 'thread-1', notified: true }),
+  generate: vi.fn().mockResolvedValue({
+    threadId: 'thread-1',
+    notified: false,
+    title: 'Weekly agent brief ready',
+    message: 'plan',
+  }),
+  notify: vi.fn().mockResolvedValue({ threadId: 'thread-1', notified: true }),
 });
 
 const makeOrgRepo = () => ({
@@ -70,7 +76,8 @@ describe('createAgentDigest (cron, fan-out)', () => {
       { name: 'agent/digest-org', data: { organizationId: 'org-2' } },
     ]);
 
-    expect(agentDigestActivity.run).not.toHaveBeenCalled();
+    expect(agentDigestActivity.generate).not.toHaveBeenCalled();
+    expect(agentDigestActivity.notify).not.toHaveBeenCalled();
   });
 
   it('does not fan out when there are no orgs', async () => {
@@ -102,7 +109,7 @@ describe('createAgentDigestOrg (per-org event handler)', () => {
     );
   });
 
-  it('runs the agent digest activity for the event org', async () => {
+  it('generates then notifies in two separate steps for the event org', async () => {
     const step = createMockStep();
 
     const result = await getHandler()({
@@ -110,8 +117,40 @@ describe('createAgentDigestOrg (per-org event handler)', () => {
       event: { data: { organizationId: 'org-9' } },
     });
 
-    expect(step.run).toHaveBeenCalledWith('run-agent-digest', expect.any(Function));
-    expect(agentDigestActivity.run).toHaveBeenCalledWith('org-9');
+    expect(step.run).toHaveBeenCalledWith('generate-digest', expect.any(Function));
+    expect(step.run).toHaveBeenCalledWith('notify', expect.any(Function));
+    expect(agentDigestActivity.generate).toHaveBeenCalledWith('org-9');
+    expect(agentDigestActivity.notify).toHaveBeenCalledWith('org-9', {
+      threadId: 'thread-1',
+      notified: false,
+      title: 'Weekly agent brief ready',
+      message: 'plan',
+    });
     expect(result).toEqual({ threadId: 'thread-1', notified: true });
+  });
+
+  it('does not run the notify step when generate skips (no AI provider)', async () => {
+    agentDigestActivity.generate.mockResolvedValueOnce({
+      threadId: 'thread-1',
+      notified: false,
+      skipped: true,
+      reason: 'ai_not_configured',
+    });
+    const step = createMockStep();
+
+    const result = await getHandler()({
+      step,
+      event: { data: { organizationId: 'org-9' } },
+    });
+
+    expect(step.run).toHaveBeenCalledWith('generate-digest', expect.any(Function));
+    expect(step.run).not.toHaveBeenCalledWith('notify', expect.any(Function));
+    expect(agentDigestActivity.notify).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      threadId: 'thread-1',
+      notified: false,
+      skipped: true,
+      reason: 'ai_not_configured',
+    });
   });
 });

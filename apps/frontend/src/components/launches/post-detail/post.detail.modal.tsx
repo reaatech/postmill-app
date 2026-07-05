@@ -7,6 +7,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import SafeImage from '@gitroom/react/helpers/safe.image';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
+import { pushAgentUiContext } from '@gitroom/frontend/components/agent/agent-context-bridge';
 import { CommentThread } from './comment.thread';
 
 interface PostDetailModalProps {
@@ -131,6 +132,13 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
         .catch(() => {});
     }
   }, [postId, mutate, fetch]);
+
+  // Producer for the `/agents` view context: while this post's detail is open,
+  // expose its id so the agent ("move this post to Monday") can resolve it.
+  // Clears its own key on unmount so the id doesn't leak to a later view.
+  useEffect(() => {
+    return pushAgentUiContext({ currentPostId: postId });
+  }, [postId]);
 
   // NOTE: this memo must stay above the early returns below — calling a hook
   // conditionally (after a loading/empty return) breaks the rules of hooks.

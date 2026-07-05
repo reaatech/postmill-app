@@ -4,6 +4,7 @@ import { Injectable } from '@nestjs/common';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import z from 'zod';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { parseOrg, requireRead } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class GroupListTool implements AgentToolInterface {
@@ -34,9 +35,8 @@ export class GroupListTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        const organizationId = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        ).id;
+        requireRead(context as any);
+        const organizationId = parseOrg(context as any).id;
 
         return {
           output: (await this._integrationService.customers(organizationId)).map(

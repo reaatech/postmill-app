@@ -1,7 +1,8 @@
 'use client';
 
-import { FC, useMemo, useState } from 'react';
+import { FC, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
+import { pushAgentUiContext } from '@gitroom/frontend/components/agent/agent-context-bridge';
 import Link from 'next/link';
 import clsx from 'clsx';
 import { Button } from '@gitroom/react/form/button';
@@ -55,6 +56,12 @@ export const CampaignDashboardPage: FC = () => {
     }
     return [...map.values()];
   }, [data]);
+
+  // Producer for the `/agents` view context: expose the open campaign so the
+  // agent can scope actions to it. Clears its own key on unmount.
+  useEffect(() => {
+    return pushAgentUiContext({ view: 'campaigns', selectedCampaignId: id });
+  }, [id]);
 
   if (error) {
     const notFound = (error as { status?: number })?.status === 404;

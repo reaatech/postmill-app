@@ -10,6 +10,20 @@ has the full per-commit detail.
 
 ### Unreleased
 
+**AI-agent surface remediation (security & correctness).** A full-surface review of the `/agents` +
+MCP + LangGraph-generator stack was remediated: a cross-tenant unscoping bug (MCP auth wrapper
+stringified as the org → `parseOrg().id === undefined` → dropped Prisma `organizationId` filter) is
+fixed with a fail-closed `parseOrg` and wrapper-unwrapping `checkAuth`; `mediaJobStatus` is
+org-scoped; `generateImage`/`generateVideo`/`designerDesign` gained the missing `requireWrite` guard
+(an `mcp:read` token could spend money), enforced by a new guard-coverage test. Expired OAuth `pos_`
+tokens are rejected and granted write scopes honoured; MCP budget checks unified onto the `agent`
+scope; the LangGraph generator is budget-gated/spend-recorded/guardrailed with fenced web research;
+HITL confirmation for `commentReply`/`mediaStudioGenerate` is enforced server-side (delegated
+specialists can't auto-send); the content pipeline no longer swallows LLM failures (circuit breaker
+now real); and the dead `/a2a` bridge is deferred (was 500-ing on a non-existent package API). New
+env: `CONTENT_PIPELINE_TOTAL_TIMEOUT_MS`, `BACKEND_URL`, `MEDIA_MCP_AUDIT_LOG_PATH`. See
+`docs/developer-docs/agent-architecture.md`.
+
 **Analytics upgrade — anomaly alerts, Insights tab, campaign scope.** The `/analytics` dashboard is
 reshaped: Best time + Recommendations + a new **Alerts** section merge into a single **Insights** tab
 (the kebab overflow is gone; tabs are now Overview | Channels | Posts | Insights | Links | Watchlist).

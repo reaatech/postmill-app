@@ -44,8 +44,19 @@ export class CopywriterService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context: ContextPacket
   ): Promise<AgentResponse> => {
-    const input = JSON.parse(context.raw_input) as CopywriterInput;
+    let input: CopywriterInput;
+    try {
+      input = JSON.parse(context.raw_input) as CopywriterInput;
+    } catch (err) {
+      this._logger.warn(
+        `Copywriter received invalid input: ${(err as Error).message}`,
+        CopywriterService.name
+      );
+      throw err;
+    }
     const orgId = (context.metadata?.orgId as string | undefined) ?? undefined;
+    const userId =
+      (context.metadata?.userId as string | undefined) ?? undefined;
 
     const system = [
       'You are a social-media copywriter.',
@@ -53,12 +64,14 @@ export class CopywriterService implements OnModuleInit {
       'Return ONLY valid JSON in the form { "platformId": "copy text", ... }.',
     ].join(' ');
 
-    const prompt = this._buildPrompt(input);
-
     try {
+      // Built inside the try so a malformed plan shape (e.g. a non-array
+      // `angles`) throws here and is recorded as a real failure, not swallowed.
+      const prompt = this._buildPrompt(input);
       const raw = await this._ai.generateText('agent', prompt, {
         system,
         orgId,
+        userId,
       });
       const perPlatform = this._parseCopy(raw, input.platformLimits);
       return {
@@ -66,14 +79,13 @@ export class CopywriterService implements OnModuleInit {
         workflow_complete: false,
       };
     } catch (err) {
+      // Rethrow so the conductor's circuit breaker records the failure instead
+      // of receiving success-shaped empty copy.
       this._logger.warn(
         `Copywriter generation failed: ${(err as Error).message}`,
         CopywriterService.name
       );
-      return {
-        content: JSON.stringify({ perPlatform: {} }),
-        workflow_complete: false,
-      };
+      throw err;
     }
   };
 

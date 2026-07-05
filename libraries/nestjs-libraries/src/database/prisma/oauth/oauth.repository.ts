@@ -216,6 +216,10 @@ export class OAuthRepository {
           ? { in: encryptedToken }
           : encryptedToken,
         revokedAt: null,
+        // Fail closed on expiry. tokenExpiresAt is nullable and only set
+        // conditionally, so allow null (legacy rows) but reject past-dated ones —
+        // an expired-but-unrevoked pos_ token must not authenticate forever.
+        OR: [{ tokenExpiresAt: null }, { tokenExpiresAt: { gt: new Date() } }],
       },
       include: {
         organization: {

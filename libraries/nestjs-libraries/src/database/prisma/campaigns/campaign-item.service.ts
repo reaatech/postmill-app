@@ -41,13 +41,22 @@ export class CampaignTagService {
     const campaign = await this._requireCampaign(orgId, campaignId);
     const entityType = this._toEnum(entityTypeSlug);
 
+    let name: string;
     if (entityType === 'POST') {
       await this._items.setPostCampaign(orgId, entityId, campaignId);
+      name = await this._resolveOneName(orgId, entityType, entityId);
     } else {
+      // Ownership gate: the resolver only returns rows scoped to this org+type,
+      // and skips orphans. A foreign/other-org entityId resolves to nothing —
+      // reject instead of tagging it (else it renders later as an orphan / a
+      // contained cross-tenant leak).
+      const resolved = await this._resolver.resolveBatch(orgId, entityType, [entityId]);
+      const item = resolved.get(entityId);
+      if (!item) throw new NotFoundException('Item not found');
       await this._items.tag({ campaignId, organizationId: orgId, entityType, entityId, createdById: userId });
+      name = item.name || entityId;
     }
 
-    const name = await this._resolveOneName(orgId, entityType, entityId);
     await this._audit.create({
       organizationId: orgId,
       userId,

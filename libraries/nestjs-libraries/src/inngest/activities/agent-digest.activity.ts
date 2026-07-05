@@ -4,6 +4,7 @@ import { RequestContext } from '@mastra/core/di';
 import { Organization } from '@prisma/client';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
+import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
 import { NotificationPreferenceService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification-preference.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
@@ -15,11 +16,17 @@ type AgentDigestContext = {
   access: string;
 };
 
+const DIGEST_TITLE = 'Weekly agent brief ready';
+const DIGEST_MESSAGE =
+  "Your agent has drafted a next-week plan based on last week's performance.";
+
 export interface AgentDigestResult {
   threadId: string;
   notified: boolean;
   skipped?: boolean;
   reason?: string;
+  title?: string;
+  message?: string;
 }
 
 @Injectable()
@@ -32,9 +39,10 @@ export class AgentDigestActivity {
     private _mastraService: MastraService,
     private _notificationService: NotificationService,
     private _organizationRepository: OrganizationRepository,
+    private _aiModelProvider: AIModelProvider,
   ) {}
 
-  async run(orgId: string): Promise<AgentDigestResult> {
+  async generate(orgId: string): Promise<AgentDigestResult> {
     const threadId = randomUUID();
 
     const categoryEnabled = await this._preferenceService.orgHasCategoryEnabled(
@@ -60,6 +68,17 @@ export class AgentDigestActivity {
       return { threadId, notified: false, skipped: true, reason: 'org_not_found' };
     }
 
+    // Pre-check the org's AI provider so an org with the `agent` category enabled
+    // but no active provider skips cleanly instead of throwing a plain
+    // Error(AI_NOT_CONFIGURED_MESSAGE) from generate() and retrying 4x forever.
+    const aiConfig = await this._aiModelProvider.resolveConfigForScope('agent', orgId);
+    if (!aiConfig) {
+      this._logger.debug(
+        `Skipping agent digest for ${orgId}: AI provider not configured`
+      );
+      return { threadId, notified: false, skipped: true, reason: 'ai_not_configured' };
+    }
+
     const requestContext = this._buildRequestContext(organization);
 
     const digestPrompt = this._buildDigestPrompt();
@@ -74,13 +93,17 @@ export class AgentDigestActivity {
       maxSteps: 20,
     });
 
+    return { threadId, notified: false, title: DIGEST_TITLE, message: DIGEST_MESSAGE };
+  }
+
+  async notify(orgId: string, digest: AgentDigestResult): Promise<AgentDigestResult> {
+    const { threadId } = digest;
     try {
       await this._notificationService.notify({
         orgId,
         category: 'agent',
-        title: 'Weekly agent brief ready',
-        message:
-          'Your agent has drafted a next-week plan based on last week\'s performance.',
+        title: digest.title ?? DIGEST_TITLE,
+        message: digest.message ?? DIGEST_MESSAGE,
         link: `/agents/${threadId}`,
       });
     } catch (err) {

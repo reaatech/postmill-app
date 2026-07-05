@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
@@ -16,6 +16,30 @@ export default function OAuthAuthorizePage() {
   const clientId = searchParams.get('client_id');
   const responseType = searchParams.get('response_type');
   const state = searchParams.get('state');
+  // These were previously read from the URL but never forwarded, so the consented
+  // authorization code carried no scope/PKCE binding: scope silently defaulted and
+  // the code_challenge was dropped (PKCE not bound at the step the user approved).
+  const redirectUri = searchParams.get('redirect_uri');
+  const codeChallenge = searchParams.get('code_challenge');
+  const codeChallengeMethod = searchParams.get('code_challenge_method');
+  const scope = searchParams.get('scope');
+
+  // Human-readable description per granted scope so the user sees what they approve
+  // instead of a hardcoded, possibly-wrong capability list. Unknown scopes render
+  // verbatim rather than being hidden.
+  const SCOPE_LABELS: Record<string, string> = {
+    'mcp:read': 'Read your integrations, posts, and analytics',
+    'mcp:posts:write': 'Create, schedule, and publish posts on your behalf',
+    'mcp:admin': 'Administer AI/provider settings for your organization',
+  };
+  const requestedScopes = useMemo(
+    () =>
+      (scope || 'mcp:read')
+        .split(/[\s,]+/)
+        .map((s) => s.trim())
+        .filter(Boolean),
+    [scope]
+  );
 
   useEffect(() => {
     if (!clientId || !responseType) {
@@ -62,6 +86,18 @@ export default function OAuthAuthorizePage() {
               client_id: clientId,
               state,
               action,
+              // Forward what the user actually consented to so the authorization
+              // code binds the requested scope + PKCE challenge (backend prefers
+              // this over any scope re-requested at token exchange).
+              ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+              ...(codeChallenge ? { code_challenge: codeChallenge } : {}),
+              ...(codeChallengeMethod
+                ? { code_challenge_method: codeChallengeMethod }
+                : {}),
+              // Always bind exactly the scopes the user saw (defaulting to
+              // mcp:read), so a client cannot re-request write/admin unbound at the
+              // token-exchange step for something the user never approved here.
+              scope: requestedScopes.join(' '),
             }),
           })
         ).json();
@@ -74,7 +110,15 @@ export default function OAuthAuthorizePage() {
         setSubmitting(false);
       }
     },
-    [clientId, state]
+    [
+      fetch,
+      clientId,
+      state,
+      redirectUri,
+      codeChallenge,
+      codeChallengeMethod,
+      requestedScopes,
+    ]
   );
 
   if (loading) {
@@ -179,9 +223,11 @@ export default function OAuthAuthorizePage() {
               will be able to:
             </div>
             <ul className="text-[14px] list-disc list-inside space-y-[4px]">
-              <li>Access your integrations and channels</li>
-              <li>Create and schedule posts on your behalf</li>
-              <li>Read your post analytics</li>
+              {requestedScopes.map((s) => (
+                <li key={s}>
+                  {SCOPE_LABELS[s] || s}
+                </li>
+              ))}
             </ul>
           </div>
 

@@ -1,8 +1,10 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { FC, useEffect, useMemo } from 'react';
 import { orderBy } from 'lodash';
 import { CalendarWeekProvider } from '@gitroom/frontend/components/launches/calendar.context';
+import { useCalendar } from '@gitroom/frontend/components/launches/calendar';
+import { pushAgentUiContext } from '@gitroom/frontend/components/agent/agent-context-bridge';
 import { Filters } from '@gitroom/frontend/components/launches/filters';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useSearchParams } from 'next/navigation';
@@ -59,6 +61,25 @@ export const SVGLine = () => {
       </defs>
     </svg>
   );
+};
+
+// Producer for the `/agents` view context: while the launches calendar is
+// mounted, expose the current week + the ids of the posts on screen so the agent
+// ("move this to Monday") can resolve them. Clears its own keys on unmount.
+const LaunchesAgentContext: FC = () => {
+  const { startDate, endDate, posts } = useCalendar();
+  const visiblePostIds = useMemo(
+    () => (posts || []).map((p) => p.id).slice(0, 50),
+    [posts]
+  );
+  useEffect(() => {
+    return pushAgentUiContext({
+      view: 'launches',
+      calendarWeek: `${startDate}/${endDate}`,
+      visiblePostIds,
+    });
+  }, [startDate, endDate, visiblePostIds]);
+  return null;
 };
 
 export const LaunchesComponent = () => {
@@ -130,6 +151,7 @@ export const LaunchesComponent = () => {
   return (
     <DNDProvider>
       <CalendarWeekProvider integrations={sortedIntegrations}>
+        <LaunchesAgentContext />
         <div className="bg-newBgColorInner flex-1 flex-col flex p-[20px] mobile:p-[12px] gap-[12px]">
           {error ? (
             <div className="flex-1 flex items-center justify-center">

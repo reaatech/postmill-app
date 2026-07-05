@@ -3,7 +3,9 @@ import { AgentDigestActivity } from '@gitroom/nestjs-libraries/inngest/activitie
 import { OrganizationRepository } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.repository';
 
 export const createAgentDigest = (
-  agentDigestActivity: AgentDigestActivity,
+  // The cron fan-out only reads org ids; the activity is threaded in solely to
+  // keep this factory's arity aligned with its sibling and the shared caller.
+  _agentDigestActivity: AgentDigestActivity,
   organizationRepository: OrganizationRepository
 ) =>
   inngest.createFunction(
@@ -39,8 +41,27 @@ export const createAgentDigestOrg = (agentDigestActivity: AgentDigestActivity) =
     async ({ step, event }) => {
       const { organizationId } = event.data;
 
-      return step.run('run-agent-digest', () =>
-        agentDigestActivity.run(organizationId)
+      // Two steps so an ack-loss retry of the notify step never re-runs the LLM
+      // (second spend / orphan thread). The threadId is minted inside generate,
+      // so it is memoized and the notify replay reuses the same thread link.
+      const digest = await step.run('generate-digest', () =>
+        agentDigestActivity.generate(organizationId)
+      );
+
+      // step.run's return type serializes every field to optional; guard the
+      // threadId so the skipped path and the notify hand-off stay well-typed.
+      if (digest.skipped || !digest.threadId) {
+        return digest;
+      }
+
+      const { threadId, title, message } = digest;
+      return step.run('notify', () =>
+        agentDigestActivity.notify(organizationId, {
+          threadId,
+          notified: false,
+          title,
+          message,
+        })
       );
     }
   );

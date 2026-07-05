@@ -38,7 +38,8 @@ import { Mastra } from '@mastra/core/mastra';
 
 describe('MastraService', () => {
   beforeEach(() => {
-    MastraService.mastra = undefined as any;
+    // Reset the memoized in-flight build promise between cases.
+    (MastraService as any)._mastraPromise = null;
   });
 
   it('registers only the postmill agent at the top level', async () => {

@@ -45,6 +45,8 @@ export default defineConfig({
       'src/components/media-tools/*.spec.{ts,tsx}',
       'src/components/composer/picks.socials.component.spec.{ts,tsx}',
       'src/components/campaigns/**/*.spec.{ts,tsx}',
+      'src/components/agent/**/*.spec.{ts,tsx}',
+      'src/components/agents/**/*.spec.{ts,tsx}',
       'src/redirects.config.spec.ts',
     ],
     coverage: {

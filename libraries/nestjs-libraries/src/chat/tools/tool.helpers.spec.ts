@@ -125,6 +125,21 @@ describe('tool.helpers', () => {
       const ctx = { requestContext: { get: () => 'not-json' } };
       expect(() => parseOrg(ctx)).toThrow('Organization context is not valid JSON');
     });
+
+    it('throws when organization has no id (empty object)', () => {
+      const ctx = { requestContext: { get: () => JSON.stringify({}) } };
+      expect(() => parseOrg(ctx)).toThrow('Organization context missing id');
+    });
+
+    it('throws on the MCP auth wrapper shape (org nested, no top-level id)', () => {
+      const ctx = {
+        requestContext: {
+          get: () =>
+            JSON.stringify({ org: { id: 'o1' }, userId: 'u1', role: 'admin' }),
+        },
+      };
+      expect(() => parseOrg(ctx)).toThrow('Organization context missing id');
+    });
   });
 
   describe('parseUser', () => {

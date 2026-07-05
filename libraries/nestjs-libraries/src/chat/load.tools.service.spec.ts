@@ -84,10 +84,11 @@ import { LoadToolsService, AgentState } from './load.tools.service';
 import { ToolFirewallService } from '@gitroom/nestjs-libraries/ai/governance/tool-firewall.service';
 import { toolList as mockToolList } from '@gitroom/nestjs-libraries/chat/tools/tool.list';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
-import { ContentAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/content.agent';
-import { MediaAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/media.agent';
-import { AnalyticsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/analytics.agent';
-import { OpsAgentBuilder } from '@gitroom/nestjs-libraries/chat/agents/ops.agent';
+import { ContentAgentBuilder, CONTENT_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/content.agent';
+import { MediaAgentBuilder, MEDIA_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/media.agent';
+import { AnalyticsAgentBuilder, ANALYTICS_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/analytics.agent';
+import { OpsAgentBuilder, OPS_TOOL_NAMES } from '@gitroom/nestjs-libraries/chat/agents/ops.agent';
+import { SUPERVISOR_TOOL_NAMES } from './load.tools.service';
 
 describe('LoadToolsService', () => {
   let service: LoadToolsService;
@@ -449,11 +450,18 @@ describe('LoadToolsService', () => {
 
     it('builds supervisor with only integrationList/groupList as direct tools by default', async () => {
       process.env.AGENT_SUPERVISOR_ENABLED = 'true';
-      const mockTools = {
-        integrationList: { id: 'integrationList' },
-        groupList: { id: 'groupList' },
-        schedulePostTool: { id: 'schedulePostTool' },
-      };
+      // pickTools now THROWS on an unresolved name, and the real specialist builders
+      // run here — so the map must contain every specialist tool name, not just three.
+      const allNames = [
+        ...SUPERVISOR_TOOL_NAMES,
+        ...CONTENT_TOOL_NAMES,
+        ...MEDIA_TOOL_NAMES,
+        ...ANALYTICS_TOOL_NAMES,
+        ...OPS_TOOL_NAMES,
+      ];
+      const mockTools = Object.fromEntries(
+        allNames.map((n) => [n, { id: n }])
+      ) as Record<string, any>;
       vi.spyOn(service, 'loadTools').mockResolvedValue(mockTools);
 
       const agent = await service.agent();

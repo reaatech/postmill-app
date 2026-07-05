@@ -58,7 +58,7 @@ describe('Specialist agent builders', () => {
     expect(ids).not.toContain('mediaStudioGenerate');
     expect(ids).not.toContain('schedulePostTool');
     expect(agent.id).toBe('content');
-    expect((agent as any).memory).toBeUndefined();
+    expect(agent.hasOwnMemory()).toBe(false);
   });
 
   it('media agent exposes only media tools', async () => {
@@ -81,7 +81,7 @@ describe('Specialist agent builders', () => {
     expect(ids).not.toContain('generatePostContent');
     expect(ids).not.toContain('schedulePostTool');
     expect(agent.id).toBe('media');
-    expect((agent as any).memory).toBeUndefined();
+    expect(agent.hasOwnMemory()).toBe(false);
   });
 
   it('analytics agent exposes only analytics tools', async () => {
@@ -99,7 +99,7 @@ describe('Specialist agent builders', () => {
     expect(ids).not.toContain('mediaStudioGenerate');
     expect(ids).not.toContain('schedulePostTool');
     expect(agent.id).toBe('analytics');
-    expect((agent as any).memory).toBeUndefined();
+    expect(agent.hasOwnMemory()).toBe(false);
   });
 
   it('ops agent exposes only ops tools', async () => {
@@ -126,7 +126,7 @@ describe('Specialist agent builders', () => {
     expect(ids).not.toContain('generatePostContent');
     expect(ids).not.toContain('mediaStudioGenerate');
     expect(agent.id).toBe('ops');
-    expect((agent as any).memory).toBeUndefined();
+    expect(agent.hasOwnMemory()).toBe(false);
   });
 
   it('pickTools resolves tools by either map key or createTool id', () => {

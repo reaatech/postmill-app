@@ -10,6 +10,22 @@
 
 ## Unreleased
 
+### Security
+- **AI-agent surface remediation.** Hardened the `/agents` + MCP + LangGraph-generator surface
+  against a full-surface review: fixed a cross-tenant unscoping bug (the MCP auth wrapper was
+  stringified as the org, so `parseOrg().id` was `undefined` → Prisma dropped the `organizationId`
+  filter and `integrationList`/`deletePost` ran cross-org); `parseOrg` now fails closed and
+  `checkAuth` unwraps the wrapper. Added org-ownership checks to `mediaJobStatus`; added the missing
+  `requireWrite` guard to `generateImage`/`generateVideo`/`designerDesign` (an `mcp:read` token could
+  spend AI/media money), plus a guard-coverage test that fails if any registered tool loses its
+  access guard. Expired-but-unrevoked OAuth (`pos_`) tokens no longer authenticate, and granted OAuth
+  write scopes are now honoured. MCP budget checks unified onto the `agent` scope (an exhausted cap
+  can no longer be bypassed via `/mcp`). The LangGraph generator is now budget-gated, records spend,
+  and runs the output guardrail; Tavily web-research is fenced as untrusted in generator prompts.
+  Human-in-the-loop confirmation for `commentReply`/`mediaStudioGenerate` is now enforced
+  server-side (a delegated specialist can no longer auto-send). The dead `/a2a` bridge (written
+  against a non-existent package API — every request 500-ed) is deferred and no longer mounted.
+
 ### Added
 - **Analytics anomaly alerts + Insights tab + true campaign scope.** The `/analytics` dashboard
   merges Best time, Recommendations, and a new Alerts section into a single **Insights** tab (tabs

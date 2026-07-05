@@ -49,6 +49,13 @@ export class CommentsInboxTool implements AgentToolInterface {
           .array(z.string())
           .optional()
           .describe('Filter by one or more channel/integration ids'),
+        limit: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .optional()
+          .describe('Max comments to return this page (1-50, default 25)'),
       }),
       outputSchema: z.object({
         comments: z.array(
@@ -111,8 +118,12 @@ export class CommentsInboxTool implements AgentToolInterface {
         const { comments, nextCursor } =
           await this._socialCommentsService.getInbox(org.id, user.id, filters);
 
+        // Cap the number of items surfaced to the model (per-item content is also
+        // capped below) — worst-case payload stays bounded regardless of page size.
+        const limit = inputData.limit ?? 25;
+
         return {
-          comments: comments.map((comment: any) => ({
+          comments: comments.slice(0, limit).map((comment: any) => ({
             id: comment.id,
             postId: comment.postId,
             integrationId: comment.integrationId,

@@ -65,6 +65,17 @@ export class MediaStudioGenerateTool implements AgentToolInterface {
         z.object({
           error: z.string(),
         }),
+        z.object({
+          needsConfirmation: z.literal(true),
+          draft: z.object({
+            provider: z.string(),
+            operation: z.enum(['image', 'video', 'audio']),
+            model: z.string().optional(),
+            input: z.record(z.union([z.string(), z.number(), z.boolean()])),
+            mediaInputs: z.record(z.string()).optional(),
+            folderId: z.string().optional(),
+          }),
+        }),
       ]),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
@@ -79,6 +90,29 @@ export class MediaStudioGenerateTool implements AgentToolInterface {
         if (!config || Object.keys(config.credentials).length === 0) {
           return {
             error: `${inputData.provider} is not configured. Add credentials in Settings → Media.`,
+          } as any;
+        }
+
+        // Structural, non-forgeable human-in-the-loop gate. In a browser/agent-UI
+        // session (`ui === 'true'`) the tool NEVER starts a paid job — it always
+        // returns a draft for human approval, which the frontend confirm card
+        // dispatches out-of-band via the REST studio-generate route (NOT by
+        // re-invoking this tool). There is deliberately no model-settable
+        // `confirmed` bypass: the acting LLM (a delegated specialist, or one steered
+        // by injected instructions) controls the tool args, so a boolean it can set
+        // is not proof of human intent. MCP/A2A/headless (`ui !== 'true'`) execute
+        // directly under their granted scopes.
+        if ((context as any).requestContext?.get('ui') === 'true') {
+          return {
+            needsConfirmation: true as const,
+            draft: {
+              provider: inputData.provider,
+              operation: inputData.operation,
+              model: inputData.model,
+              input: inputData.input,
+              mediaInputs: inputData.mediaInputs,
+              folderId: inputData.folderId,
+            },
           } as any;
         }
 

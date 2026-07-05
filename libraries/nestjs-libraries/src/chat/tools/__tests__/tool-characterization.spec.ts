@@ -53,7 +53,12 @@ describe('agent tool characterization', () => {
     };
     const tool = new IntegrationListTool(integrationService as any);
 
-    const result = await executeTool(tool, { inputData: {}, organization: org, user });
+    const result = await executeTool(tool, {
+      inputData: {},
+      organization: org,
+      user,
+      access: { mode: 'user' },
+    });
 
     expect(result).toHaveProperty('output');
     expect(Array.isArray(result.output)).toBe(true);
@@ -71,7 +76,12 @@ describe('agent tool characterization', () => {
     };
     const tool = new GroupListTool(integrationService as any);
 
-    const result = await executeTool(tool, { inputData: {}, organization: org, user });
+    const result = await executeTool(tool, {
+      inputData: {},
+      organization: org,
+      user,
+      access: { mode: 'user' },
+    });
 
     expect(result).toHaveProperty('output');
     expect(Array.isArray(result.output)).toBe(true);
@@ -95,6 +105,7 @@ describe('agent tool characterization', () => {
       inputData: { isPremium: false, platform: 'x' },
       organization: org,
       user,
+      access: { mode: 'user' },
     });
 
     expect(result).toHaveProperty('output');
@@ -235,6 +246,7 @@ describe('agent tool characterization', () => {
       inputData: { prompt: 'a cat walking' },
       organization: org,
       user,
+      access: { mode: 'user' },
     });
 
     expect(aiDefaults.textToVideo).toHaveBeenCalledWith(org.id, 'a cat walking');
@@ -266,6 +278,7 @@ describe('agent tool characterization', () => {
       inputData: { prompt: 'a red apple' },
       organization: org,
       user,
+      access: { mode: 'user' },
     });
 
     expect(aiDefaults.textToImage).toHaveBeenCalledWith(org.id, 'a red apple');
@@ -361,6 +374,7 @@ describe('agent tool characterization', () => {
       inputData: { name: 'Test design' },
       organization: org,
       user,
+      access: { mode: 'user' },
     });
 
     expect(designService.createDesign).toHaveBeenCalled();

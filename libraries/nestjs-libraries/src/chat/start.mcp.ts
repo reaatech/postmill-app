@@ -2,6 +2,7 @@ import { INestApplication, Logger } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
 import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
+import { LoadToolsService } from '@gitroom/nestjs-libraries/chat/load.tools.service';
 import { MCPServer } from '@mastra/mcp';
 import { randomUUID, createHash } from 'crypto';
 import { OAuthService } from '@gitroom/nestjs-libraries/database/prisma/oauth/oauth.service';
@@ -12,7 +13,6 @@ import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.se
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { runWithContext } from './async.storage';
 import { createOAuthMiddleware } from './oauth-middleware';
-import { extractBearerToken } from './oauth-types';
 import type { AuthStrategy, AuthResult, AuthContext } from '@reaatech/a2a-reference-auth';
 // Two-layer auth:
 // 1. Custom middleware resolves pos_/api-key tokens (backward compatible)
@@ -43,10 +43,36 @@ const fixAcceptHeader = (req: Request) => {
   }
 };
 
+// Log the Redis-down fallback exactly once so a dead Redis is visible in logs
+// instead of being masked by a silent `catch {}` on every request.
+let redisFallbackLogged = false;
+function noteRedisFallback(err: unknown) {
+  if (redisFallbackLogged) return;
+  redisFallbackLogged = true;
+  logger.warn(
+    `[startMcp] Redis unavailable for MCP rate-limit/idempotency — using in-memory fallback: ${(err as Error)?.message ?? err}`,
+  );
+}
+
 // ── Rate limiter (Redis-backed with in-memory fallback) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 200;
+
+// Opportunistic prune so the fallback maps can't grow unbounded when Redis is
+// down (one expired entry swept per call is enough to bound them under load).
+function pruneExpired<T extends { resetAt?: number; expiresAt?: number }>(
+  map: Map<string, T>,
+  now: number,
+) {
+  for (const [k, v] of map) {
+    const exp = v.resetAt ?? v.expiresAt ?? 0;
+    if (now > exp) {
+      map.delete(k);
+      break;
+    }
+  }
+}
 
 async function checkRateLimit(key: string): Promise<boolean> {
   const now = Date.now();
@@ -59,10 +85,12 @@ async function checkRateLimit(key: string): Promise<boolean> {
     }
     if (count > RATE_LIMIT_MAX) return false;
     return true;
-  } catch {
+  } catch (err) {
     // Redis unavailable — fall through to in-memory
+    noteRedisFallback(err);
   }
   // In-memory fallback
+  pruneExpired(rateLimitMap, now);
   const record = rateLimitMap.get(key);
   if (!record || now > record.resetAt) {
     rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
@@ -79,6 +107,7 @@ const IDEMPOTENCY_TTL_MS = 86_400_000;
 
 function checkIdempotencyFallback(key: string): boolean {
   const now = Date.now();
+  pruneExpired(idempotencyCache, now);
   const existing = idempotencyCache.get(key);
   if (existing && now < existing.expiresAt) return false;
   idempotencyCache.set(key, { expiresAt: now + IDEMPOTENCY_TTL_MS });
@@ -130,6 +159,20 @@ interface ResolvedMcpAuth {
 
 const DEFAULT_MCP_SCOPES = ['mcp:read'];
 const ORG_API_KEY_MCP_SCOPES = ['mcp:read', 'mcp:posts:write'];
+const KNOWN_MCP_SCOPES = ['mcp:read', 'mcp:posts:write', 'mcp:admin'];
+
+// Map a persisted OAuth `scope` string (space/comma separated) to the MCP scope
+// set, intersecting with the known scopes and flooring at DEFAULT_MCP_SCOPES so
+// legacy rows (empty/absent scope) keep working. Without this, granted write
+// scopes were ignored and every pos_ token was read-only.
+export function mapPersistedScopes(scope: string | null | undefined): string[] {
+  const granted = (scope ?? '')
+    .split(/[\s,]+/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .filter((s) => KNOWN_MCP_SCOPES.includes(s));
+  return Array.from(new Set([...DEFAULT_MCP_SCOPES, ...granted]));
+}
 
 function requiredMcpScopes(
   mcpSettings: McpSettings | null,
@@ -223,6 +266,16 @@ export const startMcp = async (app: INestApplication) => {
 
   const mcpEnabled = mcpSettings?.enabled !== false;
 
+  // Server-side backend URL. NEXT_PUBLIC_BACKEND_URL is a frontend (build-time)
+  // var; prefer a dedicated server var and fail loudly at boot if neither is set
+  // (a bare `!` would only NPE later, mid-request, on the first URL construction).
+  const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL;
+  if (!backendUrl) {
+    throw new Error(
+      'startMcp: BACKEND_URL (or NEXT_PUBLIC_BACKEND_URL) must be set to mount the MCP/A2A surface',
+    );
+  }
+
   const resolveAuthContext = async (token: string): Promise<ResolvedMcpAuth | null> => {
     if (token.startsWith('pos_')) {
       const authorization = await oauthService.getOrgByOAuthToken(token);
@@ -230,7 +283,7 @@ export const startMcp = async (app: INestApplication) => {
       return {
         auth: authorization.organization,
         userId: (authorization as any).user?.id,
-        scopes: DEFAULT_MCP_SCOPES,
+        scopes: mapPersistedScopes((authorization as any).scope),
       };
     }
     const hash = createHash('sha256').update(token).digest('hex');
@@ -264,20 +317,19 @@ export const startMcp = async (app: INestApplication) => {
   const mastra = await mastraService.mastra();
   const agent = mastra.getAgent('postmill');
 
-  // Supervisor mode exposes only integrationList/groupList on postmill itself;
-  // specialists hold the rest. Preserve the pre-refactor flat surface by unioning
-  // every specialist's static tools into the MCP/A2A tool list.
-  const postmillTools = await agent.listTools();
-  const staticAgents = ((agent as any).__getStaticAgents?.() ?? {}) as Record<string, any>;
-  const specialistTools: Record<string, any> = {};
-  for (const sub of Object.values(staticAgents)) {
-    const subTools = await (sub as any).listTools?.();
-    if (subTools) {
-      Object.assign(specialistTools, subTools);
-    }
-  }
-  const tools = { ...postmillTools, ...specialistTools };
+  // Build the MCP/A2A tool union from the in-repo inventory (LoadToolsService),
+  // NOT by reflecting Mastra's private `__getStaticAgents()`. Under the supervisor
+  // topology `agent.listTools()` returns only the supervisor's two tools; the old
+  // union depended on a private internal whose `?? {}` fallback would silently
+  // collapse the whole MCP surface on a Mastra rename. `loadTools()` is the
+  // authoritative flat inventory (every registered tool, firewall-wrapped).
+  const loadToolsService = app.get(LoadToolsService, { strict: false });
+  const tools = await loadToolsService.loadTools();
 
+  // Agent-resource surface: expose the supervisor plus any registered sub-agents.
+  // This only affects the MCP *agents* map (not the tool union above), so the
+  // private-internal fallback here is non-load-bearing.
+  const staticAgents = ((agent as any).__getStaticAgents?.() ?? {}) as Record<string, any>;
   const mcpAgents: Record<string, any> = { postmill: agent };
   for (const [key, sub] of Object.entries(staticAgents)) {
     mcpAgents[key] = sub;
@@ -297,11 +349,8 @@ export const startMcp = async (app: INestApplication) => {
 
   const oauthMiddleware = createOAuthMiddleware({
     oauth: {
-      // NOTE: NEXT_PUBLIC_BACKEND_URL is a frontend env var used here server-side.
-      // This works because the variable is set at build-time, but should be refactored
-      // to a dedicated server-side env var (e.g. BACKEND_URL) for correctness.
-      resource: new URL('/mcp-oauth', process.env.NEXT_PUBLIC_BACKEND_URL!).toString(),
-      authorizationServers: [process.env.NEXT_PUBLIC_BACKEND_URL!],
+      resource: new URL('/mcp-oauth', backendUrl).toString(),
+      authorizationServers: [backendUrl],
       validateToken: async (token: string) => {
         const org = await resolveAuth(token);
         if (!org) {
@@ -328,7 +377,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const url = new URL('/.well-known/oauth-protected-resource', process.env.NEXT_PUBLIC_BACKEND_URL);
+    const url = new URL('/.well-known/oauth-protected-resource', backendUrl);
     const result = await oauthMiddleware(req, res, url);
     if (result?.tokenValidation?.subject) {
       const authResult = await scopeStrategy.authenticate({
@@ -353,9 +402,9 @@ export const startMcp = async (app: INestApplication) => {
     res.setHeader('Content-Type', 'application/json');
     res.setHeader('Cache-Control', 'max-age=3600');
     res.json({
-      issuer: process.env.NEXT_PUBLIC_BACKEND_URL,
+      issuer: backendUrl,
       authorization_endpoint: `${process.env.FRONTEND_URL}/oauth/authorize`,
-      token_endpoint: `${process.env.NEXT_PUBLIC_OVERRIDE_BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL}/oauth/token`,
+      token_endpoint: `${process.env.NEXT_PUBLIC_OVERRIDE_BACKEND_URL || backendUrl}/oauth/token`,
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
@@ -397,7 +446,7 @@ export const startMcp = async (app: INestApplication) => {
       }
     }
 
-    const url = new URL('/mcp-oauth', process.env.NEXT_PUBLIC_BACKEND_URL);
+    const url = new URL('/mcp-oauth', backendUrl);
 
     const result = await oauthMiddleware(req, res, url);
     if (!result.proceed) return;
@@ -426,7 +475,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', auth.org.id);
+    const budgetResult = await budgetService.checkBudget('agent', auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -537,7 +586,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
+    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -547,7 +596,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const url = new URL('/mcp', process.env.NEXT_PUBLIC_BACKEND_URL);
+    const url = new URL('/mcp', backendUrl);
 
     fixAcceptHeader(req);
     await runWithContext(
@@ -641,7 +690,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
+    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -653,7 +702,7 @@ export const startMcp = async (app: INestApplication) => {
 
     const url = new URL(
       `/mcp/${id}`,
-      process.env.NEXT_PUBLIC_BACKEND_URL
+      backendUrl
     );
 
     fixAcceptHeader(req);
@@ -750,7 +799,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const budgetResult = await budgetService.checkBudget('mcp', req.auth.org.id);
+    const budgetResult = await budgetService.checkBudget('agent', req.auth.org.id);
     if (!budgetResult.allowed) {
       res.status(429).json({
         statusCode: 429,
@@ -760,7 +809,7 @@ export const startMcp = async (app: INestApplication) => {
       return;
     }
 
-    const url = new URL(req.originalUrl, process.env.NEXT_PUBLIC_BACKEND_URL);
+    const url = new URL(req.originalUrl, backendUrl);
 
     await runWithContext(
       {
@@ -850,7 +899,7 @@ export const startMcp = async (app: INestApplication) => {
             maxRequests: 30,
           });
           const auditLogger = createAuditLogger({
-            exporters: [{ type: 'file', config: { path: '/tmp/media-mcp-audit.log' } }],
+            exporters: [{ type: 'file', config: { path: process.env.MEDIA_MCP_AUDIT_LOG_PATH || '/tmp/media-mcp-audit.log' } }],
           });
 
           app.use('/media-mcp', async (req: Request, res: Response) => {
@@ -883,7 +932,7 @@ export const startMcp = async (app: INestApplication) => {
                 return;
               }
 
-              const budgetResult = await budgetService.checkBudget('mcp', resolved.org.id);
+              const budgetResult = await budgetService.checkBudget('agent', resolved.org.id);
               if (!budgetResult.allowed) {
                 res.status(429).json({
                   statusCode: 429,
@@ -898,7 +947,7 @@ export const startMcp = async (app: INestApplication) => {
             }
 
             await mediaServer.startHTTP({
-              url: new URL('/media-mcp', process.env.NEXT_PUBLIC_BACKEND_URL!),
+              url: new URL('/media-mcp', backendUrl),
               httpPath: '/media-mcp',
               options: { sessionIdGenerator: () => randomUUID(), enableJsonResponse: true },
               req: req as any,
@@ -924,103 +973,21 @@ export const startMcp = async (app: INestApplication) => {
     }
   }
 
-  // ── A2A bridge (§8) — expose the chat agent over A2A protocol in addition to MCP ──
-  try {
-    const a2aBridge = await import('@reaatech/a2a-reference-mcp-bridge' as any).catch(() => null as any);
-    if (a2aBridge?.A2aAsMcpServer && a2aBridge?.McpToolAdapter) {
-      const { A2aAsMcpServer, McpToolAdapter } = a2aBridge;
-      const resolveOrgAuth = async (token: string) => {
-        const ctx = await resolveAuthContext(token);
-        return ctx?.auth ?? null;
-      };
-      // A2A bridge: the adapter is built from the agent object. After the supervisor
-      // refactor that object only exposes supervisor tools, so feed it a facade that
-      // presents the full union surface (generate/listTools/stream) while keeping the
-      // same agent identity.
-      const a2aAgentFacade = {
-        id: agent.id,
-        name: agent.name,
-        description: 'Postmill agent with full tool surface',
-        generate: (agent as any).generate?.bind(agent),
-        stream: (agent as any).stream?.bind(agent),
-        listTools: async () => tools,
-      };
-      const toolAdapter = new McpToolAdapter(a2aAgentFacade as any, { serverName: 'postmill', auth: resolveOrgAuth } as any);
-      const a2aServer = new A2aAsMcpServer({
-        tools: toolAdapter,
-        auth: resolveOrgAuth,
-        serverInfo: { name: 'Postmill A2A', version: '1.0.0' },
-      } as any);
-
-      app.use('/a2a', async (req: Request, res: Response) => {
-        setCorsHeaders(res, req);
-        if (req.method === 'OPTIONS') {
-          res.sendStatus(200);
-          return;
-        }
-
-        if (!mcpEnabled) {
-          res.status(403).json({ error: 'a2a_disabled', error_description: 'A2A server is disabled' });
-          return;
-        }
-
-        const rateLimitKey = `a2a:${req.ip}`;
-        if (!(await checkRateLimit(rateLimitKey))) {
-          res.status(429).json({ error: 'too_many_requests', error_description: 'Rate limit exceeded' });
-          return;
-        }
-
-        const authHeader = req.headers.authorization;
-        const token = extractBearerToken(authHeader);
-        if (!token) {
-          res.status(401).json({ error: 'unauthorized', error_description: 'Missing Authorization header' });
-          return;
-        }
-
-        const authResult = await scopeStrategy.authenticate({
-          headers: { authorization: `Bearer ${token}` },
-        });
-        if (!authResult.authenticated) {
-          res.status(403).json({ error: 'insufficient_scope', error_description: authResult.reason || 'Insufficient scope' });
-          return;
-        }
-
-        const resolved = await resolveAuth(token);
-        if (!resolved) {
-          res.status(401).json({ error: 'unauthorized', error_description: 'Invalid API Key or OAuth token' });
-          return;
-        }
-
-        const budgetResult = await budgetService.checkBudget('mcp', resolved.org.id);
-        if (!budgetResult.allowed) {
-          res.status(429).json({
-            statusCode: 429,
-            error: 'BudgetExceeded',
-            message: budgetResult.reason,
-          });
-          return;
-        }
-        (req as any).auth = resolved;
-
-        try {
-          await a2aServer.handleRequest(req as any, res as any);
-        } catch (err) {
-          logger.warn(`[startMcp] A2A request failed: ${(err as Error).message}`);
-          if (!res.headersSent) {
-            res.status(500).json({ error: 'a2a_internal_error' });
-          }
-        }
-      });
-
-      logger.log('[startMcp] A2A bridge mounted at /a2a');
-    } else {
-      logger.warn(
-        '[startMcp] @reaatech/a2a-reference-mcp-bridge not available — /a2a not mounted',
-      );
-    }
-  } catch (err) {
-    logger.warn(
-      `[startMcp] A2A bridge init failed (may need package install): ${(err as Error).message}`,
-    );
-  }
+  // ── A2A bridge (§8) — DEFERRED, intentionally not mounted ──
+  // The previous `/a2a` mount was dead code: it was written against an
+  // `@reaatech/a2a-reference-mcp-bridge` API that does not exist in the installed
+  // 0.1.2. Verified against dist/index.d.ts: `McpToolAdapter` takes
+  // `{ mcpTransport, agentCardBase }` (it builds its surface from the transport,
+  // so the passed agent facade + `{serverName, auth}` arg were inert),
+  // `A2aAsMcpServer` takes `{ a2aAgentUrl, ... }` and exposes `run()`/`close()`
+  // but NO `handleRequest` — so every `/a2a` request threw
+  // `a2aServer.handleRequest is not a function` → a generic 500. No external A2A
+  // client could ever have worked against it. Rather than ship a broken route,
+  // A2A is tracked as a future feature: a correct build needs an in-process MCP
+  // transport pair connected to the existing `MCPServer`, `initialize()`, and an
+  // A2A JSON-RPC HTTP layer over `McpToolAdapter.executeTask` — plus a live smoke
+  // test against a real A2A consumer. See docs/developer-docs (agent framework)
+  // and dev/AI_AGENT_REMEDIATION.md §5.1. The MCP surface (/mcp, /mcp/:id, /sse)
+  // is unaffected.
+  logger.log('[startMcp] A2A bridge deferred — /a2a not mounted (tracked feature)');
 };

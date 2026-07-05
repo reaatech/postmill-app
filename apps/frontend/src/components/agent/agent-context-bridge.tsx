@@ -54,6 +54,25 @@ export function subscribeAgentUiContext(listener: () => void): () => void {
 }
 
 /**
+ * Scoped producer helper: merges `partial` into the module-global context and
+ * returns a disposer that removes ONLY the keys this call contributed. Because
+ * the value is a single module-global shared by every surface, a producer must
+ * never clear the whole object on unmount (that would wipe a sibling surface's
+ * ids). Wire it from an effect: `useEffect(() => pushAgentUiContext({...}), […])`.
+ */
+export function pushAgentUiContext(partial: AgentUiContextValue): () => void {
+  const keys = Object.keys(partial) as (keyof AgentUiContextValue)[];
+  setAgentUiContext((prev) => ({ ...prev, ...partial }));
+  return () => {
+    setAgentUiContext((prev) => {
+      const next = { ...prev };
+      for (const key of keys) delete next[key];
+      return next;
+    });
+  };
+}
+
+/**
  * Renders nothing. Registers the current UI view with CopilotKit so the
  * backend instructions can mention what the user was looking at.
  */

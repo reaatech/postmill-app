@@ -8,6 +8,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
@@ -25,7 +26,8 @@ import { ApiTags } from '@nestjs/swagger';
 import { GeneratorDto } from '@gitroom/nestjs-libraries/dtos/generator/generator.dto';
 import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generator/create.generated.posts.dto';
 import { AgentGraphService } from '@gitroom/nestjs-libraries/agent/agent.graph.service';
-import { Response } from 'express';
+import { BudgetExceeded } from '@gitroom/nestjs-libraries/ai/governance/errors';
+import { Request, Response } from 'express';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -252,14 +254,48 @@ export class PostsController {
   async generatePosts(
     @GetOrgFromRequest() org: Organization,
     @Body() body: GeneratorDto,
+    @Req() req: Request,
     @Res({ passthrough: false }) res: Response
   ) {
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    for await (const event of this._agentGraphService.start(org.id, body)) {
-      res.write(JSON.stringify(event) + '\n');
+    // Gate/build the run BEFORE streaming so a budget (or other pre-flight) throw
+    // is a clean status code, not a truncated NDJSON body.
+    let stream: AsyncIterable<unknown>;
+    try {
+      stream = await this._agentGraphService.start(org.id, body);
+    } catch (err: any) {
+      const status = err instanceof BudgetExceeded ? 429 : 500;
+      res
+        .status(status)
+        .json({ error: err?.message ?? 'Generator failed to start' });
+      return;
     }
 
-    res.end();
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+
+    // Stop generating if the client (e.g. the wizard tab) disconnects.
+    let clientGone = false;
+    req.on('close', () => {
+      clientGone = true;
+    });
+
+    try {
+      for await (const event of stream) {
+        if (clientGone || res.writableEnded || res.destroyed) break;
+        res.write(JSON.stringify(event) + '\n');
+      }
+    } catch (err: any) {
+      // A node throw mid-iteration (e.g. a configured output-guardrail block).
+      // Emit a final error line instead of an abruptly truncated stream.
+      if (!res.writableEnded && !res.destroyed) {
+        res.write(
+          JSON.stringify({ error: err?.message ?? 'Generation failed' }) + '\n'
+        );
+      }
+    } finally {
+      if (!res.writableEnded) {
+        res.end();
+      }
+    }
   }
 
   @Delete('/:group')

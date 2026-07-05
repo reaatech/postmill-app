@@ -191,4 +191,132 @@ describe('ContentPipelineConductorService', () => {
 
     expect(budgetService.checkBudget).toHaveBeenCalledTimes(5);
   });
+
+  it('spends under utility scope for the critic and skips budget for the finalizer', async () => {
+    makeDispatchStub({
+      [IDS.strategist]: {
+        content: JSON.stringify({ platforms: ['x'], angles: [], hooks: [], structure: 's' }),
+        workflow_complete: false,
+      },
+      [IDS.copywriter]: {
+        content: JSON.stringify({ perPlatform: { x: 'copy' } }),
+        workflow_complete: false,
+      },
+      [IDS.brandCritic]: {
+        content: JSON.stringify({ pass: true, fixes: [] }),
+        workflow_complete: false,
+      },
+      [IDS.finalizer]: {
+        content: JSON.stringify({ content: ['copy'], perPlatform: { x: 'copy' } }),
+        workflow_complete: true,
+      },
+    });
+
+    await conductor.generate('org-1', 'user-1', { brief: 'b', platforms: ['x'] });
+
+    const scopes = budgetService.checkBudget.mock.calls.map(([scope]) => scope);
+    // strategist + copywriter → 'agent', brand-critic → 'utility', finalizer → none.
+    expect(scopes).toEqual(['agent', 'agent', 'utility']);
+  });
+
+  it('throws when the finalized output is empty instead of returning a hollow success', async () => {
+    makeDispatchStub({
+      [IDS.strategist]: {
+        content: JSON.stringify({ platforms: ['x'], angles: [], hooks: [], structure: 's' }),
+        workflow_complete: false,
+      },
+      [IDS.copywriter]: {
+        content: JSON.stringify({ perPlatform: { x: 'copy' } }),
+        workflow_complete: false,
+      },
+      [IDS.brandCritic]: {
+        content: JSON.stringify({ pass: true, fixes: [] }),
+        workflow_complete: false,
+      },
+      [IDS.finalizer]: {
+        content: JSON.stringify({ content: [], perPlatform: {} }),
+        workflow_complete: true,
+      },
+    });
+
+    await expect(
+      conductor.generate('org-1', 'user-1', { brief: 'b', platforms: ['x'] })
+    ).rejects.toThrow('Content pipeline produced no output');
+  });
+
+  it('coerces a wrong-typed strategist plan to defaults without throwing or tripping the breaker', async () => {
+    let copywriterPlan: unknown;
+    makeDispatchStub({
+      // LLM returned strings where arrays are expected.
+      [IDS.strategist]: {
+        content: JSON.stringify({ angles: 'keep it fun', platforms: 'x' }),
+        workflow_complete: false,
+      },
+      [IDS.copywriter]: (_agentId, rawInput) => {
+        copywriterPlan = JSON.parse(rawInput).plan;
+        return {
+          content: JSON.stringify({ perPlatform: { x: 'copy' } }),
+          workflow_complete: false,
+        };
+      },
+      [IDS.brandCritic]: {
+        content: JSON.stringify({ pass: true, fixes: [] }),
+        workflow_complete: false,
+      },
+      [IDS.finalizer]: {
+        content: JSON.stringify({ content: ['copy'], perPlatform: { x: 'copy' } }),
+        workflow_complete: true,
+      },
+    });
+
+    const result = await conductor.generate('org-1', 'user-1', {
+      brief: 'b',
+      platforms: ['x'],
+    });
+
+    // Defaults applied: platforms fall back to the requested list, angles to [].
+    expect((copywriterPlan as any).platforms).toEqual(['x']);
+    expect((copywriterPlan as any).angles).toEqual([]);
+    expect(result.perPlatform.x).toBe('copy');
+    // No dispatch threw, so no breaker entry was recorded.
+    expect((conductor as any)._breakers.size).toBe(0);
+  });
+
+  it('rejects early once the overall deadline has passed before a later stage', async () => {
+    process.env.CONTENT_PIPELINE_TOTAL_TIMEOUT_MS = '100';
+    let now = 1_000_000;
+    const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+    try {
+      (dispatchToAgent as ReturnType<typeof vi.fn>).mockImplementation(
+        (agent: { agent_id?: string }) => {
+          // Each completed stage advances the clock by 60ms; two stages exhaust
+          // the 100ms budget, so the third stage is rejected before dispatch.
+          now += 60;
+          if (agent?.agent_id === IDS.strategist) {
+            return Promise.resolve({
+              content: JSON.stringify({ platforms: ['x'], angles: [], hooks: [], structure: 's' }),
+              workflow_complete: false,
+            });
+          }
+          return Promise.resolve({
+            content: JSON.stringify({ perPlatform: { x: 'copy' } }),
+            workflow_complete: false,
+          });
+        }
+      );
+
+      await expect(
+        conductor.generate('org-1', 'user-1', { brief: 'b', platforms: ['x'] })
+      ).rejects.toThrow(/deadline exceeded before agent/);
+
+      // The strategist and copywriter dispatched; the brand critic never did.
+      const dispatched = (dispatchToAgent as ReturnType<typeof vi.fn>).mock.calls.map(
+        ([agent]: any[]) => agent?.agent_id
+      );
+      expect(dispatched).toEqual([IDS.strategist, IDS.copywriter]);
+    } finally {
+      nowSpy.mockRestore();
+      delete process.env.CONTENT_PIPELINE_TOTAL_TIMEOUT_MS;
+    }
+  });
 });

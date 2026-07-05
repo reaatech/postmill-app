@@ -8,6 +8,7 @@ import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-rend
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { parseOrg, requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 import { DesignerDocStrictSchema } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.schema';
 import { DesignerDocOpSchema } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc-ops.schema';
 import { createBlankDoc } from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.migrate';
@@ -56,6 +57,7 @@ Prefer "/media/generate-image-with-prompt" first if you only need a single image
       execute: async (inputData, context) => {
         try {
           checkAuth(inputData, context);
+          requireWrite(context as any);
 
           const requestContext = (context as any)?.requestContext;
           const orgRaw = requestContext?.get('organization');
@@ -63,7 +65,7 @@ Prefer "/media/generate-image-with-prompt" first if you only need a single image
           if (!orgRaw) {
             return { error: 'Organization context missing', code: 'MISSING_ORG' };
           }
-          const org = typeof orgRaw === 'string' ? JSON.parse(orgRaw) : orgRaw;
+          const org = parseOrg(context as any);
           const user = typeof userRaw === 'string' ? JSON.parse(userRaw) : userRaw;
           if (!user?.id) {
             return { error: 'User context missing', code: 'MISSING_USER' };

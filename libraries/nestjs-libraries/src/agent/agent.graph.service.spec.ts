@@ -138,6 +138,8 @@ describe('AgentGraphService', () => {
   let fileService: FileService;
   let storageService: StorageService;
   let aiMediaService: { generateImage: ReturnType<typeof vi.fn> };
+  let budget: { checkBudget: ReturnType<typeof vi.fn>; recordSpend: ReturnType<typeof vi.fn> };
+  let guardrails: { checkOutput: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -148,12 +150,21 @@ describe('AgentGraphService', () => {
     aiMediaService = {
       generateImage: vi.fn().mockResolvedValue('https://cdn.example.com/agent-image.png'),
     };
+    budget = {
+      checkBudget: vi.fn().mockResolvedValue({ allowed: true }),
+      recordSpend: vi.fn().mockResolvedValue(undefined),
+    };
+    guardrails = {
+      checkOutput: vi.fn().mockImplementation((c: string) => Promise.resolve(c)),
+    };
     service = new AgentGraphService(
       postsService,
       fileService,
       aiModelProvider,
       storageService,
       aiMediaService as unknown as AiMediaService,
+      budget as any,
+      guardrails as any,
     );
   });
 
@@ -213,16 +224,31 @@ describe('AgentGraphService', () => {
       expect(result).toEqual({});
     });
 
+    it('caps the image fan-out at 10 items (bounds model-driven spend)', async () => {
+      const state = {
+        isPicture: true,
+        orgId: 'org-cap',
+        content: Array.from({ length: 15 }, (_, i) => ({ prompt: `p${i}` })),
+      } as any;
+
+      const result = await service.generatePictures(state);
+
+      expect(aiMediaService.generateImage).toHaveBeenCalledTimes(10);
+      expect(result.content).toHaveLength(10);
+    });
+
     it('handles image generation failure gracefully', async () => {
       const failingMedia = {
         generateImage: vi.fn().mockRejectedValue(new Error('Image gen failed')),
       };
       const svc = new AgentGraphService(
         postsService,
-      fileService,
+        fileService,
         aiModelProvider,
         storageService,
         failingMedia as unknown as AiMediaService,
+        budget as any,
+        guardrails as any,
       );
 
       const state = {
@@ -238,17 +264,25 @@ describe('AgentGraphService', () => {
   });
 
   describe('start', () => {
-    it('creates a graph invocation with streamEvents', async () => {
-      const body = {
-        research: 'Write about AI trends',
-        isPicture: false,
-        format: 'one_short' as const,
-        tone: 'company' as const,
-      };
+    const body = {
+      research: 'Write about AI trends',
+      isPicture: false,
+      format: 'one_short' as const,
+      tone: 'company' as const,
+    };
 
+    it('creates a graph invocation with streamEvents', async () => {
       const result = await service.start('org-99', body);
 
+      expect(budget.checkBudget).toHaveBeenCalledWith('agent', 'org-99');
       expect(Array.isArray(result)).toBe(true);
+    });
+
+    it('rejects up-front when the org budget is exceeded, before any model call', async () => {
+      budget.checkBudget.mockResolvedValueOnce({ allowed: false, reason: 'Daily cap reached' });
+
+      await expect(service.start('org-broke', body)).rejects.toThrow('Daily cap reached');
+      expect(aiModelProvider.langchainModel).not.toHaveBeenCalled();
     });
 
     it('builds the full graph with all nodes', () => {

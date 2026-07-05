@@ -6,7 +6,10 @@ import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defa
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { parseOrg, requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+
+const MAX_IMAGE_BYTES = 512 * 1024 * 1024;
 
 @Injectable()
 export class GenerateImageTool implements AgentToolInterface {
@@ -42,12 +45,20 @@ export class GenerateImageTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
+        requireWrite(context as any);
+        const org = parseOrg(context as any);
         const imageUrl = await this._aiDefaults.textToImage(org.id, inputData.prompt);
 
         const res = await safeFetch(imageUrl);
         if (!res.ok) throw new Error(`Image download failed (${res.status})`);
+        const declared = Number(res.headers.get('content-length'));
+        if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES) {
+          throw new Error('Generated image exceeds the 512 MB limit');
+        }
         const buffer = Buffer.from(await res.arrayBuffer());
+        if (buffer.byteLength > MAX_IMAGE_BYTES) {
+          throw new Error('Generated image exceeds the 512 MB limit');
+        }
         const ct = res.headers.get('content-type')?.split(';')[0] || 'image/png';
         const ext = ct === 'image/jpeg' ? 'jpg' : ct === 'image/webp' ? 'webp' : 'png';
 

@@ -12,10 +12,28 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { isISO8601, isUUID } from 'class-validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { GuardrailService } from '@gitroom/nestjs-libraries/ai/governance/guardrail.service';
 
 @Controller('/posts')
 export class SocialCommentsController {
-  constructor(private _socialCommentsService: SocialCommentsService) {}
+  constructor(
+    private _socialCommentsService: SocialCommentsService,
+    private _guardrails: GuardrailService,
+  ) {}
+
+  // When an agent HITL confirm card approves an AI-drafted reply it sets
+  // `guardrail: true`, so the org's output guardrail runs on the (possibly
+  // user-edited) text before it is dispatched — parity with the server tool's
+  // own guardOutbound. No-op for human replies (flag absent) and unconfigured orgs.
+  private async _maybeGuard(
+    message: string,
+    guardrail: boolean | undefined,
+    org: Organization,
+    user: User,
+  ): Promise<string> {
+    if (!guardrail) return message;
+    return this._guardrails.checkOutput(message, { orgId: org.id, userId: user.id });
+  }
 
   @Get('/inbox')
   @CheckPolicies([AuthorizationActions.Read, Sections.COMMUNITY_FEATURES])
@@ -109,7 +127,8 @@ export class SocialCommentsController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    return this._socialCommentsService.replyToPost(org.id, user.id, id, body.message);
+    const message = await this._maybeGuard(body.message, body.guardrail, org, user);
+    return this._socialCommentsService.replyToPost(org.id, user.id, id, message);
   }
 
   @Post('/:id/social-comments/:commentId/reply')
@@ -122,7 +141,8 @@ export class SocialCommentsController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
   ) {
-    return this._socialCommentsService.replyToComment(org.id, user.id, id, commentId, body.message);
+    const message = await this._maybeGuard(body.message, body.guardrail, org, user);
+    return this._socialCommentsService.replyToComment(org.id, user.id, id, commentId, message);
   }
 
   @Post('/:id/social-comments/:commentId/like')

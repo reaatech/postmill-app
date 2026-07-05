@@ -5,6 +5,7 @@ import { Injectable } from '@nestjs/common';
 import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { DefaultsResolutionService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-resolution.service';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
+import { parseOrg, requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class GenerateVideoTool implements AgentToolInterface {
@@ -40,7 +41,8 @@ export class GenerateVideoTool implements AgentToolInterface {
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        const org = JSON.parse((context?.requestContext as any)?.get('organization') as string);
+        requireWrite(context as any);
+        const org = parseOrg(context as any);
         const artifact = inputData.imageUrl
           ? await this._aiDefaults.imageToVideo(org.id, inputData.prompt, inputData.imageUrl)
           : await this._aiDefaults.textToVideo(org.id, inputData.prompt);

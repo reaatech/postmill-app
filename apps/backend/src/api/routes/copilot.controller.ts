@@ -264,9 +264,11 @@ export class CopilotController {
         'media',
         Array.isArray(properties.media) ? properties.media : []
       );
-      if (properties.agUiContext) {
-        requestContext.set('ag-ui', JSON.stringify(properties.agUiContext));
-      }
+      // NOTE: the `ag-ui` view context is set exclusively by `@ag-ui/mastra`
+      // (`getLocalAgents` forwards the CopilotKit readable as `{ context }` and
+      // overwrites `requestContext.set('ag-ui', …)` unconditionally). A manual set
+      // here from `properties.agUiContext` was dead — the readable always won — so
+      // the frontend transport leg and this set were both removed.
 
       requestContext.set('organization', JSON.stringify(organization));
       requestContext.set('user', JSON.stringify({ id: user.id }));
@@ -355,13 +357,5 @@ export class CopilotController {
         title: p.title,
       })),
     };
-  }
-
-  private _safeParse<T>(raw: string): T | undefined {
-    try {
-      return JSON.parse(raw) as T;
-    } catch {
-      return undefined;
-    }
   }
 }

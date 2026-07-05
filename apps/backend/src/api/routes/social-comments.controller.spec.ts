@@ -24,7 +24,14 @@ describe('SocialCommentsController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     service = new (SocialCommentsService as any)();
-    controller = new SocialCommentsController(service as unknown as SocialCommentsService);
+    // Guardrail is a pass-through unless a reply sets `guardrail: true`.
+    const guardrails = {
+      checkOutput: vi.fn().mockImplementation((c: string) => Promise.resolve(c)),
+    };
+    controller = new SocialCommentsController(
+      service as unknown as SocialCommentsService,
+      guardrails as any
+    );
   });
 
   describe('GET /:id/social-comments', () => {

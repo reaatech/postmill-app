@@ -1,0 +1,75 @@
+import { describe, it, expect, vi } from 'vitest';
+import { NotFoundException } from '@nestjs/common';
+import { CampaignTagService } from './campaign-item.service';
+
+function makeService(overrides: any = {}) {
+  const items = {
+    tag: vi.fn().mockResolvedValue({}),
+    setPostCampaign: vi.fn().mockResolvedValue({}),
+    ...overrides.items,
+  };
+  const resolver = {
+    resolveBatch: vi.fn().mockResolvedValue(new Map()),
+    ...overrides.resolver,
+  };
+  const campaigns = {
+    findById: vi.fn().mockResolvedValue({ id: 'c1', organizationId: 'org1', name: 'Launch' }),
+    ...overrides.campaigns,
+  };
+  const audit = { create: vi.fn().mockResolvedValue({}) };
+
+  const service = new CampaignTagService(
+    items as any,
+    resolver as any,
+    campaigns as any,
+    audit as any
+  );
+  return { service, items, resolver, campaigns, audit };
+}
+
+describe('CampaignTagService.tagItem', () => {
+  it('rejects a foreign non-POST entityId (resolver empty) and does not upsert', async () => {
+    const { service, items, resolver } = makeService({
+      resolver: { resolveBatch: vi.fn().mockResolvedValue(new Map()) },
+    });
+
+    await expect(
+      service.tagItem('org1', 'c1', 'u1', 'channel', 'foreign-int')
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(resolver.resolveBatch).toHaveBeenCalledWith('org1', 'INTEGRATION', ['foreign-int']);
+    expect(items.tag).not.toHaveBeenCalled();
+  });
+
+  it('upserts a valid, org-owned non-POST entity', async () => {
+    const { service, items } = makeService({
+      resolver: {
+        resolveBatch: vi
+          .fn()
+          .mockResolvedValue(new Map([['int1', { id: 'int1', name: 'YouTube' }]])),
+      },
+    });
+
+    const res = await service.tagItem('org1', 'c1', 'u1', 'channel', 'int1');
+
+    expect(res).toEqual({ success: true });
+    expect(items.tag).toHaveBeenCalledWith({
+      campaignId: 'c1',
+      organizationId: 'org1',
+      entityType: 'INTEGRATION',
+      entityId: 'int1',
+      createdById: 'u1',
+    });
+  });
+
+  it('keeps the POST scoping path (no resolver gate)', async () => {
+    const { service, items, resolver } = makeService();
+
+    await service.tagItem('org1', 'c1', 'u1', 'post', 'p1');
+
+    expect(items.setPostCampaign).toHaveBeenCalledWith('org1', 'p1', 'c1');
+    expect(items.tag).not.toHaveBeenCalled();
+    // POST resolves its name via the fixed 'a post' short-circuit, never the resolver.
+    expect(resolver.resolveBatch).not.toHaveBeenCalled();
+  });
+});

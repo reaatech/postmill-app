@@ -9,6 +9,7 @@ import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service'
 import {
   parseOrg,
   requireRead,
+  requireWrite,
 } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
@@ -75,6 +76,9 @@ export class RunGeneratorTool implements AgentToolInterface {
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
         requireRead(context as any);
+        // Image generation drives real provider spend + org file writes — a
+        // headless/mcp:read run must not be able to spend media money.
+        if (inputData.isPicture) requireWrite(context as any);
         const org = parseOrg(context as any);
 
         const groundedResearch = await this._groundResearch(org.id, inputData.research);
@@ -86,7 +90,8 @@ export class RunGeneratorTool implements AgentToolInterface {
           tone: inputData.tone,
         };
 
-        const stream = this._agentGraphService.start(org.id, body);
+        // start() is async (up-front budget gate) — await the stream handle.
+        const stream = await this._agentGraphService.start(org.id, body);
 
         // `AgentGraphService.start` returns `streamEvents(..., { version: 'v2' })`.
         // LangGraph v2 events nest the graph state under `data.output` (terminal
