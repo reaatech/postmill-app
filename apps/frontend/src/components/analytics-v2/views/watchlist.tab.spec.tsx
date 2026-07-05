@@ -19,6 +19,11 @@ vi.mock('@gitroom/helpers/utils/custom.fetch', () => ({
   useFetch: () => mockFetch,
 }));
 
+const mockToasterShow = vi.fn();
+vi.mock('@gitroom/react/toaster/toaster', () => ({
+  useToaster: () => ({ show: mockToasterShow }),
+}));
+
 const mockUseSWR = vi.fn();
 const mockMutate = vi.fn();
 vi.mock('swr', () => ({
@@ -124,6 +129,45 @@ describe('WatchlistTab', () => {
     await waitFor(() =>
       expect(mockMutate).toHaveBeenCalledWith('/analytics/v2/watchlist')
     );
+  });
+
+  it('keeps the form state and warns instead of clearing on a failed add (F5)', async () => {
+    stubAccounts({ data: [] });
+    mockFetch.mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+    render(<WatchlistTab />);
+
+    const handleInput = screen.getByPlaceholderText('@username') as HTMLInputElement;
+    fireEvent.change(handleInput, { target: { value: '@rival' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+
+    await waitFor(() =>
+      expect(mockToasterShow).toHaveBeenCalledWith('Failed to add account', 'warning')
+    );
+    // Form is NOT cleared, so the user can retry.
+    expect(handleInput.value).toBe('@rival');
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('warns and skips revalidation when a toggle fails (F5)', async () => {
+    stubAccounts({ data: [account({ enabled: true })] });
+    mockFetch.mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+    render(<WatchlistTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Enabled' }));
+    await waitFor(() =>
+      expect(mockToasterShow).toHaveBeenCalledWith('Failed to update account', 'warning')
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
+  });
+
+  it('warns and skips revalidation when a remove fails (F5)', async () => {
+    stubAccounts({ data: [account()] });
+    mockFetch.mockResolvedValue({ ok: false, json: () => Promise.resolve({}) });
+    render(<WatchlistTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+    await waitFor(() =>
+      expect(mockToasterShow).toHaveBeenCalledWith('Failed to remove account', 'warning')
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 
   it('omits displayName when the field is blank', async () => {

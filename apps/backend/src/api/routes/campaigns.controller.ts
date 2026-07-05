@@ -39,7 +39,8 @@ import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-p
 import {
   validateDateRange,
   validateToGteFrom,
-} from '@gitroom/backend/api/routes/analytics.v2.controller';
+  validateWindowCap,
+} from '@gitroom/nestjs-libraries/analytics/date-range.validation';
 
 class CreateCampaignDto {
   @IsString()
@@ -334,9 +335,7 @@ export class CampaignsController {
     // cap it so a public/large range can't blow up query cost.
     validateDateRange(from, to);
     validateToGteFrom(from, to);
-    if (dayjs(to).diff(dayjs(from), 'day') > 400) {
-      throw new BadRequestException('date range must not exceed 400 days');
-    }
+    validateWindowCap(from, to);
 
     const overview = await this._analyticsService.getOverview(
       org,

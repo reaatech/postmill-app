@@ -275,9 +275,11 @@ export const OverviewTab: FC<OverviewTabProps> = ({
         )}
       </div>
 
+      {/* A chart point click sets focusDate + a defaulted metric; while the day
+          drawer is open the metric panel stays closed so they don't stack. */}
       <MetricDetailPanel
         data={metricDrillData}
-        open={!!selectedMetric}
+        open={!!selectedMetric && !selectedDate}
         onClose={() => {
           onSelectMetric('');
         }}

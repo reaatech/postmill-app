@@ -118,7 +118,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
             <div>
               <button
                 onClick={() => setDrillMetric(null)}
-                className="flex items-center gap-[6px] text-[13px] text-newTableText hover:text-newTableText/80 transition-colors mb-[16px]"
+                className="flex items-center gap-[6px] text-[13px] text-newTableText hover:text-newTableText transition-colors mb-[16px]"
               >
                 <svg
                   width="14"

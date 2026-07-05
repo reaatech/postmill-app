@@ -44,7 +44,7 @@ export const ExportButton: FC<ExportButtonProps> = ({
       <button
         onClick={() => setOpen(!open)}
         disabled={exporting}
-        className="px-[12px] py-[6px] text-[13px] font-medium rounded-[8px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-btnText hover:border-newTableText/30 transition-colors flex items-center gap-[6px]"
+        className="px-[12px] py-[6px] text-[13px] font-medium rounded-[8px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-btnText hover:border-newTableText transition-colors flex items-center gap-[6px]"
       >
         <svg
           width="14"

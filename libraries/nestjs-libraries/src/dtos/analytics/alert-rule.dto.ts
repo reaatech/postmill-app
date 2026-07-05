@@ -1,11 +1,12 @@
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
   IsString,
-  IsUUID,
+  Length,
   Max,
   Min,
 } from 'class-validator';
@@ -28,8 +29,11 @@ const DIRECTIONS = ['up', 'down'] as const;
 //     comparator change_pct, threshold 30, direction down).
 // `integrationId` null = the rule applies to every channel.
 export class CreateAlertRuleDto {
+  // Integration.id is a cuid (not a uuid) — length-bound string here; the
+  // service's org-ownership check (assertIntegrationInOrg) is the real gate.
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @Length(1, 64)
   integrationId?: string;
 
   @IsString()
@@ -60,8 +64,11 @@ export class CreateAlertRuleDto {
 }
 
 export class UpdateAlertRuleDto {
+  // Integration.id is a cuid (not a uuid) — length-bound string here; the
+  // service's org-ownership check (assertIntegrationInOrg) is the real gate.
   @IsOptional()
-  @IsUUID()
+  @IsString()
+  @Length(1, 64)
   integrationId?: string;
 
   @IsOptional()
@@ -98,9 +105,13 @@ export class UpdateAlertRuleDto {
 // to a subset of channels (empty/absent = all); `rangePreset` picks a rolling
 // window ('7d' | '30d' | '90d', default 30d) resolved to from/to at read time.
 export class AnalyticsShareDto {
+  // Bounded: stored verbatim in the share config JSON — cap count and id
+  // length so an oversized payload can't bloat the row.
   @IsOptional()
   @IsArray()
+  @ArrayMaxSize(50)
   @IsString({ each: true })
+  @Length(1, 64, { each: true })
   integrations?: string[];
 
   @IsOptional()

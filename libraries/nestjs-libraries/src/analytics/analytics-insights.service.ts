@@ -157,11 +157,14 @@ export class AnalyticsInsightsService {
       });
     }
 
-    // Top post patterns — find the best-performing post content pattern
+    // Top post patterns — find the best-performing post content pattern.
+    // Post-snapshot values are cumulative LEVELS (R1.2): rank by each post's
+    // latest level (rows are date-ascending; last write wins), never the sum
+    // of its snapshot rows.
     const postMetrics: Record<string, number> = {};
     for (const snap of postSnapshots) {
       if (snap.metric === 'impressions' || snap.metric === 'engagement') {
-        postMetrics[snap.postId] = (postMetrics[snap.postId] || 0) + snap.value;
+        postMetrics[snap.postId] = snap.value;
       }
     }
 

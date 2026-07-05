@@ -2,6 +2,7 @@
 
 import { FC, useCallback, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import clsx from 'clsx';
 import dayjs from 'dayjs';
 import useSWR from 'swr';
@@ -41,6 +42,24 @@ function isDataEmpty(data: OverviewResponse | undefined): boolean {
   const hasChannels = !!data.byChannel?.length;
   return !hasKpis && !hasSeries && !hasChannels;
 }
+
+interface CampaignListItem {
+  id: string;
+  name: string;
+  integrationIds?: string[];
+  startDate?: string | null;
+  endDate?: string | null;
+  color?: string | null;
+}
+
+// One hook per resource (repo SWR convention) — the org's campaign list used
+// for the filter dropdown and the overview chart's campaign bands (6.5).
+const useAnalyticsCampaigns = () => {
+  const fetch = useFetch();
+  return useSWR<CampaignListItem[]>('/campaigns', (url: string) =>
+    fetch(url).then((r: Response) => r.json())
+  );
+};
 
 export const AnalyticsDashboard: FC = () => {
   const t = useT();
@@ -97,22 +116,8 @@ export const AnalyticsDashboard: FC = () => {
     [urlCampaigns]
   );
 
-  const fetch = useFetch();
-  const { data: campaignData } = useSWR('/campaigns', (url: string) =>
-    fetch(url).then((r: Response) => r.json())
-  );
-  const campaignList = useMemo(
-    () =>
-      (campaignData as Array<{
-        id: string;
-        name: string;
-        integrationIds?: string[];
-        startDate?: string | null;
-        endDate?: string | null;
-        color?: string | null;
-      }>) || [],
-    [campaignData]
-  );
+  const { data: campaignData } = useAnalyticsCampaigns();
+  const campaignList = useMemo(() => campaignData || [], [campaignData]);
   const campaigns = useMemo(
     () => campaignList.map((c) => ({ id: c.id, name: c.name })),
     [campaignList]
@@ -134,20 +139,15 @@ export const AnalyticsDashboard: FC = () => {
     [campaignList, to]
   );
 
-  // Selected campaigns narrow the channel set to the channels they publish to,
-  // so every tab (which already reads `activeIntegrations`) respects the filter.
-  const activeIntegrations = useMemo(() => {
-    let base = selectedChannels.length ? selectedChannels : allIntegrationIds;
-    if (selectedCampaigns.length) {
-      const campaignChannels = new Set(
-        campaignList
-          .filter((c) => selectedCampaigns.includes(c.id))
-          .flatMap((c) => c.integrationIds || [])
-      );
-      base = base.filter((id) => campaignChannels.has(id));
-    }
-    return base;
-  }, [selectedChannels, allIntegrationIds, selectedCampaigns, campaignList]);
+  // The user's explicit channel selection rides into the fetches unchanged —
+  // the server intersects campaign posts with the integration filter itself.
+  // Client-side intersecting with the campaigns' channels sent an EMPTY
+  // `integrations=` when the sets were disjoint, which the backend reads as
+  // "no restriction" and silently returned every channel's campaign data.
+  const activeIntegrations = useMemo(
+    () => (selectedChannels.length ? selectedChannels : allIntegrationIds),
+    [selectedChannels, allIntegrationIds]
+  );
 
   const {
     data: overviewData,
@@ -252,9 +252,20 @@ export const AnalyticsDashboard: FC = () => {
 
   const handleSelectDate = useCallback(
     (date: string) => {
-      updateParams({ focusDate: date || undefined });
+      if (date) {
+        // The day drill needs a metric — a chart point click only carries the
+        // date, so default to the chart's displayed metric (the first KPI) or
+        // the drawer would never open while the URL still gained ?focusDate.
+        updateParams({
+          focusDate: date,
+          metric: drillMetric || overviewData?.kpis?.[0]?.metric,
+        });
+        return;
+      }
+      // Closing the day drawer clears what the click set (date + metric).
+      updateParams({ focusDate: undefined, metric: undefined });
     },
-    [updateParams]
+    [updateParams, drillMetric, overviewData]
   );
 
   const handleSelectPost = useCallback(
@@ -294,6 +305,14 @@ export const AnalyticsDashboard: FC = () => {
     },
     [updateParams]
   );
+
+  // When the org-level empty block is shown, the tab content is skipped so the
+  // user doesn't get a second, redundant empty chart card beneath it.
+  const showEmptyBlock =
+    !overviewLoading &&
+    !overviewError &&
+    (tab === 'overview' || tab === 'channels') &&
+    isDataEmpty(overviewData);
 
   const drill: DrillState = {
     metric: drillMetric,
@@ -400,7 +419,7 @@ export const AnalyticsDashboard: FC = () => {
             </div>
           </div>
 
-          {!overviewLoading && !overviewError && (tab === 'overview' || tab === 'channels') && isDataEmpty(overviewData) && (
+          {showEmptyBlock && (
             <div className="flex flex-col items-center justify-center py-[48px] px-[24px] mb-[16px] bg-newBgColorInner border border-newTableBorder rounded-[12px]">
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-newTableText mb-[16px]">
                 <path d="M18 20V10" />
@@ -413,7 +432,7 @@ export const AnalyticsDashboard: FC = () => {
               <div className="text-[13px] text-newTableText text-center max-w-[420px] mb-[20px]">
                 {t('analytics_empty_desc', 'Analytics appears after your first scheduled collection (requires connected channels and background jobs configured).')}
               </div>
-              <a
+              <Link
                 href="/settings/channels"
                 className="inline-flex items-center gap-[8px] px-[16px] py-[8px] bg-btnPrimary text-white text-[13px] font-[500] rounded-[8px] hover:opacity-90 transition-opacity"
               >
@@ -421,11 +440,11 @@ export const AnalyticsDashboard: FC = () => {
                   <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
                 </svg>
                 {t('analytics_connect_channels', 'Connect channels')}
-              </a>
+              </Link>
             </div>
           )}
 
-          {tab === 'overview' && (
+          {tab === 'overview' && !showEmptyBlock && (
             <ErrorBoundary>
               <OverviewTab
                 data={overviewData}
@@ -446,7 +465,7 @@ export const AnalyticsDashboard: FC = () => {
               />
             </ErrorBoundary>
           )}
-          {tab === 'channels' && (
+          {tab === 'channels' && !showEmptyBlock && (
             <ErrorBoundary>
               <ChannelsTab
                 data={overviewData}

@@ -287,7 +287,17 @@ export class AnalyticsDetailService {
       // stay campaign-exact. (Phase-1 approximation; refined in a later phase.)
       const topPostsSnapshots =
         await this.analyticsRepository.getMetricDetailTopPosts(org.id, ids, metric, fromDate, toDate);
-      topPosts = topPostsSnapshots.map((snap) => ({
+      // Rows are value-desc LEVELS; dedup to one entry per post (its highest
+      // row = latest level) so one daily-snapshotted post can't fill the list.
+      const seenPosts = new Set<string>();
+      topPosts = topPostsSnapshots
+        .filter((snap) => {
+          if (seenPosts.has(snap.postId)) return false;
+          seenPosts.add(snap.postId);
+          return true;
+        })
+        .slice(0, 10)
+        .map((snap) => ({
         postId: snap.postId,
         content: (snap.post as any)?.content?.substring(0, 200) || '',
         publishedAt: (snap.post as any)?.publishDate?.toISOString() || '',
@@ -569,7 +579,16 @@ export class AnalyticsDetailService {
 
     const postSnapshots = await this.analyticsRepository.getChannelPostSnapshots(org.id, integrationId, metric, fromDate, toDate);
 
-    const topPosts = postSnapshots.map((snap) => ({
+    // Same per-post dedup as getMetricDetail: rows are value-desc levels.
+    const seenTopPosts = new Set<string>();
+    const topPosts = postSnapshots
+      .filter((snap) => {
+        if (seenTopPosts.has(snap.postId)) return false;
+        seenTopPosts.add(snap.postId);
+        return true;
+      })
+      .slice(0, 10)
+      .map((snap) => ({
       postId: snap.postId,
       content: (snap.post as any)?.content?.substring(0, 200) || '',
       publishedAt: (snap.post as any)?.publishDate?.toISOString() || '',

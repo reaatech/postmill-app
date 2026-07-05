@@ -444,7 +444,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
         },
       ];
     } catch (err) {
-      this.logger.error('Mastodon analytics error:', err);
+      this.logger.warn(`Mastodon analytics failed: ${(err as Error)?.message}`);
       return [];
     }
   }
@@ -479,7 +479,7 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      this.logger.error('Mastodon postAnalytics error:', err);
+      this.logger.warn(`Mastodon postAnalytics failed: ${(err as Error)?.message}`);
       return [];
     }
   }

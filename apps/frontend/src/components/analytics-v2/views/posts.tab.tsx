@@ -133,7 +133,7 @@ export const PostsTab: FC<PostsTabProps> = ({
         <div className="relative">
           <button
             onClick={() => setShowMetrics(!showMetrics)}
-            className="px-[10px] py-[5px] text-[12px] font-medium rounded-[6px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-btnText hover:border-newTableText/30 transition-colors flex items-center gap-[6px]"
+            className="px-[10px] py-[5px] text-[12px] font-medium rounded-[6px] bg-newTableHeader border border-newTableBorder text-newTableText hover:text-btnText hover:border-newTableText transition-colors flex items-center gap-[6px]"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
               <rect x="1" y="1" width="4" height="4" rx="1" stroke="currentColor" strokeWidth="1.5" />

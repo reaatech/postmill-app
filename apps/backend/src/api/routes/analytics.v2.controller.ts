@@ -40,20 +40,15 @@ import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/p
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { IsString, IsOptional, IsIn, MinLength, MaxLength, isUUID } from 'class-validator';
 
-export function validateDateRange(from: string, to: string) {
-  if (!from || !to) {
-    throw new BadRequestException('from and to query parameters are required');
-  }
-  if (!dayjs(from).isValid() || !dayjs(to).isValid()) {
-    throw new BadRequestException('from and to must be valid dates');
-  }
-}
+// Date-range helpers live in the shared util (used by the campaigns + public
+// controllers too); re-exported here for back-compat with existing imports.
+import {
+  validateDateRange,
+  validateToGteFrom,
+  validateWindowCap,
+} from '@gitroom/nestjs-libraries/analytics/date-range.validation';
 
-export function validateToGteFrom(from: string, to: string) {
-  if (dayjs(to).isBefore(dayjs(from))) {
-    throw new BadRequestException('to must be greater than or equal to from');
-  }
-}
+export { validateDateRange, validateToGteFrom, validateWindowCap };
 
 export function parseIntegrations(integrations?: string): string[] {
   if (!integrations) return [];
@@ -123,6 +118,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     return this._analyticsService.getOverview(
       org,
       query.from,
@@ -141,6 +137,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     return this._analyticsService.getChannel(
       org,
       integrationId,
@@ -157,6 +154,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     return this._analyticsService.getPosts(
       org,
       query.from,
@@ -187,6 +185,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     return this._analyticsService.getMetricDetail(
       org,
       metric,
@@ -230,6 +229,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     return this._analyticsService.getChannelMetric(
       org,
       integrationId,
@@ -300,6 +300,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
 
     const budget = await this._budgetService.checkBudget('utility', org.id);
     if (!budget.allowed) {
@@ -320,6 +321,7 @@ export class AnalyticsV2Controller {
   ) {
     validateDateRange(query.from, query.to);
     validateToGteFrom(query.from, query.to);
+    validateWindowCap(query.from, query.to);
     if (query.format && !['csv', 'json'].includes(query.format)) {
       throw new BadRequestException('format must be csv or json');
     }
@@ -403,7 +405,11 @@ export class AnalyticsV2Controller {
 
   // ── 7.6: org-level public share dashboard ──
 
+  // The GET returns the live share token (= the public link). Reading it is
+  // part of MANAGING sharing, so it carries the same gate as mint/disable —
+  // a viewer-role member shouldn't be able to lift the org-wide public link.
   @Get('/share')
+  @RequirePermission('analytics', 'update')
   async getShare(@GetOrgFromRequest() org: Organization) {
     return this._shareService.getShare(org.id);
   }
@@ -451,10 +457,15 @@ export class AnalyticsV2Controller {
       org.id,
       metric || 'followers',
     );
-    const own =
-      from && to && dayjs(from).isValid() && dayjs(to).isValid()
-        ? await this._analyticsService.getFollowerSeries(org.id, from, to)
-        : [];
+    let own: Awaited<ReturnType<AnalyticsService['getFollowerSeries']>> = [];
+    if (from || to) {
+      // Explicit dates must be valid — 400 like every other date route
+      // (previously invalid dates were silently ignored → own: []).
+      validateDateRange(from!, to!);
+      validateToGteFrom(from!, to!);
+      validateWindowCap(from!, to!);
+      own = await this._analyticsService.getFollowerSeries(org.id, from!, to!);
+    }
     return { watched, own };
   }
 

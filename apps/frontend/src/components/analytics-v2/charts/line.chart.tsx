@@ -56,22 +56,38 @@ export const LineChart: FC<LineChartProps> = ({
     return hexToRgba(c, 0.4);
   })();
 
+  // Keep the latest click handler in a ref so the chart doesn't have to be
+  // destroyed/recreated whenever the parent passes a new inline callback.
+  const onPointClickRef = useRef(onPointClick);
+  useEffect(() => {
+    onPointClickRef.current = onPointClick;
+  }, [onPointClick]);
+
   useEffect(() => {
     if (!ref.current) return;
 
     const ctx = ref.current.getContext('2d');
     if (!ctx) return;
 
-    const labels = series.map(p => p.date);
+    // With a comparison series the chart labels are the sorted union of both
+    // series' dates and each series is mapped over that union (null where a
+    // date is missing) — index-pairing the raw arrays misaligns whenever the
+    // date sets differ (e.g. watchlist own-vs-watched). Chart.js's default
+    // `spanGaps: false` breaks the line at nulls instead of bridging them.
+    const mainLabels = series.map(p => p.date);
+    const labels =
+      comparisonSeries && comparisonSeries.length
+        ? Array.from(
+            new Set([...mainLabels, ...comparisonSeries.map(p => p.date)])
+          ).sort()
+        : mainLabels;
 
     const datasets: Record<string, unknown>[] = [];
 
     if (comparisonSeries && comparisonSeries.length) {
-      const comparisonLabels = comparisonSeries.map(p => p.date);
-      const allLabels = Array.from(new Set([...labels, ...comparisonLabels])).sort();
       datasets.push({
         label: 'Previous period',
-          data: allLabels.map(d => comparisonSeries.find(p => p.date === d)?.value ?? null),
+          data: labels.map(d => comparisonSeries.find(p => p.date === d)?.value ?? null),
           borderColor: resolvedComparisonColor,
           backgroundColor: 'transparent',
           borderWidth: 2,
@@ -85,7 +101,10 @@ export const LineChart: FC<LineChartProps> = ({
 
       datasets.push({
         label: 'Current period',
-        data: series.map(p => p.value),
+        data:
+          comparisonSeries && comparisonSeries.length
+            ? labels.map(d => series.find(p => p.date === d)?.value ?? null)
+            : series.map(p => p.value),
           borderColor: resolvedColor,
           backgroundColor: (() => {
             if (!ctx) return 'transparent';
@@ -153,8 +172,8 @@ export const LineChart: FC<LineChartProps> = ({
         responsive: true,
         maintainAspectRatio: false,
         onClick: (_event: unknown, elements: { index: number }[]) => {
-          if (elements.length > 0 && onPointClick) {
-            onPointClick(labels[elements[0].index]);
+          if (elements.length > 0 && onPointClickRef.current) {
+            onPointClickRef.current(labels[elements[0].index]);
           }
         },
         animation: { duration: 600, easing: 'easeOutQuart' },
@@ -233,7 +252,7 @@ export const LineChart: FC<LineChartProps> = ({
     return () => {
       chartRef.current?.destroy();
     };
-  }, [series, comparisonSeries, color, comparisonColor, height, format, onPointClick, campaignBands, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor, gridDottedColor]);
+  }, [series, comparisonSeries, color, comparisonColor, height, format, campaignBands, resolvedColor, resolvedComparisonColor, bgColor, textColor, tableText, gridColor, borderColor, gridDottedColor]);
 
   return <canvas ref={ref} style={{ width: '100%', height: '100%' }} />;
 };

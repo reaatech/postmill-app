@@ -89,7 +89,7 @@ export const ErrorState: FC<ErrorStateProps> = ({ title, message, onRetry }) => 
   const t = useT();
   return (
     <div className="flex flex-col items-center justify-center py-[48px] text-center">
-      <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-[var(--negative,#f97066)]/10 flex items-center justify-center text-[var(--negative,#f97066)]">
+      <div className="w-[48px] h-[48px] mb-[16px] rounded-full bg-[rgba(249,112,102,0.1)] flex items-center justify-center text-[var(--negative,#f97066)]">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" />
           <path d="M12 8v4m0 4h.01" />

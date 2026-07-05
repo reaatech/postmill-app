@@ -20,7 +20,7 @@ const RANGE_PRESETS: { value: string; labelKey: string; fallback: string }[] = [
 export const AnalyticsShareModal: FC = () => {
   const t = useT();
   const toaster = useToaster();
-  const { data, isLoading, save, disable } = useAnalyticsShare();
+  const { data, isLoading, error, save, disable } = useAnalyticsShare();
   const { data: integrationsData } = useIntegrationList();
   const integrations = useMemo(
     () => (integrationsData || []) as Integrations[],
@@ -76,16 +76,41 @@ export const AnalyticsShareModal: FC = () => {
     }
   };
 
-  const copy = () => {
+  const copy = async () => {
     if (!publicUrl) return;
-    navigator.clipboard.writeText(publicUrl);
-    toaster.show(t('link_copied_to_clipboard', 'Link copied to clipboard'), 'success');
+    // navigator.clipboard is undefined on non-HTTPS origins — fall back to a
+    // "copy manually" hint instead of throwing.
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(publicUrl);
+      toaster.show(t('link_copied_to_clipboard', 'Link copied to clipboard'), 'success');
+    } catch {
+      toaster.show(
+        t('link_copy_manual', 'Could not copy automatically — select the link and copy it manually'),
+        'warning'
+      );
+    }
   };
 
   if (isLoading) {
     return (
       <div className="w-full sm:w-[520px] max-w-full">
         <TabSkeleton variant="list" />
+      </div>
+    );
+  }
+
+  // The share config GET is permission-gated (analytics:update) — a 403 (or
+  // any load failure) renders a quiet notice instead of a broken form.
+  if (error) {
+    return (
+      <div className="w-full sm:w-[520px] max-w-full">
+        <p className="text-[13px] text-newTableText">
+          {t(
+            'analytics_share_no_access',
+            'Sharing is managed by org admins — you don’t have access to the public share settings.'
+          )}
+        </p>
       </div>
     );
   }

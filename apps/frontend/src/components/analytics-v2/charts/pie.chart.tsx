@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import DrawChart from 'chart.js/auto';
 import { resolveCSSVar, useCSSToken } from '../kit/chart-theme';
 
@@ -41,6 +41,14 @@ export const PieChart: FC<PieChartProps> = ({
   const borderColor = useCSSToken('var(--new-table-border)', '#2b2b2b');
   const [chartColors, setChartColors] = useState(resolveChartColors);
 
+  // Keep the latest click handler in a ref — with `processed` memoized the
+  // chart effect no longer re-runs every render, so reading the handler at
+  // event time keeps it fresh (same pattern as bar.chart).
+  const onSliceClickRef = useRef(onSliceClick);
+  useEffect(() => {
+    onSliceClickRef.current = onSliceClick;
+  }, [onSliceClick]);
+
   useEffect(() => {
     const target = document.body || document.documentElement;
     const observer = new MutationObserver(() => {
@@ -50,14 +58,17 @@ export const PieChart: FC<PieChartProps> = ({
     return () => observer.disconnect();
   }, []);
 
-  const processed = (() => {
+  // Memoized on the actual data — `processed` is an effect dep, so a fresh
+  // array each render would tear down + re-animate the doughnut on every
+  // parent render.
+  const processed = useMemo(() => {
     const sorted = [...data].sort((a, b) => b.value - a.value);
     if (sorted.length <= maxSlices) return sorted;
     const top = sorted.slice(0, maxSlices - 1);
     const other = sorted.slice(maxSlices - 1);
     const otherSum = other.reduce((s, i) => s + i.value, 0);
     return [...top, { label: 'Other', value: otherSum }];
-  })();
+  }, [data, maxSlices]);
 
   useEffect(() => {
     if (!ref.current || !processed.length) return;
@@ -85,9 +96,9 @@ export const PieChart: FC<PieChartProps> = ({
         animation: { duration: 500, easing: 'easeOutQuart' },
         layout: { padding: 8 },
         onClick: (_event: unknown, elements: { index: number }[]) => {
-          if (elements.length > 0 && onSliceClick) {
+          if (elements.length > 0 && onSliceClickRef.current) {
             const index = elements[0].index;
-            onSliceClick(processed[index]?.label || '');
+            onSliceClickRef.current(processed[index]?.label || '');
           }
         },
         plugins: {

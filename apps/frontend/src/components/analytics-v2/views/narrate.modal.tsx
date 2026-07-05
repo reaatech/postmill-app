@@ -1,6 +1,7 @@
 'use client';
 
 import { FC, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useNarrate, NarrateError } from '../hooks/useNarrate';
 import { AI_SETUP_HREF } from '@gitroom/frontend/components/layout/use-ai-active';
@@ -62,12 +63,12 @@ export const NarrateModal: FC<{ from: string; to: string }> = ({ from, to }) => 
             'AI is not configured for this workspace. Set up a provider in Settings → AI to enable narration.'
           )}
           <div className="mt-[12px]">
-            <a
+            <Link
               href={AI_SETUP_HREF}
               className="inline-flex px-[14px] py-[6px] text-[13px] font-medium bg-btnPrimary text-white rounded-[8px] hover:opacity-90 transition-opacity"
             >
               {t('analytics_narrate_go_settings', 'Go to Settings → AI')}
-            </a>
+            </Link>
           </div>
         </div>
       )}

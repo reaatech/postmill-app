@@ -3,6 +3,7 @@
 import { FC, useCallback, useMemo, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import useSWR, { mutate } from 'swr';
 import { TabSkeleton, ErrorState, EmptyState } from '../kit/states';
 import { LineChart } from '../charts/line.chart';
@@ -19,6 +20,14 @@ interface WatchedAccount {
   createdAt: string;
   metrics: { id: string; metric: string; value: number; capturedAt: string }[];
 }
+
+// One hook per resource (repo SWR convention) — the org's watched accounts.
+const useWatchlist = () => {
+  const fetch = useFetch();
+  return useSWR<WatchedAccount[]>('/analytics/v2/watchlist', (url: string) =>
+    fetch(url).then((r: Response) => r.json()),
+  );
+};
 
 // 6.3 — competitor overlay: your channels' metric vs a watched account's, own
 // solid + watched dashed (kit palette). Empty series → EmptyState.
@@ -76,19 +85,17 @@ const WatchlistGrowthChart: FC<{ id: string; name: string }> = ({ id, name }) =>
 export const WatchlistTab: FC = () => {
   const t = useT();
   const fetch = useFetch();
+  const toaster = useToaster();
   const [provider, setProvider] = useState('x');
   const [handle, setHandle] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [growthAccount, setGrowthAccount] = useState<{ id: string; name: string } | null>(null);
 
-  const { data: accounts, error } = useSWR<WatchedAccount[]>(
-    '/analytics/v2/watchlist',
-    (url: string) => fetch(url).then((r: Response) => r.json()),
-  );
+  const { data: accounts, error } = useWatchlist();
 
   const addAccount = useCallback(async () => {
     if (!handle.trim()) return;
-    await fetch('/analytics/v2/watchlist', {
+    const res = await fetch('/analytics/v2/watchlist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -97,31 +104,44 @@ export const WatchlistTab: FC = () => {
         displayName: displayName.trim() || undefined,
       }),
     });
+    if (!res.ok) {
+      // Keep the form state so the user can retry.
+      toaster.show(t('watchlist_add_failed', 'Failed to add account'), 'warning');
+      return;
+    }
     setHandle('');
     setDisplayName('');
     mutate('/analytics/v2/watchlist');
-  }, [provider, handle, displayName, fetch]);
+  }, [provider, handle, displayName, fetch, toaster, t]);
 
   const toggleEnabled = useCallback(
     async (id: string, enabled: boolean) => {
-      await fetch(`/analytics/v2/watchlist/${id}`, {
+      const res = await fetch(`/analytics/v2/watchlist/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled: !enabled }),
       });
+      if (!res.ok) {
+        toaster.show(t('watchlist_update_failed', 'Failed to update account'), 'warning');
+        return;
+      }
       mutate('/analytics/v2/watchlist');
     },
-    [fetch],
+    [fetch, toaster, t],
   );
 
   const removeAccount = useCallback(
     async (id: string) => {
-      await fetch(`/analytics/v2/watchlist/${id}`, {
+      const res = await fetch(`/analytics/v2/watchlist/${id}`, {
         method: 'DELETE',
       });
+      if (!res.ok) {
+        toaster.show(t('watchlist_remove_failed', 'Failed to remove account'), 'warning');
+        return;
+      }
       mutate('/analytics/v2/watchlist');
     },
-    [fetch],
+    [fetch, toaster, t],
   );
 
   return (

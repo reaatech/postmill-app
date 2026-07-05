@@ -66,42 +66,52 @@ describe('AnalyticsRepository — campaign scope (1.1)', () => {
     expect(where.post).toEqual({ campaignId: { in: ['A', 'B'] }, deletedAt: null });
   });
 
-  it('getLatestPostSnapshotsBeforeByCampaigns reads latest-prior level per (post,metric) (R1.3)', async () => {
-    const { repo, findMany } = makeRepo();
+  // R1.3 baselines are read via a raw DISTINCT ON query (Prisma client-side
+  // `distinct` would ship every pre-window row from the DB — see the repo
+  // comment). The spec asserts the raw path is used, its params ride through,
+  // and the degenerate inputs short-circuit without touching the DB.
+  const makeRawRepo = () => {
+    const queryRaw = vi.fn(async () => [
+      { postId: 'p1', metric: 'likes', value: 90 },
+    ]);
+    const repo = Object.create(AnalyticsRepository.prototype) as AnalyticsRepository;
+    (repo as any)._prisma = { $queryRaw: queryRaw };
+    return { repo, queryRaw };
+  };
+
+  it('getLatestPostSnapshotsBeforeByCampaigns runs DISTINCT ON in the DB and returns the rows (R1.3)', async () => {
+    const { repo, queryRaw } = makeRawRepo();
     const before = new Date('2024-02-01');
 
-    await repo.getLatestPostSnapshotsBeforeByCampaigns(
+    const rows = await repo.getLatestPostSnapshotsBeforeByCampaigns(
       'org1',
       ['A'],
       before,
       ['i1'],
     );
 
-    const args = findMany.mock.calls[0][0];
-    expect(args.where.organizationId).toBe('org1');
-    expect(args.where.date).toEqual({ lt: before });
-    expect(args.where.integrationId).toEqual({ in: ['i1'] });
-    expect(args.where.post).toEqual({ campaignId: { in: ['A'] }, deletedAt: null });
-    // one latest-prior row per (post, metric): distinct + date-desc ordering
-    expect(args.distinct).toEqual(['postId', 'metric']);
-    expect(args.orderBy).toEqual([
-      { postId: 'asc' },
-      { metric: 'asc' },
-      { date: 'desc' },
-    ]);
-    expect(args.select).toEqual({ postId: true, metric: true, value: true });
+    expect(rows).toEqual([{ postId: 'p1', metric: 'likes', value: 90 }]);
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    // Tagged template: params ride as values (orgId, before, campaign ids,
+    // integration ids); the SQL text carries DISTINCT ON + date DESC ordering.
+    const [strings, ...values] = queryRaw.mock.calls[0] as any[];
+    const sql = strings.join(' ');
+    expect(sql).toContain('DISTINCT ON');
+    expect(sql).toContain('"date" DESC');
+    expect(values).toContainEqual('org1');
+    expect(values).toContainEqual(before);
   });
 
-  it('getLatestPostSnapshotsBeforeByCampaigns omits the integration filter when absent (R1.3)', async () => {
-    const { repo, findMany } = makeRepo();
+  it('getLatestPostSnapshotsBeforeByCampaigns short-circuits on empty inputs (R1.3)', async () => {
+    const { repo, queryRaw } = makeRawRepo();
 
-    await repo.getLatestPostSnapshotsBeforeByCampaigns(
-      'org1',
-      ['A', 'B'],
-      new Date('2024-02-01'),
-    );
-
-    expect(findMany.mock.calls[0][0].where.integrationId).toBeUndefined();
+    await expect(
+      repo.getLatestPostSnapshotsBeforeByCampaigns('org1', [], new Date()),
+    ).resolves.toEqual([]);
+    await expect(
+      repo.getLatestPostSnapshotsBeforeByCampaigns('org1', ['A'], new Date(), []),
+    ).resolves.toEqual([]);
+    expect(queryRaw).not.toHaveBeenCalled();
   });
 
   it('getPostsByCampaigns scopes by campaignId + org/date and includes integration', async () => {

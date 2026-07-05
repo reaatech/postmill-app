@@ -46,6 +46,7 @@ function stub(over: any = {}) {
   mockUseAnalyticsShare.mockReturnValue({
     data: { token: null, enabled: false, config: {} },
     isLoading: false,
+    error: undefined,
     save: mockSave,
     disable: mockDisable,
     ...over,
@@ -168,14 +169,42 @@ describe('AnalyticsShareModal', () => {
     expect(mockToasterShow).toHaveBeenCalledWith('Share link rotated', 'success');
   });
 
-  it('copies the public URL to the clipboard', () => {
+  it('copies the public URL to the clipboard', async () => {
     stub({ data: { token: 'tok123', enabled: true, config: {} } });
     render(<AnalyticsShareModal />);
     fireEvent.click(screen.getByText('Copy'));
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
       expect.stringContaining('/share/analytics/tok123')
     );
-    expect(mockToasterShow).toHaveBeenCalledWith('Link copied to clipboard', 'success');
+    await waitFor(() =>
+      expect(mockToasterShow).toHaveBeenCalledWith('Link copied to clipboard', 'success')
+    );
+  });
+
+  it('falls back to a "copy manually" warning when the Clipboard API is unavailable (F6)', async () => {
+    // navigator.clipboard is undefined on non-HTTPS origins.
+    Object.defineProperty(navigator, 'clipboard', {
+      value: undefined,
+      configurable: true,
+    });
+    stub({ data: { token: 'tok123', enabled: true, config: {} } });
+    render(<AnalyticsShareModal />);
+    fireEvent.click(screen.getByText('Copy'));
+    await waitFor(() =>
+      expect(mockToasterShow).toHaveBeenCalledWith(
+        'Could not copy automatically — select the link and copy it manually',
+        'warning'
+      )
+    );
+  });
+
+  it('renders a quiet admins-only notice when the share config GET fails (F6)', () => {
+    stub({ data: undefined, error: new Error('403') });
+    render(<AnalyticsShareModal />);
+    expect(screen.getByText(/Sharing is managed by org admins/i)).toBeTruthy();
+    // No broken form underneath.
+    expect(screen.queryByText('Create link')).toBeFalsy();
+    expect(screen.queryByText('Date range')).toBeFalsy();
   });
 
   it('disables the link and toasts success', async () => {

@@ -527,8 +527,17 @@ export class AnalyticsActivity {
       const cooldownDays = retentionDays('ANALYTICS_ANOMALY_COOLDOWN_DAYS', 3);
 
       const since = dayjs().subtract(35, 'day').startOf('day').toDate();
-      const snapshots =
+      const loaded =
         await this._analyticsRepository.getSnapshotsForOrgSince(orgId, since);
+      // Exclude today's rows: the 02:00 UTC sweep upserts a ~2-hour PARTIAL day
+      // for flow metrics, and testing that partial against a 28-full-day
+      // baseline systematically fires false "drop" alerts. Yesterday is the
+      // newest complete day — it becomes the candidate for the detector AND for
+      // alert-rule evaluation (both read the series' last point).
+      const todayStart = dayjs().startOf('day');
+      const snapshots = loaded.filter((s) =>
+        dayjs(s.date).isBefore(todayStart)
+      );
       if (snapshots.length === 0) return;
 
       const integrations =
@@ -613,6 +622,7 @@ export class AnalyticsActivity {
         }
 
         const recent = await this._analyticsRepository.getRecentAnomaly(
+          orgId,
           g.integrationId,
           g.metric,
           result.direction,

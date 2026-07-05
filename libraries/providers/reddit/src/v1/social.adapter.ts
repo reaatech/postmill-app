@@ -758,7 +758,7 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
 
       return result;
     } catch (err) {
-      this.logger.error('Reddit postAnalytics error:', err);
+      this.logger.warn(`Reddit postAnalytics failed: ${(err as Error)?.message}`);
       return [];
     }
   }

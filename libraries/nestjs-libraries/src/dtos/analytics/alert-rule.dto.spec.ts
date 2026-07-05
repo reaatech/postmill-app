@@ -12,7 +12,9 @@ const pipe = new ValidationPipe({
   forbidNonWhitelisted: true,
 });
 
-const UUID = '11111111-1111-4111-8111-111111111111';
+// Integration.id is a cuid — the DTO must accept cuids (a prior @IsUUID()
+// made every channel-scoped rule impossible to create).
+const CUID = 'clxkq2z9w0000abcdmn123456';
 
 describe('CreateAlertRuleDto (R2.5)', () => {
   const meta = { type: 'body' as const, metatype: CreateAlertRuleDto };
@@ -34,16 +36,16 @@ describe('CreateAlertRuleDto (R2.5)', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects a non-uuid integrationId (@IsUUID)', async () => {
+  it('rejects an over-long integrationId (@Length)', async () => {
     await expect(
-      pipe.transform({ ...base, integrationId: 'not-a-uuid' }, meta),
+      pipe.transform({ ...base, integrationId: 'x'.repeat(65) }, meta),
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('accepts a valid uuid integrationId', async () => {
+  it('accepts a cuid integrationId (Integration ids are cuids, not uuids)', async () => {
     await expect(
-      pipe.transform({ ...base, integrationId: UUID }, meta),
-    ).resolves.toMatchObject({ integrationId: UUID });
+      pipe.transform({ ...base, integrationId: CUID }, meta),
+    ).resolves.toMatchObject({ integrationId: CUID });
   });
 });
 
@@ -56,10 +58,16 @@ describe('UpdateAlertRuleDto (R2.5)', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects a non-uuid integrationId', async () => {
+  it('rejects an empty-string integrationId (@Length)', async () => {
     await expect(
-      pipe.transform({ integrationId: 'nope' }, meta),
+      pipe.transform({ integrationId: '' }, meta),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('accepts a cuid integrationId', async () => {
+    await expect(
+      pipe.transform({ integrationId: CUID }, meta),
+    ).resolves.toMatchObject({ integrationId: CUID });
   });
 
   it('accepts an empty body (all optional)', async () => {
@@ -80,5 +88,11 @@ describe('AnalyticsShareDto (R2.6)', () => {
     await expect(
       pipe.transform({ rangePreset }, meta),
     ).resolves.toMatchObject({ rangePreset });
+  });
+
+  it('rejects an oversized integrations array (@ArrayMaxSize)', async () => {
+    await expect(
+      pipe.transform({ integrations: Array.from({ length: 51 }, (_, i) => `id${i}`) }, meta),
+    ).rejects.toThrow(BadRequestException);
   });
 });

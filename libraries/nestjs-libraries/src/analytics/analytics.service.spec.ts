@@ -812,6 +812,21 @@ describe('AnalyticsService', () => {
       integration: { id: intId, name: 'Channel', providerIdentifier: 'insta', picture: null },
     });
 
+    it('uses the LAST snapshot level per (post, metric) — never the sum of rows', async () => {
+      // Post-snapshot values are cumulative lifetime levels; a post snapshotted
+      // daily must show its latest level (150), not the row sum (250) which
+      // inflates by snapshot-day count and biases sort toward older posts.
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getPostSnapshots as any).mockResolvedValue([
+        { postId: 'p1', metric: 'likes', value: 100, date: d(2024, 1, 1) },
+        { postId: 'p1', metric: 'likes', value: 150, date: d(2024, 1, 2) },
+      ]);
+      (analyticsRepository.findPosts as any).mockResolvedValue([mkPost('p1')]);
+      (analyticsRepository.countPosts as any).mockResolvedValue(1);
+      const r = await service.getPosts(mockOrg as any, from, to, ['i1']);
+      expect(r.posts[0].metrics).toEqual({ likes: 150 });
+    });
+
     it('returns paginated posts with default page/limit', async () => {
       (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
       (analyticsRepository.getPostSnapshots as any).mockResolvedValue([

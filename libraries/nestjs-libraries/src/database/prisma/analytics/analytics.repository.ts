@@ -1,5 +1,6 @@
 import { PrismaRepository, PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class AnalyticsRepository {
@@ -73,23 +74,38 @@ export class AnalyticsRepository {
   // getPostSnapshotsByCampaigns. This is the per-post baseline the level-
   // differencing aggregation subtracts so an in-window total is a true window
   // delta, not the cumulative running total. Missing (post, metric) ⇒ baseline 0.
-  getLatestPostSnapshotsBeforeByCampaigns(
+  async getLatestPostSnapshotsBeforeByCampaigns(
     orgId: string,
     campaignIds: string[],
     before: Date,
     integrationIds?: string[],
-  ) {
-    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
-      where: {
-        organizationId: orgId,
-        date: { lt: before },
-        ...(integrationIds ? { integrationId: { in: integrationIds } } : {}),
-        post: { campaignId: { in: campaignIds }, deletedAt: null },
-      },
-      orderBy: [{ postId: 'asc' }, { metric: 'asc' }, { date: 'desc' }],
-      distinct: ['postId', 'metric'],
-      select: { postId: true, metric: true, value: true },
-    });
+  ): Promise<{ postId: string; metric: string; value: number }[]> {
+    // Raw DISTINCT ON, not Prisma `distinct`: without the nativeDistinct
+    // preview feature Prisma dedups findMany results IN THE CLIENT, shipping
+    // every pre-window row (unbounded — rollup keeps post rows forever) from
+    // the DB on each campaign-scoped request. DISTINCT ON pushes the
+    // latest-per-(post, metric) selection into Postgres.
+    if (campaignIds.length === 0) return [];
+    if (integrationIds && integrationIds.length === 0) return [];
+    return this._prisma.$queryRaw<
+      Array<{ postId: string; metric: string; value: number }>
+    >`
+      SELECT DISTINCT ON (pas."postId", pas."metric")
+        pas."postId", pas."metric", pas."value"
+      FROM "PostAnalyticsSnapshot" pas
+      JOIN "Post" p ON p."id" = pas."postId"
+      WHERE
+        pas."organizationId" = ${orgId}
+        AND pas."date" < ${before}
+        AND p."campaignId" IN (${Prisma.join(campaignIds)})
+        AND p."deletedAt" IS NULL
+        ${
+          integrationIds
+            ? Prisma.sql`AND pas."integrationId" IN (${Prisma.join(integrationIds)})`
+            : Prisma.empty
+        }
+      ORDER BY pas."postId", pas."metric", pas."date" DESC
+    `;
   }
 
   // Campaign-scoped post list (1.1) — mirrors findPosts but scopes by
@@ -296,7 +312,9 @@ export class AnalyticsRepository {
         post: { select: { content: true, publishDate: true } },
       },
       orderBy: { value: 'desc' },
-      take: 10,
+      // Rows, not posts: a post snapshotted daily appears once per day. Fetch a
+      // deeper page so consumers can dedup to distinct posts and still fill 10.
+      take: 50,
     });
   }
 
@@ -384,7 +402,8 @@ export class AnalyticsRepository {
       },
       include: { post: { select: { content: true, publishDate: true } } },
       orderBy: { value: 'desc' },
-      take: 10,
+      // Rows, not posts — deeper page for per-post dedup (see above).
+      take: 50,
     });
   }
 
@@ -493,6 +512,8 @@ export class AnalyticsRepository {
         organizationId: orgId,
         releaseId: { not: null },
         publishDate: { gte: since },
+        // Soft-deleted posts must not keep being polled for provider metrics.
+        deletedAt: null,
       },
       include: { integration: true },
       orderBy: { id: 'asc' },
@@ -648,13 +669,16 @@ export class AnalyticsRepository {
   // Cooldown check (4.3): most recent anomaly for this (integration, metric,
   // direction) on/after `sinceDate` — null means "outside cooldown, may notify".
   getRecentAnomaly(
+    orgId: string,
     integrationId: string,
     metric: string,
     direction: string,
     sinceDate: Date,
   ) {
     return this._analyticsAnomaly.model.analyticsAnomaly.findFirst({
-      where: { integrationId, metric, direction, date: { gte: sinceDate } },
+      // organizationId is defense-in-depth (integration ids are globally-unique
+      // PKs), kept for consistency with every sibling org-scoped read.
+      where: { organizationId: orgId, integrationId, metric, direction, date: { gte: sinceDate } },
       orderBy: { date: 'desc' },
     });
   }

@@ -30,9 +30,11 @@ vi.mock('@gitroom/frontend/components/launches/helpers/use.integration.list', ()
 }));
 
 vi.mock('./views/overview.tab', () => ({
-  OverviewTab: ({ loading, error }: any) => (
+  OverviewTab: ({ loading, error, onSelectDate }: any) => (
     <div data-testid="overview-tab" data-loading={loading} data-error={!!error}>
       {loading ? 'Loading overview...' : error ? 'Overview error' : 'Overview Content'}
+      <button onClick={() => onSelectDate?.('2024-01-05')}>select-date</button>
+      <button onClick={() => onSelectDate?.('')}>clear-date</button>
     </div>
   ),
 }));
@@ -80,7 +82,27 @@ vi.mock('./post-analytics.drawer', () => ({
 const mockUseOverview = vi.mocked(useOverview);
 const mockUsePosts = vi.mocked(usePosts);
 
+// Non-empty by default — the dashboard now hides the overview/channels tab
+// content behind its own empty block when the org has no data at all (F9).
 const overviewData: OverviewResponse = {
+  range: { from: '2024-01-01', to: '2024-01-07' },
+  kpis: [
+    {
+      metric: 'impressions',
+      label: 'Impressions',
+      format: 'number',
+      total: 100,
+      previousTotal: 80,
+      percentageChange: 25,
+      sparkline: [],
+    },
+  ],
+  series: {},
+  byChannel: [],
+  breakdown: { byPlatform: [] },
+};
+
+const emptyOverviewData: OverviewResponse = {
   range: { from: '2024-01-01', to: '2024-01-07' },
   kpis: [],
   series: {},
@@ -219,6 +241,67 @@ describe('AnalyticsDashboard', () => {
 
     const call = mockUseOverview.mock.calls[mockUseOverview.mock.calls.length - 1][0] as any;
     expect(call.campaigns).toEqual(['c1', 'c2']);
+  });
+
+  it('passes the explicit channel filter through unchanged when campaigns are also selected (F4a)', () => {
+    // Previously a client-side campaign∩channel intersection could collapse to
+    // [] (sent as "no restriction" to the backend); the explicit selection must
+    // ride into the fetch untouched — the server intersects campaign posts itself.
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&integrations=i1&campaigns=c1'
+    );
+
+    render(<AnalyticsDashboard />);
+
+    const call = mockUseOverview.mock.calls[mockUseOverview.mock.calls.length - 1][0] as any;
+    expect(call.integrations).toEqual(['i1']);
+    expect(call.campaigns).toEqual(['c1']);
+  });
+
+  it('defaults the metric to the first KPI when a chart point is clicked without one (F8)', () => {
+    render(<AnalyticsDashboard />);
+    fireEvent.click(screen.getByText('select-date'));
+    expect(mockReplace).toHaveBeenCalled();
+    const url = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(url).toContain('focusDate=2024-01-05');
+    expect(url).toContain('metric=impressions');
+  });
+
+  it('keeps an existing drill metric when a chart point is clicked (F8)', () => {
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&metric=likes'
+    );
+    render(<AnalyticsDashboard />);
+    fireEvent.click(screen.getByText('select-date'));
+    const url = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(url).toContain('metric=likes');
+  });
+
+  it('clears both focusDate and metric when the day drawer closes (F8)', () => {
+    mockSearchParams = new URLSearchParams(
+      'from=2024-01-01&to=2024-01-07&focusDate=2024-01-05&metric=impressions'
+    );
+    render(<AnalyticsDashboard />);
+    fireEvent.click(screen.getByText('clear-date'));
+    const url = mockReplace.mock.calls[mockReplace.mock.calls.length - 1][0] as string;
+    expect(url).not.toContain('focusDate');
+    expect(url).not.toContain('metric');
+  });
+
+  it('shows only the dashboard-level empty block for an empty org (F9)', () => {
+    mockUseOverview.mockReturnValue({
+      data: emptyOverviewData,
+      isLoading: false,
+      error: undefined,
+      isValidating: false,
+      mutate: vi.fn(),
+    } as any);
+
+    render(<AnalyticsDashboard />);
+
+    expect(screen.getByText('No analytics data yet')).toBeTruthy();
+    // The tab content is suppressed — no second empty state beneath the block.
+    expect(screen.queryByTestId('overview-tab')).toBeNull();
   });
 
   it('shows the campaign-scope note when the overview reports campaign-posts scope (1.6)', () => {

@@ -17,11 +17,14 @@ seeded to every role). Every **mutating** route — `POST /analytics/v2/share`,
 `POST/PUT/DELETE /analytics/v2/watchlist*` routes — requires the
 `analytics:update` RBAC permission (`@RequirePermission('analytics','update')`),
 so a seeded viewer/member/editor cannot, e.g., mint the org-wide public share
-link. `POST /analytics/v2/narrate` is a read surface gated on AI billing
+link. `GET /analytics/v2/share` carries the same gate: it returns the live
+token (= the public link), so reading it is part of managing sharing.
+`POST /analytics/v2/narrate` is a read surface gated on AI billing
 (`@CheckPolicies([Create, AI])` + a per-request `BudgetService` check), like the
 CopilotKit chat surface. Alert-rule bodies are bounded: `threshold` ∈
-`[0, 1_000_000_000]`, `integrationId` must be a UUID **and** belong to the org
-(else 400), and share `rangePreset` ∈ `{7d, 30d, 90d}`.
+`[0, 1_000_000_000]`, `integrationId` is a length-bounded string (Integration
+ids are **cuids**, not uuids) that must belong to the org (else 400), and share
+`rangePreset` ∈ `{7d, 30d, 90d}` with `integrations` capped at 50 ids.
 
 Most date-range endpoints also accept an optional `campaigns` param — a
 comma-separated list of campaign UUIDs — to scope aggregation to those campaigns'
@@ -191,10 +194,17 @@ crashing the sweep.
 
 ## Date validation
 
-All date-range endpoints validate:
+All date-range endpoints validate (shared helpers in
+`libraries/nestjs-libraries/src/analytics/date-range.validation.ts`):
 - `from` and `to` are required (400 if missing).
 - Both must be valid dates parsable by dayjs (400 if invalid).
 - `to` must be >= `from` (400 if `to` is before `from`).
+- The window is capped at **400 days** (400 if exceeded) — aggregation iterates
+  day-by-day, so an unbounded range would be a single-request CPU sink. The cap
+  applies to every date route: the v2 overview/channel/posts/metric/export/
+  content-insights routes, `GET /watchlist/:id/series` (explicit invalid dates
+  now 400 instead of being silently ignored), the campaign-analytics routes,
+  and the public-API overview.
 - `integrations` is comma-separated, parsed with `parseIntegrations()`.
 - `campaigns` is comma-separated, parsed with `parseCampaigns()` (each id validated as a UUID).
 - `limit` is capped at 100.
@@ -281,9 +291,12 @@ the public API (`public.integrations.controller.ts`, API-key authenticated):
 | GET | `/analytics/anomalies` | Detected anomalies for the org |
 | GET | `/analytics/:integration` | Legacy single-channel analytics |
 
-`GET /analytics/overview`, `/analytics/campaign/:id`, and `/analytics/anomalies`
-are registered **above** the catch-all `GET /analytics/:integration` so Express
-route order resolves the static paths first — previously `overview` fell through
+`GET /analytics/overview` validates `from`/`to` and enforces the same 400-day
+window cap as the authed v2 routes (it was previously unreachable, so this is
+new surface, not a contract change). It, `/analytics/campaign/:id`, and
+`/analytics/anomalies` are registered **above** the catch-all
+`GET /analytics/:integration` so Express route order resolves the static paths
+first — previously `overview` fell through
 to the `:integration` handler (`integration='overview'` → 500), so its throttle
 and docs were dead. The legacy `:integration` response shape is preserved for
 n8n/Zapier compatibility.

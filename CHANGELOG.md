@@ -171,6 +171,17 @@
   `/share/analytics/[token]` and `/share/campaign/[token]` pages render again (public root layout +
   proxy exemption + backend `baseUrl`), the alerts "View top post" link opens the post drawer, and
   the anomaly notification deep link carries the URI-encoded metric **key** (not the display label).
+  Follow-up review fixes on the same branch: alert-rule `integrationId` accepts cuids (a `@IsUUID()`
+  check made every channel-scoped rule impossible); every date route — including the newly reachable
+  public `GET /analytics/overview` — validates `from`/`to` and caps the window at 400 days; the Posts
+  tab / recommendations / weekly digest read each post's **latest level** instead of summing snapshot
+  rows (and top-post lists dedup to one entry per post); anomaly detection excludes today's partial
+  day (no more false "drop" alerts at the 02:00 sweep) and evaluates only complete days; the campaign
+  baseline read runs as a DB-side `DISTINCT ON` (Prisma's client-side `distinct` shipped the full
+  pre-window history per request); `AnalyticsAlertRule.integrationId` gains a cascade FK (migration
+  `20260705100000_alert_rule_integration_fk`); `GET /analytics/v2/share` is RBAC-gated like
+  mint/disable; campaign-scoped derived ratios use level-differenced totals; the watchlist growth
+  overlay aligns both series on a shared date axis.
 - **Designer safe-zone insets on story formats.** `getSafeZoneInset` treated a preset's `safeZones`
   (unsafe overlay rects, e.g. the IG story top bar / bottom UI strip) as if they were the safe area,
   degenerating to a zero-size box on `ig-story`/`ig-reel`/`fb-story`/`tiktok` and clamping reflowed

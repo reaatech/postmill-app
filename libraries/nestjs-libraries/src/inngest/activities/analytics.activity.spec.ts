@@ -1554,6 +1554,52 @@ describe('AnalyticsActivity', () => {
       expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
     });
 
+    it("excludes today's PARTIAL day from detection (no false drop at the 02:00 sweep)", async () => {
+      // 28 full days at 500/day, then today's ~2-hour partial (40). Without the
+      // today-filter this fires a false 'drop'; with it, yesterday (500, normal)
+      // is the candidate and nothing fires.
+      const rows = Array.from({ length: 28 }, (_, i) => ({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 500,
+        date: dayjs().subtract(28 - i, 'day').startOf('day').toDate(),
+      }));
+      rows.push({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 40,
+        date: dayjs().startOf('day').toDate(), // today — partial
+      });
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(rows);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).not.toHaveBeenCalled();
+      expect(notificationService.notifyAnalyticsAnomaly).not.toHaveBeenCalled();
+    });
+
+    it('still fires on a genuine anomaly dated yesterday', async () => {
+      const rows = Array.from({ length: 28 }, (_, i) => ({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 100,
+        date: dayjs().subtract(29 - i, 'day').startOf('day').toDate(),
+      }));
+      rows.push({
+        integrationId: 'i1',
+        metric: 'impressions',
+        value: 900,
+        date: dayjs().subtract(1, 'day').startOf('day').toDate(), // yesterday — complete
+      });
+      analyticsRepository.getSnapshotsForOrgSince.mockResolvedValue(rows);
+
+      await activity.detectAnomalies('org-1');
+
+      expect(analyticsRepository.createAnomalies).toHaveBeenCalledTimes(1);
+      const persisted = analyticsRepository.createAnomalies.mock.calls[0][0];
+      expect(persisted[0].direction).toBe('spike');
+    });
+
     // ── 7.3: user-defined alert rules ──
 
     // A flat, non-anomalous followers series (no auto-anomaly) so only the rule

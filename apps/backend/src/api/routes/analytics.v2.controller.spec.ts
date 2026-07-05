@@ -642,6 +642,9 @@ describe('AuthZ decorator metadata (R2.1 / R2.2)', () => {
     'deleteAlertRule',
     'mintShare',
     'disableShare',
+    // getShare returns the live token (= the public link) — reading it is part
+    // of managing sharing, gated like mint/disable.
+    'getShare',
     'addWatchlistEntry',
     'updateWatchlistEntry',
     'deleteWatchlistEntry',
@@ -663,7 +666,7 @@ describe('AuthZ decorator metadata (R2.1 / R2.2)', () => {
 
   // GET routes stay on the org-scope default (no RequirePermission).
   it('read routes are not RBAC-gated', () => {
-    for (const m of ['getOverview', 'getChannel', 'listAnomalies', 'listAlertRules', 'getShare', 'listWatchlist']) {
+    for (const m of ['getOverview', 'getChannel', 'listAnomalies', 'listAlertRules', 'listWatchlist']) {
       expect(requirePerm(m)).toBeUndefined();
     }
   });

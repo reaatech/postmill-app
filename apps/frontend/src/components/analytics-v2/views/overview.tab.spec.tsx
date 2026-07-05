@@ -210,4 +210,46 @@ describe('OverviewTab', () => {
     closeBtn.click();
     expect(onSelectMetric).toHaveBeenCalledWith('');
   });
+
+  it('suppresses the metric panel while the day drawer is open (F8)', () => {
+    // A chart point click sets focusDate + a defaulted metric — only the day
+    // drawer may open, not two stacked drawers.
+    mockUseMetricDrill.mockReturnValue({
+      data: {
+        metric: 'impressions',
+        label: 'Impressions',
+        format: 'count',
+        total: 50000,
+        previousTotal: 40000,
+        percentageChange: 25,
+        series: [],
+        byChannel: [],
+        topPosts: [],
+        movers: { up: [], down: [] },
+      },
+    });
+    mockUseDayDrill.mockReturnValue({
+      data: {
+        date: '2024-01-02',
+        metric: 'impressions',
+        value: 8000,
+        byChannel: [],
+        posts: [],
+      },
+    });
+    render(
+      <OverviewTab
+        {...baseProps}
+        loading={false}
+        data={sampleData}
+        selectedMetric="impressions"
+        selectedDate="2024-01-02"
+        onSelectDate={vi.fn()}
+      />
+    );
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(1);
+    // The one open drawer is the day panel (aria-label = the day's metric).
+    expect(dialogs[0].getAttribute('aria-label')).toBe('impressions');
+  });
 });

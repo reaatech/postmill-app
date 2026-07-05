@@ -263,6 +263,25 @@ export class AnalyticsOverviewService {
             metric
           )
         : aggregateSnapshots(rows, metric);
+    // Level-aware derived ratios: under campaign scope the flow-sum inside
+    // computeDerivedMetrics would inflate numerator and denominator by each
+    // metric's snapshot-day count (which skews the ratio when coverage differs
+    // per metric). Compute from the same level-differenced totals the KPIs use;
+    // followers is a channel-level metric absent under campaign scope, so
+    // reachPerFollower is null there.
+    const derivedOf = (rows: SnapshotLike[]) => {
+      if (!useLevel) return computeDerivedMetrics(rows);
+      const impressions = totalOf(rows, 'impressions', curBaselines);
+      const likes = totalOf(rows, 'likes', curBaselines);
+      const comments = totalOf(rows, 'comments', curBaselines);
+      const shares = totalOf(rows, 'shares', curBaselines);
+      return {
+        engagementRate:
+          impressions > 0 ? (likes + comments + shares) / impressions : null,
+        reachPerFollower: null,
+      };
+    };
+
     const sparkOf = (rows: SnapshotLike[], metric: string) => {
       if (!useLevel) return buildSparkline(rows, metric, fromDate, toDate);
       const dayMap = buildPostSnapshotSeries(
@@ -342,7 +361,7 @@ export class AnalyticsOverviewService {
         kpis: channelKpis,
         // 6.2 — per-channel engagement rate / reach-per-follower so a small
         // channel can be compared fairly against a large one.
-        derived: computeDerivedMetrics(channelSnapshots),
+        derived: derivedOf(channelSnapshots),
       };
     });
 
@@ -454,7 +473,7 @@ export class AnalyticsOverviewService {
         ),
       },
       // 6.2 — org-wide derived ratios over all channels' snapshots.
-      derived: computeDerivedMetrics(snapshots),
+      derived: derivedOf(snapshots),
       ...(scope ? { scope } : {}),
     };
 
@@ -634,11 +653,14 @@ export class AnalyticsOverviewService {
         )
       : await this.getPostSnapshots(org.id, ids, fromDate, toDate);
 
+    // Post-snapshot values are cumulative lifetime LEVELS (R1.2), so a post's
+    // per-metric number is its LAST level in the window — never the sum of its
+    // snapshot rows (which inflates by the number of snapshot days and biases
+    // sort toward older posts). Rows arrive date-ascending, so last write wins.
     const postMetrics: Record<string, Record<string, number>> = {};
     for (const snap of postSnapshots) {
       if (!postMetrics[snap.postId]) postMetrics[snap.postId] = {};
-      postMetrics[snap.postId][snap.metric] =
-        (postMetrics[snap.postId][snap.metric] || 0) + snap.value;
+      postMetrics[snap.postId][snap.metric] = snap.value;
     }
 
     const p = Math.max(1, page || 1);

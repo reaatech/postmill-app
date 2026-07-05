@@ -293,6 +293,7 @@ model Integration {
   analyticsSnapshots        AnalyticsSnapshot[]
   postAnalyticsSnapshots    PostAnalyticsSnapshot[]
   analyticsAnomalies        AnalyticsAnomaly[]
+  analyticsAlertRules       AnalyticsAlertRule[]
   socialComments            SocialComment[]
 
   @@unique([organizationId, internalId])
@@ -374,6 +375,10 @@ model AnalyticsAlertRule {
   id              String   @id @default(uuid())
   organizationId  String
   integrationId   String?  // null = any channel
+  // Cascade like AnalyticsAnomaly: deleting a channel deletes its scoped rules
+  // (a dangling rule would silently never fire; SetNull would silently widen
+  // the rule to every channel).
+  integration     Integration? @relation(fields: [integrationId], references: [id], onDelete: Cascade)
   metric          String
   comparator      String   // 'gte' | 'lte' | 'change_pct'
   threshold       Float

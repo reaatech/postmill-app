@@ -33,7 +33,8 @@ import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/camp
 import {
   validateDateRange,
   validateToGteFrom,
-} from '@gitroom/backend/api/routes/analytics.v2.controller';
+  validateWindowCap,
+} from '@gitroom/nestjs-libraries/analytics/date-range.validation';
 import dayjs from 'dayjs';
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -667,9 +668,7 @@ export class PublicIntegrationsController {
     // cap it (public route) so a large range can't blow up query cost.
     validateDateRange(from, to);
     validateToGteFrom(from, to);
-    if (dayjs(to).diff(dayjs(from), 'day') > 400) {
-      throw new HttpException({ msg: 'date range must not exceed 400 days' }, 400);
-    }
+    validateWindowCap(from, to);
 
     const overview = await this._analyticsService.getOverview(
       org,
@@ -719,6 +718,12 @@ export class PublicIntegrationsController {
     @Query('compare') compare: string
   ) {
     Sentry.metrics.count('public_api-request', 1);
+    // Same validation + window cap as the authed v2 date routes: garbage dates
+    // must 400 (not reach Prisma), and an unbounded range must not drive the
+    // day-by-day aggregation loops on an API-key request.
+    validateDateRange(from, to);
+    validateToGteFrom(from, to);
+    validateWindowCap(from, to);
     return this._analyticsService.getOverview(
       org,
       from,
