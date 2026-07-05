@@ -1,3 +1,5 @@
+import * as net from 'net';
+
 import { metadata as providerMetadata } from './metadata';
 import {
   ProviderModule,
@@ -127,8 +129,32 @@ export class CustomProxyAdapter implements VpnCapability {
     };
   }
 
-  async healthCheck(): Promise<{ ok: boolean; error?: string }> {
-    return { ok: true };
+  // Unlike the consumer-VPN adapters (fixed catalog, key-only), the custom proxy points
+  // at an arbitrary user-supplied host/port. A cheap TCP connect at save time catches a
+  // typo now instead of surfacing it as a publish-time posting error.
+  async healthCheck(config: Record<string, string> = {}): Promise<{ ok: boolean; error?: string }> {
+    const host = config.host?.trim();
+    const port = Number(config.port);
+    if (!host || !Number.isInteger(port) || port < 1 || port > 65535) {
+      return { ok: false, error: 'A valid proxy host and port are required.' };
+    }
+
+    return new Promise((resolve) => {
+      const socket = net.createConnection({ host, port });
+      const done = (result: { ok: boolean; error?: string }) => {
+        clearTimeout(timer);
+        socket.destroy();
+        resolve(result);
+      };
+      const timer = setTimeout(
+        () => done({ ok: false, error: `Could not reach proxy at ${host}:${port} (timed out).` }),
+        5000
+      );
+      socket.once('connect', () => done({ ok: true }));
+      socket.once('error', (err: Error) =>
+        done({ ok: false, error: `Could not reach proxy at ${host}:${port}: ${err.message}` })
+      );
+    });
   }
 }
 

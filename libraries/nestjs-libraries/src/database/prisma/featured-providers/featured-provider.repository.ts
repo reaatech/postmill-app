@@ -1,4 +1,4 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 
 /**
@@ -10,6 +10,7 @@ import { Injectable } from '@nestjs/common';
 export class FeaturedProviderRepository {
   constructor(
     private _featuredProvider: PrismaRepository<'featuredProvider'>,
+    private _transaction: PrismaTransaction,
   ) {}
 
   list(domain?: string) {
@@ -33,14 +34,23 @@ export class FeaturedProviderRepository {
     });
   }
 
-  /** Bulk set sortOrder for a domain's featured providers (upsert each). */
+  /**
+   * Bulk set sortOrder for a domain's featured providers. 6.1: run the upserts
+   * in one `$transaction` so ordering is atomic — a mid-loop failure no longer
+   * leaves a partially-reordered set, and it is a single round-trip.
+   */
   async reorder(
     domain: string,
     entries: Array<{ providerId: string; sortOrder: number }>,
   ) {
-    for (const { providerId, sortOrder } of entries) {
-      await this.upsert(domain, providerId, sortOrder);
-    }
+    const ops = entries.map(({ providerId, sortOrder }) =>
+      this._featuredProvider.model.featuredProvider.upsert({
+        where: { domain_providerId: { domain, providerId } },
+        create: { domain, providerId, sortOrder },
+        update: { sortOrder },
+      }),
+    );
+    await this._transaction.model.$transaction(ops);
     return this.list(domain);
   }
 }

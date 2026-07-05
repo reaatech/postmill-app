@@ -1,5 +1,5 @@
 import { HttpException, Injectable, Logger } from '@nestjs/common';
-import { StorageProviderType } from '@prisma/client';
+import { Prisma, StorageProviderType } from '@prisma/client';
 import { StorageRepository } from './storage.repository';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
@@ -157,13 +157,14 @@ export class StorageService {
       }
     }
 
-    const version =
-      data.version ??
-      this._resolution.latestActiveVersion(
-        'storage',
-        this.#storageTypeToKernelId(data.type)
-      ) ??
-      'v1';
+    // Route the pinned version through the lifecycle gate (1.4): a supplied
+    // version is validated (deprecated/retired/unknown rejected), and an absent
+    // version resolves to latest-active.
+    const version = this._resolution.resolveWriteVersion(
+      'storage',
+      this.#storageTypeToKernelId(data.type),
+      data.version
+    );
 
     const created = await this._storageRepository.create({
       organizationId: orgId,
@@ -216,7 +217,7 @@ export class StorageService {
     },
     userId?: string
   ) {
-    await this.#getOrgScopedConfig(id, orgId);
+    const config = await this.#getOrgScopedConfig(id, orgId);
 
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
@@ -224,16 +225,67 @@ export class StorageService {
       updateData.credentials = this._encryptionService.encrypt(
         JSON.stringify(data.credentials)
       );
+      // 3.5: recompute the account fingerprint on credential rotation. Only
+      // createConfig computed it, so a rotated credential kept the stale
+      // fingerprint — blocking re-adding the old account and failing to dedupe
+      // the new one. Uses the stored row's type (updateConfig can't change type).
+      updateData.accountFingerprint = this.#computeFingerprint(
+        config.type,
+        data.credentials
+      );
+      // 3.6(a): rotating to another config's credentials collides on the
+      // @@unique([organizationId, accountFingerprint]) index. Pre-check
+      // (excluding this row) and map to the same friendly 409 createConfig
+      // returns, instead of a raw P2002 → 500.
+      if (updateData.accountFingerprint) {
+        const clash = await this._storageRepository.findByFingerprint(
+          orgId,
+          updateData.accountFingerprint
+        );
+        if (clash && clash.id !== id) {
+          throw new HttpException(
+            'A storage provider with these credentials is already configured for this organization',
+            409
+          );
+        }
+      }
     }
     if (data.region !== undefined) updateData.region = data.region;
     if (data.bucket !== undefined) updateData.bucket = data.bucket;
     if (data.endpoint !== undefined) updateData.endpoint = data.endpoint;
     if (data.publicUrl !== undefined) updateData.publicUrl = data.publicUrl;
     if (data.quotaBytes !== undefined) updateData.quotaBytes = data.quotaBytes;
-    if (data.version !== undefined) updateData.version = data.version;
+    if (data.version !== undefined) {
+      // 3.6(b): route the version through the lifecycle gate. This is an
+      // in-place update, so pass the row's existing version as `currentVersion`
+      // — a deprecated-pinned config can still be updated in place (only a write
+      // that would newly pin a deprecated/retired/preview version is rejected).
+      updateData.version = this._resolution.resolveWriteVersion(
+        'storage',
+        this.#storageTypeToKernelId(config.type),
+        data.version,
+        config.version ? { currentVersion: config.version } : undefined
+      );
+    }
 
-    const updated = await this._storageRepository.update(id, updateData);
-    this.#audit('update', orgId, updated, userId);
+    let updated;
+    try {
+      updated = await this._storageRepository.update(id, updateData);
+    } catch (err) {
+      // Belt-and-suspenders for a TOCTOU race on the fingerprint pre-check.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new HttpException(
+          'A storage provider with these credentials is already configured for this organization',
+          409
+        );
+      }
+      throw err;
+    }
+    // 6.5: await the audit write so the row is not dropped on process exit.
+    await this.#audit('update', orgId, updated, userId);
     return this.#sanitize(updated);
   }
 
@@ -482,7 +534,8 @@ export class StorageService {
     }
 
     const done = page.length < limit;
-    this.#audit('migrate', orgId, source);
+    // 6.5: await the audit write so the row is not dropped on process exit.
+    await this.#audit('migrate', orgId, source);
     return {
       migrated,
       failed,

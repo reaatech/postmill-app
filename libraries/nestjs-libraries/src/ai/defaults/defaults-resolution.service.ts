@@ -5,14 +5,14 @@ import { OrgAiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { RuntimeContextFactory } from '@gitroom/nestjs-libraries/providers/runtime-context.factory';
-import { ProviderKernel, ProviderMetadata } from '@gitroom/provider-kernel';
+import { ProviderKernel, ProviderMetadata, AiCapability } from '@gitroom/provider-kernel';
+import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import {
   AI_MODEL_CATEGORIES,
   AI_MEDIA_CATEGORIES,
   AiMediaCategory,
   AiModelCategory,
 } from './default-categories';
-import { MediaOperation } from '@gitroom/nestjs-libraries/ai/governance/media-operation.types';
 
 export interface ResolvedDefault {
   providerId: string;
@@ -236,25 +236,34 @@ export class DefaultsResolutionService {
       const credentials = await this._credentialsForCandidate(domain, candidate, orgId);
       const mod = this._kernel.get(domain, candidate.providerId, candidate.version);
       const ctx = this._runtimeContextFactory.build({ credentials, orgId });
-      const capability: any = mod?.create(ctx);
+      const capability = mod?.create(ctx);
 
-      if (!capability?.listModels) {
-        // No live catalog: fall back to the committed static model list (direct
-        // providers and non-live hubs ship these in metadata.ts).
-        return isMediaCandidate
-          ? this._staticMediaModels(candidate, category)
-          : undefined;
+      // 1.5: the two domains' listModels contracts differ — media takes
+      // (operation, MediaCredentialOptions), AI takes the plain creds map. Type
+      // each branch so the compiler enforces the signature (the previous
+      // `any` cast passed the runtime CONTEXT where AI expected creds → apiKey
+      // was undefined → placeholder catalog → wrong/dropped stored default).
+      if (isMediaCandidate) {
+        const media = capability as MediaProviderAdapter | undefined;
+        if (!media?.listModels) {
+          // No live catalog: fall back to the committed static model list.
+          return this._staticMediaModels(candidate, category);
+        }
+        const live = await media.listModels(this._categoryToOperation(category), {
+          credentials,
+        });
+        // A transient empty live catalog should not hide a static fallback.
+        if (!live || live.length === 0) {
+          return this._staticMediaModels(candidate, category) || live;
+        }
+        return live;
       }
 
-      const live = isMediaCandidate
-        ? await capability.listModels(this._categoryToOperation(category), ctx)
-        : await capability.listModels(ctx);
-
-      // A transient empty live catalog should not hide a static fallback.
-      if (!live || live.length === 0) {
-        return (isMediaCandidate && this._staticMediaModels(candidate, category)) || live;
+      const ai = capability as Pick<AiCapability, 'listModels'> | undefined;
+      if (!ai?.listModels) {
+        return undefined;
       }
-      return live;
+      return ai.listModels(credentials);
     } catch (err) {
       this._logger.warn(
         `listModels failed for ${candidate.providerId}@${candidate.version} category ${category}: ${(err as Error).message}`,
@@ -280,7 +289,7 @@ export class DefaultsResolutionService {
     }
   }
 
-  private _categoryToOperation(category: string): MediaOperation {
+  private _categoryToOperation(category: string): 'image' | 'video' | 'audio' {
     // Simplified mapping for listModels calls. The full mapping lives in
     // default-categories.ts, but listModels only understands the kernel's
     // MediaOperation union ('image' | 'video' | 'audio').

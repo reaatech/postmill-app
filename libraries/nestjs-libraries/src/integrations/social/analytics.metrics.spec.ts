@@ -41,7 +41,7 @@ describe('METRIC_REGISTRY', () => {
 });
 
 describe('PROVIDER_METRIC_MAP', () => {
-  const providers = ['facebook', 'instagram', 'instagram-standalone', 'linkedin-page', 'tiktok', 'youtube', 'gmb', 'pinterest', 'threads', 'x', 'bluesky', 'mastodon', 'mastodon-custom', 'reddit', 'telegram', 'discord'];
+  const providers = ['facebook', 'instagram', 'instagram-standalone', 'linkedin-page', 'tiktok', 'youtube', 'gmb', 'pinterest', 'threads', 'x', 'bluesky', 'mastodon', 'reddit', 'telegram', 'discord'];
 
   it('covers all expected providers', () => {
     for (const p of providers) {
@@ -202,9 +202,6 @@ describe('normalizeMetric', () => {
     expect(normalizeMetric('mastodon', 'Favourites')).toBe('favorites');
     expect(normalizeMetric('mastodon', 'Reblogs')).toBe('reposts');
     expect(normalizeMetric('mastodon', 'Replies')).toBe('replies');
-    // mastodon-custom inherits the same adapter methods → same labels.
-    expect(normalizeMetric('mastodon-custom', 'Followers')).toBe('followers');
-    expect(normalizeMetric('mastodon-custom', 'Favourites')).toBe('favorites');
   });
 
   it('resolves reddit labels correctly (7.1)', () => {

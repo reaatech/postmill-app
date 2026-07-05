@@ -4,7 +4,6 @@ import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encrypti
 import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-config.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
-import { randomBytes } from 'crypto';
 
 // Optional VPN egress selection stored (as JSON) on the channel config. Not a
 // secret — just which enabled org VPN provider×region the channel routes through.
@@ -71,14 +70,20 @@ export class OrgProviderConfigService {
     }
   }
 
-  // Pin a new or existing config to the latest active social-provider version unless
-  // the caller supplied an explicit version or a version is already pinned.
+  // 1.1: pin a new or existing config to a lifecycle-validated version. The
+  // client-supplied (or already-pinned) version is validated through
+  // resolveWriteVersion — a deprecated version rejects the write, retired is 410,
+  // unknown is 400 — replacing the unvalidated `latestActive ?? 'v1'`.
   #resolveVersion(identifier: string, explicitVersion?: string | null, existingVersion?: string | null): string {
-    return (
-      explicitVersion ||
-      existingVersion ||
-      this._resolution.latestActiveVersion('social', identifier) ||
-      'v1'
+    // 1.4: on an update, `existingVersion` is the row's current pin — pass it as
+    // `currentVersion` so an in-place edit (disable / credential rotation) of a
+    // deprecated-pinned row is allowed; only a create or an explicit change to a
+    // deprecated/retired version is rejected.
+    return this._resolution.resolveWriteVersion(
+      'social',
+      identifier,
+      explicitVersion || existingVersion || undefined,
+      existingVersion ? { currentVersion: existingVersion } : undefined,
     );
   }
 
@@ -157,6 +162,8 @@ export class OrgProviderConfigService {
 
     this.#audit('create', orgId, data.identifier, userId);
     this.#recordCredentialRotated(orgId, data.identifier, result.id, userId);
+    // 1.3a: evict the cached kernel capability so a resolve rebuilds with fresh creds.
+    this._resolution.invalidate('social', data.identifier, orgId);
     return this.#maskSensitive(result);
   }
 
@@ -199,6 +206,8 @@ export class OrgProviderConfigService {
     const result = await this._repository.updateById(id, update as any);
     this.#audit('update', orgId, existing.identifier, userId);
     this.#recordCredentialRotated(orgId, existing.identifier, id, userId);
+    // 1.3a: evict the cached kernel capability so a resolve rebuilds with fresh creds.
+    this._resolution.invalidate('social', existing.identifier, orgId);
     return this.#maskSensitive(result);
   }
 
@@ -209,12 +218,14 @@ export class OrgProviderConfigService {
     }
     await this._repository.deleteById(id);
     this.#audit('delete', orgId, existing.identifier, userId);
+    // 1.3a: evict the cached kernel capability for this provider.
+    this._resolution.invalidate('social', existing.identifier, orgId);
   }
 
   async testConnection(
     orgId: string,
     id: string
-  ): Promise<{ success: boolean; authUrl?: string; error?: string }> {
+  ): Promise<{ success: boolean; error?: string }> {
     const config = await this._repository.getById(orgId, id);
     if (!config) {
       return { success: false, error: 'Provider not configured' };
@@ -225,15 +236,11 @@ export class OrgProviderConfigService {
       return { success: false, error: 'Client ID not configured' };
     }
 
-    const state = randomBytes(32).toString('base64url');
-    const redirectUri =
-      config.redirectUri ||
-      `${process.env.FRONTEND_URL}/integrations/social/${config.identifier}`;
-    const scopes = config.scopes || '';
-
-    const authUrl = `${process.env.FRONTEND_URL || 'http://localhost:4200'}/oauth-test?provider=${config.identifier}&state=${state}&redirect_uri=${encodeURIComponent(redirectUri)}&client_id=${decrypted.clientId}&scope=${encodeURIComponent(scopes)}`;
-
-    return { success: true, authUrl };
+    // 6.7: never echo the decrypted OAuth clientId back to the client. The old
+    // return embedded `client_id=${decrypted.clientId}` in an authUrl, leaking
+    // the exact secret `#maskSensitive` deliberately withholds. Report only that
+    // credentials are present and decryptable.
+    return { success: true };
   }
 
   // Resolve the active VPN selection for a connecting integration (by its bound

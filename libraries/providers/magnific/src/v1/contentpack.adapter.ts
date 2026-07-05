@@ -108,16 +108,19 @@ export class MagnificContentPack implements ContentPackCapabilityContract {
   }
 
   private downloadPathForCapability(capability: ContentPackCapability, id: string): string {
+    // Percent-encode the client-supplied id so a `../` cannot path-traverse the
+    // authenticated request within the provider host.
+    const safeId = encodeURIComponent(id);
     switch (capability) {
       case 'photos':
       case 'vectors':
-        return `/v1/resources/${id}/download`;
+        return `/v1/resources/${safeId}/download`;
       case 'icons':
-        return `/v1/icons/${id}/download`;
+        return `/v1/icons/${safeId}/download`;
       case 'videos':
-        return `/v1/videos/${id}/download`;
+        return `/v1/videos/${safeId}/download`;
       default:
-        return `/v1/resources/${id}/download`;
+        return `/v1/resources/${safeId}/download`;
     }
   }
 

@@ -301,7 +301,8 @@ export class IntegrationService {
       // whether the provider is currently enabled for new connections, and a
       // single disabled/unknown provider must not abort the whole batch.
       const provider = this._integrationManager.getSocialIntegrationUnchecked(
-        integration.providerIdentifier
+        integration.providerIdentifier,
+        integration.providerVersion
       );
       if (!provider) {
         continue;
@@ -407,7 +408,8 @@ export class IntegrationService {
     }
 
     const provider = await this._integrationManager.getSocialIntegration(
-      getIntegration.providerIdentifier
+      getIntegration.providerIdentifier,
+      org
     );
 
     if (!provider.fetchPageInformation) {
@@ -465,8 +467,16 @@ export class IntegrationService {
 
     const integrationProvider =
       this._integrationManager.getSocialIntegrationUnchecked(
-        getIntegration.providerIdentifier
+        getIntegration.providerIdentifier,
+        getIntegration.providerVersion
       );
+
+    // 1.3: the Unchecked lookup returns undefined for a retired-pinned version
+    // (it no longer throws). A retired adapter can't serve analytics — return
+    // empty instead of TypeError-ing on `integrationProvider.refreshWait` below.
+    if (!integrationProvider) {
+      return [];
+    }
 
     if (
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
@@ -609,7 +619,8 @@ export class IntegrationService {
 
     const getSocialIntegration =
       await this._integrationManager.getSocialIntegration(
-        getIntegration.providerIdentifier
+        getIntegration.providerIdentifier,
+        data.orgId
       );
 
     // Warm the org credential cache before invoking the internal plug — see processPlugs.
@@ -644,7 +655,8 @@ export class IntegrationService {
     }
 
     const integration = await this._integrationManager.getSocialIntegration(
-      getPlugById.integration.providerIdentifier
+      getPlugById.integration.providerIdentifier,
+      getPlugById.integration.organizationId
     );
 
     // Warm the org credential cache before invoking the plug. Plug methods that sign with the

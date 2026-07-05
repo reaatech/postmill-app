@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { AiSettingsRepository } from './ai-settings.repository';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 
 @Injectable()
 export class AiSettingsService {
-  constructor(private _repository: AiSettingsRepository) {}
+  constructor(
+    private _repository: AiSettingsRepository,
+    private _encryption: EncryptionService,
+  ) {}
 
   // ── AIProviderConfig ──
 
@@ -263,8 +267,17 @@ export class AiSettingsService {
       }
     }
 
+    // 3.9: per-org AIOrgProviderConfig rows are read back at runtime by
+    // OrgAiSettingsService / OrgMediaProviderSettingsService via EncryptionService,
+    // so the admin write goes through the same service for symmetry. Note this is a
+    // no-op in crypto terms: EncryptionService.encrypt delegates to
+    // AuthService.fixedEncryption (encryption.service.ts), the same routine used for
+    // the deployment-wide AIProviderConfig — both share one getEncryptionKey(), so
+    // the two routes do NOT diverge even when a dedicated ENCRYPTION_KEY is set. It
+    // is "same key behind two routes"; keeping this call on EncryptionService is
+    // convention, not correctness.
     const encryptedCredentials = data.credentials
-      ? AuthService.fixedEncryption(JSON.stringify(data.credentials))
+      ? this._encryption.encrypt(JSON.stringify(data.credentials))
       : undefined;
 
     return this._repository.upsertOrgProviderConfig(organizationId, identifier, {

@@ -31,6 +31,15 @@ export class ProviderVersionDeprecatedForWriteError extends Error {
   }
 }
 
+export class ProviderVersionPreviewError extends Error {
+  constructor(public readonly ctx: Required<ProviderErrorContext>) {
+    super(
+      `Provider version is preview-only and cannot be pinned for new configs without opt-in: ${ctx.domain}/${ctx.providerId}@${ctx.version}`,
+    );
+    this.name = 'ProviderVersionPreviewError';
+  }
+}
+
 export class ProviderCredentialError extends Error {
   constructor(
     public readonly ctx: Required<ProviderErrorContext>,

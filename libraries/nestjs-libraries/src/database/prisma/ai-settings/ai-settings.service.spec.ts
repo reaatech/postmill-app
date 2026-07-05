@@ -52,6 +52,12 @@ vi.mock('@gitroom/helpers/auth/auth.service', () => ({
   },
 }));
 
+// 3.9: per-org rows encrypt via EncryptionService (AES-GCM), NOT AuthService.fixedEncryption.
+const mockEncryption = {
+  encrypt: vi.fn((value: string) => `AESGCM:${value}`),
+  decrypt: vi.fn((hash: string) => hash.replace('AESGCM:', '')),
+};
+
 import { AiSettingsService } from './ai-settings.service';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
 
@@ -60,7 +66,7 @@ describe('AiSettingsService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    service = new AiSettingsService(mockRepo as any);
+    service = new AiSettingsService(mockRepo as any, mockEncryption as any);
   });
 
   // ── AIProviderConfig ──
@@ -555,14 +561,18 @@ describe('AiSettingsService', () => {
   });
 
   describe('upsertOrgProviderConfig', () => {
-    it('encrypts credentials before storage', async () => {
+    it('encrypts org-row credentials via EncryptionService, not fixedEncryption (3.9)', async () => {
       const data = { credentials: { apiKey: 'sk-secret' } };
-      const encrypted = AuthService.fixedEncryption(JSON.stringify(data.credentials));
+      const encrypted = mockEncryption.encrypt(JSON.stringify(data.credentials));
+      vi.clearAllMocks();
       mockRepo.upsertOrgProviderConfig.mockResolvedValue({ id: '1' });
 
       await service.upsertOrgProviderConfig('org1', 'openai', data);
 
-      expect(AuthService.fixedEncryption).toHaveBeenCalledWith(JSON.stringify(data.credentials));
+      // org rows use the same AES-GCM route the org runtime read path uses…
+      expect(mockEncryption.encrypt).toHaveBeenCalledWith(JSON.stringify(data.credentials));
+      // …and NOT the global-config crypto route.
+      expect(AuthService.fixedEncryption).not.toHaveBeenCalled();
       expect(mockRepo.upsertOrgProviderConfig).toHaveBeenCalledWith('org1', 'openai', {
         ...data,
         credentials: encrypted,

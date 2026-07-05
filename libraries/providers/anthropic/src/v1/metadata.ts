@@ -7,7 +7,7 @@ export const metadata: ProviderMetadata = {
   },
   "id": "anthropic",
   "displayName": "anthropic",
-  "kind": "hub",
+  "kind": "direct",
   "domains": [
     "ai"
   ],
@@ -16,9 +16,6 @@ export const metadata: ProviderMetadata = {
     "high-reasoning",
     "workflow",
     "vision"
-  ],
-  "mediaCategories": [
-    "image-focal-point"
   ],
   "hasModelList": true,
   "modelHints": {
@@ -42,5 +39,6 @@ export const metadata: ProviderMetadata = {
       "claude-3-7-sonnet",
       "claude-3-5-sonnet"
     ]
-  }
+  },
+  "mediaCategories": []
 };

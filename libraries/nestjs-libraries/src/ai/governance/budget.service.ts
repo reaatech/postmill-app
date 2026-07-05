@@ -8,7 +8,17 @@ import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/n
 export interface BudgetSettings {
   monthlyCap?: number;
   dailyCap?: number;
-  perOrgCaps?: Record<string, { monthly?: number; daily?: number }>;
+  // 5.5: the per-org slice also carries `alertThresholdPct` (per-org alert
+  // threshold, enforced in recordSpend). A per-org `enabled` kill-switch is
+  // deliberately NOT enforced: the slice is org-writable (PUT /settings/ai/budget)
+  // but a super-admin can impose a cap into the same slice via the governance
+  // whole-blob route — honoring an org-written `enabled:false` would let a tenant
+  // self-exempt from an operator-imposed cap. The org path also no longer
+  // persists `enabled` (see OrgAiSettingsRepository#dtoToBudgetSlice).
+  perOrgCaps?: Record<
+    string,
+    { monthly?: number; daily?: number; alertThresholdPct?: number }
+  >;
   scopeCaps?: Record<string, { monthly?: number; daily?: number }>;
   alertThresholdPct?: number;
 }
@@ -226,6 +236,9 @@ export class BudgetService {
 
     if (organizationId) {
       const orgCaps = caps.perOrgCaps?.[organizationId];
+      // 5.5 (review F1): per-org caps are ALWAYS enforced when present — no
+      // org-writable `enabled` bypass (a tenant must not be able to self-exempt
+      // from an operator-imposed cap living in the same slice).
       const orgMonthly = Math.max(
         this._spendAccum!.orgMonthly.get(organizationId) ?? 0,
         db.orgMonthly.get(organizationId) ?? 0
@@ -406,8 +419,15 @@ export class BudgetService {
 
     if (data.organizationId) {
       const orgCaps = caps.perOrgCaps?.[data.organizationId];
+      // 5.5: use the per-org alert threshold when the org set one, else the global.
+      // Normalize a percent-style value (e.g. 80) to a fraction — the field name
+      // says "Pct" and the DTO has no 0–1 range, so an API client sending 80
+      // would otherwise set the alert point at cap×80 (never fires).
+      const rawOrgThreshold = orgCaps?.alertThresholdPct ?? threshold;
+      const orgThreshold =
+        rawOrgThreshold > 1 ? rawOrgThreshold / 100 : rawOrgThreshold;
       const orgMonthly = this._spendAccum!.orgMonthly.get(data.organizationId) ?? 0;
-      if (orgCaps?.monthly && orgMonthly >= orgCaps.monthly * threshold) {
+      if (orgCaps?.monthly && orgMonthly >= orgCaps.monthly * orgThreshold) {
         const alertKey = `${data.organizationId}:monthly:${this._getAccumKey()}`;
         if (!this._thresholdFired.has(alertKey)) {
           this._thresholdFired.add(alertKey);

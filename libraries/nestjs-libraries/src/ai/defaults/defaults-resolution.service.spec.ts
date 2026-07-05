@@ -374,6 +374,32 @@ describe('DefaultsResolutionService', () => {
     });
   });
 
+  it('passes the plain creds map (not the runtime context) to an AI provider listModels (1.5)', async () => {
+    const repository = makeRepository();
+    const aiSettings = makeAiSettings([
+      { identifier: 'qwen', enabled: true, isConfigured: true, version: 'v1' },
+    ]);
+    // org has a stored key → _credentialsForCandidate returns it for the AI candidate.
+    aiSettings.getByIdentifier.mockResolvedValue({ credentials: { apiKey: 'dashscope-key' } });
+    const listModels = vi.fn().mockResolvedValue([{ id: 'qwen-max' }]);
+    const kernel = makeKernel({
+      get: vi.fn().mockReturnValue({ create: () => ({ listModels }) }),
+    });
+    service = new DefaultsResolutionService(
+      repository as any,
+      aiSettings as any,
+      makeMediaSettings() as any,
+      kernel as any,
+      makeRuntimeContextFactory() as any,
+    );
+
+    await service.resolve('ai', 'low-reasoning', 'org-1');
+
+    // AI contract is listModels(creds: Record<string,string>) — the org's key must
+    // arrive verbatim, NOT the runtime context object.
+    expect(listModels).toHaveBeenCalledWith({ apiKey: 'dashscope-key' });
+  });
+
   it('ranks auto-pick by provider-local modelHints', async () => {
     const repository = makeRepository();
     const aiSettings = makeAiSettings([

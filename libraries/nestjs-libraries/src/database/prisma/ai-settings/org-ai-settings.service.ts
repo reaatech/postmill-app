@@ -129,7 +129,11 @@ export class OrgAiSettingsService {
     },
   ) {
     const { version: requestedVersion, ...payload } = data;
-    const version = this._resolveVersion(identifier, requestedVersion);
+    // 1.1: validate the (client-supplied or defaulted) version against the
+    // lifecycle before pinning — a deprecated version rejects the write (400), a
+    // retired version is 410, an unknown version is 400. Persist the resolved
+    // version rather than the unvalidated client string.
+    const version = this._resolution.resolveWriteVersion('ai', identifier, requestedVersion);
 
     // §3.5 — capture BEFORE the write whether this org has any provider configured yet.
     // Only a first-time setup (the org's very first provider) auto-activates below, so the
@@ -157,6 +161,10 @@ export class OrgAiSettingsService {
     if (data.credentials && this._credentialLink) {
       await this._credentialLink.syncFromAiProvider(orgId, identifier, data.credentials);
     }
+
+    // 1.3a: drop the cached capability so the next resolve rebuilds with the
+    // freshly-written credentials/config rather than a stale closure.
+    this._resolution.invalidate('ai', identifier, orgId);
 
     // §3.5 auto-activate the org's first-ever LLM provider on save so the setup wizard's
     // step-1 gate clears without a separate "Make Primary" click. Scoped to a first-time
@@ -196,16 +204,26 @@ export class OrgAiSettingsService {
   }
 
   async delete(orgId: string, identifier: string) {
-    return this._repository.delete(orgId, identifier);
+    // 1.4: delete the actually-pinned row, not a hardcoded v1 — otherwise a
+    // config pinned to a later version 404s the delete (Prisma P2025 → 500) and
+    // orphans the row.
+    const version = await this._getPinnedVersion(orgId, identifier);
+    const result = await this._repository.delete(orgId, identifier, version);
+    // 1.3a: evict the cached capability for the deleted config.
+    this._resolution.invalidate('ai', identifier, orgId);
+    return result;
   }
 
   async testConnection(orgId: string, identifier: string) {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+    // 1.4: resolve the pinned version so the test operates on the same row a
+    // read would (stored row's version, else latest-active).
+    const version = await this._getPinnedVersion(orgId, identifier);
+    const config = await this._repository.getByIdentifier(orgId, identifier, version);
     if (!config) {
       throw new Error(`Provider "${identifier}" not configured for this organization`);
     }
 
-    const adapter = this._resolveAdapter(identifier, config.version ?? 'v1');
+    const adapter = this._resolveAdapter(identifier, config.version ?? version);
     if (!adapter) {
       throw new Error(`Unknown provider: ${identifier}`);
     }
@@ -231,6 +249,22 @@ export class OrgAiSettingsService {
     if (version) return version;
     const latest = this._kernel.latestActive('ai', identifier);
     return latest?.manifest.version ?? DEFAULT_VERSION;
+  }
+
+  // 1.4: the version an org's row is pinned to — the stored row's version, else
+  // the latest active version, else the default. Mirrors
+  // OrgShortLinkSettingsService.getPinnedVersion (the reference implementation).
+  private async _getPinnedVersion(orgId: string, identifier: string): Promise<string> {
+    // 1.2: version-AGNOSTIC read — `getByIdentifier` findUnique-defaults to v1, so
+    // a config pinned to v2 would return null and wrongly fall through to
+    // latestActive (resolving the wrong row, reading empty creds, deleting the
+    // wrong row). Use the newest-row-any-version read instead.
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
+    return (
+      config?.version ??
+      this._resolution.latestActiveVersion('ai', identifier) ??
+      DEFAULT_VERSION
+    );
   }
 
   private _decryptCredentials(encrypted: string | null): Record<string, string> {

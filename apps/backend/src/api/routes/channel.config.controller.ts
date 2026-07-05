@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Logger,
   Param,
@@ -18,10 +19,18 @@ import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integ
 import { Prisma } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
+import { SaveChannelConfigDto } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
+// PROVIDER_REMEDIATION 0.2 + 3.2: `ProviderConfiguration` is the platform-global
+// social OAuth-app store (no organizationId). It was gated only by
+// `@RequirePermission('channels','manage')`, which the RBAC seeder grants to owner,
+// admin AND editor — so an editor could rewrite the global clientId/clientSecret and
+// flip provider availability platform-wide. The class-level SuperAdminGuard is the
+// structural backstop; each handler also calls `_assertSuperAdmin` (defense in depth).
 @ApiTags('Channel Config')
 @Controller('/admin/channel-configs')
-@UseGuards(OrgRbacGuard)
+@UseGuards(SuperAdminGuard, OrgRbacGuard)
 export class ChannelConfigController {
   private readonly _logger = new Logger(ChannelConfigController.name);
   constructor(
@@ -30,9 +39,16 @@ export class ChannelConfigController {
     private _integrationManager: IntegrationManager
   ) {}
 
+  private _assertSuperAdmin(user: User) {
+    if (!user?.isSuperAdmin) {
+      throw new ForbiddenException('Super admin access required');
+    }
+  }
+
   @Get('/')
   @RequirePermission('channels', 'manage')
   async listConfigs(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const dbConfigs = await this._providerConfigService.getAll();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
 
@@ -77,6 +93,7 @@ export class ChannelConfigController {
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string
   ) {
+    this._assertSuperAdmin(user);
     const config = await this._providerConfigService.getByIdentifier(
       identifier
     );
@@ -108,16 +125,9 @@ export class ChannelConfigController {
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
     @Body()
-    body: {
-      enabled: boolean;
-      clientId?: string;
-      clientSecret?: string;
-      redirectUri?: string;
-      scopes?: string;
-      additionalConfig?: string;
-      setupInstructions?: string;
-    }
+    body: SaveChannelConfigDto
   ) {
+    this._assertSuperAdmin(user);
     if (typeof body.enabled !== 'boolean') {
       throw new BadRequestException('enabled must be a boolean');
     }
@@ -192,6 +202,7 @@ export class ChannelConfigController {
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string
   ) {
+    this._assertSuperAdmin(user);
 
     const config = await this._providerConfigService.getByIdentifier(
       identifier

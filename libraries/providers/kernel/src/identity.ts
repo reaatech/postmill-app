@@ -9,6 +9,28 @@ export type ProviderDomain =
   | 'email'
   | 'auth';
 
+/**
+ * Single source of truth for the provider-domain set (3.3/4.5). Kept in lockstep
+ * with the `ProviderDomain` union above — the `satisfies` clause makes the
+ * compiler reject any drift. Consumers (manifest validation, the catalog
+ * controller, featured-provider service) import this instead of re-declaring it.
+ */
+export const PROVIDER_DOMAINS = [
+  'ai',
+  'media',
+  'storage',
+  'shortlink',
+  'social',
+  'vpn',
+  'contentpack',
+  'email',
+  'auth',
+] as const satisfies readonly ProviderDomain[];
+
+export function isProviderDomain(value: string): value is ProviderDomain {
+  return (PROVIDER_DOMAINS as readonly string[]).includes(value);
+}
+
 export const DEFAULT_VERSION = 'v1';
 export const QUALIFIED_SEPARATOR = '@';
 

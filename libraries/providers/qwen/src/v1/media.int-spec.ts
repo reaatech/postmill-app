@@ -61,6 +61,28 @@ describe('qwen media adapter (DashScope async task API)', () => {
     expect(out.image).toBe('https://cdn.qwen/img.png');
   }, 15000);
 
+  it('2.1: a 503 on poll THROWS (transient); a FAILED task_status → returned failed', async () => {
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = qwenMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob('task-1', { apiKey: 'k' })).rejects.toThrow(/transient/i);
+
+    const f = makeCtx(() => res({ output: { task_status: 'FAILED', message: 'nope' } }));
+    const a2: any = qwenMediaModule.create(f.ctx as any);
+    expect((await a2.pollJob('task-1', { apiKey: 'k' })).status).toBe('failed');
+  });
+
+  it('2.1: a 4xx on poll → returned failed; missing key on poll → terminal failed', async () => {
+    const four = makeCtx(() => res('bad', false, 400));
+    const a1: any = qwenMediaModule.create(four.ctx as any);
+    expect((await a1.pollJob('task-1', { apiKey: 'k' })).status).toBe('failed');
+
+    const nokey = makeCtx(() => res({}));
+    const a2: any = qwenMediaModule.create(nokey.ctx as any);
+    const r = await a2.pollJob('task-1', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/key is required/);
+  });
+
   it('rejects unsupported audio/avatar and a missing key', async () => {
     const { ctx } = makeCtx(() => res({}));
     const adapter: any = qwenMediaModule.create(ctx as any);

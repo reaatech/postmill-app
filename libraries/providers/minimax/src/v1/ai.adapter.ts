@@ -14,6 +14,14 @@ export const minimaxAiModule: ProviderModule<any, any> = {
     credentialFields: (adapter as any).credentialFields || [],
     capabilities: (adapter as any).capabilities,
   },
-  create: () => adapter as any,
-  validateCredentials: async (ctx) => adapter.validateCredentials(ctx.credentials),
+  // 0.4: thread the injected SSRF-safe fetch into the shared adapter so the
+  // `${baseURL}/models` call is validated (never the global fetch on a tenant baseURL).
+  create: (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter as any;
+  },
+  validateCredentials: async (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter.validateCredentials(ctx.credentials);
+  },
 };

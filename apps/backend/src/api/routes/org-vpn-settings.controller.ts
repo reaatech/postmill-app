@@ -18,6 +18,7 @@ import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-confi
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import { UpsertVpnConfigDto } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 @ApiTags('Org VPN Settings')
 @Controller('/settings/vpn')
@@ -46,13 +47,7 @@ export class OrgVpnSettingsController {
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      name?: string;
-      credentials?: Record<string, string>;
-      regions?: string[];
-      enabled?: boolean;
-    },
+    @Body() body: UpsertVpnConfigDto,
   ) {
     if (
       body.regions !== undefined &&

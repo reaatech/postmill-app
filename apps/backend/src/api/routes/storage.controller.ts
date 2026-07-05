@@ -10,17 +10,26 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
-import { Organization, StorageProviderType, User } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import {
+  CreateStorageConfigDto,
+  UpdateStorageConfigDto,
+  MigrateStorageDto,
+  SetOrgQuotaDto,
+  SetDefaultFolderDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 @ApiTags('Storage Settings')
 @Controller('/settings/storage')
@@ -28,7 +37,8 @@ import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-p
 export class StorageController {
   constructor(
     private _storageService: StorageService,
-    private _auditService: AuditService
+    private _auditService: AuditService,
+    private _fileService: FileService
   ) {}
 
   @Get('/')
@@ -44,18 +54,7 @@ export class StorageController {
   async createProvider(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body()
-    body: {
-      type: StorageProviderType;
-      name: string;
-      credentials?: Record<string, string>;
-      region?: string;
-      bucket?: string;
-      endpoint?: string;
-      publicUrl?: string;
-      quotaBytes?: number;
-      version?: string;
-    }
+    @Body() body: CreateStorageConfigDto
   ) {
     const created = await this._storageService.createConfig(
       org.id,
@@ -93,17 +92,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body()
-    body: {
-      name?: string;
-      credentials?: Record<string, string>;
-      region?: string;
-      bucket?: string;
-      endpoint?: string;
-      publicUrl?: string;
-      quotaBytes?: number;
-      version?: string;
-    }
+    @Body() body: UpdateStorageConfigDto
   ) {
     return this.#stripBigInts(
       await this._storageService.updateConfig(
@@ -188,7 +177,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @Param('sourceId') sourceId: string,
     @Param('targetId') targetId: string,
-    @Body() body: { cursor?: string; limit?: number }
+    @Body() body: MigrateStorageDto
   ) {
     const limit = body?.limit
       ? Math.min(100, Math.max(1, Math.floor(body.limit)))
@@ -234,7 +223,7 @@ export class StorageController {
   async setOrgQuota(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
-    @Body() body: { quotaBytes: number }
+    @Body() body: SetOrgQuotaDto
   ) {
     if (!user.isSuperAdmin) {
       throw new ForbiddenException('Super-admin required');
@@ -294,11 +283,28 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: { folderId?: string | null }
+    @Body() body: SetDefaultFolderDto
   ) {
+    const folderId = body.folderId || null;
+
+    // Validate cross-org / missing folder before persisting (mirror
+    // MediaProviderController._assertStorageOwnership). `getFolder` throws
+    // `HttpException('Folder not found', 404)` for the ownership/not-found case;
+    // anything else is infra and must propagate.
+    if (folderId) {
+      try {
+        await this._fileService.getFolder(org.id, folderId);
+      } catch (err) {
+        if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
+        throw new BadRequestException(
+          'folderId does not belong to this organization'
+        );
+      }
+    }
+
     return this._storageService.setDefaultFolderForProvider(
       id,
-      body.folderId || null,
+      folderId,
       org.id,
       user.id
     );

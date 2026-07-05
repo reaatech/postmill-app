@@ -11,6 +11,7 @@ vi.mock('@ai-sdk/amazon-bedrock', () => ({
 }));
 
 import { BedrockAdapter } from '../ai.adapter';
+import { createAmazonBedrock } from '@ai-sdk/amazon-bedrock';
 
 describe('BedrockAdapter', () => {
   let adapter: BedrockAdapter;
@@ -95,6 +96,17 @@ describe('BedrockAdapter', () => {
       const result = await adapter.validateCredentials({ region: 'us-east-1' });
       expect(result.ok).toBe(false);
       expect(result.error).toBe('AWS credentials are required');
+    });
+
+    // 5.15: presence check only — never a paid `doGenerate` ping.
+    it('validates present credentials without running paid inference (5.15)', async () => {
+      const result = await adapter.validateCredentials({
+        region: 'us-east-1',
+        accessKeyId: 'AKIA-test',
+        secretAccessKey: 'secret',
+      });
+      expect(result).toEqual({ ok: true });
+      expect(createAmazonBedrock).not.toHaveBeenCalled();
     });
   });
 

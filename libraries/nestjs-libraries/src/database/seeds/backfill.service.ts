@@ -96,6 +96,77 @@ export class BackfillService {
       () => this.backfillDefaultModels(),
       true,
     );
+    await this._runStep(
+      'budget global-cap cleanup',
+      (tx) => this.cleanupLeakedGlobalBudgetCaps(tx),
+      true,
+    );
+  }
+
+  // PROVIDER_REMEDIATION_02 §0.4: pre-fix org budget writes leaked their org-slice
+  // keys (monthlyCap / dailyCap / alertThresholdPct) to the TOP LEVEL of the
+  // AISystemSettings.budgetSettings singleton, where BudgetService.checkBudget
+  // enforces them as a PLATFORM-GLOBAL cap. Once platform spend passed a leaked
+  // value, EVERY tenant 429'd ("Global … cap exceeded") on all four AI surfaces,
+  // and the org that set it could no longer see/clear it (getBudget returns only
+  // its own perOrgCaps slice). Strip those top-level keys ONCE, preserving
+  // perOrgCaps and every other key. Ledger-gated one-time (a super-admin may later
+  // set an *intentional* global cap via the whole-blob governance route — this
+  // never re-runs to clobber that). Idempotent within the run.
+  private async cleanupLeakedGlobalBudgetCaps(tx: Prisma.TransactionClient) {
+    // Take the same row lock upsertBudget uses — during a rolling deploy a live
+    // replica's budget write racing this read-modify-write would otherwise be
+    // clobbered with the stale blob.
+    await tx.$executeRaw`SELECT id FROM "AISystemSettings" WHERE id = 'singleton' FOR UPDATE`;
+    const settings = await tx.aISystemSettings.findUnique({
+      where: { id: 'singleton' },
+      select: { budgetSettings: true },
+    });
+    if (!settings?.budgetSettings) return;
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(settings.budgetSettings);
+    } catch {
+      return;
+    }
+    if (!parsed || typeof parsed !== 'object') return;
+
+    const hasLeaked =
+      'monthlyCap' in parsed ||
+      'dailyCap' in parsed ||
+      'alertThresholdPct' in parsed;
+    if (!hasLeaked) return;
+
+    const {
+      monthlyCap,
+      dailyCap,
+      alertThresholdPct,
+      ...cleaned
+    } = parsed as Record<string, unknown>;
+    // The stripped keys are INDISTINGUISHABLE from an intentional super-admin
+    // global cap set via the governance whole-blob route — so never destroy them
+    // silently: log the removed values and park them under a backup key
+    // (BudgetService reads only its known keys, so the extra key is inert) for an
+    // operator to restore via the governance route if the cap was intentional.
+    const stripped = {
+      ...(monthlyCap !== undefined ? { monthlyCap } : {}),
+      ...(dailyCap !== undefined ? { dailyCap } : {}),
+      ...(alertThresholdPct !== undefined ? { alertThresholdPct } : {}),
+    };
+    this._logger.warn(
+      `Budget cleanup: stripped top-level global caps from AISystemSettings.budgetSettings ` +
+        `(kept under _strippedLegacyGlobalCaps for operator review): ${JSON.stringify(stripped)}`,
+    );
+    await tx.aISystemSettings.update({
+      where: { id: 'singleton' },
+      data: {
+        budgetSettings: JSON.stringify({
+          ...cleaned,
+          _strippedLegacyGlobalCaps: stripped,
+        }),
+      },
+    });
   }
 
   private async _runStep(

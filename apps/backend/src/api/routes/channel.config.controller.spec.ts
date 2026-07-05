@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 // The social provider list now comes from IntegrationManager (kernel-backed);
@@ -66,6 +66,7 @@ function createDbConfig(overrides: Record<string, any> = {}): Record<string, any
 }
 
 const adminUser = { id: '1', isSuperAdmin: true } as any;
+const regularUser = { id: '2', isSuperAdmin: false } as any;
 
 let controller: ChannelConfigController;
 
@@ -469,5 +470,40 @@ describe('deleteConfig', () => {
     mockProviderConfigService.delete.mockRejectedValue(genericError);
 
     await expect(controller.deleteConfig(adminUser, 'x')).rejects.toThrow('DB connection failed');
+  });
+});
+
+// PROVIDER_REMEDIATION 0.2: the global social OAuth-app store is super-admin only.
+// `channels:manage` is granted to owner/admin/EDITOR by the RBAC seeder, so a
+// non-super-admin (editor/owner) must be rejected before any service call.
+describe('super-admin gating (0.2)', () => {
+  const forbidden = ForbiddenException;
+
+  it('rejects listConfigs for a non-super-admin', async () => {
+    await expect(controller.listConfigs(regularUser)).rejects.toThrow(forbidden);
+    expect(mockProviderConfigService.getAll).not.toHaveBeenCalled();
+  });
+
+  it('rejects getConfig for a non-super-admin', async () => {
+    await expect(controller.getConfig(regularUser, 'x')).rejects.toThrow(forbidden);
+    expect(mockProviderConfigService.getByIdentifier).not.toHaveBeenCalled();
+  });
+
+  it('rejects saveConfig for a non-super-admin (no global write)', async () => {
+    await expect(
+      controller.saveConfig(regularUser, 'x', { enabled: true, clientId: 'evil' } as any),
+    ).rejects.toThrow(forbidden);
+    expect(mockProviderConfigService.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejects deleteConfig for a non-super-admin', async () => {
+    await expect(controller.deleteConfig(regularUser, 'x')).rejects.toThrow(forbidden);
+    expect(mockProviderConfigService.delete).not.toHaveBeenCalled();
+  });
+
+  it('allows a super-admin through to the service', async () => {
+    mockProviderConfigService.getAll.mockResolvedValue([]);
+    await expect(controller.listConfigs(adminUser)).resolves.toBeDefined();
+    expect(mockProviderConfigService.getAll).toHaveBeenCalled();
   });
 });

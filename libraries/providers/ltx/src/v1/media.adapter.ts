@@ -21,6 +21,14 @@ import {
 // completion webhook → video relies on the media-jobs-poll cron (like Runway/Wan).
 const BASE = 'https://api.ltx.video';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
+// 5.11 — the poll id is namespaced `<op>:<id>`; an unrecognized prefix must be treated as a
+// BARE text-to-video id (never silently routed with the prefix stripped).
+const LTX_OPS = new Set<LtxOp>(['text-to-video', 'image-to-video', 'audio-to-video']);
+
 // Sub-operation → async submit/poll path segment. Routed by the media inputs present in the request
 // (the studio descriptor's media-field names are LTX's native params): an audio source → audio-to-video,
 // an image source → image-to-video, otherwise text-to-video.
@@ -94,13 +102,29 @@ export class LtxAdapter extends BearerTokenMediaAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    // jobId is `<op>:<id>`; a bare id (no prefix) defaults to text-to-video.
-    const sep = jobId.indexOf(':');
-    const op = sep > 0 ? jobId.slice(0, sep) : 'text-to-video';
-    const id = sep > 0 ? jobId.slice(sep + 1) : jobId;
+    // Missing key is a config error → terminal failed (matches openai/Sora), not a thrown
+    // error the lifecycle would retry to the 24h timeout.
+    let headers: Record<string, string>;
+    try {
+      headers = this._headers(options);
+    } catch (err) {
+      return { status: 'failed', error: (err as Error).message };
+    }
 
-    const res = await this._fetch(`${BASE}/v2/${op}/${id}`, { headers: this._headers(options) });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    // jobId is `<op>:<id>`; an unrecognized (or absent) prefix is treated as a bare
+    // text-to-video id — never routed with the prefix silently stripped.
+    const sep = jobId.indexOf(':');
+    const prefix = sep > 0 ? jobId.slice(0, sep) : '';
+    const known = LTX_OPS.has(prefix as LtxOp);
+    const op = known ? prefix : 'text-to-video';
+    const id = known ? jobId.slice(sep + 1) : jobId;
+
+    const res = await this._fetch(`${BASE}/v2/${op}/${id}`, { headers });
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`LTX Studio poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as LtxStatusResponse;
 
     if (data.status === 'completed') {
@@ -126,7 +150,10 @@ export class LtxAdapter extends BearerTokenMediaAdapter {
     try {
       const res = await this._fetch(`${BASE}/v2/text-to-video/00000000-0000-0000-0000-000000000000`, { headers });
       if (res.status === 401 || res.status === 403) return { ok: false, message: 'Invalid LTX Studio API key' };
-      return { ok: true, message: 'Connection successful' };
+      // 5.6 — only an expected status (2xx, or the not-found/unprocessable a valid key produces
+      // for a fake job id) counts as connected; a 5xx/unexpected status is NOT success.
+      if (res.ok || res.status === 404 || res.status === 422) return { ok: true, message: 'Connection successful' };
+      return { ok: false, message: `LTX Studio returned ${res.status}` };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }

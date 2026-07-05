@@ -98,10 +98,24 @@ describe('SmtpAdapter', () => {
         from: 'Test Sender <noreply@example.com>',
         to: 'user@example.com',
         subject: 'Welcome',
-        text: '<h1>Welcome</h1>',
+        // text/plain part is stripped of HTML markup, not the raw html
+        text: 'Welcome',
         html: '<h1>Welcome</h1>',
       });
       expect(result).toEqual({ providerMessageId: '<abc123@example.com>' });
+    });
+
+    it('strips HTML markup from the text/plain part', async () => {
+      await adapter.send({
+        ...sendParams,
+        html: '<p>Hi <b>there</b></p><p>Line two &amp; more</p><script>alert(1)</script>',
+      });
+
+      const call = mockSendMail.mock.calls[mockSendMail.mock.calls.length - 1][0];
+      expect(call.text).not.toContain('<');
+      expect(call.text).not.toContain('alert(1)');
+      expect(call.text).toContain('Hi there');
+      expect(call.text).toContain('Line two & more');
     });
 
     it('includes replyTo when provided', async () => {

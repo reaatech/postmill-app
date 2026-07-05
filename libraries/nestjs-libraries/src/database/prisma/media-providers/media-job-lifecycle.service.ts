@@ -172,9 +172,16 @@ export class MediaJobLifecycleService {
     const providerJobId = this.providerJobRef(job);
     if (!providerJobId) return 'skipped';
 
+    // includeDisabled: an in-flight render submitted while the provider was
+    // enabled must COMPLETE even if the org disables the provider mid-render —
+    // polling/downloading costs nothing new, and failing would discard paid work.
+    // New generations are blocked at the entry points (studio/HeyGen/chat-tool),
+    // so this cannot start fresh spend. Null here = row genuinely gone.
     const config = await this._orgMediaProviderSettings.getConfigForProvider(
       job.organizationId,
       job.provider,
+      undefined,
+      { includeDisabled: true },
     );
     if (!config) {
       await this.failJob(job, `Provider "${job.provider}" is no longer configured`);
@@ -184,7 +191,11 @@ export class MediaJobLifecycleService {
     let adapter;
     try {
       adapter = this._resolution.resolveMedia(job.provider, {
-        version: config.version ?? job.version ?? 'v1',
+        // 4.10: an in-flight render must be polled through the version it was
+        // CREATED under (pinned on the job row) — not the config's current
+        // version, which may have been upgraded mid-render and parse the
+        // namespaced `<op>:<id>` provider ref differently.
+        version: job.version ?? config.version ?? 'v1',
         credentials: config.credentials,
         orgId: job.organizationId,
       });
@@ -509,9 +520,14 @@ export class MediaJobLifecycleService {
     folderId?: string;
     metadata: Record<string, unknown>;
   }): Promise<StoredArtifact> {
+    // includeDisabled: landing a finished artifact must honor the row's storage
+    // binding even if the provider was disabled mid-render (else the file would
+    // silently divert to local storage instead of the org's configured bucket).
     const config = await this._orgMediaProviderSettings.getConfigForProvider(
       params.organizationId,
       params.provider,
+      undefined,
+      { includeDisabled: true },
     );
 
     const adapter = config?.storageProviderId

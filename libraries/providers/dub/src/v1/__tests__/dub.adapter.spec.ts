@@ -252,11 +252,14 @@ describe('DubAdapter', () => {
       fetchSpy.mockRestore();
     });
 
-    it('skips links that return non-ok response', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(404, 'Not Found', false));
+    it('pushes a 0-click fallback on non-ok response (one entry per input)', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(500, 'Server Error', false));
 
-      const result = await adapter.linkStatistics(mockContext, ['https://dub.sh/a']);
-      expect(result).toEqual([]);
+      const result = await adapter.linkStatistics(mockContext, ['https://dub.sh/a', 'https://dub.sh/b']);
+      expect(result).toEqual([
+        { short: 'https://dub.sh/a', original: '', clicks: '0' },
+        { short: 'https://dub.sh/b', original: '', clicks: '0' },
+      ]);
 
       fetchSpy.mockRestore();
     });

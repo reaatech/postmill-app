@@ -4,13 +4,8 @@ import {
   SocialClientInformation,
   SocialAuthTokenDetails,
   SocialGenerateAuthUrlResponse,
-  SocialAnalyticsData,
   SocialPostDetails,
   SocialPostResponse,
-  SocialCommentDTO,
-  SocialCommentsResult,
-  SocialMentionResult,
-  SocialPageInformationResult,
 } from './social';
 import {
   ClientInformation,
@@ -19,23 +14,37 @@ import {
 
 /**
  * Maps ProviderRuntimeContext credentials to the legacy ClientInformation shape.
- * Falls back to an empty object so the wrapped provider can rely on
- * IntegrationManager.getClientInformation when no explicit credentials are supplied.
+ * Returns `undefined` when the context carries no usable credential keys (e.g. the
+ * `RuntimeContextFactory` default empty `{}`), so the per-call `clientInformation`
+ * resolved by `IntegrationManager.getClientInformation` (the org-config→env funnel)
+ * is never discarded in favour of a blank context object.
  */
 function contextToClientInformation(
   context?: ProviderRuntimeContext
 ): ClientInformation | undefined {
-  if (!context?.credentials) {
+  const credentials = context?.credentials;
+  if (!credentials) {
     return undefined;
   }
 
-  const credentials = context.credentials;
+  const client_id = (credentials.client_id || credentials.clientId || '') as string;
+  const client_secret = (credentials.client_secret ||
+    credentials.clientSecret || '') as string;
+  const instanceUrl = (credentials.instanceUrl ||
+    credentials.instance_url || '') as string;
+  const token = credentials.token as string | undefined;
+
+  // An empty / no-client-key credentials object means "no explicit creds" —
+  // treat it as absent so the resolved per-call clientInformation wins.
+  if (!client_id && !client_secret && !instanceUrl && !token) {
+    return undefined;
+  }
+
   return {
-    client_id: (credentials.client_id || credentials.clientId || '') as string,
-    client_secret: (credentials.client_secret ||
-      credentials.clientSecret || '') as string,
-    instanceUrl: (credentials.instanceUrl || credentials.instance_url || '') as string,
-    token: credentials.token as string | undefined,
+    client_id,
+    client_secret,
+    instanceUrl,
+    token,
   };
 }
 
@@ -46,10 +55,177 @@ function contextToClientInformation(
  * IntegrationManager internally, so the context mapping is a best-effort fallback.
  */
 export class SocialProviderKernelAdapter implements SocialCapability {
+  // Optional capabilities are assigned conditionally in the constructor so that
+  // presence-probing consumers (`!!provider.fetchComments`) see them only when the
+  // wrapped provider actually implements them — never an always-truthy stub that
+  // would `TypeError` on `this._provider.method!(...)` mid-sync.
+  reConnect?: SocialCapability['reConnect'];
+  analytics?: SocialCapability['analytics'];
+  postAnalytics?: SocialCapability['postAnalytics'];
+  changeNickname?: SocialCapability['changeNickname'];
+  changeProfilePicture?: SocialCapability['changeProfilePicture'];
+  missing?: SocialCapability['missing'];
+  comment?: SocialCapability['comment'];
+  fetchComments?: SocialCapability['fetchComments'];
+  replyToComment?: SocialCapability['replyToComment'];
+  likeComment?: SocialCapability['likeComment'];
+  externalUrl?: SocialCapability['externalUrl'];
+  mention?: SocialCapability['mention'];
+  mentionFormat?: SocialCapability['mentionFormat'];
+  fetchPageInformation?: SocialCapability['fetchPageInformation'];
+
   constructor(
     private readonly _provider: SocialProvider,
     private readonly _context: ProviderRuntimeContext
-  ) {}
+  ) {
+    if (_provider.reConnect) {
+      this.reConnect = (id, requiredId, accessToken) =>
+        _provider.reConnect!(id, requiredId, accessToken);
+    }
+    if (_provider.analytics) {
+      this.analytics = (id, accessToken, date, clientInformation) =>
+        _provider.analytics!(
+          id,
+          accessToken,
+          date,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.postAnalytics) {
+      this.postAnalytics = (
+        integrationId,
+        accessToken,
+        postId,
+        fromDate,
+        clientInformation
+      ) =>
+        _provider.postAnalytics!(
+          integrationId,
+          accessToken,
+          postId,
+          fromDate,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.changeNickname) {
+      this.changeNickname = (id, accessToken, name) =>
+        _provider.changeNickname!(id, accessToken, name);
+    }
+    if (_provider.changeProfilePicture) {
+      this.changeProfilePicture = (id, accessToken, url) =>
+        _provider.changeProfilePicture!(id, accessToken, url);
+    }
+    if (_provider.missing) {
+      this.missing = (id, accessToken) => _provider.missing!(id, accessToken);
+    }
+    if (_provider.comment) {
+      this.comment = (
+        id,
+        postId,
+        lastCommentId,
+        accessToken,
+        postDetails,
+        integration,
+        clientInformation
+      ) =>
+        _provider.comment!(
+          id,
+          postId,
+          lastCommentId,
+          accessToken,
+          postDetails as any,
+          integration,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.fetchComments) {
+      this.fetchComments = (
+        id,
+        accessToken,
+        postId,
+        cursor,
+        integration,
+        clientInformation
+      ) =>
+        _provider.fetchComments!(
+          id,
+          accessToken,
+          postId,
+          cursor,
+          integration,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.replyToComment) {
+      this.replyToComment = (
+        id,
+        accessToken,
+        postId,
+        parentCommentId,
+        message,
+        integration,
+        clientInformation
+      ) =>
+        _provider.replyToComment!(
+          id,
+          accessToken,
+          postId,
+          parentCommentId,
+          message,
+          integration,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.likeComment) {
+      this.likeComment = (
+        id,
+        accessToken,
+        postId,
+        commentId,
+        like,
+        integration,
+        clientInformation
+      ) =>
+        _provider.likeComment!(
+          id,
+          accessToken,
+          postId,
+          commentId,
+          like,
+          integration,
+          this._creds(clientInformation)
+        );
+    }
+    if (_provider.externalUrl) {
+      this.externalUrl = (url) => _provider.externalUrl!(url);
+    }
+    if (_provider.mention) {
+      this.mention = (token, data, id, integration) =>
+        _provider.mention!(token, data, id, integration);
+    }
+    if (_provider.mentionFormat) {
+      this.mentionFormat = (idOrHandle, name) =>
+        _provider.mentionFormat!(idOrHandle, name);
+    }
+    if (_provider.fetchPageInformation) {
+      this.fetchPageInformation = (accessToken, data) =>
+        _provider.fetchPageInformation!(accessToken, data);
+    }
+  }
+
+  /**
+   * Resolve the credentials to hand the wrapped provider: the explicit per-call
+   * `clientInformation` (org-config→env funnel) takes precedence; the runtime
+   * context is only a fallback when no explicit creds were supplied.
+   */
+  private _creds(
+    clientInformation?: SocialClientInformation
+  ): ClientInformation | undefined {
+    return (
+      (clientInformation as ClientInformation | undefined) ||
+      contextToClientInformation(this._context)
+    );
+  }
 
   get identifier(): string {
     return this._provider.identifier;
@@ -151,94 +327,23 @@ export class SocialProviderKernelAdapter implements SocialCapability {
     params: { code: string; codeVerifier: string; refresh?: string },
     clientInformation?: SocialClientInformation
   ): Promise<SocialAuthTokenDetails | string> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.authenticate(
-      params,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
+    return this._provider.authenticate(params, this._creds(clientInformation));
   }
 
   async refreshToken(
     refreshToken: string,
     clientInformation?: SocialClientInformation
   ): Promise<SocialAuthTokenDetails> {
-    const ctxInfo = contextToClientInformation(this._context);
     return this._provider.refreshToken(
       refreshToken,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
+      this._creds(clientInformation)
     );
-  }
-
-  async reConnect(
-    id: string,
-    requiredId: string,
-    accessToken: string
-  ): Promise<Omit<SocialAuthTokenDetails, 'refreshToken' | 'expiresIn'>> {
-    return this._provider.reConnect!(id, requiredId, accessToken);
   }
 
   async generateAuthUrl(
     clientInformation?: SocialClientInformation
   ): Promise<SocialGenerateAuthUrlResponse> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.generateAuthUrl(
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async analytics(
-    id: string,
-    accessToken: string,
-    date: number,
-    clientInformation?: SocialClientInformation
-  ): Promise<SocialAnalyticsData[]> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.analytics!(
-      id,
-      accessToken,
-      date,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async postAnalytics(
-    integrationId: string,
-    accessToken: string,
-    postId: string,
-    fromDate: number,
-    clientInformation?: SocialClientInformation
-  ): Promise<SocialAnalyticsData[]> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.postAnalytics!(
-      integrationId,
-      accessToken,
-      postId,
-      fromDate,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async changeNickname(
-    id: string,
-    accessToken: string,
-    name: string
-  ): Promise<{ name: string }> {
-    return this._provider.changeNickname!(id, accessToken, name);
-  }
-
-  async changeProfilePicture(
-    id: string,
-    accessToken: string,
-    url: string
-  ): Promise<{ url: string }> {
-    return this._provider.changeProfilePicture!(id, accessToken, url);
-  }
-
-  async missing(
-    id: string,
-    accessToken: string
-  ): Promise<{ id: string; url: string }[]> {
-    return this._provider.missing!(id, accessToken);
+    return this._provider.generateAuthUrl(this._creds(clientInformation));
   }
 
   async post(
@@ -248,121 +353,12 @@ export class SocialProviderKernelAdapter implements SocialCapability {
     integration: any,
     clientInformation?: SocialClientInformation
   ): Promise<SocialPostResponse[]> {
-    const ctxInfo = contextToClientInformation(this._context);
     return this._provider.post(
       id,
       accessToken,
       postDetails as any,
       integration,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
+      this._creds(clientInformation)
     );
-  }
-
-  async comment(
-    id: string,
-    postId: string,
-    lastCommentId: string | undefined,
-    accessToken: string,
-    postDetails: SocialPostDetails[],
-    integration: any,
-    clientInformation?: SocialClientInformation
-  ): Promise<SocialPostResponse[]> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.comment!(
-      id,
-      postId,
-      lastCommentId,
-      accessToken,
-      postDetails as any,
-      integration,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async fetchComments(
-    id: string,
-    accessToken: string,
-    postId: string,
-    cursor: string | undefined,
-    integration: any,
-    clientInformation?: SocialClientInformation
-  ): Promise<SocialCommentsResult> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.fetchComments!(
-      id,
-      accessToken,
-      postId,
-      cursor,
-      integration,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async replyToComment(
-    id: string,
-    accessToken: string,
-    postId: string,
-    parentCommentId: string,
-    message: string,
-    integration: any,
-    clientInformation?: SocialClientInformation
-  ): Promise<SocialCommentDTO> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.replyToComment!(
-      id,
-      accessToken,
-      postId,
-      parentCommentId,
-      message,
-      integration,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async likeComment(
-    id: string,
-    accessToken: string,
-    postId: string,
-    commentId: string,
-    like: boolean,
-    integration: any,
-    clientInformation?: SocialClientInformation
-  ): Promise<{ liked: boolean; likeCount?: number }> {
-    const ctxInfo = contextToClientInformation(this._context);
-    return this._provider.likeComment!(
-      id,
-      accessToken,
-      postId,
-      commentId,
-      like,
-      integration,
-      (ctxInfo || clientInformation) as ClientInformation | undefined
-    );
-  }
-
-  async mention(
-    token: string,
-    data: { query: string },
-    id: string,
-    integration: any
-  ): Promise<SocialMentionResult[] | { none: true }> {
-    return this._provider.mention!(token, data, id, integration);
-  }
-
-  mentionFormat(idOrHandle: string, name: string): string {
-    return this._provider.mentionFormat!(idOrHandle, name);
-  }
-
-  async fetchPageInformation(
-    accessToken: string,
-    data: any
-  ): Promise<SocialPageInformationResult> {
-    return this._provider.fetchPageInformation!(accessToken, data);
-  }
-
-  async externalUrl(
-    url: string
-  ): Promise<{ client_id: string; client_secret: string }> {
-    return this._provider.externalUrl!(url);
   }
 }

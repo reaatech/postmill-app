@@ -48,7 +48,7 @@ export class LinkedinPageProvider
       expires_in,
       refresh_token: refreshToken,
     } = await (
-      await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      await this.fetch('https://www.linkedin.com/oauth/v2/accessToken', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -63,7 +63,7 @@ export class LinkedinPageProvider
     ).json();
 
     const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
+      await this.fetch('https://api.linkedin.com/v2/me', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -75,7 +75,7 @@ export class LinkedinPageProvider
       sub: id,
       picture,
     } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
+      await this.fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -140,7 +140,7 @@ export class LinkedinPageProvider
 
   async companies(accessToken: string) {
     const { elements, ...all } = await (
-      await fetch(
+      await this.fetch(
         'https://api.linkedin.com/v2/organizationalEntityAcls?q=roleAssignee&role=ADMINISTRATOR&projection=(elements*(organizationalTarget~(localizedName,vanityName,logoV2(original~:playableStreams))))',
         {
           headers: {
@@ -184,7 +184,7 @@ export class LinkedinPageProvider
   async fetchPageInformation(accessToken: string, params: { page: string }) {
     const pageId = params.page;
     const data = await (
-      await fetch(
+      await this.fetch(
         `https://api.linkedin.com/v2/organizations/${pageId}?projection=(id,localizedName,vanityName,logoV2(original~:playableStreams))`,
         {
           headers: {
@@ -228,7 +228,7 @@ export class LinkedinPageProvider
       refresh_token: refreshToken,
       scope,
     } = await (
-      await fetch('https://www.linkedin.com/oauth/v2/accessToken', {
+      await this.fetch('https://www.linkedin.com/oauth/v2/accessToken', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -244,7 +244,7 @@ export class LinkedinPageProvider
       sub: id,
       picture,
     } = await (
-      await fetch('https://api.linkedin.com/v2/userinfo', {
+      await this.fetch('https://api.linkedin.com/v2/userinfo', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -252,7 +252,7 @@ export class LinkedinPageProvider
     ).json();
 
     const { vanityName } = await (
-      await fetch('https://api.linkedin.com/v2/me', {
+      await this.fetch('https://api.linkedin.com/v2/me', {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },

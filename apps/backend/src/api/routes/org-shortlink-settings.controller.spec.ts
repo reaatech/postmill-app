@@ -8,6 +8,8 @@ const mockGetActiveProvider = vi.fn();
 const mockGetProviders = vi.fn();
 const mockListProviderMetadata = vi.fn();
 const mockUpsert = vi.fn();
+const mockUpdateById = vi.fn();
+const mockGetExistingConfigId = vi.fn();
 const mockSetActive = vi.fn();
 const mockDelete = vi.fn();
 const mockTestConnection = vi.fn();
@@ -22,6 +24,8 @@ vi.mock(
       getProviders = mockGetProviders;
       listProviderMetadata = mockListProviderMetadata;
       upsert = mockUpsert;
+      updateById = mockUpdateById;
+      getExistingConfigId = mockGetExistingConfigId;
       setActive = mockSetActive;
       delete = mockDelete;
       deleteById = mockDelete;
@@ -96,6 +100,10 @@ describe('OrgShortLinkSettingsController', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetPinnedVersion.mockResolvedValue('v1');
+    // 0.3: default to "no existing config" so the identifier-route falls to the
+    // fingerprint-create `upsert` branch (first save / add-account). Tests that
+    // exercise the rotation-in-place path override this to return a row id.
+    mockGetExistingConfigId.mockResolvedValue(null);
 
     controller = new OrgShortLinkSettingsController(
       new (OrgShortLinkSettingsService as any)(),
@@ -119,6 +127,14 @@ describe('OrgShortLinkSettingsController', () => {
       const policies = Reflect.getMetadata(
         CHECK_POLICIES_KEY,
         OrgShortLinkSettingsController.prototype.getConfig,
+      );
+      expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
+    });
+
+    it('updateConfigById is gated with ADMIN create policy', () => {
+      const policies = Reflect.getMetadata(
+        CHECK_POLICIES_KEY,
+        OrgShortLinkSettingsController.prototype.updateConfigById,
       );
       expect(policies).toEqual([[AuthorizationActions.Create, Sections.ADMIN]]);
     });
@@ -291,8 +307,40 @@ describe('OrgShortLinkSettingsController', () => {
         credentials: body.credentials,
         customDomain: body.customDomain,
         extraConfig: body.extraConfig,
+        // PROVIDER_REMEDIATION 6.6: fingerprint is now computed server-side.
+        accountFingerprint: expect.any(String),
         version: undefined,
       });
+      expect(result).toEqual({ identifier: 'bitly', success: true });
+    });
+
+    // 0.3: when a config already exists for the provider, a credentialed save is a
+    // ROTATION → update the existing row in place (NOT a fingerprint-create that
+    // strands the active row on the revoked key).
+    it('updates the existing row in place on rotation instead of creating a duplicate', async () => {
+      const adapter = stubAdapter();
+      mockResolveShortLink.mockReturnValue(adapter);
+      mockGetExistingConfigId.mockResolvedValue('cfg-1');
+      mockUpdateById.mockResolvedValue({});
+
+      const result = await controller.upsertConfig(org, 'bitly', body as any);
+
+      expect(mockGetExistingConfigId).toHaveBeenCalledWith('org-1', 'bitly');
+      expect(mockUpdateById).toHaveBeenCalledWith(
+        'org-1',
+        'cfg-1',
+        {
+          credentials: body.credentials,
+          customDomain: body.customDomain,
+          extraConfig: body.extraConfig,
+          name: undefined,
+          accountFingerprint: expect.any(String),
+          version: undefined,
+        },
+        // F9: the service cross-checks the row belongs to this provider.
+        'bitly',
+      );
+      expect(mockUpsert).not.toHaveBeenCalled();
       expect(result).toEqual({ identifier: 'bitly', success: true });
     });
 
@@ -311,9 +359,41 @@ describe('OrgShortLinkSettingsController', () => {
         credentials: body.credentials,
         customDomain: body.customDomain,
         extraConfig: body.extraConfig,
+        accountFingerprint: expect.any(String),
         version: 'v2',
       });
       expect(result).toEqual({ identifier: 'bitly', success: true });
+    });
+
+    // PROVIDER_REMEDIATION 6.6: the fingerprint is derived server-side and any
+    // client-supplied `accountFingerprint` is ignored (prevents duplicate-row minting).
+    it('ignores a client-supplied accountFingerprint and computes it server-side', async () => {
+      const adapter = stubAdapter();
+      mockResolveShortLink.mockReturnValue(adapter);
+      mockUpsert.mockResolvedValue({});
+
+      await controller.upsertConfig(org, 'bitly', {
+        credentials: { apiKey: 'test-key' },
+        customDomain: 'short.myco.com',
+        accountFingerprint: 'client-forged-value',
+      } as any);
+
+      const passed = mockUpsert.mock.calls[0][2];
+      expect(passed.accountFingerprint).toEqual(expect.any(String));
+      expect(passed.accountFingerprint).not.toBe('client-forged-value');
+    });
+
+    it('leaves the fingerprint undefined when no credentials are provided', async () => {
+      const adapter = stubAdapter();
+      mockResolveShortLink.mockReturnValue(adapter);
+      mockUpsert.mockResolvedValue({});
+
+      await controller.upsertConfig(org, 'bitly', {
+        customDomain: 'short.myco.com',
+      } as any);
+
+      const passed = mockUpsert.mock.calls[0][2];
+      expect(passed.accountFingerprint).toBeUndefined();
     });
   });
 

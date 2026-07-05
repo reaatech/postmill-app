@@ -33,6 +33,11 @@ function makeResolution(overrides: Record<string, any> = {}) {
   return {
     resolveStorage: vi.fn(() => adapterMock),
     latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    // 3.6: storage writes now route the version through resolveWriteVersion
+    // (lifecycle-validated) instead of latestActiveVersion directly.
+    resolveWriteVersion: vi.fn(
+      (_domain: string, _id: string, version?: string) => version ?? 'v1',
+    ),
     ...overrides,
   } as unknown as ProviderResolutionService;
 }
@@ -285,7 +290,7 @@ describe('StorageService — version pin-on-write', () => {
     });
     const auditService = { create: vi.fn() } as unknown as AuditService;
     const resolution = makeResolution({
-      latestActiveVersion: vi.fn().mockReturnValue('v2'),
+      resolveWriteVersion: vi.fn().mockReturnValue('v2'),
     });
     const service = new StorageService(repo, auditService, encryption, resolution);
 
@@ -295,30 +300,40 @@ describe('StorageService — version pin-on-write', () => {
       credentials: { accessKeyId: 'key', secretAccessKey: 'secret' },
     });
 
-    expect(resolution.latestActiveVersion).toHaveBeenCalledWith('storage', 's3');
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith(
+      'storage',
+      's3',
+      undefined,
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ version: 'v2' }),
     );
   });
 
-  it('falls back to v1 when kernel has no active version', async () => {
+  // 3.6: version resolution now goes through the lifecycle validator — a storage
+  // type with NO registered/active kernel module is a clean rejection, not a
+  // silent v1 pin (the old `latestActiveVersion(...) ?? 'v1'` fallback is gone).
+  // All 13 StorageProviderType values ship registered active modules, so this
+  // only fires for a genuinely broken deployment.
+  it('propagates the validator rejection when the kernel has no active version', async () => {
     const repo = makeRepo({
-      create: vi.fn().mockResolvedValue({ id: 's3-1', version: 'v1' }),
+      create: vi.fn(),
     });
     const auditService = { create: vi.fn() } as unknown as AuditService;
     const resolution = makeResolution({
-      latestActiveVersion: vi.fn().mockReturnValue(undefined),
+      resolveWriteVersion: vi.fn(() => {
+        throw new Error('Provider not found: storage/s3');
+      }),
     });
     const service = new StorageService(repo, auditService, encryption, resolution);
 
-    await service.createConfig('org-1', {
-      type: StorageProviderType.S3,
-      name: 'My S3',
-    });
-
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ version: 'v1' }),
-    );
+    await expect(
+      service.createConfig('org-1', {
+        type: StorageProviderType.S3,
+        name: 'My S3',
+      }),
+    ).rejects.toThrow('Provider not found');
+    expect(repo.create).not.toHaveBeenCalled();
   });
 
   it('uses explicit body.version when provided', async () => {
@@ -335,10 +350,85 @@ describe('StorageService — version pin-on-write', () => {
       version: 'v3',
     });
 
-    expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith(
+      'storage',
+      's3',
+      'v3',
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ version: 'v3' }),
     );
+  });
+});
+
+describe('StorageService — updateConfig fingerprint recompute (3.5) + audit await (6.5)', () => {
+  const s3Row = {
+    id: 's3-1',
+    organizationId: 'org-1',
+    type: StorageProviderType.S3,
+    version: 'v1',
+    name: 'S3',
+    credentials: 'enc:{}',
+    region: 'us-east-1',
+    bucket: 'b',
+    endpoint: null,
+    publicUrl: null,
+    mounted: false,
+  };
+
+  it('recomputes accountFingerprint when credentials are rotated', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    const auditService = { create: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await service.updateConfig(
+      's3-1',
+      'org-1',
+      { credentials: { accessKeyId: 'rotated-key', secretAccessKey: 'x' } },
+    );
+
+    const updateArg = (repo.update as any).mock.calls[0][1];
+    expect(updateArg).toHaveProperty('accountFingerprint');
+    expect(typeof updateArg.accountFingerprint).toBe('string');
+    expect(updateArg.accountFingerprint.length).toBeGreaterThan(0);
+  });
+
+  it('does not set accountFingerprint when credentials are not supplied', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    const auditService = { create: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await service.updateConfig('s3-1', 'org-1', { name: 'Renamed' });
+
+    const updateArg = (repo.update as any).mock.calls[0][1];
+    expect(updateArg).not.toHaveProperty('accountFingerprint');
+  });
+
+  it('awaits the audit write on update (6.5 — not a floating promise)', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    let resolveAudit!: () => void;
+    const auditGate = new Promise<void>((r) => (resolveAudit = r));
+    const create = vi.fn().mockReturnValue(auditGate);
+    const auditService = { create } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    let settled = false;
+    const p = service.updateConfig('s3-1', 'org-1', { name: 'x' }).then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled).toBe(false); // still waiting on the audit write
+    resolveAudit();
+    await p;
+    expect(settled).toBe(true);
+    expect(create).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -5,6 +5,11 @@ const mockRepo = {
   getActive: vi.fn(),
   getByOrg: vi.fn(),
   getByIdentifier: vi.fn(),
+  // 1.2: _getPinnedVersion now reads version-agnostically. Delegate to
+  // getByIdentifier so per-test `getByIdentifier.mockResolvedValue(...)` covers both.
+  findAnyByIdentifier: vi.fn((orgId: string, id: string) =>
+    mockRepo.getByIdentifier(orgId, id),
+  ),
   setActive: vi.fn(),
   delete: vi.fn(),
   getBudget: vi.fn(),
@@ -18,6 +23,9 @@ const mockEncryption = {
 
 const mockResolution = {
   resolveAI: vi.fn(),
+  resolveWriteVersion: vi.fn((_domain: string, _id: string, version?: string) => version ?? 'v1'),
+  latestActiveVersion: vi.fn().mockReturnValue('v1'),
+  invalidate: vi.fn(),
 };
 
 const mockKernel = {
@@ -83,6 +91,29 @@ describe('OrgAiSettingsService.upsert auto-activation', () => {
     await service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk-test' } });
 
     expect(mockRepo.setActive).toHaveBeenCalledWith('org-1', 'openai', 'v1');
+  });
+
+  it('pins the resolveWriteVersion result and invalidates the cache on upsert (1.1/1.3a)', async () => {
+    mockRepo.getByOrg.mockResolvedValue([{ id: 'cfg-1', identifier: 'openai' }]);
+    mockRepo.upsert.mockResolvedValue({ id: 'cfg-1' });
+    mockResolution.resolveWriteVersion.mockReturnValueOnce('v2');
+
+    await service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk' }, version: 'v2' });
+
+    expect(mockResolution.resolveWriteVersion).toHaveBeenCalledWith('ai', 'openai', 'v2');
+    // 3rd positional arg is the payload; 4th is the validated version
+    expect(mockRepo.upsert.mock.calls[0][3]).toBe('v2');
+    expect(mockResolution.invalidate).toHaveBeenCalledWith('ai', 'openai', 'org-1');
+  });
+
+  it('propagates a rejected write version (deprecated/retired/unknown) from resolveWriteVersion (1.1)', async () => {
+    mockResolution.resolveWriteVersion.mockImplementationOnce(() => {
+      throw new Error('deprecated version rejects new writes');
+    });
+    await expect(
+      service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk' }, version: 'v0' }),
+    ).rejects.toThrow('deprecated');
+    expect(mockRepo.upsert).not.toHaveBeenCalled();
   });
 
   it('does not auto-activate on an established org (already has a configured provider)', async () => {
@@ -390,10 +421,12 @@ describe('OrgAiSettingsService reads/mutations', () => {
   });
 
   describe('delete + budget pass-throughs', () => {
-    it('delete delegates to the repository', async () => {
+    it('delete resolves the pinned version, deletes that row, and invalidates the cache (1.4/1.3a)', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v2' });
       mockRepo.delete.mockResolvedValue({ ok: true });
       await service.delete('org-1', 'openai');
-      expect(mockRepo.delete).toHaveBeenCalledWith('org-1', 'openai');
+      expect(mockRepo.delete).toHaveBeenCalledWith('org-1', 'openai', 'v2');
+      expect(mockResolution.invalidate).toHaveBeenCalledWith('ai', 'openai', 'org-1');
     });
 
     it('getBudget delegates to the repository', async () => {

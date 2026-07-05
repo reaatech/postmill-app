@@ -224,7 +224,8 @@ export class IntegrationsController {
     }
 
     const manager = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      org.id
     );
     if (!manager.changeProfilePicture && !manager.changeNickname) {
       throw new Error('Invalid integration');
@@ -276,7 +277,7 @@ export class IntegrationsController {
     }
 
     const integrationProvider =
-      await this._integrationManager.getSocialIntegration(integration);
+      await this._integrationManager.getSocialIntegration(integration, org.id);
 
     if (integrationProvider.externalUrl && !externalUrl) {
       throw new Error('Missing external url');
@@ -426,7 +427,8 @@ export class IntegrationsController {
     }
 
     const integrationProvider = await this._integrationManager.getSocialIntegration(
-      getIntegration.providerIdentifier
+      getIntegration.providerIdentifier,
+      org.id
     );
     if (!integrationProvider) {
       throw new Error('Invalid provider');

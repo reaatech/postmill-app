@@ -101,19 +101,18 @@ async function uploadVideo(
 
   const video = await downloadVideo(videoPath);
 
-  console.log('Downloaded video', videoPath, video.size);
-
   const uploadUrl = new URL(
     'https://video.bsky.app/xrpc/app.bsky.video.uploadVideo'
   );
   uploadUrl.searchParams.append('did', agent.session!.did);
   uploadUrl.searchParams.append('name', videoPath.split('/').pop()!);
 
-  // Known proxy gap: bare fetch to the fixed provider host video.bsky.app from a
-  // module-scope helper (no `this`), so it gets neither ssrfSafeDispatcher nor
-  // per-channel VPN egress. Fixed first-party host (low SSRF risk), but the VPN
-  // selection does not apply to the Bluesky video upload. See README.
-  const uploadResponse = await fetch(uploadUrl, {
+  // Known proxy gap: module-scope helper (no `this`) so SocialAbstract.fetch()
+  // (timeout/retry + per-channel VPN egress) is unreachable here. Routed through
+  // safeFetch so it still gets ssrfSafeDispatcher + per-hop re-validation; the
+  // per-channel VPN selection does not apply to the Bluesky video upload. Fixed
+  // first-party host (low SSRF risk). See README "Known proxy gap".
+  const uploadResponse = await safeFetch(uploadUrl.toString(), {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${serviceAuth.token}`,
@@ -124,7 +123,6 @@ async function uploadVideo(
   });
 
   const jobStatus = (await uploadResponse.json()) as AppBskyVideoDefs.JobStatus;
-  console.log('JobId:', jobStatus.jobId);
   let blob: BlobRef | undefined = jobStatus.blob;
   const videoAgent = new AtpAgent({ service: 'https://video.bsky.app' });
 
@@ -132,11 +130,6 @@ async function uploadVideo(
     const { data: status } = await videoAgent.app.bsky.video.getJobStatus({
       jobId: jobStatus.jobId,
     });
-    console.log(
-      'Status:',
-      status.jobStatus.state,
-      status.jobStatus.progress || ''
-    );
     if (status.jobStatus.blob) {
       blob = status.jobStatus.blob;
     }
@@ -152,8 +145,6 @@ async function uploadVideo(
 
     await timer(30000);
   }
-
-  console.log('posting video...');
 
   return {
     $type: 'app.bsky.embed.video',

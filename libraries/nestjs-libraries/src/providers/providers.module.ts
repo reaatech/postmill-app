@@ -26,7 +26,9 @@ function adaptEncryption(service: EncryptionService): EncryptionPort {
 
 function adaptSafeFetch(): SafeFetchPort {
   return async (input, init) => {
-    const url = typeof input === 'string' ? input : input.toString();
+    // 4.4: input is string|URL. `URL.href` (not the generic toString of a
+    // Request) is the correct resolved URL string for SSRF validation.
+    const url = typeof input === 'string' ? input : input.href;
     return safeFetch(url, init as RequestInit);
   };
 }
@@ -60,9 +62,10 @@ function adaptTelemetry(telemetry: TelemetryService): TelemetryPort {
   };
 }
 
+// 4.8: only telemetry is consumed by KernelOptions today; the encryption/logger
+// ports are provided to adapters via the 'ProviderPorts' factory, not the
+// kernel, so they are not parameters here.
 export function createProviderKernel(
-  encryption: EncryptionService,
-  logger: Logger,
   telemetry: TelemetryService,
 ): ProviderKernel {
   return new ProviderKernel({
@@ -76,15 +79,10 @@ export function createProviderKernel(
     Logger,
     {
       provide: PROVIDER_KERNEL,
-      useFactory: (
-        encryption: EncryptionService,
-        logger: Logger,
-        telemetry: TelemetryService,
-      ) => {
-        const kernel = createProviderKernel(encryption, logger, telemetry);
-        return kernel;
+      useFactory: (telemetry: TelemetryService) => {
+        return createProviderKernel(telemetry);
       },
-      inject: [EncryptionService, Logger, TelemetryService],
+      inject: [TelemetryService],
     },
     {
       provide: 'ProviderPorts',

@@ -98,7 +98,6 @@ import { DribbbleProvider } from './dribbble.provider';
 import { DiscordProvider } from './discord.provider';
 import { SlackProvider } from './slack.provider';
 import { MastodonProvider } from './mastodon.provider';
-import { MastodonCustomProvider } from './mastodon.custom.provider';
 import { GmbProvider } from './gmb.provider';
 import { VkProvider } from './vk.provider';
 import { WhopProvider } from './whop.provider';
@@ -554,62 +553,6 @@ describe('mastodon deep', () => {
       .mockImplementationOnce(() => Promise.resolve(resp({ id: 'nested-comment-123' })));
     const r = await provider.comment('user123', 'status-456', 'comment-123', 'tok', [{ id: 'c3', message: 'Nested', settings: {}, media: [] }], {} as any);
     expect(r[0].postId).toBe('nested-comment-123');
-  });
-});
-
-// ─────────────────────────────────────────────────────────────
-// 5. MASTODON CUSTOM PROVIDER
-// ─────────────────────────────────────────────────────────────
-describe('mastodon-custom deep', () => {
-  let provider: MastodonCustomProvider;
-
-  beforeEach(() => {
-    provider = new MastodonCustomProvider();
-    globalThis.fetch = vi.fn();
-  });
-
-  it('externalUrl registers app and returns credentials', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(resp({ client_id: 'cid-123', client_secret: 'cs-456' }));
-    const r = await provider.externalUrl('https://mastodon.example.com');
-    expect(r.client_id).toBe('cid-123');
-    expect(r.client_secret).toBe('cs-456');
-  });
-
-  it('generateAuthUrl constructs dynamic URL', async () => {
-    const r = await provider.generateAuthUrl(undefined, { instanceUrl: 'https://mastodon.example.com', client_id: 'custom-cid', client_secret: 'custom-cs' });
-    expect(r.url).toContain('mastodon.example.com/oauth/authorize');
-    expect(r.url).toContain('client_id=custom-cid');
-    expect(r).toHaveProperty('codeVerifier');
-    expect(r).toHaveProperty('state');
-  });
-
-  it('authenticate uses client information', async () => {
-    globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ access_token: 'custom-tok' })))
-      .mockImplementationOnce(() => Promise.resolve(resp({ id: '999', display_name: 'Custom User', acct: 'custom@example.com', username: 'custom', avatar: 'https://ex.com/av.jpg' })));
-    const r = await provider.authenticate({ code: 'code', codeVerifier: 'v' }, { instanceUrl: 'https://mastodon.example.com', client_id: 'cid', client_secret: 'cs' });
-    expect(r.accessToken).toBe('custom-tok');
-    expect(r.id).toBe('999');
-  });
-
-  it('post delegates to dynamicPost', async () => {
-    globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ id: 'custom-status-123' })));
-    const r = await provider.post('user123', 'tok', [{ id: 'p1', message: 'Custom instance post', settings: {}, media: [] }]);
-    expect(r).toHaveLength(1);
-    expect(r[0].postId).toBe('custom-status-123');
-  });
-
-  it('propagates RefreshTokenError when post hits a disabled login', async () => {
-    globalThis.fetch = vi.fn().mockResolvedValue(respError('Your login is currently disabled', 403));
-    await expect(provider.post('user123', 'tok', [{ id: 'p1', message: 'Custom instance post', settings: {}, media: [] }])).rejects.toThrow(RefreshTokenError);
-  });
-
-  it('comment delegates to dynamicComment', async () => {
-    globalThis.fetch = vi.fn()
-      .mockImplementationOnce(() => Promise.resolve(resp({ id: 'custom-comment-123' })));
-    const r = await provider.comment('user123', 'status-456', undefined, 'tok', [{ id: 'c1', message: 'Comment', settings: {}, media: [] }], {} as any);
-    expect(r[0].postId).toBe('custom-comment-123');
   });
 });
 

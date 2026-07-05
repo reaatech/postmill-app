@@ -24,14 +24,14 @@ export class AnthropicAdapter implements AIProviderAdapter {
   readonly privacy = { dataRetention: 'API data may be used for training; opt out via API request', trainingOnData: true, description: 'Anthropic API' };
 
   async listModels(_creds: Record<string, string>): Promise<ModelInfo[]> {
+    // 2.5: current live model IDs only — the previous catalog carried
+    // `claude-4-20250514` (never existed), `claude-3-opus-20240229` (retired),
+    // and `claude-3-5-sonnet-20241022` (retired 404), with the sole `reasoning`
+    // flag on the retired opus, so high-reasoning auto-pick chose a dead model.
     return [
-      { id: 'claude-opus-4-20250514', label: 'Claude Opus 4', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-4-20250514', label: 'Claude 4', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-3-5-haiku-20241022', label: 'Claude 3.5 Haiku', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
-      { id: 'claude-3-opus-20240229', label: 'Claude 3 Opus', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true }, reasoning: true },
+      { id: 'claude-opus-4-8', label: 'Claude Opus 4.8', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true }, reasoning: true },
+      { id: 'claude-sonnet-5', label: 'Claude Sonnet 5', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
+      { id: 'claude-haiku-4-5', label: 'Claude Haiku 4.5', kind: 'text', capabilities: { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true } },
     ];
   }
 

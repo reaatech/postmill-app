@@ -37,6 +37,50 @@ const DEFAULT_IMAGE_MODEL = 'imagen-3.0-generate-002';
 const DEFAULT_VIDEO_MODEL = 'veo-2.0-generate-001';
 const VERTEX_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
+// 5.7/5.14 — the GCS object is downloaded with the minted token then base64-inflated; reject
+// oversize via content-length before buffering. Matches the lifecycle's MAX_ARTIFACT_BYTES.
+const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
+// 2.3 — stream the body with a running byte counter, aborting once it passes the cap, so a
+// chunked / no-content-length body can't be fully buffered into the heap before the size check.
+// Returns null when the cap is exceeded (the caller maps that to a terminal failure).
+async function readCapped(res: Response, cap: number): Promise<Buffer | null> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length > cap ? null : buf;
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > cap) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  }
+  return Buffer.concat(chunks);
+}
+
+// 5.14 — turn a `gs://bucket/object` URI into the authenticated JSON-API media download URL.
+// The lifecycle's safeFetch cannot fetch a gs:// scheme, so the completed render must be inlined.
+function gcsMediaUrl(gcsUri: string): string {
+  const rest = gcsUri.replace(/^gs:\/\//, '');
+  const slash = rest.indexOf('/');
+  const bucket = rest.slice(0, slash);
+  const object = rest.slice(slash + 1);
+  return `https://storage.googleapis.com/storage/v1/b/${encodeURIComponent(bucket)}/o/${encodeURIComponent(object)}?alt=media`;
+}
+
 export class VertexMediaAdapter implements MediaProviderAdapter {
   constructor(private readonly _fetch: SafeFetchPort) {}
   readonly identifier = 'vertex';
@@ -193,7 +237,22 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const creds = await this._credentials(options);
+    // 2.1 — a config error (missing project / invalid service-account JSON / no credentials) is
+    // TERMINAL: return failed rather than throwing, which the lifecycle would re-poll for ~24h. A
+    // genuine token-mint NETWORK error stays transient (rethrow) so the lifecycle retries.
+    let creds: VertexCredentials;
+    try {
+      creds = await this._credentials(options);
+    } catch (err) {
+      const message = (err as Error).message || 'Vertex AI credential error';
+      // `requires`/`not valid JSON` are this adapter's own _credentials throws;
+      // `invalid_grant` is google-auth's terminal signal for a revoked/expired/
+      // malformed service-account key — equally a config error, not transient.
+      if (/requires|not valid JSON|invalid credentials|invalid_grant/i.test(message)) {
+        return { status: 'failed', error: message };
+      }
+      throw err;
+    }
     // Operation names look like:
     // projects/{p}/locations/{r}/publishers/google/models/{model}/operations/{id}
     const modelMatch = jobId.match(/models\/([^/]+)\//);
@@ -203,25 +262,47 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
       headers: this._headers(creds),
       body: JSON.stringify({ operationName: jobId }),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Vertex AI poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as VertexOperationResponse;
 
     if (!data.done) return { status: 'pending' };
     if (data.error) return { status: 'failed', error: data.error.message || 'Vertex AI operation failed' };
 
     const video = data.response?.videos?.[0];
+    const mime = video?.mimeType || 'video/mp4';
     if (video?.bytesBase64Encoded) {
       return {
         status: 'completed',
-        artifactUrl: `data:${video.mimeType || 'video/mp4'};base64,${video.bytesBase64Encoded}`,
-        metadata: { provider: this.identifier, model, mime: video.mimeType || 'video/mp4' },
+        artifactUrl: `data:${mime};base64,${video.bytesBase64Encoded}`,
+        metadata: { provider: this.identifier, model, mime },
       };
     }
     if (video?.gcsUri) {
+      // 5.14 — the lifecycle's safeFetch cannot download a gs:// URL. Fetch the object with the
+      // minted access token and inline it as a data URL (the Sora/Gemini pattern).
+      const fileRes = await this._fetch(gcsMediaUrl(video.gcsUri), { headers: this._headers(creds) });
+      // 2.2 — classify the download leg: a 429/5xx is transient (THROW to retry the paid render),
+      // but a permanent 4xx (expired/deleted object) is terminal — return failed rather than
+      // re-polling every sweep for 24h.
+      if (!fileRes.ok) {
+        if (isTransientStatus(fileRes.status)) {
+          const body = await fileRes.text();
+          throw new Error(`Vertex AI GCS download transient error ${fileRes.status}: ${body.slice(0, 200)}`);
+        }
+        return { status: 'failed', error: `Vertex AI GCS download failed (${fileRes.status})` };
+      }
+      const declared = Number(fileRes.headers.get('content-length') || 0);
+      if (declared > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Vertex AI video exceeds the size limit' };
+      const buffer = await readCapped(fileRes, MAX_ARTIFACT_BYTES);
+      if (!buffer) return { status: 'failed', error: 'Vertex AI video exceeds the size limit' };
       return {
         status: 'completed',
-        artifactUrl: video.gcsUri,
-        metadata: { provider: this.identifier, model, mime: video.mimeType || 'video/mp4' },
+        artifactUrl: `data:${mime};base64,${buffer.toString('base64')}`,
+        metadata: { provider: this.identifier, model, mime },
       };
     }
     return { status: 'failed', error: 'Vertex AI operation finished without video output' };

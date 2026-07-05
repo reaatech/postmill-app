@@ -95,18 +95,23 @@ describe('ResendAdapter', () => {
       expect(result).toEqual({ providerMessageId: 'msg_001' });
     });
 
-    it('includes replyTo when provided', async () => {
+    it('includes replyTo (camelCase, the key resend@6 reads) when provided', async () => {
       await adapter.send({ ...sendParams, replyTo: 'reply@example.com' });
 
       expect(mockEmailsSend).toHaveBeenCalledWith(
         expect.objectContaining({
-          reply_to: 'reply@example.com',
+          replyTo: 'reply@example.com',
         }),
       );
+      // must NOT emit the dropped snake_case key
+      expect(mockEmailsSend.mock.calls[0][0]).not.toHaveProperty('reply_to');
     });
 
-    it('throws on resend error', async () => {
-      mockEmailsSend.mockResolvedValueOnce({ data: null, error: 'rate limited' });
+    it('throws resend error message (not "[object Object]")', async () => {
+      mockEmailsSend.mockResolvedValueOnce({
+        data: null,
+        error: { name: 'rate_limit_exceeded', message: 'rate limited' },
+      });
 
       await expect(adapter.send(sendParams)).rejects.toThrow('rate limited');
     });

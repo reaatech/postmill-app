@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OrgMediaProviderSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.repository';
 import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
+import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 
 // §11.4 auto-config live-link: OpenAI and MiniMax are both AI providers and media
 // providers and share one API key. Configuring (or re-keying) either surface updates
@@ -18,10 +19,28 @@ export class ProviderCredentialLinkService {
     private _mediaRepository: OrgMediaProviderSettingsRepository,
     private _aiRepository: OrgAiSettingsRepository,
     private _encryption: EncryptionService,
+    private _resolution: ProviderResolutionService,
   ) {}
 
   isLinked(identifier: string): boolean {
     return LINKED_PROVIDERS.has(identifier);
+  }
+
+  // 1.4/1.2: resolve the pinned version for the mirror-target row the same way the
+  // owning settings services do — the target row's stored version, else the latest
+  // active version, else v1. Hardcoding v1 would split rows (mirror at v1, primary
+  // at v2) the moment a linked provider ships v2. Computed from an already-fetched
+  // row (a version-AGNOSTIC read — findUnique-by-v1 would miss a v2-pinned row).
+  private _pinnedVersion(
+    domain: 'ai' | 'media',
+    identifier: string,
+    existing: { version?: string | null } | null,
+  ): string {
+    return (
+      existing?.version ??
+      this._resolution.latestActiveVersion(domain, identifier) ??
+      'v1'
+    );
   }
 
   // AI provider configured/re-keyed → mirror credentials onto the media config.
@@ -32,10 +51,23 @@ export class ProviderCredentialLinkService {
   ): Promise<void> {
     if (!this.isLinked(identifier)) return;
     try {
-      await this._mediaRepository.upsert(orgId, identifier, {
-        enabled: true,
-        credentials: this._encryption.encrypt(JSON.stringify(credentials)),
-      });
+      const existing = await this._mediaRepository.findAnyByIdentifier(
+        orgId,
+        identifier,
+      );
+      const version = this._pinnedVersion('media', identifier, existing);
+      await this._mediaRepository.upsert(
+        orgId,
+        identifier,
+        {
+          // 1.1(c): preserve the existing mirror row's enabled flag — a re-key must
+          // not silently re-enable a deliberately-disabled provider. Default to
+          // enabled:true only when creating a brand-new mirror row.
+          enabled: existing ? existing.enabled : true,
+          credentials: this._encryption.encrypt(JSON.stringify(credentials)),
+        },
+        version,
+      );
     } catch (err) {
       // Non-fatal: the primary surface's save must not fail because of the mirror.
       this._logger.warn(
@@ -52,10 +84,21 @@ export class ProviderCredentialLinkService {
   ): Promise<void> {
     if (!this.isLinked(identifier)) return;
     try {
-      await this._aiRepository.upsert(orgId, identifier, {
-        enabled: true,
-        credentials: this._encryption.encrypt(JSON.stringify(credentials)),
-      });
+      const existing = await this._aiRepository.findAnyByIdentifier(
+        orgId,
+        identifier,
+      );
+      const version = this._pinnedVersion('ai', identifier, existing);
+      await this._aiRepository.upsert(
+        orgId,
+        identifier,
+        {
+          // 1.1(c): preserve a disabled mirror row's state on re-key (create → true).
+          enabled: existing ? existing.enabled : true,
+          credentials: this._encryption.encrypt(JSON.stringify(credentials)),
+        },
+        version,
+      );
     } catch (err) {
       this._logger.warn(
         `Failed to mirror media credentials to AI config for ${identifier}: ${(err as Error).message}`,

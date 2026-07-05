@@ -27,6 +27,10 @@ import {
 //   video  → Speak audio→talk-video  POST /v1/speak/higgsfield  (model = 'speak', routing marker only)
 const BASE = 'https://platform.higgsfield.ai';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
 const SOUL_ENDPOINT = '/v1/text2image/soul';
 const DOP_ENDPOINT = '/v1/image2video/dop';
 const SPEAK_ENDPOINT = '/v1/speak/higgsfield';
@@ -66,10 +70,13 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
     const creds = options?.credentials || {};
     let id = creds.keyId;
     let secret = creds.keySecret;
-    // Fallback: a single "KEY_ID:KEY_SECRET" string in apiKey/key.
+    // Fallback: a single "KEY_ID:KEY_SECRET" string in apiKey/key. 5.12 — split on the FIRST
+    // colon only, so a secret that itself contains ':' is not truncated.
     const combined = options?.apiKey || creds.apiKey || creds.key;
     if ((!id || !secret) && combined && combined.includes(':')) {
-      [id, secret] = combined.split(':');
+      const idx = combined.indexOf(':');
+      id = combined.slice(0, idx);
+      secret = combined.slice(idx + 1);
     }
     if (!id || !secret) throw new Error('Higgsfield requires both an API Key ID and Key Secret');
     return {
@@ -172,8 +179,20 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const res = await this._fetch(`${BASE}/requests/${jobId}/status`, { headers: this._headers(options) });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    // Missing/invalid credentials are a config error → terminal failed (matches openai/Sora),
+    // not a thrown error the lifecycle would retry to the 24h timeout.
+    let headers: Record<string, string>;
+    try {
+      headers = this._headers(options);
+    } catch (err) {
+      return { status: 'failed', error: (err as Error).message };
+    }
+    const res = await this._fetch(`${BASE}/requests/${jobId}/status`, { headers });
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Higgsfield poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as HiggsfieldResponse;
 
     if (data.status === 'completed') {
@@ -201,8 +220,12 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
     }
     try {
       const res = await this._fetch(`${BASE}/requests/00000000-0000-0000-0000-000000000000/status`, { headers });
-      if (res.status === 401) return { ok: false, message: 'Invalid Higgsfield API credentials' };
-      return { ok: true, message: 'Connection successful' };
+      // 5.6 — 401/403 (a wrong keySecret returns 403) is an auth failure; only an expected
+      // status (2xx / 404 / 422 for the fake request id) counts as connected. A 5xx / other
+      // unexpected status must NOT be reported as success.
+      if (res.status === 401 || res.status === 403) return { ok: false, message: 'Invalid Higgsfield API credentials' };
+      if (res.ok || res.status === 404 || res.status === 422) return { ok: true, message: 'Connection successful' };
+      return { ok: false, message: `Higgsfield returned ${res.status}` };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }

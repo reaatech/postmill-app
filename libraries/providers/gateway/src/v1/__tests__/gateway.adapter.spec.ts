@@ -1,9 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const doGenerateMock = vi.fn().mockResolvedValue({});
+const getAvailableModelsMock = vi.fn().mockResolvedValue({ models: [] });
+
 vi.mock('@ai-sdk/gateway', () => ({
   createGateway: vi.fn(() => ({
+    getAvailableModels: getAvailableModelsMock,
     languageModel: vi.fn(() => ({
-      doGenerate: vi.fn().mockResolvedValue({}),
+      doGenerate: doGenerateMock,
     })),
     imageModel: vi.fn(function() { return {}; }),
     textEmbeddingModel: vi.fn(function() { return {}; }),
@@ -92,6 +96,14 @@ describe('GatewayAdapter', () => {
       const result = await adapter.validateCredentials({});
       expect(result.ok).toBe(false);
       expect(result.error).toBe('API key is required');
+    });
+
+    // 5.15: cheap authenticated metadata call, not a paid generation.
+    it('validates via getAvailableModels without running paid inference (5.15)', async () => {
+      const result = await adapter.validateCredentials({ apiKey: 'gw_test' });
+      expect(result).toEqual({ ok: true });
+      expect(getAvailableModelsMock).toHaveBeenCalled();
+      expect(doGenerateMock).not.toHaveBeenCalled();
     });
   });
 

@@ -902,7 +902,8 @@ export class PostsService {
         }
 
         const provider = await this._integrationManager.getSocialIntegration(
-          integration.providerIdentifier
+          integration.providerIdentifier,
+          integration.organizationId
         );
 
         let additionalSettings: any[] = [];
@@ -1034,7 +1035,8 @@ export class PostsService {
     for (const post of body.posts) {
       const providerIdentifier = (post.settings as any)?.__type;
       const provider = await this._integrationManager.getSocialIntegration(
-        providerIdentifier
+        providerIdentifier,
+        orgId
       );
       const removeLinks = !!provider?.stripLinks?.();
 

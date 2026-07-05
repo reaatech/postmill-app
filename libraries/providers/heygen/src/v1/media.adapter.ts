@@ -43,6 +43,15 @@ interface HeyGenAudioStatusResponse {
   };
 }
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine. 4xx / a
+// provider-reported terminal state stays a returned { status: 'failed' }.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
+// 5.11 — the poll id is namespaced `<op>:<id>`; an unrecognized prefix must be treated as a
+// BARE avatar-video id (never silently routed with the prefix stripped).
+const HEYGEN_OPS = new Set(['video', 'translate', 'tts']);
+
 export class HeyGenAdapter implements MediaProviderAdapter {
   constructor(private readonly _fetch: SafeFetchPort) {}
   readonly identifier = 'heygen';
@@ -120,9 +129,15 @@ export class HeyGenAdapter implements MediaProviderAdapter {
   // single pollJob can route to the right one. A bare id (no `:`) is an avatar-video job —
   // this preserves the generic media-provider path (governance/grid), which stores the raw id.
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a config error → terminal failed (matches the openai/Sora convention),
+    // not a thrown error the lifecycle would retry to the 24h timeout.
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'HeyGen API key is required' };
+
     const sep = jobId.indexOf(':');
-    const op = sep > 0 ? jobId.slice(0, sep) : 'video';
-    const id = sep > 0 ? jobId.slice(sep + 1) : jobId;
+    const prefix = sep > 0 ? jobId.slice(0, sep) : '';
+    const known = HEYGEN_OPS.has(prefix);
+    const op = known ? prefix : 'video';
+    const id = known ? jobId.slice(sep + 1) : jobId;
 
     switch (op) {
       case 'translate':
@@ -140,7 +155,11 @@ export class HeyGenAdapter implements MediaProviderAdapter {
       headers: this._headers(options),
     });
 
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen video poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const { data } = (await res.json()) as HeyGenStatusResponse;
 
     if (data?.status === 'completed') {
@@ -162,7 +181,11 @@ export class HeyGenAdapter implements MediaProviderAdapter {
       headers: this._headers(options),
     });
 
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen translate poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const { data } = (await res.json()) as HeyGenTranslateStatusResponse;
     const status = data?.status;
 
@@ -186,7 +209,11 @@ export class HeyGenAdapter implements MediaProviderAdapter {
       headers: this._headers(options),
     });
 
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen tts poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const { data } = (await res.json()) as HeyGenAudioStatusResponse;
 
     if (data?.status === 'completed' || data?.status === 'success') {

@@ -12,7 +12,36 @@ vi.mock('@langchain/openai', () => ({
   ChatOpenAI: vi.fn(function() { return {}; }),
 }));
 
-import { OpenAICompatibleAdapter } from '../domains/ai-helpers';
+import { OpenAICompatibleAdapter, BoundedProviderCache } from '../domains/ai-helpers';
+
+describe('BoundedProviderCache (4.11)', () => {
+  it('evicts the least-recently-used entry past the cap', () => {
+    const cache = new BoundedProviderCache<number>(2);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    cache.set('c', 3); // evicts 'a' (LRU)
+    expect(cache.size).toBe(2);
+    expect(cache.get('a')).toBeUndefined();
+    expect(cache.get('b')).toBe(2);
+    expect(cache.get('c')).toBe(3);
+  });
+
+  it('refreshes recency on read so the touched entry survives', () => {
+    const cache = new BoundedProviderCache<number>(2);
+    cache.set('a', 1);
+    cache.set('b', 2);
+    cache.get('a'); // 'a' now most-recently-used
+    cache.set('c', 3); // evicts 'b' instead of 'a'
+    expect(cache.get('a')).toBe(1);
+    expect(cache.get('b')).toBeUndefined();
+  });
+
+  it('stays bounded under many rotated keys', () => {
+    const cache = new BoundedProviderCache<number>(256);
+    for (let i = 0; i < 10_000; i++) cache.set(`key-${i}`, i);
+    expect(cache.size).toBe(256);
+  });
+});
 
 describe('OpenAICompatibleAdapter', () => {
   let adapter: OpenAICompatibleAdapter;
@@ -189,19 +218,66 @@ describe('OpenAICompatibleAdapter', () => {
     });
   });
 
-  describe('baseURL normalization', () => {
-    it('strips trailing slashes from baseURL before calling validateCredentials fetch', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ data: [] }), { status: 200 }),
-      );
+  // 0.4: the `${baseURL}/models` call must go through the injected SSRF-safe
+  // fetch — never the global fetch on a free-text tenant baseURL.
+  describe('SSRF safe fetch (0.4)', () => {
+    it('listModels does not hit the global fetch when no safe fetch is injected', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const models = await adapter.listModels({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1' });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(models[0].id).toBe('default');
+      fetchSpy.mockRestore();
+    });
 
-      await adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1//' });
+    it('validateCredentials returns cannot-validate when no safe fetch is injected', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch');
+      const result = await adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1' });
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: false, error: 'cannot validate' });
+      fetchSpy.mockRestore();
+    });
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+    it('validateCredentials uses the injected safe fetch, not the global fetch', async () => {
+      const globalSpy = vi.spyOn(globalThis, 'fetch');
+      const safeFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+      adapter.setSafeFetch(safeFetch);
+      const result = await adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1' });
+      expect(result).toEqual({ ok: true });
+      expect(safeFetch).toHaveBeenCalledWith(
         'https://api.example.com/v1/models',
         expect.objectContaining({ headers: expect.anything() }),
       );
-      fetchSpy.mockRestore();
+      expect(globalSpy).not.toHaveBeenCalled();
+      globalSpy.mockRestore();
+    });
+
+    it('validateCredentials propagates an SSRF rejection instead of reflecting a body', async () => {
+      const safeFetch = vi.fn().mockRejectedValue(new Error('SSRF: refusing to fetch a non-public host'));
+      adapter.setSafeFetch(safeFetch);
+      await expect(
+        adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'http://169.254.169.254/latest' }),
+      ).rejects.toThrow(/SSRF/);
+    });
+
+    it('validateCredentials maps 401/403 to a generic invalid-key message (no raw body)', async () => {
+      const safeFetch = vi.fn().mockResolvedValue(new Response('secret internal body', { status: 401 }));
+      adapter.setSafeFetch(safeFetch);
+      const result = await adapter.validateCredentials({ apiKey: 'bad', baseURL: 'https://api.example.com/v1' });
+      expect(result).toEqual({ ok: false, error: 'Invalid API key' });
+    });
+  });
+
+  describe('baseURL normalization', () => {
+    it('strips trailing slashes from baseURL before calling the safe fetch', async () => {
+      const safeFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+      adapter.setSafeFetch(safeFetch);
+
+      await adapter.validateCredentials({ apiKey: 'test-key', baseURL: 'https://api.example.com/v1//' });
+
+      expect(safeFetch).toHaveBeenCalledWith(
+        'https://api.example.com/v1/models',
+        expect.objectContaining({ headers: expect.anything() }),
+      );
     });
 
     it.each([
@@ -209,17 +285,15 @@ describe('OpenAICompatibleAdapter', () => {
       { input: 'a/', expected: 'a/models' },
       { input: 'a///', expected: 'a/models' },
     ])('normalizes baseURL "$input" to "$expected" in listModels', async ({ input, expected }) => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-        new Response(JSON.stringify({ data: [] }), { status: 200 }),
-      );
+      const safeFetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [] }), { status: 200 }));
+      adapter.setSafeFetch(safeFetch);
 
       await adapter.listModels({ apiKey: 'test-key', baseURL: input });
 
-      expect(fetchSpy).toHaveBeenCalledWith(
+      expect(safeFetch).toHaveBeenCalledWith(
         expected,
         expect.objectContaining({ headers: expect.anything() }),
       );
-      fetchSpy.mockRestore();
     });
 
     it.each([

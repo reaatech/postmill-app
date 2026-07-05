@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { createHash } from 'node:crypto';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
+import { OrgProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.repository';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
@@ -12,6 +13,7 @@ import {
   VpnProxyRegion,
 } from './vpn.types';
 import { VpnDispatcherService } from './vpn-dispatcher.service';
+import { resolveSafeProxyHost } from './vpn-dispatcher.factory';
 
 export interface VpnProviderListItem {
   identifier: string;
@@ -62,6 +64,11 @@ export class OrgVpnConfigService {
     private _dispatcher: VpnDispatcherService,
     private _resolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    // layering: sanctioned leaf-read — OrgProviderConfigService depends back on
+    // this service (channel VPN validation), so routing "up" through it would
+    // create a Nest DI cycle. 3.7: used only to clear orphaned channel
+    // vpnSelection rows when a VPN provider is deleted.
+    private _channelConfigRepository: OrgProviderConfigRepository,
   ) {}
 
   // Effective region catalog for an adapter: derived from config for dynamic
@@ -228,10 +235,20 @@ export class OrgVpnConfigService {
     },
   ) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
-    const version =
-      config?.version ??
-      this._resolution.latestActiveVersion('vpn', identifier) ??
-      'v1';
+    // 1.1: validate the pinned version against the lifecycle before persisting —
+    // a deprecated version rejects the write, retired is 410, unknown is 400.
+    // Replaces the unvalidated `latestActive ?? 'v1'`. VPN config bodies carry no
+    // client version, so the existing pin (else latest-active) is validated.
+    // 1.4: when a config already exists, this is an in-place update — pass its
+    // pinned version as `currentVersion` so a deprecated-pinned VPN config can
+    // still be re-keyed / toggled / have its regions changed; only a fresh pin to
+    // a deprecated/retired version is rejected.
+    const version = this._resolution.resolveWriteVersion(
+      'vpn',
+      identifier,
+      config?.version ?? undefined,
+      config?.version ? { currentVersion: config.version } : undefined,
+    );
 
     let adapter;
     try {
@@ -288,13 +305,65 @@ export class OrgVpnConfigService {
 
     // Drop any pooled dispatchers so a cred/region/enabled change takes effect now.
     this._dispatcher.invalidate(orgId, identifier);
+    // 1.3a: evict the cached kernel capability so the next resolve rebuilds it.
+    this._resolution.invalidate('vpn', identifier, orgId);
     return result;
   }
 
   async delete(orgId: string, identifier: string) {
     const result = await this._repository.delete(orgId, identifier);
     this._dispatcher.invalidate(orgId, identifier);
+    // 1.3a: evict the cached kernel capability for this provider.
+    this._resolution.invalidate('vpn', identifier, orgId);
+    // 3.7: clear any channel configs still pointing their egress at this VPN
+    // provider — otherwise resolveProxyForChannel returns null and posts
+    // silently egress from the server's real IP (a privacy regression).
+    await this._clearOrphanedChannelSelections(orgId, identifier);
     return result;
+  }
+
+  // 3.7: null out the vpnSelection on every channel config in the org that
+  // referenced the just-deleted VPN provider, logging each so an operator can
+  // see the egress fell back to the server IP. Non-fatal — a failure here must
+  // never break the delete.
+  private async _clearOrphanedChannelSelections(
+    orgId: string,
+    identifier: string,
+  ): Promise<void> {
+    try {
+      const channels = await this._channelConfigRepository.getByOrg(orgId);
+      for (const channel of channels) {
+        const sel = this._parseVpnSelection(
+          (channel as { vpnSelection?: string | null }).vpnSelection,
+        );
+        if (sel?.enabled && sel.identifier === identifier) {
+          await this._channelConfigRepository.updateById(channel.id, {
+            vpnSelection: null,
+          });
+          this._logger.warn(
+            `Cleared VPN selection on channel config ${channel.id} (org=${orgId}) ` +
+              `after deleting VPN provider "${identifier}" — this channel now egresses ` +
+              `from the server IP until a new VPN is selected.`,
+          );
+        }
+      }
+    } catch (err) {
+      this._logger.warn(
+        `Failed to clear channel VPN selections for "${identifier}" (org=${orgId}): ${(err as Error)?.message}`,
+      );
+    }
+  }
+
+  private _parseVpnSelection(
+    raw: string | null | undefined,
+  ): { enabled?: boolean; identifier?: string } | null {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   async testConnection(orgId: string, identifier: string) {
@@ -323,6 +392,30 @@ export class OrgVpnConfigService {
 
     const decrypted = this._decryptCredentials(config.credentials);
     if (adapter.healthCheck) {
+      // SSRF gate: the custom-proxy health check opens a raw TCP socket to the
+      // org-supplied host, which — without validation — turns "Test connection"
+      // into an internal reachability / port-scan oracle (169.254.169.254:80,
+      // 10.0.0.x:22, …). The adapter lives in `providers/*` and can only depend on
+      // the kernel, so it cannot run SSRF validation itself; do it here (the
+      // service already decrypts creds and can import the dispatch-path resolver).
+      // Validate any host-bearing config through the SAME resolver the dispatch
+      // path uses (respecting SSRF_ALLOWED_PRIVATE_CIDRS via isBlockedIp) and hand
+      // the adapter a validated literal IP so the connect leg can't be redirected
+      // to a private address via DNS rebinding.
+      const host =
+        typeof decrypted.host === 'string' ? decrypted.host.trim() : '';
+      if (host) {
+        let safeIp: string;
+        try {
+          safeIp = await resolveSafeProxyHost(host);
+        } catch {
+          return {
+            ok: false,
+            error: 'Proxy host is not a permitted public address.',
+          };
+        }
+        return adapter.healthCheck({ ...decrypted, host: safeIp });
+      }
       return adapter.healthCheck(decrypted);
     }
     return { ok: true };

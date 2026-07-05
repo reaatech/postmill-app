@@ -12,6 +12,7 @@ function makeService() {
       })
     ),
     getProviders: vi.fn().mockResolvedValue([]),
+    isProviderEnabledForOperation: vi.fn().mockResolvedValue(true),
   };
 
   const lifecycle = {
@@ -258,6 +259,33 @@ describe('MediaStudioService', () => {
           input: { prompt: 'a cat' },
         }),
       ).rejects.toThrow('not configured');
+    });
+
+    it('blocks generation for a disabled provider before resolving credentials (1.7)', async () => {
+      const { service, orgSettings, resolution } = makeService();
+      orgSettings.isProviderEnabledForOperation.mockResolvedValue(false);
+
+      await expect(
+        service.generate('org-1', 'user-1', 'test-provider', {
+          operation: 'image',
+          input: { prompt: 'a cat' },
+        }),
+      ).rejects.toThrow('disabled');
+      // never reaches credential resolution / adapter dispatch
+      expect(orgSettings.getConfigForProvider).not.toHaveBeenCalled();
+      expect(resolution.resolveMedia).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('listModels enabled gate (1.7)', () => {
+    it('returns [] for a disabled provider without resolving the adapter', async () => {
+      const { service, orgSettings, resolution } = makeService();
+      orgSettings.isProviderEnabledForOperation.mockResolvedValue(false);
+
+      const models = await service.listModels('org-1', 'test-provider', 'image');
+      expect(models).toEqual([]);
+      expect(orgSettings.getConfigForProvider).not.toHaveBeenCalled();
+      expect(resolution.resolveMedia).not.toHaveBeenCalled();
     });
   });
 });

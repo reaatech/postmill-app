@@ -67,15 +67,24 @@ export class OrgContentPackSettingsService {
     const active = await this.getActive(orgId);
     if (!active) return null;
 
-    const capabilityInstance = this._resolution.resolveContentPack(
-      active.identifier,
-      {
+    // 1.6: if the active pack pins a retired version or its module failed boot
+    // registration, resolution throws (ProviderNotFoundError /
+    // ProviderVersionRetiredError). Degrade to the free provider (return null)
+    // instead of 500-ing every stock search for the org.
+    let capabilityInstance;
+    try {
+      capabilityInstance = this._resolution.resolveContentPack(active.identifier, {
         version: active.version,
         credentials: active.credentials,
         orgId,
         extras: { extraConfig: active.extraConfig },
-      }
-    );
+      });
+    } catch (err) {
+      this._logger.warn(
+        `Content pack "${active.identifier}@${active.version}" could not be resolved; falling back to the free provider: ${(err as Error).message}`,
+      );
+      return null;
+    }
     if (!capabilityInstance.capabilities.includes(capability as any)) return null;
     return { capability: capabilityInstance, active };
   }
@@ -93,15 +102,19 @@ export class OrgContentPackSettingsService {
       ? this._encryption.encrypt(JSON.stringify(data.credentials))
       : undefined;
 
-    const version =
-      data.version ??
-      this._resolution.latestActiveVersion('contentpack', identifier) ??
-      DEFAULT_VERSION;
+    // 1.1: validate the (client-supplied or defaulted) version against the
+    // lifecycle before pinning (deprecated → 400, retired → 410, unknown → 400).
+    const version = this._resolution.resolveWriteVersion('contentpack', identifier, data.version);
 
-    return this._repository.upsert(orgId, identifier, {
+    const result = await this._repository.upsert(orgId, identifier, {
       credentials: encryptedCredentials,
       extraConfig: data.extraConfig,
     }, version);
+
+    // 1.3a: evict the cached capability so the next resolve rebuilds with fresh creds.
+    this._resolution.invalidate('contentpack', identifier, orgId);
+
+    return result;
   }
 
   async setActive(orgId: string, identifier: string | null) {
@@ -133,7 +146,10 @@ export class OrgContentPackSettingsService {
     if (active?.identifier === identifier) {
       await this._repository.setActivePointer(orgId, null);
     }
-    return this._repository.delete(orgId, identifier);
+    const result = await this._repository.delete(orgId, identifier);
+    // 1.3a: evict the cached capability for the deleted config.
+    this._resolution.invalidate('contentpack', identifier, orgId);
+    return result;
   }
 
   async testConnection(orgId: string, identifier: string) {

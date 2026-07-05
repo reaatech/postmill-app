@@ -151,6 +151,32 @@
   for existing orgs on deploy.
 
 ### Fixed
+- **Provider-surface round-2 remediation.** Follow-up hardening and cleanup on top of the v4.0.0
+  provider-framework cutover:
+  - **`GET /providers/catalog?domain=` is no longer anonymous** — it moved into the authenticated
+    route group (`AuthMiddleware`/`CsrfMiddleware` apply) and an unknown/unsupported `?domain=` now
+    returns **400 Bad Request** (`resolveDomainFilter` rejects it) instead of an unfiltered/empty
+    catalog. Only authenticated settings pages consume it, so no anonymous caller is affected.
+  - **Self-hosted media over plain `http://` is now blocked for outbound provider fetches.**
+    `safeFetch` enforces HTTPS + public-IP, so a self-hosted instance serving media over `http://`
+    (LOCAL storage) or a private address gets a "Blocked URL" where it previously worked (e.g.
+    **Pinterest video** posting). Serve media over HTTPS, or opt the private range in via
+    `SSRF_ALLOWED_PRIVATE_CIDRS`.
+  - **Add-channel connect/list blips now surface an error** instead of an empty account list on a
+    provider 4xx/5xx during the handshake (GMB, Kick, LinkedIn-page, Whop) — a correctness
+    improvement; a transient provider error is no longer silently read as "no accounts".
+  - **Removed the stale `mastodon-custom` provider references** (analytics metric map + test mocks).
+    The provider was dropped; forked-from-upstream production `Integration` rows still pinned to
+    `mastodon-custom` are now dead channels — see the new
+    [provider round-2 checklist](https://github.com/reaatech/postmill-app/blob/main/docs/operations-guide/provider-round-2-checklist.md)
+    for the count-and-remap runbook.
+  - **Corrected the encryption-route docs.** `EncryptionService.encrypt/decrypt` delegates to
+    `AuthService.fixedEncryption` (one shared `getEncryptionKey()`); the two routes do **not** diverge
+    even with a dedicated `ENCRYPTION_KEY`. Documentation-only correction — behaviour unchanged, old
+    rows still decrypt.
+  - **Release checklist** consolidating the above plus the boot-time budget global-cap cleanup
+    backfill and the optional SES `EMAIL_WEBHOOK_SECRET` (carried from the round-1 email work) is
+    published under the operations guide.
 - **Analytics post-snapshot level semantics + `feat/stats-upgrade` review remediation.**
   `PostAnalyticsSnapshot.value` is now treated as a **cumulative lifetime level** for every metric
   (matching what every provider `postAnalytics()` returns), and all post-scoped consumers difference

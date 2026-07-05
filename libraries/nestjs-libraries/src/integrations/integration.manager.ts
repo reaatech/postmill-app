@@ -201,8 +201,14 @@ export class IntegrationManager {
   getAllowedSocialsIntegrations() {
     return this.getSocialProviders().map((p) => p.identifier);
   }
-  async getSocialIntegration(integration: string, orgId?: string): Promise<SocialProvider> {
-    const provider = this.getSocialIntegrationUnchecked(integration);
+  async getSocialIntegration(
+    integration: string,
+    orgId?: string,
+    version?: string
+  ): Promise<SocialProvider> {
+    // When the caller pins the connected row's stored version, resolve that exact
+    // adapter and reject a retired version (see getSocialIntegrationUnchecked).
+    const provider = this.getSocialIntegrationUnchecked(integration, version);
     if (!provider) {
       throw new NotFoundException(`Unknown integration: ${integration}`);
     }
@@ -234,6 +240,19 @@ export class IntegrationManager {
       ? this._kernel.get('social', integration, version)
       : this._kernel.get('social', integration, DEFAULT_VERSION) ??
         this._kernel.latestActive('social', integration);
+
+    // 1.3: the Unchecked variant is documented to RETURN undefined for
+    // unknown/unavailable ids so a single bad provider can't abort a cross-org
+    // sweep (channel list, token refresh — callers rely on `if (!provider)
+    // continue`). A retired pinned version must therefore return undefined here,
+    // NOT throw — the throw belonged to the CHECKED getSocialIntegration, which
+    // surfaces the 404/410 for a single user-facing lookup. Version-less listing
+    // paths keep their existing, status-agnostic behaviour. Latent today (all
+    // social providers are v1), so this is behaviour-neutral for real data.
+    if (version && mod?.manifest.status === 'retired') {
+      return undefined;
+    }
+
     return mod?.legacyProvider as SocialProvider | undefined;
   }
 

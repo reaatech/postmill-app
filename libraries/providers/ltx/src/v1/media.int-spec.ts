@@ -87,6 +87,43 @@ describe('ltx media adapter (op-routed submit-and-poll, namespaced job id)', () 
     expect(recs[1].url).toBe('https://api.ltx.video/v2/text-to-video');
   });
 
+  it('2.1: a 503 on poll THROWS (transient); a provider status:failed → returned failed', async () => {
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = ltxMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob('text-to-video:abc', { apiKey: 'k' })).rejects.toThrow(/transient/i);
+
+    const f = makeCtx(() => res({ status: 'failed', error: 'nope' }));
+    const a2: any = ltxMediaModule.create(f.ctx as any);
+    const r = await a2.pollJob('text-to-video:abc', { apiKey: 'k' });
+    expect(r.status).toBe('failed');
+  });
+
+  it('2.1: a 4xx on poll → returned failed; missing key on poll → terminal failed', async () => {
+    const four = makeCtx(() => res('bad', false, 422));
+    const a1: any = ltxMediaModule.create(four.ctx as any);
+    expect((await a1.pollJob('text-to-video:abc', { apiKey: 'k' })).status).toBe('failed');
+
+    const nokey = makeCtx(() => res({}));
+    const a2: any = ltxMediaModule.create(nokey.ctx as any);
+    const r = await a2.pollJob('text-to-video:abc', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/key is required/);
+  });
+
+  it('5.11: an unknown prefix is treated as a bare text-to-video id (full id in path)', async () => {
+    const { recs, ctx } = makeCtx(() => res({ status: 'processing' }));
+    const adapter: any = ltxMediaModule.create(ctx as any);
+    await adapter.pollJob('weird:abc', { apiKey: 'k' });
+    expect(recs[0].url).toBe('https://api.ltx.video/v2/text-to-video/weird:abc');
+  });
+
+  it('5.6: testConnection rejects a 5xx as NOT connected', async () => {
+    const { ctx } = makeCtx(() => res('down', false, 500));
+    const adapter: any = ltxMediaModule.create(ctx as any);
+    const tc = await adapter.testConnection({ apiKey: 'k' });
+    expect(tc.ok).toBe(false);
+  });
+
   it('testConnection ok; image and unsupported ops throw', async () => {
     const { ctx } = makeCtx(() => res('', true, 404));
     const adapter: any = ltxMediaModule.create(ctx as any);

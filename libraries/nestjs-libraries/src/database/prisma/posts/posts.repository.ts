@@ -91,6 +91,9 @@ export class PostsRepository {
         integration: {
           select: {
             providerIdentifier: true,
+            // 4.13: include the pinned version so the recovery-enqueue path can
+            // resolve the exact adapter (and reject a retired one).
+            providerVersion: true,
           },
         },
         publishDate: true,

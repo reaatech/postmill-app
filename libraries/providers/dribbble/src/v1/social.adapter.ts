@@ -133,12 +133,18 @@ export class DribbbleProvider extends SocialAbstract implements SocialProvider {
     clientInformation?: ClientInformation
   ) {
     const { access_token, scope } = await (
-      await this.fetch(
-        `https://dribbble.com/oauth/token?client_id=${clientInformation?.client_id || ''}&client_secret=${clientInformation?.client_secret || ''}&code=${params.code}&redirect_uri=${process.env.FRONTEND_URL}/integrations/social/dribbble`,
-        {
-          method: 'POST',
-        }
-      )
+      await this.fetch('https://dribbble.com/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          client_id: clientInformation?.client_id || '',
+          client_secret: clientInformation?.client_secret || '',
+          code: params.code,
+          redirect_uri: `${process.env.FRONTEND_URL}/integrations/social/dribbble`,
+        }).toString(),
+      })
     ).json();
 
     this.checkScopes(this.scopes, scope);

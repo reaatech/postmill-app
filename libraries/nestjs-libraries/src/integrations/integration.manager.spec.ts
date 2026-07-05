@@ -814,6 +814,90 @@ describe('IntegrationManager', () => {
     });
   });
 
+  // ---- 2.7: org-only enablement passes orgId through ----
+
+  describe('getSocialIntegration org-only enablement (2.7)', () => {
+    it('resolves a provider enabled only via per-org config when orgId is passed', async () => {
+      const orgPcm = { isEnabled: vi.fn().mockResolvedValue(true) };
+      const globalPcm = { isEnabled: vi.fn().mockResolvedValue(false) };
+      const m = new IntegrationManager(globalPcm as any, orgPcm as any, fakeKernel);
+
+      const provider = await m.getSocialIntegration('x', 'org-1');
+
+      expect(provider.identifier).toBe('x');
+      expect(orgPcm.isEnabled).toHaveBeenCalledWith('org-1', 'x');
+    });
+
+    it('throws when the same org-only provider is resolved without an orgId (no global/env)', async () => {
+      const orgPcm = { isEnabled: vi.fn().mockResolvedValue(true) };
+      const globalPcm = { isEnabled: vi.fn().mockResolvedValue(false) };
+      const m = new IntegrationManager(globalPcm as any, orgPcm as any, fakeKernel);
+
+      await expect(m.getSocialIntegration('x')).rejects.toThrow(NotFoundException);
+      expect(orgPcm.isEnabled).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---- 4.13: version pinning + retired-status rejection ----
+
+  describe('getSocialIntegrationUnchecked version pinning + retired status (4.13)', () => {
+    const mkMod = (version: string, status: string, name: string) => ({
+      manifest: {
+        domain: 'social',
+        providerId: 'demo',
+        version,
+        status,
+        capabilities: {},
+      },
+      legacyProvider: { identifier: 'demo', name },
+    });
+
+    it('resolves the exact pinned version (a v2-pinned row runs the v2 adapter)', () => {
+      const v1 = mkMod('v1', 'active', 'Demo v1');
+      const v2 = mkMod('v2', 'active', 'Demo v2');
+      const kernel = {
+        get: (_d: string, _id: string, v: string) => (v === 'v2' ? v2 : v1),
+        latestActive: () => v1,
+        listManifests: () => [],
+      } as any;
+      const m = new IntegrationManager({} as any, {} as any, kernel);
+
+      expect(m.getSocialIntegrationUnchecked('demo', 'v2')?.name).toBe('Demo v2');
+      expect(m.getSocialIntegrationUnchecked('demo', 'v1')?.name).toBe('Demo v1');
+    });
+
+    it('returns undefined for a retired pinned version (1.3 — Unchecked must never throw)', () => {
+      // 1.3: the Unchecked variant returns undefined (not throw) for a retired
+      // pinned version so a single retired-pinned row can't abort a cross-org
+      // sweep (channel list / token refresh rely on `if (!provider) continue`).
+      // The CHECKED getSocialIntegration delegates here and therefore surfaces a
+      // generic 404 ("Unknown integration") for a retired pin — the retired
+      // wording/410 does not survive on that path.
+      const retired = mkMod('v1', 'retired', 'Demo v1');
+      const kernel = {
+        get: () => retired,
+        latestActive: () => retired,
+        listManifests: () => [],
+      } as any;
+      const m = new IntegrationManager({} as any, {} as any, kernel);
+
+      expect(m.getSocialIntegrationUnchecked('demo', 'v1')).toBeUndefined();
+    });
+
+    it('does not check status on the version-less listing path', () => {
+      const retired = mkMod('v1', 'retired', 'Demo v1');
+      const kernel = {
+        get: () => retired,
+        latestActive: () => retired,
+        listManifests: () => [],
+      } as any;
+      const m = new IntegrationManager({} as any, {} as any, kernel);
+
+      // No version pinned → status-agnostic (existing listing behaviour), no throw.
+      expect(m.getSocialIntegrationUnchecked('demo')?.identifier).toBe('demo');
+    });
+  });
+
   // ---- Delegation methods ----
 
   describe('getClientInformation', () => {

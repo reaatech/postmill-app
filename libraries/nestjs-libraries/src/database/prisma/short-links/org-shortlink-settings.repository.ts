@@ -23,6 +23,16 @@ export class OrgShortLinkSettingsRepository {
     });
   }
 
+  // The ACTIVE row for this org+identifier, or null. Rotation must target the row
+  // `getActive()` actually reads — orgs already carrying pre-fix duplicate rows
+  // (active row on a revoked key + newer inactive row) would otherwise keep
+  // rotating the wrong one (PROVIDER_REMEDIATION_02 §0.3 review F7).
+  getActiveByIdentifier(orgId: string, identifier: string) {
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.findFirst({
+      where: { organizationId: orgId, identifier, isActive: true },
+    });
+  }
+
   getById(orgId: string, id: string) {
     return this._orgShortLinkConfig.model.orgShortLinkConfig.findFirst({
       where: { id, organizationId: orgId },
@@ -73,6 +83,28 @@ export class OrgShortLinkSettingsRepository {
     }
     return this._orgShortLinkConfig.model.orgShortLinkConfig.create({
       data: { organizationId: orgId, identifier, version, ...data },
+    });
+  }
+
+  // Row-id-targeted in-place update (mirrors StorageService.updateConfig by-id).
+  // Ownership is enforced by the caller (service.updateById does getById(orgId,id)
+  // first), so the unique where is the row id alone.
+  updateById(
+    configId: string,
+    data: {
+      enabled?: boolean;
+      isActive?: boolean;
+      credentials?: string;
+      customDomain?: string;
+      extraConfig?: string;
+      name?: string;
+      accountFingerprint?: string;
+      version?: string;
+    },
+  ) {
+    return this._orgShortLinkConfig.model.orgShortLinkConfig.update({
+      where: { id: configId },
+      data,
     });
   }
 

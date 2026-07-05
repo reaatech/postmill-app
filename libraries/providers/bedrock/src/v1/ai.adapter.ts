@@ -66,17 +66,16 @@ export class BedrockAdapter implements AIProviderAdapter {
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.region) return { ok: false, error: 'AWS region is required' };
     if (!creds.accessKeyId || !creds.secretAccessKey) return { ok: false, error: 'AWS credentials are required' };
-    try {
-      const provider = this._buildProvider(creds);
-      const model = provider.languageModel('amazon.nova-lite-v1:0');
-      await (model as any).doGenerate({
-        prompt: [{ role: 'user', content: [{ type: 'text' as const, text: 'ping' }] }],
-        maxOutputTokens: 1,
-      });
-      return { ok: true };
-    } catch (err: any) {
-      return { ok: false, error: err.message || 'Unknown error' };
-    }
+    // 3.8/5.15: this is a PRESENCE-only check — it verifies the required fields
+    // are filled in, NOT that the credentials actually authenticate. A wrong or
+    // expired secret passes here and only fails at first real use. We accept
+    // that reduced strength deliberately: Bedrock exposes no *free* auth probe
+    // through the AI-SDK provider (a control-plane ListFoundationModels call
+    // would require the AWS SDK / hand-rolled SigV4, which is not wired here),
+    // and the previous `doGenerate` ping burned paid inference on every test.
+    // The reduced strength is surfaced honestly to operators via the manifest
+    // `setupNotes` below, so "Test connection" doesn't imply live verification.
+    return { ok: true };
   }
 
   /** @note bedrock SDK returns specificationVersion "v1" — cast through unknown to satisfy the v2 interface */
@@ -111,6 +110,11 @@ export const bedrockAiModule: ProviderModule<any, any> = {
     status: 'active',
     credentialFields: (adapter as any).credentialFields || [],
     capabilities: (adapter as any).capabilities,
+    // 3.8: Bedrock has no free authenticated probe, so "Test connection" only
+    // checks that the fields are present — real credentials are verified on
+    // first use. Tell operators so a passing test isn't mistaken for live auth.
+    setupNotes:
+      'Test connection only verifies the fields are present; AWS credentials are verified on first use.',
   },
   create: () => adapter as any,
   validateCredentials: async (ctx) => adapter.validateCredentials(ctx.credentials),

@@ -113,6 +113,7 @@ function resp(data: any) {
     status: 200, ok: true,
     json: vi.fn().mockResolvedValue(data),
     text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+    blob: vi.fn().mockResolvedValue(new Blob([JSON.stringify(data)])),
     headers: new Map([['x-restli-id', 'urn:li:post:abc'], ['get', (k: string) => k === 'x-restli-id' ? 'urn:li:post:abc' : undefined]]),
   };
 }
@@ -1567,8 +1568,15 @@ describe('pinterest deep', () => {
   });
 
   it('post with video', async () => {
+    // Sequence through the shared fetch mock: (1) this.fetch registers the media,
+    // (2) safeFetch downloads the source video (reads .blob()), (3) safeFetch PUTs
+    // to the presigned upload_url, (4) this.fetch polls media status, (5) this.fetch
+    // creates the pin. The download+upload legs used to be bare axios (mocked
+    // separately) — they now route through safeFetch, so two extra mocks are needed.
     globalThis.fetch = vi.fn()
       .mockImplementationOnce(() => Promise.resolve(resp({ media_id: 'media-123', upload_url: 'https://upload.ex.com', upload_parameters: { key: 'val' } })))
+      .mockImplementationOnce(() => Promise.resolve(resp({})))
+      .mockImplementationOnce(() => Promise.resolve(resp({})))
       .mockImplementationOnce(() => Promise.resolve(resp({ status: 'succeeded' })))
       .mockImplementationOnce(() => Promise.resolve(resp({ id: 'pin-vid-123' })));
     const r = await provider.post('user123', 'tok', [{ id: 'p1', message: 'Video pin', media: [{ type: 'video', path: 'https://ex.com/vid.mp4' }, { type: 'image', path: 'https://ex.com/cover.jpg' }], settings: { board: 'board-123', title: 'My Pin', link: 'https://ex.com', dominant_color: '#ff0000' } }]);

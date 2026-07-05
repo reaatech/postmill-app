@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import * as Sentry from '@sentry/nestjs';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { FeatureFlagsService } from '@gitroom/nestjs-libraries/feature-flags';
@@ -54,9 +55,18 @@ export class ProvidersBootstrap implements OnModuleInit {
           `Registered provider ${domain}/${mod.manifest.providerId}@${mod.manifest.version}`,
         );
       } catch (err) {
-        this._logger.warn(
-          `Failed to register ${domain}/${mod.manifest.providerId}@${mod.manifest.version}: ${(err as Error).message}`,
+        // PROVIDER_REMEDIATION 4.7: a failed register means every org configured for
+        // this provider gets runtime 404s. Escalate to error-level + Sentry so a
+        // manifest regression can't ship silently. Boot still continues (logs-and-
+        // continue) so one bad module doesn't take down the whole process.
+        const key = `${domain}/${mod.manifest.providerId}@${mod.manifest.version}`;
+        this._logger.error(
+          `Failed to register provider ${key}: ${(err as Error).message}`,
+          (err as Error).stack,
         );
+        Sentry.captureException(err, {
+          tags: { subsystem: 'provider-kernel', provider: key },
+        });
       }
     }
   }

@@ -18,6 +18,41 @@ import {
 // returns it inline as a data URL — see pollJob.
 const SORA_BASE = 'https://api.openai.com/v1/videos';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
+// 5.7 — the auth-only MP4 is buffered then base64-inflated (~2.3× resident); reject via the
+// content-length header BEFORE buffering so a huge render can't blow the 2 GB heap. Matches the
+// lifecycle's MAX_ARTIFACT_BYTES so nothing that passes here is rejected later.
+const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
+// 2.3 — stream the body with a running byte counter, aborting once it passes the cap, so a
+// chunked / no-content-length body can't be fully buffered into the heap before the size check.
+// Returns null when the cap is exceeded (the caller maps that to a terminal failure).
+async function readCapped(res: Response, cap: number): Promise<Buffer | null> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length > cap ? null : buf;
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > cap) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  }
+  return Buffer.concat(chunks);
+}
+
 interface SoraJob {
   id?: string;
   status?: 'queued' | 'in_progress' | 'completed' | 'failed';
@@ -160,7 +195,11 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
     const headers = { Authorization: `Bearer ${apiKey}` };
 
     const res = await this._fetch(`${SORA_BASE}/${jobId}`, { headers });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Sora poll transient error ${res.status}: ${body.slice(0, 200)}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as SoraJob;
 
     if (data.status === 'completed') {
@@ -168,8 +207,22 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       // and return it inline as a data URL — the lifecycle decodes data URLs, whereas the default
       // unauthenticated re-download of a provider URL would 401 here.
       const contentRes = await this._fetch(`${SORA_BASE}/${jobId}/content`, { headers });
-      if (!contentRes.ok) return { status: 'failed', error: `Sora content download failed (${contentRes.status})` };
-      const base64 = Buffer.from(await contentRes.arrayBuffer()).toString('base64');
+      // 2.2 — classify the download leg: a 429/5xx is transient (THROW to retry the paid render),
+      // but a permanent 4xx (expired/deleted clip) is terminal — return failed rather than
+      // re-polling every sweep for 24h.
+      if (!contentRes.ok) {
+        if (isTransientStatus(contentRes.status)) {
+          const body = await contentRes.text();
+          throw new Error(`Sora content download transient error ${contentRes.status}: ${body.slice(0, 200)}`);
+        }
+        return { status: 'failed', error: `Sora content download failed (${contentRes.status})` };
+      }
+      // 5.7 — reject oversize via content-length before buffering + base64-inflating.
+      const declared = Number(contentRes.headers.get('content-length') || 0);
+      if (declared > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Sora video exceeds the size limit' };
+      const buffer = await readCapped(contentRes, MAX_ARTIFACT_BYTES);
+      if (!buffer) return { status: 'failed', error: 'Sora video exceeds the size limit' };
+      const base64 = buffer.toString('base64');
       return {
         status: 'completed',
         artifactUrl: `data:video/mp4;base64,${base64}`,

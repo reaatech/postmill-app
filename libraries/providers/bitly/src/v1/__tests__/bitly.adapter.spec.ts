@@ -207,11 +207,14 @@ describe('BitlyAdapter', () => {
       fetchSpy.mockRestore();
     });
 
-    it('returns empty results on non-ok response (skips without error)', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(404, 'Not Found', false));
+    it('pushes a 0-click fallback on non-ok response (one entry per input)', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(500, 'Server Error', false));
 
-      const result = await adapter.linkStatistics(mockContext, ['https://bit.ly/a']);
-      expect(result).toEqual([]);
+      const result = await adapter.linkStatistics(mockContext, ['https://bit.ly/a', 'https://bit.ly/b']);
+      expect(result).toEqual([
+        { short: 'https://bit.ly/a', original: '', clicks: '0' },
+        { short: 'https://bit.ly/b', original: '', clicks: '0' },
+      ]);
 
       fetchSpy.mockRestore();
     });

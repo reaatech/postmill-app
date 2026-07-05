@@ -275,7 +275,7 @@ export class S3StorageBase implements StorageCapability {
         stream: file.buffer as any,
       };
     } catch (err) {
-      console.error('Error uploading file to S3:', err);
+      console.warn(`S3 upload failed: ${(err as Error).message}`);
       throw err;
     }
   }

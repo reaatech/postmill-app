@@ -21,6 +21,10 @@ import {
 // the gateway AI-SDK adapter, so audio is omitted here.
 const GATEWAY_BASE = 'https://ai-gateway.vercel.sh/v1';
 
+// 5.7 — the AI-SDK returns the video in memory; reject oversize BEFORE base64-inflating (~1.33×)
+// so a huge render can't blow the 2 GB heap. Matches the lifecycle's MAX_ARTIFACT_BYTES.
+const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
 // One long-lived dispatcher so a multi-minute video render isn't killed by the default 5-min
 // fetch timeout. Created lazily to avoid touching undici when the gateway is never used.
 let _videoDispatcher: Agent | undefined;
@@ -74,6 +78,14 @@ export class GatewayMediaAdapter extends AiSdkMediaAdapter {
     const video = result.videos?.[0];
     if (!video) throw new Error('Gateway returned no video');
     const mime = (video as { mediaType?: string }).mediaType || 'video/mp4';
+    // 5.7 — check the raw byte size before base64-inflating; the SDK already materialized the
+    // bytes, so guard the heap here rather than after a second in-memory copy.
+    const rawBytes = video.uint8Array
+      ? video.uint8Array.length
+      : video.base64
+        ? Math.floor((video.base64.length * 3) / 4)
+        : 0;
+    if (rawBytes > MAX_ARTIFACT_BYTES) throw new Error('Gateway video exceeds the size limit');
     const b64 = video.base64 || Buffer.from(video.uint8Array).toString('base64');
     return {
       jobId: `gateway-video-${b64.length}`,

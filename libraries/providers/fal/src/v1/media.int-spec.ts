@@ -71,6 +71,32 @@ describe('fal media adapter (sync image + queued video)', () => {
     expect(out.image).toBe('https://cdn.fal/img.png');
   });
 
+  it('2.1: a 503 on the status poll THROWS (transient); FAILED status → returned failed', async () => {
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = falMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob('fal-ai/kling::req-1', { apiKey: 'k' })).rejects.toThrow(/transient/i);
+
+    const f = makeCtx(() => res({ status: 'FAILED', error: 'model error' }));
+    const a2: any = falMediaModule.create(f.ctx as any);
+    expect((await a2.pollJob('fal-ai/kling::req-1', { apiKey: 'k' })).status).toBe('failed');
+  });
+
+  it('2.1: a 5xx on the post-COMPLETED result fetch THROWS (render already succeeded)', async () => {
+    const { ctx } = makeCtx((url) =>
+      url.endsWith('/status') ? res({ status: 'COMPLETED' }) : res('gone', false, 502),
+    );
+    const adapter: any = falMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('fal-ai/kling::req-1', { apiKey: 'k' })).rejects.toThrow(/transient/i);
+  });
+
+  it('2.1: missing key on poll → terminal failed (not thrown)', async () => {
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = falMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('fal-ai/kling::req-1', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/key is required/);
+  });
+
   it('rejects a missing key and unsupported avatar generation', async () => {
     const { ctx } = makeCtx(() => res({}));
     const adapter: any = falMediaModule.create(ctx as any);

@@ -135,6 +135,22 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
 **Never use bare `fetch()` on user-supplied URLs.** DTO validation alone does not survive DNS
 rebinding or 30x redirects.
 
+### Self-hosted media over `http://` (Pinterest video, LOCAL storage)
+
+Because `safeFetch` enforces **HTTPS + public IP**, a self-hosted instance that serves its own media
+over plain `http://` or from a private/internal address will now get a `Blocked URL` error where the
+fetch previously worked. The concrete case is **Pinterest video posting**: the provider fetches the
+media URL server-side through `safeFetch`, so a LOCAL-storage instance exposing media at
+`http://<private-host>/uploads/...` fails the pre-flight validation.
+
+To keep self-hosted media working with providers that re-fetch it:
+
+- **Serve media over HTTPS** with a publicly resolvable hostname (the recommended fix), **or**
+- Add the private range to `SSRF_ALLOWED_PRIVATE_CIDRS` (opt-in) so the internal media host is
+  reachable. This narrows the SSRF posture — scope it to the exact CIDR your media host uses.
+
+Managed/cloud storage (S3/R2/B2/etc.) is unaffected — those already serve HTTPS public URLs.
+
 ## Encryption at rest
 
 Secrets stored in the database are encrypted with AES-256-GCM.

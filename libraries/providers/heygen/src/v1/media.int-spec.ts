@@ -60,6 +60,44 @@ describe('heygen media adapter (async avatar-video submit-and-poll)', () => {
     expect(done.artifactUrl).toBe('https://cdn.heygen/translated.mp4');
   });
 
+  it('2.1: a 503 on poll THROWS (transient) so the render is not permanently failed', async () => {
+    const { ctx } = makeCtx(() => res('temporarily unavailable', false, 503));
+    const adapter: any = heygenMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('vid-123', { apiKey: 'k' })).rejects.toThrow(/transient/i);
+  });
+
+  it('2.1: a provider status:failed → returned { status: failed } (permanent)', async () => {
+    const { ctx } = makeCtx(() => res({ data: { status: 'failed', error: { message: 'render error' } } }));
+    const adapter: any = heygenMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('vid-123', { apiKey: 'k' });
+    expect(r.status).toBe('failed');
+    expect(r.error).toBe('render error');
+  });
+
+  it('2.1: a 4xx on poll → returned { status: failed } (permanent, not thrown)', async () => {
+    const { ctx } = makeCtx(() => res('bad request', false, 400));
+    const adapter: any = heygenMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('vid-123', { apiKey: 'k' });
+    expect(r.status).toBe('failed');
+  });
+
+  it('2.1: a missing key on poll → terminal failed (not thrown)', async () => {
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = heygenMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('vid-123', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/key is required/);
+  });
+
+  it('5.11: an unknown `<op>:` prefix is treated as a BARE avatar-video id (full id sent, not stripped)', async () => {
+    const { recs, ctx } = makeCtx(() => res({ data: { status: 'completed', video_url: 'https://cdn/x.mp4' } }));
+    const adapter: any = heygenMediaModule.create(ctx as any);
+    const done = await adapter.pollJob('weird:abc', { apiKey: 'k' });
+    expect(done.status).toBe('completed');
+    // full string used as the video id, routed to the avatar-video endpoint
+    expect(recs[0].url).toBe('https://api.heygen.com/v1/video_status.get?video_id=weird%3Aabc');
+  });
+
   it('rejects a missing key and unsupported image/audio operations', async () => {
     const { ctx } = makeCtx(() => res({}));
     const adapter: any = heygenMediaModule.create(ctx as any);
