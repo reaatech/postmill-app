@@ -1,4 +1,13 @@
-import { IsBoolean, IsIn, IsOptional, Matches, Allow } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  Matches,
+  Allow,
+  ValidateNested,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { PollDto } from './poll.dto';
 
 export class XDto {
   // Discriminator property kept by keepDiscriminatorProperty:true on the post settings
@@ -28,4 +37,9 @@ export class XDto {
   @IsOptional()
   @IsBoolean()
   paid_partnership?: boolean;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => PollDto)
+  poll?: PollDto;
 }

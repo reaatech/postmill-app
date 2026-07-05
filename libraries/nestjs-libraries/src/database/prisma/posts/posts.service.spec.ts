@@ -467,10 +467,15 @@ describe('PostsService Inngest dispatch', () => {
     expect(result).toEqual({ error: true });
   });
 
-  it('startWorkflow emits post/publish with idempotency id and current payload fields', async () => {
+  it('startWorkflow emits post/publish with a unique-per-send id and current payload fields', async () => {
     await service.startWorkflow('youtube', 'post-456', 'org-2', 'QUEUE' as State);
 
-    expect(inngest.send).toHaveBeenCalledWith({
+    const publish = vi
+      .mocked(inngest.send)
+      .mock.calls.map((c) => c[0] as any)
+      .find((e) => e.name === 'post/publish');
+
+    expect(publish).toMatchObject({
       name: 'post/publish',
       data: {
         postId: 'post-456',
@@ -478,8 +483,9 @@ describe('PostsService Inngest dispatch', () => {
         taskQueue: 'youtube',
         maxConcurrentJob: 3,
       },
-      id: 'post_post-456',
     });
+    // Unique-per-send id (no longer the constant `post_${postId}`).
+    expect(publish.id).toMatch(/^post_post-456_/);
   });
 
   it('startWorkflow emits post/cancel before post/publish', async () => {
@@ -557,5 +563,301 @@ describe('PostsService Inngest dispatch', () => {
         }),
       })
     );
+  });
+});
+
+// ── POSTS_REMEDIATION tasks 0.5, 0.8, 1.2, 1.5, 1.6, 1.7, 4.1b, 4.4e ──
+
+function makePostsService(overrides: Record<string, any> = {}) {
+  const postRepository = {
+    getPost: vi.fn(),
+    getPostById: vi.fn(),
+    getPostsByGroup: vi.fn(),
+    changeState: vi.fn().mockResolvedValue(undefined),
+    changeDate: vi.fn().mockResolvedValue({ date: '2030-01-01' }),
+    countPostsFromDay: vi.fn().mockResolvedValue(0),
+    ...overrides.postRepository,
+  };
+  const integrationManager = {
+    getSocialIntegrationUnchecked: vi.fn().mockReturnValue({ maxConcurrentJob: 1 }),
+  };
+  const integrationService = {
+    getIntegrationsList: vi.fn().mockResolvedValue([]),
+    ...overrides.integrationService,
+  };
+  const shortLinkService = {
+    shouldShortlink: vi.fn().mockResolvedValue({ ask: false, domain: undefined }),
+    ...overrides.shortLinkService,
+  };
+  const campaignsRepository = {
+    findById: vi.fn(),
+    ...overrides.campaignsRepository,
+  };
+  const subscriptionService = {
+    getSubscriptionByOrganizationId: vi.fn().mockResolvedValue(null),
+    ...overrides.subscriptionService,
+  };
+
+  const service = new PostsService(
+    postRepository as any, // _postRepository
+    {} as any, // _analyticsRepository
+    integrationManager as any, // _integrationManager
+    integrationService as any, // _integrationService
+    {} as any, // _fileService
+    shortLinkService as any, // _shortLinkService
+    {} as any, // _openaiService
+    {} as any, // _refreshIntegrationService
+    {} as any, // _ragService
+    {} as any, // _storageService
+    campaignsRepository as any, // _campaignsRepository
+    {} as any, // _auditService
+    subscriptionService as any, // _subscriptionService
+  );
+
+  return { service, postRepository, integrationService, shortLinkService, campaignsRepository, subscriptionService };
+}
+
+describe('0.5 — strip decrypted integration secrets from HTTP reads', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+  });
+
+  it('getPost result has no token/refreshToken on integration', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPost.mockResolvedValue({
+      id: 'p1',
+      group: 'g1',
+      image: '[]',
+      settings: '{}',
+      integrationId: 'int-1',
+      integration: {
+        id: 'int-1',
+        providerIdentifier: 'x',
+        name: 'My X',
+        picture: 'pic.png',
+        profile: 'handle',
+        token: 'SECRET_TOKEN',
+        refreshToken: 'SECRET_REFRESH',
+        customInstanceDetails: 'SECRET_INSTANCE',
+      },
+      childrenPost: [],
+    });
+
+    const result = await service.getPost('org-1', 'p1');
+    const integration = (result.posts[0] as any).integration;
+
+    expect(integration.token).toBeUndefined();
+    expect(integration.refreshToken).toBeUndefined();
+    expect(integration.customInstanceDetails).toBeUndefined();
+    expect(integration.id).toBe('int-1');
+    expect(integration.providerIdentifier).toBe('x');
+    expect(integration.name).toBe('My X');
+    expect(integration.picture).toBe('pic.png');
+    expect(integration.profile).toBe('handle');
+  });
+});
+
+describe('0.8 / 4.4e — unique publish event id + inngest-disabled warning', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
+    (PostsService as any)._inngestDisabledWarned = false;
+  });
+
+  it('emits a post/publish id matching /^post_.*_/ that differs between two sends', async () => {
+    const { service } = makePostsService();
+
+    await service.startWorkflow('x', 'post-123', 'org-1', 'QUEUE' as State);
+    await service.startWorkflow('x', 'post-123', 'org-1', 'QUEUE' as State);
+
+    const publishSends = vi
+      .mocked(inngest.send)
+      .mock.calls.map((c) => c[0] as any)
+      .filter((e) => e.name === 'post/publish');
+
+    expect(publishSends).toHaveLength(2);
+    expect(publishSends[0].id).toMatch(/^post_.*_/);
+    expect(publishSends[1].id).toMatch(/^post_.*_/);
+    expect(publishSends[0].id).not.toBe(publishSends[1].id);
+  });
+
+  it('4.4e — warns once when USE_INNGEST is disabled and sends nothing', async () => {
+    const { service } = makePostsService();
+    vi.mocked(isInngestEnabled).mockReturnValue(false);
+    const { Logger } = await import('@nestjs/common');
+    const warnSpy = vi.spyOn(Logger, 'warn').mockImplementation(() => undefined);
+
+    await service.startWorkflow('x', 'post-1', 'org-1', 'QUEUE' as State);
+    await service.startWorkflow('x', 'post-2', 'org-1', 'QUEUE' as State);
+
+    const inngestWarns = warnSpy.mock.calls.filter((c) => String(c[0]).includes('USE_INNGEST'));
+    expect(inngestWarns).toHaveLength(1);
+    expect(inngest.send).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+describe('1.2 — changePostStatus approval gate', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
+  });
+
+  it('rejects promoting a pending campaign draft to schedule', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPostById.mockResolvedValue({
+      id: 'p1',
+      campaignId: 'camp-1',
+      approvalStatus: 'pending',
+      integration: { providerIdentifier: 'x' },
+    });
+
+    await expect(service.changePostStatus('org-1', 'p1', 'schedule')).rejects.toThrow(
+      'Draft not approved',
+    );
+    expect(postRepository.changeState).not.toHaveBeenCalled();
+  });
+
+  it('allows promoting an approved campaign draft', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPostById.mockResolvedValue({
+      id: 'p1',
+      campaignId: 'camp-1',
+      approvalStatus: 'approved',
+      integration: { providerIdentifier: 'x' },
+    });
+
+    await expect(service.changePostStatus('org-1', 'p1', 'schedule')).resolves.toEqual({
+      id: 'p1',
+      state: 'QUEUE',
+    });
+    // 4.4a — org id is now threaded through the publish-path mutators
+    expect(postRepository.changeState).toHaveBeenCalledWith('p1', 'QUEUE', 'org-1');
+  });
+});
+
+describe('1.5 — bulkCreate enforces remaining POSTS_PER_MONTH budget', () => {
+  const prev = process.env.STRIPE_PUBLISHABLE_KEY;
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+  });
+  afterEach(() => {
+    if (prev === undefined) delete process.env.STRIPE_PUBLISHABLE_KEY;
+    else process.env.STRIPE_PUBLISHABLE_KEY = prev;
+  });
+
+  it('rejects a bulk request (402) when the org is at its monthly cap', async () => {
+    const { service } = makePostsService({
+      subscriptionService: {
+        getSubscriptionByOrganizationId: vi
+          .fn()
+          .mockResolvedValue({ subscriptionTier: 'STANDARD', createdAt: new Date() }), // 400/mo
+      },
+      postRepository: {
+        countPostsFromDay: vi.fn().mockResolvedValue(400),
+      },
+    });
+
+    await expect(
+      service.bulkCreate('org-1', {
+        rows: [
+          {
+            content: 'hello',
+            channels: ['int-1'],
+            scheduleAt: '2999-01-01T00:00:00.000Z',
+          } as any,
+        ],
+      } as any),
+    ).rejects.toMatchObject({ status: 402 });
+  });
+});
+
+describe('1.6 — UTM not applied to already-shortened URLs', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+  });
+
+  it('leaves a short-domain URL untouched and applies UTM to raw URLs', async () => {
+    const { service } = makePostsService({
+      shortLinkService: {
+        shouldShortlink: vi.fn().mockResolvedValue({ ask: false, domain: 'short.io' }),
+      },
+      campaignsRepository: {
+        findById: vi.fn().mockResolvedValue({ utmEnabled: true, name: 'My Campaign' }),
+      },
+    });
+
+    const [out] = await (service as any)._appendUtmToMessages(
+      ['Read https://short.io/abc and https://example.com/page.'],
+      'camp-1',
+      'org-1',
+      'x',
+    );
+
+    expect(out).toContain('https://short.io/abc');
+    expect(out).not.toContain('short.io/abc?');
+    expect(out).not.toContain('short.io/abc&');
+    expect(out).toContain('utm_campaign=my-campaign');
+    // Raw URL tagged; trailing '.' preserved outside the query string.
+    expect(out).toMatch(/example\.com\/page\?utm_campaign=my-campaign[^.\s]*\.$/);
+  });
+});
+
+describe('1.7 — reject scheduling in the past', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+  });
+
+  it('validateAndCreatePost rejects a schedule with a past date', async () => {
+    const { service } = makePostsService();
+    const past = '2000-01-01T00:00:00.000Z';
+    vi.spyOn(service, 'mapTypeToPost').mockResolvedValue({
+      type: 'schedule',
+      date: past,
+      posts: [],
+    } as any);
+
+    await expect(
+      service.validateAndCreatePost('org-1', { type: 'schedule', date: past }, 'WEB' as any),
+    ).rejects.toThrow('Cannot schedule a post in the past');
+  });
+});
+
+describe('4.1b — changeDate guards', () => {
+  beforeEach(() => {
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.clearAllMocks();
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
+  });
+
+  it('throws Post not found for an unknown id', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPostById.mockResolvedValue(null);
+
+    await expect(service.changeDate('org-1', 'nope', '2030-01-01', 'schedule')).rejects.toThrow(
+      'Post not found',
+    );
+  });
+
+  it('does not re-queue an already-published post on reschedule', async () => {
+    const { service, postRepository } = makePostsService();
+    postRepository.getPostById.mockResolvedValue({
+      id: 'p1',
+      state: 'PUBLISHED',
+      integration: { providerIdentifier: 'x' },
+    });
+    const startSpy = vi.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+
+    await service.changeDate('org-1', 'p1', '2030-01-01', 'schedule');
+
+    expect(postRepository.changeDate).toHaveBeenCalled();
+    expect(startSpy).not.toHaveBeenCalled();
   });
 });

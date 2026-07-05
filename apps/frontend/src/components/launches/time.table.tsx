@@ -14,6 +14,7 @@ import useKeypress from 'react-use-keypress';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { sortBy } from 'lodash';
 import { usePreventWindowUnload } from '@gitroom/react/helpers/use.prevent.window.unload';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import clsx from 'clsx';
@@ -48,6 +49,7 @@ export const TimeTable: FC<{
   const [minute, setMinute] = useState(0);
   const fetch = useFetch();
   const modal = useModals();
+  const toaster = useToaster();
   usePreventWindowUnload(true);
 
   const askClose = useCallback(async () => {
@@ -68,7 +70,10 @@ export const TimeTable: FC<{
   useKeypress('Escape', askClose);
 
   const removeSlot = useCallback(
-    (index: number) => async () => {
+    // Key deletion by the slot's `time` value, not the sorted display index — the
+    // rendered list is sorted while `currentTimes` is not, so an index would delete
+    // the wrong slot.
+    (value: number) => async () => {
       if (
         !(await deleteDialog(
           t(
@@ -79,7 +84,7 @@ export const TimeTable: FC<{
       ) {
         return;
       }
-      setCurrentTimes((prev) => prev.filter((_, i) => i !== index));
+      setCurrentTimes((prev) => prev.filter((p) => p.time !== value));
     },
     []
   );
@@ -117,15 +122,22 @@ export const TimeTable: FC<{
   }, [currentTimes]);
 
   const save = useCallback(async () => {
-    await fetch(`/integrations/${props.integration.id}/time`, {
+    const res = await fetch(`/integrations/${props.integration.id}/time`, {
       method: 'POST',
       body: JSON.stringify({
         time: currentTimes,
       }),
     });
+    if (!res.ok) {
+      toaster.show(
+        t('failed_to_save_time_slots', 'Failed to save time slots'),
+        'warning'
+      );
+      return;
+    }
     mutate();
     modal.closeAll();
-  }, [currentTimes]);
+  }, [currentTimes, toaster, t]);
 
   return (
     <div className="relative w-full max-w-[400px] mx-auto">
@@ -210,7 +222,7 @@ export const TimeTable: FC<{
                 </div>
                 <button
                   type="button"
-                  onClick={removeSlot(index)}
+                  onClick={removeSlot(timeSlot.value)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity p-[8px] hover:bg-red-500/10 rounded-[6px] text-red-400 hover:text-red-500"
                 >
                   <TrashIcon size={16} />

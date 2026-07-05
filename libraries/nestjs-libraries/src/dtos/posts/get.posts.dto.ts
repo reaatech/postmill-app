@@ -5,9 +5,58 @@ import {
   IsNumber,
   Min,
   Max,
+  ValidateBy,
+  ValidationOptions,
+  buildMessage,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+// 4.3b: DTO-level belt-and-suspenders for the repo's ~92-day MAX_WINDOW_DAYS clamp
+// (posts.repository.ts). Rejects an `endDate` that is more than `maxDays` after the
+// sibling `startDate` so an absurd multi-year window is refused at the edge rather
+// than silently clamped. The repo clamp stays the runtime enforcer.
+const MAX_WINDOW_DAYS = 92;
+const MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+function IsWithinWindowOf(
+  property: string,
+  maxDays: number,
+  validationOptions?: ValidationOptions
+) {
+  return ValidateBy(
+    {
+      name: 'isWithinWindowOf',
+      constraints: [property, maxDays],
+      validator: {
+        validate(value: any, args): boolean {
+          const [relatedPropertyName, days] = args!.constraints as [
+            string,
+            number
+          ];
+          const start = (args!.object as any)[relatedPropertyName];
+          // Presence/format is @IsDateString's job — only enforce the window when
+          // both ends parse to a real date.
+          if (value == null || start == null) {
+            return true;
+          }
+          const startMs = Date.parse(start);
+          const endMs = Date.parse(value);
+          if (Number.isNaN(startMs) || Number.isNaN(endMs)) {
+            return true;
+          }
+          return (endMs - startMs) / MS_PER_DAY <= days;
+        },
+        defaultMessage: buildMessage(
+          (eachPrefix) =>
+            `${eachPrefix}$property must not be more than ${maxDays} days after ${property}`,
+          validationOptions
+        ),
+      },
+    },
+    validationOptions
+  );
+}
 
 export class GetPostsDto {
   @ApiProperty({
@@ -22,6 +71,7 @@ export class GetPostsDto {
     example: '2026-01-31T23:59:59.000Z',
   })
   @IsDateString()
+  @IsWithinWindowOf('startDate', MAX_WINDOW_DAYS)
   endDate: string;
 
   @ApiPropertyOptional({

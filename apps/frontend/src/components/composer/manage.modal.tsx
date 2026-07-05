@@ -208,17 +208,44 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
   const changeCustomer = useCallback(
     (customer: string) => {
-      const neededIntegrations = integrations.filter(
-        (p) => p?.customer?.id === customer
+      const apply = () => {
+        const neededIntegrations = integrations.filter(
+          (p) => p?.customer?.id === customer
+        );
+        setSelectedIntegrations(
+          neededIntegrations.map((p) => ({
+            settings: {},
+            selectedIntegrations: p,
+          }))
+        );
+      };
+
+      // Switching customer wipes the current selection and any per-channel work.
+      // Only warn when a selected channel actually carries customizations — a
+      // per-channel content override (`internal` entry) or non-empty settings —
+      // otherwise switch immediately without a prompt.
+      const hasCustomizations = selectedIntegrations.some(
+        (p) =>
+          internal.some((i) => i.integration.id === p.integration.id) ||
+          (p.settings && Object.keys(p.settings).length > 0)
       );
-      setSelectedIntegrations(
-        neededIntegrations.map((p) => ({
-          settings: {},
-          selectedIntegrations: p,
-        }))
-      );
+
+      if (!hasCustomizations) {
+        apply();
+        return;
+      }
+
+      deleteDialog(
+        t(
+          'switch_customer_lose_customizations',
+          'Switching customer will clear your selected channels and any per-channel customizations. Continue?'
+        ),
+        t('yes_switch', 'Yes, switch')
+      ).then((confirmed) => {
+        if (confirmed) apply();
+      });
     },
-    [integrations, setSelectedIntegrations]
+    [integrations, selectedIntegrations, internal, setSelectedIntegrations, t]
   );
 
   // "Started composing" = any editor has real text or attached media. Drives both nav guards
@@ -229,10 +256,16 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         .replace(/<[^>]*>/g, '')
         .replace(/&nbsp;/g, ' ')
         .trim();
-    return (global || []).some(
-      (g) => stripped(g?.content).length > 0 || (g?.media?.length ?? 0) > 0
+    const hasWork = (v?: { content?: string; media?: any[] }) =>
+      stripped(v?.content ?? '').length > 0 || (v?.media?.length ?? 0) > 0;
+    // In edit mode the content lives in `internal[].integrationValue`, not
+    // `global` (which is one empty value), so inspect both — otherwise the
+    // nav guards never arm while editing an existing post.
+    return (
+      (global || []).some(hasWork) ||
+      (internal || []).some((i) => (i?.integrationValue || []).some(hasWork))
     );
-  }, [global]);
+  }, [global, internal]);
 
   // Warn before navigating away (refresh / tab close / back button / new URL) once the user
   // has actually started composing.
@@ -302,9 +335,18 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       setLoading(false);
       return;
     }
-    await fetch(`/posts/${existingData.group}`, {
+    const res = await fetch(`/posts/${existingData.group}`, {
       method: 'DELETE',
     });
+    if (!res.ok) {
+      toaster.show(
+        (await res.json().catch(() => null))?.message ||
+          t('failed_to_delete_post', 'Failed to delete post'),
+        'warning'
+      );
+      setLoading(false);
+      return;
+    }
     mutate();
     if (customClose) {
       customClose();
@@ -312,7 +354,7 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
     }
     modal.closeAll();
     return;
-  }, [existingData, mutate, modal, customClose, fetch, t]);
+  }, [existingData, mutate, modal, customClose, fetch, t, toaster]);
 
   const saveAsTemplate = useCallback(async () => {
     if (!ref.current?.getAllValues) return;
@@ -399,7 +441,10 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
   }, [fetch, modal, toaster, t]);
 
   const schedule = useCallback(
-    (type: 'draft' | 'now' | 'schedule' | 'update') => async () => {
+    (type: 'draft' | 'now' | 'schedule' | 'update', skipPreflight = false) => async () => {
+      // 3.8: claim the loading lock at the very top so a second click during the
+      // (network) preflight/getAllValues round-trip can't start a duplicate flow.
+      setLoading(true);
       if (
         (type === 'now' || type === 'schedule') &&
         (existingData?.posts?.[0]?.state === 'PUBLISHED' ||
@@ -444,8 +489,9 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
         }
       }
 
-      // 2J: Run preflight check for schedule/now (skip for draft)
-      if (type === 'schedule' || type === 'now') {
+      // 2J: Run preflight check for schedule/now (skip for draft, and when the
+      // user already reviewed the panel and clicked Proceed → skipPreflight).
+      if ((type === 'schedule' || type === 'now') && !skipPreflight) {
         const allValues = await ref.current.getAllValues();
         const group = existingData.group || makeId(10);
         const posts = allValues.map((post: any) => ({
@@ -466,7 +512,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
 
         const preflightResult = await runPreflight({ type, posts, date: date.utc().format('YYYY-MM-DDTHH:mm:ss') });
 
-        if (preflightResult && preflightResult.blocking.length > 0) {
+        if (
+          preflightResult &&
+          (preflightResult.blocking.length > 0 ||
+            preflightResult.results.some((r) => r.warnings?.length))
+        ) {
           setShowPreflight(true);
           setPendingScheduleType(type);
           setPreflightData(preflightResult);
@@ -474,8 +524,6 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           return;
         }
       }
-
-      setLoading(true);
 
       // Pull the local values to build the payload, but rely on the server
       // (`/posts/valid`) for the actual validation — checkValidity now lives
@@ -511,12 +559,20 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
       }));
 
       if (!dummy) {
-        const checkAllValid = await (
-          await fetch('/posts/valid', {
-            method: 'POST',
-            body: JSON.stringify({ type, posts }),
-          })
-        ).json();
+        const validRes = await fetch('/posts/valid', {
+          method: 'POST',
+          body: JSON.stringify({ type, posts }),
+        });
+        if (!validRes.ok) {
+          toaster.show(
+            (await validRes.json().catch(() => null))?.message ||
+              t('failed_to_validate_post', 'Failed to validate your post'),
+            'warning'
+          );
+          setLoading(false);
+          return;
+        }
+        const checkAllValid = await validRes.json();
 
         const focus = (id: string, where: 'fix' | 'preview') => {
           integrationById(id)?.ref?.current?.[where]?.();
@@ -623,10 +679,22 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
             campaignId && type === 'draft'
               ? `/campaigns/${campaignId}/drafts`
               : '/posts';
-          await fetch(url, {
+          const res = await fetch(url, {
             method: 'POST',
             body: JSON.stringify(data),
           });
+          if (!res.ok) {
+            // 0.11: the shared fetch does not throw on 4xx/5xx — surface the
+            // server message, keep the modal open, and clear loading so the
+            // user can retry without losing their composed content.
+            toaster.show(
+              (await res.json().catch(() => null))?.message ||
+                t('failed_to_save_post', 'Failed to save your post'),
+              'warning'
+            );
+            setLoading(false);
+            return;
+          }
         }
 
         if (!addEditSets) {
@@ -638,10 +706,11 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           );
         }
         if (customClose) {
+          // 3.8: keep the loading lock until customClose fires so the deferred
+          // close can't re-enable the button and reopen a second submit window.
           setTimeout(() => {
             customClose();
           }, 2000);
-          setLoading(false);
           return;
         }
 
@@ -1064,8 +1133,12 @@ export const ManageModal: FC<AddEditModalProps> = (props) => {
           onProceed={() => {
             setShowPreflight(false);
             setPreflightData(null);
-            if (pendingScheduleType) {
-              schedule(pendingScheduleType)();
+            const pending = pendingScheduleType;
+            setPendingScheduleType(null);
+            // 3.13: skipPreflight=true so we don't re-run preflight and re-open
+            // the panel (which would loop) — proceed straight to submit.
+            if (pending) {
+              schedule(pending, true)();
             }
           }}
         />

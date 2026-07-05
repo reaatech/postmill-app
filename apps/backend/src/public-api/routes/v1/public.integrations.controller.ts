@@ -229,6 +229,30 @@ export class PublicIntegrationsController {
         ? rawBody.creationMethod
         : 'API';
 
+    // 4.2d — reject scheduling/publishing onto a disabled or refresh-needed
+    // channel at create time (the publish would otherwise fail later). Drafts
+    // are allowed so the user can reconnect before promoting.
+    if (rawBody.type !== 'draft') {
+      for (const p of rawBody.posts || []) {
+        const integrationId = p?.integration?.id;
+        if (!integrationId) {
+          continue;
+        }
+        const channel = await this._integrationService.getIntegrationById(
+          org.id,
+          integrationId
+        );
+        if (channel && (channel.disabled || channel.refreshNeeded)) {
+          throw new HttpException(
+            {
+              msg: `Channel ${channel.name} is disconnected or needs reauthentication. Reconnect it before scheduling.`,
+            },
+            400
+          );
+        }
+      }
+    }
+
     return this._postsService.validateAndCreatePost(
       org.id,
       rawBody,
@@ -250,6 +274,10 @@ export class PublicIntegrationsController {
   ) {
     Sentry.metrics.count('public_api-request', 1);
     const getPostById = await this._postsService.getPost(org.id, id);
+    // 4.2b — an unknown/foreign id resolves to null; reading `.group` would 500.
+    if (!getPostById?.group) {
+      throw new HttpException({ msg: 'Post not found' }, 404);
+    }
     return this._postsService.deletePost(org.id, getPostById.group);
   }
 
@@ -623,6 +651,7 @@ export class PublicIntegrationsController {
   }
 
   @Put('/posts/:id/status')
+  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async changePostStatus(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -790,7 +819,11 @@ export class PublicIntegrationsController {
       throw new HttpException({ msg: 'Tool not found' }, 404);
     }
 
-    while (true) {
+    // 4.2c — cap the token-refresh retries. A provider that keeps throwing
+    // RefreshToken (or a refresh that keeps returning a token that still fails)
+    // must not spin forever; give up and 502 after a bounded number of attempts.
+    const MAX_REFRESH_RETRIES = 2;
+    for (let attempt = 0; attempt <= MAX_REFRESH_RETRIES; attempt++) {
       try {
         // @ts-ignore
         const result = await integrationProvider[body.methodName](
@@ -803,6 +836,15 @@ export class PublicIntegrationsController {
         return { output: result };
       } catch (err) {
         if (err instanceof RefreshToken) {
+          // Retries exhausted — stop looping and surface a 502 instead of
+          // spinning forever on a token that never becomes valid.
+          if (attempt >= MAX_REFRESH_RETRIES) {
+            throw new HttpException(
+              { msg: 'Integration tool failed after token refresh retries' },
+              502
+            );
+          }
+
           const data = await this._refreshIntegrationService.refresh(
             getIntegration
           );
@@ -833,5 +875,12 @@ export class PublicIntegrationsController {
         throw new HttpException({ msg: 'Unexpected error' }, 500);
       }
     }
+
+    // Unreachable in practice (every iteration returns or throws), but keeps the
+    // method's return type total and guards against a future edit to the loop.
+    throw new HttpException(
+      { msg: 'Integration tool failed after token refresh retries' },
+      502
+    );
   }
 }

@@ -6,6 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
+import SafeImage from '@gitroom/react/helpers/safe.image';
 import { CommentComposer } from './comment.composer';
 
 dayjs.extend(relativeTime);
@@ -132,9 +133,11 @@ const CommentItem: FC<{
     >
       <div className="shrink-0">
         {comment.authorPicture ? (
-          <img
+          <SafeImage
             src={comment.authorPicture}
             alt=""
+            width={24}
+            height={24}
             className="w-[24px] h-[24px] rounded-full object-cover"
           />
         ) : (

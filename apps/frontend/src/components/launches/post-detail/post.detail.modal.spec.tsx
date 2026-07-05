@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 
 const mockFetchFn = vi.fn().mockResolvedValue({ ok: true });
 const mockMutateFn = vi.fn();
@@ -336,14 +336,77 @@ describe('PostDetailModal', () => {
     expect(screen.queryByTestId('comment-thread')).toBeNull();
   });
 
-  it('calls POST /posts/:postId/social-comments/read on mount', () => {
-    mockFetchFn.mockResolvedValueOnce({ ok: true });
+  // 4.6e — mark-read now probes the unread count first, then POSTs read. The
+  // POST is deferred behind the awaited probe, so it is not synchronous on mount.
+  it('probes unread-count then POSTs mark-read on mount for a published post', async () => {
     stubData({ postData: basePostData(), analyticsData: baseAnalyticsData() });
     render(<PostDetailModal postId="post-1" />);
+    await waitFor(() =>
+      expect(mockFetchFn).toHaveBeenCalledWith(
+        '/posts/post-1/social-comments/read',
+        { method: 'POST' }
+      )
+    );
     expect(mockFetchFn).toHaveBeenCalledWith(
+      '/posts/post-1/social-comments/unread-count'
+    );
+  });
+
+  // 4.6e — the global calendar mutate must fire only when marking read actually
+  // cleared an unread badge.
+  it('revalidates the calendar when mark-read cleared unread comments', async () => {
+    mockFetchFn
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ unreadCount: 3 }) })
+      .mockResolvedValueOnce({ ok: true });
+    stubData({ postData: basePostData(), analyticsData: baseAnalyticsData() });
+    render(<PostDetailModal postId="post-1" />);
+    await waitFor(() => expect(mockMutateFn).toHaveBeenCalled());
+  });
+
+  it('does NOT revalidate the calendar when nothing was unread', async () => {
+    mockFetchFn
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ unreadCount: 0 }) })
+      .mockResolvedValueOnce({ ok: true });
+    stubData({ postData: basePostData(), analyticsData: baseAnalyticsData() });
+    render(<PostDetailModal postId="post-1" />);
+    await waitFor(() =>
+      expect(mockFetchFn).toHaveBeenCalledWith(
+        '/posts/post-1/social-comments/read',
+        { method: 'POST' }
+      )
+    );
+    expect(mockMutateFn).not.toHaveBeenCalled();
+  });
+
+  // 4.6e — mark-read must NOT fire for non-published / release-less posts.
+  it('does not call mark-read for a DRAFT post', () => {
+    const data = basePostData({ posts: [{ ...basePostData().posts[0], state: 'DRAFT' }] });
+    stubData({ postData: data, analyticsData: baseAnalyticsData() });
+    render(<PostDetailModal postId="post-1" />);
+    expect(mockFetchFn).not.toHaveBeenCalledWith(
       '/posts/post-1/social-comments/read',
       { method: 'POST' }
     );
+  });
+
+  it('does not call mark-read when releaseId is "missing"', () => {
+    const data = basePostData({ posts: [{ ...basePostData().posts[0], releaseId: 'missing' }] });
+    stubData({ postData: data, analyticsData: baseAnalyticsData() });
+    render(<PostDetailModal postId="post-1" />);
+    expect(mockFetchFn).not.toHaveBeenCalledWith(
+      '/posts/post-1/social-comments/read',
+      { method: 'POST' }
+    );
+  });
+
+  // 4.6d — release URL with a non-http(s) scheme must not become an anchor href.
+  it('does not show "Open on platform" when releaseURL has a javascript: scheme', () => {
+    const data = basePostData({
+      posts: [{ ...basePostData().posts[0], releaseURL: 'javascript:alert(1)' }],
+    });
+    stubData({ postData: data, analyticsData: baseAnalyticsData() });
+    render(<PostDetailModal postId="post-1" />);
+    expect(screen.queryByText('Open on platform')).toBeNull();
   });
 
   it('does not crash when analytics data is missing entirely', () => {

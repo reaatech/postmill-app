@@ -4,21 +4,31 @@ import React, { FC, useEffect, useImperativeHandle, useState } from 'react';
 import { computePosition, flip, shift } from '@floating-ui/dom';
 import { posToDOMRect, ReactRenderer } from '@tiptap/react';
 
-// Debounce utility for TipTap
+// Debounce utility for TipTap. Each superseded call must still resolve (TipTap
+// awaits every returned promise) — otherwise cancelled keystrokes leak pending
+// promises, so we resolve the previous call with `[]` when a newer one arrives.
 const debounce = <T extends any[]>(
   func: (...args: any[]) => Promise<T>,
   wait: number
 ) => {
   let timeout: NodeJS.Timeout;
+  let pendingResolve: ((value: T) => void) | null = null;
   return (...args: any[]): Promise<T> => {
     clearTimeout(timeout);
-    return new Promise((resolve) => {
+    if (pendingResolve) {
+      pendingResolve([] as T);
+      pendingResolve = null;
+    }
+    return new Promise<T>((resolve) => {
+      pendingResolve = resolve;
       timeout = setTimeout(async () => {
         try {
           const result = await func(...args);
+          if (pendingResolve === resolve) pendingResolve = null;
           resolve(result);
         } catch (error) {
           console.error('Debounced function error:', error);
+          if (pendingResolve === resolve) pendingResolve = null;
           resolve([] as T);
         }
       }, wait);
@@ -155,13 +165,14 @@ export const suggestion = (
   return {
     allowSpaces: true,
     items: async ({ query }: { query: string }) => {
+      // `items` can fire before `render().onBeforeStart` assigns `component`.
       if (!query || query.length < 2) {
-        component.updateProps({ loading: true, stop: true });
+        component?.updateProps({ loading: true, stop: true });
         return [];
       }
 
       try {
-        component.updateProps({ loading: true, stop: false });
+        component?.updateProps({ loading: true, stop: false });
         const result = await debouncedLoadList(query);
         return result;
       } catch (error) {

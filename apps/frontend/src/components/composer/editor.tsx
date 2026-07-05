@@ -14,6 +14,7 @@ import React, {
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
+import { PROVIDER_CAPABILITIES } from '@gitroom/provider-kernel/domains/social-capabilities';
 import EmojiPicker from 'emoji-picker-react';
 import { Theme } from 'emoji-picker-react';
 import { BoldText } from '@gitroom/frontend/components/composer/bold.text';
@@ -76,6 +77,13 @@ import {
 import { DelayComponent } from '@gitroom/frontend/components/composer/delay.component';
 
 const MAX_UPLOAD_SIZE = 1024 * 1024 * 1024; // 1 GB
+
+// Rich-text formatting (links / bullets / headings) in the markdown/html editor
+// is gated on the shared provider-capabilities matrix (`richText`) rather than an
+// ad-hoc per-provider comparison. `richText` is optional in the matrix and absent
+// means supported, so an unknown/unlisted provider defaults to supported.
+export const supportsRichTextFormatting = (identifier?: string) =>
+  PROVIDER_CAPABILITIES[identifier || '']?.richText ?? true;
 
 const InterceptBoldShortcut = Extension.create({
   name: 'preventBoldWithUnderline',
@@ -292,9 +300,8 @@ export const EditorWrapper: FC<{
     (index: number) => () => {
       setTimeout(() => {
         // scroll the the bottom
-        document.querySelector('#social-content').scrollTo({
-          top: document.querySelector('#social-content').scrollHeight,
-        });
+        const el = document.querySelector('#social-content');
+        el?.scrollTo({ top: el.scrollHeight });
       }, 20);
       if (internal) {
         return addInternalValue(index, current, [
@@ -714,9 +721,10 @@ export const Editor: FC<{
     if (showEditor) {
       return;
     }
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       setShowEditor(true);
     }, 20);
+    return () => clearTimeout(timeout);
   }, [showEditor]);
 
   if (!showEditor) {
@@ -829,7 +837,7 @@ export const Editor: FC<{
                           </MenuItem>
                           {(editorType === 'markdown' ||
                             editorType === 'html') &&
-                            identifier !== 'telegram' && (
+                            supportsRichTextFormatting(identifier) && (
                               <>
                                 <MenuItem label={t('link', 'Link')}>
                                   <AComponent

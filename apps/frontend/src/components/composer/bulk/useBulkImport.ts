@@ -35,6 +35,13 @@ export function useBulkImport() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ rows }),
       });
+      // Shared fetch never throws on 4xx/5xx — a rejected batch (400/402/413/500)
+      // has no `rows`, so surface its message instead of rendering an empty result.
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        setError(body?.message || 'Bulk import failed');
+        return [];
+      }
       const data = await res.json();
       setResults(data?.rows || []);
       return data?.rows || [];

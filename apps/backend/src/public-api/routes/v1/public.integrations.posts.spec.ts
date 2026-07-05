@@ -7,6 +7,7 @@ vi.mock('file-type', () => ({ fromBuffer: vi.fn() }));
 import { HttpException } from '@nestjs/common';
 import { PublicIntegrationsController } from './public.integrations.controller';
 import { DefaultNotConfiguredError } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
+import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
 
 describe('PublicIntegrationsController.getPosts — J2 pagination cap', () => {
   const org = { id: 'org-1' } as any;
@@ -53,6 +54,134 @@ describe('PublicIntegrationsController.getPosts — J2 pagination cap', () => {
     const res = await ctrl.getPosts(org, query());
     expect(res.posts).toEqual(all);
     expect(res.cursor).toBeNull();
+  });
+});
+
+describe('PublicIntegrationsController.deletePost — 4.2b unknown-id guard', () => {
+  const org = { id: 'org-1' } as any;
+
+  const make = (getPost: any) => {
+    const postsService = {
+      getPost: vi.fn().mockResolvedValue(getPost),
+      deletePost: vi.fn().mockResolvedValue({ deleted: true }),
+    };
+    const ctrl = new (PublicIntegrationsController as any)(
+      {}, postsService, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+    );
+    return { ctrl, postsService };
+  };
+
+  it('throws 404 (not 500) for an unknown/foreign id', async () => {
+    const { ctrl, postsService } = make(null);
+    await expect(ctrl.deletePost(org, 'missing')).rejects.toThrow(
+      expect.objectContaining({ status: 404 })
+    );
+    expect(postsService.deletePost).not.toHaveBeenCalled();
+  });
+
+  it('deletes by group when the post exists', async () => {
+    const { ctrl, postsService } = make({ group: 'grp-1' });
+    await ctrl.deletePost(org, 'p-1');
+    expect(postsService.deletePost).toHaveBeenCalledWith('org-1', 'grp-1');
+  });
+});
+
+describe('PublicIntegrationsController.createPost — 4.2d disabled-channel guard', () => {
+  const org = { id: 'org-1' } as any;
+
+  const make = (channel: any) => {
+    const integrationService = {
+      getIntegrationById: vi.fn().mockResolvedValue(channel),
+    };
+    const postsService = {
+      validateAndCreatePost: vi.fn().mockResolvedValue({ id: 'grp' }),
+    };
+    const ctrl = new (PublicIntegrationsController as any)(
+      integrationService, postsService, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}
+    );
+    return { ctrl, integrationService, postsService };
+  };
+
+  const body = (type: string) =>
+    ({ type, posts: [{ integration: { id: 'int-1' } }] }) as any;
+
+  it('rejects a schedule onto a refresh-needed channel with 400', async () => {
+    const { ctrl, postsService } = make({
+      id: 'int-1',
+      name: 'X',
+      disabled: false,
+      refreshNeeded: true,
+    });
+    await expect(ctrl.createPost(org, body('schedule'))).rejects.toThrow(
+      expect.objectContaining({ status: 400 })
+    );
+    expect(postsService.validateAndCreatePost).not.toHaveBeenCalled();
+  });
+
+  it('allows a draft even onto a disconnected channel', async () => {
+    const { ctrl, postsService } = make({
+      id: 'int-1',
+      name: 'X',
+      disabled: true,
+      refreshNeeded: false,
+    });
+    await ctrl.createPost(org, body('draft'));
+    expect(postsService.validateAndCreatePost).toHaveBeenCalled();
+  });
+
+  it('allows a schedule onto a healthy channel', async () => {
+    const { ctrl, postsService } = make({
+      id: 'int-1',
+      name: 'X',
+      disabled: false,
+      refreshNeeded: false,
+    });
+    await ctrl.createPost(org, body('schedule'));
+    expect(postsService.validateAndCreatePost).toHaveBeenCalled();
+  });
+});
+
+describe('PublicIntegrationsController.integration-trigger — 4.2c bounded refresh loop', () => {
+  const org = { id: 'org-1' } as any;
+
+  it('caps refresh retries and throws 502 instead of looping forever', async () => {
+    const search = vi.fn().mockRejectedValue(new RefreshToken('x', '{}', ''));
+    const provider = { identifier: 'x', refreshWait: false, search };
+    const integrationService = {
+      getIntegrationById: vi.fn().mockResolvedValue({
+        id: 'int-1',
+        providerIdentifier: 'x',
+        token: 'tok',
+        internalId: 'iid',
+      }),
+      disconnectChannel: vi.fn(),
+    };
+    const integrationManager = {
+      getSocialIntegrationUnchecked: vi.fn().mockReturnValue(provider),
+      getAllTools: vi.fn().mockReturnValue({ x: [{ methodName: 'search' }] }),
+    };
+    // refresh keeps handing back a token, so without a cap the loop would spin forever.
+    const refreshIntegrationService = {
+      refresh: vi.fn().mockResolvedValue({ accessToken: 'new-token' }),
+    };
+
+    const ctrl = new (PublicIntegrationsController as any)(
+      integrationService,
+      {}, // postsService
+      {}, // fileService
+      {}, // notificationService
+      integrationManager,
+      refreshIntegrationService,
+      {}, {}, {}, {}, {}, {}
+    );
+
+    await expect(
+      ctrl.triggerIntegrationTool(org, 'int-1', { methodName: 'search', data: {} })
+    ).rejects.toThrow(expect.objectContaining({ status: 502 }));
+
+    // attempts: 0, 1, 2 → MAX_REFRESH_RETRIES(2)+1 = 3 provider calls, then 502.
+    expect(search).toHaveBeenCalledTimes(3);
+    expect(refreshIntegrationService.refresh).toHaveBeenCalledTimes(2);
   });
 });
 

@@ -106,8 +106,16 @@ export const LaunchesComponent = () => {
     );
   }, [integrations]);
 
-  const isSameOrigin = (opener: Window | null) =>
-    opener?.location?.origin === window.location.origin;
+  const isSameOrigin = (opener: Window | null) => {
+    // Reading `.location.origin` on a cross-origin window throws a SecurityError
+    // (a throwing getter is NOT guarded by optional chaining) — swallow it and
+    // treat cross-origin as "not same origin" so the calendar never crashes.
+    try {
+      return !!opener && opener.location.origin === window.location.origin;
+    } catch {
+      return false;
+    }
+  };
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -137,7 +145,10 @@ export const LaunchesComponent = () => {
         );
       }
     }
-    if (window.opener) {
+    // Only auto-close when we were opened as an OAuth popup carrying a result
+    // (`msg`/`added`); a normal opener (e.g. a same-tab navigation) must not
+    // close the calendar out from under the user.
+    if (window.opener && (search.get('msg') || search.get('added'))) {
       window.close();
     }
   }, []);

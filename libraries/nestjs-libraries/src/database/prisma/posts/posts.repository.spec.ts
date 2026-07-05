@@ -1,7 +1,77 @@
 import { describe, expect, it, vi } from 'vitest';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
 import { PostsRepository } from './posts.repository';
 
+dayjs.extend(utc);
+
 describe('PostsRepository', () => {
+  describe('claimForPublish (0.7)', () => {
+    it('flips exactly a QUEUE, non-deleted row to PUBLISHING and returns the count', async () => {
+      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      (repository as any)._post = { model: { post: { updateMany } } };
+
+      const count = await repository.claimForPublish('post-1');
+
+      expect(count).toBe(1);
+      expect(updateMany).toHaveBeenCalledWith({
+        where: { id: 'post-1', state: 'QUEUE', deletedAt: null },
+        data: { state: 'PUBLISHING' },
+      });
+    });
+
+    it('returns 0 when the row is no longer QUEUE (already claimed / published)', async () => {
+      const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      (repository as any)._post = { model: { post: { updateMany } } };
+
+      expect(await repository.claimForPublish('post-1')).toBe(0);
+    });
+  });
+
+  describe('searchForMissingThreeHoursPosts (2.1)', () => {
+    it('only recovers posts overdue by more than 3 hours', () => {
+      const findMany = vi.fn().mockResolvedValue([]);
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      (repository as any)._post = { model: { post: { findMany } } };
+
+      repository.searchForMissingThreeHoursPosts();
+
+      const where = findMany.mock.calls[0][0].where;
+      const upper = dayjs.utc(where.publishDate.lt);
+      const lower = dayjs.utc(where.publishDate.gte);
+
+      // A 1-minute-overdue QUEUE post is NOT within [gte, lt) — it is after the
+      // now-3h upper bound, so it is excluded.
+      const oneMinOverdue = dayjs.utc().subtract(1, 'minute');
+      expect(oneMinOverdue.isAfter(upper)).toBe(true);
+
+      // A 4-hour-overdue post falls inside the window and is recovered.
+      const fourHoursOverdue = dayjs.utc().subtract(4, 'hour');
+      expect(fourHoursOverdue.isBefore(upper)).toBe(true);
+      expect(fourHoursOverdue.isAfter(lower)).toBe(true);
+    });
+  });
+
+  describe('_redactSensitive (4.1a)', () => {
+    it('redacts compound sensitive keys like client_secret', () => {
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      const out = (repository as any)._redactSensitive('{"client_secret":"abc"}');
+      expect(out).not.toContain('abc');
+      expect(out).toContain('[REDACTED]');
+    });
+
+    it('still redacts cookie and privateKey variants', () => {
+      const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+      const out = (repository as any)._redactSensitive(
+        '{"cookie":"sess=1","private_key":"xyz"}'
+      );
+      expect(out).not.toContain('sess=1');
+      expect(out).not.toContain('xyz');
+    });
+  });
+
   describe('createPopularPosts', () => {
     it('persists the supplied popular post fields', async () => {
       const create = vi.fn().mockResolvedValue({ id: 'popular-1' });

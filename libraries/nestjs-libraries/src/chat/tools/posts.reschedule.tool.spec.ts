@@ -8,6 +8,7 @@ import {
 
 const makePostsService = () => ({
   changeDate: vi.fn(),
+  getPostById: vi.fn().mockResolvedValue({ id: 'post-1', state: 'QUEUE' }),
 });
 
 describe('PostsRescheduleTool', () => {
@@ -58,5 +59,37 @@ describe('PostsRescheduleTool', () => {
         access: { mode: 'headless' },
       })
     ).rejects.toThrow('headless runs are read-only');
+  });
+
+  it('4.2a — rejects an unknown post id before calling changeDate', async () => {
+    const service = makePostsService();
+    service.getPostById.mockResolvedValue(null);
+    const tool = new PostsRescheduleTool(service as any);
+
+    await expect(
+      executeTool(tool, {
+        inputData: { id: 'missing', date: '2026-01-20T09:00:00.000Z' },
+        organization: makeOrganization(),
+        user: makeUser(),
+        access: { mode: 'mcp', scopes: ['mcp:posts:write'] },
+      })
+    ).rejects.toThrow('Post not found');
+    expect(service.changeDate).not.toHaveBeenCalled();
+  });
+
+  it('4.2a — refuses to reschedule an already-PUBLISHED post', async () => {
+    const service = makePostsService();
+    service.getPostById.mockResolvedValue({ id: 'post-1', state: 'PUBLISHED' });
+    const tool = new PostsRescheduleTool(service as any);
+
+    await expect(
+      executeTool(tool, {
+        inputData: { id: 'post-1', date: '2026-01-20T09:00:00.000Z' },
+        organization: makeOrganization(),
+        user: makeUser(),
+        access: { mode: 'mcp', scopes: ['mcp:posts:write'] },
+      })
+    ).rejects.toThrow('already been published');
+    expect(service.changeDate).not.toHaveBeenCalled();
   });
 });

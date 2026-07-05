@@ -233,8 +233,18 @@ export class OAuthRepository {
             },
           },
         },
+        // 1.1: load the granting user's org membership + role so the auth
+        // middleware can map a pos_ token to the user's ACTUAL org role instead
+        // of hard-coding SUPERADMIN. `scope` is a scalar column and is already
+        // returned by findFirst — it drives per-route write-scope enforcement.
         user: {
-          select: { id: true },
+          include: {
+            organizations: {
+              include: {
+                roleRef: true,
+              },
+            },
+          },
         },
       },
     });

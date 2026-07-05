@@ -4,6 +4,9 @@ import { z } from 'zod';
 import { Injectable } from '@nestjs/common';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
+import dayjs from 'dayjs';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { AllProvidersSettings } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/all.providers.settings';
 import { Integration } from '@prisma/client';
@@ -39,9 +42,50 @@ export class IntegrationSchedulePostTool implements AgentToolInterface {
   constructor(
     private _postsService: PostsService,
     private _integrationService: IntegrationService,
-    private _guardrailService: GuardrailService
+    private _guardrailService: GuardrailService,
+    private _subscriptionService: SubscriptionService
   ) {}
   name = 'integrationSchedulePostTool';
+
+  // 1.3 — mirror the HTTP `@CheckPolicies([Create, POSTS_PER_MONTH])` gate that
+  // the dashboard/public create routes carry. The MCP entrypoints only check the
+  // AI budget, so without this a capped org can schedule unlimited posts through
+  // the agent. Returns a quota error string (for the model) when over the cap, or
+  // null when the write is allowed.
+  private async _postsBudgetError(
+    organizationId: string,
+    orgCreatedAt: Date | undefined
+  ): Promise<string | null> {
+    // No billing configured (self-hosted / dev) → no cap, same as the guard's
+    // early return when STRIPE_PUBLISHABLE_KEY is unset.
+    if (!process.env.STRIPE_PUBLISHABLE_KEY) {
+      return null;
+    }
+
+    const subscription =
+      await this._subscriptionService.getSubscriptionByOrganizationId(
+        organizationId
+      );
+    const tier = subscription?.subscriptionTier || 'FREE';
+    const limit = pricing[tier]?.posts_per_month ?? 0;
+
+    const createdAt =
+      (await this._subscriptionService.getSubscription(organizationId))
+        ?.createdAt ||
+      orgCreatedAt ||
+      new Date();
+    const totalMonthPast = Math.abs(dayjs(createdAt).diff(dayjs(), 'month'));
+    const checkFrom = dayjs(createdAt).add(totalMonthPast, 'month');
+    const count = await this._postsService.countPostsFromDay(
+      organizationId,
+      checkFrom.toDate()
+    );
+
+    if (count >= limit) {
+      return `Monthly post limit reached for this plan (${limit} posts/month). Upgrade the subscription to schedule more posts.`;
+    }
+    return null;
+  }
 
   run() {
     return createTool({
@@ -142,9 +186,20 @@ If the tools return errors, you would need to rerun it with the right parameters
         checkAuth(inputData, context);
         const toolContext = context as any;
         requireWrite(toolContext);
-        const organizationId = parseOrg(toolContext).id;
+        const org = parseOrg(toolContext);
+        const organizationId = org.id;
         const userId = parseUser(toolContext).id;
         const finalOutput = [];
+
+        // 1.3 — enforce the POSTS_PER_MONTH cap before creating anything, so the
+        // agent path can't bypass the billing gate the HTTP create routes carry.
+        const quotaError = await this._postsBudgetError(
+          organizationId,
+          org.createdAt ? new Date(org.createdAt) : undefined
+        );
+        if (quotaError) {
+          return { errors: quotaError };
+        }
 
         // Apply configured output guardrails to all outbound post/comment content.
         for (const post of inputData.socialPost) {
@@ -159,11 +214,24 @@ If the tools return errors, you would need to rerun it with the right parameters
 
         const integrations = {} as Record<string, Integration>;
         for (const platform of inputData.socialPost) {
-          integrations[platform.integrationId] =
-            await this._integrationService.getIntegrationById(
-              organizationId,
-              platform.integrationId
-            );
+          const resolved = await this._integrationService.getIntegrationById(
+            organizationId,
+            platform.integrationId
+          );
+          integrations[platform.integrationId] = resolved;
+
+          // 4.2d — refuse to schedule/publish onto a channel that is disabled or
+          // needs reauthentication; the publish would fail. Drafts are allowed
+          // (the user may reconnect before promoting).
+          if (
+            resolved &&
+            platform.type !== 'draft' &&
+            (resolved.disabled || resolved.refreshNeeded)
+          ) {
+            return {
+              errors: `${resolved.name}: This channel is disconnected or needs reauthentication. Reconnect it before scheduling.`,
+            };
+          }
 
           // Same server-side validation as the dashboard / public API
           // (settings DTO + media checkValidity + empty / too-long content).

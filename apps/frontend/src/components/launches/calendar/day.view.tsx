@@ -20,7 +20,9 @@ export const DayView = () => {
 
   const options = useMemo(() => {
     const createdPosts = posts.map((post) => ({
-      integration: [integrations.find((i) => i.id === post.integration.id)!],
+      integration: [
+        integrations.find((i) => i.id === post.integration.id),
+      ].filter(Boolean),
       image: post?.integration?.picture || '',
       identifier: post?.integration?.providerIdentifier || '',
       id: post?.integration?.id || '',

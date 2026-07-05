@@ -36,7 +36,7 @@ export const TagsComponent: FC<{
     return (await fetch('/posts/tags')).json();
   }, []);
 
-  const { data, isLoading, mutate } = useSWR('load-tags', loadTags);
+  const { data, isLoading, mutate } = useSWR('/posts/tags', loadTags);
 
   if (isLoading) {
     return null;
@@ -94,16 +94,25 @@ export const TagsComponentInner: FC<{
 
     const newTag = newValues.tags.find((p: any) => p.name === val);
     if (newTag) {
-      const modify = [...tagValue, newTag];
-      setTagValue(modify);
-      onChange({
-        target: {
-          value: modify,
-          name,
-        },
+      // Functional update: `addTag` used to close over a frozen `tagValue`
+      // (empty dep array), so creating a tag dropped any toggles made since
+      // mount. Derive the next value from the latest state and emit the same
+      // normalized `{label,value}` shape the toggle handlers use.
+      setTagValue((prev) => {
+        const modify = [...prev, newTag];
+        onChange({
+          target: {
+            value: modify.map((p: any) => ({
+              label: p.name,
+              value: p.name,
+            })),
+            name,
+          },
+        });
+        return modify;
       });
     }
-  }, []);
+  }, [modals, mutate, onChange, name, t]);
 
   const deleteTag = useCallback(
     async (tag: any, e: React.MouseEvent) => {
@@ -298,7 +307,7 @@ export const TagsComponentA: FC<{
       name: string;
       color: string;
     }[];
-  }>('tags', loadTags, {
+  }>('/posts/tags', loadTags, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     revalidateIfStale: false,

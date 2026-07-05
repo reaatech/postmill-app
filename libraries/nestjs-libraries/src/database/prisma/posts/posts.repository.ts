@@ -1,4 +1,4 @@
-import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
+import { PrismaRepository, PrismaTransaction } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
 import { Post as PostBody } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import {
@@ -33,7 +33,8 @@ export class PostsRepository {
     private _tagsPosts: PrismaRepository<'tagsPosts'>,
     private _errors: PrismaRepository<'errors'>,
     private _socialComment: PrismaRepository<'socialComment'>,
-    private _postCommentRead: PrismaRepository<'postCommentRead'>
+    private _postCommentRead: PrismaRepository<'postCommentRead'>,
+    private _transaction: PrismaTransaction
   ) {}
 
   private async _enrichWithUnreadComments(posts: any[], userId: string): Promise<void> {
@@ -79,7 +80,10 @@ export class PostsRepository {
         },
         publishDate: {
           gte: dayjs.utc().subtract(2, 'day').toDate(),
-          lt: dayjs.utc().toDate(),
+          // 2.1: restore the 3-hour grace this "three hours" finder implied — only
+          // recover posts overdue by >3h, so a run legitimately mid-publish (provider
+          // 5xx backoff, slow media upload) at the top of the hour isn't cancelled.
+          lt: dayjs.utc().subtract(3, 'hour').toDate(),
         },
         state: 'QUEUE',
         deletedAt: null,
@@ -180,7 +184,13 @@ export class PostsRepository {
   async getPosts(orgId: string, query: GetPostsDto, userId?: string) {
     // Use the provided start and end dates directly
     const startDate = dayjs.utc(query.startDate).toDate();
-    const endDate = dayjs.utc(query.endDate).toDate();
+    // 4.3b: clamp the window server-side to ~92 days. A caller-supplied multi-year
+    // range multiplied by a small `intervalInDays` in the expansion loop below would
+    // otherwise generate an unbounded number of synthetic posts (DoS).
+    const MAX_WINDOW_DAYS = 92;
+    const requestedEnd = dayjs.utc(query.endDate);
+    const maxEnd = dayjs.utc(startDate).add(MAX_WINDOW_DAYS, 'day');
+    const endDate = (requestedEnd.isAfter(maxEnd) ? maxEnd : requestedEnd).toDate();
 
     const list = await this._post.model.post.findMany({
       where: {
@@ -211,17 +221,16 @@ export class PostsRepository {
         integration: {
           deletedAt: null,
           organizationId: orgId,
+          // 4.3a: merge the customer filter into the existing integration relation
+          // filter instead of replacing the whole object (which dropped deletedAt/org
+          // scoping on the relation).
+          ...(query.customer ? { customerId: query.customer } : {}),
         },
         deletedAt: null,
         parentPostId: null,
-        ...(query.customer
-          ? {
-              integration: {
-                customerId: query.customer,
-              },
-            }
-          : {}),
       },
+      // 4.3b: bound the base row set feeding the interval expansion.
+      take: 1000,
       select: {
         id: true,
         content: true,
@@ -319,7 +328,9 @@ export class PostsRepository {
       where: { organizationId: orgId, group, deletedAt: null },
       select: { id: true, settings: true },
     });
-    for (const post of posts) {
+    // 4.3f: batch the per-post updates into a single transaction instead of N awaited
+    // round-trips.
+    const updates = posts.map((post) => {
       let settings: any = {};
       try {
         settings = post.settings ? JSON.parse(post.settings) : {};
@@ -328,10 +339,13 @@ export class PostsRepository {
       }
       if (color) settings.color = color;
       else delete settings.color;
-      await this._post.model.post.update({
+      return this._post.model.post.update({
         where: { id: post.id },
         data: { settings: JSON.stringify(settings) },
       });
+    });
+    if (updates.length) {
+      await this._transaction.model.$transaction(updates);
     }
     return { color: color || null };
   }
@@ -518,12 +532,13 @@ export class PostsRepository {
     return decryptPostIntegrationTokens(post);
   }
 
-  updatePost(id: string, postId: string, releaseURL: string, orgId?: string) {
+  updatePost(id: string, postId: string, releaseURL: string, orgId: string) {
     return this._post.model.post.update({
       where: {
         id,
-        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
-        ...(orgId ? { organizationId: orgId } : {}),
+        // 4.4a: org scoping is REQUIRED on the publish-path mutators — always
+        // scope the write so a mis-threaded id can't touch another org's row.
+        organizationId: orgId,
       },
       data: {
         state: 'PUBLISHED',
@@ -533,12 +548,12 @@ export class PostsRepository {
     });
   }
 
-  updatePostSettings(id: string, settings: string, orgId?: string) {
+  updatePostSettings(id: string, settings: string, orgId: string) {
     return this._post.model.post.update({
       where: {
         id,
-        // Defense-in-depth org scoping (B5): applied when the caller threads orgId.
-        ...(orgId ? { organizationId: orgId } : {}),
+        // 4.4a: org scoping is REQUIRED on the publish-path mutators.
+        organizationId: orgId,
       },
       data: { settings },
     });
@@ -557,10 +572,48 @@ export class PostsRepository {
     });
   }
 
+  // 0.7: atomic publish state-claim. Flips exactly one QUEUE post to PUBLISHING and
+  // returns the affected row count — the worker aborts the run when count === 0 so a
+  // recovery enqueue racing a live run (or a "post now" during sleep) can't double-post.
+  async claimForPublish(id: string): Promise<number> {
+    const { count } = await this._post.model.post.updateMany({
+      where: { id, state: 'QUEUE', deletedAt: null },
+      data: { state: 'PUBLISHING' },
+    });
+    return count;
+  }
+
+  // 0.7 follow-up: recover posts orphaned in PUBLISHING by a terminal Inngest run
+  // loss *after* the atomic claim (the claim moves QUEUE -> PUBLISHING, but if the
+  // run then dies unrecoverably the row is stuck: the missing-post finder only
+  // matches QUEUE). Reset stale PUBLISHING rows (same >3h grace / 2-day floor as the
+  // finder) back to QUEUE so the finder re-enqueues them; the atomic claim on the
+  // re-run — plus the `post/cancel` the recovery sends first — keeps it
+  // double-publish-safe if the original run were somehow still alive.
+  async resetStalePublishingToQueue(): Promise<number> {
+    const { count } = await this._post.model.post.updateMany({
+      where: {
+        state: 'PUBLISHING',
+        deletedAt: null,
+        publishDate: {
+          gte: dayjs.utc().subtract(2, 'day').toDate(),
+          lt: dayjs.utc().subtract(3, 'hour').toDate(),
+        },
+      },
+      data: { state: 'QUEUE' },
+    });
+    return count;
+  }
+
   private _redactSensitive(value: string): string {
     const SENSITIVE_KEYS = [
       'token', 'accessToken', 'access_token', 'refreshToken', 'refresh_token',
       'apiKey', 'api_key', 'secret', 'password', 'Authorization',
+      // 4.1a: compound keys added explicitly — the `\b${key}\b` boundary on `secret`
+      // won't match inside `client_secret`, so the underscore-joined names need their own
+      // entries. `cookie`/`set-cookie` and private-key variants likewise.
+      'client_secret', 'clientSecret', 'cookie', 'set-cookie',
+      'privateKey', 'private_key',
     ];
     let result = value;
     for (const key of SENSITIVE_KEYS) {
@@ -572,10 +625,13 @@ export class PostsRepository {
     return result;
   }
 
-  async changeState(id: string, state: State, err?: any, body?: any) {
+  async changeState(id: string, state: State, orgId: string, err?: any, body?: any) {
     const update = await this._post.model.post.update({
       where: {
         id,
+        // 4.4a: org scoping is REQUIRED on the publish-path mutators — always
+        // scope the write so a mis-threaded id can't touch another org's row.
+        organizationId: orgId,
       },
       data: {
         state,
@@ -662,6 +718,10 @@ export class PostsRepository {
             },
           },
           {
+            // 4.3e: exclude soft-deleted rows from the PUBLISHED branch too, so a
+            // deleted post isn't counted against the quota (the QUEUE branch already
+            // filtered it). Quota semantic: deleting a *scheduled* post frees its slot.
+            deletedAt: null,
             state: 'PUBLISHED',
           },
         ],
@@ -732,7 +792,12 @@ export class PostsRepository {
       posts.push(
         await this._post.model.post.upsert({
           where: {
+            // 0.1: org-scope the upsert key (extendedWhereUnique). A client-supplied
+            // `value.id` belonging to another org fails this where and falls through to
+            // `create` (which never sets `id`, so a fresh server cuid is minted) — closing
+            // the cross-tenant hijack and id-squatting.
             id: value.id || uuidv4(),
+            organizationId: orgId,
           },
           create: { ...updateData('create'), ...(campaignId ? { campaign: { connect: { id: campaignId } } } : {}), ...(brandId ? { brand: { connect: { id: brandId } } } : {}) },
           update: {
@@ -787,6 +852,9 @@ export class PostsRepository {
           await this._post.model.post.findFirst({
             where: {
               group: body.group,
+              // 0.2: org-scope the group cleanup so a guessed foreign group uuid
+              // can't leak a foreign post id or soft-delete another org's thread.
+              organizationId: orgId,
               deletedAt: null,
               parentPostId: null,
             },
@@ -801,6 +869,8 @@ export class PostsRepository {
       await this._post.model.post.updateMany({
         where: {
           group: body.group,
+          // 0.2: org-scope the group cleanup (see above).
+          organizationId: orgId,
           deletedAt: null,
         },
         data: {
@@ -891,6 +961,8 @@ export class PostsRepository {
           }),
         },
       },
+      // 4.3e: only `publishDate` is read below — avoid fetching full (heavy) rows.
+      select: { publishDate: true },
     });
 
     return times.filter(
@@ -940,7 +1012,10 @@ export class PostsRepository {
   editTag(id: string, orgId: string, body: CreateTagDto) {
     return this._tags.model.tags.update({
       where: {
+        // 0.3: org-scope the tag write (mirror deleteTag) — the orgId param was dead,
+        // letting any user rename/recolor any org's tag by id. P2025 surfaces as 404.
         id,
+        orgId,
       },
       data: {
         name: body.name,

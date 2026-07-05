@@ -9,7 +9,6 @@ import { SocialProvider } from '@gitroom/provider-kernel';
 import dayjs from 'dayjs';
 import { Integration } from '@prisma/client';
 import { capitalize, sortBy } from 'lodash';
-import { v4 as uuidv4 } from 'uuid';
 
 const MAX_RETRIES = 5;
 
@@ -52,16 +51,22 @@ const runPostPublish = (postActivity: PostActivity) =>
 
     if (!firstPost) {
       await step.run('mark-error-no-post', () =>
-        postActivity.changeState(postId, 'ERROR', 'No Post')
+        postActivity.changeState(postId, 'ERROR', organizationId, 'No Post')
       );
       return;
     }
 
     if (!postNow && (firstPost as any).state !== 'QUEUE') {
+      // 4.4c — a duplicate/stale event on an already-PUBLISHED post is a no-op;
+      // never flip a live post back to ERROR. Only QUEUE/DRAFT are unexpected here.
+      if ((firstPost as any).state === 'PUBLISHED') {
+        return;
+      }
       await step.run('mark-error-already-posted', () =>
         postActivity.changeState(
           (firstPost as any).id,
           'ERROR',
+          organizationId,
           'Already posted',
           [firstPost]
         )
@@ -77,6 +82,18 @@ const runPostPublish = (postActivity: PostActivity) =>
       await step.sleep('wait-until-publish-date', sleepMs);
     }
 
+    // 0.7 — atomic publish claim. Repeat-posts re-enter the postNow path on an
+    // already-PUBLISHED post, so they skip the QUEUE-requiring claim.
+    const { repeat = false } = event.data;
+    if (!repeat) {
+      const claimed = await step.run('claim-publish', () =>
+        postActivity.claimForPublish(postId)
+      );
+      if (!claimed) {
+        return;
+      }
+    }
+
     const postsListBefore = await step.run('get-posts-list', () =>
       postActivity.getPostsList(organizationId, postId)
     );
@@ -84,7 +101,7 @@ const runPostPublish = (postActivity: PostActivity) =>
 
     if (!post) {
       await step.run('mark-error-no-post-list', () =>
-        postActivity.changeState(postId, 'ERROR', 'No Post')
+        postActivity.changeState(postId, 'ERROR', organizationId, 'No Post')
       );
       return;
     }
@@ -103,6 +120,7 @@ const runPostPublish = (postActivity: PostActivity) =>
         postActivity.changeState(
           postsListBefore[0].id,
           'ERROR',
+          organizationId,
           'Refresh channel needed',
           postsListBefore
         )
@@ -124,6 +142,7 @@ const runPostPublish = (postActivity: PostActivity) =>
         postActivity.changeState(
           postsListBefore[0].id,
           'ERROR',
+          organizationId,
           'Channel disabled',
           postsListBefore
         )
@@ -141,7 +160,7 @@ const runPostPublish = (postActivity: PostActivity) =>
     const postsList = toComment ? postsListBefore : [postsListBefore[0]];
     const postsResults: any[] = [];
 
-    for (let i = 0; i < postsList.length; i++) {
+    postItems: for (let i = 0; i < postsList.length; i++) {
       const before = postsResults.length;
 
       for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -157,7 +176,7 @@ const runPostPublish = (postActivity: PostActivity) =>
             if (postsList[i].delay) {
               await step.sleep(
                 'wait-comment-delay',
-                60000 * Math.max(0, Number(postsList[i].delay ?? 0))
+                60000 * Math.min(1440, Math.max(0, Number(postsList[i].delay ?? 0)))
               );
             }
 
@@ -178,7 +197,8 @@ const runPostPublish = (postActivity: PostActivity) =>
             postActivity.updatePost(
               postsList[i].id,
               postsResults[i].postId,
-              postsResults[i].releaseURL
+              postsResults[i].releaseURL,
+              organizationId
             )
           );
 
@@ -195,46 +215,77 @@ const runPostPublish = (postActivity: PostActivity) =>
 
           break;
         } catch (err) {
-          if (err instanceof RefreshTokenError) {
-            const refresh = await step.run('refresh-token', () =>
-              postActivity.refreshTokenWithCause(
+          if (
+            err instanceof RefreshTokenError ||
+            (err as any)?.name === 'RefreshTokenError'
+          ) {
+            // 2.5 — return ONLY a non-secret signal from this step. The rotated
+            // token is persisted to the DB by refreshTokenWithCause; the retried
+            // post-social step re-reads it via _withDecryptedIntegration. The
+            // plaintext accessToken/refreshToken must never enter Inngest step
+            // state, so the mapping happens INSIDE the step.run closure.
+            const refresh = await step.run('refresh-token', async () => {
+              const result = await postActivity.refreshTokenWithCause(
                 post.integration,
-                err?.message || ''
-              )
-            );
-            if (!refresh || !refresh.accessToken) {
+                (err as any)?.message || ''
+              );
+              return {
+                refreshed: !!(result && result.accessToken),
+                ...(result && result.expiresIn
+                  ? { expiresIn: result.expiresIn }
+                  : {}),
+              };
+            });
+            if (!refresh.refreshed) {
               await step.run('mark-error-refresh-failed', () =>
                 postActivity.changeState(
                   postsList[0].id,
                   'ERROR',
+                  organizationId,
                   err,
                   postsList
                 )
               );
               return;
             }
-            post.integration.token = refresh.accessToken;
+            // 2.5 — do NOT copy the token into `post.integration` (that value
+            // would ride into the next step's serialized state). The retried
+            // post-social step re-reads the DB-persisted rotated token.
             continue;
           }
 
+          // 2.3 — for a mid-thread (i>0) failure, mark ONLY the failed child ERROR
+          // and leave the already-PUBLISHED root live; a root (i===0) failure marks
+          // the whole group ERROR.
+          const isRoot = i === 0;
           await step.run('mark-error', () =>
-            postActivity.changeState(postsList[0].id, 'ERROR', err, postsList)
+            postActivity.changeState(
+              isRoot ? postsList[0].id : postsList[i].id,
+              'ERROR',
+              organizationId,
+              err,
+              isRoot ? postsList : [postsList[i]]
+            )
           );
 
-          if (err instanceof BadBodyError) {
-            await step.run('notify-bad-body', () =>
-              postActivity.notifyPostFailed(
-                post.organizationId,
-                post?.integration?.name ?? '',
-                post.id,
-                i === 0 ? undefined : 'comment',
-                err?.message
-              )
-            );
+          // 2.3 — always notify on failure (not only for BadBodyError).
+          await step.run('notify-post-failed', () =>
+            postActivity.notifyPostFailed(
+              post.organizationId,
+              post?.integration?.name ?? '',
+              post.id,
+              isRoot ? undefined : 'comment',
+              (err as any)?.message
+            )
+          );
+
+          if (isRoot) {
             return;
           }
 
-          return;
+          // The root is published — stop posting further thread items but continue
+          // to the post-loop steps (send-webhooks/plugs) for the live root.
+          break postItems;
         }
       }
 
@@ -243,60 +294,83 @@ const runPostPublish = (postActivity: PostActivity) =>
       }
     }
 
-    // First Comment (2F) — auto-post the first comment after successful publish
-    await step.run('first-comment', async () => {
-      try {
-        const parsedSettings = JSON.parse(post.settings);
+    // First Comment (2F/4.4d) — crash-safe: post the comment in one step, then
+    // record the idempotency marker in a separate step via a partial JSON merge
+    // against FRESH settings (not the pre-publish snapshot). The record step is
+    // NOT swallowed — a failed write surfaces so a re-run can't double-post
+    // (the memoized post-first-comment step will not re-execute the comment).
+    const firstCommentPosted = await step.run(
+      'post-first-comment',
+      async () => {
+        const parsedSettings = JSON.parse(post.settings || '{}');
         const firstComment = parsedSettings?.firstComment;
         const alreadyPosted =
           parsedSettings?.firstCommentPostedAt ||
           parsedSettings?.firstCommentId;
 
-        if (firstComment && !alreadyPosted && postsResults.length > 0) {
-          const supports = await postActivity.supportsFirstComment(
-            post.integration
-          );
-          if (!supports) {
-            await postActivity.notifyFirstCommentUnsupported(
-              post.organizationId,
-              capitalize(post.integration?.providerIdentifier ?? ''),
-              post.id
-            );
-          } else {
-            const firstCommentResult = await postActivity.postFirstComment(
-              postsResults[0].postId,
-              post.integration,
-              firstComment
-            );
-
-            const postedComment = Array.isArray(firstCommentResult)
-              ? firstCommentResult[0]
-              : undefined;
-            const updatedSettings = {
-              ...parsedSettings,
-              firstCommentId: postedComment?.postId,
-              firstCommentReleaseURL: postedComment?.releaseURL,
-              firstCommentPostedAt: new Date().toISOString(),
-            };
-
-            await postActivity.updatePostSettings(
-              postsList[0].id,
-              JSON.stringify(updatedSettings)
-            );
-          }
+        if (!firstComment || alreadyPosted || postsResults.length === 0) {
+          return null;
         }
-      } catch (err) {
-        await postActivity.notifyFirstCommentFailed(
-          post.organizationId,
-          capitalize(post.integration?.providerIdentifier ?? ''),
-          post.id
+
+        const supports = await postActivity.supportsFirstComment(
+          post.integration
         );
+        if (!supports) {
+          await postActivity.notifyFirstCommentUnsupported(
+            post.organizationId,
+            capitalize(post.integration?.providerIdentifier ?? ''),
+            post.id
+          );
+          return null;
+        }
+
+        try {
+          const firstCommentResult = await postActivity.postFirstComment(
+            postsResults[0].postId,
+            post.integration,
+            firstComment
+          );
+          const postedComment = Array.isArray(firstCommentResult)
+            ? firstCommentResult[0]
+            : undefined;
+          return {
+            firstCommentId: postedComment?.postId ?? null,
+            firstCommentReleaseURL: postedComment?.releaseURL ?? null,
+          };
+        } catch (err) {
+          await postActivity.notifyFirstCommentFailed(
+            post.organizationId,
+            capitalize(post.integration?.providerIdentifier ?? ''),
+            post.id
+          );
+          return null;
+        }
       }
-    }).catch(() => {});
+    );
+
+    if (firstCommentPosted) {
+      await step.run('record-first-comment', async () => {
+        const fresh = await postActivity.getPost(organizationId, postId);
+        const freshSettings = JSON.parse(
+          (fresh as any)?.settings || post.settings || '{}'
+        );
+        const updatedSettings = {
+          ...freshSettings,
+          firstCommentId: firstCommentPosted.firstCommentId,
+          firstCommentReleaseURL: firstCommentPosted.firstCommentReleaseURL,
+          firstCommentPostedAt: new Date().toISOString(),
+        };
+        await postActivity.updatePostSettings(
+          postsList[0].id,
+          JSON.stringify(updatedSettings),
+          organizationId
+        );
+      });
+    }
 
     await step.run('send-webhooks', () =>
       postActivity.sendWebhooks(
-        postsResults[0].postId,
+        postsList[0].id,
         post.organizationId,
         post.integration.id
       )
@@ -417,8 +491,11 @@ const runPostPublish = (postActivity: PostActivity) =>
             organizationId,
             maxConcurrentJob,
             postNow: true,
+            // 0.7 — the post is already PUBLISHED here; skip the QUEUE-requiring claim.
+            repeat: true,
           },
-          id: `post_${post.id}_${uuidv4()}`,
+          // 4.4f — deterministic id so an executor retry can't emit a second event.
+          id: `post_${post.id}_repeat_${currentIndex}_${startTime.getTime()}`,
         });
       }
     }
@@ -429,7 +506,7 @@ export const createPostPublishFunctions = (postActivity: PostActivity) =>
     inngest.createFunction(
       {
         id: `post-publish-${taskQueue}`,
-        concurrency: { limit },
+        concurrency: { limit, key: 'event.data.organizationId' },
         cancelOn: [
           {
             event: 'post/cancel',

@@ -1,5 +1,6 @@
 import {
   Allow,
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsDefined,
@@ -100,6 +101,7 @@ export class ValidatePostsDto {
   @IsDefined()
   @IsArray()
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @Type(() => ValidatePost)
   @ValidateNested({ each: true })
   posts: ValidatePost[];

@@ -1,9 +1,10 @@
 'use client';
 import 'reflect-metadata';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
-import { FC, useEffect } from 'react';
+import { FC, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { ManageModal } from '@gitroom/frontend/components/composer/manage.modal';
 import { ComposerProps } from '@gitroom/frontend/components/composer/composer.types';
@@ -13,6 +14,26 @@ import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useRouter } from 'next/navigation';
 
 export type { ComposerProps, AddEditModalProps } from '@gitroom/frontend/components/composer/composer.types';
+
+// Auto-add signatures for a brand-new post. Kept as its own SWR hook (one hook per
+// resource) so the component body stays declarative. Never throws — a failure still
+// resolves (to `[]`) so the new-post composer seeds empty instead of hanging.
+const useAutoSignatures = (isNewPost: boolean) => {
+  const fetch = useFetch();
+  return useSWR(
+    isNewPost ? 'signatures-auto' : null,
+    async () => {
+      try {
+        const res = await fetch('/signatures/auto');
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    },
+    { revalidateOnFocus: false, revalidateOnReconnect: false }
+  );
+};
 
 // The single post-composer entry point. It unifies the two former thin wrappers
 // (route `PostComposer` + modal `AddEditModal`) into one component: a 3-layer
@@ -67,14 +88,27 @@ const ComposerInner: FC<ComposerProps> = (props) => {
       }))
     );
 
+  // The store's `integrations` are seeded by the parent `Composer` effect, but a
+  // child effect runs before its parent (React 19), so on first commit the store
+  // is still empty. Gate on store readiness — run once `integrations` is populated
+  // (guarded by `seededRef`) and null-guard every `find()` so a miss never reaches
+  // `addOrRemoveSelectedIntegration(undefined, …)` (which would `undefined.id`).
+  const seededRef = useRef(false);
   useEffect(() => {
+    if (seededRef.current || !integrations.length) {
+      return;
+    }
+    seededRef.current = true;
+
     if (props?.set?.posts?.length) {
       for (const post of props?.set?.posts) {
         if (post.integration) {
           const integration = integrations.find(
             (i) => i.id === post.integration.id
           );
-          addOrRemoveSelectedIntegration(integration, post.settings);
+          if (integration) {
+            addOrRemoveSelectedIntegration(integration, post.settings);
+          }
         }
       }
     }
@@ -83,7 +117,9 @@ const ComposerInner: FC<ComposerProps> = (props) => {
       const integration = integrations.find(
         (i) => i.id === existingData.integration
       );
-      addOrRemoveSelectedIntegration(integration, existingData.settings);
+      if (integration) {
+        addOrRemoveSelectedIntegration(integration, existingData.settings);
+      }
     }
 
     if (props?.selectedChannels?.length) {
@@ -94,7 +130,7 @@ const ComposerInner: FC<ComposerProps> = (props) => {
         }
       }
     }
-  }, []);
+  }, [integrations]);
 
   if (existingData.integration && selectedIntegrations.length === 0) {
     return null;
@@ -144,21 +180,7 @@ const ComposerInnerInner: FC<ComposerProps> = (props) => {
     !props.addEditSets &&
     !props.dummy;
 
-  const { data: autoSignatures } = useSWR(
-    isNewPost ? 'signatures-auto' : null,
-    async () => {
-      // Never throw — a failure must still resolve so the new-post composer
-      // seeds (empty) instead of hanging on a blank editor.
-      try {
-        const res = await fetch('/signatures/auto');
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
-    },
-    { revalidateOnFocus: false, revalidateOnReconnect: false }
-  );
+  const { data: autoSignatures } = useAutoSignatures(isNewPost);
 
   useEffect(() => {
     if (!isNewPost) return;
@@ -282,7 +304,9 @@ const ComposerInnerInner: FC<ComposerProps> = (props) => {
   }, []);
 
   if (!global.length && !internal.length) {
-    return null;
+    // Seeding is still in flight (waiting on the auto-signature fetch and the init
+    // effect) — show a loader rather than a blank frame.
+    return <LoadingComponent />;
   }
 
   return (

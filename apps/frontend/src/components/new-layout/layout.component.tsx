@@ -59,6 +59,15 @@ const CreateEditCampaignModal = dynamic(
   { ssr: false }
 );
 
+// Lazy — the CSV bulk-import surface is only pulled in when "Bulk Import" is chosen.
+const BulkImport = dynamic(
+  () =>
+    import('@gitroom/frontend/components/composer/bulk/bulk.import').then(
+      (m) => m.BulkImport
+    ),
+  { ssr: false }
+);
+
 const jakartaSans = Plus_Jakarta_Sans({
   weight: ['600', '500', '700'],
   style: ['normal', 'italic'],
@@ -247,7 +256,15 @@ const useCreateActions = () => {
     });
   }, [modals, mutate, t]);
 
-  return { openCampaign, openChannel: addChannel };
+  const openBulkImport = useCallback(() => {
+    modals.openModal({
+      title: t('bulk_import', 'Bulk Import'),
+      withCloseButton: true,
+      children: <BulkImport />,
+    });
+  }, [modals, t]);
+
+  return { openCampaign, openChannel: addChannel, openBulkImport };
 };
 
 // The create actions as a list of menu rows, shared by the desktop "+" dropdown and the mobile
@@ -257,7 +274,7 @@ const CreateMenuItems: React.FC<{ onSelect?: () => void; showChannel: boolean }>
   showChannel,
 }) => {
   const t = useT();
-  const { openCampaign, openChannel } = useCreateActions();
+  const { openCampaign, openChannel, openBulkImport } = useCreateActions();
   return (
     <>
       <a
@@ -282,6 +299,33 @@ const CreateMenuItems: React.FC<{ onSelect?: () => void; showChannel: boolean }>
         </svg>
         {t('new_post', 'New Post')}
       </a>
+      <button
+        type="button"
+        role="menuitem"
+        onClick={() => {
+          onSelect?.();
+          openBulkImport();
+        }}
+        className={createMenuRow}
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="M14 3v4a1 1 0 0 0 1 1h4" />
+          <path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z" />
+          <path d="M12 18v-6" />
+          <path d="m9 15 3 3 3-3" />
+        </svg>
+        {t('bulk_import', 'Bulk Import')}
+      </button>
       <button
         type="button"
         role="menuitem"

@@ -20,11 +20,17 @@ import { OrgVpnConfigService } from '@gitroom/nestjs-libraries/vpn/org-vpn-confi
 import { VpnDispatcherService } from '@gitroom/nestjs-libraries/vpn/vpn-dispatcher.service';
 import { runWithVpnDispatcher } from '@gitroom/nestjs-libraries/vpn/vpn.context';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
+import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { v4 as uuidv4 } from 'uuid';
 import { CircuitBreakerService } from '@gitroom/nestjs-libraries/ai/governance/circuit-breaker.service';
 import { webhookSignature, webhookTimeoutMs } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import type { Dispatcher } from 'undici';
 
 // Drops fields the workflow and downstream activities never read — biggest wins are `error` (grows per retry) and `childrenPost` (Prisma side-loads it on every recursive row).
+// 2.5: also strips the decrypted OAuth secrets (`token`/`refreshToken`/
+// `customInstanceDetails`) from the side-loaded `integration` so plaintext
+// secrets never land in Inngest run state. The publish/refresh steps re-read the
+// decrypted integration by id from the DB (see `_withDecryptedIntegration`).
 function slimPost(post: any) {
   if (!post) return post;
   const {
@@ -39,9 +45,17 @@ function slimPost(post: any) {
     updatedAt,
     comments,
     errors,
+    integration,
     ...rest
   } = post;
-  return rest;
+  if (!integration) return rest;
+  const {
+    token,
+    refreshToken,
+    customInstanceDetails,
+    ...safeIntegration
+  } = integration;
+  return { ...rest, integration: safeIntegration };
 }
 
 @Injectable()
@@ -69,8 +83,18 @@ export class PostActivity {
     private _orgProviderConfigService: OrgProviderConfigService,
     private _orgVpnConfigService: OrgVpnConfigService,
     private _vpnDispatcherService: VpnDispatcherService,
-    private _campaignsRepository: CampaignsRepository
+    private _campaignsRepository: CampaignsRepository,
+    // layering: sanctioned leaf-read — atomic publish claim delegates straight
+    // to the repo (mirrors the injected _campaignsRepository above).
+    private _postsRepository: PostsRepository
   ) {}
+
+  // 0.7: atomic publish-state claim. Delegates to the repository's
+  // `updateMany({ state: 'QUEUE' → 'PUBLISHING' })` which returns the row count
+  // (1 = this run won the claim, 0 = a concurrent/stale run already claimed it).
+  async claimForPublish(id: string) {
+    return this._postsRepository.claimForPublish(id);
+  }
 
   // Resolve the per-channel VPN proxy dispatcher (or undefined) for a publish.
   // Non-fatal: any resolution failure falls back to direct egress so a VPN
@@ -111,7 +135,29 @@ export class PostActivity {
     return this._integrationService.getIntegrationById(orgId, id);
   }
 
+  // 2.5: the integration carried in step state has been slimmed of its decrypted
+  // token/refreshToken (see slimPost). Any step that actually posts or refreshes
+  // re-reads the decrypted integration by id from the DB — which
+  // refreshTokenWithCause has already persisted after a rotation, so a refresh
+  // followed by a re-post picks up the fresh token.
+  private async _withDecryptedIntegration(
+    integration: Integration
+  ): Promise<Integration> {
+    if ((integration as any)?.token) {
+      return integration;
+    }
+    const full = await this._integrationService.getIntegrationById(
+      integration.organizationId,
+      integration.id
+    );
+    return ((full as unknown) as Integration) ?? integration;
+  }
+
   async searchForMissingThreeHoursPosts() {
+    // 0.7 follow-up: first reclaim any post orphaned in PUBLISHING (a terminal run
+    // loss after the atomic claim) back to QUEUE, so the finder below re-enqueues it
+    // this same sweep. Idempotent — safe on Inngest step retry.
+    await this._postService.resetStalePublishingToQueue();
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
       // 5.4: thread the row's pinned version so recovery resolves the EXACT
@@ -141,13 +187,17 @@ export class PostActivity {
           maxConcurrentJob,
           postNow: true,
         },
-        id: `post_${post.id}`,
+        // 0.8: unique-per-send id so successive hourly recovery attempts (and a
+        // reschedule's replacement event) are not deduped against a constant
+        // `post_${id}` for ~24h. Double-sends are now caught by the 0.7 atomic
+        // claim, not by Inngest event dedup.
+        id: `post_${post.id}_recovery_${uuidv4()}`,
       });
     }
   }
 
-  async updatePost(id: string, postId: string, releaseURL: string) {
-    await this._postService.updatePost(id, postId, releaseURL);
+  async updatePost(id: string, postId: string, releaseURL: string, orgId: string) {
+    await this._postService.updatePost(id, postId, releaseURL, orgId);
   }
 
   async getPost(orgId: string, postId: string) {
@@ -160,11 +210,14 @@ export class PostActivity {
       }
     }
     const post = await this._postService.getPostById(postId, orgId);
-    if (post.deletedAt) {
+    // 4.4b: getPostById can return null for a missing/foreign id — guard before
+    // reading .deletedAt so a deleted/absent post returns false instead of
+    // throwing inside step.run.
+    if (!post || post.deletedAt) {
       return false;
     }
 
-    return post;
+    return slimPost(post);
   }
 
   async getPostsList(orgId: string, postId: string) {
@@ -223,6 +276,9 @@ export class PostActivity {
     integration: Integration,
     posts: Post[]
   ) {
+    // 2.5: re-read the decrypted token (slimmed out of step state).
+    integration = await this._withDecryptedIntegration(integration);
+
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier,
       integration.organizationId,
@@ -240,13 +296,10 @@ export class PostActivity {
       integration.providerConfigId
     ).catch(() => undefined);
 
-    return getIntegration.comment(
-      integration.internalId,
-      postId,
-      lastPostId,
-      integration.token,
-      await Promise.all(
-        (newPosts || []).map(async (p) => ({
+    const commentPayload = await Promise.all(
+      (newPosts || []).map(async (p) => {
+        const settings = JSON.parse(p.settings || '{}');
+        return {
           id: p.id,
           message: stripHtmlValidation(
             getIntegration.editor,
@@ -256,15 +309,29 @@ export class PostActivity {
             !/<\/?[a-z][\s\S]*>/i.test(p.content),
             getIntegration.mentionFormat
           ),
-          settings: JSON.parse(p.settings || '{}'),
+          settings,
           media: await this._postService.updateMedia(
             p.id,
             JSON.parse(p.image || '[]'),
             getIntegration?.convertToJPEG || false,
             integration.organizationId
           ),
-        }))
-      ),
+          // 2.2: lift the composer's poll (stored in settings) to the top level.
+          ...(settings.poll ? { poll: settings.poll } : {}),
+        };
+      })
+    );
+
+    // 2.2: never publish a plain comment when a poll was requested on a provider
+    // that can't do polls.
+    this._assertPollSupported(integration.providerIdentifier, commentPayload);
+
+    return getIntegration.comment(
+      integration.internalId,
+      postId,
+      lastPostId,
+      integration.token,
+      commentPayload,
       integration,
       clientInformation
     );
@@ -275,6 +342,9 @@ export class PostActivity {
     integration: Integration,
     firstComment: string,
   ) {
+    // 2.5: re-read the decrypted token (slimmed out of step state).
+    integration = await this._withDecryptedIntegration(integration);
+
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier,
       integration.organizationId,
@@ -327,6 +397,30 @@ export class PostActivity {
     });
   }
 
+  // 2.2: capability guard. If any payload item carries a poll but the provider's
+  // `poll` capability is false, throw a non-retriable BadBodyError so the post is
+  // never silently published as a plain post.
+  private _assertPollSupported(
+    providerIdentifier: string,
+    payload: { poll?: unknown }[]
+  ) {
+    if (!payload.some((p) => p.poll)) {
+      return;
+    }
+    const capabilities =
+      PROVIDER_CAPABILITIES[
+        providerIdentifier as keyof typeof PROVIDER_CAPABILITIES
+      ];
+    if (!capabilities?.poll) {
+      throw new BadBodyError(
+        providerIdentifier,
+        '{}',
+        '',
+        `Provider ${providerIdentifier} does not support polls`
+      );
+    }
+  }
+
   async postSocial(integration: Integration, posts: Post[]) {
     if (process.env.STRIPE_SECRET_KEY) {
       const subscription = await this._subscriptionService.getSubscription(
@@ -337,6 +431,9 @@ export class PostActivity {
         throw new Error('No active subscription found for this organization.');
       }
     }
+
+    // 2.5: re-read the decrypted token (slimmed out of step state).
+    integration = await this._withDecryptedIntegration(integration);
 
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier,
@@ -367,6 +464,7 @@ export class PostActivity {
           integration.organizationId,
           integration.providerIdentifier
         );
+        const settings = JSON.parse(p.settings || '{}');
         return {
           id: p.id,
           message: stripHtmlValidation(
@@ -377,16 +475,23 @@ export class PostActivity {
             !/<\/?[a-z][\s\S]*>/i.test(contentWithUtm),
             getIntegration.mentionFormat
           ),
-          settings: JSON.parse(p.settings || '{}'),
+          settings,
           media: await this._postService.updateMedia(
             p.id,
             JSON.parse(p.image || '[]'),
             getIntegration?.convertToJPEG || false,
             integration.organizationId
           ),
+          // 2.2: lift the composer's poll (stored in settings) up to the
+          // top-level `poll` the adapter reads.
+          ...(settings.poll ? { poll: settings.poll } : {}),
         };
       })
     );
+
+    // 2.2: never publish a plain post when a poll was requested but this provider
+    // can't do polls — fail hard (non-retriable) instead of silently dropping it.
+    this._assertPollSupported(integration.providerIdentifier, postPayload);
 
     // D2: short-circuit when this provider×org breaker is OPEN.
     const breakerKey = `${integration.providerIdentifier}:${integration.organizationId}`;
@@ -510,12 +615,12 @@ export class PostActivity {
     );
   }
 
-  async updatePostSettings(id: string, settings: string) {
-    await this._postService.updatePostSettings(id, settings);
+  async updatePostSettings(id: string, settings: string, orgId: string) {
+    await this._postService.updatePostSettings(id, settings, orgId);
   }
 
-  async changeState(id: string, state: State, err?: any, body?: any) {
-    await this._postService.changeState(id, state, err, body);
+  async changeState(id: string, state: State, orgId: string, err?: any, body?: any) {
+    await this._postService.changeState(id, state, orgId, err, body);
   }
 
   async internalPlugs(integration: Integration, settings: any) {
@@ -616,6 +721,9 @@ export class PostActivity {
   async refreshToken(
     integration: Integration
   ): Promise<false | AuthTokenDetails> {
+    // 2.5: the refresh needs the decrypted refreshToken, slimmed out of step state.
+    integration = await this._withDecryptedIntegration(integration);
+
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier,
       integration.organizationId,
@@ -645,6 +753,9 @@ export class PostActivity {
     integration: Integration,
     cause: string
   ): Promise<false | AuthTokenDetails> {
+    // 2.5: the refresh needs the decrypted refreshToken, slimmed out of step state.
+    integration = await this._withDecryptedIntegration(integration);
+
     const getIntegration = await this._integrationManager.getSocialIntegration(
       integration.providerIdentifier,
       integration.organizationId,

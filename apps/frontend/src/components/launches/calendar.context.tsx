@@ -49,6 +49,7 @@ export const CalendarContext = createContext({
   endDate: newDayjs().endOf('isoWeek').format('YYYY-MM-DD'),
   customer: null as string | null,
   loading: true,
+  error: null as any,
   sets: [] as { name: string; id: string; content: string[] }[],
   signature: undefined as any,
   comments: [] as Array<{
@@ -299,7 +300,14 @@ export const CalendarWeekProvider: FC<{
       endDate: newDayjs(filters.endDate).endOf('day').utc().format(),
     }).toString();
 
-    const data = await (await fetch(`/posts?${modifiedParams}`)).json();
+    const res = await fetch(`/posts?${modifiedParams}`);
+    if (!res.ok) {
+      // Without this, error JSON flows through `expandPosts` and renders as an
+      // empty calendar — a user seeing "no posts" during an API blip may
+      // recreate/reschedule. Throw so SWR surfaces `error` for a retry banner.
+      throw new Error('Failed to load posts');
+    }
+    const data = await res.json();
     return expandPosts(data);
   }, [filters, params]);
 
@@ -308,6 +316,7 @@ export const CalendarWeekProvider: FC<{
   const {
     data: calendarData,
     isLoading: calendarIsLoading,
+    error: calendarError,
     mutate: mutateCalendar,
   } = useSWR(`/posts-${params}`, loadData, {
     refreshInterval: 3600000,
@@ -363,7 +372,7 @@ export const CalendarWeekProvider: FC<{
       (campaignList || []).map((c: any) => ({ id: c.id, name: c.name })),
     [campaignList]
   );
-  const { data: tagsData } = useSWR('load-tags', loadTags, {
+  const { data: tagsData } = useSWR('/posts/tags', loadTags, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
     refreshWhenHidden: false,
@@ -581,7 +590,9 @@ export const CalendarWeekProvider: FC<{
           if (post.id === id) {
             return {
               ...post,
-              publishDate: date.utc().format('YYYY-MM-DDTHH:mm:ss'),
+              // Store the server shape (zoned ISO with `Z`); a zone-less
+              // 'YYYY-MM-DDTHH:mm:ss' is misread as local by `newDayjs()`.
+              publishDate: date.utc().toISOString(),
             };
           }
           return post;
@@ -653,6 +664,7 @@ export const CalendarWeekProvider: FC<{
         ...filters,
         posts: calendarIsLoading ? [] : filteredPosts,
         loading,
+        error: calendarError,
         integrations,
         setFilters: setFiltersWrapper,
         changeDate,

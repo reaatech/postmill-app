@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Fragment, useMemo } from 'react';
+import React, { Fragment, useEffect, useMemo, useState } from 'react';
 import { useCalendar } from './context';
 import { CalendarColumn } from './grid';
 import dayjs from 'dayjs';
@@ -15,8 +15,18 @@ import i18next from 'i18next';
 export const RangeView = () => {
   const { startDate, endDate } = useCalendar();
 
+  // Recompute day names when the UI language changes (i18next is non-reactive).
+  const [resolvedLanguage, setResolvedLanguage] = useState(
+    i18next.resolvedLanguage
+  );
+  useEffect(() => {
+    const handler = (lng: string) => setResolvedLanguage(lng);
+    i18next.on('languageChanged', handler);
+    return () => i18next.off('languageChanged', handler);
+  }, []);
+
   const localizedDays = useMemo(() => {
-    const currentLanguage = i18next.resolvedLanguage || 'en';
+    const currentLanguage = resolvedLanguage || 'en';
     dayjs.locale(currentLanguage);
 
     const start = newDayjs(startDate).startOf('day');
@@ -33,7 +43,7 @@ export const RangeView = () => {
       });
     }
     return days;
-  }, [i18next.resolvedLanguage, startDate, endDate]);
+  }, [resolvedLanguage, startDate, endDate]);
 
   return (
     <div className="flex flex-col text-textColor flex-1">
@@ -76,7 +86,7 @@ export const RangeView = () => {
                   key={`${day.date.format('YYYY-MM-DD')}-${hour}`}
                   className="relative"
                 >
-                  <CalendarColumn getDate={day.date.hour(hour).startOf('hour')} />
+                  <CalendarColumn getDate={day.date.startOf('day').add(hour, 'hour')} />
                 </div>
               ))}
             </Fragment>

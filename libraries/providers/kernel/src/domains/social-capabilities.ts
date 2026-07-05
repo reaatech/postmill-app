@@ -10,6 +10,11 @@ export interface ProviderCapability {
   linkPreview: boolean;
   refreshToken: boolean;
   watchlist: boolean;
+  // Whether the provider's markdown/html editor supports rich-text block/link
+  // constructs (links, bullets, headings). Optional: absent means supported —
+  // only set `false` for a provider whose editor lacks them (e.g. telegram's
+  // markdown flavour). Composer editor reads this via `richText ?? true`.
+  richText?: boolean;
 }
 
 export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
@@ -303,6 +308,8 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     linkPreview: false,
     refreshToken: false,
     watchlist: false,
+    // Telegram's markdown flavour has no link/bullet/heading toolbar support.
+    richText: false,
   },
   'nostr': {
     analytics: false,

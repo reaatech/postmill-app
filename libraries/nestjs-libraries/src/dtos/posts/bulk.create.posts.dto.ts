@@ -5,6 +5,7 @@ import {
   IsString,
   ValidateNested,
   ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
@@ -15,6 +16,7 @@ export class BulkCreatePostRowDto {
   @IsArray()
   @IsString({ each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   channels!: string[];
 
   @IsDateString()
@@ -34,5 +36,6 @@ export class BulkCreatePostsDto {
   @ValidateNested({ each: true })
   @Type(() => BulkCreatePostRowDto)
   @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   rows!: BulkCreatePostRowDto[];
 }

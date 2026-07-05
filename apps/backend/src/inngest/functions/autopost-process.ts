@@ -16,10 +16,12 @@ export const createAutopostProcess = (autopostActivity: AutopostActivity) =>
     async ({ step, event }) => {
       await step.run('process', () => autopostActivity.autoPost(event.data.id));
       await step.sleep('wait-1h', '1h');
+      // No `id`: a constant idempotency id would dedupe every hourly hop against
+      // the activation event, killing recurrence after the first run (0.9). The
+      // memoized `step.sendEvent` already prevents duplicate sends within a run.
       await step.sendEvent('autopost/process', {
         name: 'autopost/process',
         data: { id: event.data.id },
-        id: `autopost-${event.data.id}`,
       });
     }
   );

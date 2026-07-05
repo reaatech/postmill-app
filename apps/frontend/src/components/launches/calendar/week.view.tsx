@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Fragment, useMemo } from 'react';
+import React, { Fragment, useEffect, useMemo, useState } from 'react';
 import { useCalendar } from './context';
 import { CalendarColumn } from './grid';
 import dayjs from 'dayjs';
@@ -14,8 +14,18 @@ export const WeekView = () => {
   const { startDate, endDate } = useCalendar();
   const t = useT();
 
+  // Recompute day names when the UI language changes (i18next is non-reactive).
+  const [resolvedLanguage, setResolvedLanguage] = useState(
+    i18next.resolvedLanguage
+  );
+  useEffect(() => {
+    const handler = (lng: string) => setResolvedLanguage(lng);
+    i18next.on('languageChanged', handler);
+    return () => i18next.off('languageChanged', handler);
+  }, []);
+
   const localizedDays = useMemo(() => {
-    const currentLanguage = i18next.resolvedLanguage || 'en';
+    const currentLanguage = resolvedLanguage || 'en';
     dayjs.locale(currentLanguage);
 
     const days = [];
@@ -29,7 +39,7 @@ export const WeekView = () => {
       });
     }
     return days;
-  }, [i18next.resolvedLanguage, startDate]);
+  }, [resolvedLanguage, startDate]);
 
   return (
     <div className="flex flex-col text-textColor flex-1">
@@ -69,7 +79,7 @@ export const WeekView = () => {
                 >
                   <div className="relative">
                     <CalendarColumn
-                      getDate={day.date.hour(hour).startOf('hour')}
+                      getDate={day.date.startOf('day').add(hour, 'hour')}
                     />
                   </div>
                 </Fragment>
