@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TextFormatPanel } from './text-format-panel';
 import { TEXT_STYLE_PRESETS, TextStylePreset, FONT_PAIRINGS } from '../text-styles';
 import { ensureFontLoaded } from '../fonts';
@@ -172,13 +172,23 @@ export const TextInspector: FC<TextInspectorProps> = ({ store }) => {
       ? '#808080'
       : out?.background || '#ffffff';
   const [sampledBg, setSampledBg] = useState<string | null>(null);
+  // Sample only when the element identity/geometry actually changes — keying the
+  // effect on a stable primitive string (not the `primary` object reference, which
+  // is new on every store mutation) stops the background being re-sampled on every
+  // unrelated edit while a text element is selected.
+  const primaryRef = useRef(primary);
+  primaryRef.current = primary;
+  const sampleKey = primary
+    ? `${primary.id}:${primary.x}:${primary.y}:${primary.width}:${primary.height}`
+    : '';
   useEffect(() => {
-    if (!primary) {
+    const p = primaryRef.current;
+    if (!p) {
       setSampledBg(null);
       return;
     }
-    setSampledBg(sampleTextBackground(primary));
-  }, [primary]);
+    setSampledBg(sampleTextBackground(p));
+  }, [sampleKey]);
   const bgColor = sampledBg ?? heuristicBg;
   const ratio = primary ? getContrastRatio(textFill, bgColor) : 21;
   const isLowContrast = ratio < 4.5;

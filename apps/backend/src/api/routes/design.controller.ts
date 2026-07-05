@@ -26,7 +26,10 @@ import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file
 import { DesignRenderService } from '@gitroom/nestjs-libraries/media/design-render/design-render.service';
 import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render/design-bulk.service';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
-import { FRAME_RENDERER_SCRIPT } from '@gitroom/nestjs-libraries/media/design-render/frame-renderer-script';
+import {
+  FRAME_RENDERER_SCRIPT,
+  escapeForScriptTag,
+} from '@gitroom/nestjs-libraries/media/design-render/frame-renderer-script';
 import { RenderDesignDto } from '@gitroom/nestjs-libraries/dtos/design/render.design.dto';
 import { RenderVideoDesignDto } from '@gitroom/nestjs-libraries/dtos/design/render-video.design.dto';
 import { BulkGenerateDesignDto } from '@gitroom/nestjs-libraries/dtos/design/bulk.generate.design.dto';
@@ -425,8 +428,8 @@ export class DesignRenderFrameController {
   <canvas id="frame-canvas"></canvas>
   <script>
     window.__DATA = {
-      output: ${JSON.stringify(output)},
-      baseUrl: ${JSON.stringify(baseUrl)}
+      output: ${escapeForScriptTag(output)},
+      baseUrl: ${escapeForScriptTag(baseUrl)}
     };
     ${FRAME_RENDERER_SCRIPT}
     window.__FRAME_API.preload().then(function () {

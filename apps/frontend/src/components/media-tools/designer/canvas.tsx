@@ -76,7 +76,6 @@ export const DesignerCanvas: FC<CanvasProps> = ({
   const pushHistory = store((s) => s.pushHistory);
   const setSelectedIds = store((s) => s.setSelectedIds);
   const updateElement = store((s) => s.updateElement);
-  const removeElement = store((s) => s.removeElement);
   const duplicateElement = store((s) => s.duplicateElement);
   const addElement = store((s) => s.addElement);
   const setZoom = store((s) => s.setZoom);
@@ -131,16 +130,28 @@ export const DesignerCanvas: FC<CanvasProps> = ({
       setBgImage(null);
       return;
     }
+    let cancelled = false;
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.onload = () => setBgImage(img);
-    img.onerror = () => setBgImage(null);
+    img.onload = () => {
+      if (!cancelled) setBgImage(img);
+    };
+    img.onerror = () => {
+      if (!cancelled) setBgImage(null);
+    };
     img.src = src;
+    return () => {
+      cancelled = true;
+    };
   }, [output?.bg]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && !(e.target as HTMLElement)?.matches?.('input,textarea')) {
+      if (
+        e.code === 'Space' &&
+        !(e.target as HTMLElement)?.matches?.('input,textarea') &&
+        !(e.target as HTMLElement)?.isContentEditable
+      ) {
         e.preventDefault();
         setIsSpacePressed(true);
       }
@@ -289,6 +300,11 @@ export const DesignerCanvas: FC<CanvasProps> = ({
     [output, selectedIds, output.width, output.height, snapEnabled]
   );
 
+  // Element drags fire on the element node itself and bubble to the Layer (the
+  // Transformer is a sibling and never sees them), so these handlers live on the
+  // <Layer>. `e.target.id()` is the real dragged element there. For a
+  // multi-selection the Transformer moves every attached node together, so on
+  // drag-end we persist all of them.
   const handleDragMove = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       if (e.target === e.target.getStage()) return;
@@ -314,12 +330,18 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         cancelAnimationFrame(rafIdRef.current);
         rafIdRef.current = null;
       }
-      const node = e.target;
-      const id = node.id();
-      if (id) {
-        updateElement(id, { x: node.x(), y: node.y() });
-        pushHistory();
-      }
+      if (e.target === e.target.getStage()) return;
+      const trNodes = transformerRef.current?.nodes() || [];
+      const nodes = trNodes.length > 1 ? trNodes : [e.target];
+      let changed = false;
+      nodes.forEach((node) => {
+        const id = node.id();
+        if (id) {
+          updateElement(id, { x: node.x(), y: node.y() });
+          changed = true;
+        }
+      });
+      if (changed) pushHistory();
     },
     [pushHistory, updateElement]
   );
@@ -455,7 +477,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
       const st = store.getState();
       const mod = e.ctrlKey || e.metaKey;
       if (e.key === 'Delete' || e.key === 'Backspace') {
-        selectedIds.forEach((id) => removeElement(id));
+        st.removeElements(selectedIds);
       } else if (e.key === 'Escape') {
         setSelectedIds([]);
       } else if (mod && e.key.toLowerCase() === 'a') {
@@ -491,11 +513,14 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         if (e.key === 'ArrowDown') dy = delta;
         if (e.key === 'ArrowLeft') dx = -delta;
         if (e.key === 'ArrowRight') dx = delta;
+        let moved = false;
         selectedIds.forEach((id) => {
           const el = ((output as any)?.children || []).find((c: any) => c.id === id);
           if (!el || el.locked || el.hidden) return;
           updateElement(id, { x: el.x + dx, y: el.y + dy });
+          moved = true;
         });
+        if (moved) pushHistory();
       } else if (e.key === 'Enter') {
         if (selectedIds.length === 1) {
           const el = ((output as any)?.children || []).find((c: any) => c.id === selectedIds[0]);
@@ -503,7 +528,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         }
       }
     },
-    [editingTextId, selectedIds, removeElement, setSelectedIds, updateElement, output, duplicateElement, store]
+    [editingTextId, selectedIds, setSelectedIds, updateElement, output, duplicateElement, store, pushHistory]
   );
 
   const handleStageDblClick = useCallback(
@@ -698,7 +723,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
           }
         }}
       >
-        <Layer>
+        <Layer onDragMove={handleDragMove} onDragEnd={handleDragEnd}>
           <Rect
             x={0}
             y={0}
@@ -757,8 +782,6 @@ export const DesignerCanvas: FC<CanvasProps> = ({
               anchorSize={10}
               anchorCornerRadius={5}
               rotateAnchorOffset={24}
-              onDragMove={handleDragMove}
-              onDragEnd={handleDragEnd}
               onTransform={handleTransform}
               onTransformEnd={handleTransformEnd}
             />
@@ -778,7 +801,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
 
       {uploadingFile && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e5e7eb]/60">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e1e2e] text-[13px] text-white">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] text-textColor">
             <svg className={`w-4 h-4 ${reduceMotion ? '' : 'animate-spin'}`} viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" opacity="0.3" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
@@ -813,14 +836,14 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         return (
           <TextEditingOverlay
             element={el}
-            stageRect={{ x: 0, y: 0, scale: zoom }}
+            stageRect={{ x: viewportX, y: viewportY, scale: zoom }}
             onUpdate={updateElement}
             onComplete={() => setEditingTextId(null)}
           />
         );
       })()}
 
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-[#1e1e2e] rounded-lg px-3 py-2 text-[12px] text-textColor/60">
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-newBgColorInner border border-newBorder rounded-lg px-3 py-2 text-[12px] text-newTextColor/60">
         <button
           onClick={() => setZoom(zoom / 1.25)}
           className="w-7 h-7 flex items-center justify-center rounded hover:bg-newColColor/30"

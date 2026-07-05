@@ -9,6 +9,7 @@ import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storag
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { NotificationService } from '@gitroom/nestjs-libraries/database/prisma/notifications/notification.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { readResponseCapped } from '@gitroom/nestjs-libraries/utils/capped-stream';
 
 // AIMediaJob has no dedicated provider-job-id column; while a job is pending the
 // provider's external reference is stored in `artifactUrl` under this scheme and is
@@ -18,8 +19,19 @@ const PENDING_REF_PREFIX = 'pending://';
 // Async jobs run 3–30 minutes (§11.2); anything older than this is dead.
 const JOB_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 
+// §3.1 crash-recovery: a job sits in the transient `landing` state only for the duration of
+// one completeJob (a bounded download + storage write — seconds to ~1 min). If it's still
+// `landing` after this, the worker that claimed it crashed mid-completion; reclaim it. Set
+// well beyond the worst-case completeJob so a slow-but-live completion is never reclaimed.
+const LANDING_STALE_MS = 10 * 60 * 1000;
+
 // Defensive cap when downloading provider artifacts.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
+// §6.2: bound the sibling fan-out for a single provider job (e.g. a music provider
+// returning many takes) so a runaway/malicious `extraArtifactUrls` can't spawn an
+// unbounded set of sibling downloads + File rows.
+const MAX_EXTRA_ARTIFACTS = 8;
 
 // 'stt' jobs are created already-complete (transcript stored inline via
 // completeJobWithBuffer), so they never enter the async poll path — but the type must
@@ -165,6 +177,7 @@ export class MediaJobLifecycleService {
     if (!job || (job.status !== 'pending' && job.status !== 'processing')) return 'skipped';
 
     if (Date.now() - job.createdAt.getTime() > JOB_TIMEOUT_MS) {
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       await this.failJob(job, 'Job timed out waiting for the provider');
       return 'failed';
     }
@@ -184,6 +197,7 @@ export class MediaJobLifecycleService {
       { includeDisabled: true },
     );
     if (!config) {
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       await this.failJob(job, `Provider "${job.provider}" is no longer configured`);
       return 'failed';
     }
@@ -202,6 +216,7 @@ export class MediaJobLifecycleService {
     } catch (err) {
       // Unknown/retired provider version throws — fail the job cleanly instead of
       // leaving it pending until the 24h timeout (and 500-ing the webhook path).
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       await this.failJob(
         job,
         `Provider "${job.provider}" could not be resolved: ${(err as Error).message}`,
@@ -209,6 +224,7 @@ export class MediaJobLifecycleService {
       return 'failed';
     }
     if (!adapter?.pollJob) {
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       await this.failJob(job, `Provider "${job.provider}" cannot report job status`);
       return 'failed';
     }
@@ -224,26 +240,48 @@ export class MediaJobLifecycleService {
     }
 
     if (poll.status === 'failed') {
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       await this.failJob(job, poll.error || 'Provider reported failure');
       return 'failed';
     }
     if (poll.status === 'completed' && poll.artifactUrl) {
+      // §3.1: atomically claim the terminal transition before doing any work. Two
+      // concurrent invocations both see `completed`; only the one that flips the row
+      // out of pending/processing downloads/stores/notifies — the loser short-circuits.
+      if (!(await this._claimForCompletion(job.id))) return 'skipped';
       const ok = await this.completeJob(job, poll.artifactUrl, poll.metadata, job.folderId);
       // Land any additional artifacts from the SAME generation (e.g. Suno returns 2 clips) as
-      // sibling completed jobs. Done after the primary completes: once the primary flips to
-      // `completed`, processJob short-circuits to 'skipped' on later sweeps, so siblings are
-      // created exactly once. (Primary-first ordering means a mid-fan-out crash loses an extra
-      // clip rather than duplicating the set on the next retry.)
+      // sibling completed jobs. Done after the primary completes: the atomic claim above already
+      // guarantees a single winner, so siblings are created exactly once. (Primary-first ordering
+      // means a mid-fan-out crash loses an extra clip rather than duplicating the set on retry.)
       if (ok && poll.extraArtifactUrls?.length) {
-        await this._landExtraArtifacts(job, poll.extraArtifactUrls, poll.metadata);
+        await this._landExtraArtifacts(
+          job,
+          poll.extraArtifactUrls.slice(0, MAX_EXTRA_ARTIFACTS),
+          poll.metadata,
+        );
       }
       return ok ? 'completed' : 'failed';
     }
 
+    // §3.1: guard the pending→processing write so a slow poller can't regress a job
+    // a webhook already completed — the conditional update no-ops unless still pending.
     if (job.status === 'pending') {
-      await this._aiSettings.updateMediaJob(job.id, { status: 'processing' });
+      await this._aiSettings.claimMediaJobStatus(job.id, ['pending'], 'processing');
     }
     return 'pending';
+  }
+
+  // §3.1: atomically claim a job for terminal handling (complete or fail). Returns true
+  // only for the single caller that flips it out of pending/processing into the transient
+  // `landing` state; concurrent callers that lose the claim must not re-download/re-notify.
+  private async _claimForCompletion(jobId: string): Promise<boolean> {
+    const count = await this._aiSettings.claimMediaJobStatus(
+      jobId,
+      ['pending', 'processing'],
+      'landing',
+    );
+    return count === 1;
   }
 
   // Land extra artifacts from a single provider job (e.g. a music provider returning multiple
@@ -267,7 +305,7 @@ export class MediaJobLifecycleService {
           version: primary.version,
           inputJson: primary.inputJson,
         });
-        await this.completeJob(sibling, url, metadata, primary.folderId);
+        await this.completeJob(sibling, url, metadata, primary.folderId, { notify: false });
       } catch (err) {
         this._logger.warn(
           `Failed to land extra artifact for job ${primary.id}: ${(err as Error).message}`,
@@ -360,6 +398,7 @@ export class MediaJobLifecycleService {
     artifactUrl: string,
     metadata?: MediaArtifactMetadata,
     folderId?: string | null,
+    options?: { notify?: boolean },
   ): Promise<boolean> {
     try {
       const stored = await this.storeArtifact({
@@ -378,15 +417,22 @@ export class MediaJobLifecycleService {
         error: null,
       });
 
-      await this._notify(
-        job,
-        'success',
-        `AI ${job.operation} ready`,
-        `Your generated ${job.operation} is ready in the media library.`,
-      );
+      // §6.2: siblings (extra takes) pass notify:false — the primary already told the
+      // user "ready", and a sibling that fails between create and complete must not
+      // fire a spurious failure notification for a take the user never asked for.
+      if (options?.notify !== false) {
+        await this._notify(
+          job,
+          'success',
+          `AI ${job.operation} ready`,
+          `Your generated ${job.operation} is ready in the media library.`,
+        );
+      }
       return true;
     } catch (err) {
-      await this.failJob(job, `Failed to store generated artifact: ${(err as Error).message}`);
+      await this.failJob(job, `Failed to store generated artifact: ${(err as Error).message}`, {
+        notify: options?.notify,
+      });
       return false;
     }
   }
@@ -464,6 +510,21 @@ export class MediaJobLifecycleService {
   // ── Polling sweep entrypoint (Temporal activity) ──
 
   async processPendingJobs(limit = 100): Promise<{ processed: number; completed: number; failed: number }> {
+    // §3.1 crash-recovery: recover jobs stranded mid-completion (stuck in `landing`) before
+    // the sweep runs, so the reclaimed rows are re-driven in this same pass. The cutoff is
+    // far beyond the worst-case completeJob (bounded download + storage write), so a job on
+    // the normal fast path is never reclaimed.
+    try {
+      const reclaimed = await this._aiSettings.reclaimStaleLandingJobs(
+        new Date(Date.now() - LANDING_STALE_MS),
+      );
+      if (reclaimed > 0) {
+        this._logger.warn(`Reclaimed ${reclaimed} media job(s) stranded in 'landing'`);
+      }
+    } catch (err) {
+      this._logger.warn(`Stale-landing reclaim failed: ${(err as Error).message}`);
+    }
+
     const jobs = await this._aiSettings.getPendingMediaJobs(limit);
     let completed = 0;
     let failed = 0;
@@ -504,8 +565,13 @@ export class MediaJobLifecycleService {
     if (!res.ok) throw new Error(`Artifact download failed (${res.status})`);
     const contentLength = Number(res.headers.get('content-length') || 0);
     if (contentLength > MAX_ARTIFACT_BYTES) throw new Error('Artifact exceeds the size limit');
-    const buffer = Buffer.from(await res.arrayBuffer());
-    if (buffer.length > MAX_ARTIFACT_BYTES) throw new Error('Artifact exceeds the size limit');
+    // 1.6: stream with a running byte cap — content-length is advisory, so we
+    // abort mid-transfer instead of buffering a multi-GB body into heap.
+    const buffer = await readResponseCapped(
+      res,
+      MAX_ARTIFACT_BYTES,
+      'Artifact exceeds the size limit',
+    );
     const mime = res.headers.get('content-type')?.split(';')[0] || mimeHint || 'application/octet-stream';
     return { buffer, mime };
   }
@@ -536,9 +602,17 @@ export class MediaJobLifecycleService {
 
     const path = await adapter.writeBuffer(params.buffer, params.mime);
 
+    // 1.3: the folderId originates from a client (studio/heygen generate DTO);
+    // only honour it when the caller's org owns it, else fall through to the
+    // org's standard folder resolution below.
+    const ownedFolderId = await this._fileService.resolveOwnedFolderId(
+      params.organizationId,
+      params.folderId,
+    );
+
     const folderName = OPERATION_FOLDER[params.operation] || 'other';
     const folderId =
-      params.folderId ??
+      ownedFolderId ??
       (config?.storageRootFolderId
         ? await this._orgMediaProviderSettings.getStandardFolderId(
             params.organizationId,

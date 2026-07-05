@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { OrgContentPackSettingsService } from '@gitroom/nestjs-libraries/database/prisma/content-packs/org-content-pack-settings.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import type { ContentPackCapability as ContentPackCapabilityInstance } from '@gitroom/provider-kernel';
+import { ContentPackDailyCapError } from './content-packs/content-pack.interface';
 import type { ContentPackCapability } from './content-packs/content-pack.interface';
 import {
   StockAudioItem,
@@ -20,6 +21,8 @@ const CACHE_TTL_SECONDS = 60;
 
 @Injectable()
 export class StockMediaService {
+  private readonly _logger = new Logger(StockMediaService.name);
+
   constructor(
     private readonly _redis: RedisService,
     private readonly _contentPacks: OrgContentPackSettingsService,
@@ -83,6 +86,9 @@ export class StockMediaService {
         const res = await safeFetch(`https://api.unsplash.com/photos?${params}`, {
           headers: { Authorization: `Client-ID ${this.unsplashKey}` },
         });
+        if (!res.ok) {
+          return { results: [], page, totalPages: 0, configured: true, source: 'unsplash' };
+        }
         const data = await res.json();
         const photos = Array.isArray(data) ? data : [];
         return {
@@ -100,6 +106,9 @@ export class StockMediaService {
       const res = await safeFetch(`https://api.unsplash.com/search/photos?${params}`, {
         headers: { Authorization: `Client-ID ${this.unsplashKey}` },
       });
+      if (!res.ok) {
+        return { results: [], page, totalPages: 0, configured: true, source: 'unsplash' };
+      }
       const data = (await res.json()) as any;
       return {
         results: (data.results || []).map(this.mapUnsplashPhoto.bind(this)),
@@ -113,9 +122,13 @@ export class StockMediaService {
 
   async getRelatedPhotos(photoId: string): Promise<StockPhotoItem[]> {
     if (!this.unsplashKey) return [];
-    const res = await safeFetch(`https://api.unsplash.com/photos/${photoId}/related`, {
-      headers: { Authorization: `Client-ID ${this.unsplashKey}` },
-    });
+    const res = await safeFetch(
+      `https://api.unsplash.com/photos/${encodeURIComponent(photoId)}/related`,
+      {
+        headers: { Authorization: `Client-ID ${this.unsplashKey}` },
+      }
+    );
+    if (!res.ok) return [];
     const data = (await res.json()) as any;
     return (data.results || []).map(this.mapUnsplashPhoto.bind(this));
   }
@@ -161,6 +174,9 @@ export class StockMediaService {
       const res = await safeFetch(`${endpoint}?${params}`, {
         headers: { Authorization: this.pexelsKey! },
       });
+      if (!res.ok) {
+        return { results: [], page, totalPages: 0, configured: true, source: 'pexels' };
+      }
       const data = (await res.json()) as any;
       return {
         results: (data.videos || []).map(this.mapPexelsVideo.bind(this)),
@@ -174,9 +190,13 @@ export class StockMediaService {
 
   async getRelatedVideos(videoId: string): Promise<StockVideoItem[]> {
     if (!this.pexelsKey) return [];
-    const res = await safeFetch(`https://api.pexels.com/videos/videos/${videoId}`, {
-      headers: { Authorization: this.pexelsKey },
-    });
+    const res = await safeFetch(
+      `https://api.pexels.com/videos/videos/${encodeURIComponent(videoId)}`,
+      {
+        headers: { Authorization: this.pexelsKey },
+      }
+    );
+    if (!res.ok) return [];
     const video = (await res.json()) as any;
     if (!video || !video.id) return [];
 
@@ -449,6 +469,18 @@ export class StockMediaService {
 
   async triggerDownload(downloadLocation: string): Promise<void> {
     if (!this.unsplashKey) return;
+    // 0.3: `downloadLocation` is fully client-controlled. `safeFetch` blocks
+    // private IPs, but any public HTTPS host would still receive the deployment's
+    // Unsplash access key. Only ever send the key to Unsplash's own API host.
+    let parsed: URL;
+    try {
+      parsed = new URL(downloadLocation);
+    } catch {
+      return;
+    }
+    if (parsed.protocol !== 'https:' || parsed.hostname !== 'api.unsplash.com') {
+      return;
+    }
     try {
       await safeFetch(downloadLocation, {
         headers: { Authorization: `Client-ID ${this.unsplashKey}` },
@@ -474,15 +506,47 @@ export class StockMediaService {
     // "default to free" behaviour.
     const resolved = await this._contentPacks.getActiveForCapability(orgId, capability);
     if (resolved) {
-      const result = await resolved.capability.search(
-        capability as any,
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([, v]) => v !== undefined)
+      ) as Record<string, string>;
+
+      // 1.7: cache pack results too, but under an ORG-SCOPED key — pack results
+      // are billable and tenant-specific, so they must never share the global
+      // `stock:` namespace. Without this every keystroke is a billable call.
+      const cacheKey = this.buildPackCacheKey(
+        orgId,
+        resolved.active.identifier,
+        capability,
         query,
         page,
-        Object.fromEntries(Object.entries(filters).filter(([, v]) => v !== undefined)) as Record<string, string>
+        cleanFilters
       );
-      // v1 content-pack adapters delegate to the legacy ContentPack implementation,
-      // which already returns the StockSearchResponse shape. Cast for type parity.
-      return result as unknown as StockSearchResponse<T>;
+
+      try {
+        return await this.withCache(cacheKey, async () => {
+          const result = await resolved.capability.search(
+            capability as any,
+            query,
+            page,
+            cleanFilters
+          );
+          // v1 content-pack adapters delegate to the legacy ContentPack
+          // implementation, which already returns the StockSearchResponse shape.
+          return result as unknown as StockSearchResponse<T>;
+        });
+      } catch (err) {
+        // 1.7: a pack failure must not 500 every stock search for the org.
+        // The daily-cap error is surfaced (ProviderExceptionFilter → 402); any
+        // other pack error degrades to the free provider (mirrors the
+        // getActiveForCapability resolution-failure fallback).
+        if (err instanceof ContentPackDailyCapError) {
+          throw err;
+        }
+        this._logger.warn(
+          `Content pack search for "${capability}" failed; falling back to the free provider: ${(err as Error).message}`
+        );
+        return freeSearch();
+      }
     }
     return freeSearch();
   }
@@ -492,11 +556,30 @@ export class StockMediaService {
     capability: string,
     ...parts: Array<string | number | undefined>
   ): string {
+    // Map empty/undefined parts to a placeholder rather than dropping them, so
+    // e.g. (query='', page=2) can't collide with (query='2', page=undefined).
     const input = parts
-      .filter((p): p is string | number => p !== undefined && p !== null && p !== '')
+      .map((p) => (p === undefined || p === null || p === '' ? '~' : String(p)))
       .join('|');
     const hash = createHash('sha256').update(input).digest('hex');
     return `stock:${source}:${capability}:${hash}`;
+  }
+
+  private buildPackCacheKey(
+    orgId: string,
+    identifier: string,
+    capability: string,
+    query: string,
+    page: number,
+    filters: Record<string, string>
+  ): string {
+    const filterStr = Object.keys(filters)
+      .sort()
+      .map((k) => `${k}=${filters[k]}`)
+      .join('&');
+    const input = [capability, query || '~', String(page), filterStr || '~'].join('|');
+    const hash = createHash('sha256').update(input).digest('hex');
+    return `stock-pack:${orgId}:${identifier}:${hash}`;
   }
 
   private async withCache<T>(
@@ -515,11 +598,16 @@ export class StockMediaService {
 
     const result = await fetcher();
 
-    // Negative-cache empty results so a missing key / no hits doesn't hammer the API.
-    try {
-      await this._redis.set(key, JSON.stringify(result), ttl).catch(() => {});
-    } catch {
-      // ignore
+    // Negative-cache empty results so a missing key / no hits doesn't hammer the
+    // API. But never cache `configured:false` here: the no-key state returns
+    // before withCache, so `configured:false` only reaches this point on a
+    // transient provider failure — caching it would suppress the tab for 60s.
+    if ((result as { configured?: boolean }).configured !== false) {
+      try {
+        await this._redis.set(key, JSON.stringify(result), ttl).catch(() => {});
+      } catch {
+        // ignore
+      }
     }
 
     return result;

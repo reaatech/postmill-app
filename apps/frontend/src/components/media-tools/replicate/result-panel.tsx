@@ -107,28 +107,28 @@ function DetailsCard() {
     ([, v]) => v !== undefined && v !== null && v !== ''
   );
   return (
-    <div className="mt-4 rounded-xl border border-newBorder bg-newBgColorInner p-3">
+    <div className="mt-4 rounded-xl border border-studioBorder bg-newBgColorInner p-3">
       <div className="flex gap-6 mb-2">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-gray-500">Model</div>
-          <div className="text-sm text-white">{meta.modelName}</div>
+          <div className="text-[10px] uppercase tracking-wider text-newTextColor/50">Model</div>
+          <div className="text-sm text-textColor">{meta.modelName}</div>
         </div>
         {estimate && !estimate.approximate && (
           <div>
-            <div className="text-[10px] uppercase tracking-wider text-gray-500">Est. cost</div>
+            <div className="text-[10px] uppercase tracking-wider text-newTextColor/50">Est. cost</div>
             <div className="text-sm text-green-400">${estimate.usd.toFixed(4)}</div>
           </div>
         )}
       </div>
       {entries.length > 0 && (
-        <div className="border-t border-newBorder pt-2 space-y-1">
+        <div className="border-t border-studioBorder pt-2 space-y-1">
           {entries.map(([k, v]) => {
             const display =
               typeof v === 'object' ? (v as any).url || (v as any).fileId || JSON.stringify(v) : String(v);
             return (
-              <div key={k} className="text-[11px] text-gray-400">
-                <span className="text-gray-500">{k.replace(/_/g, ' ')}: </span>
-                <span className={k === 'prompt' ? 'text-gray-300' : 'text-gray-300'}>{display}</span>
+              <div key={k} className="text-[11px] text-newTextColor/70">
+                <span className="text-newTextColor/50">{k.replace(/_/g, ' ')}: </span>
+                <span className="text-newTextColor/80">{display}</span>
               </div>
             );
           })}
@@ -219,10 +219,10 @@ export function ResultPanel({ medium }: { medium: Medium }) {
   if (!selectedModel) {
     return (
       <Frame>
-        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-newBorder py-20 text-center">
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-studioBorder py-20 text-center">
           <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
-          <p className="text-gray-400">Nothing generated yet</p>
-          <p className="text-xs text-gray-600">Pick a model and configure it to get started.</p>
+          <p className="text-newTextColor/70">Nothing generated yet</p>
+          <p className="text-xs text-newTextColor/50">Pick a model and configure it to get started.</p>
         </div>
       </Frame>
     );
@@ -233,19 +233,19 @@ export function ResultPanel({ medium }: { medium: Medium }) {
     return (
       <Frame>
         <div className="flex flex-col gap-2">
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-newTextColor/50">
             Example of <span className="text-designerAccent">{selectedModel.id}</span>
           </div>
           {selectedModel.coverImageUrl ? (
             <img
               src={selectedModel.coverImageUrl}
               alt="Model example"
-              className="w-full rounded-2xl border border-newBorder object-contain max-h-[60vh]"
+              className="w-full rounded-2xl border border-studioBorder object-contain max-h-[60vh]"
             />
           ) : (
-            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-newBorder py-20">
+            <div className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-studioBorder py-20">
               <span className="text-5xl opacity-40">{MEDIUM_ICON[medium]}</span>
-              <p className="text-xs text-gray-600">No example available — generate to see output.</p>
+              <p className="text-xs text-newTextColor/50">No example available — generate to see output.</p>
             </div>
           )}
         </div>
@@ -257,10 +257,10 @@ export function ResultPanel({ medium }: { medium: Medium }) {
   if (runState === 'running') {
     return (
       <Frame>
-        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-newBorder py-20">
+        <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-studioBorder py-20">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-designerAccent" />
-          <p className="text-gray-300">Generating your {medium}…</p>
-          <p className="text-xs text-gray-500">
+          <p className="text-newTextColor/80">Generating your {medium}…</p>
+          <p className="text-xs text-newTextColor/50">
             {medium === 'image' ? 'This usually takes 10–30 seconds.' : 'This can take a few minutes.'}
           </p>
           <ElapsedTimer />
@@ -280,7 +280,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
         <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-red-900/50 bg-red-950/20 py-16 px-6">
           <p className="text-red-400 text-center">{error || 'Generation failed'}</p>
           {!isInputError && (
-            <p className="text-xs text-gray-500 text-center max-w-sm">
+            <p className="text-xs text-newTextColor/50 text-center max-w-sm">
               If a generation fails for no clear reason, check your{' '}
               <a
                 href="https://replicate.com/account/billing"
@@ -295,7 +295,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
           )}
           <button
             onClick={() => generate()}
-            className="px-4 py-2 rounded-lg bg-gray-800 text-white text-sm hover:bg-gray-700 transition-colors"
+            className="px-4 py-2 rounded-lg bg-btnSimple text-textColor text-sm hover:bg-boxHover transition-colors"
           >
             Retry
           </button>
@@ -313,7 +313,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
       <Frame>
         <div className="flex flex-col gap-3">
           {selectedCategory === 'caption' && (
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-newTextColor/70">
               Captions are burned into the video — the output is an MP4, not a subtitle file.
             </p>
           )}
@@ -322,7 +322,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
             <div className={single ? '' : 'grid grid-cols-2 gap-3'}>
               {urls.map((url, i) => (
                 <div key={i} className="group relative">
-                  <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-newBorder" />
+                  <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-studioBorder" />
                   <ActionOverlay
                     onDownload={() => handleDownload(url)}
                     onRegenerate={() => generate()}
@@ -341,15 +341,15 @@ export function ResultPanel({ medium }: { medium: Medium }) {
           )}
 
           {result.kind === 'audio' && urls.length > 0 && (
-            <div className="group relative rounded-2xl border border-newBorder p-3">
+            <div className="group relative rounded-2xl border border-studioBorder p-3">
               <AudioPlayer src={urls[0]} />
               <ActionOverlay onDownload={() => handleDownload(urls[0])} onRegenerate={() => generate()} onNew={handleNew} />
             </div>
           )}
 
           {result.kind === 'text' && result.text && (
-            <div className="rounded-2xl border border-newBorder bg-newBgColorInner p-4 max-h-[50vh] overflow-y-auto">
-              <p className="text-sm text-white whitespace-pre-wrap">{result.text}</p>
+            <div className="rounded-2xl border border-studioBorder bg-newBgColorInner p-4 max-h-[50vh] overflow-y-auto">
+              <p className="text-sm text-textColor whitespace-pre-wrap">{result.text}</p>
             </div>
           )}
 
@@ -370,7 +370,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
               ) : (
                 <button
                   onClick={openInFiles}
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
                 >
                   Open in Files
                 </button>
@@ -395,25 +395,25 @@ export function ResultPanel({ medium }: { medium: Medium }) {
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => navigator.clipboard.writeText(result.text!)}
-                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
               >
                 Copy
               </button>
               <button
                 onClick={() => downloadBlob(result.text!, 'transcript.txt', 'text/plain')}
-                className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
               >
                 Download .txt
               </button>
               {result.segments && result.segments.length > 0 && (
                 <button
                   onClick={() => downloadBlob(generateSrt(result.segments!), 'transcript.srt', 'text/plain')}
-                  className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors"
+                  className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors"
                 >
                   Download .srt
                 </button>
               )}
-              <button onClick={handleNew} className="px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors">
+              <button onClick={handleNew} className="px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors">
                 New
               </button>
             </div>

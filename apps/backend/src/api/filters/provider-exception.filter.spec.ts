@@ -3,6 +3,7 @@ import { ArgumentsHost } from '@nestjs/common';
 import {
   ProviderVersionRetiredError,
   ProviderKernel,
+  ContentPackDailyCapError,
 } from '@gitroom/provider-kernel';
 import { ProviderExceptionFilter } from './provider-exception.filter';
 
@@ -76,5 +77,20 @@ describe('ProviderExceptionFilter — retired version → 410', () => {
     const body = json.mock.calls[0][0];
     expect(body).toMatchObject({ providerId: 'openai', version: 'v1' });
     expect(body.latestActive).toBeUndefined();
+  });
+
+  it('1.7: maps ContentPackDailyCapError to HTTP 402 with the message', () => {
+    const kernel = {
+      latestActive: vi.fn(),
+    } as unknown as ProviderKernel;
+
+    const filter = new ProviderExceptionFilter(kernel);
+    const { host, status, json } = makeHost();
+
+    filter.catch(new ContentPackDailyCapError('Daily cap reached'), host);
+
+    expect(status).toHaveBeenCalledWith(402);
+    const body = json.mock.calls[0][0];
+    expect(body.message).toBe('Daily cap reached');
   });
 });

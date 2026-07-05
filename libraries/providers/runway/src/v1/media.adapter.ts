@@ -8,6 +8,8 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -70,7 +72,7 @@ export class RunwayAdapter implements MediaProviderAdapter {
         ...input,
       }),
     });
-    if (!res.ok) throw new Error(`Runway image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Runway image generation failed: ${redactError(await res.text())}`);
     const { id } = (await res.json()) as RunwayTaskCreateResponse;
     if (!id) throw new Error('Runway returned no task id');
 
@@ -117,7 +119,7 @@ export class RunwayAdapter implements MediaProviderAdapter {
         ...rest,
       }),
     });
-    if (!res.ok) throw new Error(`Runway video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Runway video generation failed: ${redactError(await res.text())}`);
     const { id } = (await res.json()) as RunwayTaskCreateResponse;
     if (!id) throw new Error('Runway returned no task id');
     return { jobId: id };
@@ -132,10 +134,20 @@ export class RunwayAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Runway API key is required' };
+
     const res = await this._fetch(`${BASE}/tasks/${jobId}`, {
       headers: this._headers(options),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — a 429/5xx poll is transient: THROW so the lifecycle retries rather than
+      // permanently failing a still-rendering task.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Runway poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as RunwayTaskStatusResponse;
 
     if (data.status === 'SUCCEEDED') {
@@ -144,7 +156,7 @@ export class RunwayAdapter implements MediaProviderAdapter {
       return { status: 'completed', artifactUrl, metadata: { provider: this.identifier } };
     }
     if (data.status === 'FAILED' || data.status === 'CANCELLED') {
-      return { status: 'failed', error: data.failure || data.failureCode || 'Runway task failed' };
+      return { status: 'failed', error: redactError(data.failure || data.failureCode || 'Runway task failed') };
     }
     return { status: 'pending' };
   }

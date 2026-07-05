@@ -9,9 +9,16 @@ import {
   MediaOperation,
   MediaModelOption,
   MediaInputValue,
+  resolveApiKey,
+  redactError,
+  isTransientStatus,
+  readCappedArrayBuffer,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
+
+// Cap a fetched source frame before base64-inlining it into the i2v request body (6.1j).
+const MAX_SOURCE_IMAGE_BYTES = 32 * 1024 * 1024;
 
 // SiliconFlow — same key as the SiliconFlow LLM provider (registry id `siliconflow`), reused
 // via the universal-credential fallback. Image + TTS ride the OpenAI-compatible base
@@ -66,19 +73,28 @@ export class SiliconFlowMediaAdapter extends OpenAiCompatibleMediaAdapter {
       headers: this._headers(options),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`SiliconFlow video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`SiliconFlow video generation failed: ${redactError(await res.text())}`);
     const requestId = ((await res.json()) as SiliconFlowSubmit).requestId;
     if (!requestId) throw new Error('SiliconFlow returned no requestId');
     return { jobId: requestId };
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'SiliconFlow API key is required' };
+
     const res = await this._fetch(`${this.baseUrl}/video/status`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify({ requestId: jobId }),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering video retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`SiliconFlow poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as SiliconFlowStatus;
     const status = (data.status || '').toLowerCase();
     if (status === 'succeed' || status === 'succeeded' || status === 'success') {
@@ -87,7 +103,7 @@ export class SiliconFlowMediaAdapter extends OpenAiCompatibleMediaAdapter {
       return { status: 'completed', artifactUrl: url, metadata: { provider: this.identifier } };
     }
     if (status === 'failed' || status === 'error') {
-      return { status: 'failed', error: data.reason || 'SiliconFlow video generation failed' };
+      return { status: 'failed', error: redactError(data.reason || 'SiliconFlow video generation failed') };
     }
     return { status: 'pending' };
   }
@@ -96,7 +112,8 @@ export class SiliconFlowMediaAdapter extends OpenAiCompatibleMediaAdapter {
     try {
       const res = await this._fetch(url, {});
       if (!res.ok) return url;
-      const buf = Buffer.from(await res.arrayBuffer());
+      // 6.1j — cap the source frame (content-length pre-check + streamed cap) before base64.
+      const buf = await readCappedArrayBuffer(res as any, MAX_SOURCE_IMAGE_BYTES);
       const mime = res.headers.get('content-type') || 'image/png';
       return `data:${mime};base64,${buf.toString('base64')}`;
     } catch {

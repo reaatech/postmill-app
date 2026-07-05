@@ -89,6 +89,32 @@ const ALLOWED_MIME_TYPES = new Set<string>([
   'font/woff2',
 ]);
 
+// §6.2: allowlist for `writeBuffer`, which lands provider/AI-generated artifacts (a
+// broader set than user uploads: adds video/webm + audio/webm and the text/plain &
+// application/json transcript/provenance sidecars). This blocks a provider from landing
+// `text/html` (or any other active type) in the org bucket, where it could be served
+// and executed. Text/JSON have no magic bytes, so they are trusted only from the caller's
+// declared content-type — never sniffed.
+const STORED_ARTIFACT_ALLOWED_MIME = new Set<string>([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+  'image/bmp',
+  'image/tiff',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+  'audio/mp3',
+  'audio/mp4',
+  'audio/wav',
+  'audio/ogg',
+  'audio/webm',
+  'text/plain',
+  'application/json',
+]);
+
 /**
  * Shared S3-protocol storage adapter. Used by every S3-compatible storage
  * provider (AWS S3, Backblaze B2, Wasabi, DigitalOcean Spaces, Hetzner, Storj,
@@ -298,8 +324,16 @@ export class S3StorageBase implements StorageCapability {
 
   async writeBuffer(buffer: Buffer, contentType?: string): Promise<string> {
     const detected = await fromBuffer(buffer);
-    const ext = detected?.ext || 'bin';
+    // §6.2: prefer the sniffed type (magic bytes are trustworthy); text/JSON have no
+    // magic and fall back to the caller's declared content-type. Reject anything not on
+    // the allowlist so a provider can't land text/html in the org bucket.
     const mime = detected?.mime || contentType || 'application/octet-stream';
+    if (!STORED_ARTIFACT_ALLOWED_MIME.has(mime)) {
+      throw new Error(`Unsupported stored artifact type: ${mime}`);
+    }
+    const ext =
+      detected?.ext ||
+      (mime === 'application/json' ? 'json' : mime === 'text/plain' ? 'txt' : 'bin');
     const id = randomBytes(8).toString('hex');
     const key = `${id}.${ext}`;
 

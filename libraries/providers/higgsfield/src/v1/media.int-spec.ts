@@ -135,4 +135,30 @@ describe('higgsfield media adapter (submit-and-poll, two-part key)', () => {
     await expect(adapter.generateAudio('x', { credentials: { keyId: 'a', keySecret: 'b' } })).rejects.toThrow();
     await expect(adapter.generateAvatar('x', { credentials: { keyId: 'a', keySecret: 'b' } })).rejects.toThrow();
   });
+
+  // 6.1h — a Soul batch surfaces extra takes via the generic extraArtifactUrls (Suno pattern).
+  it('pollJob returns extra image takes as extraArtifactUrls', async () => {
+    const { ctx } = makeCtx(() =>
+      res({
+        status: 'completed',
+        images: [{ url: 'https://cdn.hf/1.png' }, { url: 'https://cdn.hf/2.png' }, { url: 'https://cdn.hf/3.png' }],
+      }),
+    );
+    const adapter: any = higgsfieldMediaModule.create(ctx as any);
+    const out = await adapter.pollJob('req-1', { credentials: { keyId: 'a', keySecret: 'b' } });
+    expect(out.status).toBe('completed');
+    expect(out.artifactUrl).toBe('https://cdn.hf/1.png');
+    expect(out.extraArtifactUrls).toEqual(['https://cdn.hf/2.png', 'https://cdn.hf/3.png']);
+    expect(out.metadata?.source).toBeUndefined();
+  });
+
+  it('pollJob throws on a transient 503 and returns failed on missing creds', async () => {
+    const { ctx: t } = makeCtx(() => res('down', false, 503));
+    await expect(
+      (higgsfieldMediaModule.create(t as any) as any).pollJob('req-1', { credentials: { keyId: 'a', keySecret: 'b' } }),
+    ).rejects.toThrow(/transient/);
+    const { ctx: noKey } = makeCtx(() => res({}));
+    const failed = await (higgsfieldMediaModule.create(noKey as any) as any).pollJob('req-1', {});
+    expect(failed.status).toBe('failed');
+  });
 });

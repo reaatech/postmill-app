@@ -18,9 +18,14 @@ interface SaveToFilesModalProps {
   attribution?: Record<string, unknown>;
   // Bare audio can't be a standalone social post — hide "Save & Post" for it.
   allowPost?: boolean;
+  // When provided, the save uploads this locally-produced blob via `/files/upload-simple`
+  // (respecting the chosen folder + file name) instead of server-fetching `url` via
+  // `/files/import`. Used for icons, whose SVG source `/files/import` intentionally rejects
+  // (anti-XSS) — the caller rasterizes to PNG here so folder selection is preserved (6.3g).
+  uploadBlob?: () => Promise<Blob>;
 }
 
-export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution, allowPost = true }) => {
+export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source, type, downloadLocation, attribution, allowPost = true, uploadBlob }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const modal = useModals();
@@ -64,18 +69,29 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
   const handleSave = useCallback(async (andPost: boolean) => {
     setSaving(true);
     try {
-      const res = await fetch('/files/import', {
-        method: 'POST',
-        body: JSON.stringify({
-          url,
-          name: fileName,
-          folderId: selectedFolderId,
-          source,
-          type,
-          downloadLocation,
-          attribution,
-        }),
-      });
+      let res: Response;
+      if (uploadBlob) {
+        // Local raster (e.g. an icon rasterized from SVG) → multipart upload into the
+        // selected folder. `/files/import` would reject the SVG source outright.
+        const blob = await uploadBlob();
+        const form = new FormData();
+        form.append('file', blob, fileName);
+        if (selectedFolderId) form.append('folderId', selectedFolderId);
+        res = await fetch('/files/upload-simple', { method: 'POST', body: form });
+      } else {
+        res = await fetch('/files/import', {
+          method: 'POST',
+          body: JSON.stringify({
+            url,
+            name: fileName,
+            folderId: selectedFolderId,
+            source,
+            type,
+            downloadLocation,
+            attribution,
+          }),
+        });
+      }
       if (!res.ok) {
         toaster.show('Failed to save file', 'warning');
         return;
@@ -109,7 +125,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
     } finally {
       setSaving(false);
     }
-  }, [url, fileName, selectedFolderId, source, type, downloadLocation, attribution, fetch, toaster, modal]);
+  }, [url, fileName, selectedFolderId, source, type, downloadLocation, attribution, uploadBlob, fetch, toaster, modal]);
 
   const renderFolderTree = (items: any[], depth: number = 0): React.ReactNode => {
     return (items || []).map((folder: any) => {
@@ -118,7 +134,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
         <div key={folder.id}>
           <div
             className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
-              selectedFolderId === folder.id ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-newColColor/50'
+              selectedFolderId === folder.id ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-newColColor/50'
             }`}
             style={{ paddingLeft: `${12 + depth * 16}px` }}
             onClick={() => setSelectedFolderId(folder.id)}
@@ -182,10 +198,10 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
 
       <div>
         <div className="text-[13px] font-[500] text-textColor mb-[6px]">Destination</div>
-        <div className="max-h-[260px] overflow-y-auto border border-newBorder rounded-[8px] p-[8px] bg-newBgColorInner">
+        <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
           <div
             className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
-              selectedFolderId === null ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-newColColor/50'
+              selectedFolderId === null ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-newColColor/50'
             }`}
             onClick={() => setSelectedFolderId(null)}
           >

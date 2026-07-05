@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import puppeteer from 'puppeteer';
 import * as path from 'path';
-import { FRAME_RENDERER_SCRIPT } from './frame-renderer-script';
+import { FRAME_RENDERER_SCRIPT, escapeForScriptTag } from './frame-renderer-script';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import type { VideoOutput } from './design-render.types';
 
 export interface FrameCaptureProgress {
@@ -13,6 +14,64 @@ export interface RenderRouteOptions {
   jobId: string;
   orgId: string;
   token: string;
+}
+
+function renderBaseUrl(): string {
+  return (
+    process.env.NEXT_PUBLIC_BACKEND_URL ||
+    process.env.FRONTEND_URL ||
+    'http://localhost:3000'
+  ).replace(/\/$/, '');
+}
+
+/** Collect every visual media URL the headless page will load (skips audio — the mixer
+ *  downloads audio host-side through safeFetch). */
+export function collectCompositionMediaUrls(output: VideoOutput): string[] {
+  const urls: string[] = [];
+  const bg = (output as any)?.bg;
+  if (bg?.type === 'image' && bg.src) urls.push(bg.src);
+  for (const track of (output as any)?.tracks || []) {
+    if (track?.type === 'audio') continue;
+    for (const clip of track?.clips || []) {
+      if (clip?.src) urls.push(clip.src);
+      for (const frame of clip?.frames || []) {
+        if (frame?.url) urls.push(frame.url);
+      }
+    }
+  }
+  return urls;
+}
+
+/**
+ * A render media URL is safe to hand the headless browser when it is inert (`data:`/`blob:`),
+ * same-origin/relative (served by our own backend), or a validated public HTTPS URL. A
+ * private-IP / metadata / non-public host (e.g. `http://169.254.169.254/…`) is rejected
+ * host-side BEFORE the browser (which runs `--no-sandbox` with host network on the in-process
+ * path) can fetch it — closing the blind-SSRF hole in the frame renderer.
+ */
+export async function isRenderMediaUrlAllowed(src: string): Promise<boolean> {
+  if (!src) return true;
+  if (/^(data:|blob:)/i.test(src)) return true;
+  // Relative path → resolves against our own baseUrl (same origin). Allowed.
+  if (!/^https?:\/\//i.test(src) && !src.startsWith('//')) return true;
+  const absolute = src.startsWith('//') ? `https:${src}` : src;
+  try {
+    const u = new URL(absolute);
+    const base = new URL(renderBaseUrl());
+    if (u.host === base.host) return true; // same-origin storage / dev host
+  } catch {
+    return false;
+  }
+  return isSafePublicHttpsUrl(absolute);
+}
+
+/** Reject the whole render if any visual media URL is not host-side-safe (SSRF guard). */
+export async function assertCompositionMediaSafe(output: VideoOutput): Promise<void> {
+  for (const src of collectCompositionMediaUrls(output)) {
+    if (!(await isRenderMediaUrlAllowed(src))) {
+      throw new Error(`Unsafe media URL blocked in render composition: ${src}`);
+    }
+  }
 }
 
 @Injectable()
@@ -35,6 +94,10 @@ export class ChromiumFrameCaptureService {
     const height = output.height;
     const durationMs = output.durationMs;
     const totalFrames = Math.max(1, Math.ceil((durationMs / 1000) * fps));
+
+    // SSRF guard: validate every visual media URL host-side before the headless browser
+    // (which runs --no-sandbox) can fetch it. Throws for private-IP / metadata hosts.
+    await assertCompositionMediaSafe(output);
 
     const browser = await puppeteer.launch({
       headless: true,
@@ -75,8 +138,8 @@ export class ChromiumFrameCaptureService {
   <canvas id="frame-canvas"></canvas>
   <script>
     window.__DATA = {
-      output: ${JSON.stringify(output)},
-      baseUrl: ${JSON.stringify(baseUrl)}
+      output: ${escapeForScriptTag(output)},
+      baseUrl: ${escapeForScriptTag(baseUrl)}
     };
     ${FRAME_RENDERER_SCRIPT}
   </script>

@@ -13,6 +13,7 @@ import {
   ProviderNotFoundError,
   ProviderVersionDeprecatedForWriteError,
   ProviderVersionRetiredError,
+  ContentPackDailyCapError,
 } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 
@@ -22,6 +23,7 @@ import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.m
   ProviderNotFoundError,
   ProviderCredentialError,
   ProviderManifestError,
+  ContentPackDailyCapError,
 )
 export class ProviderExceptionFilter implements ExceptionFilter {
   constructor(
@@ -55,6 +57,10 @@ export class ProviderExceptionFilter implements ExceptionFilter {
       status = HttpStatus.BAD_REQUEST;
     } else if (exception instanceof ProviderNotFoundError) {
       status = HttpStatus.NOT_FOUND;
+    } else if (exception instanceof ContentPackDailyCapError) {
+      // 1.7: a content pack's daily quota/rate limit → 402 Payment Required so
+      // the UI shows a clear "limit reached" instead of a generic 500.
+      status = HttpStatus.PAYMENT_REQUIRED;
     }
 
     response.status(status).json(body);

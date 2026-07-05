@@ -43,6 +43,32 @@ const getOrCreateImage = (src?: string): HTMLImageElement | null => {
   return img;
 };
 
+// Drop the hidden <video> DOM nodes for clips no longer present (evict on clip
+// removal), so the module map doesn't append to document.body forever.
+const evictOverlayVideos = (liveClipIds: Set<string>) => {
+  videoElements.forEach((el, id) => {
+    if (!liveClipIds.has(id)) {
+      el.pause();
+      el.removeAttribute('src');
+      el.load();
+      el.remove();
+      videoElements.delete(id);
+    }
+  });
+};
+
+// Full teardown on overlay unmount (mode switch / designer close).
+const clearOverlayMedia = () => {
+  videoElements.forEach((el) => {
+    el.pause();
+    el.removeAttribute('src');
+    el.load();
+    el.remove();
+  });
+  videoElements.clear();
+  imageElements.clear();
+};
+
 const seekVideo = (clip: VideoClip, playheadMs: number) => {
   const el = getOrCreateVideo(clip);
   if (!el) return;
@@ -150,55 +176,9 @@ const FilteredClipImage: FC<FilteredClipImageProps> = ({ clip, width, height, ti
   );
 };
 
-export const VideoCanvasOverlay: FC<VideoCanvasOverlayProps> = ({
-  store,
-  width,
-  height,
-}) => {
-  const doc = store((s) => s.doc);
-  const currentOutput = store((s) => s.currentOutput);
-  const playheadMs = store((s) => s.playheadMs);
-  const [tick, setTick] = useState(0);
-
-  const vo = doc.outputs[currentOutput] as VideoOutput | undefined;
-  const isVideo = doc.mode === 'video' && !!vo;
-
-  const clipsAtPlayhead = useMemo(() => {
-    if (!isVideo || !vo) return [];
-    return composeClipsAtPlayhead(vo, playheadMs);
-  }, [isVideo, vo, playheadMs]);
-
-  // Preload image sources for image clips.
-  useEffect(() => {
-    for (const { clip, trackType } of clipsAtPlayhead) {
-      if ((trackType === 'image' || trackType === 'sticker') && clip.src) {
-        getOrCreateImage(clip.src);
-      }
-    }
-  }, [clipsAtPlayhead]);
-
-  // Keep redrawing so the video frame updates while playing.
-  useEffect(() => {
-    if (!isVideo) return;
-    let raf: number;
-    const loop = () => {
-      setTick((t) => t + 1);
-      raf = requestAnimationFrame(loop);
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [isVideo, playheadMs]);
-
-  // Seek/pause video elements so the held frame is rendered when paused.
-  useEffect(() => {
-    if (!isVideo) return;
-    for (const { clip, trackType } of clipsAtPlayhead) {
-      if ((trackType === 'video' || trackType === 'sticker') && clip.src && (clip.speed == null || clip.speed > 0)) {
-        seekVideo(clip, playheadMs);
-      }
-    }
-  }, [isVideo, clipsAtPlayhead, playheadMs]);
-
+// Module-scoped so it is a stable component type — declaring it inside the parent
+// created a brand-new type every render, remounting it and re-rasterizing the
+// caption text on every tick.
 const CaptionClip: FC<{ clip: VideoClip; width: number; height: number; playheadMs: number }> = ({
   clip,
   width,
@@ -259,6 +239,87 @@ const CaptionClip: FC<{ clip: VideoClip; width: number; height: number; playhead
     />
   );
 };
+
+export const VideoCanvasOverlay: FC<VideoCanvasOverlayProps> = ({
+  store,
+  width,
+  height,
+}) => {
+  const doc = store((s) => s.doc);
+  const currentOutput = store((s) => s.currentOutput);
+  const playheadMs = store((s) => s.playheadMs);
+  const [tick, setTick] = useState(0);
+
+  const vo = doc.outputs[currentOutput] as VideoOutput | undefined;
+  const isVideo = doc.mode === 'video' && !!vo;
+
+  const clipsAtPlayhead = useMemo(() => {
+    if (!isVideo || !vo) return [];
+    return composeClipsAtPlayhead(vo, playheadMs);
+  }, [isVideo, vo, playheadMs]);
+
+  // Preload image sources for image clips.
+  useEffect(() => {
+    for (const { clip, trackType } of clipsAtPlayhead) {
+      if ((trackType === 'image' || trackType === 'sticker') && clip.src) {
+        getOrCreateImage(clip.src);
+      }
+    }
+  }, [clipsAtPlayhead]);
+
+  // A continuous redraw is only needed when dynamic content (a video/sticker or a
+  // CSS-filtered clip) sits under the playhead; text/image/caption/empty regions
+  // repaint from the playheadMs subscription, so the 60fps loop stays off then.
+  const needsRaf = useMemo(
+    () =>
+      isVideo &&
+      clipsAtPlayhead.some(
+        ({ clip, trackType }) =>
+          trackType === 'video' ||
+          trackType === 'sticker' ||
+          (clip.filters?.length ?? 0) > 0
+      ),
+    [isVideo, clipsAtPlayhead]
+  );
+
+  // Keep redrawing so the video frame updates while playing.
+  useEffect(() => {
+    if (!needsRaf) return;
+    let raf: number;
+    const loop = () => {
+      setTick((t) => t + 1);
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [needsRaf, playheadMs]);
+
+  // Seek/pause video elements so the held frame is rendered when paused.
+  useEffect(() => {
+    if (!isVideo) return;
+    for (const { clip, trackType } of clipsAtPlayhead) {
+      // Include speed:0 (freeze) clips: sourceTimeForPlayhead resolves them to a
+      // constant frame, so seeking shows the held frame instead of frame 0.
+      if ((trackType === 'video' || trackType === 'sticker') && clip.src) {
+        seekVideo(clip, playheadMs);
+      }
+    }
+  }, [isVideo, clipsAtPlayhead, playheadMs]);
+
+  // Evict hidden <video> nodes for clips that no longer exist in the output.
+  useEffect(() => {
+    if (!vo) return;
+    const liveIds = new Set<string>();
+    for (const track of vo.tracks) {
+      for (const clip of track.clips) liveIds.add(clip.id);
+    }
+    evictOverlayVideos(liveIds);
+  }, [vo]);
+
+  // Full teardown of the module-level media maps on unmount.
+  useEffect(() => {
+    return () => clearOverlayMedia();
+  }, []);
 
   if (!isVideo) return null;
 

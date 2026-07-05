@@ -44,6 +44,11 @@ const MIME_BY_EXT: Record<string, string> = {
 // transcript lines up with what auto-captions produce there.
 const MAX_WORDS_PER_SEGMENT = 12;
 
+// §6.2: transcription reads the whole source file into memory (no streaming to Deepgram),
+// so bound it to protect the backend heap. 250 MB comfortably covers long-form audio and
+// short video while blocking a multi-GB source from OOMing the process.
+const MAX_TRANSCRIPTION_SOURCE_BYTES = 250 * 1024 * 1024;
+
 // Bespoke Deepgram (STT) studio backend. Unlike the kit studios, Deepgram returns text
 // rather than a media artifact, so it has its own controller/service instead of riding
 // the generic MediaStudioService.
@@ -135,12 +140,22 @@ export class DeepgramService {
     if (!file || file.organizationId !== orgId) {
       throw new ForbiddenException('File not found');
     }
+    // §6.2: reject oversized sources up front (using the stored size) so we never even
+    // attempt to buffer a multi-GB file into heap.
+    if (file.fileSize && file.fileSize > MAX_TRANSCRIPTION_SOURCE_BYTES) {
+      throw new ForbiddenException('File is too large to transcribe (max 250 MB).');
+    }
     // readFile resolves the bytes for both local (handles full /uploads URLs) and cloud
     // (object key) storage — no outbound HTTP, so no SSRF surface for internal URLs.
     const adapter = file.folderId
       ? await this._storage.resolveAdapterForFolder(file.folderId, orgId)
       : await this._storage.getLocalAdapterForOrg(orgId, true);
     const buffer = await adapter.readFile(file.path);
+    // Backstop for a stale/zero fileSize (the row default is 0): a source whose real
+    // bytes exceed the ceiling still can't sail through.
+    if (buffer.length > MAX_TRANSCRIPTION_SOURCE_BYTES) {
+      throw new ForbiddenException('File is too large to transcribe (max 250 MB).');
+    }
     return { buffer, mimeType: this._mimeForPath(file.path) };
   }
 

@@ -457,6 +457,11 @@ export function useCollaboration({
   const mountedRef = useRef(true);
   const lastSentDocRef = useRef<DesignerDoc | null>(null);
   const lastRebuiltDocRef = useRef<DesignerDoc | null>(null);
+  const wsConnectedRef = useRef(false);
+
+  // 4.4: peer awareness is stamped with `ts`; entries not refreshed within this
+  // window are treated as ghost peers from an ungraceful disconnect and pruned.
+  const AWARENESS_STALE_MS = 30_000;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -469,8 +474,18 @@ export function useCollaboration({
     const docMap = ydoc.getMap(Y_DOC);
     const awarenessMap = ydoc.getMap(Y_AWARENESS);
 
-    const handleYUpdate = (_update: Uint8Array, origin: any) => {
-      if (origin === 'local') return;
+    // 4.4: single origin-tagged update observer.
+    // - local edits: broadcast ONLY the incremental delta (not the whole doc)
+    //   to the room, matching the Yjs idiom and keeping payloads O(change).
+    // - remote edits (applied via ws.onmessage with no origin): rebuild the doc.
+    const handleYUpdate = (update: Uint8Array, origin: any) => {
+      if (origin === 'local') {
+        const ws = wsRef.current;
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(update);
+        }
+        return;
+      }
       if (!mountedRef.current) return;
 
       const rebuilt = rebuildDocFromY(docMap);
@@ -484,13 +499,24 @@ export function useCollaboration({
 
     ydoc.on('update', handleYUpdate);
 
-    awarenessMap.observe(() => {
+    // 4.4: recompute the REAL connected count = self (when the socket is up) +
+    // distinct non-stale peer awareness entries, and hand fresh peer awareness
+    // to the callbacks (pruning ghost peers).
+    const recompute = () => {
+      const now = Date.now();
       const timelinePeers: TimelineAwareness[] = [];
       const imagePeers: ImageAwareness[] = [];
+      const stale: string[] = [];
+      const peerIds = new Set<string>();
       awarenessMap.forEach((val, key) => {
         if (key === clientIdRef.current || typeof val !== 'string') return;
         try {
           const parsed = JSON.parse(val);
+          if (typeof parsed.ts === 'number' && now - parsed.ts > AWARENESS_STALE_MS) {
+            stale.push(key);
+            return;
+          }
+          peerIds.add(key);
           if (parsed.type === 'timeline') {
             timelinePeers.push(parsed);
           } else if (parsed.type === 'image') {
@@ -500,12 +526,37 @@ export function useCollaboration({
           // ignore malformed awareness
         }
       });
+
+      if (stale.length) {
+        ydoc.transact(() => {
+          for (const key of stale) awarenessMap.delete(key);
+        }, 'local');
+      }
+
       onPeerTimeline?.(timelinePeers);
       onPeerImage?.(imagePeers);
-    });
+      onConnectedChange?.((wsConnectedRef.current ? 1 : 0) + peerIds.size);
+    };
 
-    const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${location.host}/collaboration?room=${roomName}`;
+    awarenessMap.observe(recompute);
+
+    // 4.4: dev routing — the collaboration gateway lives on the BACKEND HTTP
+    // server, not the Next dev port. Point at NEXT_PUBLIC_BACKEND_URL's origin
+    // when set (dev), else same-origin (prod, where the app and gateway share it).
+    const backendBase = process.env.NEXT_PUBLIC_BACKEND_URL;
+    let wsHost = location.host;
+    let wsSecure = location.protocol === 'https:';
+    if (backendBase) {
+      try {
+        const u = new URL(backendBase);
+        wsHost = u.host;
+        wsSecure = u.protocol === 'https:';
+      } catch {
+        // fall back to same-origin
+      }
+    }
+    const protocol = wsSecure ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${wsHost}/collaboration?room=${roomName}`;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
     const connect = () => {
@@ -516,9 +567,11 @@ export function useCollaboration({
       wsRef.current = ws;
 
       ws.onopen = () => {
-        onConnectedChange?.(1);
+        wsConnectedRef.current = true;
+        recompute();
         // Push our local Yjs state so the server/room catches up with any
-        // edits made while disconnected (offline-edit merge, T-37.4).
+        // edits made while disconnected (offline-edit merge, T-37.4). This is
+        // the ONE full-state send — steady-state edits go out as deltas.
         if (ydocRef.current && ws.readyState === WebSocket.OPEN) {
           ws.send(Y.encodeStateAsUpdate(ydocRef.current));
         }
@@ -535,6 +588,7 @@ export function useCollaboration({
       };
 
       ws.onclose = () => {
+        wsConnectedRef.current = false;
         onConnectedChange?.(0);
         awarenessMapRef.current.clear();
         wsRef.current = null;
@@ -552,6 +606,16 @@ export function useCollaboration({
     return () => {
       mountedRef.current = false;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      // 4.4: delete our own awareness BEFORE closing so peers prune us
+      // immediately (the local-origin delta rides out on the still-open socket).
+      try {
+        if (awarenessMap.has(clientIdRef.current)) {
+          ydoc.transact(() => awarenessMap.delete(clientIdRef.current), 'local');
+        }
+      } catch {
+        // ignore
+      }
+      wsConnectedRef.current = false;
       wsRef.current?.close();
       ydoc.off('update', handleYUpdate);
       ydoc.destroy();
@@ -572,7 +636,6 @@ export function useCollaboration({
   const sendUpdate = useCallback(
     (doc: DesignerDoc) => {
       const ydoc = ydocRef.current;
-      const ws = wsRef.current;
       if (!ydoc) return;
 
       if (lastSentDocRef.current && deepEqual(lastSentDocRef.current, doc)) {
@@ -584,6 +647,8 @@ export function useCollaboration({
 
       const docMap = ydoc.getMap(Y_DOC);
 
+      // 4.4: transact with a 'local' origin — the update observer forwards the
+      // resulting incremental delta to the room (no whole-doc encode here).
       ydoc.transact(() => {
         if (doc.mode === 'video') {
           syncVideoDocToY(docMap, doc, lastDoc);
@@ -600,11 +665,6 @@ export function useCollaboration({
           }
         }
       }, 'local');
-
-      const update = Y.encodeStateAsUpdate(ydoc);
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(update);
-      }
     },
     []
   );
@@ -614,23 +674,19 @@ export function useCollaboration({
       const ydoc = ydocRef.current;
       if (!ydoc) return;
 
-      const awareness: TimelineAwareness = {
+      const awareness: TimelineAwareness & { ts: number } = {
         type: 'timeline',
         playheadMs,
         selectedClipId,
         clientId: clientIdRef.current,
+        ts: Date.now(),
       };
 
+      // 4.4: 'local' transact → observer broadcasts just this awareness delta.
       ydoc.transact(() => {
         const awarenessMap = ydoc.getMap(Y_AWARENESS);
         awarenessMap.set(clientIdRef.current, JSON.stringify(awareness));
       }, 'local');
-
-      const update = Y.encodeStateAsUpdate(ydoc);
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(update);
-      }
     },
     []
   );
@@ -645,25 +701,21 @@ export function useCollaboration({
       const ydoc = ydocRef.current;
       if (!ydoc) return;
 
-      const awareness: ImageAwareness = {
+      const awareness: ImageAwareness & { ts: number } = {
         type: 'image',
         clientId: clientIdRef.current,
         outputIndex,
         mouseX,
         mouseY,
         selectedIds,
+        ts: Date.now(),
       };
 
+      // 4.4: 'local' transact → observer broadcasts just this awareness delta.
       ydoc.transact(() => {
         const awarenessMap = ydoc.getMap(Y_AWARENESS);
         awarenessMap.set(clientIdRef.current, JSON.stringify(awareness));
       }, 'local');
-
-      const update = Y.encodeStateAsUpdate(ydoc);
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(update);
-      }
     },
     []
   );

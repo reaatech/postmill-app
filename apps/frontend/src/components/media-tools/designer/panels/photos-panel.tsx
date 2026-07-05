@@ -93,7 +93,8 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
         id: '',
         startMs,
         endMs,
-        src: isVideo ? (item as StockVideoItem).url : item.thumbUrl,
+        // Full-resolution source for placement/export; the grid uses thumbUrl.
+        src: item.url,
         width: out.width,
         height: out.height,
         naturalWidth: item.width,
@@ -124,7 +125,10 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
       opacity: 1,
       locked: false,
       hidden: false,
-      src: item.thumbUrl,
+      // Full-resolution source so a large export isn't a blurry ~200px thumb.
+      src: item.url,
+      naturalWidth: item.width || undefined,
+      naturalHeight: item.height || undefined,
     };
 
     state.addElement(el);
@@ -284,7 +288,9 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
                   'application/x-designer-element',
                   JSON.stringify({
                     type: 'image',
-                    src: item.thumbUrl,
+                    src: item.url,
+                    naturalWidth: item.width,
+                    naturalHeight: item.height,
                     width: fit.width,
                     height: fit.height,
                   })

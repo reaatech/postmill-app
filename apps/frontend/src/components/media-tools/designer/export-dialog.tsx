@@ -12,7 +12,7 @@ import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useBrandColors } from './panels/use-brand-colors';
 import { useBrandFonts } from './panels/use-brand-fonts';
 import { getBrandViolations } from './brand-compliance';
-import { CanvasElements, gradientFillProps } from './elements';
+import { CanvasElements, gradientFillProps, getImageNaturalSize } from './elements';
 import type { DesignerDoc, DesignerOutput, VideoOutput } from './designer.store';
 import { getThumbnailDataUrl } from './designer';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
@@ -226,6 +226,32 @@ const renderOutputToBlob = async (
       );
       requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
     });
+
+    // The Konva render reads element bitmaps from the shared imageCache, which is
+    // populated asynchronously (incl. the cross-origin proxy fallback). Two RAFs
+    // aren't enough for a slow/proxied image, so wait until every element src is
+    // actually cached (or a deadline), plus let the background <img> finish.
+    {
+      const srcs: string[] = [];
+      for (const el of output.children) {
+        if (el.type === 'image' && el.src) srcs.push(el.src);
+      }
+      if (bgImageEl && !bgImageEl.complete) {
+        await new Promise<void>((res) => {
+          const done = () => res();
+          bgImageEl.addEventListener('load', done, { once: true });
+          bgImageEl.addEventListener('error', done, { once: true });
+          setTimeout(done, 5000);
+        });
+      }
+      const deadline = Date.now() + 5000;
+      while (Date.now() < deadline && srcs.some((s) => !getImageNaturalSize(s))) {
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      await new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r()))
+      );
+    }
 
     const stage = stageRef.current;
     if (!stage) return null;
@@ -540,7 +566,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             <div
               className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
                 selectedFolderId === folder.id
-                  ? 'bg-designerAccent/20 text-white'
+                  ? 'bg-designerAccent/20 text-textColor'
                   : 'text-textColor hover:bg-newColColor/50'
               }`}
               style={{ paddingLeft: `${12 + depth * 16}px` }}
@@ -981,8 +1007,9 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
 
   // --- Server-side PDF render ---
 
-  const renderPdfOnServer = useCallback(async (): Promise<Blob | null> => {
-    const pdfDoc: DesignerDoc = { ...doc, outputs: selectedOutputs as DesignerOutput[] };
+  const renderPdfOnServer = useCallback(async (outputs?: DesignerOutput[]): Promise<Blob | null> => {
+    const pdfOutputs = (outputs ?? (selectedOutputs as DesignerOutput[]));
+    const pdfDoc: DesignerDoc = { ...doc, outputs: pdfOutputs };
     const res = await fetch('/media/designs/render', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1030,6 +1057,23 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           const output = selectedOutputs[i];
           const fmt = outputFormats[output.id] || 'png';
           try {
+            const outputName = (output.name || output.formatId || `output_${i + 1}`).replace(
+              /[^a-zA-Z0-9]/g,
+              '_'
+            );
+            // A per-output PDF (in a mixed selection) must go through the server
+            // renderer — Konva's toBlob can't emit PDF and would otherwise write a
+            // PNG named ".pdf".
+            if (fmt === 'pdf') {
+              const pdfBlob = await renderPdfOnServer([output as DesignerOutput]);
+              if (!pdfBlob) throw new Error('PDF render failed');
+              const fileName = `${baseName} - ${outputName}.pdf`;
+              const saved = await uploadBlob(pdfBlob, fileName);
+              if (saved) {
+                results.push({ id: saved.id, path: saved.path, name: fileName, outputId: output.id });
+              }
+              continue;
+            }
             const { blob, usedFormat } = await renderOutputWithFallback(
               output as DesignerOutput,
               fmt,
@@ -1037,10 +1081,6 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               scale
             );
             const ext = extFor(usedFormat);
-            const outputName = (output.name || output.formatId || `output_${i + 1}`).replace(
-              /[^a-zA-Z0-9]/g,
-              '_'
-            );
             const fileName = `${baseName} - ${outputName}.${ext}`;
             const saved = await uploadBlob(blob, fileName);
             if (saved) {
@@ -1261,7 +1301,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
             <div
               className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
                 selectedFolderId === null
-                  ? 'bg-designerAccent/20 text-white'
+                  ? 'bg-designerAccent/20 text-textColor'
                   : 'text-textColor hover:bg-newColColor/50'
               }`}
               onClick={() => setSelectedFolderId(null)}

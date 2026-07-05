@@ -8,6 +8,8 @@ import {
   MediaJobSubmission,
   MediaModelOption,
   resolveApiKey,
+  redactError,
+  validateModelId,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -39,13 +41,13 @@ export class FireworksMediaAdapter extends BearerTokenMediaAdapter {
   };
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
-    const model = options?.model || 'flux-1-schnell-fp8';
+    const model = validateModelId(options?.model || 'flux-1-schnell-fp8');
     const res = await this._fetch(`${BASE}/${model}/text_to_image`, {
       method: 'POST',
       headers: { ...this._headers(options), Accept: 'application/json' },
       body: JSON.stringify({ prompt, ...this._clean(options?.input) }),
     });
-    if (!res.ok) throw new Error(`Fireworks image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Fireworks image generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as FireworksImageResponse;
     const urls = (data.base64 || [])
       .filter(Boolean)

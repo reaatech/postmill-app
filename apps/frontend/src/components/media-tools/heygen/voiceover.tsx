@@ -37,6 +37,8 @@ export const Voiceover: FC<VoiceoverProps> = ({ voices, onGenerated }) => {
       }
       toaster.show('Voiceover started — track it in the queue', 'success');
       onGenerated();
+    } catch {
+      toaster.show('Failed to start the voiceover', 'warning');
     } finally {
       setGenerating(false);
     }

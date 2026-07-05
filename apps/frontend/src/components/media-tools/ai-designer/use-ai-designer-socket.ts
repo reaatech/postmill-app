@@ -173,6 +173,20 @@ export function useAiDesignerSocket(
     []
   );
 
+  // For user-intent actions: surface a failure (→ toast in the consumer) instead of
+  // a silent no-op when the socket is down, so the click isn't quietly swallowed.
+  const emitGuarded = useCallback(
+    <T extends object>(event: string, payload: T): string => {
+      if (!socketRef.current?.connected) {
+        callbacksRef.current.onError?.({
+          message: 'Not connected to the AI Designer — reconnecting, please try again.',
+        });
+      }
+      return emit(event, payload);
+    },
+    [emit]
+  );
+
   const start = useCallback(
     (payload: Omit<AiDesignerStartPayloadWithMode, 'nonce'>) => {
       return emit('start', payload);
@@ -192,33 +206,33 @@ export function useAiDesignerSocket(
 
   const submitForm = useCallback(
     (replyTo: string, values: Record<string, unknown>) => {
-      return emit('form:submit', {
+      return emitGuarded('form:submit', {
         replyTo,
         values,
       } as Omit<AiDesignerFormSubmitPayload, 'nonce'>);
     },
-    [emit]
+    [emitGuarded]
   );
 
   const acceptPlan = useCallback(
     (replyTo: string, variantId?: string, saveTemplate?: boolean) => {
-      return emit('accept:plan', {
+      return emitGuarded('accept:plan', {
         replyTo,
         variantId,
         saveTemplate,
       } as Omit<AiDesignerAcceptPlanPayload, 'nonce'>);
     },
-    [emit]
+    [emitGuarded]
   );
 
   const revisePlan = useCallback(
     (instruction: string, targetDesignId?: string) => {
-      return emit('revise', {
+      return emitGuarded('revise', {
         instruction,
         targetDesignId,
       } as Omit<AiDesignerRevisePayload, 'nonce'>);
     },
-    [emit]
+    [emitGuarded]
   );
 
   const cancel = useCallback(() => {

@@ -9,6 +9,9 @@ import {
   MediaOperation,
   MediaModelOption,
   MediaInputValue,
+  resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -58,7 +61,7 @@ export class TogetherAiMediaAdapter extends OpenAiCompatibleMediaAdapter {
       headers: this._headers(options),
       body: JSON.stringify({ model, prompt, ...this._videoBody(options?.input) }),
     });
-    if (!res.ok) throw new Error(`Together video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Together video generation failed: ${redactError(await res.text())}`);
     const id = ((await res.json()) as TogetherVideoCreate).id;
     if (!id) throw new Error('Together returned no video id');
     return { jobId: id };
@@ -80,8 +83,17 @@ export class TogetherAiMediaAdapter extends OpenAiCompatibleMediaAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Together AI API key is required' };
+
     const res = await this._fetch(`${this.baseUrl}/videos/${jobId}`, { headers: this._headers(options) });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering video retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Together poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as TogetherVideoStatus;
     const status = data.status;
     if (status === 'completed') {
@@ -91,7 +103,7 @@ export class TogetherAiMediaAdapter extends OpenAiCompatibleMediaAdapter {
       return { status: 'completed', artifactUrl: url, metadata: { provider: this.identifier } };
     }
     if (status === 'failed' || status === 'error' || status === 'canceled') {
-      return { status: 'failed', error: data.error?.message || 'Together video generation failed' };
+      return { status: 'failed', error: redactError(data.error?.message || 'Together video generation failed') };
     }
     return { status: 'pending' };
   }

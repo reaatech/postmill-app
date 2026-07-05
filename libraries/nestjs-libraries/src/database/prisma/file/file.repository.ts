@@ -424,9 +424,11 @@ export class FileRepository {
     return { success: true };
   }
 
-  bulkMove(ids: string[], folderId: string | null) {
+  // 1.2: org-scoped so a foreign file id can never be relocated/detached, even
+  // if a future caller forgets the controller-level ownership pre-filter.
+  bulkMove(org: string, ids: string[], folderId: string | null) {
     return this._file.model.file.updateMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, organizationId: org },
       data: { folderId },
     });
   }

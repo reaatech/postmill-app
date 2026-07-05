@@ -260,26 +260,36 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
         <>
           {/* Responsive aspect-video grid (F6) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px]">
-            {items.map((video) => (
-              <button
+            {items.map((video) => {
+              // role=button div (not <button>) so the author-credit <a> is valid HTML.
+              const activate = () => {
+                if (mode === 'select' && (onSelect || onSelectFull)) {
+                  const payload = {
+                    url: video.url,
+                    width: video.width,
+                    height: video.height,
+                    thumbnail: video.thumbUrl,
+                    type: 'video' as const,
+                    source: video.source,
+                    attribution: video.attribution,
+                    name: video.description || undefined,
+                  };
+                  onSelectFull?.(payload);
+                  onSelect?.(payload);
+                } else {
+                  openVideo(video);
+                }
+              };
+              return (
+              <div
                 key={video.id}
-                type="button"
-                onClick={() => {
-                  if (mode === 'select' && (onSelect || onSelectFull)) {
-                    const payload = {
-                      url: video.url,
-                      width: video.width,
-                      height: video.height,
-                      thumbnail: video.thumbUrl,
-                      type: 'video' as const,
-                      source: video.source,
-                      attribution: video.attribution,
-                      name: video.description || undefined,
-                    };
-                    onSelectFull?.(payload);
-                    onSelect?.(payload);
-                  } else {
-                    openVideo(video);
+                role="button"
+                tabIndex={0}
+                onClick={activate}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate();
                   }
                 }}
                 className="group text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
@@ -318,8 +328,9 @@ export const StockVideos: FC<StockVideosProps> = ({ mode = 'browse', onSelect, o
                     <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(video.source)}</span>
                   </div>
                 </div>
-              </button>
-            ))}
+              </div>
+              );
+            })}
           </div>
 
           {/* Infinite-scroll sentinel + skeleton tail (F2) */}

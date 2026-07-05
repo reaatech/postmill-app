@@ -53,63 +53,104 @@ const audioContextSingleton =
     ? new (window.AudioContext || (window as any).webkitAudioContext)()
     : null;
 
-const waveformCache = new Map<string, number[]>();
+type WaveformFetch = (url: string, init?: RequestInit) => Promise<Response>;
 
-async function fetchWaveform(src: string, barCount: number): Promise<number[]> {
-  const key = `${src}#${barCount}`;
-  const cached = waveformCache.get(key);
+// Decode each audio source ONCE into a fixed high-resolution peak array, keyed by
+// src only (never by bar count). Trimming/zooming changes bar count continuously,
+// so keying by count re-fetched + re-`decodeAudioData`'d the whole file on almost
+// every mousemove. Bars are resampled from the cached peaks in memory instead.
+const HIRES_BUCKETS = 2048;
+const peaksCache = new Map<string, number[]>();
+const peaksInflight = new Map<string, Promise<number[]>>();
+
+async function getPeaks(src: string, fetchFn: WaveformFetch): Promise<number[]> {
+  const cached = peaksCache.get(src);
   if (cached) return cached;
+  const inflight = peaksInflight.get(src);
+  if (inflight) return inflight;
 
-  const bars = new Array(barCount).fill(0.1);
-  try {
-    const res = await fetch(src);
-    if (!res.ok) throw new Error('fetch failed');
-    const arrayBuffer = await res.arrayBuffer();
-    const ctx = audioContextSingleton;
-    if (!ctx) throw new Error('no audio context');
-    const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-    const channel = audioBuffer.getChannelData(0);
-    const step = Math.max(1, Math.floor(channel.length / barCount));
-    let max = 0;
-    for (let i = 0; i < barCount; i++) {
-      let peak = 0;
-      const start = i * step;
-      const end = Math.min(start + step, channel.length);
-      for (let j = start; j < end; j++) {
-        const v = Math.abs(channel[j]);
-        if (v > peak) peak = v;
+  const p = (async () => {
+    const peaks = new Array(HIRES_BUCKETS).fill(0.1);
+    try {
+      const res = await fetchFn(src);
+      if (!res.ok) throw new Error('fetch failed');
+      const arrayBuffer = await res.arrayBuffer();
+      const ctx = audioContextSingleton;
+      if (!ctx) throw new Error('no audio context');
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      const channel = audioBuffer.getChannelData(0);
+      const step = Math.max(1, Math.floor(channel.length / HIRES_BUCKETS));
+      let max = 0;
+      for (let i = 0; i < HIRES_BUCKETS; i++) {
+        let peak = 0;
+        const start = i * step;
+        const end = Math.min(start + step, channel.length);
+        for (let j = start; j < end; j++) {
+          const v = Math.abs(channel[j]);
+          if (v > peak) peak = v;
+        }
+        peaks[i] = peak;
+        if (peak > max) max = peak;
       }
-      bars[i] = peak;
-      if (peak > max) max = peak;
+      if (max > 0) {
+        for (let i = 0; i < HIRES_BUCKETS; i++) peaks[i] /= max;
+      }
+    } catch {
+      peaks.fill(0.1);
     }
-    if (max > 0) {
-      for (let i = 0; i < barCount; i++) bars[i] /= max;
-    }
-  } catch {
-    // Leave uniform low bars on failure.
-  }
-  waveformCache.set(key, bars);
-  return bars;
+    peaksCache.set(src, peaks);
+    peaksInflight.delete(src);
+    return peaks;
+  })();
+
+  peaksInflight.set(src, p);
+  return p;
 }
 
-function useWaveform(src: string | undefined, barCount: number): number[] | null {
-  const [bars, setBars] = useState<number[] | null>(null);
+function resamplePeaks(peaks: number[], barCount: number): number[] {
+  if (barCount <= 0) return [];
+  const out = new Array(barCount).fill(0.1);
+  const ratio = peaks.length / barCount;
+  for (let i = 0; i < barCount; i++) {
+    const start = Math.floor(i * ratio);
+    const end = Math.max(start + 1, Math.floor((i + 1) * ratio));
+    let peak = 0;
+    for (let j = start; j < end && j < peaks.length; j++) {
+      if (peaks[j] > peak) peak = peaks[j];
+    }
+    out[i] = peak;
+  }
+  return out;
+}
+
+function useWaveform(
+  src: string | undefined,
+  barCount: number,
+  fetchFn: WaveformFetch
+): number[] | null {
+  const [peaks, setPeaks] = useState<number[] | null>(null);
   useEffect(() => {
-    if (!src) return;
+    if (!src) {
+      setPeaks(null);
+      return;
+    }
     let cancelled = false;
-    fetchWaveform(src, barCount).then((b) => {
-      if (!cancelled) setBars(b);
+    getPeaks(src, fetchFn).then((p) => {
+      if (!cancelled) setPeaks(p);
     });
     return () => {
       cancelled = true;
     };
-  }, [src, barCount]);
-  return bars;
+  }, [src, fetchFn]);
+  // Resample the cached high-res peaks to the current bar count in memory — no
+  // re-fetch, no re-decode.
+  return useMemo(() => (peaks ? resamplePeaks(peaks, barCount) : null), [peaks, barCount]);
 }
 
 const WaveformBars: FC<{ src: string | undefined; width: number }> = ({ src, width }) => {
+  const fetch = useFetch();
   const barCount = Math.max(6, Math.floor(width / 6));
-  const bars = useWaveform(src, barCount);
+  const bars = useWaveform(src, barCount, fetch);
   if (!bars) {
     return (
       <>
@@ -575,9 +616,16 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
     scrollToPlayhead();
   }, [isVideo, vo, isPlaying, store, setPlayhead, scrollToPlayhead]);
 
+  // Guards the long-running poll loops (landOrPoll / runClipTransform) so they
+  // stop touching the store / firing toasts after the timeline unmounts.
+  const mountedRef = useRef(true);
+
   useEffect(() => {
     return () => {
-      previewRef.current?.pause();
+      mountedRef.current = false;
+      // destroy() (not just pause()) removes the hidden <video>/<audio> DOM nodes
+      // and drops buffers — otherwise they leak for the whole SPA session.
+      previewRef.current?.destroy();
       previewRef.current = null;
     };
   }, []);
@@ -732,6 +780,10 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       (globalThis as any)._clipCounter = ((globalThis as any)._clipCounter || 0) + 1;
       const ctr = (globalThis as any)._clipCounter;
 
+      // Source time of the frame under the playhead — the frozen frame, and the
+      // point the second half resumes from.
+      const frozenSourceMs = (original.trimInMs ?? 0) + (splitPoint - original.startMs);
+
       const first: VideoClip = {
         ...original,
         id: `el-${Date.now()}-${ctr}`,
@@ -752,12 +804,17 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         naturalWidth: original.naturalWidth,
         naturalHeight: original.naturalHeight,
         speed: 0,
+        // Hold the frame at the split point (a speed:0 clip resolves to this
+        // constant source time), otherwise it shows the source's first frame.
+        trimInMs: frozenSourceMs,
       };
       const second: VideoClip = {
         ...original,
         id: `el-${Date.now()}-${ctr + 2}`,
         startMs: splitPoint + freezeDuration,
-        trimInMs: original.trimInMs ? original.trimInMs + (splitPoint - original.startMs) : undefined,
+        // Resume from the split point, not the source start (always offset, even
+        // when the original had no trimIn).
+        trimInMs: frozenSourceMs,
       };
 
       const clips = [...track.clips];
@@ -786,7 +843,15 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       } else if (e.key === ' ' && !(e.target as HTMLElement)?.matches?.('input,textarea')) {
         e.preventDefault();
         handlePlayPause();
-      } else if (e.key === 's' && e.ctrlKey && selectedClip && selectedClip.outputIndex === currentOutput) {
+      } else if (
+        e.key.toLowerCase() === 's' &&
+        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        !(e.target as HTMLElement)?.matches?.('input,textarea') &&
+        selectedClip && selectedClip.outputIndex === currentOutput
+      ) {
+        // Plain S splits; Ctrl/Cmd+S must fall through to the global Save handler
+        // (the timeline is focusable, so overloading Ctrl+S silently split the
+        // clip AND saved the mutated doc).
         e.preventDefault();
         store.getState().splitClip(currentOutput, selectedClip.trackId, selectedClip.clipId, playheadMs);
       } else if (e.key === 'f' && e.ctrlKey && selectedClip && selectedClip.outputIndex === currentOutput) {
@@ -1005,11 +1070,13 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       return null;
     };
     while (polls < MAX_POLLS) {
+      if (!mountedRef.current) return; // timeline unmounted — stop polling
       const artifactUrl = await check().catch((e) => {
-        toaster.show(e.message, 'warning');
+        if (mountedRef.current) toaster.show(e.message, 'warning');
         return '__error__';
       });
       if (artifactUrl === '__error__') return;
+      if (!mountedRef.current) return;
       if (artifactUrl) {
         await addMediaToTimeline(store, { type, url: artifactUrl });
         return;
@@ -1017,7 +1084,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       polls++;
       await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
     }
-    toaster.show('Generation timed out', 'warning');
+    if (mountedRef.current) toaster.show('Generation timed out', 'warning');
   }, [fetch, store, toaster]);
 
   const runClipTransform = useCallback(async (
@@ -1051,6 +1118,7 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
       } else {
         let polls = 0;
         while (polls < MAX_POLLS) {
+          if (!mountedRef.current) return; // timeline unmounted — stop polling
           const jobRes = await fetch(`/media/jobs/${id}`);
           if (!jobRes.ok) throw new Error('Failed to check transform status');
           const job = await jobRes.json();
@@ -1069,9 +1137,9 @@ export const VideoTimeline: FC<VideoTimelineProps> = ({ store, sendTimelineAware
         }
       }
     } catch (e) {
-      toaster.show((e as Error).message || 'Transform failed', 'warning');
+      if (mountedRef.current) toaster.show((e as Error).message || 'Transform failed', 'warning');
     } finally {
-      if (clearMenu) setClipMenu(null);
+      if (clearMenu && mountedRef.current) setClipMenu(null);
     }
   }, [clipMenu, fetch, store, toaster]);
 

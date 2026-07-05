@@ -4,6 +4,7 @@ import React, { FC, useCallback, useState } from 'react';
 import useSWR from 'swr';
 import { useRouter } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import {
   StockPhotoItem,
@@ -30,8 +31,44 @@ interface StockPreviewModalProps {
   type: 'photo' | 'video' | 'vector' | 'sticker' | 'icon';
 }
 
+// Icons are SVG. `/files/import` intentionally rejects `image/svg+xml` (anti-XSS — never
+// ingest raw SVG). To keep "Save to Files" functional for icons we rasterize the SVG to a
+// PNG client-side and upload the raster instead (6.3g). Iconify's API sends `ACAO: *`, so the
+// canvas stays untainted with `crossOrigin='anonymous'`.
+async function rasterizeSvgUrlToPngBlob(url: string, size = 512): Promise<Blob> {
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  const loaded = new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('icon load failed'));
+  });
+  img.src = url;
+  await loaded;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('no canvas context');
+
+  const iw = img.naturalWidth || size;
+  const ih = img.naturalHeight || size;
+  const scale = Math.min(size / iw, size / ih);
+  const dw = iw * scale;
+  const dh = ih * scale;
+  ctx.drawImage(img, (size - dw) / 2, (size - dh) / 2, dw, dh);
+
+  return await new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob(
+      (b) => (b ? resolve(b) : reject(new Error('rasterize failed'))),
+      'image/png',
+    ),
+  );
+}
+
 export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialItem, type }) => {
   const fetch = useFetch();
+  const toaster = useToaster();
   const modal = useModals();
   const router = useRouter();
   const [item, setItem] = useState(initialItem);
@@ -104,8 +141,9 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
         name = `${source}-${item.id}.gif`;
         break;
       case 'icon': {
+        // Saved as a rasterized PNG (see uploadBlob below) — SVG is rejected by /files/import.
         const icon = item as StockIconItem;
-        name = `${source}-${icon.prefix}-${icon.iconName}.svg`;
+        name = `${source}-${icon.prefix}-${icon.iconName}.png`;
         break;
       }
       default:
@@ -132,6 +170,7 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           type={type}
           downloadLocation={downloadLocation}
           attribution={item.attribution}
+          uploadBlob={type === 'icon' ? () => rasterizeSvgUrlToPngBlob(item.url) : undefined}
         />
       ),
       size: 'lg',
@@ -156,7 +195,11 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           attribution: item.attribution,
         }),
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        const msg = await res.text().catch(() => '');
+        toaster.show(msg || 'Could not save this item', 'warning');
+        return;
+      }
       const savedFile = await res.json();
       const integrationsRes = await fetch('/integrations');
       const integrations = integrationsRes.ok ? await integrationsRes.json() : [];
@@ -181,10 +224,12 @@ export const StockPreviewModal: FC<StockPreviewModalProps> = ({ item: initialIte
           />
         ),
       });
+    } catch {
+      toaster.show('Could not save this item', 'warning');
     } finally {
       setPosting(false);
     }
-  }, [posting, fetch, modal, item, type]);
+  }, [posting, fetch, modal, toaster, item, type]);
 
   const renderPreview = () => {
     if (type === 'video') {

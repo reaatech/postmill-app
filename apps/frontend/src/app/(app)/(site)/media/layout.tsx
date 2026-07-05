@@ -597,12 +597,13 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
   const { collapsed, toggle } = useSidebarCollapse('media:sidebar-collapsed');
   const { data: enabledProviders } = useEnabledMediaProviders();
 
-  // Show only enabled providers under "AI Media"; non-provider sections always
-  // show. Filtering an empty Providers section also drops its header below.
-  const visibleTabs = sortedTabs.filter((t) => {
-    if (t.section !== 'Providers') return true;
-    return enabledProviders?.has(providerIdentifier(t.href)) ?? false;
-  });
+  // Provider studios that aren't configured yet stay DISCOVERABLE: the desktop
+  // rail shows them dimmed (click → the studio's own configure/landing screen)
+  // instead of hiding them, while the mobile strip stays lean with enabled ones.
+  const isTabEnabled = (t: (typeof sortedTabs)[number]) =>
+    t.section !== 'Providers' || (enabledProviders?.has(providerIdentifier(t.href)) ?? false);
+  const railTabs = sortedTabs;
+  const stripTabs = sortedTabs.filter(isTabEnabled);
 
   if (permissions.isLoaded && !permissions.hasPermission('media', 'read')) {
     return (
@@ -662,12 +663,13 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="flex flex-1 min-h-0 flex-col gap-[4px] overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent">
-          {visibleTabs.map((t, i) => {
+          {railTabs.map((t, i) => {
             const active = pathname.startsWith(t.href);
+            const enabled = isTabEnabled(t);
             // 'Platform' (Designer) is the lone built-in tool — no section header.
             const showHeader =
               t.section !== 'Platform' &&
-              (i === 0 || visibleTabs[i - 1].section !== t.section);
+              (i === 0 || railTabs[i - 1].section !== t.section);
             return (
               <React.Fragment key={t.href}>
                 {showHeader && (
@@ -682,12 +684,13 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
                 )}
                 <Link
                   href={t.href}
-                  title={t.label}
+                  title={enabled ? t.label : `${t.label} — not configured`}
                   aria-current={active ? 'page' : undefined}
                   className={clsx(
                     'group/rail relative flex items-center gap-[10px] rounded-e-[6px] text-[13px] text-textColor transition-colors',
                     collapsed ? 'justify-center px-[8px] py-[10px]' : 'ps-[10px] pe-[12px] py-[8px]',
-                    active ? 'bg-boxHover' : 'hover:bg-boxHover'
+                    active ? 'bg-boxHover' : 'hover:bg-boxHover',
+                    !enabled && !active && 'opacity-45 hover:opacity-100'
                   )}
                 >
                   <span
@@ -712,7 +715,7 @@ export default function MediaLayout({ children }: { children: React.ReactNode })
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <SubmenuStrip
           ariaLabel="Media tools"
-          items={visibleTabs.map((t) => ({
+          items={stripTabs.map((t) => ({
             href: t.href,
             label: t.label,
             icon: t.icon,

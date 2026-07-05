@@ -20,6 +20,14 @@ export function isPodmanRenderEnabled(): boolean {
   return raw === 'true' || raw === '1';
 }
 
+/**
+ * Overall wall-clock cap for a single render (in-process encoder + Podman container share
+ * this budget). A render that exceeds it is aborted/failed rather than pinning a worker.
+ */
+export function getRenderTimeoutMs(): number {
+  return intEnv('VIDEO_RENDER_TIMEOUT_MS', 120000);
+}
+
 export interface PodmanRenderConfig {
   bin: string;
   image: string;
@@ -39,8 +47,13 @@ export function getPodmanRenderConfig(): PodmanRenderConfig {
     pod: process.env.VIDEO_RENDER_POD || 'postmill-render',
     cpus: intEnv('VIDEO_RENDER_CPUS', 4),
     memory: process.env.VIDEO_RENDER_MEMORY || '8g',
-    network: process.env.VIDEO_RENDER_NETWORK || 'host',
-    timeoutMs: intEnv('VIDEO_RENDER_TIMEOUT_MS', 120000),
+    // Isolated bridge network by default: the render container must NOT join the host
+    // network, or containerized Chromium can reach localhost / internal services / cloud
+    // metadata (169.254.169.254) — negating the isolation and re-opening the render-path
+    // SSRF surface. `host` is opt-in (VIDEO_RENDER_NETWORK=host) and defeats that isolation;
+    // full metadata-blocking still needs an egress proxy / firewall on the bridge.
+    network: process.env.VIDEO_RENDER_NETWORK || 'bridge',
+    timeoutMs: getRenderTimeoutMs(),
     splitFallback: (process.env.VIDEO_RENDER_SPLIT_FALLBACK || '').toLowerCase() !== 'false',
   };
 }

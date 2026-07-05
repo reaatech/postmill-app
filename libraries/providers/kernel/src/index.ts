@@ -12,6 +12,7 @@ export * from './domains/ai-helpers';
 export * from './domains/languages';
 export * from './domains/media';
 export * from './domains/media-helpers';
+export * from './domains/media-guards';
 export * from './domains/metadata';
 export * from './domains/storage';
 export * from './domains/storage-helpers';

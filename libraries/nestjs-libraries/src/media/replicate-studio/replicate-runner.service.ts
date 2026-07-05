@@ -14,7 +14,7 @@ import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/datab
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
 import { estimate } from './replicate-cost';
-import { isWarm } from './replicate-catalog.allowlist';
+import { isWarm, MODEL_ALLOWLIST } from './replicate-catalog.allowlist';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
 import { renderWorkDir } from '@gitroom/nestjs-libraries/media/design-render/render-job-spec';
 import * as fs from 'fs';
@@ -54,6 +54,20 @@ export interface GetJobResult {
 @Injectable()
 export class ReplicateRunnerService {
   private readonly _logger = new Logger(ReplicateRunnerService.name);
+
+  // 1.5: flat set of every allowlisted "owner/name" model id. The catalog UI
+  // only lists these, but `runSync`/`runAsync` took `body.modelId` straight to
+  // Replicate — letting any `media:create` user run an arbitrary (billable)
+  // model on the org's key. Enforce the allowlist at the runner boundary.
+  private static readonly _allowedModels = new Set<string>(
+    Object.values(MODEL_ALLOWLIST).flat()
+  );
+
+  private _assertModelAllowed(modelId: string): void {
+    if (!ReplicateRunnerService._allowedModels.has(modelId)) {
+      throw new BadRequestException(`Model "${modelId}" is not allowed`);
+    }
+  }
 
   constructor(
     private readonly _catalog: ReplicateCatalogService,
@@ -253,6 +267,7 @@ export class ReplicateRunnerService {
     },
     opts?: { creditType?: string },
   ): Promise<RunSyncResult> {
+    this._assertModelAllowed(params.modelId);
     return this._withCredit(orgId, opts?.creditType, async () => {
       const apiKey = await this._getApiKey(orgId);
       const resolvedInput = await this._resolveInputUrls(params.input, orgId);
@@ -320,6 +335,7 @@ export class ReplicateRunnerService {
     },
     opts?: { creditType?: string },
   ): Promise<RunAsyncResult> {
+    this._assertModelAllowed(params.modelId);
     return this._withCredit(orgId, opts?.creditType, async () => {
       const apiKey = await this._getApiKey(orgId);
       const resolvedInput = await this._resolveInputUrls(params.input, orgId);

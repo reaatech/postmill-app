@@ -55,6 +55,11 @@ export class OrgContentPackSettingsService {
     if (!config || !config.credentials) return null;
 
     const credentials = this._decryptCredentials(config.credentials);
+    // 6.3: a decrypt failure yields empty creds. Treat that as "no active pack"
+    // (return null → fall back to the free provider) rather than resolving a
+    // pack with blank credentials that would fail every call.
+    if (!credentials || Object.keys(credentials).length === 0) return null;
+
     return {
       identifier: active.identifier,
       version: active.version,

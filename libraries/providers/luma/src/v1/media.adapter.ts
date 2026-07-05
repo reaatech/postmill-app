@@ -8,6 +8,8 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -76,7 +78,7 @@ export class LumaAdapter implements MediaProviderAdapter {
       }),
     });
 
-    if (!res.ok) throw new Error(`Luma video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Luma video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as LumaGenerationResponse;
     if (!data.id) throw new Error('Luma returned no generation id');
     return { jobId: data.id };
@@ -91,11 +93,23 @@ export class LumaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a permanent config error → terminal failed, not a thrown error the
+    // lifecycle would retry for 24h.
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Luma API key is required' };
+
     const res = await this._fetch(`${BASE}/generations/${jobId}`, {
       headers: this._headers(options),
     });
 
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — a 429/5xx poll is transient: THROW so the lifecycle retries rather than
+      // permanently failing a still-rendering generation.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Luma poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as LumaGenerationResponse;
 
     switch (data.state) {
@@ -107,7 +121,7 @@ export class LumaAdapter implements MediaProviderAdapter {
           metadata: { provider: this.identifier, mime: 'video/mp4' },
         };
       case 'failed':
-        return { status: 'failed', error: data.failure_reason || 'Unknown error' };
+        return { status: 'failed', error: redactError(data.failure_reason || 'Unknown error') };
       default:
         return { status: 'pending' };
     }

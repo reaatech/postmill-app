@@ -302,11 +302,11 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
         aria-modal="true"
         aria-label="Select media"
         className={clsx(
-          'bg-[#1a1a2e] border border-[#2a2a4a] rounded-xl flex flex-col',
+          'bg-newBgColor border border-studioBorder rounded-xl flex flex-col',
           multiple ? 'w-[760px] max-h-[680px]' : 'w-[720px] max-h-[600px]'
         )}
       >
-        <div className="flex items-center justify-between px-5 py-3 border-b border-[#2a2a4a]">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-studioBorder">
           <div className="flex gap-1" role="tablist" aria-label="Media source">
             {tabs.map((tab) => (
               <button
@@ -317,7 +317,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
                 className={`px-4 py-1.5 rounded text-sm font-medium transition-colors ${
                   activeTab === tab
                     ? 'bg-[#2B5CD3] text-white'
-                    : 'text-gray-400 hover:text-white'
+                    : 'text-newTextColor/60 hover:text-textColor'
                 }`}
                 onClick={() => setActiveTab(tab)}
               >
@@ -326,7 +326,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
             ))}
           </div>
           <button
-            className="text-gray-400 hover:text-white text-lg"
+            className="text-newTextColor/60 hover:text-textColor text-lg"
             onClick={onClose}
             aria-label="Close media selector"
             title="Close media selector"
@@ -421,7 +421,7 @@ export const MediaSelectorModal: React.FC<MediaSelectorModalProps> = ({
         </div>
 
         {multiple && (
-          <div className="border-t border-[#2a2a4a] px-5 py-3 flex items-center gap-3">
+          <div className="border-t border-studioBorder px-5 py-3 flex items-center gap-3">
             <div className="flex-1 flex items-center gap-2 overflow-x-auto">
               {selection.length === 0 && (
                 <span className="text-sm text-newTextColor/50">

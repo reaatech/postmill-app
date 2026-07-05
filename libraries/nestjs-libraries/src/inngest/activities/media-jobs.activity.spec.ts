@@ -49,17 +49,42 @@ describe('MediaJobsActivity', () => {
 
     await activity.processPendingMediaJobs();
 
+    const bucket = Math.floor(Date.now() / 60000);
     expect(h.send).toHaveBeenCalledWith({
       name: 'media/render',
+      id: `media-render-d1-${bucket}`,
       data: { jobId: 'd1', op: 'design' },
     });
     expect(h.send).toHaveBeenCalledWith({
       name: 'media/render',
+      id: `media-render-m1-${bucket}`,
       data: { jobId: 'm1', op: 'merge' },
     });
     expect(h.send).toHaveBeenCalledTimes(2); // x1 is not a local render
     expect(videoRender.processVideoRender).not.toHaveBeenCalled();
     expect(videoRender.processMergeRender).not.toHaveBeenCalled();
+  });
+
+  it('re-enqueues only STALE pending renders, leaving freshly-queued ones alone (3.2)', async () => {
+    const now = Date.now();
+    const { activity } = makeActivity({
+      pending: [
+        // ~5s old → still legitimately queued behind concurrency:3; not re-sent.
+        { id: 'fresh', provider: 'chromium-ffmpeg', model: null, updatedAt: new Date(now - 5_000) },
+        // ~5min old → its original event was likely lost; re-enqueue.
+        { id: 'stale', provider: 'chromium-ffmpeg', model: null, updatedAt: new Date(now - 300_000) },
+      ],
+    });
+
+    await activity.processPendingMediaJobs();
+
+    const bucket = Math.floor(Date.now() / 60000);
+    expect(h.send).toHaveBeenCalledTimes(1);
+    expect(h.send).toHaveBeenCalledWith({
+      name: 'media/render',
+      id: `media-render-stale-${bucket}`,
+      data: { jobId: 'stale', op: 'design' },
+    });
   });
 
   it('renders inline through the semaphore when Inngest is off', async () => {

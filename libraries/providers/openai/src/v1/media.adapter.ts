@@ -9,6 +9,7 @@ import {
   MediaPollResult,
   MediaInputValue,
   resolveApiKey,
+  redactError,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -26,6 +27,9 @@ const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
 // content-length header BEFORE buffering so a huge render can't blow the 2 GB heap. Matches the
 // lifecycle's MAX_ARTIFACT_BYTES so nothing that passes here is rejected later.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
+// 6.1j — cap a fetched source frame before buffering it into the multipart upload.
+const MAX_SOURCE_IMAGE_BYTES = 32 * 1024 * 1024;
 
 // 2.3 — stream the body with a running byte counter, aborting once it passes the cap, so a
 // chunked / no-content-length body can't be fully buffered into the heap before the size check.
@@ -122,7 +126,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       }),
     });
 
-    if (!res.ok) throw new Error(`OpenAI image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`OpenAI image generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as OpenAIImageResponse;
     const fmt = String(options?.input?.output_format || 'png');
     const dataMime = fmt === 'jpeg' ? 'image/jpeg' : fmt === 'webp' ? 'image/webp' : 'image/png';
@@ -164,7 +168,14 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       // Image-to-video: fetch the source frame and upload it as a multipart file.
       const imgRes = await this._fetch(input_reference);
       if (!imgRes.ok) throw new Error(`Sora reference image fetch failed (${imgRes.status})`);
-      const bytes = Buffer.from(await imgRes.arrayBuffer());
+      // 6.1j — content-length pre-check + streamed cap so an oversized source frame can't be
+      // fully buffered before the size check.
+      const declaredLen = Number(imgRes.headers.get('content-length') || '0');
+      if (declaredLen && declaredLen > MAX_SOURCE_IMAGE_BYTES) {
+        throw new Error('Sora reference image exceeds the size limit');
+      }
+      const bytes = await readCapped(imgRes as unknown as Response, MAX_SOURCE_IMAGE_BYTES);
+      if (!bytes) throw new Error('Sora reference image exceeds the size limit');
       const mime = imgRes.headers.get('content-type')?.split(';')[0] || 'image/png';
       const ext = mime === 'image/jpeg' ? 'jpg' : mime === 'image/webp' ? 'webp' : 'png';
       const form = new FormData();
@@ -183,7 +194,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       });
     }
 
-    if (!res.ok) throw new Error(`Sora video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Sora video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as SoraJob;
     if (!data.id) throw new Error('Sora returned no job id');
     return { jobId: data.id, metadata: { provider: this.identifier, model } };
@@ -292,7 +303,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       }),
     });
 
-    if (!res.ok) throw new Error(`OpenAI TTS failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`OpenAI TTS failed: ${redactError(await res.text())}`);
     return Buffer.from(await res.arrayBuffer());
   }
 
@@ -309,7 +320,7 @@ export class OpenaiMediaAdapter implements MediaProviderAdapter {
       body: formData,
     });
 
-    if (!res.ok) throw new Error(`OpenAI STT failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`OpenAI STT failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as OpenAITranscriptionResponse;
     return data.text || '';
   }

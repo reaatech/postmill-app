@@ -53,4 +53,20 @@ describe('luma media adapter (async video submit-and-poll)', () => {
     await expect(adapter.generateAudio('x', { apiKey: 'k' })).rejects.toThrow();
     await expect(adapter.generateAvatar('x', { apiKey: 'k' })).rejects.toThrow();
   });
+
+  // 3.4 — transient poll = retry (throw); terminal 4xx = failed; missing key = failed (not throw).
+  it('pollJob throws on a 502 and returns failed on a 404', async () => {
+    const { ctx: ctx5 } = makeCtx(() => res('bad gateway', false, 502));
+    await expect(
+      (lumaMediaModule.create(ctx5 as any) as any).pollJob('gen-1', { apiKey: 'luma-key' }),
+    ).rejects.toThrow(/transient/);
+
+    const { ctx: ctx4 } = makeCtx(() => res('gone', false, 404));
+    const out = await (lumaMediaModule.create(ctx4 as any) as any).pollJob('gen-1', { apiKey: 'luma-key' });
+    expect(out.status).toBe('failed');
+
+    const { ctx: ctxNoKey } = makeCtx(() => res({}));
+    const noKey = await (lumaMediaModule.create(ctxNoKey as any) as any).pollJob('gen-1', {});
+    expect(noKey.status).toBe('failed');
+  });
 });

@@ -11,6 +11,11 @@ interface FontCacheEntry {
   filePath: string;
 }
 
+/** Neutralize a fileId before it becomes a temp filename (no path traversal / separators). */
+export function safeFileId(fileId: string): string {
+  return String(fileId).replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
 // Mirror of the curated Designer font catalog from
 // apps/frontend/src/components/media-tools/designer/fonts.ts.
 // The backend registers these on demand from Google Fonts so exports render
@@ -106,7 +111,7 @@ export class FontLoaderService {
           const match = font.path.match(/\.(\w{2,5})(\?|$)/);
           if (match) ext = '.' + match[1];
         }
-        const tmpPath = path.join(this._tempDir, `${font.fileId}${ext}`);
+        const tmpPath = path.join(this._tempDir, `${safeFileId(font.fileId)}${ext}`);
         await fs.writeFile(tmpPath, buffer);
 
         registerFont(tmpPath, { family: font.family, weight: String(font.weights?.[0] || '400') });
@@ -143,7 +148,7 @@ export class FontLoaderService {
           const match = font.path.match(/\.(\w{2,5})(\?|$)/);
           if (match) ext = '.' + match[1];
         }
-        const tmpPath = path.join(this._tempDir, `${font.fileId}_${weight}${ext}`);
+        const tmpPath = path.join(this._tempDir, `${safeFileId(font.fileId)}_${weight}${ext}`);
         await fs.writeFile(tmpPath, buffer);
 
         registerFont(tmpPath, { family: font.family, weight: String(weight) });

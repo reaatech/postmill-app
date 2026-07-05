@@ -182,12 +182,19 @@ export class CaptionService {
     };
   }
 
+  // Strip control/override tokens before caption text is burned in: CR/LF would break the
+  // SRT cue / ASS dialogue line structure, and `{`/`}` are ASS style-override delimiters
+  // (e.g. `{\pos(..)}`) an attacker could inject via a crafted transcript.
+  private _sanitizeCaptionText(text: string): string {
+    return (text || '').replace(/[\r\n]+/g, ' ').replace(/[{}]/g, '');
+  }
+
   private _buildSrt(segments: TranscriptSegment[]): string {
     return segments
       .map((s, i) => {
         const start = this._formatSrtTime(s.start);
         const end = this._formatSrtTime(s.end);
-        return `${i + 1}\n${start} --> ${end}\n${s.text}\n`;
+        return `${i + 1}\n${start} --> ${end}\n${this._sanitizeCaptionText(s.text)}\n`;
       })
       .join('\n');
   }
@@ -205,7 +212,7 @@ export class CaptionService {
       .map((s) => {
         const start = this._formatAssTime(s.start);
         const end = this._formatAssTime(s.end);
-        return `Dialogue: 0,${start},${end},Default,,0,0,0,,${s.text.replace(/,/g, '，')}`;
+        return `Dialogue: 0,${start},${end},Default,,0,0,0,,${this._sanitizeCaptionText(s.text).replace(/,/g, '，')}`;
       })
       .join('\n');
 

@@ -9,8 +9,8 @@ import { HeyGenJob } from './use-heygen';
 import { openInDesigner } from '@gitroom/frontend/components/media-tools/open-in-designer';
 
 const STATUS_META: Record<HeyGenJob['status'], { label: string; className: string }> = {
-  pending: { label: 'Queued', className: 'text-yellow-400 bg-yellow-400/10' },
-  processing: { label: 'Rendering', className: 'text-yellow-400 bg-yellow-400/10' },
+  pending: { label: 'Queued', className: 'text-amber-600 bg-amber-600/10' },
+  processing: { label: 'Rendering', className: 'text-amber-600 bg-amber-600/10' },
   completed: { label: 'Ready', className: 'text-green-400 bg-green-400/10' },
   failed: { label: 'Failed', className: 'text-red-400 bg-red-400/10' },
 };

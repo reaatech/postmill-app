@@ -59,7 +59,7 @@ export const togetheraiDescriptor: StudioDescriptor = {
       operation: 'video',
       description: 'Generate a video clip from a text prompt.',
       fields: [
-        { type: 'select', name: 'model', label: 'Model', source: 'models' },
+        { type: 'select', name: 'model', label: 'Model', source: 'models', required: true },
         { type: 'prompt', name: 'prompt', label: 'Prompt', required: true, placeholder: 'Describe the scene…' },
         { type: 'text', name: 'negative_prompt', label: 'Negative prompt', placeholder: 'What to avoid (optional)' },
         {
@@ -84,7 +84,7 @@ export const togetheraiDescriptor: StudioDescriptor = {
       operation: 'video',
       description: 'Animate a source image into a video clip.',
       fields: [
-        { type: 'select', name: 'model', label: 'Model', source: 'models' },
+        { type: 'select', name: 'model', label: 'Model', source: 'models', required: true },
         { type: 'media', name: 'frame_image', label: 'Source image', accept: 'image', required: true },
         { type: 'prompt', name: 'prompt', label: 'Prompt', placeholder: 'Describe the motion…' },
         {

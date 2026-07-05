@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { useReplicateStore } from './replicate.store';
 import { EditorShell, toolbarBtn, toolbarPrimary } from './editor-shell';
@@ -44,13 +45,14 @@ function buildFontString(layer: TextLayer) {
   return `${style}${weight}${layer.fontSize}px "${layer.fontFamily}", sans-serif`;
 }
 
-const fieldLabel = 'text-[10px] uppercase tracking-wider text-gray-500';
+const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/50';
 const fieldInput =
-  'w-full px-2 py-1 rounded border border-newBorder bg-newBgColor text-white text-xs focus:outline-none focus:border-designerAccent';
+  'w-full px-2 py-1 rounded border border-studioBorder bg-newBgColor text-textColor text-xs focus:outline-none focus:border-designerAccent';
 
 export function MemeEditor() {
   const fetch = useFetch();
   const modals = useModals();
+  const toaster = useToaster();
   const saveFolderId = useReplicateStore((s) => s.saveFolderId);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [baseImage, setBaseImage] = useState<FileValue | null>(null);
@@ -195,6 +197,7 @@ export function MemeEditor() {
     setSaving(true);
     canvas.toBlob(async (blob) => {
       if (!blob) {
+        toaster.show('Could not render the meme image', 'warning');
         setSaving(false);
         return;
       }
@@ -203,13 +206,17 @@ export function MemeEditor() {
       if (saveFolderId) formData.append('folderId', saveFolderId);
       try {
         const res = await fetch('/files/upload-simple', { method: 'POST', body: formData });
+        if (!res.ok) throw new Error(await res.text().catch(() => 'Save failed'));
         const data = await res.json();
         setSavedPath(data.path || data.name);
+        toaster.show('Saved to Files', 'success');
+      } catch (err) {
+        toaster.show((err as Error).message || 'Could not save the meme', 'warning');
       } finally {
         setSaving(false);
       }
     }, 'image/png');
-  }, [fetch, saveFolderId]);
+  }, [fetch, saveFolderId, toaster]);
 
   const handleOpenDesigner = useCallback(() => {
     if (savedPath) {
@@ -311,7 +318,7 @@ export function MemeEditor() {
       <div>
         <div className={`${fieldLabel} mb-2`}>Layers</div>
         {layers.length === 0 ? (
-          <p className="text-xs text-gray-600">No text yet — add a text layer.</p>
+          <p className="text-xs text-newTextColor/50">No text yet — add a text layer.</p>
         ) : (
           <div className="space-y-1">
             {layers.map((l, i) => (
@@ -319,7 +326,7 @@ export function MemeEditor() {
                 key={l.id}
                 onClick={() => setSelectedLayerId(l.id)}
                 className={`flex items-center justify-between px-2 py-1.5 rounded-lg cursor-pointer text-xs ${
-                  selectedLayerId === l.id ? 'bg-designerAccent/20 text-white' : 'text-gray-400 hover:bg-boxHover'
+                  selectedLayerId === l.id ? 'bg-designerAccent/20 text-textColor' : 'text-newTextColor/70 hover:bg-boxHover'
                 }`}
               >
                 <span className="truncate">
@@ -341,7 +348,7 @@ export function MemeEditor() {
       </div>
 
       {selectedLayer && (
-        <div className="space-y-3 border-t border-newBorder pt-3">
+        <div className="space-y-3 border-t border-studioBorder pt-3">
           <div className={fieldLabel}>Text</div>
           <textarea
             value={selectedLayer.text}
@@ -383,7 +390,7 @@ export function MemeEditor() {
                 <button
                   key={c}
                   onClick={() => updateLayer(selectedLayer.id, { fill: c })}
-                  className={`w-5 h-5 rounded border ${selectedLayer.fill === c ? 'border-designerAccent' : 'border-newBorder'}`}
+                  className={`w-5 h-5 rounded border ${selectedLayer.fill === c ? 'border-designerAccent' : 'border-studioBorder'}`}
                   style={{ backgroundColor: c }}
                   aria-label={`Fill ${c}`}
                 />
@@ -403,7 +410,7 @@ export function MemeEditor() {
                 <button
                   key={c}
                   onClick={() => updateLayer(selectedLayer.id, { outlineColor: c })}
-                  className={`w-5 h-5 rounded border ${selectedLayer.outlineColor === c ? 'border-designerAccent' : 'border-newBorder'}`}
+                  className={`w-5 h-5 rounded border ${selectedLayer.outlineColor === c ? 'border-designerAccent' : 'border-studioBorder'}`}
                   style={{ backgroundColor: c }}
                   aria-label={`Outline ${c}`}
                 />
@@ -419,7 +426,7 @@ export function MemeEditor() {
             </div>
           </div>
           <div className="flex items-center gap-4">
-            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+            <label className="flex items-center gap-1.5 text-xs text-newTextColor/70">
               <input
                 type="checkbox"
                 checked={selectedLayer.bold}
@@ -427,7 +434,7 @@ export function MemeEditor() {
               />
               Bold
             </label>
-            <label className="flex items-center gap-1.5 text-xs text-gray-400">
+            <label className="flex items-center gap-1.5 text-xs text-newTextColor/70">
               <input
                 type="checkbox"
                 checked={selectedLayer.italic}
@@ -436,7 +443,7 @@ export function MemeEditor() {
               Italic
             </label>
           </div>
-          <p className="text-[10px] text-gray-600">Tip: drag the text directly on the canvas to position it.</p>
+          <p className="text-[10px] text-newTextColor/50">Tip: drag the text directly on the canvas to position it.</p>
         </div>
       )}
     </div>
@@ -455,7 +462,7 @@ export function MemeEditor() {
         >
           <canvas
             ref={canvasRef}
-            className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg border border-newBorder cursor-move shadow-2xl"
+            className="max-w-full max-h-[calc(100vh-200px)] object-contain rounded-lg border border-studioBorder cursor-move shadow-2xl"
             onMouseDown={handlePointerDown}
             onTouchStart={handlePointerDown}
           />

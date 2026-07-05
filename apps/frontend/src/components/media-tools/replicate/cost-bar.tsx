@@ -56,10 +56,10 @@ export function CostBar() {
 
   let body: React.ReactNode;
   if (!storedEstimate) {
-    body = <span className="text-xs text-gray-600">Estimating…</span>;
+    body = <span className="text-xs text-newTextColor/50">Estimating…</span>;
   } else if (storedEstimate.approximate) {
     body = (
-      <span className="text-xs text-gray-400">
+      <span className="text-xs text-newTextColor/70">
         Billed by usage
         {surcharge > 0 && <> · + ${surcharge.toFixed(2)} enhance</>}
       </span>
@@ -67,18 +67,18 @@ export function CostBar() {
   } else {
     const total = storedEstimate.usd + surcharge;
     body = (
-      <span className="text-sm text-gray-300">
+      <span className="text-sm text-newTextColor/80">
         Estimated cost{' '}
-        <span className="text-white font-semibold">${total.toFixed(4)}</span>
+        <span className="text-textColor font-semibold">${total.toFixed(4)}</span>
         {surcharge > 0 && (
-          <span className="text-[10px] text-gray-500"> (incl. ${surcharge.toFixed(2)} enhance)</span>
+          <span className="text-[10px] text-newTextColor/50"> (incl. ${surcharge.toFixed(2)} enhance)</span>
         )}
       </span>
     );
   }
 
   return (
-    <div className="flex items-center justify-between rounded-lg border border-newBorder bg-newBgColorInner px-3 py-2.5">
+    <div className="flex items-center justify-between rounded-lg border border-studioBorder bg-newBgColorInner px-3 py-2.5">
       {body}
     </div>
   );

@@ -34,6 +34,52 @@ function withTimeoutSignal(
   return caller ? AbortSignal.any([caller, timeout]) : timeout;
 }
 
+// 1.4: credential-class headers that must NOT survive a cross-origin redirect.
+// A provider endpoint that 302s to a CDN/third-party host would otherwise
+// receive the org's API key (HeyGen artifact/status URLs legitimately redirect).
+// Mirrors browser/undici auto-redirect behaviour (auth stripped off-origin).
+const CREDENTIAL_HEADER_NAMES = [
+  'authorization',
+  'cookie',
+  'x-api-key',
+  'api-key',
+  'apikey',
+  'x-goog-api-key',
+  'x-amz-security-token',
+];
+
+function originOf(url: string): string | null {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+// Return a shallow-cloned init with the credential-class headers removed.
+// Handles Headers, array-of-pairs, and plain-object header shapes.
+function stripCredentialHeaders(init: RequestInit | undefined): RequestInit {
+  const next: RequestInit = { ...(init as RequestInit) };
+  const src = next.headers;
+  if (!src) {
+    return next;
+  }
+  const out: Record<string, string> = {};
+  const entries: Iterable<[string, string]> =
+    src instanceof Headers
+      ? (src as Headers).entries()
+      : Array.isArray(src)
+        ? (src as [string, string][])
+        : Object.entries(src as Record<string, string>);
+  for (const [k, v] of entries) {
+    if (!CREDENTIAL_HEADER_NAMES.includes(k.toLowerCase())) {
+      out[k] = v as string;
+    }
+  }
+  next.headers = out;
+  return next;
+}
+
 // D4: HMAC-SHA256 signature for an outbound webhook body. Secret is the
 // deployment-wide WEBHOOK_SIGNING_SECRET; when unset it falls back to
 // JWT_SECRET (mirroring EncryptionService's key-derivation) so signing is
@@ -63,6 +109,11 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
     timeoutMs,
   );
 
+  // 1.4: track the origin the credential headers were issued for; once a
+  // redirect leaves it, strip them for all subsequent hops.
+  const originalOrigin = originOf(url);
+  let currentInit: RequestInit | undefined = init;
+
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     if (!(await isSafePublicHttpsUrl(currentUrl))) {
       throw new Error('Blocked URL');
@@ -70,7 +121,7 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
 
     try {
       response = (await undiciFetch(currentUrl, {
-        ...(init as unknown as UndiciRequestInit),
+        ...(currentInit as unknown as UndiciRequestInit),
         signal,
         redirect: 'manual',
         dispatcher: ssrfSafeDispatcher,
@@ -92,6 +143,10 @@ export async function safeFetch(url: string, init?: RequestInit): Promise<Respon
         currentUrl = new URL(location, currentUrl).toString();
       } catch {
         throw new Error('Invalid redirect target');
+      }
+      // 1.4: strip credential headers when the hop leaves the original origin.
+      if (originalOrigin && originOf(currentUrl) !== originalOrigin) {
+        currentInit = stripCredentialHeaders(currentInit);
       }
       continue;
     }

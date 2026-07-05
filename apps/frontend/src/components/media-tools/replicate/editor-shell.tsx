@@ -20,8 +20,8 @@ export function EditorShell({
 }) {
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between h-12 flex-shrink-0 px-4 border-b border-newBorder">
-        <h2 className="text-sm font-medium text-white">{title}</h2>
+      <div className="flex items-center justify-between h-12 flex-shrink-0 px-4 border-b border-studioBorder">
+        <h2 className="text-sm font-medium text-textColor">{title}</h2>
         {toolbar && <div className="flex items-center gap-2">{toolbar}</div>}
       </div>
       <div className="flex mobile:flex-col flex-1 overflow-hidden">
@@ -31,7 +31,7 @@ export function EditorShell({
           {children}
         </div>
         {inspector && (
-          <div className="w-72 flex-shrink-0 border-l border-newBorder overflow-y-auto bg-newBgColorInner mobile:w-full mobile:border-l-0 mobile:border-t mobile:max-h-[45%]">
+          <div className="w-72 flex-shrink-0 border-l border-studioBorder overflow-y-auto bg-newBgColorInner mobile:w-full mobile:border-l-0 mobile:border-t mobile:max-h-[45%]">
             {inspector}
           </div>
         )}
@@ -41,6 +41,6 @@ export function EditorShell({
 }
 
 export const toolbarBtn =
-  'px-3 py-1.5 rounded-lg bg-gray-800 text-white text-xs hover:bg-gray-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
+  'px-3 py-1.5 rounded-lg bg-btnSimple text-textColor text-xs hover:bg-boxHover transition-colors disabled:opacity-40 disabled:cursor-not-allowed';
 export const toolbarPrimary =
   'px-3 py-1.5 rounded-lg bg-designerAccent text-white text-xs font-medium hover:bg-designerAccent/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed';

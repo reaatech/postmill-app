@@ -277,6 +277,37 @@ describe('MediaStudioService', () => {
     });
   });
 
+  describe('listJobs drive-on-read fan-out (§3.3)', () => {
+    it('bounds concurrent processJob calls to the drive-concurrency limit (≤3) with 20 pending', async () => {
+      const { service, aiSettings, lifecycle } = makeService();
+      const pending = Array.from({ length: 20 }, (_, i) => ({
+        id: `job-${i}`,
+        status: 'pending',
+        operation: 'video',
+        artifactUrl: null,
+        error: null,
+        createdAt: new Date(),
+      }));
+      aiSettings.getMediaJobsByProvider.mockResolvedValue(pending);
+
+      let inFlight = 0;
+      let maxInFlight = 0;
+      lifecycle.processJob.mockImplementation(async () => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((r) => setTimeout(r, 0));
+        inFlight--;
+        return 'pending';
+      });
+
+      await service.listJobs('org-1', 'test-provider');
+
+      // every pending job is driven, but never more than the concurrency cap at once
+      expect(lifecycle.processJob).toHaveBeenCalledTimes(20);
+      expect(maxInFlight).toBeLessThanOrEqual(3);
+    });
+  });
+
   describe('listModels enabled gate (1.7)', () => {
     it('returns [] for a disabled provider without resolving the adapter', async () => {
       const { service, orgSettings, resolution } = makeService();

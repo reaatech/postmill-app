@@ -121,7 +121,7 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
 
   return (
     <div className="flex flex-col gap-3 w-full items-center">
-      <div className="relative border border-newBorder rounded-xl overflow-hidden bg-gray-900 shadow-2xl">
+      <div className="relative border border-studioBorder rounded-xl overflow-hidden bg-gray-900 shadow-2xl">
         <canvas
           ref={canvasRef}
           className="max-w-full max-h-[calc(100vh-280px)] object-contain cursor-crosshair"
@@ -143,32 +143,32 @@ export function MaskPainter({ sourceImage, onMaskReady }: MaskPainterProps) {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsEraser(false)}
-            className={`px-3 py-1 rounded-lg text-xs ${!isEraser ? 'bg-designerAccent text-white' : 'bg-gray-800 text-gray-400'}`}
+            className={`px-3 py-1 rounded-lg text-xs ${!isEraser ? 'bg-designerAccent text-white' : 'bg-btnSimple text-newTextColor/70'}`}
           >
             Brush
           </button>
           <button
             onClick={() => setIsEraser(true)}
-            className={`px-3 py-1 rounded-lg text-xs ${isEraser ? 'bg-designerAccent text-white' : 'bg-gray-800 text-gray-400'}`}
+            className={`px-3 py-1 rounded-lg text-xs ${isEraser ? 'bg-designerAccent text-white' : 'bg-btnSimple text-newTextColor/70'}`}
           >
             Eraser
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <label className="text-xs text-gray-400">Size:</label>
+          <label className="text-xs text-newTextColor/70">Size:</label>
           <input
             type="range"
             min="5"
             max="100"
             value={brushSize}
             onChange={(e) => setBrushSize(Number(e.target.value))}
-            className="w-24"
+            className="w-24 accent-designerAccent"
           />
-          <span className="text-xs text-gray-500">{brushSize}px</span>
+          <span className="text-xs text-newTextColor/50">{brushSize}px</span>
         </div>
         <button
           onClick={clearMask}
-          className="px-3 py-1.5 rounded-lg bg-gray-800 text-gray-400 text-xs hover:bg-gray-700 transition-colors"
+          className="px-3 py-1.5 rounded-lg bg-btnSimple text-newTextColor/70 text-xs hover:bg-boxHover transition-colors"
         >
           Clear
         </button>

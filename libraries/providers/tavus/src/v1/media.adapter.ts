@@ -9,6 +9,8 @@ import {
   MediaInputValue,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -69,7 +71,7 @@ export class TavusAdapter implements MediaProviderAdapter {
         ...(options?.webhookUrl ? { callback_url: options.webhookUrl } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`Tavus video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Tavus video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as TavusVideoResponse;
     if (!data.video_id) throw new Error('Tavus returned no video id');
     return { jobId: data.video_id };
@@ -84,19 +86,30 @@ export class TavusAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Tavus API key is required' };
+
     const res = await this._fetch(`${BASE}/videos/${jobId}`, {
       headers: this._headers(options),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering video retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Tavus poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as TavusVideoResponse;
 
     if (data.status === 'ready') {
-      const artifactUrl = data.download_url || data.hosted_url;
-      if (!artifactUrl) return { status: 'failed', error: 'Tavus video ready without a download URL' };
-      return { status: 'completed', artifactUrl, metadata: { provider: this.identifier, mime: 'video/mp4' } };
+      // 6.1f — `hosted_url` is an HTML share page, not a downloadable asset. Only the
+      // `download_url` is the real mp4; if it hasn't populated yet, keep polling rather than
+      // landing the HTML page as a "video".
+      if (!data.download_url) return { status: 'pending' };
+      return { status: 'completed', artifactUrl: data.download_url, metadata: { provider: this.identifier, mime: 'video/mp4' } };
     }
     if (data.status === 'error' || data.status === 'deleted') {
-      return { status: 'failed', error: data.error || `Tavus video status: ${data.status}` };
+      return { status: 'failed', error: redactError(data.error || `Tavus video status: ${data.status}`) };
     }
     return { status: 'pending' };
   }

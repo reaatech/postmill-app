@@ -1531,6 +1531,9 @@ model AIMediaJob {
 
   @@index([organizationId, createdAt])
   @@index([organizationId, status, createdAt])
+  // §6.2: the polling sweep selects pending/processing jobs across ALL orgs ordered by
+  // createdAt (no org filter), which the org-prefixed index above can't serve.
+  @@index([status, createdAt])
   @@index([userId, createdAt])
   @@index([provider, createdAt])
 }

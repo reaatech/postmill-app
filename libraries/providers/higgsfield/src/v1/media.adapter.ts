@@ -9,6 +9,8 @@ import {
   MediaCredentialOptions,
   MediaJobSubmission,
   MediaPollResult,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -27,10 +29,8 @@ import {
 //   video  → Speak audio→talk-video  POST /v1/speak/higgsfield  (model = 'speak', routing marker only)
 const BASE = 'https://platform.higgsfield.ai';
 
-// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
-// rather than permanently failing a job whose generation may still be fine.
-const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
-
+// 2.1 — a 429/5xx on a status poll is transient: THROW (via the shared `isTransientStatus`) so the
+// lifecycle retries the render rather than permanently failing a job whose generation may still be fine.
 const SOUL_ENDPOINT = '/v1/text2image/soul';
 const DOP_ENDPOINT = '/v1/image2video/dop';
 const SPEAK_ENDPOINT = '/v1/speak/higgsfield';
@@ -91,7 +91,7 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
       headers: this._headers(options),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Higgsfield request failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Higgsfield request failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as HiggsfieldResponse;
     if (!data.request_id) throw new Error('Higgsfield returned no request id');
     return data.request_id;
@@ -190,8 +190,8 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
     const res = await this._fetch(`${BASE}/requests/${jobId}/status`, { headers });
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`Higgsfield poll transient error ${res.status}: ${body.slice(0, 200)}`);
-      return { status: 'failed', error: body };
+      if (isTransientStatus(res.status)) throw new Error(`Higgsfield poll transient error ${res.status}: ${redactError(body, 200)}`);
+      return { status: 'failed', error: redactError(body) };
     }
     const data = (await res.json()) as HiggsfieldResponse;
 
@@ -199,9 +199,16 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
       const images = (data.images || []).map((i) => i.url).filter((u): u is string => !!u);
       const artifactUrl = data.video?.url || images[0];
       if (!artifactUrl) return { status: 'failed', error: 'Higgsfield completed without output' };
-      // Stash the full image list (Soul batch_size: 4) for generateImage to surface as multi.
-      const metadata = images.length > 1 ? { provider: this.identifier, source: JSON.stringify(images) } : { provider: this.identifier };
-      return { status: 'completed', artifactUrl, metadata };
+      // 6.1h — Soul returns a batch (batch_size: 4). Surface the extra takes via the generic
+      // `extraArtifactUrls` (Suno pattern) so the lifecycle lands each as its own File, rather
+      // than the old dead JSON stash in `metadata.source` that nothing consumed.
+      const extras = data.video?.url ? [] : images.slice(1);
+      return {
+        status: 'completed',
+        artifactUrl,
+        ...(extras.length ? { extraArtifactUrls: extras } : {}),
+        metadata: { provider: this.identifier },
+      };
     }
     if (data.status === 'failed' || data.status === 'nsfw') {
       return { status: 'failed', error: data.status === 'nsfw' ? 'Blocked by NSFW filter' : 'Higgsfield generation failed' };

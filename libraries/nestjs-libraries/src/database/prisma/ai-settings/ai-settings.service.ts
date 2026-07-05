@@ -373,8 +373,19 @@ export class AiSettingsService {
     return this._repository.getMediaJobById(id);
   }
 
+  // §3.1: atomic status-transition claim — see AiSettingsRepository.claimMediaJobStatus.
+  claimMediaJobStatus(id: string, from: string[], to: string) {
+    return this._repository.claimMediaJobStatus(id, from, to);
+  }
+
   getPendingMediaJobs(limit = 100) {
     return this._repository.getPendingMediaJobs(limit);
+  }
+
+  // §3.1 crash-recovery: reset jobs stranded in the transient `landing` state (a crash
+  // between the completion claim and the terminal write) back to `processing`.
+  reclaimStaleLandingJobs(cutoff: Date) {
+    return this._repository.reclaimStaleLandingJobs(cutoff);
   }
 
   // ── AIPromptLibraryItem ──

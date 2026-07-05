@@ -5,6 +5,22 @@
  * video-canvas-overlay.tsx.
  */
 
+/**
+ * Serialize a value for safe interpolation inside an inline `<script>` block.
+ * `JSON.stringify` does NOT escape `<` or `/`, so a user-controlled string containing
+ * `</script><script>â¦</script>` would break out of the block and execute in the render
+ * browser (SSRF/exfil on the `--no-sandbox` in-process path). Escaping `<` (which neutralizes
+ * `</script`) plus the U+2028/U+2029 line separators (which break JS string literals) makes
+ * the payload inert while remaining valid JSON to `JSON.parse`. Apply to EVERY value inlined
+ * into a `<script>` (both the composition and the baseUrl).
+ */
+export function escapeForScriptTag(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, '\\u003c')
+    .replace(/\u2028/g, '\\u2028')
+    .replace(/\u2029/g, '\\u2029');
+}
+
 export const FRAME_RENDERER_SCRIPT = /* js */ `
 (function () {
   const output = window.__DATA.output;

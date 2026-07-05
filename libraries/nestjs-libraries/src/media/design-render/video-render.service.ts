@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { FfmpegVideoEncoderService } from './ffmpeg-video-encoder.service';
@@ -6,13 +6,19 @@ import { PodmanRenderService } from './podman-render.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { mediaJobWebhookToken } from '@gitroom/nestjs-libraries/media/media-job-token';
-import { isPodmanRenderEnabled } from './render-config';
+import { isPodmanRenderEnabled, getRenderTimeoutMs } from './render-config';
 import { DesignRenderJobSpec, MergeRenderJobSpec, renderWorkDir } from './render-job-spec';
 import { mergeLocalFiles } from '@gitroom/nestjs-libraries/media/replicate-studio/video-merge';
+import {
+  MAX_DIMENSION,
+  MAX_TRACKS,
+  MAX_CLIPS_PER_TRACK,
+} from '@gitroom/nestjs-libraries/media/designer-doc/designer-doc.limits';
 import * as fs from 'fs';
 import * as path from 'path';
 
 const MAX_DURATION_MS = 60000;
+const MAX_FPS = 240;
 const RENDER_PAYLOAD_TTL_SECONDS = 24 * 60 * 60;
 
 function payloadKey(jobId: string): string {
@@ -21,6 +27,65 @@ function payloadKey(jobId: string): string {
 
 function mergePayloadKey(jobId: string): string {
   return `video-render:merge:${jobId}`;
+}
+
+/** Deterministic media/render event id so a re-dispatch inside the same minute dedups. */
+function renderEventId(jobId: string): string {
+  return `media-render-${jobId}-${Math.floor(Date.now() / 60000)}`;
+}
+
+/**
+ * Bound-check an attacker-controlled video composition before it drives Puppeteer/FFmpeg.
+ * Rejects out-of-range dims/fps/track/clip counts (a `100000x100000` viewport or `fps:100000`
+ * exhausts memory / produces millions of screenshots — a resource DoS). Mirrors the bounds in
+ * designer-doc.schema.ts (StrictVideoOutputSchema) without full strict-parsing so legitimate
+ * extra fields on the composition are not rejected.
+ */
+function validateVideoComposition(composition: any): void {
+  const width = composition?.width;
+  const height = composition?.height;
+  const fps = composition?.fps ?? 30;
+
+  if (
+    !Number.isFinite(width) ||
+    !Number.isFinite(height) ||
+    width < 1 ||
+    height < 1 ||
+    width > MAX_DIMENSION ||
+    height > MAX_DIMENSION
+  ) {
+    throw new BadRequestException(
+      `Composition dimensions ${width}x${height} are out of range (1..${MAX_DIMENSION})`,
+    );
+  }
+  if (!Number.isFinite(fps) || fps < 1 || fps > MAX_FPS) {
+    throw new BadRequestException(`Composition fps ${fps} is out of range (1..${MAX_FPS})`);
+  }
+
+  const tracks = Array.isArray(composition?.tracks) ? composition.tracks : [];
+  if (tracks.length > MAX_TRACKS) {
+    throw new BadRequestException(`Composition has ${tracks.length} tracks (max ${MAX_TRACKS})`);
+  }
+  for (const track of tracks) {
+    const clips = Array.isArray(track?.clips) ? track.clips : [];
+    if (clips.length > MAX_CLIPS_PER_TRACK) {
+      throw new BadRequestException(
+        `Composition track has ${clips.length} clips (max ${MAX_CLIPS_PER_TRACK})`,
+      );
+    }
+  }
+}
+
+/** Reject a promise if it does not settle within `ms` (in-process encoder wall-clock cap). Exported for unit testing. */
+export function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () => reject(new Error(`${label} exceeded the ${ms}ms wall-clock timeout`)),
+      ms,
+    );
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer)) as Promise<T>;
 }
 
 function baseUrl(): string {
@@ -61,6 +126,7 @@ export class VideoRenderService {
         `Composition duration ${durationMs}ms exceeds the 60 s hard cap`,
       );
     }
+    validateVideoComposition(composition);
 
     const job = await this._lifecycle.createPendingJob({
       organizationId: orgId,
@@ -119,12 +185,18 @@ export class VideoRenderService {
   /** Send the media/render event (Inngest enforces the 3-concurrent limit). */
   private async dispatch(jobId: string, op: 'design' | 'merge') {
     if (isInngestEnabled()) {
-      await inngest.send({ name: 'media/render', data: { jobId, op } });
+      // Deterministic event id: a same-minute re-dispatch (initial enqueue + the sweep's
+      // re-enqueue) dedups instead of stacking duplicate render runs.
+      await inngest.send({ name: 'media/render', data: { jobId, op }, id: renderEventId(jobId) });
     }
   }
 
   async getJob(orgId: string, jobId: string) {
-    return this._aiSettings.getMediaJobById(jobId);
+    // Org-scope the read: never return another org's job status / artifactUrl / error for a
+    // guessed or leaked job id. Mirrors HeyGenService.getJob / ReplicateRunnerService.getJob.
+    const job = await this._aiSettings.getMediaJobById(jobId);
+    if (!job || job.organizationId !== orgId) return null;
+    return job;
   }
 
   async processVideoRender(jobId: string) {
@@ -138,11 +210,20 @@ export class VideoRenderService {
     try {
       await this._aiSettings.updateMediaJob(jobId, { status: 'processing' });
 
-      const raw = await ioRedis.get(payloadKey(jobId));
+      // Atomically claim the render payload: GETDEL is a single Redis op, so exactly one
+      // concurrent runner obtains it (the equivalent of an `updateMany` count===1 claim).
+      // A loser sees null here and must NOT mark the job failed — the winner is rendering it.
+      const raw = await ioRedis.getdel(payloadKey(jobId));
       if (!raw) {
+        const current = await this._aiSettings.getMediaJobById(jobId);
+        if (current && current.status !== 'pending') {
+          this.logger.log(
+            `Render ${jobId} already claimed by another runner; skipping duplicate`,
+          );
+          return;
+        }
         throw new Error(`No pending composition found for job ${jobId}`);
       }
-      await ioRedis.del(payloadKey(jobId));
       const input = JSON.parse(raw);
 
       const composition = input.composition || {};
@@ -153,6 +234,7 @@ export class VideoRenderService {
           `Composition duration ${durationMs}ms exceeds the 60 s hard cap`,
         );
       }
+      validateVideoComposition(composition);
 
       const format = ['webm', 'gif', 'webp-animated'].includes(input.format)
         ? input.format
@@ -178,7 +260,13 @@ export class VideoRenderService {
         videoPath = path.join(workDir, 'out', `output.${format}`);
         thumbnailPath = path.join(workDir, 'out', 'thumbnail.jpg');
       } else {
-        const result = await this._encoder.encode(composition, options);
+        // The in-process encoder has no external timeout (only Podman enforces one);
+        // cap its wall-clock so a pathological composition can't pin a worker forever.
+        const result = await withTimeout(
+          this._encoder.encode(composition, options),
+          getRenderTimeoutMs(),
+          'In-process video encode',
+        );
         videoPath = result.videoPath;
         thumbnailPath = result.thumbnailPath;
         workDir = path.dirname(videoPath);
@@ -239,11 +327,18 @@ export class VideoRenderService {
     try {
       await this._aiSettings.updateMediaJob(jobId, { status: 'processing' });
 
-      const raw = await ioRedis.get(mergePayloadKey(jobId));
+      // Atomic single-winner claim (see processVideoRender): a loser skips silently.
+      const raw = await ioRedis.getdel(mergePayloadKey(jobId));
       if (!raw) {
+        const current = await this._aiSettings.getMediaJobById(jobId);
+        if (current && current.status !== 'pending') {
+          this.logger.log(
+            `Merge ${jobId} already claimed by another runner; skipping duplicate`,
+          );
+          return;
+        }
         throw new Error(`No pending merge payload found for job ${jobId}`);
       }
-      await ioRedis.del(mergePayloadKey(jobId));
       const input = JSON.parse(raw) as {
         clips: Array<{ trimStart?: number; trimEnd?: number }>;
         transitions: Array<{ type: string; duration?: number }>;

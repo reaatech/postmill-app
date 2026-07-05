@@ -99,21 +99,20 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
     [store, currentOutput]
   );
 
+  // Reorder via the store action, which replaces ONLY the current output's
+  // children (preserving all other formats) and commits history. The previous
+  // setDoc({ outputs: [{...output}] }) wrote a single-output array, silently
+  // destroying every other format.
   const moveUp = useCallback(
     (e: React.MouseEvent, index: number) => {
       e.stopPropagation();
       const children = getCurrentChildren();
       if (index >= children.length - 1) return;
-      const newElements = [...children];
-      [newElements[index], newElements[index + 1]] = [newElements[index + 1], newElements[index]];
-      const output = store.getState().doc.outputs[currentOutput];
-      store.getState().setDoc({
-        ...store.getState().doc,
-        outputs: [{ ...output, children: newElements }],
-      });
-      store.getState().pushHistory();
+      const el = children[index];
+      if (!el) return;
+      store.getState().reorder([el.id], 'forward');
     },
-    [store, currentOutput, getCurrentChildren]
+    [store, getCurrentChildren]
   );
 
   const moveDown = useCallback(
@@ -121,16 +120,11 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
       e.stopPropagation();
       const children = getCurrentChildren();
       if (index <= 0) return;
-      const newElements = [...children];
-      [newElements[index], newElements[index - 1]] = [newElements[index - 1], newElements[index]];
-      const output = store.getState().doc.outputs[currentOutput];
-      store.getState().setDoc({
-        ...store.getState().doc,
-        outputs: [{ ...output, children: newElements }],
-      });
-      store.getState().pushHistory();
+      const el = children[index];
+      if (!el) return;
+      store.getState().reorder([el.id], 'backward');
     },
-    [store, currentOutput, getCurrentChildren]
+    [store, getCurrentChildren]
   );
 
   const handlePanelKeyDown = useCallback(

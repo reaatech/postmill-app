@@ -184,6 +184,33 @@ describe('openai media adapter — Sora Videos API', () => {
     expect(contentBuffered).toBe(false);
   });
 
+  // 6.1j — an oversize source frame (content-length over cap) is rejected before buffering.
+  it('image-to-video rejects an oversize input_reference before buffering', async () => {
+    const huge = String(100 * 1024 * 1024);
+    let imgBuffered = false;
+    const bigImg = {
+      ok: true,
+      status: 200,
+      headers: { get: (k: string) => (k.toLowerCase() === 'content-length' ? huge : 'image/png') },
+      arrayBuffer: async () => {
+        imgBuffered = true;
+        return new ArrayBuffer(8);
+      },
+    };
+    const { ctx } = makeCtx((url) =>
+      url.startsWith('https://ref.example') ? bigImg : json({ id: 'video_abc', status: 'queued' }),
+    );
+    const adapter: any = openaiMediaModule.create(ctx as any);
+    await expect(
+      adapter.generateVideo('a scene', {
+        apiKey: 'sk-test',
+        model: 'sora-2',
+        input: { input_reference: 'https://ref.example/frame.png' },
+      }),
+    ).rejects.toThrow(/size limit/);
+    expect(imgBuffered).toBe(false);
+  });
+
   it('rejects avatar generation (unsupported)', async () => {
     const { ctx } = makeCtx(() => json({}));
     const adapter: any = openaiMediaModule.create(ctx as any);

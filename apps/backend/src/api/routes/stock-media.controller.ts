@@ -12,6 +12,13 @@ import { ApiTags } from '@nestjs/swagger';
 export class StockMediaController {
   constructor(private _stockMediaService: StockMediaService) {}
 
+  // 6.3: clamp `page` to >= 1 so a negative/zero/NaN page can't produce a
+  // negative provider offset.
+  private _page(page: string): number {
+    const parsed = parseInt(page || '1', 10);
+    return Number.isFinite(parsed) && parsed >= 1 ? parsed : 1;
+  }
+
   @Get('/photos')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   @RequirePermission('media', 'read')
@@ -22,7 +29,7 @@ export class StockMediaController {
     @Query('orientation') orientation: string,
     @Query('color') color: string
   ) {
-    return this._stockMediaService.searchPhotos(org.id, query || '', parseInt(page || '1', 10), orientation || undefined, color || undefined);
+    return this._stockMediaService.searchPhotos(org.id, query || '', this._page(page), orientation || undefined, color || undefined);
   }
 
   @Get('/photos/:id/related')
@@ -45,7 +52,7 @@ export class StockMediaController {
     @Query('orientation') orientation: string,
     @Query('size') size: string
   ) {
-    return this._stockMediaService.searchVideos(org.id, query || '', parseInt(page || '1', 10), orientation || undefined, size || undefined);
+    return this._stockMediaService.searchVideos(org.id, query || '', this._page(page), orientation || undefined, size || undefined);
   }
 
   @Get('/videos/:id/related')
@@ -66,7 +73,7 @@ export class StockMediaController {
     @Query('query') query: string,
     @Query('page') page: string
   ) {
-    return this._stockMediaService.searchAudio(org.id, query || '', parseInt(page || '1', 10));
+    return this._stockMediaService.searchAudio(org.id, query || '', this._page(page));
   }
 
   @Get('/vectors')
@@ -82,7 +89,7 @@ export class StockMediaController {
     return this._stockMediaService.searchVectors(
       org.id,
       query || '',
-      parseInt(page || '1', 10),
+      this._page(page),
       orientation || undefined,
       color || undefined
     );
@@ -96,7 +103,7 @@ export class StockMediaController {
     @Query('query') query: string,
     @Query('page') page: string
   ) {
-    return this._stockMediaService.searchStickers(org.id, query || '', parseInt(page || '1', 10));
+    return this._stockMediaService.searchStickers(org.id, query || '', this._page(page));
   }
 
   @Get('/icons')
@@ -107,6 +114,6 @@ export class StockMediaController {
     @Query('query') query: string,
     @Query('page') page: string
   ) {
-    return this._stockMediaService.searchIcons(org.id, query || '', parseInt(page || '1', 10));
+    return this._stockMediaService.searchIcons(org.id, query || '', this._page(page));
   }
 }

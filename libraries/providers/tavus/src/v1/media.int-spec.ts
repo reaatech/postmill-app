@@ -53,4 +53,33 @@ describe('tavus media adapter (async replica-video submit-and-poll)', () => {
     await expect(adapter.generateImage('x', { apiKey: 'k' })).rejects.toThrow();
     await expect(adapter.generateAudio('x', { apiKey: 'k' })).rejects.toThrow();
   });
+
+  // 6.1f — `ready` with only a `hosted_url` (HTML share page, no mp4) must NOT complete; keep
+  // polling until the real `download_url` appears.
+  it('pollJob stays pending when ready carries only hosted_url', async () => {
+    const { ctx } = makeCtx(() =>
+      res({ status: 'ready', hosted_url: 'https://tavus.io/share/abc' }),
+    );
+    const adapter: any = tavusMediaModule.create(ctx as any);
+    const out = await adapter.pollJob('vid-1', { apiKey: 'tavus-key' });
+    expect(out.status).toBe('pending');
+  });
+
+  it('pollJob completes with download_url and honours transient/terminal poll errors', async () => {
+    const { ctx: ok } = makeCtx(() =>
+      res({ status: 'ready', download_url: 'https://cdn.tavus/out.mp4', hosted_url: 'https://tavus.io/s/x' }),
+    );
+    const done = await (tavusMediaModule.create(ok as any) as any).pollJob('vid-1', { apiKey: 'tavus-key' });
+    expect(done.status).toBe('completed');
+    expect(done.artifactUrl).toBe('https://cdn.tavus/out.mp4');
+
+    const { ctx: t } = makeCtx(() => res('overloaded', false, 500));
+    await expect(
+      (tavusMediaModule.create(t as any) as any).pollJob('vid-1', { apiKey: 'tavus-key' }),
+    ).rejects.toThrow(/transient/);
+
+    const { ctx: f } = makeCtx(() => res('nope', false, 404));
+    const failed = await (tavusMediaModule.create(f as any) as any).pollJob('vid-1', { apiKey: 'tavus-key' });
+    expect(failed.status).toBe('failed');
+  });
 });

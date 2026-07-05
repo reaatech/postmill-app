@@ -16,7 +16,7 @@ function RequiredMark({ required }: { required?: boolean }) {
 }
 
 const inputClass =
-  'w-full px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm focus:outline-none focus:border-designerAccent';
+  'w-full px-3 py-2 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-sm focus:outline-none focus:border-designerAccent';
 
 // ── Prompt (with inline AI enhancement) ──────────────────────────────────────
 function PromptField({
@@ -74,7 +74,7 @@ function PromptField({
   return (
     <div className="mb-4">
       <div className="flex items-center justify-between mb-1.5">
-        <label className="text-xs text-gray-400">
+        <label className="text-xs text-newTextColor/70">
           {schema.title || name}
           <RequiredMark required={required} />
         </label>
@@ -98,9 +98,9 @@ function PromptField({
         rows={mode === 'negative' ? 2 : 4}
         className={`${inputClass} resize-none`}
       />
-      {note && <p className="text-[10px] text-yellow-400 mt-1">{note}</p>}
+      {note && <p className="text-[10px] text-amber-600 mt-1">{note}</p>}
       {!note && schema.description && (
-        <p className="text-[10px] text-gray-600 mt-1">{schema.description}</p>
+        <p className="text-[10px] text-newTextColor/50 mt-1">{schema.description}</p>
       )}
     </div>
   );
@@ -121,7 +121,7 @@ function AdvancedField({
   onChange: (v: unknown) => void;
 }) {
   const label = (
-    <label className="block text-xs text-gray-400 mb-1">
+    <label className="block text-xs text-newTextColor/70 mb-1">
       {schema.title || name}
       <RequiredMark required={required} />
     </label>
@@ -129,12 +129,20 @@ function AdvancedField({
 
   if (schema.enum) {
     const hasValue = value !== undefined && value !== null && value !== '';
+    // Coerce the string <select> value back to the schema's declared type so a
+    // numeric/boolean enum isn't sent to the provider as a string (→ 422).
+    const coerce = (raw: string): unknown => {
+      if (raw === '') return undefined;
+      if (schema.type === 'integer' || schema.type === 'number') return Number(raw);
+      if (schema.type === 'boolean') return raw === 'true';
+      return raw;
+    };
     return (
       <div className="mb-3">
         {label}
         <select
           value={String(value ?? '')}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(e) => onChange(coerce(e.target.value))}
           className={inputClass}
         >
           {!hasValue && <option value="">Select…</option>}
@@ -155,9 +163,9 @@ function AdvancedField({
           type="checkbox"
           checked={!!value}
           onChange={(e) => onChange(e.target.checked)}
-          className="rounded bg-gray-800 border-gray-600"
+          className="rounded accent-designerAccent"
         />
-        <span className="text-xs text-gray-400">
+        <span className="text-xs text-newTextColor/70">
           {schema.title || name}
           <RequiredMark required={required} />
         </span>
@@ -172,7 +180,7 @@ function AdvancedField({
       <div className="mb-3">
         <div className="flex items-center justify-between mb-1">
           {label}
-          <span className="text-[10px] text-gray-500 tabular-nums">
+          <span className="text-[10px] text-newTextColor/50 tabular-nums">
             {value !== undefined ? String(value) : ''}
           </span>
         </div>
@@ -212,7 +220,7 @@ function AdvancedField({
         className={inputClass}
       />
       {schema.description && (
-        <p className="text-[10px] text-gray-600 mt-1">{schema.description}</p>
+        <p className="text-[10px] text-newTextColor/50 mt-1">{schema.description}</p>
       )}
     </div>
   );
@@ -285,7 +293,7 @@ export function DynamicForm() {
 
   if (primary.length === 0 && advanced.length === 0) {
     return (
-      <div className="text-sm text-gray-500 text-center py-4">
+      <div className="text-sm text-newTextColor/50 text-center py-4">
         No configurable parameters for this model.
       </div>
     );
@@ -298,15 +306,15 @@ export function DynamicForm() {
       ))}
 
       {advanced.length > 0 && (
-        <div className="mt-2 border-t border-newBorder pt-3">
+        <div className="mt-2 border-t border-studioBorder pt-3">
           <button
             type="button"
             onClick={() => setAdvancedOpen((o) => !o)}
-            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-200 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-newTextColor/70 hover:text-textColor transition-colors"
           >
             <span className={`transition-transform ${advancedOpen ? 'rotate-90' : ''}`}>▸</span>
             Advanced settings
-            <span className="text-gray-600">({advanced.length})</span>
+            <span className="text-newTextColor/50">({advanced.length})</span>
           </button>
           {advancedOpen && (
             <div className="mt-3">

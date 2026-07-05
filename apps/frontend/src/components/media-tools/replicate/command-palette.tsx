@@ -130,7 +130,7 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
       onClick={closePalette}
     >
       <div
-        className="w-full max-w-lg rounded-xl border border-newBorder bg-newBgColor shadow-2xl overflow-hidden"
+        className="w-full max-w-lg rounded-xl border border-studioBorder bg-newBgColor shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <input
@@ -153,11 +153,11 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
             }
           }}
           placeholder="Search commands…"
-          className="w-full px-4 py-3 bg-transparent text-white text-sm focus:outline-none border-b border-newBorder"
+          className="w-full px-4 py-3 bg-transparent text-textColor text-sm focus:outline-none border-b border-studioBorder"
         />
         <div className="max-h-80 overflow-y-auto py-1">
           {filtered.length === 0 && (
-            <div className="px-4 py-6 text-center text-xs text-gray-500">No commands</div>
+            <div className="px-4 py-6 text-center text-xs text-newTextColor/50">No commands</div>
           )}
           {filtered.map((a, i) => (
             <button
@@ -165,11 +165,11 @@ export function CommandPalette({ categories }: { categories: CategoryDefinition[
               onMouseEnter={() => setActive(i)}
               onClick={() => choose(a)}
               className={`w-full flex items-center justify-between px-4 py-2 text-left text-sm ${
-                i === active ? 'bg-designerAccent/20 text-white' : 'text-gray-300'
+                i === active ? 'bg-designerAccent/20 text-textColor' : 'text-newTextColor/80'
               }`}
             >
               <span>{a.label}</span>
-              {a.hint && <span className="text-[10px] text-gray-500">{a.hint}</span>}
+              {a.hint && <span className="text-[10px] text-newTextColor/50">{a.hint}</span>}
             </button>
           ))}
         </div>

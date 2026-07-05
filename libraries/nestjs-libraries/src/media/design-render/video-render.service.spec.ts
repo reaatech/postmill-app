@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { VideoRenderService } from './video-render.service';
+import { VideoRenderService, withTimeout } from './video-render.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 
 vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => ({
   ioRedis: {
     set: vi.fn().mockResolvedValue('OK'),
     get: vi.fn(),
+    getdel: vi.fn(),
     del: vi.fn().mockResolvedValue(1),
   },
 }));
@@ -124,7 +125,7 @@ describe('VideoRenderService', () => {
 
   it('processes a pending job and completes it with the rendered artifact', async () => {
     const composition = videoOutput(3000);
-    vi.mocked(ioRedis.get).mockResolvedValueOnce(
+    vi.mocked(ioRedis.getdel).mockResolvedValueOnce(
       JSON.stringify({
         organizationId: orgId,
         composition,
@@ -173,8 +174,9 @@ describe('VideoRenderService', () => {
     encoder.cleanup(tmpDir);
   });
 
-  it('fails the job when no payload is found in Redis', async () => {
-    vi.mocked(ioRedis.get).mockResolvedValueOnce(null);
+  it('fails the job when no payload is found in Redis (genuinely missing, still pending)', async () => {
+    vi.mocked(ioRedis.getdel).mockResolvedValueOnce(null);
+    // getMediaJobById keeps returning a 'pending' job → treated as a genuine missing payload.
 
     await service.processVideoRender('job-1');
 
@@ -185,5 +187,99 @@ describe('VideoRenderService', () => {
         error: expect.stringContaining('No pending composition'),
       }),
     );
+  });
+
+  it('org-scopes getJob — returns null for another org, the job for the owner', async () => {
+    vi.mocked(aiSettings.getMediaJobById).mockResolvedValue({
+      id: 'job-1',
+      organizationId: 'org-OWNER',
+      status: 'completed',
+      artifactUrl: 'https://cdn/x.mp4',
+    } as any);
+
+    await expect(service.getJob('org-ATTACKER', 'job-1')).resolves.toBeNull();
+    await expect(service.getJob('org-OWNER', 'job-1')).resolves.toMatchObject({
+      id: 'job-1',
+    });
+  });
+
+  it('rejects an oversized composition (dims/fps bound-check) on enqueue', async () => {
+    await expect(
+      service.enqueueRender(orgId, {
+        composition: { ...videoOutput(3000), width: 100000, height: 100000 },
+      }),
+    ).rejects.toThrow(/out of range/);
+
+    await expect(
+      service.enqueueRender(orgId, {
+        composition: { ...videoOutput(3000), fps: 100000 },
+      }),
+    ).rejects.toThrow(/fps .* out of range/);
+  });
+
+  it('does not double-render or spuriously fail a job when two runners race the claim', async () => {
+    const composition = videoOutput(3000);
+    // Only the first GETDEL returns the payload; the loser gets null (atomic single-winner).
+    vi.mocked(ioRedis.getdel)
+      .mockResolvedValueOnce(
+        JSON.stringify({ organizationId: orgId, composition, bitrateKbps: 4000 }),
+      )
+      .mockResolvedValueOnce(null);
+
+    // Stateful job: both runners read 'pending' at the top guard; the winner's
+    // updateMediaJob(processing) flips it so the loser's re-read is no longer 'pending'.
+    const state = { status: 'pending' };
+    vi.mocked(aiSettings.getMediaJobById).mockImplementation(
+      async () =>
+        ({
+          id: 'job-1',
+          organizationId: orgId,
+          provider: 'chromium-ffmpeg',
+          status: state.status,
+        }) as any,
+    );
+    vi.mocked(aiSettings.updateMediaJob).mockImplementation(async (_id, data: any) => {
+      if (data?.status) state.status = data.status;
+      return undefined as any;
+    });
+
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'postmill-race-'));
+    const videoPath = path.join(tmpDir, 'output.mp4');
+    fs.writeFileSync(videoPath, Buffer.from('v'));
+    vi.mocked(encoder.encode).mockResolvedValue({
+      videoPath,
+      thumbnailPath: path.join(tmpDir, 'missing.jpg'),
+    });
+
+    await Promise.all([
+      service.processVideoRender('job-1'),
+      service.processVideoRender('job-1'),
+    ]);
+
+    // Exactly one render; the loser never marks the job failed.
+    expect(encoder.encode).toHaveBeenCalledTimes(1);
+    expect(aiSettings.updateMediaJob).not.toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ status: 'failed' }),
+    );
+
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  describe('withTimeout (in-process encoder wall-clock cap)', () => {
+    it('rejects a promise that does not settle within the timeout', async () => {
+      const neverSettles = new Promise<string>(() => {
+        /* an encoder that hangs forever */
+      });
+      await expect(withTimeout(neverSettles, 10, 'encode')).rejects.toThrow(
+        /encode exceeded the 10ms wall-clock timeout/,
+      );
+    });
+
+    it('resolves with the value when the promise settles in time', async () => {
+      await expect(
+        withTimeout(Promise.resolve('done'), 1000, 'encode'),
+      ).resolves.toBe('done');
+    });
   });
 });

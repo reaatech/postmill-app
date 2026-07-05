@@ -23,6 +23,7 @@ const DESIGNER_HANDOFF_KEY = 'designer:timeline-handoff';
  * - Images land on the static canvas; optional metadata (source, attribution,
  *   dimensions) is forwarded to preserve the existing attribution + sizing flow.
  * - Audio and video land on the video timeline (via the timeline handoff path).
+ *   HeyGen avatar renders (`operation: 'avatar'`) are treated as video.
  * - Pass `router.push` as the optional `navigate` callback to stay in-tab;
  *   otherwise the helper opens a new tab.
  * - Non-media operations (`stt`, `text`, etc.) are ignored.
@@ -46,7 +47,7 @@ export function openInDesigner(
     naturalHeight,
   } = args;
 
-  if (!artifactUrl || !['image', 'audio', 'video'].includes(operation)) {
+  if (!artifactUrl || !['image', 'audio', 'video', 'avatar'].includes(operation)) {
     return;
   }
 

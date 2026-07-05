@@ -8,11 +8,18 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
+  validateModelId,
+  readCappedArrayBuffer,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
 
 const BASE = 'https://api.stability.ai';
+
+// Cap a fetched source frame before buffering it into a multipart upload (6.1j).
+const MAX_SOURCE_IMAGE_BYTES = 32 * 1024 * 1024;
 
 interface StabilityImageResponse {
   image?: string;
@@ -77,13 +84,13 @@ export class StabilityAdapter implements MediaProviderAdapter {
       form.append(key, String(value));
     }
 
-    const model = options?.model || 'core';
+    const model = validateModelId(options?.model || 'core');
     const res = await this._fetch(`${BASE}/v2beta/stable-image/generate/${model}`, {
       method: 'POST',
       headers: { Authorization: this._auth(options), Accept: 'application/json' },
       body: form,
     });
-    if (!res.ok) throw new Error(`Stability AI image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Stability AI image generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as StabilityImageResponse;
     if (!data.image) throw new Error('Stability AI returned no image');
     const fmt = String(fields.output_format || 'png');
@@ -104,7 +111,7 @@ export class StabilityAdapter implements MediaProviderAdapter {
     }
     const imageRes = await this._fetch(options.sourceUrl);
     if (!imageRes.ok) throw new Error('Stability AI: could not fetch source image');
-    const imageBuffer = Buffer.from(await imageRes.arrayBuffer());
+    const imageBuffer = await readCappedArrayBuffer(imageRes as any, MAX_SOURCE_IMAGE_BYTES);
 
     const form = new FormData();
     form.append('image', new Blob([new Uint8Array(imageBuffer)]), 'source.png');
@@ -114,7 +121,7 @@ export class StabilityAdapter implements MediaProviderAdapter {
       headers: { Authorization: this._auth(options) },
       body: form,
     });
-    if (!res.ok) throw new Error(`Stability AI video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Stability AI video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as StabilityVideoSubmitResponse;
     if (!data.id) throw new Error('Stability AI returned no job id');
     return { jobId: data.id };
@@ -132,7 +139,7 @@ export class StabilityAdapter implements MediaProviderAdapter {
       headers: { Authorization: this._auth(options), Accept: 'application/json' },
       body: form,
     });
-    if (!res.ok) throw new Error(`Stability AI audio generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Stability AI audio generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as StabilityAudioResponse;
     if (!data.audio) throw new Error('Stability AI returned no audio');
     return {
@@ -147,14 +154,23 @@ export class StabilityAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Stability AI API key is required' };
+
     const res = await this._fetch(`${BASE}/v2beta/image-to-video/result/${jobId}`, {
       headers: { Authorization: this._auth(options), Accept: 'application/json' },
     });
     if (res.status === 202) return { status: 'pending' };
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering job retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Stability AI poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as StabilityVideoResultResponse;
     if (!data.video) {
-      return { status: 'failed', error: data.errors?.join('; ') || 'Stability AI job returned no video' };
+      return { status: 'failed', error: redactError(data.errors?.join('; ') || 'Stability AI job returned no video') };
     }
     return {
       status: 'completed',

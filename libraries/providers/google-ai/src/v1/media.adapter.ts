@@ -9,6 +9,8 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  validateModelId,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -123,7 +125,7 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
 
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
     const key = this._key(options);
-    const model = options?.model || DEFAULT_IMAGE_MODEL;
+    const model = validateModelId(options?.model || DEFAULT_IMAGE_MODEL);
     const input = this._clean((options?.input || {}) as Record<string, MediaInputValue>);
 
     // Imagen uses the predict endpoint; Gemini-native image models (Nano Banana) use
@@ -139,7 +141,7 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
         headers: this._headers(key),
         body: JSON.stringify({ instances: [{ prompt }], parameters }),
       });
-      if (!res.ok) throw new Error(`Google AI Studio image generation failed: ${await res.text()}`);
+      if (!res.ok) throw new Error(`Google AI Studio image generation failed: ${redactError(await res.text())}`);
       const data = (await res.json()) as PredictResponse;
       const images = (data.predictions || [])
         .filter((p) => !!p.bytesBase64Encoded)
@@ -160,7 +162,7 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
       headers: this._headers(key),
       body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig }),
     });
-    if (!res.ok) throw new Error(`Google AI Studio image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Google AI Studio image generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as GenerateContentResponse;
     const parts = data.candidates?.[0]?.content?.parts || [];
     const images = parts
@@ -177,7 +179,7 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
 
   async generateVideo(prompt: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
     const key = this._key(options);
-    const model = options?.model || DEFAULT_VIDEO_MODEL;
+    const model = validateModelId(options?.model || DEFAULT_VIDEO_MODEL);
     const input = this._clean((options?.input || {}) as Record<string, MediaInputValue>);
     const parameters: Record<string, MediaInputValue> = {};
     const aspectRatio = options?.aspectRatio || input.aspectRatio;
@@ -192,7 +194,7 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
       headers: this._headers(key),
       body: JSON.stringify({ instances: [{ prompt }], parameters }),
     });
-    if (!res.ok) throw new Error(`Google AI Studio video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Google AI Studio video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as VeoOperation;
     if (!data.name) throw new Error('Google AI Studio returned no operation name');
     // The operation name is a full resource path (models/{model}/operations/{id}) polled at

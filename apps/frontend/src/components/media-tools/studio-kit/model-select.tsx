@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useMemo, useRef, useState } from 'react';
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react';
 import { useStudioModels } from './hooks';
 
 // Searchable model combobox for hub studios. Populates from the live provider catalog
@@ -25,6 +25,11 @@ export const ModelSelect: FC<{
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // Clear the pending blur-close timer if the combobox unmounts mid-blur.
+  useEffect(() => () => {
+    if (blurTimer.current) clearTimeout(blurTimer.current);
+  }, []);
 
   // Merge live catalog with static fallbacks, de-duplicated by id (live wins).
   const options = useMemo<Option[]>(() => {

@@ -40,6 +40,7 @@ export const genviralDescriptor: StudioDescriptor = {
           name: 'model',
           label: 'Model',
           source: 'models',
+          required: true,
           options: [
             { value: 'openai/sora-2', label: 'OpenAI Sora 2' },
             { value: 'bytedance/seedance-2.0', label: 'ByteDance Seedance 2.0' },

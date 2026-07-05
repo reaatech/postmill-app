@@ -172,7 +172,7 @@ export const TextEditingOverlay: FC<TextEditingProps> = ({
     if (element.richText?.length) {
       return runsToHtml(element.richText, element);
     }
-    return (element.text || '').replace(/\n/g, '<br>');
+    return escapeHtml(element.text || '').replace(/\n/g, '<br>');
   });
   const scale = stageRect.scale || 1;
 
@@ -219,8 +219,10 @@ export const TextEditingOverlay: FC<TextEditingProps> = ({
     }
   };
 
-  const left = (element.x + stageRect.x) * scale + 2;
-  const top = (element.y + stageRect.y) * scale + 2;
+  // Match the canvas HUD: the Stage is offset by the viewport (stageRect.x/y),
+  // which is a screen-space translation applied AFTER scaling the element coords.
+  const left = element.x * scale + stageRect.x + 2;
+  const top = element.y * scale + stageRect.y + 2;
   const width = element.width * scale - 4;
   const minHeight = Math.max(element.height * scale - 4, 20);
 

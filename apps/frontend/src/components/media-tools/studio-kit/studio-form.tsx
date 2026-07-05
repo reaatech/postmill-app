@@ -2,6 +2,7 @@
 
 import React, { FC } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { ModelSelect } from './model-select';
 import type { FileFieldValue, StudioField, StudioFieldValue } from './types';
@@ -33,6 +34,7 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
   onChange,
 }) => {
   const modals = useModals();
+  const toaster = useToaster();
   const display = value?.url || value?.fileId;
 
   const choose = () => {
@@ -43,7 +45,12 @@ const MediaPicker: FC<{ field: StudioField & { type: 'media' }; value?: FileFiel
         <MediaSelectorModal
           open
           onClose={close}
+          kinds={[field.accept]}
           onSelect={(item) => {
+            if (item.type !== field.accept) {
+              toaster.show(`Please choose a ${field.accept} file`, 'warning');
+              return;
+            }
             onChange({ fileId: item.fileId, url: item.url, type: item.type });
             close();
           }}

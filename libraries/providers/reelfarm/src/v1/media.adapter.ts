@@ -9,6 +9,8 @@ import {
   MediaPollResult,
   MediaInputValue,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -104,7 +106,7 @@ export class ReelFarmAdapter implements MediaProviderAdapter {
       headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Reel.Farm slideshow generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Reel.Farm slideshow generation failed: ${redactError(await res.text())}`);
     const id = ((await res.json()) as ReelFarmGenerateResponse).slideshow_id;
     if (id === undefined || id === null) throw new Error('Reel.Farm returned no slideshow id');
     return { jobId: String(id) };
@@ -119,10 +121,18 @@ export class ReelFarmAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Reel.Farm API key is required' };
     const headers = this._headers(options);
 
     const statusRes = await this._fetch(`${BASE}/slideshows/${jobId}/status`, { headers });
-    if (!statusRes.ok) return { status: 'failed', error: await statusRes.text() };
+    if (!statusRes.ok) {
+      const body = await statusRes.text();
+      // 3.4 — a 429/5xx status poll is transient: THROW so the still-rendering slideshow retries.
+      if (isTransientStatus(statusRes.status)) {
+        throw new Error(`Reel.Farm status poll transient error ${statusRes.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const status = (await statusRes.json()) as ReelFarmStatusResponse;
 
     if (status.status === 'failed') {
@@ -132,7 +142,14 @@ export class ReelFarmAdapter implements MediaProviderAdapter {
     if (!status.video_id) return { status: 'pending' };
 
     const videoRes = await this._fetch(`${BASE}/videos/${status.video_id}`, { headers });
-    if (!videoRes.ok) return { status: 'pending' };
+    // The render already succeeded; a transient error must retry, not fail. A non-transient
+    // error stays pending (the export may still be finalizing).
+    if (!videoRes.ok) {
+      if (isTransientStatus(videoRes.status)) {
+        throw new Error(`Reel.Farm video fetch transient error ${videoRes.status}`);
+      }
+      return { status: 'pending' };
+    }
     const video = (await videoRes.json()) as ReelFarmVideoResponse;
 
     if (video.failed) return { status: 'failed', error: 'Reel.Farm video render failed' };

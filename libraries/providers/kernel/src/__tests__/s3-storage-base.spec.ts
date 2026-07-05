@@ -86,6 +86,28 @@ describe('S3StorageBase', () => {
     });
   });
 
+  describe('writeBuffer (§6.2 stored-artifact allowlist)', () => {
+    it('rejects a disallowed content-type (text/html) so a provider cannot land executable HTML', async () => {
+      const adapter = make();
+      await expect(
+        adapter.writeBuffer(Buffer.from('<html><script>alert(1)</script></html>'), 'text/html'),
+      ).rejects.toThrow('Unsupported stored artifact type');
+      expect(s3ClientMock.send).not.toHaveBeenCalled();
+    });
+
+    it('allows a text/plain transcript sidecar and stores it with a .txt key', async () => {
+      s3ClientMock.send.mockResolvedValue({});
+      const adapter = make('us-east-1', 'my-bucket', undefined, 'https://cdn.example.com');
+
+      const url = await adapter.writeBuffer(Buffer.from('hello world transcript'), 'text/plain');
+
+      const cmd = s3ClientMock.send.mock.calls[0][0];
+      expect(cmd.config.ContentType).toBe('text/plain');
+      expect(cmd.config.Key).toMatch(/\.txt$/);
+      expect(url).toContain('https://cdn.example.com/');
+    });
+  });
+
   describe('testConnection', () => {
     it('returns success on HeadBucket success', async () => {
       s3ClientMock.send.mockResolvedValue({});

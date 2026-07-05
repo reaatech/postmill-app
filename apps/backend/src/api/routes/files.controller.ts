@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   HttpException,
+  Logger,
   Param,
   Post,
   Put,
@@ -23,6 +24,8 @@ import { CustomFileValidationPipe } from '@gitroom/nestjs-libraries/upload/custo
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import { ContentPackDailyCapError } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
+import type { ContentPackCapability } from '@gitroom/nestjs-libraries/media/stock/content-packs/content-pack.interface';
+import { ImportFromUrlDto } from '@gitroom/nestjs-libraries/dtos/file/import.from.url.dto';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
@@ -43,9 +46,29 @@ import * as path from 'path';
 const TMP_UPLOAD_DIR = path.join(tmpdir(), 'postmill-uploads');
 try { mkdirSync(TMP_UPLOAD_DIR, { recursive: true }); } catch {}
 
+// 0.4: the frontend sends a SINGULAR media kind (`photo`/`video`/…), but content
+// pack capabilities are PLURAL (`photos`/`videos`/…). Map + validate so the
+// mint-then-ingest path actually resolves a pack capability instead of 500-ing.
+const CONTENT_PACK_CAPABILITY_MAP: Record<string, ContentPackCapability> = {
+  photo: 'photos',
+  photos: 'photos',
+  image: 'photos',
+  vector: 'vectors',
+  vectors: 'vectors',
+  video: 'videos',
+  videos: 'videos',
+  sticker: 'stickers',
+  stickers: 'stickers',
+  icon: 'icons',
+  icons: 'icons',
+  audio: 'audio',
+};
+
 @ApiTags('Files')
 @Controller('/files')
 export class FilesController {
+  private readonly _logger = new Logger(FilesController.name);
+
   constructor(
     private _fileService: FileService,
     private _storageService: StorageService,
@@ -150,6 +173,10 @@ export class FilesController {
   async saveMedia(
     @GetOrgFromRequest() org: Organization,
     @Body('name') name: string,
+    // NOTE (6.3): `path` is a client-supplied storage path persisted without an
+    // ownership check. Low impact today — object names are `randomBytes` and
+    // served publicly — but the correct fix is to derive it from a server-issued
+    // upload token. Tracked follow-up; do not widen this to accept arbitrary URLs.
     @Body('path') path: string,
     @Body('originalName') originalName: string,
     @Body('folderId') folderId?: string
@@ -282,11 +309,16 @@ export class FilesController {
   @Post('/bulk/move')
   @CheckPolicies([AuthorizationActions.Update, Sections.MEDIA])
   @RequirePermission('media', 'update')
-  bulkMove(
+  async bulkMove(
     @GetOrgFromRequest() org: Organization,
     @Body() body: BulkMoveMediaDto
   ) {
-    return this._fileService.bulkMove(org.id, body.ids, body.folderId || null);
+    // 1.2: the repository's bulkMove updateMany is NOT org-scoped, so restrict
+    // the id set to files the caller's org actually owns before moving. Foreign
+    // ids drop out here → they affect 0 rows.
+    const owned = await this._fileService.getByIds(org.id, body.ids);
+    const ownedIds = owned.map((f) => f.id);
+    return this._fileService.bulkMove(org.id, ownedIds, body.folderId || null);
   }
 
   @Get('/search')
@@ -314,10 +346,13 @@ export class FilesController {
   @Get('/folder/:folderId/contents')
   @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
   @RequirePermission('media', 'read')
-  getFolderContents(
+  async getFolderContents(
     @GetOrgFromRequest() org: Organization,
     @Param('folderId') folderId: string
   ) {
+    // 1.1: this was the lone folder route missing an ownership check — validate
+    // the folder belongs to the caller's org before disclosing its contents.
+    await this._fileService.getFolder(org.id, folderId);
     return this._fileService.getFolderContents(folderId);
   }
 
@@ -326,6 +361,9 @@ export class FilesController {
   @RequirePermission('media', 'create')
   bulkSaveFiles(
     @GetOrgFromRequest() org: Organization,
+    // NOTE (6.3): like save-media, each item's `path` is a client-supplied
+    // storage path persisted without an ownership check (low impact — random
+    // object names, public serving). Tracked: derive from a server-issued token.
     @Body() body: { items: Array<{ name: string; path: string; originalName?: string }> }
   ) {
     return this._fileService.bulkSave(org.id, body.items);
@@ -362,25 +400,39 @@ export class FilesController {
   @RequirePermission('media', 'create')
   async importFromUrl(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { url: string; name: string; folderId?: string; source?: string; downloadLocation?: string; attribution?: Record<string, unknown>; type?: string }
+    @Body() body: ImportFromUrlDto
   ) {
     const contentPackIdentifiers = this._resolution
       .listManifests('contentpack')
       .map((m) => m.providerId);
     if (body.source && contentPackIdentifiers.includes(body.source) && body.downloadLocation) {
+      // 0.4: map the singular client `type` → the plural pack capability and
+      // validate before resolving. An unknown type is a client error (400), not
+      // a silent default that mints the wrong capability.
+      const capability = CONTENT_PACK_CAPABILITY_MAP[(body.type || 'photos').toLowerCase()];
+      if (!capability) {
+        throw new HttpException(`Unsupported content pack type: ${body.type}`, 400);
+      }
+
+      let licensedUrl: string;
       try {
-        const licensedUrl = await this._stockMediaService.resolveContentPackDownload(
+        licensedUrl = await this._stockMediaService.resolveContentPackDownload(
           org.id,
           body.downloadLocation,
-          (body.type as any) || 'photos'
+          capability
         );
-        return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
       } catch (err) {
         if (err instanceof ContentPackDailyCapError) {
           throw new HttpException(err.message, 402);
         }
-        throw new HttpException((err as Error).message, 500);
+        // 6.3: never leak the raw upstream provider body to the client — log the
+        // detail server-side, return a generic message.
+        this._logger.warn(
+          `Content pack mint failed for "${body.source}": ${(err as Error).message}`
+        );
+        throw new HttpException('Could not retrieve the licensed asset', 502);
       }
+      return this._fileService.importFromUrl(org.id, { ...body, url: licensedUrl });
     }
 
     const result = await this._fileService.importFromUrl(org.id, body);

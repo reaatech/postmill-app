@@ -374,6 +374,9 @@ export interface SliderProps {
   max: number;
   step?: number;
   onChange: (n: number) => void;
+  // Fired once when the drag/keyboard interaction ends — used to commit a single
+  // history entry for a continuous control instead of one per tick.
+  onCommit?: () => void;
   label?: string;
   suffix?: string;
 }
@@ -384,6 +387,7 @@ export const Slider: React.FC<SliderProps> = ({
   max,
   step = 1,
   onChange,
+  onCommit,
   label,
   suffix,
 }) => {
@@ -409,6 +413,9 @@ export const Slider: React.FC<SliderProps> = ({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
+        onPointerUp={onCommit}
+        onKeyUp={onCommit}
+        onBlur={onCommit}
         className="designer-slider w-full h-[4px] appearance-none rounded-full cursor-pointer focus:outline-none"
         style={{
           background: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT} ${pct}%, var(--new-border) ${pct}%, var(--new-border) 100%)`,
