@@ -43,6 +43,21 @@ vi.mock('@gitroom/nestjs-libraries/inngest/inngest.client', () => ({
   isInngestEnabled: vi.fn().mockReturnValue(true),
 }));
 
+const { parseStringMock, parseURLMock, safeFetchMock } = vi.hoisted(() => ({
+  parseStringMock: vi.fn(),
+  parseURLMock: vi.fn(),
+  safeFetchMock: vi.fn(),
+}));
+vi.mock('rss-parser', () => ({
+  default: class {
+    parseString = parseStringMock;
+    parseURL = parseURLMock;
+  },
+}));
+vi.mock('@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch', () => ({
+  safeFetch: (...args: any[]) => safeFetchMock(...args),
+}));
+
 import { AutopostService } from './autopost.service';
 import {
   inngest,
@@ -71,14 +86,32 @@ describe('AutopostService.processCron Inngest dispatch', () => {
     );
   });
 
-  it('sends autopost/process when active and Inngest is enabled', async () => {
+  it('sends autopost/process when active and Inngest is enabled with a per-activation unique id', async () => {
     await service.processCron(true, 'org-1', 'ap-1');
 
-    expect(inngest.send).toHaveBeenCalledWith({
-      name: 'autopost/process',
-      data: { id: 'ap-1' },
-      id: 'autopost-ap-1',
-    });
+    expect(inngest.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'autopost/process',
+        data: { id: 'ap-1' },
+        // 0.9: id is unique per activation (timestamp-suffixed), no longer the
+        // constant `autopost-ap-1` that would be deduped across re-activations.
+        id: expect.stringMatching(/^autopost-ap-1-\d+$/),
+      })
+    );
+  });
+
+  it('varies the activation id across successive activations (0.9)', async () => {
+    const nowSpy = vi.spyOn(Date, 'now');
+    nowSpy.mockReturnValueOnce(1000).mockReturnValueOnce(2000);
+
+    await service.processCron(true, 'org-1', 'ap-1');
+    await service.processCron(true, 'org-1', 'ap-1');
+
+    const first = vi.mocked(inngest.send).mock.calls[0][0] as any;
+    const second = vi.mocked(inngest.send).mock.calls[1][0] as any;
+    expect(first.id).not.toBe(second.id);
+
+    nowSpy.mockRestore();
   });
 
   it('sends autopost/cancel when inactive and Inngest is enabled', async () => {
@@ -105,5 +138,52 @@ describe('AutopostService.processCron Inngest dispatch', () => {
 
     expect(inngest.send).not.toHaveBeenCalled();
     expect(result).toBe(false);
+  });
+});
+
+describe('AutopostService.loadXML SSRF-safe RSS fetch (0.6)', () => {
+  let service: AutopostService;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = new AutopostService(
+      new AutopostRepository(),
+      new IntegrationService(),
+      new PostsService(),
+      new AIModelProvider(),
+      new AiMediaService()
+    );
+  });
+
+  it('fetches the feed through safeFetch and parses via parseString, not parseURL', async () => {
+    safeFetchMock.mockResolvedValue({
+      text: vi.fn().mockResolvedValue('<rss>xml</rss>'),
+    });
+    parseStringMock.mockResolvedValue({
+      items: [
+        {
+          pubDate: '2026-01-02T00:00:00Z',
+          link: 'https://example.com/post',
+          description: 'hello',
+        },
+      ],
+    });
+
+    const result = await service.loadXML('https://example.com/feed.xml');
+
+    expect(safeFetchMock).toHaveBeenCalledWith('https://example.com/feed.xml');
+    expect(parseStringMock).toHaveBeenCalledWith('<rss>xml</rss>');
+    expect(parseURLMock).not.toHaveBeenCalled();
+    expect(result.success).toBe(true);
+    expect(result.url).toBe('https://example.com/post');
+  });
+
+  it('returns { success: false } when safeFetch rejects (e.g. private-IP rebinding)', async () => {
+    safeFetchMock.mockRejectedValue(new Error('blocked: private address'));
+
+    const result = await service.loadXML('http://169.254.169.254/feed');
+
+    expect(parseStringMock).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: false });
   });
 });

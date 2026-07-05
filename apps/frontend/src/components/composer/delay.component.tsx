@@ -114,7 +114,8 @@ export const DelayComponent: FC<{
             <div className="flex gap-[4px]">
               <input
                 type="number"
-                min="1"
+                min={0}
+                max={1440}
                 value={customValue}
                 onChange={(e) => setCustomValue(e.target.value)}
                 onClick={(e) => e.stopPropagation()}

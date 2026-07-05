@@ -16,6 +16,7 @@ export * from './medium.settings.dto';
 export * from './mewe.dto';
 export * from './moltbook.dto';
 export * from './pinterest.dto';
+export * from './poll.dto';
 export * from './reddit.dto';
 export * from './skool.dto';
 export * from './slack.dto';

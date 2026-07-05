@@ -198,10 +198,15 @@ describe('agent tool characterization', () => {
     const guardrailService = {
       checkOutput: vi.fn().mockImplementation((content: string) => Promise.resolve(content)),
     };
+    const subscriptionService = {
+      getSubscriptionByOrganizationId: vi.fn().mockResolvedValue(null),
+      getSubscription: vi.fn().mockResolvedValue(null),
+    };
     const tool = new IntegrationSchedulePostTool(
       postsService as any,
       integrationService as any,
-      guardrailService as any
+      guardrailService as any,
+      subscriptionService as any
     );
 
     const result = await executeTool(tool, {

@@ -36,8 +36,43 @@ export class PublicAuthMiddleware implements NestMiddleware {
           return;
         }
 
+        // 1.1: enforce the consented OAuth scopes instead of granting blanket
+        // SUPERADMIN. Reject writes (any mutating HTTP verb) when the token was
+        // not granted the write scope.
+        const scopes = (authorization.scope || '')
+          .split(/[\s,]+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const isWrite = !['GET', 'HEAD', 'OPTIONS'].includes(
+          (req.method || 'GET').toUpperCase()
+        );
+        if (isWrite && !scopes.includes('mcp:posts:write')) {
+          res.status(HttpStatus.FORBIDDEN).json({
+            msg: 'Insufficient OAuth scope: mcp:posts:write required',
+          });
+          return;
+        }
+
+        // Map the pos_ token to the granting user's ACTUAL org role (mirror the
+        // API-key branch) — never hard-code SUPERADMIN.
+        const oauthUserOrg = authorization.user?.organizations?.find(
+          (o) => o.organizationId === authorization.organizationId
+        );
+        const oauthRoleKey = oauthUserOrg?.roleRef?.key ?? 'member';
+
         // @ts-ignore
-        req.org = { ...org, users: [{ users: { role: 'SUPERADMIN' } }] };
+        req.oauthScopes = scopes;
+        // @ts-ignore
+        req.org = {
+          ...org,
+          users: [
+            {
+              roleId: oauthUserOrg?.roleId ?? undefined,
+              roleRef: oauthUserOrg?.roleRef ?? undefined,
+              users: { role: oauthRoleKey },
+            },
+          ],
+        };
       } else {
         const hash = crypto.createHash('sha256').update(auth).digest('hex');
         const apiKey = await this._apiKeysService.findActiveByHash(hash);

@@ -1,4 +1,5 @@
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -8,6 +9,8 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Max,
+  Min,
   Validate,
   ValidateIf,
   ValidateNested,
@@ -44,10 +47,13 @@ export class PostContent {
   id: string;
 
   @ApiPropertyOptional({
-    description: 'Delay in seconds before this block (thread spacing).',
+    description:
+      'Delay in minutes before this block (thread spacing). 0–1440 (max 24h).',
   })
   @IsOptional()
   @IsNumber()
+  @Min(0)
+  @Max(1440)
   delay: number;
 
   @ApiProperty({
@@ -165,6 +171,7 @@ export class CreatePostDto {
   @ApiProperty({ type: () => [Tags], description: 'Tags to attach.' })
   @IsArray()
   @IsDefined()
+  @Type(() => Tags)
   @ValidateNested({ each: true })
   tags: Tags[];
 
@@ -177,5 +184,6 @@ export class CreatePostDto {
   @IsArray()
   @ValidateNested({ each: true })
   @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   posts: Post[];
 }

@@ -114,12 +114,19 @@ export const Menu: FC<{
     ) {
       return;
     }
-    await fetch('/integrations/disable', {
+    const res = await fetch('/integrations/disable', {
       method: 'POST',
       body: JSON.stringify({
         id,
       }),
     });
+    if (!res.ok) {
+      toast.show(
+        t('channel_disable_failed', 'Failed to disable channel'),
+        'warning'
+      );
+      return;
+    }
     toast.show(t('channel_disabled', 'Channel Disabled'), 'success');
     setShow(false);
     onChange(false);
@@ -146,6 +153,13 @@ export const Menu: FC<{
       );
       return;
     }
+    if (!deleteIntegration.ok) {
+      toast.show(
+        t('channel_delete_failed', 'Failed to delete channel'),
+        'warning'
+      );
+      return;
+    }
     // Clean up extension refresh token if applicable
     if (
       extensionId &&
@@ -168,12 +182,19 @@ export const Menu: FC<{
   }, [t, extensionId, id, fetch, onChange, toast]);
 
   const enableChannel = useCallback(async () => {
-    await fetch('/integrations/enable', {
+    const res = await fetch('/integrations/enable', {
       method: 'POST',
       body: JSON.stringify({
         id,
       }),
     });
+    if (!res.ok) {
+      toast.show(
+        t('channel_enable_failed', 'Failed to enable channel'),
+        'warning'
+      );
+      return;
+    }
     toast.show(t('channel_enabled', 'Channel Enabled'), 'success');
     setShow(false);
     onChange(false);

@@ -730,6 +730,7 @@ model AutoPost {
   organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([deletedAt])
+  @@index([organizationId])
 }
 
 model Sets {
@@ -758,6 +759,7 @@ model Errors {
 
   @@index([organizationId])
   @@index([createdAt])
+  @@index([postId])
 }
 
 model Mentions {
@@ -1577,6 +1579,7 @@ enum State {
   PUBLISHED
   ERROR
   DRAFT
+  PUBLISHING
 }
 
 enum SubscriptionTier {

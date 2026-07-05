@@ -278,4 +278,27 @@ export const CalendarItem: FC<{
       </div>
     </div>
   );
-});
+}, arePropsEqual);
+
+// The grid passes a fresh curried lambda for every action handler on each render
+// (e.g. `editPost(post, false)`), plus a fresh `getDate` dayjs — which defeats the
+// default shallow `memo` and re-renders (and re-registers `useDrag` on) every card
+// whenever any calendar context value changes (a few hundred cards per keystroke in
+// the filter search). Those handlers are semantically stable for a given post, so we
+// compare the meaningful inputs (post identity + the primitive/value props) and skip
+// re-render otherwise. `post` keeps object identity across filter re-renders; a data
+// refresh mints new post objects, so a genuine change still re-renders.
+function arePropsEqual(
+  prev: React.ComponentProps<typeof CalendarItem>,
+  next: React.ComponentProps<typeof CalendarItem>
+) {
+  return (
+    prev.post === next.post &&
+    prev.state === next.state &&
+    prev.display === next.display &&
+    prev.isBeforeNow === next.isBeforeNow &&
+    prev.showTime === next.showTime &&
+    prev.integrations === next.integrations &&
+    prev.date.valueOf() === next.date.valueOf()
+  );
+}

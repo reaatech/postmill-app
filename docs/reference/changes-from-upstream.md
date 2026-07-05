@@ -34,6 +34,16 @@ every page, the generator recording `$0` spend, the generator wizard hanging on 
 discarded guardrail redaction, a wedged `MastraService` build promise, and made the media-generate /
 comment-reply approve paths idempotent (`X-Idempotency-Key`).
 
+**Posts surface remediation — public API paging bound (additive, non-breaking).** The legacy public
+`GET /public/v1/posts` route previously returned **every** post in the requested publish-date window
+as an unbounded array. It is now capped at a hard maximum of **100** posts per response (also the
+default page size) to remove a DoS/query-cost footgun. This is additive and back-compatible: the
+response shape is unchanged (`{ posts, cursor }`) — when no paging param is sent the caller still
+receives `{ posts }`, just capped at 100 rather than the whole window, and an additive optional
+`cursor` query param (an integer offset) plus a `cursor` field in the response let n8n/Zapier readers
+page through the remainder (`cursor` is `null` on the last page). Callers that relied on receiving
+more than 100 rows in a single call must now follow the `cursor`. No field was removed or renamed.
+
 **Analytics upgrade — anomaly alerts, Insights tab, campaign scope.** The `/analytics` dashboard is
 reshaped: Best time + Recommendations + a new **Alerts** section merge into a single **Insights** tab
 (the kebab overflow is gone; tabs are now Overview | Channels | Posts | Insights | Links | Watchlist).

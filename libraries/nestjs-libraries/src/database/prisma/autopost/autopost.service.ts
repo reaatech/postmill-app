@@ -104,7 +104,9 @@ export class AutopostService {
         return await inngest.send({
           name: 'autopost/process',
           data: { id },
-          id: `autopost-${id}`,
+          // Unique per activation so re-activating within Inngest's ~24h dedup
+          // window isn't silently deduplicated (0.9).
+          id: `autopost-${id}-${Date.now()}`,
         });
       } catch (err) {
         Logger.warn(`Failed to send autopost/process event: ${(err as Error)?.message}`);
@@ -136,7 +138,8 @@ export class AutopostService {
 
   async loadXML(url: string) {
     try {
-      const { items } = await parser.parseURL(url);
+      const res = await safeFetch(url);
+      const { items } = await parser.parseString(await res.text());
       const findLast = items.reduce(
         (all: any, current: any) => {
           if (dayjs(current.pubDate).isAfter(all.pubDate)) {

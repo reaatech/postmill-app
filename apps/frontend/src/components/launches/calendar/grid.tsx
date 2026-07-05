@@ -12,6 +12,7 @@ import { useInterval } from '@mantine/hooks';
 import { newDayjs } from '@gitroom/frontend/components/layout/set.timezone';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useAddProvider } from '@gitroom/frontend/components/launches/add.provider.component';
@@ -82,6 +83,7 @@ export const CalendarColumn: FC<{
     loading,
   } = useCalendar();
   const modal = useModals();
+  const toaster = useToaster();
   const fetch = useFetch();
 
   const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor, postAnalyticsDrawer } = usePostActions();
@@ -198,28 +200,63 @@ export const CalendarColumn: FC<{
         action = whatToDo;
       }
 
-      if (!item.interval) {
-        changeDate(item.id, getDate);
+      // Whole-day cells (month view) render `getDate` at 23:59:59 — preserve the
+      // dragged post's original time-of-day instead of snapping to end-of-day.
+      let targetDate = getDate;
+      if (display === 'month' && post) {
+        const orig = newDayjs(post.publishDate);
+        targetDate = getDate
+          .startOf('day')
+          .hour(orig.hour())
+          .minute(orig.minute());
       }
-      const { status } = await fetch(`/posts/${item.id}/date`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          date: getDate.utc().format('YYYY-MM-DDTHH:mm:ss'),
-          action,
-        }),
-      });
-      if (status !== 500) {
-        if (item.interval || action === 'schedule') {
+
+      if (!item.interval) {
+        changeDate(item.id, targetDate);
+      }
+      try {
+        const res = await fetch(`/posts/${item.id}/date`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            date: targetDate.utc().format('YYYY-MM-DDTHH:mm:ss'),
+            action,
+          }),
+        });
+        if (!res.ok) {
+          // Any non-2xx (500, 403/402/409/CSRF, …) is a failure: revert the
+          // optimistic move and surface the server message.
+          let message = t('failed_to_reschedule', 'Failed to reschedule the post');
+          try {
+            const body = await res.json();
+            if (body?.message) {
+              message = Array.isArray(body.message)
+                ? body.message.join(', ')
+                : body.message;
+            }
+          } catch {
+            // non-JSON error body — keep the generic message
+          }
+          toaster.show(message, 'warning');
           reloadCalendarView();
           return;
         }
-        return;
+        if (item.interval || action === 'schedule') {
+          reloadCalendarView();
+        }
+      } catch {
+        // Network error — useFetch does not throw for HTTP status, so this is a
+        // genuine connection failure. Revert the optimistic move.
+        toaster.show(
+          t('network_error_try_again', 'Network error, please try again'),
+          'warning'
+        );
+        reloadCalendarView();
       }
     },
     collect: (monitor) => ({
       canDrop: isBeforeNow ? false : !!monitor.canDrop() && !!monitor.isOver(),
     }),
-  }), [posts, isBeforeNow, changeDate, getDate, fetch, modal, t, reloadCalendarView]);
+  }), [posts, isBeforeNow, changeDate, getDate, display, fetch, modal, toaster, t, reloadCalendarView]);
 
   const router = useRouter();
   const addModal = useCallback(async () => {
@@ -263,12 +300,16 @@ export const CalendarColumn: FC<{
     params.set('date', date.format('YYYY-MM-DDTHH:mm:ss'));
 
     if (set?.content) {
-      const parsedSet = JSON.parse(set.content);
-      if (parsedSet?.posts?.[0]?.value?.[0]?.content) {
-        params.set(
-          'content',
-          encodeURIComponent(parsedSet.posts[0].value[0].content)
-        );
+      try {
+        const parsedSet = JSON.parse(set.content);
+        if (parsedSet?.posts?.[0]?.value?.[0]?.content) {
+          params.set(
+            'content',
+            encodeURIComponent(parsedSet.posts[0].value[0].content)
+          );
+        }
+      } catch {
+        // Malformed Set.content — fall back to opening the composer with no prefill.
       }
     }
 

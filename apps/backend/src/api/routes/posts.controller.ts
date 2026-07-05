@@ -31,8 +31,12 @@ import { Request, Response } from 'express';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
+import { CreateCommentDto } from '@gitroom/nestjs-libraries/dtos/posts/create.comment.dto';
+import { SeparatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/separate.posts.dto';
+import { ShouldShortlinkDto } from '@gitroom/nestjs-libraries/dtos/posts/should.shortlink.dto';
 import { SetPostColorDto } from '@gitroom/nestjs-libraries/dtos/posts/set.post.color.dto';
 import { ShortlinkActiveDto } from '@gitroom/nestjs-libraries/dtos/posts/shortlink-active.dto';
+import { Throttle } from '@nestjs/throttler';
 import {
   AuthorizationActions,
   Sections,
@@ -76,9 +80,11 @@ export class PostsController {
   }
 
   @Post('/should-shortlink')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async shouldShortlink(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { messages: string[] }
+    @Body() body: ShouldShortlinkDto
   ) {
     return this._shortLinkService.shouldShortlink(org.id, body.messages);
   }
@@ -111,12 +117,15 @@ export class PostsController {
   }
 
   @Post('/:id/comments')
+  @RequirePermission('comments', 'create')
   async createComment(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: { comment: string }
+    @Body() body: CreateCommentDto
   ) {
+    // Org scoping is passed to the service; post-ownership (404-on-null for a
+    // post outside this org) is enforced on the service/repository path.
     return this._postsService.createComment(org.id, user.id, id, body.comment);
   }
 
@@ -126,6 +135,7 @@ export class PostsController {
   }
 
   @Post('/tags')
+  @RequirePermission('posts', 'update')
   async createTag(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateTagDto
@@ -134,6 +144,7 @@ export class PostsController {
   }
 
   @Put('/tags/:id')
+  @RequirePermission('posts', 'update')
   async editTag(
     @GetOrgFromRequest() org: Organization,
     @Body() body: CreateTagDto,
@@ -143,6 +154,7 @@ export class PostsController {
   }
 
   @Delete('/tags/:id')
+  @RequirePermission('posts', 'update')
   async deleteTag(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string
@@ -232,6 +244,7 @@ export class PostsController {
   }
 
   @Post('/')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async createPost(
     @GetOrgFromRequest() org: Organization,
@@ -241,6 +254,7 @@ export class PostsController {
   }
 
   @Post('/generator/draft')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   generatePostsDraft(
     @GetOrgFromRequest() org: Organization,
@@ -250,6 +264,7 @@ export class PostsController {
   }
 
   @Post('/generator')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async generatePosts(
     @GetOrgFromRequest() org: Organization,
@@ -299,6 +314,7 @@ export class PostsController {
   }
 
   @Delete('/:group')
+  @RequirePermission('posts', 'delete')
   deletePost(
     @GetOrgFromRequest() org: Organization,
     @Param('group') group: string
@@ -317,6 +333,8 @@ export class PostsController {
   }
 
   @Put('/:id/date')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   changeDate(
     @GetOrgFromRequest() org: Organization,
     @Param('id') id: string,
@@ -336,6 +354,7 @@ export class PostsController {
   }
 
   @Post('/bulk')
+  @RequirePermission('posts', 'create')
   @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
   async bulkCreate(
     @GetOrgFromRequest() org: Organization,
@@ -345,9 +364,11 @@ export class PostsController {
   }
 
   @Post('/separate-posts')
+  @CheckPolicies([AuthorizationActions.Create, Sections.AI])
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
   async separatePosts(
     @GetOrgFromRequest() org: Organization,
-    @Body() body: { content: string; len: number }
+    @Body() body: SeparatePostsDto
   ) {
     return this._postsService.separatePosts(body.content, body.len);
   }

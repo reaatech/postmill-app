@@ -226,7 +226,7 @@ export const usePostActions = (onMutate?: () => void) => {
   const modal = useModals();
   const toaster = useToaster();
   const router = useRouter();
-  const { integrations, reloadCalendarView } = useCalendar();
+  const { integrations, posts, reloadCalendarView } = useCalendar();
   const [statsPostId, setStatsPostId] = useState<string | null>(null);
 
   const mutate = useCallback(() => {
@@ -313,20 +313,39 @@ export const usePostActions = (onMutate?: () => void) => {
 
   const deletePost = useCallback(
     (post: any) => async () => {
-      if (
-        !(await deleteDialog(
-          t(
-            'are_you_sure_you_want_to_delete_post',
-            'Are you sure you want to delete post?'
-          )
-        ))
-      ) {
+      // Deleting one card removes the whole group (`/posts/:group`) — every
+      // channel it publishes to. Disclose that scope when the group spans more
+      // than one integration.
+      const distinctIntegrations = new Set(
+        (posts || [])
+          .filter((p: any) => p.group === post.group)
+          .map((p: any) => p.integration?.id)
+      );
+      const confirmMessage =
+        distinctIntegrations.size > 1
+          ? t(
+              'delete_post_group_scope',
+              'This post is scheduled to multiple channels — deleting it removes it from all of them. Are you sure?'
+            )
+          : t(
+              'are_you_sure_you_want_to_delete_post',
+              'Are you sure you want to delete post?'
+            );
+      if (!(await deleteDialog(confirmMessage))) {
         return;
       }
 
-      await fetch(`/posts/${post.group}`, {
+      const res = await fetch(`/posts/${post.group}`, {
         method: 'DELETE',
       });
+
+      if (!res.ok) {
+        toaster.show(
+          t('post_delete_failed', 'Failed to delete post'),
+          'warning'
+        );
+        return;
+      }
 
       toaster.show(
         t('post_deleted_successfully', 'Post deleted successfully'),
@@ -335,7 +354,7 @@ export const usePostActions = (onMutate?: () => void) => {
 
       mutate();
     },
-    [toaster, t, fetch, mutate]
+    [toaster, t, fetch, mutate, posts]
   );
 
   const openStatistics = useCallback(
@@ -395,10 +414,19 @@ export const usePostActions = (onMutate?: () => void) => {
           <ChangeColorModalBody
             initial={post.color ?? null}
             onApply={async (color) => {
-              await fetch(`/posts/group/${post.group}/color`, {
+              const res = await fetch(`/posts/group/${post.group}/color`, {
                 method: 'PUT',
                 body: JSON.stringify({ color }),
               });
+
+              if (!res.ok) {
+                toaster.show(
+                  t('color_update_failed', 'Failed to update color'),
+                  'warning'
+                );
+                return;
+              }
+
               modal.closeAll();
               toaster.show(t('color_updated', 'Color updated'), 'success');
               mutate();

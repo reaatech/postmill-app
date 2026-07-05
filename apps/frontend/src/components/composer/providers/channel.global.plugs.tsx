@@ -155,7 +155,7 @@ const PlugPop: FC<{
     mode: 'all',
   });
   const submit: SubmitHandler<any> = useCallback(async (data) => {
-    await fetch(`/integrations/${settings.providerId}/plugs`, {
+    const res = await fetch(`/integrations/${settings.providerId}/plugs`, {
       method: 'POST',
       body: JSON.stringify({
         func: plug.methodName,
@@ -165,6 +165,11 @@ const PlugPop: FC<{
         })),
       }),
     });
+    // Shared fetch doesn't throw on 4xx/5xx — only report success when it saved.
+    if (!res.ok) {
+      toaster.show('Failed to update plug', 'warning');
+      return;
+    }
     toaster.show('Plug updated', 'success');
     closeAll();
   }, []);
@@ -207,6 +212,7 @@ const PlugItem: FC<{
 }> = (props) => {
   const { plug, addPlug, data } = props;
   const t = useT();
+  const toaster = useToaster();
   const [activated, setActivated] = useState(!!data?.activated);
   useEffect(() => {
     setActivated(!!data?.activated);
@@ -214,7 +220,7 @@ const PlugItem: FC<{
   const fetch = useFetch();
   const changeActivated = useCallback(
     async (status: 'on' | 'off') => {
-      await fetch(`/integrations/plugs/${data?.id}/activate`, {
+      const res = await fetch(`/integrations/plugs/${data?.id}/activate`, {
         body: JSON.stringify({
           status: status === 'on',
         }),
@@ -223,6 +229,11 @@ const PlugItem: FC<{
           'Content-Type': 'application/json',
         },
       });
+      // Only flip the optimistic toggle when the server actually persisted it.
+      if (!res.ok) {
+        toaster.show('Failed to update automation', 'warning');
+        return;
+      }
       setActivated(status === 'on');
     },
     [activated]

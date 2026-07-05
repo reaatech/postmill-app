@@ -41,6 +41,18 @@ export class PostsRescheduleTool implements AgentToolInterface {
         const toolContext = context as any;
         requireWrite(toolContext);
         const org = parseOrg(toolContext);
+
+        // 4.2a — load the post first (org-scoped). Reject an unknown/foreign id
+        // (would 500 in changeDate) and refuse to re-queue an already-PUBLISHED
+        // post (would republish it).
+        const post = await this._postsService.getPostById(inputData.id, org.id);
+        if (!post) {
+          throw new Error('Post not found');
+        }
+        if (post.state === 'PUBLISHED') {
+          throw new Error('Cannot reschedule a post that has already been published');
+        }
+
         await this._postsService.changeDate(
           org.id,
           inputData.id,

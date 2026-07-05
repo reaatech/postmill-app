@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useCalendar } from './context';
 import { CalendarColumn } from './grid';
 import dayjs from 'dayjs';
@@ -12,8 +12,19 @@ export const MonthView = () => {
   const { startDate } = useCalendar();
   const t = useT();
 
+  // Re-render (and recompute localized day names) when the UI language changes —
+  // the memo below reads `i18next.resolvedLanguage`, which is otherwise non-reactive.
+  const [resolvedLanguage, setResolvedLanguage] = useState(
+    i18next.resolvedLanguage
+  );
+  useEffect(() => {
+    const handler = (lng: string) => setResolvedLanguage(lng);
+    i18next.on('languageChanged', handler);
+    return () => i18next.off('languageChanged', handler);
+  }, []);
+
   const localizedDays = useMemo(() => {
-    const currentLanguage = i18next.resolvedLanguage || 'en';
+    const currentLanguage = resolvedLanguage || 'en';
     dayjs.locale(currentLanguage);
 
     const days = [];
@@ -21,7 +32,7 @@ export const MonthView = () => {
       days.push(newDayjs().day(i).format('dddd'));
     }
     return days;
-  }, [i18next.resolvedLanguage]);
+  }, [resolvedLanguage]);
 
   const calendarDays = useMemo(() => {
     const monthStart = newDayjs(startDate);

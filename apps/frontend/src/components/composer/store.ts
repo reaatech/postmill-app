@@ -178,7 +178,7 @@ export const useLaunchStore = create<StoreState>()((set) => ({
   ) => {
     set((state) => {
       const existing = state.selectedIntegrations.find(
-        (i) => i.integration.id === integration.id
+        (i) => i?.integration?.id === integration?.id
       );
 
       if (existing) {
@@ -192,6 +192,11 @@ export const useLaunchStore = create<StoreState>()((set) => ({
             : {}),
           loaded: false,
           selectedIntegrations: selectedList,
+          // Drop any per-channel customizations for the deselected channel so a
+          // later re-select doesn't resurrect stale `internal` content.
+          internal: state.internal.filter(
+            (i) => i.integration.id !== existing.integration.id
+          ),
           ...(selectedList.length === 0
             ? {
                 current: 'global',
@@ -266,6 +271,13 @@ export const useLaunchStore = create<StoreState>()((set) => ({
     }),
   deleteGlobalValue: (index: number) =>
     set((state) => {
+      // DELIBERATE id-reuse: ids are pinned to their *position*, not their content.
+      // Deleting a middle thread item shifts the following items' content up while
+      // the id sequence stays put, so on an edit an existing DB row keeps its id but
+      // now carries the next item's content. This is intentional (the composer treats
+      // the thread as an ordered slot list, and the server reconciles by id so no
+      // orphan rows are left); do NOT "fix" it into delete-by-id without also
+      // reworking how the thread reconciles against persisted post rows.
       // Preserve the IDs at their current positions
       const ids = state.global.map((item) => item.id);
 
@@ -287,6 +299,9 @@ export const useLaunchStore = create<StoreState>()((set) => ({
       return {
         internal: state.internal.map((item) => {
           if (item.integration.id === integrationId) {
+            // DELIBERATE id-reuse: see deleteGlobalValue — ids are pinned to the
+            // slot position, so deleting a middle item shifts content up onto the
+            // surviving ids. Intentional; do not convert to delete-by-id in isolation.
             // Preserve the IDs at their current positions
             const ids = item.integrationValue.map((v) => v.id);
 
@@ -322,6 +337,12 @@ export const useLaunchStore = create<StoreState>()((set) => ({
             (i) => i.integration.id !== integrationId
           ),
         };
+      }
+
+      // The integration must still be selected to switch it to internal mode; a
+      // missing entry (e.g. deselected mid-flight) is a no-op rather than a crash.
+      if (!integration?.integration) {
+        return {};
       }
 
       return {

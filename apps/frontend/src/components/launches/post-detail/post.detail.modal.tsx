@@ -58,6 +58,8 @@ const StatePill: FC<{ state: string }> = ({ state }) => {
     PUBLISHED: { bg: 'bg-green-500', label: t('published', 'Published') },
     QUEUE: { bg: 'bg-blue-500', label: t('scheduled', 'Scheduled') },
     DRAFT: { bg: 'bg-amber-500', label: t('draft', 'Draft') },
+    // 0.7: transient claim state while the publish worker is posting.
+    PUBLISHING: { bg: 'bg-blue-500', label: t('publishing', 'Publishing') },
   };
 
   const pill = config[state] || config.QUEUE;
@@ -123,15 +125,51 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
   const { data: statsData } = usePostStatistics(postId);
 
   useEffect(() => {
-    if (!hasMarkedRef.current) {
-      hasMarkedRef.current = true;
-      fetch(`/posts/${postId}/social-comments/read`, { method: 'POST' })
-        .then(() => {
-          mutate((key: any) => typeof key === 'string' && key.startsWith('/posts-'));
-        })
-        .catch(() => {});
+    if (hasMarkedRef.current) {
+      return;
     }
-  }, [postId, mutate, fetch]);
+    // Only PUBLISHED posts with a real release id can have synced social
+    // comments to mark read — firing the POST + global calendar mutate on every
+    // modal open (drafts/queued included) was wasteful and needlessly churned
+    // the calendar SWR cache.
+    const main = postData?.posts?.[0];
+    if (
+      !main ||
+      main.state !== 'PUBLISHED' ||
+      !main.releaseId ||
+      main.releaseId === 'missing'
+    ) {
+      return;
+    }
+    hasMarkedRef.current = true;
+    // The mark-read POST always upserts a read timestamp regardless of whether
+    // anything was actually unread (its response carries no unread signal), and
+    // postData has no unread count — so probe the unread count first and only
+    // revalidate every cached calendar window when marking read actually cleared
+    // an unread badge. Nothing unread ⇒ the calendar view is unchanged.
+    (async () => {
+      let hadUnread = true;
+      try {
+        const countRes = await fetch(
+          `/posts/${postId}/social-comments/unread-count`
+        );
+        if (countRes.ok) {
+          const { unreadCount } = await countRes.json();
+          hadUnread = (unreadCount ?? 0) > 0;
+        }
+      } catch {
+        // fall through — treat as possibly-unread so we don't drop a real update
+      }
+
+      const res = await fetch(`/posts/${postId}/social-comments/read`, {
+        method: 'POST',
+      });
+      if (!res.ok || !hadUnread) {
+        return;
+      }
+      mutate((key: any) => typeof key === 'string' && key.startsWith('/posts-'));
+    })().catch(() => {});
+  }, [postId, postData, mutate, fetch]);
 
   // Producer for the `/agents` view context (2.3): while this post's detail is
   // open, expose its id (merged on top of the launches keys) so the agent
@@ -289,7 +327,9 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
               </div>
             </div>
           )}
-          {mainPost?.releaseURL && mainPost.releaseURL !== 'missing' && (
+          {mainPost?.releaseURL &&
+            mainPost.releaseURL !== 'missing' &&
+            /^https?:\/\//i.test(mainPost.releaseURL) && (
             <a
               href={mainPost.releaseURL}
               target="_blank"

@@ -44,8 +44,9 @@ function mockRes() {
   } as unknown as MockResponse;
 }
 
-function mockReq(authorization?: string) {
+function mockReq(authorization?: string, method = 'GET') {
   return {
+    method,
     headers: authorization ? { authorization } : {},
   } as unknown as PublicRequest;
 }
@@ -214,18 +215,79 @@ describe('PublicAuthMiddleware', () => {
     expect(next).toHaveBeenCalled();
   });
 
-  it('routes pos_ tokens through OAuthService and sets SUPERADMIN', async () => {
+  it('routes a read (GET) pos_ token through OAuthService and maps to the granting user\'s real org role', async () => {
     oauthService.getOrgByOAuthToken.mockResolvedValue({
+      organizationId: 'org-1',
+      scope: 'mcp:read',
       organization: { id: 'org-1', subscription: { subscriptionTier: 'PRO' } },
+      user: {
+        id: 'user-1',
+        organizations: [
+          {
+            organizationId: 'org-1',
+            roleId: 'role-member',
+            roleRef: { id: 'role-member', key: 'member' },
+          },
+        ],
+      },
     });
-    const req = mockReq('pos_oauthtoken');
+    const req = mockReq('pos_oauthtoken', 'GET');
     const res = mockRes();
 
     await middleware.use(req, res, next);
 
     expect(oauthService.getOrgByOAuthToken).toHaveBeenCalledWith('pos_oauthtoken');
     expect(apiKeysService.findActiveByHash).not.toHaveBeenCalled();
-    expect(req.org.users[0].users.role).toBe('SUPERADMIN');
+    // No longer hard-coded SUPERADMIN — the real membership role is used.
+    expect(req.org.users[0].users.role).toBe('member');
+    expect((req as any).oauthScopes).toEqual(['mcp:read']);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('rejects a read-only pos_ token on a write route with 403', async () => {
+    oauthService.getOrgByOAuthToken.mockResolvedValue({
+      organizationId: 'org-1',
+      scope: 'mcp:read',
+      organization: { id: 'org-1', subscription: { subscriptionTier: 'PRO' } },
+      user: {
+        id: 'user-1',
+        organizations: [
+          { organizationId: 'org-1', roleId: 'role-admin', roleRef: { id: 'role-admin', key: 'admin' } },
+        ],
+      },
+    });
+    const req = mockReq('pos_readonly', 'POST');
+    const res = mockRes();
+
+    await middleware.use(req, res, next);
+
+    expect(res.status).toHaveBeenCalledWith(HttpStatus.FORBIDDEN);
+    expect(res.json).toHaveBeenCalledWith({
+      msg: 'Insufficient OAuth scope: mcp:posts:write required',
+    });
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('allows a pos_ token with mcp:posts:write on a write route and maps the real role', async () => {
+    oauthService.getOrgByOAuthToken.mockResolvedValue({
+      organizationId: 'org-1',
+      scope: 'mcp:read mcp:posts:write',
+      organization: { id: 'org-1', subscription: { subscriptionTier: 'PRO' } },
+      user: {
+        id: 'user-1',
+        organizations: [
+          { organizationId: 'org-1', roleId: 'role-admin', roleRef: { id: 'role-admin', key: 'admin' } },
+        ],
+      },
+    });
+    const req = mockReq('pos_writer', 'POST');
+    const res = mockRes();
+
+    await middleware.use(req, res, next);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(req.org.users[0].users.role).toBe('admin');
+    expect((req as any).oauthScopes).toEqual(['mcp:read', 'mcp:posts:write']);
     expect(next).toHaveBeenCalled();
   });
 

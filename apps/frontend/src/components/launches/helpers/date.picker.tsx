@@ -59,6 +59,7 @@ export const DatePicker: FC<{
           <Calendar
             onChange={changeDate('date')}
             value={date.toDate()}
+            minDate={newDayjs().startOf('day').toDate()}
             dayClassName={(date, modifiers) => {
               if (modifiers.weekend) {
                 return '!text-textColor';

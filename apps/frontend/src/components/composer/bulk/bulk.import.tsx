@@ -6,42 +6,123 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useBulkImport, BulkRow } from './useBulkImport';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 
+// 5 MB is generous for a text CSV of posts; anything larger is almost certainly a
+// mistaken upload and would block the main thread in `readAsText`.
+const MAX_CSV_BYTES = 5 * 1024 * 1024;
+
+// Minimal RFC-4180 parser: honours double-quoted fields (which may embed commas,
+// newlines, and escaped `""` quotes) so post content containing a comma isn't
+// truncated and shifted into the channel/date columns.
+export function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (text[i + 1] === '"') {
+          field += '"';
+          i++;
+        } else {
+          inQuotes = false;
+        }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = true;
+    } else if (ch === ',') {
+      row.push(field);
+      field = '';
+    } else if (ch === '\r') {
+      // ignore — handled by the following \n (or end of input)
+    } else if (ch === '\n') {
+      row.push(field);
+      rows.push(row);
+      row = [];
+      field = '';
+    } else {
+      field += ch;
+    }
+  }
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  // Drop blank rows (trailing newline, empty lines).
+  return rows.filter((r) => r.some((c) => c.trim() !== ''));
+}
+
+// Rendered as the body of the "Bulk Import" modal, opened from the layout "+" create
+// menu (`CreateMenuItems`). The modal supplies the title bar + outer padding, so this
+// component is just the CSV picker / preview / results.
 export const BulkImport: FC = () => {
   const t = useT();
   const fetch = useFetch();
   const { submit, loading, results, error } = useBulkImport();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [rows, setRows] = useState<BulkRow[]>([]);
+  const [parseError, setParseError] = useState('');
 
   const handleFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
+      setParseError('');
+      setRows([]);
       const file = e.target.files?.[0];
+      // Reset the input so re-selecting the same (fixed) file re-triggers onChange.
+      e.target.value = '';
       if (!file) return;
+      if (file.size > MAX_CSV_BYTES) {
+        setParseError('File is too large (max 5 MB).');
+        return;
+      }
       const reader = new FileReader();
+      reader.onerror = () => setParseError('Could not read the file.');
       reader.onload = (evt) => {
-        const text = evt.target?.result as string;
-        const lines = text.split('\n').filter((l) => l.trim());
-        if (lines.length < 2) return;
-        const header = lines[0].split(',').map((h) => h.trim().toLowerCase());
+        const text = (evt.target?.result as string) || '';
+        const parsedRows = parseCsv(text);
+        if (parsedRows.length === 0) {
+          setParseError('The file is empty.');
+          return;
+        }
+        const header = parsedRows[0].map((h) => h.trim().toLowerCase());
         const contentIdx = header.indexOf('content');
         const channelIdx = header.indexOf('channel');
-        const dateIdx = header.indexOf('schedule_at') >= 0 ? header.indexOf('schedule_at') : header.indexOf('date');
+        const dateIdx =
+          header.indexOf('schedule_at') >= 0
+            ? header.indexOf('schedule_at')
+            : header.indexOf('date');
         const mediaIdx = header.indexOf('media_url');
         const campaignIdx = header.indexOf('campaign_id');
 
         if (contentIdx < 0 || channelIdx < 0 || dateIdx < 0) {
+          setParseError(
+            'Invalid or missing header. Required columns: content, channel, schedule_at (or date).'
+          );
+          return;
+        }
+        if (parsedRows.length < 2) {
+          setParseError('No data rows found below the header.');
           return;
         }
 
         const parsed: BulkRow[] = [];
-        for (let i = 1; i < lines.length; i++) {
-          const cols = lines[i].split(',').map((c) => c.trim());
+        for (let i = 1; i < parsedRows.length; i++) {
+          const cols = parsedRows[i];
           parsed.push({
-            content: cols[contentIdx] || '',
-            channels: (cols[channelIdx] || '').split(';').filter(Boolean),
-            scheduleAt: cols[dateIdx] || '',
-            mediaUrl: mediaIdx >= 0 ? cols[mediaIdx] : undefined,
-            campaignId: campaignIdx >= 0 ? cols[campaignIdx] : undefined,
+            content: (cols[contentIdx] || '').trim(),
+            channels: (cols[channelIdx] || '')
+              .split(';')
+              .map((c) => c.trim())
+              .filter(Boolean),
+            scheduleAt: (cols[dateIdx] || '').trim(),
+            mediaUrl: mediaIdx >= 0 ? (cols[mediaIdx] || '').trim() : undefined,
+            campaignId:
+              campaignIdx >= 0 ? (cols[campaignIdx] || '').trim() : undefined,
           });
         }
         setRows(parsed);
@@ -57,10 +138,7 @@ export const BulkImport: FC = () => {
   }, [rows, submit]);
 
   return (
-    <div className="flex flex-col gap-[16px] p-[24px]">
-      <h2 className="text-[20px] font-semibold">
-        {t('bulk_import', 'Bulk Import')}
-      </h2>
+    <div className="flex flex-col gap-[16px]">
       <p className="text-[13px] text-newTableText">
         {t(
           'bulk_import_desc',
@@ -121,7 +199,9 @@ export const BulkImport: FC = () => {
         </div>
       )}
 
-      {error && <div className="text-red-500 text-[13px]">{error}</div>}
+      {(error || parseError) && (
+        <div className="text-red-500 text-[13px]">{error || parseError}</div>
+      )}
 
       {results && results.length > 0 && (
         <div className="flex flex-col gap-[8px]">

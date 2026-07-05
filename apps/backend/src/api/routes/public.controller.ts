@@ -3,7 +3,6 @@ import {
   Controller,
   Get,
   Logger,
-  Param,
   Post,
   Query,
   Req,
@@ -13,7 +12,6 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { TrackService } from '@gitroom/nestjs-libraries/track/track.service';
 import { RealIP } from 'nestjs-real-ip';
 import { UserAgent } from '@gitroom/nestjs-libraries/user/user.agent';
@@ -40,7 +38,6 @@ export class PublicController {
   constructor(
     private _trackService: TrackService,
     private _agentGraphInsertService: AgentGraphInsertService,
-    private _postsService: PostsService,
     private _subscriptionService: SubscriptionService
   ) {}
   @Post('/agent')
@@ -54,31 +51,6 @@ export class PublicController {
       throw new UnauthorizedException();
     }
     return this._agentGraphInsertService.newPost(body.text);
-  }
-
-  @Get(`/posts/:id`)
-  async getPreview(@Param('id') id: string) {
-    return (await this._postsService.getPostsRecursively(id, true)).map(
-      ({ childrenPost, ...p }) => ({
-        ...p,
-        ...(p.integration
-          ? {
-              integration: {
-                id: p.integration.id,
-                name: p.integration.name,
-                picture: p.integration.picture,
-                providerIdentifier: p.integration.providerIdentifier,
-                profile: p.integration.profile,
-              },
-            }
-          : {}),
-      })
-    );
-  }
-
-  @Get(`/posts/:id/comments`)
-  async getComments(@Param('id') postId: string) {
-    return { comments: await this._postsService.getComments(postId) };
   }
 
   @Post('/t')

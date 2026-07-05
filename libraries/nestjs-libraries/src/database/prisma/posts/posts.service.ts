@@ -13,9 +13,12 @@ import { ValidatePostsDto } from '@gitroom/nestjs-libraries/dtos/posts/validate.
 import { BulkCreatePostsDto, BulkCreatePostRowDto } from '@gitroom/nestjs-libraries/dtos/posts/bulk.create.posts.dto';
 import dayjs from 'dayjs';
 import { randomInt } from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
+import { SubscriptionService } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.service';
+import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { IntegrationManager } from '@gitroom/nestjs-libraries/integrations/integration.manager';
 import {
   Integration,
@@ -81,18 +84,24 @@ export class PostsService {
     // layering: sanctioned leaf-read of CampaignsRepository (CampaignsService → PostsService, routing up would cycle)
     private _campaignsRepository: CampaignsRepository,
     private _auditService: AuditService,
+    private _subscriptionService: SubscriptionService,
   ) {}
 
   searchForMissingThreeHoursPosts() {
     return this._postRepository.searchForMissingThreeHoursPosts();
   }
 
-  updatePost(id: string, postId: string, releaseURL: string) {
-    return this._postRepository.updatePost(id, postId, releaseURL);
+  // 0.7 follow-up: recover posts orphaned in the PUBLISHING claim (see repository).
+  resetStalePublishingToQueue() {
+    return this._postRepository.resetStalePublishingToQueue();
   }
 
-  updatePostSettings(id: string, settings: string) {
-    return this._postRepository.updatePostSettings(id, settings);
+  updatePost(id: string, postId: string, releaseURL: string, orgId: string) {
+    return this._postRepository.updatePost(id, postId, releaseURL, orgId);
+  }
+
+  updatePostSettings(id: string, settings: string, orgId: string) {
+    return this._postRepository.updatePostSettings(id, settings, orgId);
   }
 
   async getMissingContent(
@@ -579,7 +588,9 @@ export class PostsService {
     const errors = await this._postRepository.getErrorsByPostIds(
       loadAll.map((p) => p.id)
     );
-    const posts = this.arrangePostsByGroup(loadAll, undefined);
+    const posts = this._stripIntegrationSecrets(
+      this.arrangePostsByGroup(loadAll, undefined)
+    );
     const rootPost = posts[0] as any;
 
     return {
@@ -624,7 +635,9 @@ export class PostsService {
   async getPostsByGroup(orgId: string, group: string) {
     const convertToJPEG = false;
     const loadAll = await this._postRepository.getPostsByGroup(orgId, group);
-    const posts = this.arrangePostsByGroup(loadAll, undefined);
+    const posts = this._stripIntegrationSecrets(
+      this.arrangePostsByGroup(loadAll, undefined)
+    );
 
     return {
       group: posts?.[0]?.group,
@@ -663,8 +676,31 @@ export class PostsService {
     ];
   }
 
+  /**
+   * Re-project each post's decrypted `integration` down to safe display fields
+   * before returning it over HTTP. The repo layer (and `getPostsRecursively`)
+   * decrypt `token`/`refreshToken` for the Inngest publisher, which shares
+   * `repository.getPost` — those secrets must never leave the server. Mirrors
+   * the calendar list `select`. Strip here, never in the repo.
+   */
+  private _stripIntegrationSecrets(posts: any[]): any[] {
+    return (posts || []).map((post) => {
+      if (!post?.integration) {
+        return post;
+      }
+      const { id, providerIdentifier, name, picture, profile } =
+        post.integration;
+      return {
+        ...post,
+        integration: { id, providerIdentifier, name, picture, profile },
+      };
+    });
+  }
+
   async getPost(orgId: string, id: string, convertToJPEG = false) {
-    const posts = await this.getPostsRecursively(id, true, orgId, true);
+    const posts = this._stripIntegrationSecrets(
+      await this.getPostsRecursively(id, true, orgId, true)
+    );
     const list = {
       group: posts?.[0]?.group,
       posts: await Promise.all(
@@ -839,11 +875,15 @@ export class PostsService {
           data: { postId },
         });
       } else {
-        Logger.debug(
-          `Skipping post/cancel event for post ${postId} — Inngest is disabled`
-        );
+        this._warnInngestDisabledOnce();
       }
-    } catch (err) {}
+    } catch (err) {
+      Logger.error(
+        `Failed to send post/cancel event for post ${postId}: ${
+          (err as Error)?.message
+        }`
+      );
+    }
 
     if (state === 'DRAFT') {
       return;
@@ -859,14 +899,35 @@ export class PostsService {
             taskQueue,
             maxConcurrentJob,
           },
-          id: `post_${postId}`,
+          // Unique-per-send id: a constant `post_${postId}` is an Inngest
+          // idempotency key that dedupes every reschedule/edit for ~24h,
+          // black-holing the post. Genuine double-sends are caught by the
+          // atomic publish claim, not by event dedup.
+          id: `post_${postId}_${uuidv4()}`,
         });
       } else {
-        Logger.debug(
-          `Skipping post/publish event for post ${postId} — Inngest is disabled`
-        );
+        this._warnInngestDisabledOnce();
       }
-    } catch (err) {}
+    } catch (err) {
+      Logger.error(
+        `Failed to send post/publish event for post ${postId}: ${
+          (err as Error)?.message
+        }`
+      );
+    }
+  }
+
+  private static _inngestDisabledWarned = false;
+
+  /** One-time boot warning so silent no-op scheduling (USE_INNGEST !== 'true') is visible. */
+  private _warnInngestDisabledOnce() {
+    if (PostsService._inngestDisabledWarned) {
+      return;
+    }
+    PostsService._inngestDisabledWarned = true;
+    Logger.warn(
+      'USE_INNGEST is not enabled — post scheduling events are being skipped (no-op). Publishing/rescheduling will not fire.'
+    );
   }
 
   /**
@@ -1017,11 +1078,32 @@ export class PostsService {
       .replace(/[^a-z0-9-]/g, '');
     const utm = `utm_campaign=${encodeURIComponent(slug)}&utm_source=${encodeURIComponent(providerIdentifier)}&utm_medium=social`;
 
+    // Never re-process URLs already on the active short-link provider's domain:
+    // on edit the stored content holds SHORT urls, and appending UTM to a short
+    // link corrupts it (the shortener then skips it as already-on-domain). UTM
+    // is only ever applied to raw source URLs, before the first shorten.
+    let shortLinkDomain: string | undefined;
+    try {
+      const resolved = await this._shortLinkService.shouldShortlink(
+        organizationId,
+        []
+      );
+      shortLinkDomain = resolved?.domain;
+    } catch {
+      shortLinkDomain = undefined;
+    }
+
     return messages.map((msg) =>
       msg.replace(/(https?:\/\/[^\s<"']+)/g, (url) => {
-        if (url.includes('utm_campaign')) return url;
-        const sep = url.includes('?') ? '&' : '?';
-        return `${url}${sep}${utm}`;
+        // Don't swallow trailing punctuation into the URL — reattach it after.
+        const trailing = url.match(/[).,]+$/)?.[0] || '';
+        const core = trailing ? url.slice(0, -trailing.length) : url;
+        if (core.includes('utm_campaign')) return url;
+        if (shortLinkDomain && shortLinkDomain !== 'empty' && core.includes(shortLinkDomain)) {
+          return url;
+        }
+        const sep = core.includes('?') ? '&' : '?';
+        return `${core}${sep}${utm}${trailing}`;
       })
     );
   }
@@ -1116,6 +1198,18 @@ export class PostsService {
 
     if (replaceDraft) {
       (body as any).type = rawBody.type;
+    }
+
+    // Reject scheduling in the past — a past publishDate publishes immediately
+    // (the worker clamps the sleep to 0) rather than at the intended time.
+    // `now` is current by definition; `draft`/`update` legitimately carry
+    // historical dates (draft promotion / editing an already-published post).
+    if (
+      body.type === 'schedule' &&
+      body.date &&
+      dayjs(body.date).isBefore(dayjs())
+    ) {
+      throw new BadRequestException('Cannot schedule a post in the past');
     }
 
     if (
@@ -1269,8 +1363,8 @@ export class PostsService {
     return this._openaiService.separatePosts(content, len);
   }
 
-  async changeState(id: string, state: State, err?: any, body?: any) {
-    return this._postRepository.changeState(id, state, err, body);
+  async changeState(id: string, state: State, orgId: string, err?: any, body?: any) {
+    return this._postRepository.changeState(id, state, orgId, err, body);
   }
 
   async changePostStatus(
@@ -1283,8 +1377,18 @@ export class PostsService {
       throw new BadRequestException('Post not found');
     }
 
+    // A campaign draft may only be promoted to the schedule once it has been
+    // approved — mirrors the `promoteDrafts` gate so this route can't bypass it.
+    if (
+      status === 'schedule' &&
+      getPostById.campaignId &&
+      getPostById.approvalStatus !== 'approved'
+    ) {
+      throw new BadRequestException('Draft not approved');
+    }
+
     const state: State = status === 'draft' ? 'DRAFT' : 'QUEUE';
-    await this._postRepository.changeState(id, state);
+    await this._postRepository.changeState(id, state, orgId);
 
     try {
       await this.startWorkflow(
@@ -1458,6 +1562,9 @@ export class PostsService {
     action: 'schedule' | 'update' = 'schedule'
   ) {
     const getPostById = await this._postRepository.getPostById(id, orgId);
+    if (!getPostById) {
+      throw new BadRequestException('Post not found');
+    }
 
     // schedule: Set status to QUEUE and change date (reschedule the post)
     // update: Just change the date without changing the status
@@ -1469,7 +1576,8 @@ export class PostsService {
       action
     );
 
-    if (action === 'schedule') {
+    // Don't re-queue an already-published post when rescheduling.
+    if (action === 'schedule' && getPostById.state !== 'PUBLISHED') {
       try {
         await this.startWorkflow(
           getPostById.integration.providerIdentifier,
@@ -1646,13 +1754,58 @@ export class PostsService {
     return this._postRepository.deleteTag(id, orgId);
   }
 
-  createComment(
+  async createComment(
     orgId: string,
     userId: string,
     postId: string,
     comment: string
   ) {
+    // 4.1c: verify the post is in this org before writing an internal comment —
+    // the repository createComment does not scope by org, so without this a
+    // member could comment on another tenant's post by id.
+    const post = await this.getPostById(postId, orgId);
+    if (!post) {
+      throw new BadRequestException('Post not found');
+    }
     return this._postRepository.createComment(orgId, userId, postId, comment);
+  }
+
+  /**
+   * Enforce the remaining POSTS_PER_MONTH quota for a batch that creates
+   * `requestedCount` posts up front (e.g. bulk create), mirroring the
+   * PermissionsService POSTS_PER_MONTH computation — which only fires once per
+   * request, so a large batch would otherwise blow past the monthly cap.
+   * No-op when billing is disabled (no STRIPE_PUBLISHABLE_KEY).
+   */
+  private async _enforcePostsBudget(orgId: string, requestedCount: number) {
+    if (!process.env.STRIPE_PUBLISHABLE_KEY || requestedCount <= 0) {
+      return;
+    }
+
+    const subscription =
+      await this._subscriptionService.getSubscriptionByOrganizationId(orgId);
+    const tier = (subscription?.subscriptionTier ||
+      'FREE') as keyof typeof pricing;
+    const options = pricing[tier] || pricing.FREE;
+
+    const anchor = subscription?.createdAt
+      ? dayjs(subscription.createdAt)
+      : dayjs().startOf('month');
+    const totalMonthPast = Math.abs(anchor.diff(dayjs(), 'month'));
+    const checkFrom = anchor.add(totalMonthPast, 'month');
+    const used = await this._postRepository.countPostsFromDay(
+      orgId,
+      checkFrom.toDate()
+    );
+
+    if (used + requestedCount > options.posts_per_month) {
+      throw new HttpException(
+        {
+          message: `Posts per month limit reached (${options.posts_per_month}). This request would create ${requestedCount} post(s).`,
+        },
+        HttpStatus.PAYMENT_REQUIRED
+      );
+    }
   }
 
   /**
@@ -1665,6 +1818,15 @@ export class PostsService {
     body: BulkCreatePostsDto,
   ): Promise<{ rows: Array<{ index: number; success: boolean; postId?: string; error?: string; warnings?: string[] }> }> {
     const results: Array<{ index: number; success: boolean; postId?: string; error?: string; warnings?: string[] }> = [];
+
+    // Enforce the monthly quota against the whole request up front (rows ×
+    // channels) — createPost's per-post gate is not re-checked in this loop.
+    const requestedCount = (body.rows || []).reduce(
+      (sum, r) => sum + (r.channels?.length || 0),
+      0
+    );
+    await this._enforcePostsBudget(orgId, requestedCount);
+
     const integrations = await this._integrationService.getIntegrationsList(orgId);
     const activeIntegrations = integrations.filter((f) => !f.disabled && !f.deletedAt);
 
@@ -1673,6 +1835,16 @@ export class PostsService {
       const rowWarnings: string[] = [];
       let rowError: string | undefined;
       const postIds: string[] = [];
+
+      // Reject scheduling in the past — a past date publishes immediately.
+      if (row.scheduleAt && dayjs(row.scheduleAt).isBefore(dayjs())) {
+        results.push({
+          index: i,
+          success: false,
+          error: 'Cannot schedule a post in the past',
+        });
+        continue;
+      }
 
       try {
         for (const channelId of row.channels) {
