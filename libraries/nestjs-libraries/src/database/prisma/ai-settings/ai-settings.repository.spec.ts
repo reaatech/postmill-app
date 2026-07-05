@@ -70,7 +70,9 @@ describe('AiSettingsRepository', () => {
     mockMediaJob = {
       create: vi.fn().mockResolvedValue({}),
       update: vi.fn().mockResolvedValue({}),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(null),
     };
     mockPromptLibraryItem = {
       findMany: vi.fn().mockResolvedValue([]),
@@ -625,6 +627,74 @@ describe('AiSettingsRepository', () => {
         data: { status: 'completed', artifactUrl: 'https://cdn.example.com/img.png' },
       });
       expect(result).toEqual(updated);
+    });
+  });
+
+  describe('claimMediaJobStatus (§3.1)', () => {
+    it('conditionally transitions status and returns the updated count', async () => {
+      mockMediaJob.updateMany.mockResolvedValue({ count: 1 });
+
+      const count = await repository.claimMediaJobStatus('mj1', ['pending', 'processing'], 'landing');
+
+      expect(mockMediaJob.updateMany).toHaveBeenCalledWith({
+        where: { id: 'mj1', status: { in: ['pending', 'processing'] } },
+        data: { status: 'landing' },
+      });
+      expect(count).toBe(1);
+    });
+
+    it('returns 0 when the row is no longer in an eligible status (lost claim)', async () => {
+      mockMediaJob.updateMany.mockResolvedValue({ count: 0 });
+      expect(await repository.claimMediaJobStatus('mj1', ['pending'], 'processing')).toBe(0);
+    });
+  });
+
+  describe('reclaimStaleLandingJobs (§3.1 crash-recovery)', () => {
+    it('resets only `landing` rows older than the cutoff back to `processing`', async () => {
+      mockMediaJob.updateMany.mockResolvedValue({ count: 2 });
+      const cutoff = new Date('2026-07-05T00:00:00.000Z');
+
+      const count = await repository.reclaimStaleLandingJobs(cutoff);
+
+      expect(mockMediaJob.updateMany).toHaveBeenCalledWith({
+        where: { status: 'landing', updatedAt: { lt: cutoff } },
+        data: { status: 'processing' },
+      });
+      expect(count).toBe(2);
+    });
+  });
+
+  describe('getPendingMediaJobs (fair sweep §6.2)', () => {
+    it('over-fetches oldest-first (limit*3) and passes through when the pool fits', async () => {
+      mockMediaJob.findMany.mockResolvedValue([{ id: 'a', organizationId: 'o1' }]);
+
+      const result = await repository.getPendingMediaJobs(10);
+
+      expect(mockMediaJob.findMany).toHaveBeenCalledWith({
+        where: { status: { in: ['pending', 'processing'] } },
+        orderBy: { createdAt: 'asc' },
+        take: 30,
+      });
+      expect(result).toHaveLength(1);
+    });
+
+    it('caps a flooding org so other orgs are not starved from the window', async () => {
+      const pool = [
+        ...Array.from({ length: 25 }, (_, i) => ({ id: `a${i}`, organizationId: 'orgA' })),
+        ...Array.from({ length: 3 }, (_, i) => ({ id: `b${i}`, organizationId: 'orgB' })),
+        ...Array.from({ length: 2 }, (_, i) => ({ id: `c${i}`, organizationId: 'orgC' })),
+      ];
+      mockMediaJob.findMany.mockResolvedValue(pool);
+
+      const selected = await repository.getPendingMediaJobs(10);
+      const countOf = (org: string) => selected.filter((j: any) => j.organizationId === org).length;
+
+      expect(selected).toHaveLength(10);
+      // per-org cap = ceil(10/5) = 2 → orgB and orgC get in despite orgA flooding the head;
+      // the leftover pass fills the remaining slots from orgA's overflow.
+      expect(countOf('orgB')).toBe(2);
+      expect(countOf('orgC')).toBe(2);
+      expect(countOf('orgA')).toBe(6);
     });
   });
 

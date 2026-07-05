@@ -48,6 +48,9 @@ export interface DesignerState {
   currentOutput: number;
   zoom: number; viewportX: number; viewportY: number;
   history: DesignerDoc[]; historyIndex: number;
+  // The history index that matches the last persisted doc, so undo/redo back to a
+  // saved state clears isDirty instead of always reporting unsaved.
+  savedHistoryIndex: number;
   designId: string | null;
   designTemplateId: string | null;
   templateId: string | null;
@@ -73,7 +76,11 @@ export interface DesignerActions {
   addElement: (element: DesignerElement, beforeId?: string) => void;
   updateElement: (id: string, updates: Partial<DesignerElement>) => void;
   updateElements: (ids: string[], updates: Partial<DesignerElement>) => void;
+  // Same as updateElements but does NOT commit history — for continuous controls
+  // (slider/drag), which push a single history entry on release instead.
+  updateElementsSilent: (ids: string[], updates: Partial<DesignerElement>) => void;
   removeElement: (id: string) => void;
+  removeElements: (ids: string[]) => void;
   duplicateElement: (id: string) => void;
   setSelectedIds: (ids: string[]) => void;
   setOutputBackground: (bg: DesignerBackground) => void;
@@ -177,6 +184,7 @@ export const createDesignerStore = (
       currentOutput: 0,
       zoom: 1, viewportX: 0, viewportY: 0,
       history: [JSON.parse(JSON.stringify(initialDoc))], historyIndex: 0,
+      savedHistoryIndex: 0,
       designId: null, designTemplateId: null, templateId: null,
       designName: 'Untitled Design',
       isDirty: false, isSaving: false, lastSaved: null,
@@ -273,12 +281,34 @@ export const createDesignerStore = (
         get().pushHistory();
       },
 
+      updateElementsSilent: (ids, updates) => {
+        if (isVideoMode()) return;
+        const { doc, currentOutput, editFormatOnly, linkedUpdateFlash } = get();
+        const { outputs, affected } = applyLinked(doc, currentOutput, new Set(ids), updates, editFormatOnly);
+        const now = Date.now();
+        const nextFlash: Record<number, number> = { ...linkedUpdateFlash };
+        affected.forEach((i) => (nextFlash[i] = now));
+        set({ doc: { ...doc, outputs }, isDirty: true, linkedUpdateFlash: nextFlash });
+      },
+
       removeElement: (id) => {
         if (isVideoMode()) return;
         const { selectedIds } = get();
         set({
           doc: { ...get().doc, outputs: withActiveChildren(activeImage().children.filter((el) => el.id !== id)) },
           isDirty: true, selectedIds: selectedIds.filter((s) => s !== id),
+        });
+        get().pushHistory();
+      },
+
+      removeElements: (ids) => {
+        if (isVideoMode()) return;
+        if (!ids.length) return;
+        const remove = new Set(ids);
+        const { selectedIds } = get();
+        set({
+          doc: { ...get().doc, outputs: withActiveChildren(activeImage().children.filter((el) => !remove.has(el.id))) },
+          isDirty: true, selectedIds: selectedIds.filter((s) => !remove.has(s)),
         });
         get().pushHistory();
       },
@@ -469,36 +499,54 @@ export const createDesignerStore = (
       requestFit: () => set({ fitNonce: get().fitNonce + 1 }),
 
       pushHistory: () => {
-        const { doc, history, historyIndex } = get();
+        const { doc, history, historyIndex, savedHistoryIndex } = get();
         const snapshot = JSON.parse(JSON.stringify(doc));
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(snapshot);
-        if (newHistory.length > 50) newHistory.shift();
-        set({ history: newHistory, historyIndex: newHistory.length - 1 });
+        let savedIdx = savedHistoryIndex;
+        if (newHistory.length > 50) {
+          newHistory.shift();
+          savedIdx -= 1; // indices shifted down; -1 → saved snapshot evicted
+        }
+        set({ history: newHistory, historyIndex: newHistory.length - 1, savedHistoryIndex: savedIdx });
       },
 
       undo: () => {
-        const { historyIndex, history } = get();
+        const { historyIndex, history, savedHistoryIndex, currentOutput } = get();
         if (historyIndex <= 0) return;
         const newIndex = historyIndex - 1;
-        set({ doc: JSON.parse(JSON.stringify(history[newIndex])), historyIndex: newIndex, selectedIds: [], isDirty: true, currentOutput: 0 });
+        const nextDoc = JSON.parse(JSON.stringify(history[newIndex]));
+        set({
+          doc: nextDoc,
+          historyIndex: newIndex,
+          selectedIds: [],
+          isDirty: newIndex !== savedHistoryIndex,
+          currentOutput: Math.max(0, Math.min(currentOutput, (nextDoc.outputs?.length ?? 1) - 1)),
+        });
       },
 
       redo: () => {
-        const { historyIndex, history } = get();
+        const { historyIndex, history, savedHistoryIndex, currentOutput } = get();
         if (historyIndex >= history.length - 1) return;
         const newIndex = historyIndex + 1;
-        set({ doc: JSON.parse(JSON.stringify(history[newIndex])), historyIndex: newIndex, selectedIds: [], isDirty: true, currentOutput: 0 });
+        const nextDoc = JSON.parse(JSON.stringify(history[newIndex]));
+        set({
+          doc: nextDoc,
+          historyIndex: newIndex,
+          selectedIds: [],
+          isDirty: newIndex !== savedHistoryIndex,
+          currentOutput: Math.max(0, Math.min(currentOutput, (nextDoc.outputs?.length ?? 1) - 1)),
+        });
       },
 
-      markSaved: () => set({ isDirty: false, isSaving: false, lastSaved: new Date() }),
+      markSaved: () => set({ isDirty: false, isSaving: false, lastSaved: new Date(), savedHistoryIndex: get().historyIndex }),
       setSaving: (saving) => set({ isSaving: saving }),
 
       reset: (w, h) => {
         const newDoc = createEmptyDoc(w, h);
         set({
           doc: newDoc, selectedIds: [], currentOutput: 0, zoom: 1, viewportX: 0, viewportY: 0,
-          history: [JSON.parse(JSON.stringify(newDoc))], historyIndex: 0,
+          history: [JSON.parse(JSON.stringify(newDoc))], historyIndex: 0, savedHistoryIndex: 0,
           designId: null, designTemplateId: null, templateId: null,
           designName: 'Untitled Design', isDirty: false, isSaving: false, lastSaved: null,
           editFormatOnly: false,
@@ -516,7 +564,7 @@ export const createDesignerStore = (
           doc: migrated, designId: id, designName: name,
           templateId, designTemplateId: templateId,
           selectedIds: [], currentOutput: 0, zoom: 1,
-          history: [JSON.parse(JSON.stringify(migrated))], historyIndex: 0, isDirty: false,
+          history: [JSON.parse(JSON.stringify(migrated))], historyIndex: 0, savedHistoryIndex: 0, isDirty: false,
           playheadMs: 0,
           selectedClip: null,
           linkedUpdateFlash: {},
@@ -645,7 +693,11 @@ export const createDesignerStore = (
             const splitPoint = Math.max(original.startMs + 100, Math.min(original.endMs - 100, atMs));
             if (splitPoint <= original.startMs || splitPoint >= original.endMs) return t;
             const first: VideoClip = { ...original, id: genId(), endMs: splitPoint };
-            const second: VideoClip = { ...original, id: genId(), startMs: splitPoint, trimInMs: original.trimInMs ? original.trimInMs + (splitPoint - original.startMs) : undefined };
+            // The second half must advance its source trim-in so it continues from
+            // where the first half ended, otherwise it replays the source from 0
+            // (sourceTimeForPlayhead adds trimInMs). Applies even when the original
+            // had no trimIn.
+            const second: VideoClip = { ...original, id: genId(), startMs: splitPoint, trimInMs: (original.trimInMs ?? 0) + (splitPoint - original.startMs) };
             const clips = [...t.clips];
             clips.splice(idx, 1, first, second);
             return { ...t, clips };

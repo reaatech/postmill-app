@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -115,6 +115,11 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
     },
     { keepPreviousData: true }
   );
+
+  // Surface the load failure from an effect, not inline in render.
+  useEffect(() => {
+    if (error && !data) toaster.show("Couldn't load files", 'warning');
+  }, [error, data, toaster]);
 
   return (
     <div className="flex flex-col gap-3">
@@ -239,10 +244,10 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
           {isLoading && !data ? (
             <PanelSkeletonGrid count={4} />
           ) : error && !data ? (
-            (toaster.show('Couldn\'t load files', 'warning'), <PanelError
-              message="Couldn\'t load files"
+            <PanelError
+              message="Couldn't load files"
               onRetry={() => mutate()}
-            />)
+            />
           ) : !data?.results?.length ? (
             <div className="text-[12px] text-newTextColor/40 text-center py-4">
               No files found

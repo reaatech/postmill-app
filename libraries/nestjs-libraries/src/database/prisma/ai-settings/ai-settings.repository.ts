@@ -290,13 +290,65 @@ export class AiSettingsRepository {
     return this._aiMediaJob.model.aIMediaJob.findUnique({ where: { id } });
   }
 
+  // §3.1: atomically claim a status transition. `processJob` is check-then-act and
+  // is driven concurrently from four uncoordinated paths (webhook, cron sweep,
+  // drive-on-read listJobs, HeyGenService.getJob); a plain `update` lets two callers
+  // both complete one job (double download/File row/notification). Callers proceed
+  // only when this returns 1 — the row was still in one of `from` when we flipped it.
+  async claimMediaJobStatus(id: string, from: string[], to: string): Promise<number> {
+    const res = await this._aiMediaJob.model.aIMediaJob.updateMany({
+      where: { id, status: { in: from } },
+      data: { status: to },
+    });
+    return res.count;
+  }
+
+  // §3.1 crash-recovery: `_claimForCompletion` flips a job to the transient `landing`
+  // state before downloading/storing; a process crash in that window strands the row in
+  // `landing`, which the pending/processing-only sweep never re-selects (so it can't even
+  // reach the 24h timeout). Reset rows stuck in `landing` since before `cutoff` back to
+  // `processing` so the next sweep re-drives them. The `updatedAt < cutoff` guard means a
+  // job legitimately mid-completion (fast path) is never reclaimed — `cutoff` is set well
+  // beyond the worst-case completeJob duration. Returns the number reclaimed.
+  async reclaimStaleLandingJobs(cutoff: Date): Promise<number> {
+    const res = await this._aiMediaJob.model.aIMediaJob.updateMany({
+      where: { status: 'landing', updatedAt: { lt: cutoff } },
+      data: { status: 'processing' },
+    });
+    return res.count;
+  }
+
   // Pending/processing async jobs across all orgs for the polling sweep (§11.2).
-  getPendingMediaJobs(limit = 100) {
-    return this._aiMediaJob.model.aIMediaJob.findMany({
+  // §6.2 sweep-starvation: over-fetch an age-ordered pool and apply a per-org cap so
+  // one org flooding the queue can't monopolize the sweep window; a lightly-loaded
+  // queue is unaffected (the leftover pass fills any remaining slots oldest-first).
+  // Served by the additive (status, createdAt) index.
+  async getPendingMediaJobs(limit = 100) {
+    const perOrgCap = Math.max(1, Math.ceil(limit / 5));
+    const pool = await this._aiMediaJob.model.aIMediaJob.findMany({
       where: { status: { in: ['pending', 'processing'] } },
       orderBy: { createdAt: 'asc' },
-      take: limit,
+      take: limit * 3,
     });
+    if (pool.length <= limit) return pool;
+
+    const taken = new Map<string, number>();
+    const selected: typeof pool = [];
+    const leftover: typeof pool = [];
+    for (const job of pool) {
+      const count = taken.get(job.organizationId) ?? 0;
+      if (selected.length < limit && count < perOrgCap) {
+        taken.set(job.organizationId, count + 1);
+        selected.push(job);
+      } else {
+        leftover.push(job);
+      }
+    }
+    for (const job of leftover) {
+      if (selected.length >= limit) break;
+      selected.push(job);
+    }
+    return selected;
   }
 
   // ── AIPromptLibraryItem ──

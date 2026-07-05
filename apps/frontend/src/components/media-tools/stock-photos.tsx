@@ -251,27 +251,38 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
         <>
           {/* Masonry photo grid (F1) — CSS columns preserve each tile's aspect ratio */}
           <div className="columns-2 sm:columns-3 lg:columns-4 xl:columns-5 gap-[12px]">
-            {items.map((photo) => (
-              <button
+            {items.map((photo) => {
+              // A tile is a role=button div (not a <button>) so the author-credit
+              // <a> below is valid — an interactive <a> may not nest inside a <button>.
+              const activate = () => {
+                if (mode === 'select' && (onSelect || onSelectFull)) {
+                  const payload = {
+                    url: photo.url,
+                    width: photo.width,
+                    height: photo.height,
+                    thumbnail: photo.thumbUrl,
+                    type: 'image' as const,
+                    source: photo.source,
+                    attribution: photo.attribution,
+                    downloadLocation: photo.downloadLocation,
+                    name: photo.description || undefined,
+                  };
+                  onSelectFull?.(payload);
+                  onSelect?.(payload);
+                } else {
+                  openPhoto(photo);
+                }
+              };
+              return (
+              <div
                 key={photo.id}
-                type="button"
-                onClick={() => {
-                  if (mode === 'select' && (onSelect || onSelectFull)) {
-                    const payload = {
-                      url: photo.url,
-                      width: photo.width,
-                      height: photo.height,
-                      thumbnail: photo.thumbUrl,
-                      type: 'image' as const,
-                      source: photo.source,
-                      attribution: photo.attribution,
-                      downloadLocation: photo.downloadLocation,
-                      name: photo.description || undefined,
-                    };
-                    onSelectFull?.(payload);
-                    onSelect?.(payload);
-                  } else {
-                    openPhoto(photo);
+                role="button"
+                tabIndex={0}
+                onClick={activate}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate();
                   }
                 }}
                 className="group block w-full mb-[12px] break-inside-avoid text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
@@ -310,8 +321,9 @@ export const StockPhotos: FC<StockPhotosProps> = ({ mode = 'browse', onSelect, o
                     <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(photo.source)}</span>
                   </div>
                 </div>
-              </button>
-            ))}
+              </div>
+              );
+            })}
           </div>
 
           {/* Infinite-scroll sentinel + skeleton tail (F2) */}

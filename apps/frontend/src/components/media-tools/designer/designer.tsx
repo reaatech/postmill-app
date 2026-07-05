@@ -6,7 +6,7 @@ import { useCollaboration } from './collaboration';
 import type { TimelineAwareness, ImageAwareness } from './collaboration';
 import { CollaborationCursors, type PeerTimelineState } from './collaboration-cursors';
 import { DesignerCanvas } from './canvas';
-import { setImageFetch } from './elements';
+import { setImageFetch, clearImageCache } from './elements';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { useToaster } from '@gitroom/react/toaster/toaster';
@@ -47,6 +47,9 @@ import { getBrandViolations } from './brand-compliance';
 import { useBrandColors } from './panels/use-brand-colors';
 import { useBrandFonts } from './panels/use-brand-fonts';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
+
+// 4.4: hoisted so the memoized onPeerTimeline callback has no changing closure dep.
+const PEER_COLORS = ['#f43f5e', '#8b5cf6', '#06b6d4', '#f59e0b', '#22c55e', '#ec4899'];
 
 interface DesignerProps {
   setMedia?: (media: { id: string; path: string }[]) => void;
@@ -148,6 +151,24 @@ function buildCaptionClips(
   }
   return clips;
 }
+
+// Decode a data: URL to a Blob directly. The designer's `useFetch` prefixes the
+// backend baseUrl onto any URL, so `fetch(dataUrl)` there throws — the thumbnail
+// upload silently died and every save shipped the full base64 in the JSON.
+export const dataUrlToBlob = (dataUrl: string): Blob | null => {
+  const match = /^data:([^;,]+)?(;base64)?,([\s\S]*)$/.exec(dataUrl);
+  if (!match) return null;
+  const mime = match[1] || 'application/octet-stream';
+  const isBase64 = !!match[2];
+  const data = match[3];
+  if (isBase64) {
+    const binary = atob(data);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type: mime });
+  }
+  return new Blob([decodeURIComponent(data)], { type: mime });
+};
 
 export const getThumbnailDataUrl = (canvas: HTMLCanvasElement | null, maxDim = 400): string | undefined => {
   if (!canvas) return undefined;
@@ -257,26 +278,35 @@ export const Designer: FC<DesignerProps> = ({
   const [peerTimelines, setPeerTimelines] = useState<PeerTimelineState[]>([]);
   const [peerImages, setPeerImages] = useState<ImageAwareness[]>([]);
 
+  // 4.4: memoize the four collaboration callbacks so `useCollaboration`'s effect
+  // deps are stable. Inline arrows here got a new identity on every doc/selection
+  // render, tearing down and rebuilding the socket + Y.Doc on every keystroke/drag.
+  const onRemoteDoc = useCallback((remoteDoc: any) => {
+    store.getState().setDoc(migrateDoc(remoteDoc));
+  }, []);
+  const onConnectedChange = useCallback((count: number) => {
+    setConnectedCount(count);
+  }, []);
+  const onPeerTimeline = useCallback((peers: TimelineAwareness[]) => {
+    setPeerTimelines(
+      peers.map((p, i) => ({
+        playheadMs: p.playheadMs,
+        selectedClipId: p.selectedClipId,
+        color: PEER_COLORS[i % PEER_COLORS.length],
+      })),
+    );
+  }, []);
+  const onPeerImage = useCallback((peers: ImageAwareness[]) => {
+    setPeerImages(peers);
+  }, []);
+
   const collabData = useCollaboration({
     designId: currentDesignId,
     enabled: collabEnabled,
-    onRemoteDoc: (remoteDoc: any) => {
-      store.getState().setDoc(migrateDoc(remoteDoc));
-    },
-    onConnectedChange: (count) => setConnectedCount(count),
-    onPeerTimeline: (peers: TimelineAwareness[]) => {
-      const colors = ['#f43f5e', '#8b5cf6', '#06b6d4', '#f59e0b', '#22c55e', '#ec4899'];
-      setPeerTimelines(
-        peers.map((p, i) => ({
-          playheadMs: p.playheadMs,
-          selectedClipId: p.selectedClipId,
-          color: colors[i % colors.length],
-        })),
-      );
-    },
-    onPeerImage: (peers: ImageAwareness[]) => {
-      setPeerImages(peers);
-    },
+    onRemoteDoc,
+    onConnectedChange,
+    onPeerTimeline,
+    onPeerImage,
   });
 
   useEffect(() => {
@@ -329,6 +359,7 @@ export const Designer: FC<DesignerProps> = ({
   useEffect(() => {
     return () => {
       store.getState().reset();
+      clearImageCache();
     };
   }, [store]);
 
@@ -349,17 +380,27 @@ export const Designer: FC<DesignerProps> = ({
 
   useEffect(() => {
     if (!debouncedDoc || !currentDesignId || !isDirty) return;
+    const sentDoc = debouncedDoc;
     store.getState().setSaving(true);
     fetch(`/media/designs/${currentDesignId}`, {
       method: 'PUT',
-      body: JSON.stringify({ doc: debouncedDoc }),
+      body: JSON.stringify({ doc: sentDoc }),
     })
       .then((res) => res.json())
-      .then(() => store.getState().markSaved())
+      .then(() => {
+        // Only clear isDirty if no edit landed while the PUT was in flight —
+        // zustand replaces the doc object on every edit, so a reference mismatch
+        // means unsaved changes exist and must not be marked "Saved".
+        if (store.getState().doc === sentDoc) {
+          store.getState().markSaved();
+        } else {
+          store.getState().setSaving(false);
+        }
+      })
       .catch(() => {
         store.getState().setSaving(false);
       });
-  }, [debouncedDoc, currentDesignId, isDirty, fetch]);
+  }, [debouncedDoc, currentDesignId, isDirty, fetch, store]);
 
   const handleExport = useCallback(() => {
     const s = store.getState();
@@ -383,11 +424,11 @@ export const Designer: FC<DesignerProps> = ({
       const stageEl = document.querySelector('.konva-stage canvas') as HTMLCanvasElement;
       const previewDataUrl = getThumbnailDataUrl(stageEl);
       let previewFileId: string | undefined;
-      if (previewDataUrl) {
+      const previewBlob = previewDataUrl ? dataUrlToBlob(previewDataUrl) : null;
+      if (previewBlob) {
         try {
-          const blob = await (await fetch(previewDataUrl)).blob();
           const form = new FormData();
-          form.append('file', blob, 'thumbnail.jpg');
+          form.append('file', previewBlob, 'thumbnail.jpg');
           const uploadRes = await fetch('/files/upload-simple', { method: 'POST', body: form });
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
@@ -402,9 +443,11 @@ export const Designer: FC<DesignerProps> = ({
         doc: s.doc,
         width: s.doc.outputs[0]?.width,
         height: s.doc.outputs[0]?.height,
-        previewDataUrl,
       };
       if (previewFileId) payload.previewFileId = previewFileId;
+      // Only ship the base64 preview as a fallback when the upload failed, to keep
+      // the save JSON small.
+      else if (previewDataUrl) payload.previewDataUrl = previewDataUrl;
       if (s.designId) {
         const res = await fetch(`/media/designs/${s.designId}`, {
           method: 'PUT',
@@ -440,11 +483,11 @@ export const Designer: FC<DesignerProps> = ({
       const stageEl = document.querySelector('.konva-stage canvas') as HTMLCanvasElement;
       const previewDataUrl = getThumbnailDataUrl(stageEl);
       let thumbnailFileId: string | undefined;
-      if (previewDataUrl) {
+      const previewBlob = previewDataUrl ? dataUrlToBlob(previewDataUrl) : null;
+      if (previewBlob) {
         try {
-          const blob = await (await fetch(previewDataUrl)).blob();
           const form = new FormData();
-          form.append('file', blob, 'thumbnail.jpg');
+          form.append('file', previewBlob, 'thumbnail.jpg');
           const uploadRes = await fetch('/files/upload-simple', { method: 'POST', body: form });
           if (uploadRes.ok) {
             const uploadData = await uploadRes.json();
@@ -612,7 +655,15 @@ export const Designer: FC<DesignerProps> = ({
     probe.onerror = () => finish(10000);
     probe.src = url;
     const guard = window.setTimeout(() => finish(10000), 5000);
-    return () => window.clearTimeout(guard);
+    return () => {
+      window.clearTimeout(guard);
+      // Detach handlers and release the probe so a slow metadata load can't fire
+      // after unmount (and the element can be GC'd).
+      probe.onloadedmetadata = null;
+      probe.onerror = null;
+      probe.removeAttribute('src');
+      probe.load();
+    };
   }, [initialCaptionVideo, store]);
 
   // Timeline handoff: land a video/audio artifact directly on the timeline.

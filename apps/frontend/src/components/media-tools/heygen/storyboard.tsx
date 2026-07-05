@@ -129,6 +129,8 @@ export const Storyboard: FC<StoryboardProps> = ({ avatars, voices, onGenerated }
       }
       toaster.show('Render started — track it in the queue', 'success');
       onGenerated();
+    } catch {
+      toaster.show('Failed to start the render', 'warning');
     } finally {
       setGenerating(false);
     }

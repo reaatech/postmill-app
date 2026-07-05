@@ -70,13 +70,13 @@ export function ModelPicker({ categoryKey }: ModelPickerProps) {
 
   return (
     <div>
-      <label className="block text-xs uppercase tracking-wider text-gray-500 mb-1.5">
+      <label className="block text-xs uppercase tracking-wider text-newTextColor/70 mb-1.5">
         Model
       </label>
       <select
         value={selectedModel?.id || ''}
         onChange={(e) => loadModel(e.target.value)}
-        className="w-full px-3 py-2.5 rounded-lg border border-newBorder bg-newBgColorInner text-white text-sm focus:outline-none focus:border-designerAccent"
+        className="w-full px-3 py-2.5 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-sm focus:outline-none focus:border-designerAccent"
       >
         <option value="">Select a model…</option>
         {warm.length > 0 && (

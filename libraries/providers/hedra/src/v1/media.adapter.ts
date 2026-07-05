@@ -9,6 +9,8 @@ import {
   MediaInputValue,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -73,7 +75,7 @@ export class HedraAdapter implements MediaProviderAdapter {
         ...(aspectRatio ? { aspect_ratio: aspectRatio } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`Hedra video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Hedra video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as HedraGenerationResponse;
     const jobId = data.id || data.generation_id;
     if (!jobId) throw new Error('Hedra returned no generation id');
@@ -89,10 +91,19 @@ export class HedraAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Hedra API key is required' };
+
     const res = await this._fetch(`${BASE}/generations/${jobId}/status`, {
       headers: this._headers(options),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering generation retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Hedra poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as HedraGenerationResponse;
 
     if (data.status === 'complete') {
@@ -101,7 +112,7 @@ export class HedraAdapter implements MediaProviderAdapter {
       return { status: 'completed', artifactUrl, metadata: { provider: this.identifier, mime: 'video/mp4' } };
     }
     if (data.status === 'error' || data.status === 'failed') {
-      return { status: 'failed', error: data.error_message || 'Hedra generation failed' };
+      return { status: 'failed', error: redactError(data.error_message || 'Hedra generation failed') };
     }
     return { status: 'pending' };
   }

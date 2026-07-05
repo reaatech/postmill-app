@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { FC, useState, useCallback, useEffect } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 import { useReplicateStore } from './replicate.store';
 import { VideoPlayer } from './players/video-player';
@@ -30,9 +31,11 @@ const TRANSITION_OPTIONS = [
   { value: 'fadegrayscale', label: 'Fade Grayscale' },
 ];
 
-const fieldLabel = 'text-[10px] uppercase tracking-wider text-gray-500';
+const fieldLabel = 'text-[10px] uppercase tracking-wider text-newTextColor/50';
 const fieldInput =
-  'w-full px-2 py-1 rounded border border-newBorder bg-newBgColor text-white text-xs focus:outline-none focus:border-designerAccent';
+  'w-full px-2 py-1 rounded border border-studioBorder bg-newBgColor text-textColor text-xs focus:outline-none focus:border-designerAccent';
+
+type MergeJobData = { status: string; result: { kind: string; urls: string[] } | null };
 
 function useJobPoll(jobId: string | null) {
   const fetch = useFetch();
@@ -40,15 +43,64 @@ function useJobPoll(jobId: string | null) {
     jobId ? `merge-job-${jobId}` : null,
     async () => {
       const res = await fetch(`/media/replicate/jobs/${jobId}`);
-      return (await res.json()) as { status: string; result: { kind: string; urls: string[] } | null };
+      return (await res.json()) as MergeJobData;
     },
-    { refreshInterval: 6000 }
+    {
+      // Stop polling once the job reaches a terminal state — the previous
+      // unconditional interval polled forever while the editor stayed mounted.
+      refreshInterval: (data) =>
+        data && (data.status === 'completed' || data.status === 'failed') ? 0 : 6000,
+    }
   );
 }
+
+// Modal replacement for the native `prompt()` (which the app forbids); lets the user
+// paste an external https clip URL with inline validation.
+const UrlClipModal: FC<{ onClose: () => void; onSubmit: (url: string) => void }> = ({
+  onClose,
+  onSubmit,
+}) => {
+  const [url, setUrl] = useState('');
+  const [err, setErr] = useState<string | null>(null);
+  const submit = () => {
+    const trimmed = url.trim();
+    if (!trimmed.startsWith('https://')) {
+      setErr('External clip URL must start with https://');
+      return;
+    }
+    onSubmit(trimmed);
+  };
+  return (
+    <div className="p-4 w-[420px] max-w-full flex flex-col gap-3">
+      <input
+        value={url}
+        onChange={(e) => {
+          setUrl(e.target.value);
+          setErr(null);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') submit();
+        }}
+        placeholder="https://example.com/clip.mp4"
+        className={fieldInput}
+      />
+      {err && <p className="text-xs text-red-400">{err}</p>}
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onClose} className={toolbarBtn}>
+          Cancel
+        </button>
+        <button type="button" onClick={submit} className={toolbarPrimary}>
+          Add clip
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export function MergeEditor() {
   const fetch = useFetch();
   const modals = useModals();
+  const toaster = useToaster();
   const saveFolderId = useReplicateStore((s) => s.saveFolderId);
   const [clips, setClips] = useState<MergeClip[]>([]);
   const [transitions, setTransitions] = useState<MergeTransition[]>([]);
@@ -58,7 +110,27 @@ export function MergeEditor() {
   const [error, setError] = useState<string | null>(null);
 
   const { data: jobData } = useJobPoll(jobId);
-  const isComplete = jobData?.status === 'completed';
+  const status = jobData?.status;
+  const isComplete = status === 'completed';
+
+  // Terminal state resolution: reset `running` (so Merge re-enables) and surface a
+  // failure. Previously only the throw path reset `running`, so success left Merge
+  // disabled and failure spun forever.
+  useEffect(() => {
+    if (status === 'completed' || status === 'failed') {
+      setRunning(false);
+      if (status === 'failed') setError('Merge failed. Please try again.');
+    }
+  }, [status]);
+
+  // A transition sits between two clips: N clips ⇒ N-1 transitions. Append one only
+  // when this is not the first clip. Kept OUT of the setClips updater so StrictMode's
+  // double-invoke of the pure updater can't append a duplicate transition.
+  const appendTransitionIfNeeded = useCallback(() => {
+    if (clips.length > 0) {
+      setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
+    }
+  }, [clips.length]);
 
   const addFileClip = useCallback(() => {
     if (clips.length >= 6) return;
@@ -69,37 +141,53 @@ export function MergeEditor() {
         <MediaSelectorModal
           open
           onClose={close}
+          kinds={['video']}
           onSelect={(item) => {
-            setClips((prev) => {
-              if (prev.length >= 6) return prev;
-              if (prev.length > 0) setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
-              return [...prev, { fileId: item.fileId }];
-            });
+            if (item.type !== 'video') {
+              toaster.show('Please choose a video clip', 'warning');
+              return;
+            }
+            setClips((prev) => (prev.length >= 6 ? prev : [...prev, { fileId: item.fileId }]));
+            appendTransitionIfNeeded();
             close();
           }}
         />
       ),
     });
-  }, [clips.length, modals]);
+  }, [clips.length, modals, toaster, appendTransitionIfNeeded]);
 
   const addUrlClip = useCallback(() => {
     if (clips.length >= 6) return;
-    const url = prompt('Enter external clip URL (https):');
-    if (!url) return;
-    if (!url.startsWith('https://')) {
-      setError('External clip URL must start with https://');
-      return;
-    }
-    setClips((prev) => {
-      if (prev.length > 0) setTransitions((t) => [...t, { type: 'fade', duration: 0.5 }]);
-      return [...prev, { url }];
+    modals.openModal({
+      title: 'Add external clip URL',
+      children: (close) => (
+        <UrlClipModal
+          onClose={close}
+          onSubmit={(url) => {
+            setClips((prev) => (prev.length >= 6 ? prev : [...prev, { url }]));
+            appendTransitionIfNeeded();
+            close();
+          }}
+        />
+      ),
     });
-  }, [clips.length]);
+  }, [clips.length, modals, appendTransitionIfNeeded]);
 
   const removeClip = useCallback((index: number) => {
     setClips((prev) => prev.filter((_, i) => i !== index));
-    setTransitions((prev) => prev.filter((_, i) => i !== index));
-    setSelected((cur) => (cur === index ? null : cur));
+    // Drop the transition adjacent to the removed clip: the one before it when the
+    // last clip is removed, otherwise the one after it (clamped into range).
+    setTransitions((prev) => {
+      if (prev.length === 0) return prev;
+      const tIdx = Math.min(index, prev.length - 1);
+      return prev.filter((_, i) => i !== tIdx);
+    });
+    // Reindex the selection: cleared if it was the removed clip, shifted down if it
+    // sat after it.
+    setSelected((cur) => {
+      if (cur === null || cur === index) return null;
+      return cur > index ? cur - 1 : cur;
+    });
   }, []);
 
   const updateClip = useCallback((index: number, patch: Partial<MergeClip>) => {
@@ -156,11 +244,11 @@ export function MergeEditor() {
 
   const inspector = (
     <div className="p-4 space-y-4">
-      {!saveFolderId && <p className="text-xs text-yellow-400">Pick a save folder (header) before merging.</p>}
+      {!saveFolderId && <p className="text-xs text-amber-600">Pick a save folder (header) before merging.</p>}
       {selectedClip ? (
         <div className="space-y-3">
           <div className={fieldLabel}>Clip {selected! + 1}</div>
-          <p className="text-[11px] text-gray-500 truncate">{selectedClip.url || selectedClip.fileId}</p>
+          <p className="text-[11px] text-newTextColor/60 truncate">{selectedClip.url || selectedClip.fileId}</p>
           <div className="grid grid-cols-2 gap-2">
             <div>
               <div className={fieldLabel}>Trim start (s)</div>
@@ -188,7 +276,7 @@ export function MergeEditor() {
             </div>
           </div>
           {selected! < clips.length - 1 && transitions[selected!] && (
-            <div className="border-t border-newBorder pt-3 space-y-2">
+            <div className="border-t border-studioBorder pt-3 space-y-2">
               <div className={fieldLabel}>Transition → next clip</div>
               <select
                 value={transitions[selected!].type}
@@ -220,7 +308,7 @@ export function MergeEditor() {
           </button>
         </div>
       ) : (
-        <p className="text-xs text-gray-600">Select a clip in the strip to trim it or set its transition.</p>
+        <p className="text-xs text-newTextColor/50">Select a clip in the strip to trim it or set its transition.</p>
       )}
       {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
@@ -229,7 +317,7 @@ export function MergeEditor() {
   return (
     <EditorShell title="Merge Videos" toolbar={toolbar} inspector={inspector} stageClassName="!items-stretch !justify-start flex-col">
       {clips.length === 0 ? (
-        <div className="flex-1 flex items-center justify-center text-gray-500 text-sm">
+        <div className="flex-1 flex items-center justify-center text-newTextColor/50 text-sm">
           Add up to 6 video clips to merge them with transitions.
         </div>
       ) : (
@@ -242,22 +330,22 @@ export function MergeEditor() {
                   onClick={() => setSelected(idx)}
                   className={`flex-shrink-0 w-40 h-24 rounded-lg border flex flex-col items-center justify-center gap-1 transition-colors ${
                     selected === idx
-                      ? 'border-designerAccent bg-designerAccent/15 text-white'
-                      : 'border-newBorder bg-newBgColorInner text-gray-400 hover:bg-boxHover'
+                      ? 'border-designerAccent bg-designerAccent/15 text-textColor'
+                      : 'border-studioBorder bg-newBgColorInner text-newTextColor/70 hover:bg-boxHover'
                   }`}
                 >
                   <span className="text-2xl">🎬</span>
                   <span className="text-xs">Clip {idx + 1}</span>
                   {(clip.trimStart != null || clip.trimEnd != null) && (
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-[10px] text-newTextColor/50">
                       {clip.trimStart ?? 0}s–{clip.trimEnd ?? '∞'}s
                     </span>
                   )}
                 </button>
                 {idx < clips.length - 1 && (
                   <div className="flex-shrink-0 flex flex-col items-center justify-center w-16 text-center">
-                    <span className="text-gray-600 text-lg">⟶</span>
-                    <span className="text-[9px] text-gray-500">{transitions[idx]?.type || 'fade'}</span>
+                    <span className="text-newTextColor/50 text-lg">⟶</span>
+                    <span className="text-[9px] text-newTextColor/50">{transitions[idx]?.type || 'fade'}</span>
                   </div>
                 )}
               </React.Fragment>
@@ -268,7 +356,7 @@ export function MergeEditor() {
           {running && !isComplete && (
             <div className="flex items-center gap-2 mt-2">
               <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-designerAccent" />
-              <span className="text-sm text-gray-400">Processing merge…</span>
+              <span className="text-sm text-newTextColor/70">Processing merge…</span>
             </div>
           )}
           {isComplete && jobData?.result?.urls && (

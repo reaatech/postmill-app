@@ -19,6 +19,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
 }) => {
   const updateElement = store((s: any) => s.updateElement);
   const updateElements = store((s: any) => s.updateElements);
+  const updateElementsSilent = store((s: any) => s.updateElementsSilent);
   const reorder = store((s: any) => s.reorder);
   const pushHistory = store((s: any) => s.pushHistory);
   const currentOutput = store((s: any) => s.currentOutput);
@@ -202,7 +203,8 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
         min={0}
         max={360}
         value={Math.round(primary.rotation)}
-        onChange={(n) => set({ rotation: n })}
+        onChange={(n) => updateElementsSilent(ids, { rotation: n })}
+        onCommit={() => pushHistory()}
       />
 
       <Slider
@@ -211,7 +213,8 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
         min={0}
         max={100}
         value={Math.round((primary.opacity ?? 1) * 100)}
-        onChange={(n) => set({ opacity: n / 100 })}
+        onChange={(n) => updateElementsSilent(ids, { opacity: n / 100 })}
+        onCommit={() => pushHistory()}
       />
 
       <div className="flex items-center justify-between">

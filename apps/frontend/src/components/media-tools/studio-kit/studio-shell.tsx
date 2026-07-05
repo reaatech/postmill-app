@@ -20,9 +20,20 @@ import type {
 function defaultsFor(tab: StudioTab): Record<string, StudioFieldValue> {
   const out: Record<string, StudioFieldValue> = {};
   for (const f of tab.fields) {
-    if (f.type === 'select' && f.default !== undefined) out[f.name] = f.default;
-    else if (f.type === 'number' && f.default !== undefined) out[f.name] = f.default;
-    else if (f.type === 'toggle' && f.default !== undefined) out[f.name] = f.default;
+    if (f.type === 'select') {
+      if (f.default !== undefined) out[f.name] = f.default;
+      // A plain <select> visually shows its first option even when nothing is
+      // picked — seed it so the displayed value is actually submitted. Dynamic
+      // model comboboxes (source:'models') render an empty search box, so skip.
+      else if (f.source !== 'models' && f.options?.length) out[f.name] = f.options[0].value;
+    } else if (f.type === 'number') {
+      if (f.default !== undefined) out[f.name] = f.default;
+      // A range slider always shows a thumb (min when unset) — seed min so it's
+      // submitted; a plain number input renders empty, so only seed when ranged.
+      else if (f.min !== undefined && f.max !== undefined) out[f.name] = f.min;
+    } else if (f.type === 'toggle' && f.default !== undefined) {
+      out[f.name] = f.default;
+    }
   }
   return out;
 }

@@ -4,6 +4,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 
@@ -15,11 +16,14 @@ export class TranscriptSegmentDto {
   end!: number;
 
   @IsString()
+  @MaxLength(20000)
   text!: string;
 }
 
 export class SaveTranscriptDto {
+  // 6.3: cap the transcript body so a huge payload can't be persisted unbounded.
   @IsString()
+  @MaxLength(200000)
   text!: string;
 
   @IsOptional()

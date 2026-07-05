@@ -55,6 +55,8 @@ export const TalkingPhoto: FC<TalkingPhotoProps> = ({ voices, onGenerated }) => 
       }
       toaster.show('Talking photo started — track it in the queue', 'success');
       onGenerated();
+    } catch {
+      toaster.show('Failed to start the render', 'warning');
     } finally {
       setGenerating(false);
     }

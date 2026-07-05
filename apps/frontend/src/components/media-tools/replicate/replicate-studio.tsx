@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
@@ -77,11 +77,11 @@ function SaveFolderPicker() {
 
   return (
     <div className="flex items-center gap-2">
-      <label className="text-xs text-gray-500 mobile:hidden">Save to</label>
+      <label className="text-xs text-newTextColor/50 mobile:hidden">Save to</label>
       <select
         value={saveFolderId || ''}
         onChange={(e) => setSaveFolderId(e.target.value || null)}
-        className="px-2 py-1 rounded-lg border border-studioBorder bg-newBgColorInner text-white text-xs focus:outline-none max-w-[140px]"
+        className="px-2 py-1 rounded-lg border border-studioBorder bg-newBgColorInner text-textColor text-xs focus:outline-none max-w-[140px]"
       >
         <option value="">Files root…</option>
         {folders.map((f) => (
@@ -143,7 +143,7 @@ function MenuSpine({
             title="Toggle controls"
             aria-label="Toggle controls panel"
             className={`w-10 h-10 mb-2 flex items-center justify-center rounded-lg text-lg transition-colors ${
-              controlsOpen ? 'bg-designerAccent/20 text-designerAccent' : 'text-gray-400 hover:bg-boxHover'
+              controlsOpen ? 'bg-designerAccent/20 text-designerAccent' : 'text-newTextColor/70 hover:bg-boxHover'
             }`}
           >
             ⚙
@@ -174,10 +174,10 @@ function CategoryPanel({
       <div className="hidden mobile:block absolute inset-0 z-10 bg-black/40" onClick={onClose} />
       <div className="absolute left-[52px] inset-y-0 w-[220px] z-20 border-r border-studioBorder bg-newBgColorInner overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between px-3 h-12 border-b border-studioBorder sticky top-0 bg-newBgColorInner">
-          <span className="text-xs uppercase tracking-wider text-gray-500">
+          <span className="text-xs uppercase tracking-wider text-newTextColor/50">
             {MEDIUM_ICONS[medium]} {MEDIUM_TITLE[medium]}
           </span>
-          <button onClick={onClose} className="text-gray-500 hover:text-white" aria-label="Close">
+          <button onClick={onClose} className="text-newTextColor/50 hover:text-textColor" aria-label="Close">
             ✕
           </button>
         </div>
@@ -189,7 +189,7 @@ function CategoryPanel({
               className={`w-full text-left px-3 py-2 rounded-lg text-sm mb-0.5 transition-colors ${
                 selectedCategory === cat.key
                   ? 'bg-designerAccent/20 text-textColor'
-                  : 'text-gray-400 hover:bg-boxHover hover:text-gray-200'
+                  : 'text-newTextColor/70 hover:bg-boxHover hover:text-textColor'
               }`}
             >
               {cat.label}
@@ -215,9 +215,9 @@ function GenerateButton({ category }: { category: string }) {
 
   return (
     <div className="space-y-2">
-      {needsFolder && <p className="text-[11px] text-yellow-400">Pick a save folder before generating.</p>}
+      {needsFolder && <p className="text-[11px] text-amber-600">Pick a save folder before generating.</p>}
       {missing.length > 0 && selectedModel && (
-        <p className="text-[11px] text-gray-500">Required: {missing.join(', ')}</p>
+        <p className="text-[11px] text-newTextColor/50">Required: {missing.join(', ')}</p>
       )}
       <button
         onClick={() => generate()}
@@ -236,12 +236,12 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
     runState === 'running' ? 'Generating…' : runState === 'error' ? 'Error' : runState === 'success' ? 'Done' : '';
   const stateColor =
     runState === 'running'
-      ? 'text-yellow-400'
+      ? 'text-amber-600'
       : runState === 'error'
         ? 'text-red-400'
         : runState === 'success'
           ? 'text-green-400'
-          : 'text-gray-500';
+          : 'text-newTextColor/50';
 
   return (
     <div className="flex items-center justify-between h-12 flex-shrink-0 border-b border-studioBorder px-3 bg-newBgColorInner">
@@ -249,13 +249,13 @@ function StudioHeader({ activeCategoryLabel }: { activeCategoryLabel?: string })
         <Logo size={20} className="" />
         <h1 className="text-sm font-semibold text-textColor whitespace-nowrap">Replicate Studio</h1>
         {activeCategoryLabel && (
-          <span className="text-xs text-gray-500 truncate mobile:hidden">› {activeCategoryLabel}</span>
+          <span className="text-xs text-newTextColor/50 truncate mobile:hidden">› {activeCategoryLabel}</span>
         )}
         {stateLabel && <span className={`text-xs ${stateColor} mobile:hidden`}>· {stateLabel}</span>}
       </div>
       <div className="flex items-center gap-3">
         <SaveFolderPicker />
-        <span className="mobile:hidden text-[10px] text-gray-600 border border-studioBorder rounded px-1.5 py-0.5">
+        <span className="mobile:hidden text-[10px] text-newTextColor/50 border border-studioBorder rounded px-1.5 py-0.5">
           ⌘K
         </span>
         <FullscreenButton />
@@ -272,7 +272,12 @@ export function ReplicateStudio() {
   const setCategory = useReplicateStore((s) => s.setCategory);
   const runState = useReplicateStore((s) => s.runState);
   const result = useReplicateStore((s) => s.result);
+  const resetStore = useReplicateStore((s) => s.reset);
   const configured = status?.configured ?? true;
+
+  // The store is module-global (survives navigation); clear it when the studio
+  // unmounts so a stale model/result/form doesn't bleed into the next visit.
+  useEffect(() => () => resetStore(), [resetStore]);
   // Full-screen fills the canvas app, not the page (see HeyGen studio for the rationale).
   const { isFullscreen } = useFullscreen();
 
@@ -339,7 +344,7 @@ export function ReplicateStudio() {
 
         {/* Display area */}
         {!selectedCategory ? (
-          <div className="flex-1 flex items-center justify-center text-gray-500 px-6 text-center">
+          <div className="flex-1 flex items-center justify-center text-newTextColor/50 px-6 text-center">
             <div>
               <p className="text-lg">Pick a tool to get started</p>
               <p className="text-sm mt-1">Tap a medium on the left — image, video, or audio.</p>
@@ -364,8 +369,8 @@ export function ReplicateStudio() {
             {controlsOpen && (
               <div className={controlsClasses}>
                 <div className="flex items-center justify-between px-4 h-10 border-b border-studioBorder mobile:flex hidden">
-                  <span className="text-xs uppercase tracking-wider text-gray-500">Controls</span>
-                  <button onClick={() => setControlsOpen(false)} className="text-gray-500 hover:text-white" aria-label="Close controls">
+                  <span className="text-xs uppercase tracking-wider text-newTextColor/50">Controls</span>
+                  <button onClick={() => setControlsOpen(false)} className="text-newTextColor/50 hover:text-textColor" aria-label="Close controls">
                     ✕
                   </button>
                 </div>

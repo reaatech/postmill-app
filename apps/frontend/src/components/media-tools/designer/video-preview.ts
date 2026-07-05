@@ -105,6 +105,10 @@ export function sourceTimeForPlayhead(clip: VideoClip, playheadMs: number): numb
   const effectiveEnd = getEffectiveClipEnd(clip);
   if (playheadMs < clip.startMs || playheadMs > effectiveEnd) return null;
 
+  // A speed:0 clip is a held (freeze) frame — always the source time at its
+  // trim-in, never advancing with the playhead.
+  if (clip.speed === 0) return clip.trimInMs || 0;
+
   const isInFreeze = clip.freezeAtMs ? playheadMs > clip.endMs : false;
   if (isInFreeze) {
     return getClipDuration(clip) + (clip.trimInMs || 0);
@@ -307,6 +311,7 @@ export class VideoPreviewEngine {
   }
 
   private seekMediaElements(ms: number, vo: VideoOutput) {
+    const activeIds = new Set<string>();
     for (const track of vo.tracks) {
       const trackGain = track.gain ?? 1;
       const activeVoice = track.type === 'audio' && track.autoDuck
@@ -325,6 +330,7 @@ export class VideoPreviewEngine {
         if (track.type === 'video' && clip.src && (clip.speed == null || clip.speed > 0)) {
           const el = this.getOrCreateVideo(clip);
           if (el) {
+            activeIds.add(clip.id);
             const seekTime = sourceTime / 1000;
             if (Math.abs(el.currentTime - seekTime) > 0.1) {
               el.currentTime = seekTime;
@@ -338,6 +344,7 @@ export class VideoPreviewEngine {
         if (track.type === 'audio' && clip.src && (clip.speed == null || clip.speed > 0)) {
           const el = this.getOrCreateAudio(clip);
           if (el) {
+            activeIds.add(clip.id);
             const seekTime = sourceTime / 1000;
             if (Math.abs(el.currentTime - seekTime) > 0.1) {
               el.currentTime = seekTime;
@@ -350,6 +357,14 @@ export class VideoPreviewEngine {
         }
       }
     }
+    // Pause any media element whose clip is no longer under the playhead — a clip
+    // ending mid-timeline otherwise keeps playing to the timeline's end.
+    this.videoElements.forEach((el, id) => {
+      if (!activeIds.has(id) && !el.paused) el.pause();
+    });
+    this.audioElements.forEach((el, id) => {
+      if (!activeIds.has(id) && !el.paused) el.pause();
+    });
   }
 
   private voiceActiveAt(vo: VideoOutput, ms: number): boolean {
@@ -377,7 +392,9 @@ export class VideoPreviewEngine {
 
     const el = document.createElement('video');
     el.src = clip.src;
-    el.muted = !clip.volume || clip.volume === 0;
+    // Only mute when the volume is explicitly zeroed; an unset volume defaults to
+    // 1 (audible), so the preview no longer silences default video audio.
+    el.muted = clip.volume === 0;
     el.volume = Math.min(1, (clip.volume ?? 1));
     if (clip.speed !== undefined && clip.speed > 0) {
       el.playbackRate = clip.speed;

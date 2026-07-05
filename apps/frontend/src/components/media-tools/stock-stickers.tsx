@@ -173,28 +173,38 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
       ) : (
         <>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-[12px]">
-            {items.map((sticker) => (
-              <button
+            {items.map((sticker) => {
+              // role=button div (not <button>) so the author-credit <a> is valid HTML.
+              const activate = () => {
+                if (mode === 'select' && (onSelect || onSelectFull)) {
+                  const isVideo = !!sticker.mp4Url;
+                  const type: 'image' | 'video' = isVideo ? 'video' : 'image';
+                  const payload = {
+                    url: isVideo ? sticker.mp4Url! : sticker.url,
+                    width: sticker.width,
+                    height: sticker.height,
+                    thumbnail: sticker.thumbUrl,
+                    type,
+                    source: sticker.source,
+                    attribution: sticker.attribution,
+                    name: sticker.description || undefined,
+                  };
+                  onSelectFull?.(payload);
+                  onSelect?.(payload);
+                } else {
+                  openSticker(sticker);
+                }
+              };
+              return (
+              <div
                 key={sticker.id}
-                type="button"
-                onClick={() => {
-                  if (mode === 'select' && (onSelect || onSelectFull)) {
-                    const isVideo = !!sticker.mp4Url;
-                    const type: 'image' | 'video' = isVideo ? 'video' : 'image';
-                    const payload = {
-                      url: isVideo ? sticker.mp4Url! : sticker.url,
-                      width: sticker.width,
-                      height: sticker.height,
-                      thumbnail: sticker.thumbUrl,
-                      type,
-                      source: sticker.source,
-                      attribution: sticker.attribution,
-                      name: sticker.description || undefined,
-                    };
-                    onSelectFull?.(payload);
-                    onSelect?.(payload);
-                  } else {
-                    openSticker(sticker);
+                role="button"
+                tabIndex={0}
+                onClick={activate}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    activate();
                   }
                 }}
                 className="group text-left rounded-[8px] overflow-hidden border border-newBorder bg-newBgColorInner cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#2B5CD3]"
@@ -235,8 +245,9 @@ export const StockStickers: FC<StockStickersProps> = ({ mode = 'browse', onSelec
                     <span className="text-newTextColor/40 ml-[4px]">· {stockSourceLabel(sticker.source)}</span>
                   </div>
                 </div>
-              </button>
-            ))}
+              </div>
+              );
+            })}
           </div>
 
           {hasMore && (

@@ -156,7 +156,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
   const { fonts: customFonts } = useCustomFonts();
 
   const update = useCallback(
-    (updates: Partial<DesignerElement>) => {
+    (updates: Partial<DesignerElement>, commit = true) => {
       if (!textElements.length) return;
 
       const runUpdate: Partial<TextRun> = {};
@@ -191,7 +191,9 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
         }
         store.getState().updateElement(el.id, merged);
       }
-      store.getState().pushHistory();
+      // Continuous controls (sliders) pass commit=false during the drag and push a
+      // single history entry on release.
+      if (commit) store.getState().pushHistory();
     },
     [store, textElements, element]
   );
@@ -549,7 +551,8 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
             min={-90}
             max={90}
             value={element.curve ?? 0}
-            onChange={(n) => update({ curve: n })}
+            onChange={(n) => update({ curve: n }, false)}
+            onCommit={() => store.getState().pushHistory()}
           />
         )}
       </div>
@@ -594,21 +597,24 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               min={0}
               max={40}
               value={shadow.blur}
-              onChange={(n) => update({ textShadow: { ...shadow, blur: n } })}
+              onChange={(n) => update({ textShadow: { ...shadow, blur: n } }, false)}
+              onCommit={() => store.getState().pushHistory()}
             />
             <Slider
               label="Offset X"
               min={-40}
               max={40}
               value={shadow.offsetX}
-              onChange={(n) => update({ textShadow: { ...shadow, offsetX: n } })}
+              onChange={(n) => update({ textShadow: { ...shadow, offsetX: n } }, false)}
+              onCommit={() => store.getState().pushHistory()}
             />
             <Slider
               label="Offset Y"
               min={-40}
               max={40}
               value={shadow.offsetY}
-              onChange={(n) => update({ textShadow: { ...shadow, offsetY: n } })}
+              onChange={(n) => update({ textShadow: { ...shadow, offsetY: n } }, false)}
+              onCommit={() => store.getState().pushHistory()}
             />
           </div>
         )}

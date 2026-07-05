@@ -42,9 +42,12 @@ export class OrgContentPackSettingsRepository {
     });
   }
 
-  delete(orgId: string, identifier: string, version = 'v1') {
+  delete(orgId: string, identifier: string, version?: string) {
+    // 6.3: don't hardcode 'v1'. When a version is given, delete just that row;
+    // otherwise remove the config across all pinned versions of the identifier
+    // (a delete should not silently leave a v2 row behind).
     return this._contentPackConfig.model.contentPackConfig.deleteMany({
-      where: { organizationId: orgId, identifier, version },
+      where: { organizationId: orgId, identifier, ...(version ? { version } : {}) },
     });
   }
 

@@ -194,6 +194,18 @@ describe('ReplicateRunnerService', () => {
         }),
       ).rejects.toBeInstanceOf(ForbiddenException);
     });
+
+    it('1.5: rejects an off-allowlist modelId with BadRequestException (no provider call)', async () => {
+      await expect(
+        runner.runSync('org1', '', {
+          modelId: 'attacker/expensive-model',
+          input: { prompt: 'cat' },
+          operation: 'image',
+        }),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mockSafeFetch).not.toHaveBeenCalled();
+    });
   });
 
   describe('runAsync', () => {
@@ -206,7 +218,8 @@ describe('ReplicateRunnerService', () => {
         'org1',
         '',
         {
-          modelId: 'some/community',
+          // allowlisted community (non-warm) model → hits /predictions
+          modelId: 'arielreplicate/robust_video_matting',
           versionId: 'v-community',
           input: { prompt: 'cat' },
           operation: 'video',
@@ -232,13 +245,32 @@ describe('ReplicateRunnerService', () => {
           'org1',
           '',
           {
-            modelId: 'some/community',
+            modelId: 'arielreplicate/robust_video_matting',
             input: { prompt: 'cat' },
             operation: 'video',
           },
           { creditType: 'ai_videos' },
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('1.5: rejects an off-allowlist modelId with BadRequestException (no provider call)', async () => {
+      await expect(
+        runner.runAsync(
+          'org1',
+          '',
+          {
+            modelId: 'attacker/expensive-model',
+            versionId: 'v-x',
+            input: { prompt: 'cat' },
+            operation: 'video',
+          },
+          { creditType: 'ai_videos' },
+        ),
+      ).rejects.toBeInstanceOf(BadRequestException);
+
+      expect(mockSafeFetch).not.toHaveBeenCalled();
+      expect(mockLifecycle.createPendingJob).not.toHaveBeenCalled();
     });
 
     it('creates a pending job with metadata', async () => {

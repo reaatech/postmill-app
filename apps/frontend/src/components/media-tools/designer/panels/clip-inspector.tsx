@@ -34,17 +34,38 @@ function useKeyframeDrag(
   onMove: (oldTMs: number, newTMs: number) => void,
 ) {
   const [dragging, setDragging] = useState<{ oldTMs: number; startX: number } | null>(null);
+  // The dragged keyframe's tMs changes after each move, so match on its CURRENT
+  // tMs (not the fixed mousedown value) or it moves one tick then freezes.
+  const currentTMsRef = useRef(0);
+  const movedRef = useRef(false);
+  // True for the trailing `click` a browser fires after a drag, so marker
+  // remove / timeline add handlers can ignore it.
+  const justDraggedRef = useRef(false);
 
   useEffect(() => {
     if (!dragging) return;
+    currentTMsRef.current = dragging.oldTMs;
+    movedRef.current = false;
     const handleMove = (e: MouseEvent) => {
       if (!containerRef.current) return;
       const rect = containerRef.current.getBoundingClientRect();
       const dx = e.clientX - dragging.startX;
+      if (Math.abs(dx) > 2) movedRef.current = true;
       const dMs = (dx / rect.width) * totalMs;
-      onMove(dragging.oldTMs, dragging.oldTMs + dMs);
+      const clamped = Math.max(0, Math.min(totalMs, dragging.oldTMs + dMs));
+      onMove(currentTMsRef.current, clamped);
+      currentTMsRef.current = clamped;
     };
-    const handleUp = () => setDragging(null);
+    const handleUp = () => {
+      if (movedRef.current) {
+        justDraggedRef.current = true;
+        // Clear after the synthetic click has had a chance to fire.
+        setTimeout(() => {
+          justDraggedRef.current = false;
+        }, 0);
+      }
+      setDragging(null);
+    };
     window.addEventListener('mousemove', handleMove);
     window.addEventListener('mouseup', handleUp);
     return () => {
@@ -53,7 +74,7 @@ function useKeyframeDrag(
     };
   }, [dragging, totalMs, onMove, containerRef]);
 
-  return setDragging;
+  return { setDragging, justDraggedRef };
 }
 
 const MiniKeyframeTimeline: FC<{
@@ -63,12 +84,13 @@ const MiniKeyframeTimeline: FC<{
   onMove: (oldTMs: number, newTMs: number) => void;
 }> = ({ keyframes, totalMs, onAdd, onMove }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const setDragging = useKeyframeDrag(ref, totalMs, onMove);
+  const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
   return (
     <div
       ref={ref}
       className="relative h-5 bg-newBgColorInner border border-newBorder/30 rounded overflow-hidden cursor-crosshair"
       onClick={(e) => {
+        if (justDraggedRef.current) return; // ignore the click that follows a drag
         if (!ref.current) return;
         const rect = ref.current.getBoundingClientRect();
         const pct = (e.clientX - rect.left) / rect.width;
@@ -103,7 +125,7 @@ const KeyframePropRow: FC<{
   onEase: (tMs: number, ease: 'linear' | 'easeInOut' | 'easeIn' | 'easeOut') => void;
 }> = ({ prop, clip, keyframes, totalMs, onAdd, onMove, onRemove, onEase }) => {
   const ref = useRef<HTMLDivElement>(null);
-  const setDragging = useKeyframeDrag(ref, totalMs, onMove);
+  const { setDragging, justDraggedRef } = useKeyframeDrag(ref, totalMs, onMove);
   const propKeyframes = keyframes.filter((kf) => kf.props[prop] !== undefined);
   const currentVal =
     prop === 'x' ? (clip.x ?? 0)
@@ -126,6 +148,7 @@ const KeyframePropRow: FC<{
         ref={ref}
         className="relative h-3 bg-newBgColorInner border border-newBorder/30 rounded overflow-hidden"
         onClick={(e) => {
+          if (justDraggedRef.current) return; // ignore the click that follows a drag
           if (!ref.current) return;
           const rect = ref.current.getBoundingClientRect();
           const pct = (e.clientX - rect.left) / rect.width;
@@ -145,6 +168,7 @@ const KeyframePropRow: FC<{
             }}
             onClick={(e) => {
               e.stopPropagation();
+              if (justDraggedRef.current) return; // a drag ends in a click — don't delete
               onRemove(kf.tMs, prop);
             }}
           />
@@ -234,6 +258,8 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       const currentVal =
         prop === 'x' ? (clip.x ?? 0)
         : prop === 'y' ? (clip.y ?? 0)
+        : prop === 'width' ? (clip.width ?? 1)
+        : prop === 'height' ? (clip.height ?? 1)
         : prop === 'scale' ? ((clip.width ?? 1) / (clip.naturalWidth || 100))
         : prop === 'rotation' ? (clip.rotation ?? 0)
         : prop === 'opacity' ? (clip.opacity ?? 1)

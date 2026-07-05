@@ -7,6 +7,8 @@ import {
   MediaCredentialOptions,
   MediaJobSubmission,
   resolveApiKey,
+  redactError,
+  validateModelId,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -50,7 +52,7 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
   // FLUX generation is submit + poll; bounded internal polling keeps the
   // synchronous image contract (§11.2) — near-real-time or fail.
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
-    const model = options?.model || 'flux-pro-1.1';
+    const model = validateModelId(options?.model || 'flux-pro-1.1');
     const [width, height] = (options?.size || '1024x1024')
       .split('x')
       .map((v) => Number.parseInt(v, 10));
@@ -67,7 +69,7 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
         ...(options?.input || {}),
       }),
     });
-    if (!res.ok) throw new Error(`Black Forest Labs image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Black Forest Labs image generation failed: ${redactError(await res.text())}`);
     const { id } = (await res.json()) as BFLSubmitResponse;
     if (!id) throw new Error('Black Forest Labs returned no request id');
 
@@ -76,7 +78,7 @@ export class BlackForestLabsAdapter implements MediaProviderAdapter {
       const pollRes = await this._fetch(`${BASE}/get_result?id=${encodeURIComponent(id)}`, {
         headers: this._headers(options),
       });
-      if (!pollRes.ok) throw new Error(`Black Forest Labs polling failed: ${await pollRes.text()}`);
+      if (!pollRes.ok) throw new Error(`Black Forest Labs polling failed: ${redactError(await pollRes.text())}`);
       const data = (await pollRes.json()) as BFLResultResponse;
       if (data.status === 'Ready') {
         const url = data.result?.sample;

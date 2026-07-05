@@ -11,6 +11,8 @@ import {
   MediaOperation,
   MediaInputValue,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -100,9 +102,14 @@ export class GenviralAdapter implements MediaProviderAdapter {
       headers,
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`Genviral video generation failed: ${await res.text()}`);
-    const data = ((await res.json()) as GenviralEnvelope<GenviralVideoData>).data;
-    const id = data?.video_id;
+    if (!res.ok) throw new Error(`Genviral video generation failed: ${redactError(await res.text())}`);
+    const envelope = (await res.json()) as GenviralEnvelope<GenviralVideoData>;
+    // 6.1g — a 200 with `ok:false` is a terminal application error; surface it rather than
+    // throwing "no video id" (which reads as a generic failure).
+    if (envelope.ok === false) {
+      throw new Error(`Genviral video generation failed: ${redactError(envelope.message || 'unknown error')}`);
+    }
+    const id = envelope.data?.video_id;
     if (!id) throw new Error('Genviral returned no video id');
     return { jobId: id };
   }
@@ -116,9 +123,22 @@ export class GenviralAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Genviral API key is required' };
+
     const res = await this._fetch(`${BASE}/studio/videos/${jobId}`, { headers: this._headers(options) });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
-    const data = ((await res.json()) as GenviralEnvelope<GenviralVideoData>).data;
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering video retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Genviral poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
+    const envelope = (await res.json()) as GenviralEnvelope<GenviralVideoData>;
+    if (envelope.ok === false) {
+      return { status: 'failed', error: redactError(envelope.message || 'Genviral video generation failed') };
+    }
+    const data = envelope.data;
 
     if (data?.status === 'succeeded') {
       if (!data.output_url) return { status: 'failed', error: 'Genviral completed without output' };

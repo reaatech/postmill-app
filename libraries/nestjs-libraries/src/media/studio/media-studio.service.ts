@@ -11,6 +11,12 @@ import { ProviderKernel } from '@gitroom/provider-kernel';
 import { MediaGenerateOptions, MediaModelOption, MediaOperation } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { MEDIA_CATEGORY_OPERATION } from '@gitroom/nestjs-libraries/ai/defaults/default-categories';
+import { mapWithConcurrency, singleFlight } from '@gitroom/nestjs-libraries/utils/concurrency';
+
+// §3.3: cap the drive-on-read completion fan-out. Each processJob may download up to
+// MAX_ARTIFACT_BYTES (512 MB) on completion; an unbounded Promise.all over ~30 pending
+// jobs could run a dozen multi-hundred-MB downloads at once and OOM a 2 GB-heap backend.
+const LISTJOBS_DRIVE_CONCURRENCY = 3;
 
 export interface StudioGenerateParams {
   operation: 'video' | 'image' | 'audio';
@@ -219,10 +225,11 @@ export class MediaStudioService {
   // deploys); the media-jobs-poll cron is the backstop.
   async listJobs(orgId: string, provider: string, _version?: string, limit = 30) {
     const pending = await this._aiSettings.getMediaJobsByProvider(orgId, provider, limit);
-    await Promise.all(
-      pending
-        .filter((j) => j.status === 'pending' || j.status === 'processing')
-        .map((j) => this._lifecycle.processJob(j.id).catch(() => undefined)),
+    const drivable = pending.filter((j) => j.status === 'pending' || j.status === 'processing');
+    // §3.3: bound the fan-out and singleFlight per job id so a concurrent webhook/cron
+    // sweep and this read don't both drive (and both download) the same job at once.
+    await mapWithConcurrency(drivable, LISTJOBS_DRIVE_CONCURRENCY, (j) =>
+      singleFlight(`media-job:${j.id}`, () => this._lifecycle.processJob(j.id)).catch(() => undefined),
     );
     const jobs = await this._aiSettings.getMediaJobsByProvider(orgId, provider, limit);
     return Promise.all(jobs.map((j) => this._presentJob(orgId, j)));

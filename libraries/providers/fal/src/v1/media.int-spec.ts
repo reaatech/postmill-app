@@ -104,4 +104,22 @@ describe('fal media adapter (sync image + queued video)', () => {
     await expect(adapter.generateVideo('x', {})).rejects.toThrow('fal.ai API key is required');
     await expect(adapter.generateAvatar('x', { apiKey: 'k' })).rejects.toThrow();
   });
+
+  // 6.1i — a legacy (un-namespaced) job id can't route to a model path → terminal failed.
+  it('pollJob fails terminally on a legacy un-namespaced job id', async () => {
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = falMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('legacy-request-id', { apiKey: 'k' });
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/legacy job id/);
+  });
+
+  // 6.1b — a model id with an injected query/path is rejected before interpolation.
+  it('generateImage rejects a model id with query injection', async () => {
+    const { ctx } = makeCtx(() => res({ images: [] }));
+    const adapter: any = falMediaModule.create(ctx as any);
+    await expect(
+      adapter.generateImage('x', { apiKey: 'k', model: 'fal-ai/flux?fal_webhook=https://evil' }),
+    ).rejects.toThrow(/Invalid model id/);
+  });
 });

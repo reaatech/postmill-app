@@ -35,8 +35,12 @@ const MODELS = [
 // seconds → SRT (00:00:00,000) / VTT (00:00:00.000) timecodes.
 const pad = (n: number, w = 2) => String(Math.floor(n)).padStart(w, '0');
 const timecode = (sec: number, sep: ',' | '.') => {
-  const ms = Math.round((sec - Math.floor(sec)) * 1000);
-  return `${pad(sec / 3600)}:${pad((sec % 3600) / 60)}:${pad(sec % 60)}${sep}${pad(ms, 3)}`;
+  // Round to whole milliseconds first, then carry — rounding the fraction alone
+  // could yield 1000 ms (e.g. sec=5.9997 → "1000"), an invalid 4-digit field.
+  const totalMs = Math.round(sec * 1000);
+  const ms = totalMs % 1000;
+  const totalSec = Math.floor(totalMs / 1000);
+  return `${pad(totalSec / 3600)}:${pad((totalSec % 3600) / 60)}:${pad(totalSec % 60)}${sep}${pad(ms, 3)}`;
 };
 
 const buildSrt = (segments: Segment[]) =>

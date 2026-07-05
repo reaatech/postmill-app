@@ -42,6 +42,18 @@ function makeService() {
     }),
     getMediaJobById: vi.fn().mockImplementation(async (id: string) => jobs.get(id) || null),
     getPendingMediaJobs: vi.fn().mockResolvedValue([]),
+    // §3.1: atomic CAS on status. Mutates the shared job object synchronously (no await
+    // between read and write) so it faithfully models the DB's conditional updateMany —
+    // exactly one of two concurrent claimants sees the row still in `from`.
+    claimMediaJobStatus: vi.fn().mockImplementation(async (id: string, from: string[], to: string) => {
+      const job = jobs.get(id);
+      if (!job || !from.includes(job.status)) return 0;
+      job.status = to as AIMediaJob['status'];
+      jobs.set(id, job);
+      return 1;
+    }),
+    // §3.1 crash-recovery: default no-op (no stranded rows) for the sweep pre-pass.
+    reclaimStaleLandingJobs: vi.fn().mockResolvedValue(0),
   };
 
   const pollJob = vi.fn();
@@ -66,6 +78,9 @@ function makeService() {
 
   const mediaRepository = {
     saveGeneratedMedia: vi.fn().mockResolvedValue({ id: 'media-1', path: '/uploads/org-1/artifact.mp4' }),
+    // 1.3 (orchestrator): _writeToTenantStorage validates a client folderId's ownership;
+    // null = not owned → fall through to standard folder resolution (default behaviour).
+    resolveOwnedFolderId: vi.fn().mockResolvedValue(null),
   };
 
   const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
@@ -187,7 +202,8 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
 
       expect(await service.processJob('job-1')).toBe('pending');
       expect(pollJob).toHaveBeenCalledWith('luma-ext-1', { credentials: { apiKey: 'luma-key' } });
-      expect(aiSettings.updateMediaJob).toHaveBeenCalledWith('job-1', { status: 'processing' });
+      // §3.1: the pending→processing write is now a guarded conditional claim.
+      expect(aiSettings.claimMediaJobStatus).toHaveBeenCalledWith('job-1', ['pending'], 'processing');
     });
 
     it('polls through the version pinned on the job, not the config current version (4.10)', async () => {
@@ -402,6 +418,90 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(await service.processJob('job-1')).toBe('skipped');
       expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(1);
     });
+
+    it('caps the extra-artifact fan-out at 8 siblings (§6.2)', async () => {
+      const { service, jobs, orgSettings, pollJob, aiSettings } = makeService();
+      jobs.set('job-1', makeJob({ provider: 'suno', operation: 'audio' }));
+      orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'suno-key' },
+        storageProviderId: null,
+        storageRootFolderId: 'root-1',
+        version: 'v1',
+      });
+      pollJob.mockResolvedValue({
+        status: 'completed',
+        artifactUrl: 'https://cdn.suno/primary.mp3',
+        extraArtifactUrls: Array.from({ length: 12 }, (_, i) => `https://cdn.suno/extra-${i}.mp3`),
+        metadata: { mime: 'audio/mpeg' },
+      });
+      mockSafeFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'audio/mpeg', 'content-length': '3' }),
+        arrayBuffer: async () => new Uint8Array([1, 2, 3]).buffer,
+      });
+
+      expect(await service.processJob('job-1')).toBe('completed');
+      // 12 extras offered, only 8 siblings created (one createMediaJob per sibling).
+      expect(aiSettings.createMediaJob).toHaveBeenCalledTimes(8);
+    });
+
+    it('does not notify per sibling — only the primary "ready" fires (§6.2)', async () => {
+      const { service, notificationService } = audioCompleteWithExtras();
+
+      expect(await service.processJob('job-1')).toBe('completed');
+      // primary success notification only; the single sibling completes with notify:false
+      expect(notificationService.notify).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('processJob atomic completion claim (§3.1)', () => {
+    function completedJob() {
+      const ctx = makeService();
+      ctx.jobs.set('job-1', makeJob());
+      ctx.orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'luma-key' },
+        storageProviderId: null,
+        storageRootFolderId: 'root-1',
+        version: 'v1',
+      });
+      ctx.pollJob.mockResolvedValue({
+        status: 'completed',
+        artifactUrl: 'https://provider.example.com/out.mp4',
+        metadata: { model: 'dream-machine' },
+      });
+      mockSafeFetch.mockResolvedValue({
+        ok: true,
+        headers: new Headers({ 'content-type': 'video/mp4', 'content-length': '4' }),
+        arrayBuffer: async () => new Uint8Array([1, 2, 3, 4]).buffer,
+      });
+      return ctx;
+    }
+
+    it('two concurrent processJob on one completed job → exactly one download/File/notification', async () => {
+      const { service, mediaRepository, notificationService, jobs } = completedJob();
+
+      const [a, b] = await Promise.all([service.processJob('job-1'), service.processJob('job-1')]);
+
+      // exactly one winner; the loser short-circuits to 'skipped'
+      expect([a, b].filter((r) => r === 'completed')).toHaveLength(1);
+      expect([a, b].filter((r) => r === 'skipped')).toHaveLength(1);
+      // single download, single File row, single notification
+      expect(mockSafeFetch).toHaveBeenCalledTimes(1);
+      expect(mediaRepository.saveGeneratedMedia).toHaveBeenCalledTimes(1);
+      expect(notificationService.notify).toHaveBeenCalledTimes(1);
+      expect(jobs.get('job-1')!.status).toBe('completed');
+    });
+
+    it('a lost claim on the failure path does not double-notify', async () => {
+      const { service, jobs, pollJob, notificationService } = makeService();
+      jobs.set('job-1', makeJob());
+      pollJob.mockResolvedValue({ status: 'failed', error: 'NSFW rejected' });
+
+      const results = await Promise.all([service.processJob('job-1'), service.processJob('job-1')]);
+      expect(results.filter((r) => r === 'failed')).toHaveLength(1);
+      expect(results.filter((r) => r === 'skipped')).toHaveLength(1);
+      expect(notificationService.notify).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('failJob notify option', () => {
@@ -457,6 +557,18 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
 
       const result = await service.processPendingJobs();
       expect(result).toEqual({ processed: 2, completed: 0, failed: 1 });
+    });
+
+    it('reclaims stranded `landing` jobs before fetching the pending set (§3.1 crash-recovery)', async () => {
+      const { service, aiSettings } = makeService();
+      aiSettings.getPendingMediaJobs.mockResolvedValue([]);
+
+      await service.processPendingJobs();
+
+      expect(aiSettings.reclaimStaleLandingJobs).toHaveBeenCalledTimes(1);
+      // Reclaim cutoff is in the past (only rows stuck since before it are reset).
+      const cutoff = aiSettings.reclaimStaleLandingJobs.mock.calls[0][0] as Date;
+      expect(cutoff.getTime()).toBeLessThan(Date.now());
     });
   });
 });

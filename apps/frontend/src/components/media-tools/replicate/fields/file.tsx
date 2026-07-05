@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import { MediaSelectorModal } from '@gitroom/frontend/components/media-tools/media-selector-modal';
 
 export interface FileValue {
@@ -20,6 +21,7 @@ interface FileInputProps {
 
 export function FileInput({ value, onChange, label, required, acceptType = 'image' }: FileInputProps) {
   const modals = useModals();
+  const toaster = useToaster();
 
   const selected = useMemo<FileValue | undefined>(() => {
     if (!value) return undefined;
@@ -37,7 +39,12 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
         <MediaSelectorModal
           open
           onClose={close}
+          kinds={[acceptType]}
           onSelect={(item) => {
+            if (item.type !== acceptType) {
+              toaster.show(`Please choose a ${acceptType} file`, 'warning');
+              return;
+            }
             onChange({
               fileId: item.fileId,
               url: item.url,
@@ -57,7 +64,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
   return (
     <div className="mb-3">
       {label && (
-        <label className="block text-xs text-gray-400 mb-1">
+        <label className="block text-xs text-newTextColor/70 mb-1">
           {label}
           {required && <span className="text-red-400 ml-1">*</span>}
         </label>
@@ -66,7 +73,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
         <button
           type="button"
           onClick={handleChooseFile}
-          className="flex-1 px-3 py-2 rounded-lg border border-newBorder bg-newBgColorInner text-gray-400 text-sm text-left hover:bg-boxHover transition-colors"
+          className="flex-1 px-3 py-2 rounded-lg border border-studioBorder bg-newBgColorInner text-newTextColor text-sm text-left hover:bg-boxHover transition-colors"
         >
           {display ? (
             <span className="truncate block">{display}</span>
@@ -78,7 +85,7 @@ export function FileInput({ value, onChange, label, required, acceptType = 'imag
           <button
             type="button"
             onClick={handleClear}
-            className="px-2 py-2 rounded-lg text-gray-500 hover:text-red-400 transition-colors"
+            className="px-2 py-2 rounded-lg text-newTextColor/60 hover:text-red-400 transition-colors"
             aria-label="Clear file"
           >
             ✕

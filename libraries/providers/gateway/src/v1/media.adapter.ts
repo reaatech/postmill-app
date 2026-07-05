@@ -27,10 +27,23 @@ const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
 // One long-lived dispatcher so a multi-minute video render isn't killed by the default 5-min
 // fetch timeout. Created lazily to avoid touching undici when the gateway is never used.
+//
+// 6.1d — FIXED-HOST SSRF EXEMPTION: this deliberately bypasses `ssrfSafeDispatcher`/`safeFetch`.
+// It is sound because the destination is NOT user-controlled — the AI-SDK `createGateway` client
+// always targets the fixed Vercel gateway host (GATEWAY_BASE, `ai-gateway.vercel.sh`); the only
+// user inputs (`model`, the source `image`) ride as request-body params, never as the fetch URL.
+// The sole reason for the raw Agent is the extended 15-min timeout that the 30 s SafeFetchPort
+// cannot provide for a synchronous multi-minute render. Do not point this dispatcher at any
+// user-derived URL.
 let _videoDispatcher: Agent | undefined;
 function videoFetch(url: string | URL | Request, init?: RequestInit): Promise<Response> {
   if (!_videoDispatcher) {
     _videoDispatcher = new Agent({ headersTimeout: 15 * 60 * 1000, bodyTimeout: 15 * 60 * 1000 });
+  }
+  // Defence-in-depth: refuse to send this long-timeout dispatcher anywhere but the gateway host.
+  const target = url instanceof Request ? url.url : String(url);
+  if (!target.startsWith(GATEWAY_BASE) && !target.startsWith('https://ai-gateway.vercel.sh/')) {
+    throw new Error('Gateway video dispatcher may only target the Vercel AI Gateway host');
   }
   return fetch(url, { ...(init || {}), dispatcher: _videoDispatcher } as RequestInit);
 }

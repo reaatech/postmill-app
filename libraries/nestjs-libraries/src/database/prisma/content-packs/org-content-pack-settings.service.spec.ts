@@ -73,6 +73,26 @@ describe('OrgContentPackSettingsService', () => {
     });
   });
 
+  describe('getActive (6.3 decrypt-failure → null)', () => {
+    it('returns null when credential decryption fails (degrades to free)', async () => {
+      const { service, repository, encryption } = makeService();
+      repository.getActivePointer.mockResolvedValue({
+        activeContentPackIdentifier: 'magnific@v1',
+      });
+      repository.getByIdentifier.mockResolvedValue({
+        identifier: 'magnific',
+        version: 'v1',
+        credentials: 'corrupt-ciphertext',
+        extraConfig: {},
+      });
+      encryption.decrypt.mockImplementation(() => {
+        throw new Error('bad auth tag');
+      });
+
+      expect(await service.getActive('org-1')).toBeNull();
+    });
+  });
+
   describe('getActiveForCapability (1.6 free-provider fallback)', () => {
     function withActivePack(ctx: ReturnType<typeof makeService>) {
       ctx.repository.getActivePointer.mockResolvedValue({ activeContentPackIdentifier: 'magnific@v1' });

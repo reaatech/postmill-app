@@ -404,9 +404,11 @@ across all of them (a lone render may burst to the whole pool). Storage/clip res
 host-side (no creds in the container); the worker is the app build + distro Chromium/FFmpeg with
 `media-render-worker.ts` as ENTRYPOINT (reads `/work/job.json` → writes `/work/out`). Podman is
 **opt-in**; off (default) = the existing in-process renderer (dev/CI + graceful degradation), with
-the 3-concurrent cap still applied via a host semaphore when `USE_INNGEST` is off. Requires cgroup v2
-for the aggregate pool (else a logged per-container even-split fallback). See
-`docs/operations-guide/video-rendering.md`.
+the 3-concurrent cap still applied via a host semaphore. Note: that in-process fallback runs inside
+the `media-jobs-poll` sweep, so it needs the **Inngest cron runtime live** (dev server / cloud) even
+when `USE_INNGEST` event-sends are off — a *fully* Inngest-less deployment has no consumer and leaves
+`enqueueRender` jobs `pending`. Requires cgroup v2 for the aggregate pool (else a logged per-container
+even-split fallback). See `docs/operations-guide/video-rendering.md`.
 
 ## Notifications (V2)
 

@@ -9,6 +9,8 @@ import {
   MediaModelOption,
   MediaOperation,
   resolveApiKey,
+  redactError,
+  validateModelId,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -40,12 +42,13 @@ export class DeepInfraMediaAdapter extends BearerTokenMediaAdapter {
 
   private async _infer(model: string, body: Record<string, unknown>, options?: MediaCredentialOptions): Promise<InferenceResponse> {
     if (!model) throw new Error('DeepInfra requires a model');
+    validateModelId(model);
     const res = await this._fetch(`${BASE}/${model}`, {
       method: 'POST',
       headers: this._headers(options),
       body: JSON.stringify(body),
     });
-    if (!res.ok) throw new Error(`DeepInfra request failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`DeepInfra request failed: ${redactError(await res.text())}`);
     return (await res.json()) as InferenceResponse;
   }
 

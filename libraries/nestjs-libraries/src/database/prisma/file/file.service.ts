@@ -4,9 +4,17 @@ import { Organization } from '@prisma/client';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import { readResponseCapped } from '@gitroom/nestjs-libraries/utils/capped-stream';
 import { IStorageAdapter } from '@gitroom/nestjs-libraries/upload/upload.interface';
 import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 
+// NOTE (6.3): `image/svg+xml` is intentionally NOT allowed. Iconify serves icons
+// as raw SVG, and SVG is an active document (it can carry <script>/onload/xlink
+// payloads) served from our own origin — importing it verbatim would be stored
+// XSS. So icon "Save to Files" is a dead path by design: it must be RASTERIZED
+// client-side (SVG → PNG on a canvas) before hitting /files/import, or ingested
+// through a dedicated server-side SVG sanitizer. Do NOT "fix" the dead save by
+// adding 'image/svg+xml' here without one of those in place.
 const ALLOWED_MIME_TYPES = new Set([
   'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
   'image/bmp', 'image/tiff', 'video/mp4',
@@ -103,6 +111,23 @@ export class FileService {
   }
 
   /**
+   * 1.3 — Validate a client-supplied `folderId` belongs to `org`. Returns the
+   * id when owned, otherwise `undefined` (caller falls back to the org's
+   * standard/default folder). Non-throwing so a foreign/bogus id can't 500 a
+   * generate/import; it simply never attaches to a foreign org's folder.
+   */
+  async resolveOwnedFolderId(
+    org: string,
+    folderId?: string | null,
+  ): Promise<string | undefined> {
+    if (!folderId) {
+      return undefined;
+    }
+    const folder = await this._fileRepository.getFolder(folderId);
+    return folder && folder.organizationId === org ? folderId : undefined;
+  }
+
+  /**
    * Resolve a "/a/b/c"-style path to a folder id, creating missing segments
    * (find-or-create per level, org-scoped). Returns null for an empty path.
    */
@@ -194,7 +219,7 @@ export class FileService {
         throw new HttpException('Folder not found', 404);
       }
     }
-    return this._fileRepository.bulkMove(ids, folderId);
+    return this._fileRepository.bulkMove(org, ids, folderId);
   }
 
   searchFiles(org: string, query: string, folderId?: string) {
@@ -278,7 +303,11 @@ export class FileService {
       attribution?: Record<string, unknown>;
     }
   ) {
-    const adapter = await this._storageService.resolveAdapterForFolder(data.folderId, orgId);
+    // 1.3: never trust a client folderId — attach only to a folder the caller's
+    // org owns, else fall back to the org's default folder (null).
+    const ownedFolderId = await this.resolveOwnedFolderId(orgId, data.folderId);
+
+    const adapter = await this._storageService.resolveAdapterForFolder(ownedFolderId, orgId);
 
     const response = await safeFetch(data.url);
     if (!response.ok) {
@@ -296,9 +325,21 @@ export class FileService {
       }
     }
 
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.length > MAX_IMPORT_SIZE) {
-      throw new HttpException('File too large (max 512 MB)', 413);
+    // 1.6: stream with a running byte cap — content-length is advisory
+    // (absent on chunked, spoofable), so abort mid-transfer rather than
+    // buffering a multi-GB body into a 2 GB-heap backend.
+    let buffer: Buffer;
+    try {
+      buffer = await readResponseCapped(
+        response,
+        MAX_IMPORT_SIZE,
+        'File too large (max 512 MB)',
+      );
+    } catch (e) {
+      throw new HttpException(
+        (e as Error)?.message || 'File too large (max 512 MB)',
+        413,
+      );
     }
 
     await this._storageService.assertWithinProviderQuota(adapter, orgId, buffer.length);
@@ -326,7 +367,7 @@ export class FileService {
       name: data.name,
       path,
       type: contentType.startsWith('audio/') ? 'audio' : contentType.startsWith('video/') ? 'video' : 'image',
-      folderId: data.folderId,
+      folderId: ownedFolderId,
       fileSize,
       metadata: {
         ...(data.source ? { source: data.source } : {}),

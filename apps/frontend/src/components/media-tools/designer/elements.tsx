@@ -55,6 +55,30 @@ const notifyCacheListeners = () => {
   cacheListeners.forEach((listener) => listener());
 };
 
+// Bound the module-level cache and revoke any blob: object URLs (from the proxy
+// fallback) on eviction so a long SPA session doesn't leak decoded bitmaps or
+// object URLs. Insertion order = eviction order (oldest first).
+const MAX_IMAGE_CACHE = 240;
+const evictImageCache = () => {
+  while (imageCache.size > MAX_IMAGE_CACHE) {
+    const oldestKey = imageCache.keys().next().value as string | undefined;
+    if (oldestKey === undefined) break;
+    const img = imageCache.get(oldestKey);
+    imageCache.delete(oldestKey);
+    if (img && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  }
+};
+
+// Full teardown — call on Designer unmount to release every cached bitmap /
+// object URL.
+export const clearImageCache = () => {
+  imageCache.forEach((img) => {
+    if (img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+  });
+  imageCache.clear();
+  notifyCacheListeners();
+};
+
 const loadImage = (src: string): Promise<HTMLImageElement> => {
   const cached = imageCache.get(src);
   if (cached) return Promise.resolve(cached);
@@ -64,6 +88,7 @@ const loadImage = (src: string): Promise<HTMLImageElement> => {
 
     const finish = (loaded: HTMLImageElement) => {
       imageCache.set(src, loaded);
+      evictImageCache();
       notifyCacheListeners();
       resolve(loaded);
     };
@@ -360,7 +385,10 @@ const ImageNode: FC<ImageNodeProps> = ({ element, onSelect, onContextMenu }) => 
     debounceRef.current = setTimeout(() => {
       setFilterKey((k) => k + 1);
     }, 150);
-  }, [element.filters, element.width, element.height, isTransforming]);
+    // `image` is a dep so a bitmap that loads AFTER the debounce (proxy / cold
+    // cache) re-triggers the cache pass — otherwise the node was cached empty and
+    // stays permanently blank.
+  }, [element.filters, element.width, element.height, isTransforming, image]);
 
   useEffect(() => {
     if (wasTransformingRef.current && !isTransforming) {
@@ -377,7 +405,7 @@ const ImageNode: FC<ImageNodeProps> = ({ element, onSelect, onContextMenu }) => 
       node.cache();
       node.getLayer()?.batchDraw();
     }
-  }, [filterKey]);
+  }, [filterKey, image]);
 
   const textMask = element.mask?.type === 'text' ? element.mask : undefined;
   const shapeMask = element.mask?.type === 'shape' ? element.mask : undefined;
@@ -540,7 +568,9 @@ const IconNode: FC<IconNodeProps> = ({ element, onSelect, onContextMenu }) => {
     if (!element.src) return;
     const svg =
       `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="${element.width}" height="${element.height}" fill="${element.fill || '#000000'}">${element.src}</svg>`;
-    const dataUrl = `data:image/svg+xml;base64,${btoa(svg)}`;
+    // URL-encode rather than btoa: btoa throws on non-Latin-1 characters (e.g. an
+    // SVG carrying a non-ASCII title/glyph).
+    const dataUrl = `data:image/svg+xml,${encodeURIComponent(svg)}`;
     const img = new Image();
     img.onload = () => setImageObj(img);
     img.src = dataUrl;

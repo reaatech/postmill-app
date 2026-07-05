@@ -19,7 +19,7 @@ vi.mock('@gitroom/nestjs-libraries/media/designer-doc/designer-doc.service', () 
   DesignerDocService: class {},
 }));
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   DesignController,
   DesignTemplateController,
@@ -318,6 +318,28 @@ describe('DesignController', () => {
         [],
         { orgId: 'org-1' },
       );
+    });
+  });
+
+  describe('GET /media/designs/render-video/:jobId (0.1 org-scope)', () => {
+    it('404s when the video-render job is not visible to the org (getJob → null)', async () => {
+      const videoRenderService = { getJob: vi.fn().mockResolvedValue(null) };
+      (controller as any)._videoRenderService = videoRenderService;
+
+      await expect(
+        controller.getVideoRenderStatus(org, 'job-from-another-org'),
+      ).rejects.toBeInstanceOf(NotFoundException);
+      expect(videoRenderService.getJob).toHaveBeenCalledWith('org-1', 'job-from-another-org');
+    });
+
+    it('returns the status for a job the org owns', async () => {
+      const videoRenderService = {
+        getJob: vi.fn().mockResolvedValue({ id: 'job-1', status: 'processing', artifactUrl: null }),
+      };
+      (controller as any)._videoRenderService = videoRenderService;
+
+      const out = await controller.getVideoRenderStatus(org, 'job-1');
+      expect(out).toMatchObject({ id: 'job-1', status: 'processing', progress: 50 });
     });
   });
 

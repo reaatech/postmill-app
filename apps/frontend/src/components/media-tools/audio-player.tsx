@@ -143,8 +143,15 @@ export const AudioPlayer: FC<AudioPlayerProps> = ({ src, lazy = false, height = 
       setPlaying(false);
       setCur(0);
     };
+    // Fires for both a user pause and when another instance pauses this one via
+    // the module-level `activeAudio.pause()` — keeps the button/rAF loop in sync.
+    const onPause = () => {
+      setPlaying(false);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
     audio.addEventListener('loadedmetadata', onMeta);
     audio.addEventListener('ended', onEnd);
+    audio.addEventListener('pause', onPause);
     draw();
     if (!lazy) decode();
 
@@ -152,6 +159,7 @@ export const AudioPlayer: FC<AudioPlayerProps> = ({ src, lazy = false, height = 
       audio.pause();
       audio.removeEventListener('loadedmetadata', onMeta);
       audio.removeEventListener('ended', onEnd);
+      audio.removeEventListener('pause', onPause);
       if (activeAudio === audio) activeAudio = null;
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
@@ -181,9 +189,8 @@ export const AudioPlayer: FC<AudioPlayerProps> = ({ src, lazy = false, height = 
         rafRef.current = requestAnimationFrame(() => loopRef.current());
       }).catch(() => {});
     } else {
+      // The 'pause' listener resets `playing` and cancels the rAF loop.
       audio.pause();
-      setPlaying(false);
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     }
   }, [lazy, decode]);
 

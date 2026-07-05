@@ -8,11 +8,20 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
+  validateModelId,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
 
 const BASE = 'https://api.replicate.com/v1';
+
+// `Prefer: wait` must stay ≤ the outbound `safeFetch` budget (30 s) — a longer wait is killed
+// client-side while the prediction keeps running (and billing). We ask for a short blocking
+// window and fall back to polling the returned prediction id (2.4).
+const PREFER_WAIT_SECONDS = 25;
+const DEFAULT_IMAGE_MODEL = 'black-forest-labs/flux-schnell';
 
 type ReplicateOutput = string | string[] | undefined;
 
@@ -26,6 +35,15 @@ interface ReplicatePredictionResponse {
 function firstOutputUrl(output: ReplicateOutput): string | undefined {
   if (Array.isArray(output)) return output.find((u) => typeof u === 'string');
   return typeof output === 'string' ? output : undefined;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// A Replicate model reference is either a version HASH (64-hex, no slash) → `/predictions`
+// with a `version` field, or an `owner/name` SLUG → `/models/{slug}/predictions` (2.5). A slug
+// passed as `version` is rejected with a 422, so route it to the models endpoint instead.
+function isVersionHash(model: string): boolean {
+  return !model.includes('/');
 }
 
 export class ReplicateMediaAdapter implements MediaProviderAdapter {
@@ -62,27 +80,70 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     input: Record<string, string | number | boolean | undefined>,
     preferWait?: number,
   ): Promise<ReplicatePredictionResponse> {
-    const res = await this._fetch(`${BASE}/predictions`, {
+    const headers = this._headers(options, preferWait);
+    const model = options?.version;
+    if (!model) throw new Error('Replicate model/version is required');
+    const body = {
+      input: { ...input, ...options?.input },
+      ...(options?.webhookUrl
+        ? { webhook: options.webhookUrl, webhook_events_filter: ['completed'] }
+        : {}),
+    };
+    // Slug → /models/{slug}/predictions (input only); hash → /predictions with `version` (2.5).
+    const url = isVersionHash(model)
+      ? `${BASE}/predictions`
+      : `${BASE}/models/${validateModelId(model)}/predictions`;
+    const res = await this._fetch(url, {
       method: 'POST',
-      headers: this._headers(options, preferWait),
-      body: JSON.stringify({
-        version: options?.version,
-        input: { ...input, ...options?.input },
-        ...(options?.webhookUrl
-          ? { webhook: options.webhookUrl, webhook_events_filter: ['completed'] }
-          : {}),
-      }),
+      headers,
+      body: JSON.stringify(isVersionHash(model) ? { version: model, ...body } : body),
     });
-    if (!res.ok) throw new Error(`Replicate request failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Replicate request failed: ${redactError(await res.text())}`);
     return (await res.json()) as ReplicatePredictionResponse;
   }
 
+  // A blocking (`Prefer: wait`) create may still return `starting`/`processing` when the window
+  // elapses. Rather than returning `''`/throwing "no output" (2.4), poll the prediction id until
+  // it reaches a terminal state, keeping the synchronous image/upscale/rembg/inpaint contract.
+  private async _resolvePrediction(
+    data: ReplicatePredictionResponse,
+    options?: MediaCredentialOptions,
+  ): Promise<ReplicatePredictionResponse> {
+    if (data.status === 'succeeded' || data.status === 'failed' || data.status === 'canceled') {
+      return data;
+    }
+    if (!data.id) throw new Error('Replicate returned no prediction id');
+    for (let attempt = 0; attempt < 30; attempt++) {
+      await sleep(2000);
+      const res = await this._fetch(`${BASE}/predictions/${data.id}`, {
+        headers: this._headers(options),
+      });
+      if (!res.ok) {
+        const body = await res.text();
+        // Transient poll error: the prediction may still be fine — surface for a retry.
+        if (isTransientStatus(res.status)) {
+          throw new Error(`Replicate poll transient error ${res.status}: ${redactError(body, 200)}`);
+        }
+        throw new Error(`Replicate poll failed: ${redactError(body)}`);
+      }
+      const polled = (await res.json()) as ReplicatePredictionResponse;
+      if (polled.status === 'succeeded' || polled.status === 'failed' || polled.status === 'canceled') {
+        return polled;
+      }
+    }
+    throw new Error('Replicate prediction timed out');
+  }
+
   async generateImage(prompt: string, options?: MediaGenerateOptions): Promise<MediaGenerationResult> {
-    const data = await this._createPrediction(
-      { ...options, version: options?.version || options?.model || 'black-forest-labs/flux-schnell' },
+    const created = await this._createPrediction(
+      { ...options, version: options?.version || options?.model || DEFAULT_IMAGE_MODEL },
       { prompt },
-      60,
+      PREFER_WAIT_SECONDS,
     );
+    const data = await this._resolvePrediction(created, options);
+    if (data.status === 'failed' || data.status === 'canceled') {
+      throw new Error(`Replicate image generation failed: ${data.error || 'unknown error'}`);
+    }
     const output = data.output;
     if (!output) throw new Error('Replicate returned no output');
 
@@ -114,9 +175,7 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
       );
     }
 
-    const opts: MediaGenerateOptions = isVideoToVideo
-      ? { ...options, version: modelId }
-      : options;
+    const opts: MediaGenerateOptions = { ...options, version: modelId };
     const data = await this._createPrediction(opts, input);
     if (!data.id) throw new Error('Replicate returned no prediction id');
     return { jobId: data.id };
@@ -131,11 +190,23 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a permanent config error → terminal failed, not a thrown error the
+    // lifecycle would retry to the 24h timeout.
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Replicate API key is required' };
+
     const res = await this._fetch(`${BASE}/predictions/${jobId}`, {
       headers: this._headers(options),
     });
 
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — a 429/5xx poll is transient (render may still be fine): THROW so the lifecycle
+      // retries instead of permanently failing a paid, still-running prediction.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`Replicate poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as ReplicatePredictionResponse;
 
     switch (data.status) {
@@ -146,37 +217,47 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
       }
       case 'failed':
       case 'canceled':
-        return { status: 'failed', error: data.error || 'Unknown error' };
+        return { status: 'failed', error: redactError(data.error || 'Unknown error') };
       default:
         return { status: 'pending' };
     }
   }
 
+  // Resolve a create response to a single output URL, polling if it is still processing when
+  // the blocking window elapses (2.4 — never return '' for an in-flight prediction).
+  private async _createAndResolveUrl(
+    options: MediaGenerateOptions | undefined,
+    input: Record<string, string | number | boolean | undefined>,
+  ): Promise<string> {
+    const created = await this._createPrediction(options, input, PREFER_WAIT_SECONDS);
+    const data = await this._resolvePrediction(created, options);
+    if (data.status === 'failed' || data.status === 'canceled') {
+      throw new Error(`Replicate operation failed: ${data.error || 'unknown error'}`);
+    }
+    const url = firstOutputUrl(data.output);
+    if (!url) throw new Error('Replicate prediction succeeded without output');
+    return url;
+  }
+
   async upscaleImage(imageUrl: string, options?: MediaGenerateOptions): Promise<string> {
-    const data = await this._createPrediction(
+    return this._createAndResolveUrl(
       { ...options, version: options?.version || 'nightmareai/real-esrgan' },
       { image: imageUrl, scale: options?.scale || 4 },
-      60,
     );
-    return firstOutputUrl(data.output) || '';
   }
 
   async removeBackground(imageUrl: string, options?: MediaGenerateOptions): Promise<string> {
-    const data = await this._createPrediction(
+    return this._createAndResolveUrl(
       { ...options, version: options?.version || 'cjwbw/rembg' },
       { image: imageUrl },
-      60,
     );
-    return firstOutputUrl(data.output) || '';
   }
 
   async inpaintImage(imageUrl: string, maskUrl: string, prompt: string, options?: MediaGenerateOptions): Promise<string> {
-    const data = await this._createPrediction(
+    return this._createAndResolveUrl(
       { ...options, version: options?.version || 'stability-ai/stable-diffusion-inpainting' },
       { image: imageUrl, mask: maskUrl, prompt },
-      60,
     );
-    return firstOutputUrl(data.output) || '';
   }
 
   async upscaleVideo(videoUrl: string, options?: MediaGenerateOptions): Promise<MediaJobSubmission> {
@@ -197,45 +278,6 @@ export class ReplicateMediaAdapter implements MediaProviderAdapter {
     );
     if (!data.id) throw new Error('Replicate returned no prediction id');
     return { jobId: data.id };
-  }
-
-  async runOfficial(
-    modelId: string,
-    input: Record<string, unknown>,
-    opts?: { wait?: boolean; webhookUrl?: string; apiKey?: string; credentials?: Record<string, string> },
-  ): Promise<ReplicatePredictionResponse> {
-    const res = await this._fetch(`${BASE}/models/${modelId}/predictions`, {
-      method: 'POST',
-      headers: this._headers(opts, opts?.wait ? 60 : undefined),
-      body: JSON.stringify({
-        input,
-        ...(opts?.webhookUrl
-          ? { webhook: opts.webhookUrl, webhook_events_filter: ['completed'] }
-          : {}),
-      }),
-    });
-    if (!res.ok) throw new Error(`Replicate request failed: ${await res.text()}`);
-    return (await res.json()) as ReplicatePredictionResponse;
-  }
-
-  async runCommunity(
-    versionId: string,
-    input: Record<string, unknown>,
-    opts?: { wait?: boolean; webhookUrl?: string; apiKey?: string; credentials?: Record<string, string> },
-  ): Promise<ReplicatePredictionResponse> {
-    const res = await this._fetch(`${BASE}/predictions`, {
-      method: 'POST',
-      headers: this._headers(opts, opts?.wait ? 60 : undefined),
-      body: JSON.stringify({
-        version: versionId,
-        input,
-        ...(opts?.webhookUrl
-          ? { webhook: opts.webhookUrl, webhook_events_filter: ['completed'] }
-          : {}),
-      }),
-    });
-    if (!res.ok) throw new Error(`Replicate request failed: ${await res.text()}`);
-    return (await res.json()) as ReplicatePredictionResponse;
   }
 }
 

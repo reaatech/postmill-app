@@ -70,4 +70,26 @@ describe('runway media adapter', () => {
       'API key is required',
     );
   });
+
+  // 3.4 — a transient 5xx poll must THROW (lifecycle retries); a 4xx returns terminal failed.
+  it('pollJob throws on a 503 (transient → retry)', async () => {
+    const { ctx } = makeCtx(() => res('upstream down', false, 503));
+    const adapter: any = runwayMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('task-1', { apiKey: 'runway-key' })).rejects.toThrow(/transient/);
+  });
+
+  it('pollJob returns terminal failed on a 400', async () => {
+    const { ctx } = makeCtx(() => res('bad request', false, 400));
+    const adapter: any = runwayMediaModule.create(ctx as any);
+    const out = await adapter.pollJob('task-1', { apiKey: 'runway-key' });
+    expect(out.status).toBe('failed');
+  });
+
+  it('pollJob returns failed (not throw) when the key is missing', async () => {
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = runwayMediaModule.create(ctx as any);
+    const out = await adapter.pollJob('task-1', {});
+    expect(out.status).toBe('failed');
+    expect(out.error).toMatch(/API key/);
+  });
 });

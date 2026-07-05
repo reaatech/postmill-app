@@ -6,6 +6,7 @@ import {
   MediaGenerateOptions,
   MediaJobSubmission,
   resolveApiKey,
+  redactError,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -57,7 +58,10 @@ export class DeepgramAdapter implements MediaProviderAdapter {
     const apiKey = resolveApiKey(options);
     if (!apiKey) throw new Error('Deepgram API key is required');
 
-    const res = await this._fetch(`https://api.deepgram.com/v1/listen?model=${options?.model || 'whisper'}`, {
+    // 6.1c — build the query with URLSearchParams so a `model` containing `&callback=…` (etc.)
+    // can't inject extra Deepgram params (matches speechToTextWords).
+    const params = new URLSearchParams({ model: options?.model || 'whisper' });
+    const res = await this._fetch(`https://api.deepgram.com/v1/listen?${params.toString()}`, {
       method: 'POST',
       headers: {
         Authorization: `Token ${apiKey}`,
@@ -66,7 +70,7 @@ export class DeepgramAdapter implements MediaProviderAdapter {
       body: new Uint8Array(audio),
     });
 
-    if (!res.ok) throw new Error(`Deepgram STT failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Deepgram STT failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as DeepgramListenResponse;
     const transcript = data.results?.channels?.[0]?.alternatives?.[0]?.transcript;
     if (!transcript) throw new Error('Deepgram returned no transcript');
@@ -96,7 +100,7 @@ export class DeepgramAdapter implements MediaProviderAdapter {
       body: new Uint8Array(audio),
     });
 
-    if (!res.ok) throw new Error(`Deepgram STT failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`Deepgram STT failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as DeepgramListenResponse;
     const alt = data.results?.channels?.[0]?.alternatives?.[0];
     if (!alt?.transcript) throw new Error('Deepgram returned no transcript');

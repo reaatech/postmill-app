@@ -163,4 +163,38 @@ describe('CaptionService', () => {
 
     expect(result).toBe('/uploads/captioned.mp4');
   });
+
+  it('strips {, } override tokens and newlines from caption text before burn-in (6.4)', async () => {
+    const { service, mocks } = makeService(1);
+    mocks.aiMediaService.speechToTextWords.mockResolvedValue({
+      text: 'x',
+      // A crafted transcript word carrying an ASS override token + a newline.
+      words: [{ word: 'hi{\\an8}\nthere.', start: 0, end: 1 }],
+    });
+
+    await service.captionVideo({
+      orgId: 'org-1',
+      videoUrl: 'https://cdn.example.com/video.mp4',
+      style: 'ass',
+    });
+
+    const assWrite = mockWriteFileSync.mock.calls.find(([p]: any[]) =>
+      String(p).endsWith('.ass'),
+    );
+    expect(assWrite).toBeDefined();
+    const content = assWrite![1] as string;
+    const dialogue = content
+      .split('\n')
+      .find((l) => l.startsWith('Dialogue:'));
+    expect(dialogue).toBeDefined();
+    // The override delimiters and injected newline are gone.
+    expect(dialogue).not.toContain('{');
+    expect(dialogue).not.toContain('}');
+    expect(dialogue).toContain('an8');
+    // The whole Events section is a single Dialogue line (no newline-split cue).
+    const dialogueLines = content
+      .split('\n')
+      .filter((l) => l.startsWith('Dialogue:'));
+    expect(dialogueLines).toHaveLength(1);
+  });
 });

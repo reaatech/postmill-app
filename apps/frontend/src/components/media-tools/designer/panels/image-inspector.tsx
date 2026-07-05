@@ -38,6 +38,7 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
   const brandEnforcement = store((s: any) => s.brandEnforcement);
   const updateElement = store((s: any) => s.updateElement);
   const updateElements = store((s: any) => s.updateElements);
+  const updateElementsSilent = store((s: any) => s.updateElementsSilent);
 
   const [aiLoading, setAiLoading] = useState<string | false>(false);
   const [upscaleScale, setUpscaleScale] = useState(2);
@@ -336,7 +337,8 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
     const rect = e.currentTarget.getBoundingClientRect();
     const x = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
     const y = Math.min(1, Math.max(0, (e.clientY - rect.top) / rect.height));
-    set({ focalPoint: { x, y } });
+    // Silent during the drag — a single history entry is committed on pointer-up.
+    updateElementsSilent(ids, { focalPoint: { x, y } });
   };
 
   const handleFocalPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -352,7 +354,8 @@ export const ImageInspector: FC<ImageInspectorProps> = ({
 
   const handleFocalPointerUp = useCallback(() => {
     setDraggingFocal(false);
-  }, []);
+    store.getState().pushHistory();
+  }, [store]);
 
   const nudgeFocal = (dx: number, dy: number) => {
     const x = Math.min(1, Math.max(0, (element.focalPoint?.x ?? 0.5) + dx));

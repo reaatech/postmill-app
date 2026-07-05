@@ -9,6 +9,8 @@ import {
   MediaInputValue,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
@@ -77,7 +79,7 @@ export class DIDAdapter implements MediaProviderAdapter {
         ...(options?.webhookUrl ? { webhook: options.webhookUrl } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`D-ID video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`D-ID video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as DIDTalkResponse;
     if (!data.id) throw new Error('D-ID returned no talk id');
     return { jobId: data.id };
@@ -92,10 +94,19 @@ export class DIDAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'D-ID API key is required' };
+
     const res = await this._fetch(`${BASE}/talks/${jobId}`, {
       headers: this._headers(options),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient poll error: THROW so the still-rendering talk retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`D-ID poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as DIDTalkResponse;
 
     if (data.status === 'done') {
@@ -107,7 +118,7 @@ export class DIDAdapter implements MediaProviderAdapter {
       };
     }
     if (data.status === 'error' || data.status === 'rejected') {
-      return { status: 'failed', error: data.error?.description || `D-ID talk status: ${data.status}` };
+      return { status: 'failed', error: redactError(data.error?.description || `D-ID talk status: ${data.status}`) };
     }
     return { status: 'pending' };
   }

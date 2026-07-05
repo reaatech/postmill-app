@@ -58,6 +58,7 @@ describe('PodmanRenderService', () => {
       'VIDEO_RENDER_MEMORY',
       'VIDEO_RENDER_POD',
       'VIDEO_RENDER_IMAGE',
+      'VIDEO_RENDER_NETWORK',
     ]) {
       delete process.env[k];
     }
@@ -83,7 +84,7 @@ describe('PodmanRenderService', () => {
       '--memory',
       '8g',
       '--network',
-      'host',
+      'bridge',
     ]);
 
     const runArgs = argv[2];

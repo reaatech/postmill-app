@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useState } from 'react';
+import React, { FC, useCallback, useEffect, useState } from 'react';
 import useSWR from 'swr';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -91,6 +91,11 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
     },
     { revalidateOnFocus: false }
   );
+
+  // Surface the load failure from an effect, not inline in render.
+  useEffect(() => {
+    if (error && !data) toaster.show("Couldn't load uploads", 'warning');
+  }, [error, data, toaster]);
 
   const imageFiles = data?.results?.filter((f) => {
     const ext = f.name.split('.').pop()?.toLowerCase() || '';
@@ -384,7 +389,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       {isLoading && !data ? (
         <PanelSkeletonGrid count={6} />
       ) : error && !data ? (
-        (toaster.show('Couldn\'t load uploads', 'warning'), <PanelError message="Couldn\'t load uploads" onRetry={() => mutate()} />)
+        <PanelError message="Couldn't load uploads" onRetry={() => mutate()} />
       ) : !data?.results?.length ? (
         <div className="text-[12px] text-newTextColor/40 text-center py-4">
           No uploaded files found

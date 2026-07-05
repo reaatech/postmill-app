@@ -19,9 +19,23 @@ export class MediaJobsActivity {
     private _videoRenderService: VideoRenderService,
   ) {}
 
+  /**
+   * A still-pending local render is only re-enqueued once it has been pending longer than this
+   * (its original `media/render` event was likely lost). Freshly-enqueued jobs — including ones
+   * legitimately waiting behind the `concurrency:3` cap — are left alone, so the sweep does not
+   * stack a duplicate run for every job every minute.
+   */
+  private static readonly STALE_RENDER_MS = 90_000;
+
   /** True for the two local-compute render kinds (design timeline render + clip merge). */
   private isLocalRender(job: { provider: string; model?: string | null }): boolean {
     return job.provider === 'chromium-ffmpeg' || job.model === 'local/ffmpeg-merge';
+  }
+
+  private isStaleRender(job: { updatedAt?: Date | string | null; createdAt?: Date | string | null }): boolean {
+    const ts = job.updatedAt ?? job.createdAt;
+    if (!ts) return true;
+    return Date.now() - new Date(ts).getTime() > MediaJobsActivity.STALE_RENDER_MS;
   }
 
   /**
@@ -58,12 +72,17 @@ export class MediaJobsActivity {
     // same 3-concurrent cap.
     try {
       const pending = await this._aiSettings.getPendingMediaJobs(50);
-      const localJobs = pending.filter((j) => this.isLocalRender(j));
+      const localJobs = pending.filter(
+        (j) => this.isLocalRender(j) && this.isStaleRender(j),
+      );
       if (localJobs.length > 0) {
         if (isInngestEnabled()) {
           for (const job of localJobs) {
             await inngest.send({
               name: 'media/render',
+              // Deterministic id: a stale-job re-enqueue dedups against the initial dispatch
+              // (and other sweeps) within the same minute bucket, so at most one run is queued.
+              id: `media-render-${job.id}-${Math.floor(Date.now() / 60000)}`,
               data: {
                 jobId: job.id,
                 op: job.model === 'local/ffmpeg-merge' ? 'merge' : 'design',

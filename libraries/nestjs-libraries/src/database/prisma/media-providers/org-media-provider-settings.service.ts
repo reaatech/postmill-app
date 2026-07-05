@@ -220,7 +220,10 @@ export class OrgMediaProviderSettingsService {
   // universal-credential provider with no explicit row inherits enabled when the
   // org has the matching AI key. Wired into MediaStudioService.generate/listModels.
   async isProviderEnabledForOperation(orgId: string, identifier: string, operation: string): Promise<boolean> {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+    // §6.2: version-AGNOSTIC read — getByIdentifier defaults to v1, so once any provider
+    // pins v2 a universal provider's explicit `enabled:false` (a v2 row) would be missed
+    // and the AI-key fallback would wrongly read back as enabled.
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
     if (config) {
       if (!config.enabled) return false;
       if (!config.extraConfig) return true;
@@ -315,7 +318,9 @@ export class OrgMediaProviderSettingsService {
   }
 
   async testConnection(orgId: string, identifier: string) {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+    // §6.2: version-agnostic read so a v2-pinned row is testable (getByIdentifier's v1
+    // default would report an otherwise-configured provider as "not configured").
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
     if (!config) {
       throw new Error(`Media provider "${identifier}" not configured for this organization`);
     }

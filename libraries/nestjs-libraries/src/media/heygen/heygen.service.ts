@@ -7,6 +7,7 @@ import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/pri
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import { redactError } from '@gitroom/provider-kernel';
 
 const BASE = 'https://api.heygen.com';
 
@@ -201,7 +202,7 @@ export class HeyGenService {
         }),
       });
 
-      if (!res.ok) throw new Error(`HeyGen video generation failed: ${await res.text()}`);
+      if (!res.ok) throw new Error(`HeyGen video generation failed: ${redactError(await res.text())}`);
       const body = (await res.json()) as HeyGenGenerateResponse;
       const videoId = body.data?.video_id;
       if (!videoId) {
@@ -244,7 +245,7 @@ export class HeyGenService {
       headers: { 'x-api-key': apiKey, 'content-type': mime },
       body: buffer,
     });
-    if (!res.ok) throw new ForbiddenException(`HeyGen talking-photo upload failed (${res.status}): ${await res.text()}`);
+    if (!res.ok) throw new ForbiddenException(`HeyGen talking-photo upload failed (${res.status}): ${redactError(await res.text())}`);
     const body = (await res.json()) as { data?: { talking_photo_id?: string } };
     const id = body.data?.talking_photo_id;
     if (!id) throw new ForbiddenException('HeyGen returned no talking_photo_id');
@@ -276,7 +277,7 @@ export class HeyGenService {
         headers: this._headers(apiKey),
         body: JSON.stringify({ voice_id: params.voiceId, input_text: params.text }),
       });
-      if (!res.ok) throw new Error(`HeyGen TTS failed: ${await res.text()}`);
+      if (!res.ok) throw new Error(`HeyGen TTS failed: ${redactError(await res.text())}`);
       const body = (await res.json()) as { data?: { audio_id?: string; id?: string } };
       const audioId = body.data?.audio_id || body.data?.id;
       if (!audioId) throw new Error('HeyGen returned no audio id');
@@ -334,7 +335,7 @@ export class HeyGenService {
           headers: this._headers(apiKey),
           body: JSON.stringify({ video_url: sourceUrl, output_language: language, title: `translate-${language}` }),
         });
-        if (!res.ok) throw new Error(`HeyGen translation failed: ${await res.text()}`);
+        if (!res.ok) throw new Error(`HeyGen translation failed: ${redactError(await res.text())}`);
         const body = (await res.json()) as { data?: { video_translate_id?: string } };
         const id = body.data?.video_translate_id;
         if (!id) throw new Error('HeyGen returned no translation id');

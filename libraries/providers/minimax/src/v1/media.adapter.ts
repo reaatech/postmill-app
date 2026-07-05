@@ -8,11 +8,17 @@ import {
   MediaJobSubmission,
   MediaPollResult,
   resolveApiKey,
+  redactError,
+  isTransientStatus,
   SafeFetchPort,
   ProviderModule,
 } from '@gitroom/provider-kernel';
 
 const BASE = 'https://api.minimax.io/v1';
+
+// Cap the inline (data-URL) audio the sync T2A path decodes so a malformed/oversized hex
+// payload can't blow up memory (6.1e). 64 MB of decoded audio ≈ 128 MB of hex text.
+const MAX_INLINE_AUDIO_BYTES = 64 * 1024 * 1024;
 
 interface MiniMaxBaseResp {
   base_resp?: { status_code?: number; status_msg?: string };
@@ -74,7 +80,7 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
         ...(options?.aspectRatio ? { aspect_ratio: options.aspectRatio } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`MiniMax image generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`MiniMax image generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as MiniMaxImageResponse;
     const urls = (data.data?.image_urls || []).filter((u) => typeof u === 'string' && u.length > 0);
     if (urls.length === 0) {
@@ -108,7 +114,7 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
         ...(options?.webhookUrl ? { callback_url: options.webhookUrl } : {}),
       }),
     });
-    if (!res.ok) throw new Error(`MiniMax video generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`MiniMax video generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as MiniMaxVideoSubmitResponse;
     if (!data.task_id) {
       throw new Error(`MiniMax returned no task id: ${data.base_resp?.status_msg || 'unknown error'}`);
@@ -130,13 +136,21 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
         audio_setting: { format: 'mp3' },
       }),
     });
-    if (!res.ok) throw new Error(`MiniMax audio generation failed: ${await res.text()}`);
+    if (!res.ok) throw new Error(`MiniMax audio generation failed: ${redactError(await res.text())}`);
     const data = (await res.json()) as MiniMaxAudioResponse;
     if (!data.data?.audio) {
       throw new Error(`MiniMax returned no audio: ${data.base_resp?.status_msg || 'unknown error'}`);
     }
-    // MiniMax returns hex-encoded audio bytes.
-    const base64 = Buffer.from(data.data.audio, 'hex').toString('base64');
+    // MiniMax returns hex-encoded audio bytes. Validate the hex shape and cap the size before
+    // decoding so a malformed/oversized payload can't corrupt the clip or exhaust memory (6.1e).
+    const hex = data.data.audio;
+    if (!/^[0-9a-fA-F]*$/.test(hex) || hex.length % 2 !== 0) {
+      throw new Error('MiniMax returned malformed (non-hex) audio');
+    }
+    if (hex.length / 2 > MAX_INLINE_AUDIO_BYTES) {
+      throw new Error('MiniMax audio exceeds the inline size cap');
+    }
+    const base64 = Buffer.from(hex, 'hex').toString('base64');
     return {
       jobId: `minimax-audio-${Date.now()}`,
       artifactUrl: `data:audio/mpeg;base64,${base64}`,
@@ -149,17 +163,34 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'MiniMax API key is required' };
+
     const res = await this._fetch(`${BASE}/query/video_generation?task_id=${encodeURIComponent(jobId)}`, {
       headers: this._headers(options),
     });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      // 3.4 — transient query error: THROW so the still-rendering job retries.
+      if (isTransientStatus(res.status)) {
+        throw new Error(`MiniMax query poll transient error ${res.status}: ${redactError(body, 200)}`);
+      }
+      return { status: 'failed', error: redactError(body) };
+    }
     const data = (await res.json()) as MiniMaxVideoQueryResponse;
 
     if (data.status === 'Success' && data.file_id) {
       const fileRes = await this._fetch(`${BASE}/files/retrieve?file_id=${encodeURIComponent(data.file_id)}`, {
         headers: this._headers(options),
       });
-      if (!fileRes.ok) return { status: 'failed', error: await fileRes.text() };
+      // 3.4 — the render already succeeded; a transient error on the file-retrieve leg must
+      // retry, not permanently fail a completed generation.
+      if (!fileRes.ok) {
+        const body = await fileRes.text();
+        if (isTransientStatus(fileRes.status)) {
+          throw new Error(`MiniMax file retrieve transient error ${fileRes.status}: ${redactError(body, 200)}`);
+        }
+        return { status: 'failed', error: redactError(body) };
+      }
       const file = (await fileRes.json()) as MiniMaxFileResponse;
       if (!file.file?.download_url) {
         return { status: 'failed', error: 'MiniMax file has no download URL' };
@@ -171,7 +202,7 @@ export class MiniMaxMediaAdapter implements MediaProviderAdapter {
       };
     }
     if (data.status === 'Fail') {
-      return { status: 'failed', error: data.base_resp?.status_msg || 'MiniMax video generation failed' };
+      return { status: 'failed', error: redactError(data.base_resp?.status_msg || 'MiniMax video generation failed') };
     }
     return { status: 'pending' };
   }

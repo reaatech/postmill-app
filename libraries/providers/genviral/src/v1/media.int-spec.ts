@@ -104,4 +104,32 @@ describe('genviral media adapter (studio videos envelope)', () => {
     await expect(adapter.generateVideo('x', {})).rejects.toThrow('API key is required');
     await expect(adapter.generateVideo('x', { apiKey: 'gv-key' })).rejects.toThrow('requires a model');
   });
+
+  // 6.1g — a 200 body with `ok:false` is a terminal application error, surfaced as failure.
+  it('generateVideo throws on an ok:false envelope', async () => {
+    const { ctx } = makeCtx(() => res({ ok: false, message: 'quota exceeded' }));
+    const adapter: any = genviralMediaModule.create(ctx as any);
+    await expect(
+      adapter.generateVideo('a clip', { apiKey: 'gv-key', model: 'seedance-1' }),
+    ).rejects.toThrow(/quota exceeded/);
+  });
+
+  it('pollJob: ok:false → failed, 503 → throws, 400 → failed, missing key → failed', async () => {
+    const { ctx: okFalse } = makeCtx(() => res({ ok: false, message: 'boom' }));
+    const f1 = await (genviralMediaModule.create(okFalse as any) as any).pollJob('v1', { apiKey: 'gv-key' });
+    expect(f1.status).toBe('failed');
+
+    const { ctx: t } = makeCtx(() => res('down', false, 503));
+    await expect(
+      (genviralMediaModule.create(t as any) as any).pollJob('v1', { apiKey: 'gv-key' }),
+    ).rejects.toThrow(/transient/);
+
+    const { ctx: bad } = makeCtx(() => res('bad', false, 400));
+    const f2 = await (genviralMediaModule.create(bad as any) as any).pollJob('v1', { apiKey: 'gv-key' });
+    expect(f2.status).toBe('failed');
+
+    const { ctx: noKey } = makeCtx(() => res({}));
+    const f3 = await (genviralMediaModule.create(noKey as any) as any).pollJob('v1', {});
+    expect(f3.status).toBe('failed');
+  });
 });

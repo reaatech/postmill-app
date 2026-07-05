@@ -138,6 +138,13 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
     return map;
   }, [files]);
 
+  // Surface the files-load failure from an effect, not inline in render (a
+  // render-time toaster.show fires on every render and warns about setState in
+  // render).
+  useEffect(() => {
+    if (filesError && !files) toaster.show("Couldn't load files", 'warning');
+  }, [filesError, files, toaster]);
+
   const handleColorClick = useCallback(
     (color: string) => {
       if (!selectedElement) return;
@@ -283,7 +290,19 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
     [fetch, toaster, mutateCustomFonts]
   );
 
-  if (!brands || brands.length === 0) {
+  // Distinguish loading (brands === undefined) from empty (no profiles). The
+  // early return must sit AFTER every hook — `doc.mode` is read below via the
+  // already-hoisted `doc` selector, never a fresh conditional `store(...)` hook,
+  // which previously crashed the panel with a hook-count mismatch once brands
+  // loaded.
+  if (brands === undefined) {
+    return (
+      <div className="text-newTextColor/40 text-[12px] text-center py-8">
+        Loading brand profiles…
+      </div>
+    );
+  }
+  if (brands.length === 0) {
     return (
       <div className="text-newTextColor/40 text-[12px] text-center py-8">
         No brand profiles found. Create one in Settings &rarr; Brands.
@@ -437,7 +456,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
-          (toaster.show('Couldn\'t load files', 'warning'), <PanelError message="Couldn\'t load files" onRetry={() => mutateFiles()} />)
+          <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
           <div className="text-[12px] text-newTextColor/40 text-center py-2">
             No files found
@@ -490,7 +509,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
         {filesLoading && !files ? (
           <PanelSkeletonGrid count={3} columnsClassName="grid-cols-3" aspectClassName="aspect-square" />
         ) : filesError && !files ? (
-          (toaster.show('Couldn\'t load files', 'warning'), <PanelError message="Couldn\'t load files" onRetry={() => mutateFiles()} />)
+          <PanelError message="Couldn't load files" onRetry={() => mutateFiles()} />
         ) : !files?.results?.length ? (
           <div className="text-[12px] text-newTextColor/40 text-center py-2">
             No files found
@@ -540,7 +559,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           </div>
         )}
 
-        {store((s: any) => s.doc.mode) === 'video' && (
+        {doc.mode === 'video' && (
           <div className="flex gap-2">
             <button
               type="button"

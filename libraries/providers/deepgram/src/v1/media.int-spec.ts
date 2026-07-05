@@ -78,4 +78,16 @@ describe('deepgram media adapter (speech-to-text)', () => {
     await expect(adapter.generateImage('x', { apiKey: 'k' })).rejects.toThrow();
     await expect(adapter.generateAudio('x', { apiKey: 'k' })).rejects.toThrow();
   });
+
+  // 6.1c — a model value with an injected param is URL-encoded (no extra Deepgram params).
+  it('speechToText encodes a model containing &callback= (no param injection)', async () => {
+    const { recs, ctx } = makeCtx(() => res(LISTEN_RESPONSE));
+    const adapter: any = deepgramMediaModule.create(ctx as any);
+    await adapter.speechToText(Buffer.from('AUDIO'), { apiKey: 'dg-key', model: 'nova&callback=https://evil' });
+    // The whole value rides as a single encoded `model` param; `&callback=` is escaped.
+    expect(recs[0].url).toBe(
+      'https://api.deepgram.com/v1/listen?model=nova%26callback%3Dhttps%3A%2F%2Fevil',
+    );
+    expect(recs[0].url).not.toContain('&callback=');
+  });
 });

@@ -48,6 +48,8 @@ export const Translate: FC<TranslateProps> = ({ onGenerated }) => {
       }
       toaster.show(`Translating into ${selected.length} language(s) — track them in the queue`, 'success');
       onGenerated();
+    } catch {
+      toaster.show('Failed to start the translation', 'warning');
     } finally {
       setGenerating(false);
     }
