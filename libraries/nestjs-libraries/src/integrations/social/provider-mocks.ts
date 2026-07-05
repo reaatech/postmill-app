@@ -100,12 +100,6 @@ const mocks: Record<string, ProviderMock> = {
     postResponse: { id: 'post-123' },
     mediaResponse: { id: 'media-123' },
   },
-  'mastodon-custom': {
-    tokenResponse: { access_token: 'tok' },
-    userResponse: { id: '123', display_name: 'Test User', acct: 'testuser', avatar: 'https://ex.com/av.jpg', username: 'testuser' },
-    postResponse: { id: 'post-123' },
-    mediaResponse: { id: 'media-123' },
-  },
   bluesky: {
     tokenResponse: { accessJwt: 'tok', refreshJwt: 'rtok' },
     userResponse: { did: 'did:plc:123', handle: 'testuser', displayName: 'Test User', avatar: 'https://ex.com/av.jpg' },

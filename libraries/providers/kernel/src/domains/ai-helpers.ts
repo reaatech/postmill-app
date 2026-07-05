@@ -53,6 +53,35 @@ export class BoundedProviderCache<V> {
 }
 
 /**
+ * 3.1: the SSRF-safe fetch (`safeFetch`) throws `Blocked URL` for a private /
+ * non-public / non-HTTPS target. Recognising that message lets
+ * `validateCredentials` propagate the SSRF rejection (the caller maps it to a
+ * 400) instead of reflecting it, while treating every other failure as an
+ * ordinary transport error. Match ONLY the SSRF signals ("blocked url" — the
+ * safeFetch contract — or an explicit "ssrf" tag); anything broader (e.g. a bare
+ * `refus`) would also match "connection refused"-style transport messages and
+ * reclassify an ordinary ECONNREFUSED as an SSRF rejection.
+ */
+function isBlockedUrlError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  return /blocked url|ssrf/i.test(err.message);
+}
+
+/**
+ * 3.1: a short, non-reflective summary for a transport failure (ENOTFOUND /
+ * ECONNREFUSED / ETIMEDOUT / TLS / timeout) — enough for a "Test connection" to
+ * report a failed connection, without echoing any fetched body back to the tenant.
+ */
+function transportErrorMessage(err: unknown): string {
+  const code = (err as { code?: string })?.code;
+  if (code) return `Could not reach the Base URL (${code})`;
+  const message = (err as Error)?.message;
+  return message && message.includes('timed out')
+    ? message
+    : 'Could not reach the Base URL';
+}
+
+/**
  * Shared OpenAI-compatible AI adapter base. Lives in the kernel so the nine
  * `openai-compatible` provider packages (siliconflow, deepinfra, minimax, qwen,
  * meta-llama, gmihub, bitdeer, lightning, vultr) can construct it without
@@ -176,11 +205,22 @@ export class OpenAICompatibleAdapter implements AiCapability {
     if (!this._safeFetch) return { ok: false, error: 'cannot validate' };
     const baseURL = (creds.baseURL || this._defaultBaseURL || '').replace(/(?<![/])\/+$/, '');
     if (!baseURL) return { ok: false, error: 'Base URL is required to validate credentials' };
-    // safeFetch throws on a private/non-public URL (SSRF) — let it propagate
-    // rather than reflecting a fetched body back to the tenant.
-    const response = await this._safeFetch(`${baseURL}/models`, {
-      headers: { Authorization: `Bearer ${creds.apiKey}` },
-    });
+    // 3.1: distinguish an SSRF / URL-safety rejection from an ordinary transport
+    // failure. safeFetch throws `Blocked URL` for a private/non-public baseURL —
+    // let that propagate (the caller maps it to a 400) rather than reflecting a
+    // fetched body back to the tenant. A transport error (ENOTFOUND / ECONNREFUSED
+    // / ETIMEDOUT / TLS / timeout) from a typo'd Base URL is not security-relevant
+    // → return `{ ok:false }` so "Test connection" reports a failed connection
+    // instead of an unhandled Nest 500.
+    let response: Response;
+    try {
+      response = await this._safeFetch(`${baseURL}/models`, {
+        headers: { Authorization: `Bearer ${creds.apiKey}` },
+      });
+    } catch (err) {
+      if (isBlockedUrlError(err)) throw err;
+      return { ok: false, error: transportErrorMessage(err) };
+    }
     if (response.ok) return { ok: true };
     if (response.status === 401 || response.status === 403) {
       return { ok: false, error: 'Invalid API key' };

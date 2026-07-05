@@ -10,12 +10,14 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
@@ -35,7 +37,8 @@ import {
 export class StorageController {
   constructor(
     private _storageService: StorageService,
-    private _auditService: AuditService
+    private _auditService: AuditService,
+    private _fileService: FileService
   ) {}
 
   @Get('/')
@@ -282,9 +285,26 @@ export class StorageController {
     @Param('id') id: string,
     @Body() body: SetDefaultFolderDto
   ) {
+    const folderId = body.folderId || null;
+
+    // Validate cross-org / missing folder before persisting (mirror
+    // MediaProviderController._assertStorageOwnership). `getFolder` throws
+    // `HttpException('Folder not found', 404)` for the ownership/not-found case;
+    // anything else is infra and must propagate.
+    if (folderId) {
+      try {
+        await this._fileService.getFolder(org.id, folderId);
+      } catch (err) {
+        if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
+        throw new BadRequestException(
+          'folderId does not belong to this organization'
+        );
+      }
+    }
+
     return this._storageService.setDefaultFolderForProvider(
       id,
-      body.folderId || null,
+      folderId,
       org.id,
       user.id
     );

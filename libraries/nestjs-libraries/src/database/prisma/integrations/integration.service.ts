@@ -471,6 +471,13 @@ export class IntegrationService {
         getIntegration.providerVersion
       );
 
+    // 1.3: the Unchecked lookup returns undefined for a retired-pinned version
+    // (it no longer throws). A retired adapter can't serve analytics — return
+    // empty instead of TypeError-ing on `integrationProvider.refreshWait` below.
+    if (!integrationProvider) {
+      return [];
+    }
+
     if (
       dayjs(getIntegration?.tokenExpiration).isBefore(dayjs()) ||
       forceRefresh

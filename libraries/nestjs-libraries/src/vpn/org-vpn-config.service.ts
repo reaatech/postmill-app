@@ -13,6 +13,7 @@ import {
   VpnProxyRegion,
 } from './vpn.types';
 import { VpnDispatcherService } from './vpn-dispatcher.service';
+import { resolveSafeProxyHost } from './vpn-dispatcher.factory';
 
 export interface VpnProviderListItem {
   identifier: string;
@@ -238,10 +239,15 @@ export class OrgVpnConfigService {
     // a deprecated version rejects the write, retired is 410, unknown is 400.
     // Replaces the unvalidated `latestActive ?? 'v1'`. VPN config bodies carry no
     // client version, so the existing pin (else latest-active) is validated.
+    // 1.4: when a config already exists, this is an in-place update — pass its
+    // pinned version as `currentVersion` so a deprecated-pinned VPN config can
+    // still be re-keyed / toggled / have its regions changed; only a fresh pin to
+    // a deprecated/retired version is rejected.
     const version = this._resolution.resolveWriteVersion(
       'vpn',
       identifier,
       config?.version ?? undefined,
+      config?.version ? { currentVersion: config.version } : undefined,
     );
 
     let adapter;
@@ -386,6 +392,30 @@ export class OrgVpnConfigService {
 
     const decrypted = this._decryptCredentials(config.credentials);
     if (adapter.healthCheck) {
+      // SSRF gate: the custom-proxy health check opens a raw TCP socket to the
+      // org-supplied host, which — without validation — turns "Test connection"
+      // into an internal reachability / port-scan oracle (169.254.169.254:80,
+      // 10.0.0.x:22, …). The adapter lives in `providers/*` and can only depend on
+      // the kernel, so it cannot run SSRF validation itself; do it here (the
+      // service already decrypts creds and can import the dispatch-path resolver).
+      // Validate any host-bearing config through the SAME resolver the dispatch
+      // path uses (respecting SSRF_ALLOWED_PRIVATE_CIDRS via isBlockedIp) and hand
+      // the adapter a validated literal IP so the connect leg can't be redirected
+      // to a private address via DNS rebinding.
+      const host =
+        typeof decrypted.host === 'string' ? decrypted.host.trim() : '';
+      if (host) {
+        let safeIp: string;
+        try {
+          safeIp = await resolveSafeProxyHost(host);
+        } catch {
+          return {
+            ok: false,
+            error: 'Proxy host is not a permitted public address.',
+          };
+        }
+        return adapter.healthCheck({ ...decrypted, host: safeIp });
+      }
       return adapter.healthCheck(decrypted);
     }
     return { ok: true };

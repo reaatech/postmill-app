@@ -20,6 +20,7 @@ import { Prisma } from '@prisma/client';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
+import { SaveChannelConfigDto } from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 // PROVIDER_REMEDIATION 0.2 + 3.2: `ProviderConfiguration` is the platform-global
 // social OAuth-app store (no organizationId). It was gated only by
@@ -124,15 +125,7 @@ export class ChannelConfigController {
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
     @Body()
-    body: {
-      enabled: boolean;
-      clientId?: string;
-      clientSecret?: string;
-      redirectUri?: string;
-      scopes?: string;
-      additionalConfig?: string;
-      setupInstructions?: string;
-    }
+    body: SaveChannelConfigDto
   ) {
     this._assertSuperAdmin(user);
     if (typeof body.enabled !== 'boolean') {

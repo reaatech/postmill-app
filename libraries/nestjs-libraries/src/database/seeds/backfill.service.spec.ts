@@ -18,9 +18,14 @@ type Tx = {
   aIBrandProfile: { updateMany: ReturnType<typeof vi.fn> };
   storageProviderConfig: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
   orgShortLinkConfig: { findMany: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
-  aISystemSettings: { findFirst: ReturnType<typeof vi.fn>; update: ReturnType<typeof vi.fn> };
+  aISystemSettings: {
+    findFirst: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
   aIOrgProviderConfig: { findMany: ReturnType<typeof vi.fn> };
   mediaProviderConfig: { upsert: ReturnType<typeof vi.fn> };
+  $executeRaw: ReturnType<typeof vi.fn>;
 };
 
 const makeTx = (): Tx => ({
@@ -40,9 +45,15 @@ const makeTx = (): Tx => ({
   aIBrandProfile: { updateMany: vi.fn() },
   storageProviderConfig: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn() },
   orgShortLinkConfig: { findMany: vi.fn().mockResolvedValue([]), update: vi.fn() },
-  aISystemSettings: { findFirst: vi.fn().mockResolvedValue(null), update: vi.fn() },
+  aISystemSettings: {
+    findFirst: vi.fn().mockResolvedValue(null),
+    findUnique: vi.fn().mockResolvedValue(null),
+    update: vi.fn(),
+  },
   aIOrgProviderConfig: { findMany: vi.fn().mockResolvedValue([]) },
   mediaProviderConfig: { upsert: vi.fn() },
+  // the budget cleanup takes a SELECT … FOR UPDATE row lock
+  $executeRaw: vi.fn().mockResolvedValue(0),
 });
 
 const makeService = (tx: Tx) => {
@@ -126,6 +137,63 @@ describe('BackfillService — ragSettings.mediaProviders migration', () => {
     await makeService(tx).backfill();
 
     expect(tx.mediaProviderConfig.upsert).not.toHaveBeenCalled();
+    expect(tx.aISystemSettings.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('BackfillService — budget global-cap cleanup (0.4)', () => {
+  let tx: Tx;
+  beforeEach(() => {
+    tx = makeTx();
+  });
+
+  const runCleanup = (service: BackfillService) =>
+    (service as any).cleanupLeakedGlobalBudgetCaps(tx);
+
+  it('strips leaked top-level caps while preserving perOrgCaps', async () => {
+    tx.aISystemSettings.findUnique.mockResolvedValue({
+      budgetSettings: JSON.stringify({
+        monthlyCap: 1000,
+        dailyCap: 50,
+        alertThresholdPct: 0.8,
+        perOrgCaps: { orgA: { monthly: 5 }, orgB: { daily: 2 } },
+        scopeCaps: { agent: { monthly: 3 } },
+      }),
+    });
+
+    await runCleanup(makeService(tx));
+
+    expect(tx.aISystemSettings.update).toHaveBeenCalledTimes(1);
+    const written = JSON.parse(
+      tx.aISystemSettings.update.mock.calls[0][0].data.budgetSettings,
+    );
+    // top-level org-slice keys that leaked upward are gone…
+    expect(written).not.toHaveProperty('monthlyCap');
+    expect(written).not.toHaveProperty('dailyCap');
+    expect(written).not.toHaveProperty('alertThresholdPct');
+    // …perOrgCaps (and other keys) intact.
+    expect(written.perOrgCaps).toEqual({ orgA: { monthly: 5 }, orgB: { daily: 2 } });
+    expect(written.scopeCaps).toEqual({ agent: { monthly: 3 } });
+    // …and the stripped values are preserved (an intentional super-admin global
+    // cap is indistinguishable from a leak — never destroy silently).
+    expect(written._strippedLegacyGlobalCaps).toEqual({
+      monthlyCap: 1000,
+      dailyCap: 50,
+      alertThresholdPct: 0.8,
+    });
+  });
+
+  it('is a no-op when there are no leaked top-level caps', async () => {
+    tx.aISystemSettings.findUnique.mockResolvedValue({
+      budgetSettings: JSON.stringify({ perOrgCaps: { orgA: { monthly: 5 } } }),
+    });
+    await runCleanup(makeService(tx));
+    expect(tx.aISystemSettings.update).not.toHaveBeenCalled();
+  });
+
+  it('is a no-op when there is no settings row / no budgetSettings', async () => {
+    tx.aISystemSettings.findUnique.mockResolvedValue(null);
+    await runCleanup(makeService(tx));
     expect(tx.aISystemSettings.update).not.toHaveBeenCalled();
   });
 });

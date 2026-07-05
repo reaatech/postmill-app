@@ -137,7 +137,17 @@ describe('openai media adapter — Sora Videos API', () => {
       url.endsWith('/content') ? json('down', false, 500) : json({ id: 'video_abc', status: 'completed' }),
     );
     const adapter: any = openaiMediaModule.create(ctx as any);
-    await expect(adapter.pollJob('video_abc', { apiKey: 'sk-test' })).rejects.toThrow(/content download failed/i);
+    // 2.2: a 5xx on the content-download leg is TRANSIENT → throws (retry the paid render).
+    await expect(adapter.pollJob('video_abc', { apiKey: 'sk-test' })).rejects.toThrow(
+      /content download transient error 500/i,
+    );
+
+    // 2.2: a permanent 4xx (expired/deleted clip) is TERMINAL → { status: 'failed' }.
+    const four = makeCtx((url) =>
+      url.endsWith('/content') ? json('gone', false, 404) : json({ id: 'video_abc', status: 'completed' }),
+    );
+    const adapter4: any = openaiMediaModule.create(four.ctx as any);
+    expect((await adapter4.pollJob('video_abc', { apiKey: 'sk-test' })).status).toBe('failed');
   });
 
   it('2.1: a provider status:failed → returned { status: failed }; 4xx poll → failed', async () => {

@@ -127,7 +127,20 @@ describe('vertex media adapter (Imagen image + Veo long-running video)', () => {
         : res('down', false, 500),
     );
     const adapter: any = vertexMediaModule.create(ctx as any);
-    await expect(adapter.pollJob(opName, { credentials: CREDS })).rejects.toThrow(/GCS download failed/i);
+    // 2.2: a 5xx on the download leg is TRANSIENT → throws so the paid render is retried.
+    await expect(adapter.pollJob(opName, { credentials: CREDS })).rejects.toThrow(
+      /GCS download transient error 500/i,
+    );
+
+    // 2.2: a permanent 4xx on the download leg is TERMINAL → { status: 'failed' }
+    // (fail fast instead of re-polling a dead job for ~24h).
+    const { ctx: ctx4 } = makeCtx((url) =>
+      url.includes(':fetchPredictOperation')
+        ? res({ name: opName, done: true, response: { videos: [{ gcsUri: 'gs://b/o.mp4' }] } })
+        : res('gone', false, 404),
+    );
+    const adapter4: any = vertexMediaModule.create(ctx4 as any);
+    expect((await adapter4.pollJob(opName, { credentials: CREDS })).status).toBe('failed');
   });
 
   it('rejects missing GCP credentials and unsupported operations', async () => {

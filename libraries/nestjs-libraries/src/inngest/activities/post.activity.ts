@@ -114,8 +114,14 @@ export class PostActivity {
   async searchForMissingThreeHoursPosts() {
     const list = await this._postService.searchForMissingThreeHoursPosts();
     for (const post of list) {
+      // 5.4: thread the row's pinned version so recovery resolves the EXACT
+      // adapter (the providerVersion selected in searchForMissingThreeHoursPosts
+      // was otherwise dead). Safe post-1.3: a retired version resolves to
+      // undefined (→ maxConcurrentJob defaults to 1, recovery still enqueues; the
+      // publish step surfaces the retired adapter) rather than aborting the sweep.
       const provider = this._integrationManager.getSocialIntegrationUnchecked(
-        post.integration.providerIdentifier
+        post.integration.providerIdentifier,
+        post.integration.providerVersion ?? undefined
       );
       const taskQueue = post.integration.providerIdentifier
         .split('-')[0]

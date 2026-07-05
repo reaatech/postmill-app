@@ -866,7 +866,13 @@ describe('IntegrationManager', () => {
       expect(m.getSocialIntegrationUnchecked('demo', 'v1')?.name).toBe('Demo v1');
     });
 
-    it('rejects a retired pinned version', () => {
+    it('returns undefined for a retired pinned version (1.3 — Unchecked must never throw)', () => {
+      // 1.3: the Unchecked variant returns undefined (not throw) for a retired
+      // pinned version so a single retired-pinned row can't abort a cross-org
+      // sweep (channel list / token refresh rely on `if (!provider) continue`).
+      // The CHECKED getSocialIntegration delegates here and therefore surfaces a
+      // generic 404 ("Unknown integration") for a retired pin — the retired
+      // wording/410 does not survive on that path.
       const retired = mkMod('v1', 'retired', 'Demo v1');
       const kernel = {
         get: () => retired,
@@ -875,9 +881,7 @@ describe('IntegrationManager', () => {
       } as any;
       const m = new IntegrationManager({} as any, {} as any, kernel);
 
-      expect(() => m.getSocialIntegrationUnchecked('demo', 'v1')).toThrow(
-        NotFoundException
-      );
+      expect(m.getSocialIntegrationUnchecked('demo', 'v1')).toBeUndefined();
     });
 
     it('does not check status on the version-less listing path', () => {

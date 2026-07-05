@@ -5,6 +5,11 @@ const mockRepo = {
   getActive: vi.fn(),
   getByOrg: vi.fn(),
   getByIdentifier: vi.fn(),
+  // 1.2: _getPinnedVersion now reads version-agnostically. Delegate to
+  // getByIdentifier so per-test `getByIdentifier.mockResolvedValue(...)` covers both.
+  findAnyByIdentifier: vi.fn((orgId: string, id: string) =>
+    mockRepo.getByIdentifier(orgId, id),
+  ),
   setActive: vi.fn(),
   delete: vi.fn(),
   getBudget: vi.fn(),

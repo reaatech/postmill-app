@@ -157,7 +157,7 @@ export class HeyGenAdapter implements MediaProviderAdapter {
 
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`HeyGen video poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen video poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const { data } = (await res.json()) as HeyGenStatusResponse;
@@ -183,7 +183,7 @@ export class HeyGenAdapter implements MediaProviderAdapter {
 
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`HeyGen translate poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen translate poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const { data } = (await res.json()) as HeyGenTranslateStatusResponse;
@@ -211,7 +211,7 @@ export class HeyGenAdapter implements MediaProviderAdapter {
 
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`HeyGen tts poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`HeyGen tts poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const { data } = (await res.json()) as HeyGenAudioStatusResponse;

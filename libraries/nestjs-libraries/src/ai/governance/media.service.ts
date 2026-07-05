@@ -324,13 +324,30 @@ export class AiMediaService {
       return mediaConfig.credentials;
     }
 
+    // 1.1 (review): a null step-1 result is ambiguous — "no media row" vs "media
+    // row explicitly DISABLED". When the org deliberately switched the media
+    // provider off (e.g. openai media off to stop image spend, LLM kept on),
+    // falling through to the raw AI row below would route around that disable
+    // and keep billing the key on this surface. Stop here instead.
+    if (
+      typeof this._orgMediaProviderSettings?.isProviderExplicitlyDisabled ===
+        'function' &&
+      (await this._orgMediaProviderSettings
+        .isProviderExplicitlyDisabled(orgId, providerId)
+        .catch(() => false))
+    ) {
+      return null;
+    }
+
     // 2) Fall back to a plain AIOrgProviderConfig for AI providers that expose a
-    // media adapter but have no media-side row.
+    // media adapter but have no media-side row. Version-agnostic read (1.2 — a
+    // v2-pinned AI row must still be found) and the AI row's own `enabled:false`
+    // is honored (1.1b).
     if (!this._orgAiSettingsRepository || !this._encryptionService) return null;
     const aiConfig = await this._orgAiSettingsRepository
-      .getByIdentifier(orgId, providerId, version)
+      .findAnyByIdentifier(orgId, providerId)
       .catch(() => null);
-    if (!aiConfig?.credentials) return null;
+    if (!aiConfig?.credentials || aiConfig.enabled === false) return null;
     try {
       const decrypted = this._encryptionService.decrypt(aiConfig.credentials);
       return JSON.parse(decrypted) as Record<string, string>;

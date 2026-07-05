@@ -190,7 +190,7 @@ export class HiggsfieldAdapter extends BearerTokenMediaAdapter {
     const res = await this._fetch(`${BASE}/requests/${jobId}/status`, { headers });
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`Higgsfield poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`Higgsfield poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const data = (await res.json()) as HiggsfieldResponse;

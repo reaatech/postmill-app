@@ -140,6 +140,15 @@ export class ProviderKernel {
       | undefined;
   }
 
+  // 4.2 — version-ordering INVARIANT: `latestActive` ranks by numeric major
+  // (`versionRank`), tie-breaking same-major suffixed versions lexicographically
+  // (`compareVersions`). That tie-break means a suffixed version like `v2-beta`
+  // would lexicographically BEAT plain `v2` if it were `active`. The invariant
+  // that keeps this correct: **pre-releases must carry status `preview`, never
+  // `active`** — only `active` versions are considered here, so a `preview`
+  // `v2-beta` is excluded and `v2` wins. Suffixes on an `active` version are
+  // reserved for forward hotfixes (`v2-hotfix` intentionally > `v2`). Do not mark
+  // a pre-release `active`, or it will be selected over its stable base.
   latestActive<Caps, Capability>(
     domain: ProviderDomain,
     providerId: string,
@@ -176,7 +185,7 @@ export class ProviderKernel {
     domain: ProviderDomain,
     providerId: string,
     version?: string,
-    opts?: { allowPreview?: boolean },
+    opts?: { allowPreview?: boolean; allowDeprecated?: boolean },
   ): ProviderModule<Caps, Capability> {
     if (version) {
       const mod = this.get<Caps, Capability>(domain, providerId, version);
@@ -186,7 +195,12 @@ export class ProviderKernel {
       if (mod.manifest.status === 'retired') {
         throw new ProviderVersionRetiredError({ domain, providerId, version });
       }
-      if (mod.manifest.status === 'deprecated') {
+      // PROVIDER_REMEDIATION_02 §1.4: a deprecated version rejects a write that
+      // NEWLY pins it, but an IN-PLACE update of a row already pinned to it
+      // (credential rotation, rename, disable) must still be allowed —
+      // `allowDeprecated` lets the resolution layer opt into that. Retired stays
+      // terminal even in place.
+      if (mod.manifest.status === 'deprecated' && !opts?.allowDeprecated) {
         throw new ProviderVersionDeprecatedForWriteError({ domain, providerId, version });
       }
       if (mod.manifest.status === 'preview' && !opts?.allowPreview) {

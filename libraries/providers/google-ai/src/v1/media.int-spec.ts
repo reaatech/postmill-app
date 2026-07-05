@@ -137,7 +137,19 @@ describe('google-ai media adapter (Gemini Developer API)', () => {
       return json('down', false, 500); // the file uri download
     });
     const adapter: any = googleaiMediaModule.create(ctx as any);
-    await expect(adapter.pollJob(opName, { apiKey: 'AIza-test' })).rejects.toThrow(/download failed/i);
+    // 2.2: a 5xx on the download leg is TRANSIENT → throws so the paid render is retried.
+    await expect(adapter.pollJob(opName, { apiKey: 'AIza-test' })).rejects.toThrow(
+      /download transient error 500/i,
+    );
+
+    // 2.2: a permanent 4xx on the download leg is TERMINAL → { status: 'failed' }.
+    const { ctx: ctx4 } = makeCtx((url) => {
+      if (url.includes('/operations/'))
+        return json({ name: opName, done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://gen/file' } }] } } });
+      return json('gone', false, 404);
+    });
+    const adapter4: any = googleaiMediaModule.create(ctx4 as any);
+    expect((await adapter4.pollJob(opName, { apiKey: 'AIza-test' })).status).toBe('failed');
   });
 
   it('2.1: an operation error → returned failed; missing key on poll → terminal failed', async () => {

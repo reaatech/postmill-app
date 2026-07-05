@@ -30,6 +30,7 @@ import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-config.types';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
@@ -173,6 +174,22 @@ export class OrgAiSettingsController {
     const adapter = this._resolveAdapter(identifier, body.version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
+    // 3.2: validate a custom Base URL at CONFIG WRITE. The read primitive
+    // (listModels / validateCredentials) already routes through SafeFetchPort,
+    // but the model traffic POSTs to the org baseURL via the AI-SDK's global
+    // fetch — the same SSRF class one call deeper. Rejecting a private / non-HTTPS
+    // baseURL before it is persisted closes that at the source.
+    const baseURL = body.credentials?.baseURL;
+    if (
+      typeof baseURL === 'string' &&
+      baseURL.trim() &&
+      !(await isSafePublicHttpsUrl(baseURL))
+    ) {
+      throw new BadRequestException(
+        'Base URL must be a public HTTPS URL (private, loopback, and non-HTTPS hosts are not allowed)',
+      );
+    }
+
     await this._orgAiSettings.upsert(org.id, identifier, {
       // Configuring defaults to enabled; the kit's On/Off toggle PUTs an explicit
       // `{ enabled: false }` to disable without clearing credentials (mirrors the
@@ -228,7 +245,15 @@ export class OrgAiSettingsController {
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     if (body.credentials) {
-      return adapter.validateCredentials(body.credentials);
+      // 3.1: validateCredentials returns { ok:false } for a transport failure
+      // (typo'd Base URL → ENOTFOUND/etc.), but PROPAGATES an SSRF / URL-safety
+      // rejection (a private/non-public baseURL). Map that propagation to a 400
+      // so the candidate-credentials branch can never surface an unhandled 500.
+      try {
+        return await adapter.validateCredentials(body.credentials);
+      } catch (err) {
+        throw new BadRequestException((err as Error).message);
+      }
     }
 
     try {

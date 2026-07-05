@@ -5,6 +5,11 @@ function makeService() {
   const repository = {
     getByOrg: vi.fn().mockResolvedValue([]),
     getByIdentifier: vi.fn().mockResolvedValue(null),
+    // 1.2: _getPinnedVersion reads version-agnostically. Delegate to getByIdentifier
+    // so a per-test `getByIdentifier.mockResolvedValue(...)` also drives it.
+    findAnyByIdentifier: vi.fn((orgId: string, id: string) =>
+      repository.getByIdentifier(orgId, id),
+    ),
     upsert: vi.fn().mockResolvedValue({ identifier: 'openai' }),
     setActive: vi.fn().mockResolvedValue({ identifier: 'openai', isActive: true }),
     delete: vi.fn().mockResolvedValue({}),
@@ -32,6 +37,11 @@ function makeService() {
   };
   const orgAiRepository = {
     getByIdentifier: vi.fn().mockResolvedValue(null),
+    // 1.2: _aiCredentials reads the AI row version-agnostically. Delegate so a
+    // per-test `getByIdentifier.mockResolvedValue(...)` drives both reads.
+    findAnyByIdentifier: vi.fn((orgId: string, id: string) =>
+      orgAiRepository.getByIdentifier(orgId, id),
+    ),
   };
 
   const service = new OrgMediaProviderSettingsService(
@@ -374,8 +384,10 @@ describe('OrgMediaProviderSettingsService', () => {
       });
 
       const config = await service.getConfigForProvider('org-1', 'qwen');
-      // The AI-key fallback must NOT fire → empty creds → generation path blocks.
-      expect(config?.credentials).toEqual({});
+      // 1.1: a disabled row returns null entirely (stronger than empty creds) → the
+      // generation path treats it as not-configured; the AI-key fallback never fires.
+      expect(config).toBeNull();
+      expect(orgAiRepository.getByIdentifier).not.toHaveBeenCalled();
     });
 
     it('getProviders reports a disabled universal row as disabled even with an AI key', async () => {

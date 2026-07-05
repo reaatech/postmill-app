@@ -1,6 +1,6 @@
 # Provider framework
 
-> Verified against v4.0.0
+> Verified against v4.0.0 (incl. provider-surface round-2 remediation)
 
 Postmill integrates with dozens of external services across AI, media generation, social channels,
 short-links, VPN egress, storage, email, and auth. The **unified provider framework** replaces the
@@ -15,7 +15,7 @@ package-per-provider model.
 - Pin-on-write: every stored config/ledger/integration row records the exact provider version it
   was created against.
 - Graceful lifecycle: each version has a status (`preview → active → deprecated → retired`) with
-  sunset dates surfaced to admins and the public API.
+  sunset dates surfaced to admins and the catalog API.
 - Operational simplicity: a single resolution path — the kernel — for every domain, with no parallel
   legacy registries to keep in sync.
 
@@ -134,6 +134,14 @@ Adapters declare the flags in `capabilities`; the defaults resolver maps media c
 The kernel is the **sole** resolution path for every domain. The `PROVIDER_KERNEL=legacy` kill
 switch and the legacy in-memory registries that backed it have been removed — there is no fallback
 registry.
+
+## Catalog & health endpoints
+
+- `GET /providers/catalog?domain=` returns the provider catalog for a domain. **It is
+  authenticated** — the route sits in the authenticated group (`AuthMiddleware`/`CsrfMiddleware`
+  apply); it is **not** an anonymous/public endpoint. An unknown or unsupported `?domain=` returns
+  **400 Bad Request** (`resolveDomainFilter` rejects it) rather than an unfiltered or empty result.
+- `GET /admin/providers/health?domain=` (super-admin) returns per-version health counters.
 
 ## Testing
 

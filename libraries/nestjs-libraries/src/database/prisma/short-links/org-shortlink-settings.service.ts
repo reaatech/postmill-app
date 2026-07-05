@@ -1,4 +1,4 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger } from '@nestjs/common';
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { OrgShortLinkSettingsRepository } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
@@ -148,6 +148,102 @@ export class OrgShortLinkSettingsService {
     });
     // 1.3a: drop any cached capability so the next resolve rebuilds with fresh creds.
     this._resolution.invalidate('shortlink', identifier, orgId);
+    return result;
+  }
+
+  // The id of the existing config row for this org+identifier, or null. Prefers
+  // the ACTIVE row (the one getActive()/short-link calls actually read) over the
+  // newest — orgs already carrying pre-fix duplicate rows have an active row on
+  // the revoked key plus a newer inactive one, and rotation must heal the active
+  // row, not the newest (PROVIDER_REMEDIATION_02 §0.3 + review F7). Used to route
+  // a credentialed save to an in-place update instead of a fingerprint-create.
+  async getExistingConfigId(
+    orgId: string,
+    identifier: string,
+  ): Promise<string | null> {
+    const active = await this._repository.getActiveByIdentifier(orgId, identifier);
+    if (active) return active.id;
+    const config = await this._repository.getByIdentifier(orgId, identifier);
+    return config?.id ?? null;
+  }
+
+  // Row-id-targeted in-place update — the rotation-safe path. Preserves the row's
+  // pinned version (an in-place edit is allowed even on a deprecated-pinned row);
+  // only an explicit version *change* re-pins through the lifecycle validator.
+  // `identifier` (when supplied) must match the row's provider — the row-id route
+  // carries both, and a mismatch would stamp a fingerprint computed for the wrong
+  // provider onto the row (review F9).
+  async updateById(
+    orgId: string,
+    configId: string,
+    data: {
+      credentials?: Record<string, string>;
+      customDomain?: string;
+      extraConfig?: Record<string, string>;
+      name?: string;
+      accountFingerprint?: string;
+      version?: string;
+    },
+    identifier?: string,
+  ) {
+    const existing = await this._repository.getById(orgId, configId);
+    if (!existing) {
+      throw new Error('Configuration not found');
+    }
+    if (identifier && existing.identifier !== identifier) {
+      throw new BadRequestException(
+        'Configuration does not belong to this provider',
+      );
+    }
+
+    const encryptedCredentials = data.credentials
+      ? this._encryption.encrypt(JSON.stringify(data.credentials))
+      : undefined;
+    const encryptedExtraConfig = data.extraConfig
+      ? this._encryption.encrypt(JSON.stringify(data.extraConfig))
+      : undefined;
+
+    let version = existing.version ?? undefined;
+    if (data.version && data.version !== existing.version) {
+      version = this._resolution.resolveWriteVersion(
+        'shortlink',
+        existing.identifier,
+        data.version,
+      );
+    }
+
+    let result;
+    try {
+      result = await this._repository.updateById(configId, {
+        enabled: true,
+        ...(encryptedCredentials !== undefined
+          ? { credentials: encryptedCredentials }
+          : {}),
+        ...(encryptedExtraConfig !== undefined
+          ? { extraConfig: encryptedExtraConfig }
+          : {}),
+        ...(data.customDomain !== undefined
+          ? { customDomain: data.customDomain }
+          : {}),
+        ...(data.name !== undefined ? { name: data.name } : {}),
+        ...(data.accountFingerprint !== undefined
+          ? { accountFingerprint: data.accountFingerprint }
+          : {}),
+        ...(version !== undefined ? { version } : {}),
+      });
+    } catch (err) {
+      // Duplicate-row orgs (pre-fix state): writing this row's fingerprint can
+      // collide with a stale sibling row's on the compound unique — map the
+      // P2002 to a clean 400 instead of a raw 500 (review F8).
+      if ((err as { code?: string })?.code === 'P2002') {
+        throw new BadRequestException(
+          'Another configuration for this provider already uses these credentials. Remove the duplicate configuration first.',
+        );
+      }
+      throw err;
+    }
+    // 1.3a: drop any cached capability so the next resolve rebuilds with fresh creds.
+    this._resolution.invalidate('shortlink', existing.identifier, orgId);
     return result;
   }
 

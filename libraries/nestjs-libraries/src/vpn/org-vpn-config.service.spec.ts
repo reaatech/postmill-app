@@ -213,7 +213,8 @@ describe('OrgVpnConfigService', () => {
     await service.upsert('org-1', 'nordvpn', {
       credentials: { serviceCredentials: 'user:pass' },
     });
-    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('vpn', 'nordvpn', undefined);
+    // 1.4: no existing config row here → no currentVersion passed (4th arg undefined).
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('vpn', 'nordvpn', undefined, undefined);
   });
 
   it('propagates a resolveWriteVersion rejection (deprecated/unknown version)', async () => {
@@ -386,6 +387,28 @@ describe('OrgVpnConfigService', () => {
       const resolved = await service.resolveProxyForChannel('org-1', 'custom', 'custom');
       expect(resolved!.auth).toEqual({ username: '', password: '' });
       expect(resolved!.region.protocol).toBe('http-connect');
+    });
+
+    // 0.2: testConnection must SSRF-validate the org-supplied proxy host before the
+    // adapter opens a raw TCP socket — otherwise "Test connection" becomes an
+    // internal reachability / port-scan oracle (cloud metadata, internal ports).
+    it('blocks a link-local / metadata proxy host in testConnection without probing', async () => {
+      const metadataRow = {
+        ...customRow,
+        credentials: `enc:${JSON.stringify({
+          label: 'evil',
+          host: '169.254.169.254',
+          port: '80',
+          protocol: 'http-connect',
+        })}`,
+      };
+      vi.spyOn(repository, 'getByIdentifier').mockResolvedValue(metadataRow);
+
+      const result = await service.testConnection('org-1', 'custom');
+      expect(result).toEqual({
+        ok: false,
+        error: 'Proxy host is not a permitted public address.',
+      });
     });
   });
 });

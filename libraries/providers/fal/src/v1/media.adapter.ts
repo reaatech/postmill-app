@@ -149,7 +149,7 @@ export class FalAdapter implements MediaProviderAdapter {
     );
     if (!statusRes.ok) {
       const body = await statusRes.text();
-      if (isTransientStatus(statusRes.status)) throw new Error(`fal.ai status poll transient error ${statusRes.status}: ${body}`);
+      if (isTransientStatus(statusRes.status)) throw new Error(`fal.ai status poll transient error ${statusRes.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const status = (await statusRes.json()) as FalQueueStatusResponse;
@@ -162,7 +162,7 @@ export class FalAdapter implements MediaProviderAdapter {
       // Post-success result fetch: a 429/5xx here must retry (the render already succeeded).
       if (!resultRes.ok) {
         const body = await resultRes.text();
-        if (isTransientStatus(resultRes.status)) throw new Error(`fal.ai result fetch transient error ${resultRes.status}: ${body}`);
+        if (isTransientStatus(resultRes.status)) throw new Error(`fal.ai result fetch transient error ${resultRes.status}: ${body.slice(0, 200)}`);
         return { status: 'failed', error: body };
       }
       const result = (await resultRes.json()) as FalResultResponse;

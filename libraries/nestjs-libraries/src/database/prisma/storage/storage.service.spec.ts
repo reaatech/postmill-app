@@ -33,6 +33,11 @@ function makeResolution(overrides: Record<string, any> = {}) {
   return {
     resolveStorage: vi.fn(() => adapterMock),
     latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    // 3.6: storage writes now route the version through resolveWriteVersion
+    // (lifecycle-validated) instead of latestActiveVersion directly.
+    resolveWriteVersion: vi.fn(
+      (_domain: string, _id: string, version?: string) => version ?? 'v1',
+    ),
     ...overrides,
   } as unknown as ProviderResolutionService;
 }
@@ -285,7 +290,7 @@ describe('StorageService — version pin-on-write', () => {
     });
     const auditService = { create: vi.fn() } as unknown as AuditService;
     const resolution = makeResolution({
-      latestActiveVersion: vi.fn().mockReturnValue('v2'),
+      resolveWriteVersion: vi.fn().mockReturnValue('v2'),
     });
     const service = new StorageService(repo, auditService, encryption, resolution);
 
@@ -295,30 +300,40 @@ describe('StorageService — version pin-on-write', () => {
       credentials: { accessKeyId: 'key', secretAccessKey: 'secret' },
     });
 
-    expect(resolution.latestActiveVersion).toHaveBeenCalledWith('storage', 's3');
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith(
+      'storage',
+      's3',
+      undefined,
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ version: 'v2' }),
     );
   });
 
-  it('falls back to v1 when kernel has no active version', async () => {
+  // 3.6: version resolution now goes through the lifecycle validator — a storage
+  // type with NO registered/active kernel module is a clean rejection, not a
+  // silent v1 pin (the old `latestActiveVersion(...) ?? 'v1'` fallback is gone).
+  // All 13 StorageProviderType values ship registered active modules, so this
+  // only fires for a genuinely broken deployment.
+  it('propagates the validator rejection when the kernel has no active version', async () => {
     const repo = makeRepo({
-      create: vi.fn().mockResolvedValue({ id: 's3-1', version: 'v1' }),
+      create: vi.fn(),
     });
     const auditService = { create: vi.fn() } as unknown as AuditService;
     const resolution = makeResolution({
-      latestActiveVersion: vi.fn().mockReturnValue(undefined),
+      resolveWriteVersion: vi.fn(() => {
+        throw new Error('Provider not found: storage/s3');
+      }),
     });
     const service = new StorageService(repo, auditService, encryption, resolution);
 
-    await service.createConfig('org-1', {
-      type: StorageProviderType.S3,
-      name: 'My S3',
-    });
-
-    expect(repo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ version: 'v1' }),
-    );
+    await expect(
+      service.createConfig('org-1', {
+        type: StorageProviderType.S3,
+        name: 'My S3',
+      }),
+    ).rejects.toThrow('Provider not found');
+    expect(repo.create).not.toHaveBeenCalled();
   });
 
   it('uses explicit body.version when provided', async () => {
@@ -335,7 +350,11 @@ describe('StorageService — version pin-on-write', () => {
       version: 'v3',
     });
 
-    expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith(
+      'storage',
+      's3',
+      'v3',
+    );
     expect(repo.create).toHaveBeenCalledWith(
       expect.objectContaining({ version: 'v3' }),
     );

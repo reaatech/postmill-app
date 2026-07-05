@@ -1,5 +1,7 @@
 import {
+  IsArray,
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNumber,
   IsObject,
@@ -115,6 +117,7 @@ export class UpsertVpnConfigDto {
   credentials?: Record<string, string>;
 
   @IsOptional()
+  @IsArray()
   @IsString({ each: true })
   regions?: string[];
 
@@ -138,7 +141,7 @@ export class UpsertContentPackConfigDto {
 // ── Storage settings ─────────────────────────────────────────────────────────
 
 export class CreateStorageConfigDto {
-  @IsString()
+  @IsEnum(StorageProviderType)
   type: StorageProviderType;
 
   @IsString()
@@ -230,4 +233,39 @@ export class SetDefaultFolderDto {
   @IsOptional()
   @IsString()
   folderId?: string | null;
+}
+
+// ── Channel (social OAuth-app) config ────────────────────────────────────────
+
+// PUT /admin/channel-configs/:identifier body. Was an inline object literal
+// (metatype `Object`), so the global whitelist/forbidNonWhitelisted pipe skipped
+// it — unknown fields passed through. `enabled` is required (the controller also
+// asserts it is a boolean); the rest mirror the ProviderConfiguration upsert shape.
+export class SaveChannelConfigDto {
+  @IsBoolean()
+  enabled: boolean;
+
+  @IsOptional()
+  @IsString()
+  clientId?: string;
+
+  @IsOptional()
+  @IsString()
+  clientSecret?: string;
+
+  @IsOptional()
+  @IsString()
+  redirectUri?: string;
+
+  @IsOptional()
+  @IsString()
+  scopes?: string;
+
+  @IsOptional()
+  @IsString()
+  additionalConfig?: string;
+
+  @IsOptional()
+  @IsString()
+  setupInstructions?: string;
 }

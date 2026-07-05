@@ -41,6 +41,7 @@ through Inngest, and media can live on local disk or cloud object storage.
 | [Backup & Retention](./backup-and-retention.md) | What to back up, how to restore, automated data retention |
 | [Schema Rollback](./schema-rollback.md) | Prisma migrate rollback playbook — forward-only down migrations, half-applied recovery, expand/contract |
 | [Upgrading](./upgrading.md) | Clean upgrade path, Postiz->Postmill migration, building from source |
+| [Provider round-2 checklist](./provider-round-2-checklist.md) | Pre/post-deploy steps for the provider-surface round-2 remediation (orphaned channels, http media, catalog auth) |
 | [Security](./security.md) | Helmet, CSRF, SSRF, encryption, JWT, Sentry scrubbing, throttling |
 | [OAuth / SSO](./oauth-sso.md) | Generic OIDC provider setup (Authentik, Keycloak, etc.) |
 

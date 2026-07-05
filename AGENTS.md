@@ -53,8 +53,10 @@ resolve through a single **`ProviderKernel`** (`libraries/providers/kernel`).
   (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`). It resolves the
   kernel module — the kernel is the **sole** resolution path; the legacy in-memory registries and the
   `PROVIDER_KERNEL=legacy` kill switch have been removed.
-- **Catalog & health:** `GET /providers/catalog?domain=` returns the public provider catalog;
-  `GET /admin/providers/health?domain=` (super-admin) returns per-version health counters.
+- **Catalog & health:** `GET /providers/catalog?domain=` returns the provider catalog (**requires
+  auth** — it sits in the authenticated group behind `AuthMiddleware`/`CsrfMiddleware`, and an
+  unknown `?domain=` returns **400**); `GET /admin/providers/health?domain=` (super-admin) returns
+  per-version health counters.
 - **Stock providers** (free, env-keyed) are intentionally outside the versioning framework.
 
 See `docs/developer-docs/provider-framework.md` for the full playbook and
@@ -353,8 +355,9 @@ package per provider (`libraries/providers/<id>`).
   switch have been removed.
 - Telemetry: every resolved capability is wrapped so that provider calls log a `keyString` and feed
   per-version health counters in the kernel.
-- Public API: `GET /providers/catalog?domain=` returns the live catalog;
-  `GET /admin/providers/health?domain=` (super-admin) returns health counters.
+- API: `GET /providers/catalog?domain=` returns the live catalog (**authenticated** — no longer
+  anonymous; unknown `?domain=` returns **400**); `GET /admin/providers/health?domain=`
+  (super-admin) returns health counters.
 - Free stock providers (Unsplash, Pexels, Pixabay, GIPHY, Jamendo, Iconify) are intentionally
   excluded from versioning — they have no stored config row.
 - Email/Auth resolve through the kernel like every other domain; their former legacy registries have
@@ -785,8 +788,12 @@ New analytics/AI/social surfaces, all additive on existing infrastructure.
   **Single-key model:** one deployment-wide key encrypts every secret — there is **no per-org crypto
   key**. "Org-scoped" means DB-column-scoped (storage), not cryptographically isolated; cross-org
   isolation is enforced by query scoping. `EncryptionService` (per-org domain rows) and
-  `AuthService.fixedEncryption` (global rows) are the same key behind two routes — never mix the
-  decrypt route for a given row.
+  `AuthService.fixedEncryption` (global rows) are the same key behind two routes — in fact
+  `EncryptionService.encrypt/decrypt` now **delegates directly to** `AuthService.fixedEncryption`
+  (one shared `getEncryptionKey()`), so the routes do **not** diverge even when a dedicated
+  `ENCRYPTION_KEY` is set — behavior is unchanged and old rows still decrypt. Still, never mix the
+  decrypt route for a given row (keep per-org reads on `EncryptionService`, global reads on
+  `AuthService.fixedEncryption`) so the convention stays legible.
 - **JWT** verification pins `algorithms: ['HS256']`; new tokens carry `exp` with sliding renewal
   (legacy exp-less tokens still verify — no forced re-auth) (1E). IDs/secrets use CSPRNG (1F).
 - **CSRF** is required on cookie-authenticated mutating routes (3Z); header/API-key clients are

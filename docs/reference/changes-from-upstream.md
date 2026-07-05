@@ -91,10 +91,33 @@ Social, VPN, Content Packs, Email, and Auth — now resolve through a single `Pr
   future `v2` adapter cannot silently change an existing org's behavior.
 - `ProviderResolutionService` (`libraries/nestjs-libraries/src/providers/provider-resolution.service.ts`)
   is the single runtime bridge; the kernel is the sole resolution path.
-- New endpoints: `GET /providers/catalog?domain=` (public catalog) and
-  `GET /admin/providers/health?domain=` (super-admin, per-version health).
+- New endpoints: `GET /providers/catalog?domain=` (authenticated catalog — see the round-2 note
+  below; **not** anonymous) and `GET /admin/providers/health?domain=` (super-admin, per-version
+  health).
 - The `PROVIDER_KERNEL=legacy` kill switch and all legacy in-memory registries have been removed —
   there is no fallback registry.
+
+**Round-2 remediation (provider-surface review).** Follow-up hardening on top of the v4.0.0 cutover:
+
+- **`GET /providers/catalog?domain=` now requires auth.** The route moved into the authenticated
+  group (`AuthMiddleware`/`CsrfMiddleware` apply); it is no longer anonymously reachable. An unknown
+  or unsupported `?domain=` now returns **400 Bad Request** (`resolveDomainFilter` rejects it)
+  instead of silently returning an unfiltered/empty catalog. Only authenticated settings pages
+  consume it, so there is no anonymous caller to migrate.
+- **Self-hosted media over plain `http://` is blocked for outbound provider fetches.** `safeFetch`
+  enforces HTTPS + public-IP, so a self-hosted instance that serves media over `http://` (LOCAL
+  storage) or a private address now gets a "Blocked URL" where it previously worked (e.g. Pinterest
+  video). Set `SSRF_ALLOWED_PRIVATE_CIDRS` (and/or serve media over HTTPS) to restore it.
+- **Encryption routes documented as one key.** `EncryptionService.encrypt/decrypt` delegates to
+  `AuthService.fixedEncryption` (one shared `getEncryptionKey()`); the two "routes" never diverge,
+  even with a dedicated `ENCRYPTION_KEY`. Behavior is unchanged and old rows still decrypt — the
+  distinction is convention (which rows use which route), not cryptographic isolation.
+- **Add-channel connect/list blips now surface an error** instead of an empty list on a provider
+  4xx/5xx (GMB, Kick, LinkedIn-page, Whop) — a correctness improvement; a transient provider error
+  is no longer silently swallowed as "no accounts".
+- **Orphaned `mastodon-custom` channels.** The forked-from-upstream `mastodon-custom` provider was
+  removed; production `Integration` rows with that identifier are now dead channels — see the
+  [provider round-2 release checklist](../operations-guide/provider-round-2-checklist.md).
 
 See [Provider Framework](../developer-docs/provider-framework.md) and
 [Provider Versions](../reference/provider-versions.md).
@@ -680,4 +703,4 @@ This fork is run in production. Two invariants are deliberately preserved:
    been cut over and backfilled — see
    [Upgrading](../operations-guide/upgrading.md#v3-8-9-v3-8-10).)
 
-> Verified against v3.8.10
+> Verified against v4.0.0

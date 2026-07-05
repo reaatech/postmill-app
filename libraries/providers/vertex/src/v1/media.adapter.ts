@@ -45,6 +45,32 @@ const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
 // oversize via content-length before buffering. Matches the lifecycle's MAX_ARTIFACT_BYTES.
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 
+// 2.3 — stream the body with a running byte counter, aborting once it passes the cap, so a
+// chunked / no-content-length body can't be fully buffered into the heap before the size check.
+// Returns null when the cap is exceeded (the caller maps that to a terminal failure).
+async function readCapped(res: Response, cap: number): Promise<Buffer | null> {
+  const reader = res.body?.getReader();
+  if (!reader) {
+    const buf = Buffer.from(await res.arrayBuffer());
+    return buf.length > cap ? null : buf;
+  }
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (value) {
+      total += value.byteLength;
+      if (total > cap) {
+        await reader.cancel();
+        return null;
+      }
+      chunks.push(Buffer.from(value));
+    }
+  }
+  return Buffer.concat(chunks);
+}
+
 // 5.14 — turn a `gs://bucket/object` URI into the authenticated JSON-API media download URL.
 // The lifecycle's safeFetch cannot fetch a gs:// scheme, so the completed render must be inlined.
 function gcsMediaUrl(gcsUri: string): string {
@@ -211,7 +237,22 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const creds = await this._credentials(options);
+    // 2.1 — a config error (missing project / invalid service-account JSON / no credentials) is
+    // TERMINAL: return failed rather than throwing, which the lifecycle would re-poll for ~24h. A
+    // genuine token-mint NETWORK error stays transient (rethrow) so the lifecycle retries.
+    let creds: VertexCredentials;
+    try {
+      creds = await this._credentials(options);
+    } catch (err) {
+      const message = (err as Error).message || 'Vertex AI credential error';
+      // `requires`/`not valid JSON` are this adapter's own _credentials throws;
+      // `invalid_grant` is google-auth's terminal signal for a revoked/expired/
+      // malformed service-account key — equally a config error, not transient.
+      if (/requires|not valid JSON|invalid credentials|invalid_grant/i.test(message)) {
+        return { status: 'failed', error: message };
+      }
+      throw err;
+    }
     // Operation names look like:
     // projects/{p}/locations/{r}/publishers/google/models/{model}/operations/{id}
     const modelMatch = jobId.match(/models\/([^/]+)\//);
@@ -223,7 +264,7 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
     });
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`Vertex AI poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`Vertex AI poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const data = (await res.json()) as VertexOperationResponse;
@@ -244,12 +285,20 @@ export class VertexMediaAdapter implements MediaProviderAdapter {
       // 5.14 — the lifecycle's safeFetch cannot download a gs:// URL. Fetch the object with the
       // minted access token and inline it as a data URL (the Sora/Gemini pattern).
       const fileRes = await this._fetch(gcsMediaUrl(video.gcsUri), { headers: this._headers(creds) });
-      // Post-success download: the render already succeeded → ANY failure is transient (THROW).
-      if (!fileRes.ok) throw new Error(`Vertex AI GCS download failed: ${fileRes.status}`);
+      // 2.2 — classify the download leg: a 429/5xx is transient (THROW to retry the paid render),
+      // but a permanent 4xx (expired/deleted object) is terminal — return failed rather than
+      // re-polling every sweep for 24h.
+      if (!fileRes.ok) {
+        if (isTransientStatus(fileRes.status)) {
+          const body = await fileRes.text();
+          throw new Error(`Vertex AI GCS download transient error ${fileRes.status}: ${body.slice(0, 200)}`);
+        }
+        return { status: 'failed', error: `Vertex AI GCS download failed (${fileRes.status})` };
+      }
       const declared = Number(fileRes.headers.get('content-length') || 0);
       if (declared > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Vertex AI video exceeds the size limit' };
-      const buffer = Buffer.from(await fileRes.arrayBuffer());
-      if (buffer.length > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Vertex AI video exceeds the size limit' };
+      const buffer = await readCapped(fileRes, MAX_ARTIFACT_BYTES);
+      if (!buffer) return { status: 'failed', error: 'Vertex AI video exceeds the size limit' };
       return {
         status: 'completed',
         artifactUrl: `data:${mime};base64,${buffer.toString('base64')}`,

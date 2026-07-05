@@ -161,7 +161,7 @@ export class SunoAdapter extends BearerTokenMediaAdapter {
     );
     if (!res.ok) {
       const body = await res.text();
-      if (isTransientStatus(res.status)) throw new Error(`Suno poll transient error ${res.status}: ${body}`);
+      if (isTransientStatus(res.status)) throw new Error(`Suno poll transient error ${res.status}: ${body.slice(0, 200)}`);
       return { status: 'failed', error: body };
     }
     const data = (await res.json()) as SunoRecordResponse;

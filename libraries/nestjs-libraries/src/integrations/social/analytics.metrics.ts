@@ -236,15 +236,6 @@ export const PROVIDER_METRIC_MAP: Record<string, Record<string, string>> = {
     Reblogs: 'reposts',
     Replies: 'replies',
   },
-  // Mastodon custom-instance provider extends MastodonProvider and inherits the
-  // same analytics()/postAnalytics(), so it emits identical labels — map it too
-  // or its snapshots silently drop (the B2 lesson).
-  'mastodon-custom': {
-    Followers: 'followers',
-    Favourites: 'favorites',
-    Reblogs: 'reposts',
-    Replies: 'replies',
-  },
   reddit: {
     // Post-level only (postAnalytics) — Reddit exposes no per-account channel
     // analytics; subreddit-agnostic per-post metrics via /api/info.

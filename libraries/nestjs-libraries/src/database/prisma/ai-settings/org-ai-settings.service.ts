@@ -255,7 +255,11 @@ export class OrgAiSettingsService {
   // the latest active version, else the default. Mirrors
   // OrgShortLinkSettingsService.getPinnedVersion (the reference implementation).
   private async _getPinnedVersion(orgId: string, identifier: string): Promise<string> {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+    // 1.2: version-AGNOSTIC read — `getByIdentifier` findUnique-defaults to v1, so
+    // a config pinned to v2 would return null and wrongly fall through to
+    // latestActive (resolving the wrong row, reading empty creds, deleting the
+    // wrong row). Use the newest-row-any-version read instead.
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
     return (
       config?.version ??
       this._resolution.latestActiveVersion('ai', identifier) ??

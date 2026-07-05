@@ -35,6 +35,19 @@ export class RefreshIntegrationService {
         integration.providerVersion ?? undefined
       );
 
+    // 1.3: the Unchecked lookup now returns undefined for a retired-pinned version
+    // (instead of throwing). Skip the refresh for this row rather than
+    // TypeError-ing on `socialProvider.refreshToken` — a retired adapter can't
+    // refresh, and one bad row must not abort the caller's sweep.
+    if (!socialProvider) {
+      Logger.warn(
+        `Skipping token refresh for ${integration.providerIdentifier}@${
+          integration.providerVersion ?? 'default'
+        } — no adapter (retired/unknown version)`
+      );
+      return false as const;
+    }
+
     const refresh = await this.refreshProcess(
       integration,
       socialProvider,

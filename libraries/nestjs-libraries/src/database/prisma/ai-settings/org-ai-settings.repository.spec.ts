@@ -33,7 +33,21 @@ describe('OrgAiSettingsRepository', () => {
     pc.model = { aIOrgProviderConfig: providerConfig };
     const ss = new (PrismaRepository as any)();
     ss.model = { aISystemSettings: systemSettings };
-    repository = new OrgAiSettingsRepository(pc, ss);
+    // 3.7: upsertBudget now runs inside an interactive transaction with a row lock.
+    // The transaction client (tx) exposes the SAME aISystemSettings mock so the
+    // existing findUnique/upsert assertions still hold, plus a no-op $executeRaw
+    // for the `SELECT … FOR UPDATE` lock.
+    const transaction = {
+      model: {
+        $transaction: vi.fn(async (cb: any) =>
+          cb({
+            aISystemSettings: systemSettings,
+            $executeRaw: vi.fn().mockResolvedValue(0),
+          }),
+        ),
+      },
+    };
+    repository = new OrgAiSettingsRepository(pc, ss, transaction as any);
   });
 
   it('getByOrg scopes by organization', () => {
@@ -61,6 +75,17 @@ describe('OrgAiSettingsRepository', () => {
     repository.getActive('org1');
     expect(providerConfig.findFirst).toHaveBeenCalledWith({
       where: { organizationId: 'org1', isActive: true },
+    });
+  });
+
+  // 1.2: the version-agnostic read must NOT pin a version (getByIdentifier's
+  // findUnique defaults to v1 and misses a v2-pinned row) — findFirst with no
+  // version in the where, enabled rows first, then newest.
+  it('findAnyByIdentifier reads version-agnostically, enabled-first', () => {
+    repository.findAnyByIdentifier('org1', 'openai');
+    expect(providerConfig.findFirst).toHaveBeenCalledWith({
+      where: { organizationId: 'org1', identifier: 'openai' },
+      orderBy: [{ enabled: 'desc' }, { createdAt: 'desc' }],
     });
   });
 
@@ -178,6 +203,18 @@ describe('OrgAiSettingsRepository', () => {
       await repository.upsertBudget('org1', { monthlyCap: 99 });
       const arg = (systemSettings.upsert as any).mock.calls[0][0];
       expect(JSON.parse(arg.create.budgetSettings)).toEqual({ perOrgCaps: { org1: { monthly: 99 } } });
+    });
+
+    // 5.5 (review F1): an org-sent `enabled` must NOT be persisted — the slice is
+    // org-writable but a super-admin can impose a cap into the same slice, so a
+    // stored enabled:false would hand tenants a self-exemption switch.
+    it('drops an org-sent enabled flag instead of persisting it', async () => {
+      systemSettings.findUnique.mockResolvedValue(null);
+      await repository.upsertBudget('org1', { monthlyCap: 50, enabled: false });
+      const arg = (systemSettings.upsert as any).mock.calls[0][0];
+      expect(JSON.parse(arg.create.budgetSettings)).toEqual({
+        perOrgCaps: { org1: { monthly: 50 } },
+      });
     });
 
     // 3.10: a corrupt/legacy blob must not throw — fall back to {} and still write.

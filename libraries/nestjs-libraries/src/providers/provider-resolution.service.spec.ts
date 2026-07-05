@@ -3,6 +3,7 @@ import { BadRequestException, GoneException, Logger } from '@nestjs/common';
 import {
   ProviderKernel,
   ProviderModule,
+  ProviderNotFoundError,
   ProviderVersionRetiredError,
 } from '@gitroom/provider-kernel';
 import { RuntimeContextFactory } from './runtime-context.factory';
@@ -97,10 +98,54 @@ describe('ProviderResolutionService', () => {
     expect((capability as any).model).toBe('v2');
   });
 
-  it('retired pin yields ProviderVersionRetiredError', () => {
+  // 1.5: read-path lifecycle errors propagate RAW so the global
+  // ProviderExceptionFilter maps them (retired → 410 + latestActive hint,
+  // not-found → 404, with providerId/version in the body). Mapping them here
+  // would bypass the filter and lose the richer body.
+  it('retired pin propagates ProviderVersionRetiredError (filter maps to 410)', () => {
     expect(() => service.resolveAI('openai', { version: 'v3' })).toThrow(
       ProviderVersionRetiredError,
     );
+  });
+
+  it('unregistered version propagates ProviderNotFoundError (filter maps to 404)', () => {
+    expect(() => service.resolveAI('openai', { version: 'v99' })).toThrow(
+      ProviderNotFoundError,
+    );
+  });
+
+  // 1.4: a deprecated version can no longer be NEWLY pinned, but an in-place update
+  // of a row already pinned to it (currentVersion === target) is allowed.
+  it('resolveWriteVersion: deprecated in-place update allowed; new pin rejected', () => {
+    kernel.register(makeAiModule({}, 'v4', 'deprecated'));
+
+    // In-place update of a v4-pinned row (rotate/disable) → allowed.
+    expect(
+      service.resolveWriteVersion('ai', 'openai', 'v4', { currentVersion: 'v4' }),
+    ).toBe('v4');
+
+    // A create / fresh pin to the deprecated version → 400.
+    expect(() => service.resolveWriteVersion('ai', 'openai', 'v4')).toThrow(
+      BadRequestException,
+    );
+    // Changing an existing row FROM v1 TO the deprecated v4 is also a new pin → 400.
+    expect(() =>
+      service.resolveWriteVersion('ai', 'openai', 'v4', { currentVersion: 'v1' }),
+    ).toThrow(BadRequestException);
+  });
+
+  // 4.1: the capability cache key is independent of caller object-key order, so
+  // two logically-identical `extras` resolve to the SAME cached instance.
+  it('caches on a key-order-independent extras fingerprint', () => {
+    const a = service.resolveAI('openai', {
+      version: 'v1',
+      extras: { bucket: 'b', region: 'r' },
+    } as any);
+    const b = service.resolveAI('openai', {
+      version: 'v1',
+      extras: { region: 'r', bucket: 'b' },
+    } as any);
+    expect(a).toBe(b);
   });
 
   it('latestActiveVersion returns the highest active version', () => {

@@ -120,7 +120,8 @@ describe('OrgProviderConfigService audit (F2c)', () => {
       { identifier: 'twitter', name: 'App', enabled: false, version: 'v2' },
       'u1'
     );
-    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('social', 'twitter', 'v2');
+    // 1.4: create passes no `currentVersion` (a new pin), so the 4th arg is undefined.
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('social', 'twitter', 'v2', undefined);
     expect(repository.create).toHaveBeenCalledWith(
       'o1',
       expect.objectContaining({ version: 'v2' })

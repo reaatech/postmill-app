@@ -330,7 +330,14 @@ export class AiSettingsController {
       }
     }
 
-    return adapter.validateCredentials(creds);
+    // 3.1: validateCredentials returns { ok:false } for transport failures but
+    // PROPAGATES an SSRF rejection ("Blocked URL") — map that to a clean 400
+    // instead of an unhandled 500 (parity with the org-AI test route).
+    try {
+      return await adapter.validateCredentials(creds);
+    } catch (err) {
+      throw new BadRequestException((err as Error).message);
+    }
   }
 
   @Put('/active')

@@ -247,6 +247,58 @@ export class PinterestProvider
     );
   }
 
+  // Buffer a fetch Response body into a Blob with a hard byte cap, aborting the
+  // read the moment the running total passes the cap. Unlike `response.blob()`,
+  // a chunked / no-content-length body can't materialize unbounded in the heap.
+  private async readBoundedBlob(
+    response: Response,
+    maxBytes = 512 * 1024 * 1024
+  ): Promise<Blob> {
+    const body = response.body;
+    if (!body) {
+      // No stream to bound — fall back, but still enforce the cap after the fact.
+      const blob = await response.blob();
+      if (blob.size > maxBytes) {
+        throw new BadBody(
+          'pinterest',
+          JSON.stringify({}),
+          {} as any,
+          `Media exceeds the ${Math.round(maxBytes / (1024 * 1024))}MB upload cap`
+        );
+      }
+      return blob;
+    }
+    const reader = body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    try {
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          total += value.byteLength;
+          if (total > maxBytes) {
+            await reader.cancel();
+            throw new BadBody(
+              'pinterest',
+              JSON.stringify({}),
+              {} as any,
+              `Media exceeds the ${Math.round(
+                maxBytes / (1024 * 1024)
+              )}MB upload cap`
+            );
+          }
+          chunks.push(value);
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+    const type = response.headers.get('content-type') || 'application/octet-stream';
+    return new Blob(chunks as BlobPart[], { type });
+  }
+
   async post(
     id: string,
     accessToken: string,
@@ -288,10 +340,14 @@ export class PinterestProvider
           `Failed to download media for upload (status ${mediaResponse.status})`
         );
       }
+      // Read the download with a hard byte cap so a hostile/oversized upstream
+      // (chunked, no content-length) can't blow the heap — abort the stream the
+      // moment it passes the cap rather than buffering the whole video first.
+      const fileBlob = await this.readBoundedBlob(mediaResponse);
+
       // Use the web FormData/Blob so undici streams the file bytes from the Blob
       // rather than materializing a second full multipart copy (form-data's
       // getBuffer would). Presigned fields first, `file` last (S3-style ordering).
-      const fileBlob = await mediaResponse.blob();
       const formData = new FormData();
       Object.keys(upload_parameters)
         .filter((f) => f)
@@ -302,10 +358,21 @@ export class PinterestProvider
       // a user-influenced URL and route through safeFetch, which enforces
       // isSafePublicHttpsUrl + per-hop re-validation before uploading file bytes.
       // No manual Content-Type: fetch derives the multipart boundary from FormData.
-      await safeFetch(upload_url, {
+      // safeFetch returns non-2xx WITHOUT throwing (unlike the old axios.post), so
+      // guard `ok` — an expired/oversized presigned policy (S3 403/400) must fail
+      // fast, not fall through into the poll loop where nothing was ever uploaded.
+      const uploadRes = await safeFetch(upload_url, {
         method: 'POST',
         body: formData,
       });
+      if (!uploadRes.ok) {
+        throw new BadBody(
+          'pinterest',
+          JSON.stringify({}),
+          {} as any,
+          `Media upload failed (status ${uploadRes.status})`
+        );
+      }
 
       let statusCode = '';
       while (statusCode !== 'succeeded') {

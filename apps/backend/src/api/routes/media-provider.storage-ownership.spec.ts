@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, HttpException } from '@nestjs/common';
 
 // ioRedis is touched by _bustDefaultsCatalogCache on the success path — stub it so no
 // real connection is attempted.
@@ -79,8 +79,12 @@ describe('MediaProviderController.setStorage ownership (3.6)', () => {
   it('rejects a storageRootFolderId owned by another org', async () => {
     const { controller, orgMedia } = makeController({
       configs: [{ id: 'store-1', organizationId: 'org-1' }],
-      // getFolder throws (404) for a cross-org folder.
-      getFolder: vi.fn().mockRejectedValue(new Error('Folder not found')),
+      // getFolder throws HttpException(404) for a cross-org/missing folder — the
+      // real FileService.getFolder shape. 3.4 now rethrows any NON-404 error, so
+      // the mock must be the genuine 404 to still map to the ownership 400.
+      getFolder: vi
+        .fn()
+        .mockRejectedValue(new HttpException('Folder not found', 404)),
     });
 
     await expect(
@@ -89,6 +93,25 @@ describe('MediaProviderController.setStorage ownership (3.6)', () => {
         storageRootFolderId: 'folder-OTHER',
       }),
     ).rejects.toThrow(BadRequestException);
+    expect(orgMedia.upsert).not.toHaveBeenCalled();
+  });
+
+  // 3.4: an infra failure (DB outage, transient Prisma error) must PROPAGATE —
+  // not be swallowed into a 400 "does not belong to this organization" that
+  // blames the user's input for a server-side blip.
+  it('rethrows a non-404 getFolder failure instead of mapping it to the ownership 400', async () => {
+    const infraError = new Error('db connection lost');
+    const { controller, orgMedia } = makeController({
+      configs: [{ id: 'store-1', organizationId: 'org-1' }],
+      getFolder: vi.fn().mockRejectedValue(infraError),
+    });
+
+    await expect(
+      controller.setStorage(org, 'openai', {
+        storageProviderId: 'store-1',
+        storageRootFolderId: 'folder-1',
+      }),
+    ).rejects.toBe(infraError);
     expect(orgMedia.upsert).not.toHaveBeenCalled();
   });
 

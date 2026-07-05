@@ -236,25 +236,42 @@ export class OrgMediaProviderSettingsService {
     return false;
   }
 
-  async getConfigForProvider(orgId: string, identifier: string, version?: string) {
+  async getConfigForProvider(
+    orgId: string,
+    identifier: string,
+    version?: string,
+    opts?: { includeDisabled?: boolean },
+  ) {
     // 1.4: resolve the pinned version (stored row's version, else latest-active)
     // rather than hardcoding v1, so callers that pass no version still hit the
     // actually-pinned row once a v2 ships.
     const resolvedVersion = version ?? (await this._getPinnedVersion(orgId, identifier));
     const config = await this._repository.getByIdentifier(orgId, identifier, resolvedVersion);
+    // 1.1: this is the credential-resolution path every generation surface funnels
+    // through (HeyGen/Deepgram/chat-tool/governance-media/lifecycle/studio). An
+    // explicit `enabled:false` row is OFF — return null so a provider the org
+    // disabled to stop spend can't keep billing (its own key OR, for a universal
+    // provider, the AI-key fallback). Non-generation display paths use getProviders;
+    // testConnection reads the row directly, so a disabled provider is still testable.
+    // `includeDisabled` is the documented exception for IN-FLIGHT work only
+    // (media-job-lifecycle polling a render that was submitted while enabled):
+    // completing already-paid work costs nothing new, so a mid-render disable
+    // must not destroy it. Never pass it from a generation entry point.
+    if (config && config.enabled === false && !opts?.includeDisabled) {
+      return null;
+    }
     const credentials = config ? this._decryptCredentials(config.credentials) : {};
     // Prefer the dedicated media credential; for universal-credential providers (Qwen),
     // fall back to the org's AI provider key so the same key drives both surfaces.
-    // 1.7: an explicit `enabled:false` row is OFF — do NOT fire the AI-key
-    // fallback for it (otherwise a provider disabled to stop spend keeps billing
-    // the org's AI key). An enabled:false row therefore resolves to empty creds,
-    // which the generation path treats as "not configured".
     if (
       Object.keys(credentials).length === 0 &&
-      UNIVERSAL_AI_CREDENTIAL.has(identifier) &&
-      config?.enabled !== false
+      UNIVERSAL_AI_CREDENTIAL.has(identifier)
     ) {
-      const aiCredentials = await this._aiCredentials(orgId, identifier);
+      const aiCredentials = await this._aiCredentials(
+        orgId,
+        identifier,
+        opts?.includeDisabled,
+      );
       if (aiCredentials) {
         return {
           credentials: aiCredentials,
@@ -276,7 +293,8 @@ export class OrgMediaProviderSettingsService {
   // 1.4: the version an org's row is pinned to — the stored row's version, else
   // the latest active version, else v1. Mirrors OrgShortLinkSettingsService.getPinnedVersion.
   private async _getPinnedVersion(orgId: string, identifier: string): Promise<string> {
-    const config = await this._repository.getByIdentifier(orgId, identifier);
+    // 1.2: version-AGNOSTIC read — findUnique-by-v1 misses a v2-pinned row.
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
     return (
       config?.version ??
       this._resolution.latestActiveVersion('media', identifier) ??
@@ -330,12 +348,32 @@ export class OrgMediaProviderSettingsService {
   // SAME EncryptionService as media creds — so reuse our own _decryptCredentials. (Note: the
   // GLOBAL AIProviderConfig uses AuthService.fixedEncryption instead; the two are NOT
   // interchangeable, which is why we read the org row directly rather than via AiSettingsService.)
-  private async _aiCredentials(orgId: string, identifier: string): Promise<Record<string, string> | null> {
+  private async _aiCredentials(
+    orgId: string,
+    identifier: string,
+    includeDisabled = false,
+  ): Promise<Record<string, string> | null> {
     if (!this._orgAiRepository) return null;
-    const config = await this._orgAiRepository.getByIdentifier(orgId, identifier);
+    // 1.2: version-agnostic read — a Qwen/Google AI config pinned to v2 must
+    // still drive the universal-credential fallback (findUnique-by-v1 missed it).
+    const config = await this._orgAiRepository.findAnyByIdentifier(orgId, identifier);
     if (!config?.credentials) return null;
+    // 1.1(b): fold the AI row's `enabled` into the universal-credential fallback —
+    // disabling the org's Qwen/Google AI key must also stop the media studio from
+    // billing that same key. A disabled AI row yields no fallback credentials
+    // (except for in-flight-job polling, see getConfigForProvider includeDisabled).
+    if (config.enabled === false && !includeDisabled) return null;
     const credentials = this._decryptCredentials(config.credentials);
     return Object.keys(credentials).length > 0 ? credentials : null;
+  }
+
+  // 1.1 (review): whether the org holds an explicit media row for this provider
+  // that is switched OFF. The governance-media fallback (AiMediaService →
+  // _credentialsForMediaProvider) must not route around a deliberate media-side
+  // disable by reading the raw AI config row.
+  async isProviderExplicitlyDisabled(orgId: string, identifier: string): Promise<boolean> {
+    const config = await this._repository.findAnyByIdentifier(orgId, identifier);
+    return config?.enabled === false;
   }
 
   // Which universal-credential adapters (Qwen) the org has an AI key for — drives the

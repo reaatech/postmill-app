@@ -19,6 +19,17 @@ export class OrgMediaProviderSettingsRepository {
     });
   }
 
+  // 1.2: version-AGNOSTIC read so _getPinnedVersion finds a v2-pinned row instead
+  // of findUnique defaulting to v1 and returning null. Enabled rows first (an org
+  // holding an enabled v1 + a disabled v2 rollback row must resolve the enabled
+  // one), then newest.
+  findAnyByIdentifier(orgId: string, identifier: string) {
+    return this._mediaProviderConfig.model.mediaProviderConfig.findFirst({
+      where: { organizationId: orgId, identifier },
+      orderBy: [{ enabled: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
   /** Identifiers enabled in at least one org — for the platform-admin overview. */
   async getEnabledIdentifiers(): Promise<string[]> {
     const rows = await this._mediaProviderConfig.model.mediaProviderConfig.findMany({

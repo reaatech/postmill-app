@@ -268,12 +268,14 @@ export class AiSettingsService {
     }
 
     // 3.9: per-org AIOrgProviderConfig rows are read back at runtime by
-    // OrgAiSettingsService / OrgMediaProviderSettingsService via EncryptionService
-    // (AES-GCM). The admin write must use the SAME crypto route — not the global
-    // AuthService.fixedEncryption used for the deployment-wide AIProviderConfig —
-    // per the "never mix per-org and global crypto routes" invariant. (Vacuous
-    // today since both derive from JWT_SECRET, but diverges the moment a dedicated
-    // ENCRYPTION_KEY is set, which would leave these rows undecryptable → {}.)
+    // OrgAiSettingsService / OrgMediaProviderSettingsService via EncryptionService,
+    // so the admin write goes through the same service for symmetry. Note this is a
+    // no-op in crypto terms: EncryptionService.encrypt delegates to
+    // AuthService.fixedEncryption (encryption.service.ts), the same routine used for
+    // the deployment-wide AIProviderConfig — both share one getEncryptionKey(), so
+    // the two routes do NOT diverge even when a dedicated ENCRYPTION_KEY is set. It
+    // is "same key behind two routes"; keeping this call on EncryptionService is
+    // convention, not correctness.
     const encryptedCredentials = data.credentials
       ? this._encryption.encrypt(JSON.stringify(data.credentials))
       : undefined;

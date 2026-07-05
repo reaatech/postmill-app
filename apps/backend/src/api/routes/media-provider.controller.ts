@@ -26,6 +26,7 @@ import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.m
 import { ProviderKernel } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
 import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
@@ -114,6 +115,22 @@ export class MediaProviderController {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
 
+    // 3.2 (review): the same write-time SSRF gate as the AI settings route. For
+    // openai/minimax these credentials are MIRRORED verbatim into the org's
+    // AIOrgProviderConfig (§11.4 live-link), where a private `baseURL` would be
+    // fetched by the AI-SDK's global dispatcher — the exact hole 3.2 closed on
+    // the AI route must not stay open through the media side door.
+    const baseURL = (body.credentials as Record<string, string> | undefined)?.baseURL;
+    if (
+      typeof baseURL === 'string' &&
+      baseURL.trim() &&
+      !(await isSafePublicHttpsUrl(baseURL))
+    ) {
+      throw new BadRequestException(
+        'Base URL must be a public HTTPS URL (private, loopback, and non-HTTPS hosts are not allowed)',
+      );
+    }
+
     // OpenAI/MiniMax credentials live-link to the AI surface inside the service (§11.4).
     // `enabled` defaults to true (configuring enables); the kit's On/Off toggle sends
     // an explicit `{ enabled: false }` with no credentials to disable without clearing them.
@@ -175,10 +192,15 @@ export class MediaProviderController {
 
     if (storageRootFolderId) {
       // `getFolder` throws (404) when the folder is missing or owned by another org;
-      // normalise to a 400 for a bad write payload.
+      // normalise that (and only that) to a 400 for a bad write payload. A non-404
+      // infra failure (DB outage, transient Prisma error) must propagate as 5xx —
+      // it is not the user's bad input.
       try {
         await this._fileService.getFolder(orgId, storageRootFolderId);
-      } catch {
+      } catch (err) {
+        // `getFolder` throws `HttpException('Folder not found', 404)` for the
+        // ownership/not-found case; anything else is infra and must propagate.
+        if (!(err instanceof HttpException) || err.getStatus() !== 404) throw err;
         throw new BadRequestException(
           'storageRootFolderId does not belong to this organization',
         );

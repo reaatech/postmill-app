@@ -75,10 +75,15 @@ export class OrgProviderConfigService {
   // resolveWriteVersion — a deprecated version rejects the write, retired is 410,
   // unknown is 400 — replacing the unvalidated `latestActive ?? 'v1'`.
   #resolveVersion(identifier: string, explicitVersion?: string | null, existingVersion?: string | null): string {
+    // 1.4: on an update, `existingVersion` is the row's current pin — pass it as
+    // `currentVersion` so an in-place edit (disable / credential rotation) of a
+    // deprecated-pinned row is allowed; only a create or an explicit change to a
+    // deprecated/retired version is rejected.
     return this._resolution.resolveWriteVersion(
       'social',
       identifier,
       explicitVersion || existingVersion || undefined,
+      existingVersion ? { currentVersion: existingVersion } : undefined,
     );
   }
 

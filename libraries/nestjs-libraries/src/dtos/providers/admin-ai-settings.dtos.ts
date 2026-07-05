@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsObject,
   IsOptional,
@@ -71,6 +72,7 @@ export class SaveMediaProviderDto {
   enabled?: boolean;
 
   @IsOptional()
+  @IsArray()
   @IsString({ each: true })
   operations?: string[];
 

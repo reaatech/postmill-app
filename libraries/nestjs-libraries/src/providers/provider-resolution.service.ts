@@ -39,6 +39,27 @@ export interface ResolutionOptions {
   extras?: Record<string, unknown>;
 }
 
+// 4.1: deterministic JSON with lexicographically-sorted object keys, so the
+// cache fingerprint is independent of caller key-insertion order. BigInt (and
+// other non-JSON-safe scalars) are coerced to a string instead of throwing,
+// which plain JSON.stringify would do on a BigInt in `extras`.
+function stableStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+  const walk = (v: unknown): unknown => {
+    if (typeof v === 'bigint') return `${v}n`;
+    if (v === null || typeof v !== 'object') return v;
+    if (seen.has(v as object)) return '[circular]';
+    seen.add(v as object);
+    if (Array.isArray(v)) return v.map(walk);
+    const out: Record<string, unknown> = {};
+    for (const key of Object.keys(v as Record<string, unknown>).sort()) {
+      out[key] = walk((v as Record<string, unknown>)[key]);
+    }
+    return out;
+  };
+  return JSON.stringify(walk(value));
+}
+
 function makeTelemetryProxy<T extends object>(
   target: T,
   key: ProviderKey,
@@ -174,9 +195,13 @@ export class ProviderResolutionService {
     // different bucket must NOT share a cached adapter, or uploads land in the
     // wrong bucket. Credentials + extras are fingerprinted together into one
     // stable hash.
+    // 4.1: canonicalize with SORTED keys before hashing — plain JSON.stringify
+    // serializes in construction order, so two call sites building the same
+    // logical extras in different key order would double-cache. stableStringify
+    // also coerces non-JSON-safe values (BigInt) instead of throwing.
     const fingerprint = accountFingerprint(
       options.credentials || options.extras
-        ? JSON.stringify({
+        ? stableStringify({
             credentials: options.credentials ?? null,
             extras: options.extras ?? null,
           })
@@ -202,6 +227,13 @@ export class ProviderResolutionService {
       options.version ??
       this._kernel.latestActive(domain, providerId)?.manifest.version ??
       DEFAULT_VERSION;
+    // 1.5: read-path lifecycle errors (ProviderVersionRetiredError → 410 with a
+    // `latestActive` upgrade hint, ProviderNotFoundError → 404) are mapped by the
+    // GLOBAL ProviderExceptionFilter (apps/backend app.module APP_FILTER), which
+    // also carries providerId/version in the body. Let the raw kernel errors
+    // propagate to it — mapping to Nest exceptions here would bypass the filter
+    // and lose the richer body. (Non-HTTP callers — Inngest activities — catch or
+    // fail their own step; no 500 surface either way.)
     const mod = this._kernel.resolveForRead<unknown, C>(
       domain,
       providerId,
@@ -362,10 +394,25 @@ export class ProviderResolutionService {
     domain: ProviderDomain,
     providerId: string,
     version?: string,
-    opts?: { allowPreview?: boolean },
+    opts?: { allowPreview?: boolean; currentVersion?: string },
   ): string {
+    // 1.4: distinguish pinning a NEW version (create, or an explicit version
+    // change) from updating an existing row AT its current pinned version. An
+    // in-place update of a deprecated-pinned row (disable / credential rotation /
+    // rename) must be allowed — only a write that would newly pin a
+    // deprecated/retired/preview version is rejected. `currentVersion` is the
+    // row's already-pinned version on updates.
+    const currentVersion = opts?.currentVersion;
+    const target = version ?? currentVersion;
+    const isInPlaceUpdate =
+      currentVersion !== undefined &&
+      (version === undefined || version === currentVersion);
     try {
-      return this._kernel.resolveForWrite(domain, providerId, version, opts)
+      return this._kernel
+        .resolveForWrite(domain, providerId, target, {
+          allowPreview: opts?.allowPreview,
+          allowDeprecated: isInPlaceUpdate,
+        })
         .manifest.version;
     } catch (err) {
       if (err instanceof ProviderVersionRetiredError) {

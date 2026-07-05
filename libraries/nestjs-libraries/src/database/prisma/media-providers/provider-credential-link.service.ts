@@ -26,24 +26,19 @@ export class ProviderCredentialLinkService {
     return LINKED_PROVIDERS.has(identifier);
   }
 
-  // 1.4: resolve the pinned version for the mirror-target row the same way the
-  // owning settings services do — the target row's stored version, else the
-  // latest active version, else v1. Hardcoding v1 would split rows (mirror at v1,
-  // primary at v2) the moment a linked provider ships v2.
-  private async _pinnedMediaVersion(orgId: string, identifier: string): Promise<string> {
-    const existing = await this._mediaRepository.getByIdentifier(orgId, identifier);
+  // 1.4/1.2: resolve the pinned version for the mirror-target row the same way the
+  // owning settings services do — the target row's stored version, else the latest
+  // active version, else v1. Hardcoding v1 would split rows (mirror at v1, primary
+  // at v2) the moment a linked provider ships v2. Computed from an already-fetched
+  // row (a version-AGNOSTIC read — findUnique-by-v1 would miss a v2-pinned row).
+  private _pinnedVersion(
+    domain: 'ai' | 'media',
+    identifier: string,
+    existing: { version?: string | null } | null,
+  ): string {
     return (
       existing?.version ??
-      this._resolution.latestActiveVersion('media', identifier) ??
-      'v1'
-    );
-  }
-
-  private async _pinnedAiVersion(orgId: string, identifier: string): Promise<string> {
-    const existing = await this._aiRepository.getByIdentifier(orgId, identifier);
-    return (
-      existing?.version ??
-      this._resolution.latestActiveVersion('ai', identifier) ??
+      this._resolution.latestActiveVersion(domain, identifier) ??
       'v1'
     );
   }
@@ -56,12 +51,19 @@ export class ProviderCredentialLinkService {
   ): Promise<void> {
     if (!this.isLinked(identifier)) return;
     try {
-      const version = await this._pinnedMediaVersion(orgId, identifier);
+      const existing = await this._mediaRepository.findAnyByIdentifier(
+        orgId,
+        identifier,
+      );
+      const version = this._pinnedVersion('media', identifier, existing);
       await this._mediaRepository.upsert(
         orgId,
         identifier,
         {
-          enabled: true,
+          // 1.1(c): preserve the existing mirror row's enabled flag — a re-key must
+          // not silently re-enable a deliberately-disabled provider. Default to
+          // enabled:true only when creating a brand-new mirror row.
+          enabled: existing ? existing.enabled : true,
           credentials: this._encryption.encrypt(JSON.stringify(credentials)),
         },
         version,
@@ -82,12 +84,17 @@ export class ProviderCredentialLinkService {
   ): Promise<void> {
     if (!this.isLinked(identifier)) return;
     try {
-      const version = await this._pinnedAiVersion(orgId, identifier);
+      const existing = await this._aiRepository.findAnyByIdentifier(
+        orgId,
+        identifier,
+      );
+      const version = this._pinnedVersion('ai', identifier, existing);
       await this._aiRepository.upsert(
         orgId,
         identifier,
         {
-          enabled: true,
+          // 1.1(c): preserve a disabled mirror row's state on re-key (create → true).
+          enabled: existing ? existing.enabled : true,
           credentials: this._encryption.encrypt(JSON.stringify(credentials)),
         },
         version,
