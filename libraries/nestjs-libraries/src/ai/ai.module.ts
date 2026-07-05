@@ -87,7 +87,10 @@ export class AiModule implements OnModuleInit, NestModule {
       .forRoutes(
         // path-to-regexp v8 named-wildcard syntax (see api.module.ts note).
         { path: 'agents{/*splat}', method: RequestMethod.ALL },
-        { path: 'posts/generator', method: RequestMethod.ALL },
+        // NOTE: `posts/generator` is intentionally NOT gated here. Its budget check
+        // lives in-service (AgentGraphService.start(), scope 'agent') so it also
+        // covers the runGenerator MCP path and records/gates under one coherent
+        // scope — the old middleware entry double-gated it under 'generator' (1.2).
         { path: 'copilot{/*splat}', method: RequestMethod.ALL },
       );
   }

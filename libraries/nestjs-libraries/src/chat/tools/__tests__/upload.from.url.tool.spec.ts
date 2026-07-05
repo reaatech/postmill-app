@@ -40,4 +40,25 @@ describe('UploadFromUrlTool', () => {
     expect(storageService.getLocalAdapterForOrg).not.toHaveBeenCalled();
     expect(fileService.saveFile).not.toHaveBeenCalled();
   });
+
+  it('throws via parseOrg when the org context has no id (fail-closed) and never fetches or stores', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const storageService = { getLocalAdapterForOrg: vi.fn() };
+    const fileService = { saveFile: vi.fn() };
+    const tool = new UploadFromUrlTool(fileService as any, storageService as any);
+
+    await expect(
+      executeTool(tool, {
+        inputData: { url: 'https://example.com/pic.png' },
+        organization: { name: 'No Id Org' }, // missing id
+        user,
+        access: { mode: 'user' },
+      })
+    ).rejects.toThrow('Organization context missing id');
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(storageService.getLocalAdapterForOrg).not.toHaveBeenCalled();
+    expect(fileService.saveFile).not.toHaveBeenCalled();
+  });
 });

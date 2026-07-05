@@ -10,6 +10,7 @@ import { Integration } from '@prisma/client';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import {
   guardOutbound,
+  parseOrg,
   parseUser,
   requireWrite,
 } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
@@ -141,9 +142,7 @@ If the tools return errors, you would need to rerun it with the right parameters
         checkAuth(inputData, context);
         const toolContext = context as any;
         requireWrite(toolContext);
-        const organizationId = JSON.parse(
-          toolContext?.requestContext?.get('organization') as string
-        ).id;
+        const organizationId = parseOrg(toolContext).id;
         const userId = parseUser(toolContext).id;
         const finalOutput = [];
 

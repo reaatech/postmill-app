@@ -57,8 +57,9 @@ export const CampaignDashboardPage: FC = () => {
     return [...map.values()];
   }, [data]);
 
-  // Producer for the `/agents` view context: expose the open campaign so the
-  // agent can scope actions to it. Clears its own key on unmount.
+  // Producer for the `/agents` view context (2.3): expose the open campaign so
+  // the agent can scope actions to it. On unmount the snapshot is KEPT and
+  // flagged stale (`leftViewAt`) as the user's last-viewed context, not deleted.
   useEffect(() => {
     return pushAgentUiContext({ view: 'campaigns', selectedCampaignId: id });
   }, [id]);

@@ -106,6 +106,8 @@ export class CommentsInboxTool implements AgentToolInterface {
         const org = parseOrg(ctx);
         const user = parseUser(ctx);
 
+        // Thread limit into the repo so nextCursor is derived from the last item
+        // we actually return (slicing here would skip items 26-50 of every page).
         const filters = {
           status: inputData.status,
           assigneeId: inputData.assigneeId,
@@ -113,17 +115,14 @@ export class CommentsInboxTool implements AgentToolInterface {
           unreadOnly: inputData.unreadOnly,
           campaignIds: inputData.campaignIds,
           integrationIds: inputData.integrationIds,
+          limit: inputData.limit ?? 25,
         };
 
         const { comments, nextCursor } =
           await this._socialCommentsService.getInbox(org.id, user.id, filters);
 
-        // Cap the number of items surfaced to the model (per-item content is also
-        // capped below) — worst-case payload stays bounded regardless of page size.
-        const limit = inputData.limit ?? 25;
-
         return {
-          comments: comments.slice(0, limit).map((comment: any) => ({
+          comments: comments.map((comment: any) => ({
             id: comment.id,
             postId: comment.postId,
             integrationId: comment.integrationId,

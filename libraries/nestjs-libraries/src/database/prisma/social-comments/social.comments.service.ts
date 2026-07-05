@@ -32,6 +32,9 @@ export interface InboxFilterOptions {
   // Multi-select: empty/absent = no filter; one or more ids = `where … { in: [...] }`.
   campaignIds?: string[];
   integrationIds?: string[];
+  // Page size (1-50); absent → 50 (REST default). The MCP inbox tool threads a
+  // smaller value so its nextCursor points at the last item it actually returns.
+  limit?: number;
 }
 
 @Injectable()

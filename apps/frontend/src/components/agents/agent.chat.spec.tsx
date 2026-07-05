@@ -107,7 +107,8 @@ vi.mock('@gitroom/helpers/utils/custom.fetch', () => ({
   useFetch: () => fetchMock,
 }));
 
-import { LoadMessages, SPECIALIST_BY_TOOL } from './agent.chat';
+import { LoadMessages, SPECIALIST_BY_TOOL, PendingApprovalCard } from './agent.chat';
+import { fireEvent, waitFor } from '@testing-library/react';
 
 const msg = (content: string) => ({ role: 'user', content: { content } });
 
@@ -190,5 +191,50 @@ describe('SPECIALIST_BY_TOOL is in lockstep with backend tool names (7.3)', () =
     expect(SPECIALIST_BY_TOOL['agent-media']).toBe('media');
     expect(SPECIALIST_BY_TOOL['agent-analytics']).toBe('analytics');
     expect(SPECIALIST_BY_TOOL['agent-ops']).toBe('ops');
+  });
+});
+
+// 3.2 — an ambiguous approve failure must not double-dispatch: a retry re-sends the
+// SAME X-Idempotency-Key so the server can dedupe.
+describe('PendingApprovalCard idempotency (3.2)', () => {
+  const pending = {
+    key: 'comment:p1::0',
+    kind: 'comment' as const,
+    draft: { action: 'reply', postId: 'p1', message: 'hi there' },
+  };
+
+  beforeEach(() => {
+    fetchMock.mockReset();
+  });
+
+  it('a retry after a network error re-sends the same idempotency key', async () => {
+    fetchMock
+      .mockRejectedValueOnce(new Error('network blip'))
+      .mockResolvedValueOnce({ ok: true, text: async () => '', json: async () => ({}) });
+
+    const view = render(<PendingApprovalCard pending={pending} />);
+    const approveBtn = () =>
+      Array.from(view.container.querySelectorAll('button')).find((b) =>
+        /approve|sending/i.test(b.textContent || '')
+      )!;
+
+    // First attempt fails (ambiguous — server may have accepted).
+    await act(async () => {
+      fireEvent.click(approveBtn());
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+
+    // Retry — the card is still offering Approve (resolved stayed null).
+    await act(async () => {
+      fireEvent.click(approveBtn());
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+
+    const key1 = fetchMock.mock.calls[0][1].headers['X-Idempotency-Key'];
+    const key2 = fetchMock.mock.calls[1][1].headers['X-Idempotency-Key'];
+    expect(key1).toBeTruthy();
+    expect(key2).toBe(key1);
+    // Same outward route both times.
+    expect(fetchMock.mock.calls[0][0]).toBe('/posts/p1/social-comments');
   });
 });

@@ -6,8 +6,12 @@ export class ReplyCommentDto {
   @MaxLength(10000)
   message: string;
 
-  // Set by the agent HITL confirm card so AI-drafted outward replies still pass
-  // the org's output guardrail on approve (default off = unchanged for humans).
+  /**
+   * @deprecated Ignored — the output guardrail is now ALWAYS enforced server-side
+   * on reply routes (it is a no-op for orgs with no output chain). Kept only for
+   * wire back-compat so existing clients that still send it aren't rejected by the
+   * whitelist pipe. See social-comments.controller `_maybeGuard` (3.1).
+   */
   @IsOptional()
   @IsBoolean()
   guardrail?: boolean;

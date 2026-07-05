@@ -171,7 +171,7 @@ describe('AgentDigestActivity', () => {
       });
     });
 
-    it('stays non-fatal when the notification dispatch throws', async () => {
+    it('stays non-fatal but reports the failure honestly when notify throws', async () => {
       vi.mocked(notificationService.notify).mockRejectedValueOnce(
         new Error('smtp down')
       );
@@ -183,7 +183,10 @@ describe('AgentDigestActivity', () => {
         message: 'msg',
       });
 
-      expect(result.notified).toBe(true);
+      // 4.2: catch is non-fatal (no throw) but must not masquerade as success.
+      expect(result.notified).toBe(false);
+      expect(result.error).toBe('smtp down');
+      expect(result.threadId).toBe('thread-7');
     });
   });
 });

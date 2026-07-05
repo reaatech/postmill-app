@@ -27,6 +27,7 @@ export interface AgentDigestResult {
   reason?: string;
   title?: string;
   message?: string;
+  error?: string;
 }
 
 @Injectable()
@@ -107,9 +108,14 @@ export class AgentDigestActivity {
         link: `/agents/${threadId}`,
       });
     } catch (err) {
+      // 4.2: non-fatal (a digest must never crash the sweep) but honest — report
+      // notified: false + the message so the step result carries the failure
+      // instead of masquerading as a success. No rethrow (leave retry semantics).
+      const message = (err as Error).message;
       this._logger.warn(
-        `Agent digest notification failed for ${orgId}: ${(err as Error).message}`
+        `Agent digest notification failed for ${orgId}: ${message}`
       );
+      return { threadId, notified: false, error: message };
     }
 
     return { threadId, notified: true };

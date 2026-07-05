@@ -329,11 +329,32 @@ describe('LoadToolsService', () => {
 
       const instructions = await agent.instructions({ requestContext: mockRequestContext });
 
-      expect(instructions).toContain('Current view:');
+      expect(instructions).toContain('The user is currently viewing:');
       expect(instructions).toContain('view: launches');
       expect(instructions).toContain('calendarWeek: 2026-06-01/2026-06-07');
       expect(instructions).toContain('visiblePostIds: post-1, post-2');
       expect(instructions).toContain('selectedCampaignId: campaign-1');
+      expect(instructions).toContain('currentPostId: post-1');
+    });
+
+    it('instructions function words the preamble as stale when leftViewAt is set (2.3)', async () => {
+      vi.spyOn(service, 'loadTools').mockResolvedValue({});
+
+      const agent = await service.agent();
+      const mockRequestContext = new Map();
+      mockRequestContext.set(
+        'ag-ui',
+        JSON.stringify({
+          view: 'launches',
+          currentPostId: 'post-1',
+          leftViewAt: '2026-07-05T00:00:00.000Z',
+        })
+      );
+
+      const instructions = await agent.instructions({ requestContext: mockRequestContext });
+
+      expect(instructions).toContain('The user most recently viewed (may be stale');
+      expect(instructions).not.toContain('The user is currently viewing:');
       expect(instructions).toContain('currentPostId: post-1');
     });
 
@@ -362,7 +383,7 @@ describe('LoadToolsService', () => {
         requestContext: mockRequestContext,
       });
 
-      expect(instructions).toContain('Current view:');
+      expect(instructions).toContain('The user is currently viewing:');
       expect(instructions).toContain('view: launches');
       expect(instructions).toContain('calendarWeek: 2026-06-01/2026-06-07');
       expect(instructions).toContain('currentPostId: post-9');
@@ -376,7 +397,8 @@ describe('LoadToolsService', () => {
 
       const instructions = await agent.instructions({ requestContext: mockRequestContext });
 
-      expect(instructions).not.toContain('Current view:');
+      expect(instructions).not.toContain('The user is currently viewing:');
+      expect(instructions).not.toContain('The user most recently viewed');
     });
 
     it('instructions function resolves org id and prepends brand voice', async () => {

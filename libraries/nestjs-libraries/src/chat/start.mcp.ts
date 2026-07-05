@@ -408,7 +408,10 @@ export const startMcp = async (app: INestApplication) => {
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code'],
       code_challenge_methods_supported: ['S256'],
-      scopes_supported: ['mcp:read', 'mcp:posts:write', 'mcp:admin'],
+      // 3.3: no tool enforces mcp:admin, so advertising it overstates the grant.
+      // mapPersistedScopes still accepts it (via KNOWN_MCP_SCOPES) for back-compat
+      // with already-granted rows; re-advertise here only if real admin tools land.
+      scopes_supported: ['mcp:read', 'mcp:posts:write'],
     });
   });
 

@@ -63,9 +63,11 @@ export const SVGLine = () => {
   );
 };
 
-// Producer for the `/agents` view context: while the launches calendar is
+// Producer for the `/agents` view context (2.3): while the launches calendar is
 // mounted, expose the current week + the ids of the posts on screen so the agent
-// ("move this to Monday") can resolve them. Clears its own keys on unmount.
+// ("move this to Monday") can resolve them later. The producer never co-mounts
+// with the agent chat, so on unmount the snapshot is KEPT and flagged stale
+// (`leftViewAt`) as the user's last-viewed context, not deleted.
 const LaunchesAgentContext: FC = () => {
   const { startDate, endDate, posts } = useCalendar();
   const visiblePostIds = useMemo(

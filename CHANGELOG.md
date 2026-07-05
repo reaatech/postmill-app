@@ -25,6 +25,37 @@
   Human-in-the-loop confirmation for `commentReply`/`mediaStudioGenerate` is now enforced
   server-side (a delegated specialist can no longer auto-send). The dead `/a2a` bridge (written
   against a non-existent package API — every request 500-ed) is deferred and no longer mounted.
+- **AI-agent remediation round 2.** Follow-up fixes from the PR-review of the above: the inbox tool
+  no longer skips comments 26–50 of every page (page size is threaded to the repository so the
+  pagination cursor points at the last item actually returned); the LangGraph generator now records
+  spend under its **real** resolved provider/model (was a `generator/generator` placeholder that the
+  pricing engine could not price, so every generator run logged `$0` and never accrued toward a cap)
+  and gates + records under one coherent `agent` scope; the generator wizard surfaces a budget/error
+  toast and re-enables instead of hanging forever on the new 429 contract; the generator's output
+  guardrail redaction is now actually applied to the copy **and** the hook (the return value was
+  being discarded); `MastraService` no longer memoizes a rejected build promise (a transient
+  first-build failure previously wedged the agent until process restart); the media-generate and
+  comment-reply approve paths are idempotent (`X-Idempotency-Key`) so an ambiguous client timeout
+  cannot double-dispatch a paid job / outward comment; the OAuth consent page no longer dead-ends on
+  a `redirect_uri` mismatch and never renders client-authored scope text as prose; and the output
+  guardrail on comment-reply approve is enforced server-side (caller flag ignored) with block-mode
+  violations mapped to `422` instead of a raw `500`.
+
+### Breaking / operator action
+
+These behavior changes from the AI-agent remediation land silently for operators — no schema change,
+but external clients / budget config may need action:
+
+- **Expired `pos_` OAuth tokens now `401` at deploy.** Any external MCP client still presenting a
+  past-dated access token stops authenticating immediately (fail-closed expiry — previously such
+  tokens were accepted). **Remedy:** the client re-authenticates through the normal OAuth flow
+  (refresh / re-issue) to obtain a fresh token.
+- **`scopeCaps.mcp` and `scopeCaps.generator` are retired in favor of `scopeCaps.agent`.** MCP budget
+  checks were unified onto the `agent` scope, and the LangGraph generator now both **gates by** and
+  **accrues to** `agent` (previously generator usage recorded `$0` and enforced nothing). **Remedy:**
+  migrate any per-scope cap values you had set under `scopeCaps.mcp` / `scopeCaps.generator` onto
+  `scopeCaps.agent`. An org with a tight `agent` cap will now see generator/MCP runs counted against
+  it (this is the intended, previously-missing enforcement).
 
 ### Added
 - **Analytics anomaly alerts + Insights tab + true campaign scope.** The `/analytics` dashboard

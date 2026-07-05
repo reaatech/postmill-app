@@ -97,6 +97,30 @@ describe('IntegrationTriggerTool (9.3)', () => {
     expect(result.output).not.toMatch(/unexpected error/i);
   });
 
+  it('throws via parseOrg when the org context has no id (fail-closed) and never queries an integration', async () => {
+    const integrationService = { getIntegrationById: vi.fn() };
+    const integrationManager = {
+      getSocialIntegrationUnchecked: vi.fn(),
+      getAllTools: vi.fn(),
+    };
+    const tool = new IntegrationTriggerTool(
+      integrationManager as any,
+      integrationService as any,
+      { refresh: vi.fn() } as any
+    );
+
+    await expect(
+      executeTool(tool, {
+        inputData: baseInput,
+        organization: { name: 'No Id Org' }, // missing id
+        user,
+        access: { mode: 'user' },
+      })
+    ).rejects.toThrow('Organization context missing id');
+
+    expect(integrationService.getIntegrationById).not.toHaveBeenCalled();
+  });
+
   it('lets a NON-array successful provider payload survive the outputSchema', async () => {
     const integration = { providerIdentifier: 'x', token: 't', internalId: 'i' };
     // A plain object payload — the old `z.array(...)` schema would reject this.

@@ -315,6 +315,12 @@ export class ContentPipelineConductorService {
     const timeoutMs = Math.min(this._agentTimeoutMs(), remaining);
     let timer: NodeJS.Timeout | undefined;
     try {
+      // NOTE (4.4): this Promise.race bounds only the CALLER'S WAIT. It does not
+      // abort the in-flight dispatchToAgent work or its spend — no AbortSignal is
+      // plumbed through agent-mesh, so a "timed out" stage keeps running to
+      // completion; only the caller stops awaiting it. The overall-deadline check
+      // (via `remaining`) likewise rejects BETWEEN stages, never mid-stage.
+      // Threading a real AbortSignal is a tracked follow-up.
       const response = await Promise.race([
         dispatchToAgent(agent, {
           sessionId: `content-pipeline:${ctx.orgId}:${randomUUID()}`,

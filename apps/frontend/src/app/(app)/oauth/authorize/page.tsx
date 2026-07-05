@@ -5,6 +5,15 @@ import { useSearchParams } from 'next/navigation';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { Logo } from '@gitroom/frontend/components/new-layout/logo';
 
+// 3.3: hoisted to module scope. Human-readable description per granted scope so the
+// user sees what they approve instead of a hardcoded, possibly-wrong capability list.
+// `mcp:admin` is intentionally absent — no tool enforces it and it is no longer
+// advertised in scopes_supported, so it must never be presented as a grantable scope.
+const SCOPE_LABELS: Record<string, string> = {
+  'mcp:read': 'Read your integrations, posts, and analytics',
+  'mcp:posts:write': 'Create, schedule, and publish posts on your behalf',
+};
+
 export default function OAuthAuthorizePage() {
   const searchParams = useSearchParams();
   const fetch = useFetch();
@@ -24,20 +33,17 @@ export default function OAuthAuthorizePage() {
   const codeChallengeMethod = searchParams.get('code_challenge_method');
   const scope = searchParams.get('scope');
 
-  // Human-readable description per granted scope so the user sees what they approve
-  // instead of a hardcoded, possibly-wrong capability list. Unknown scopes render
-  // verbatim rather than being hidden.
-  const SCOPE_LABELS: Record<string, string> = {
-    'mcp:read': 'Read your integrations, posts, and analytics',
-    'mcp:posts:write': 'Create, schedule, and publish posts on your behalf',
-    'mcp:admin': 'Administer AI/provider settings for your organization',
-  };
   const requestedScopes = useMemo(
     () =>
-      (scope || 'mcp:read')
-        .split(/[\s,]+/)
-        .map((s) => s.trim())
-        .filter(Boolean),
+      // 3.3: dedupe so `?scope=mcp:read+mcp:read` doesn't render duplicate React keys.
+      [
+        ...new Set(
+          (scope || 'mcp:read')
+            .split(/[\s,]+/)
+            .map((s) => s.trim())
+            .filter(Boolean)
+        ),
+      ],
     [scope]
   );
 
@@ -57,6 +63,11 @@ export default function OAuthAuthorizePage() {
       client_id: clientId,
       response_type: responseType,
       ...(state ? { state } : {}),
+      // 3.3: include redirect_uri (and scope) so a redirect_uri mismatch errors
+      // here — before the user ever sees an Authorize button — instead of only at
+      // POST time. AuthorizeOAuthQueryDto already declares these.
+      ...(redirectUri ? { redirect_uri: redirectUri } : {}),
+      ...(scope ? { scope } : {}),
     });
 
     fetch(`/oauth/authorize?${params}`)
@@ -73,7 +84,7 @@ export default function OAuthAuthorizePage() {
         setError('Failed to validate OAuth request');
         setLoading(false);
       });
-  }, [clientId, responseType, state]);
+  }, [clientId, responseType, state, redirectUri, scope]);
 
   const handleAction = useCallback(
     async (action: 'approve' | 'deny') => {
@@ -102,9 +113,16 @@ export default function OAuthAuthorizePage() {
           })
         ).json();
 
-        if (result.redirect) {
-          window.location.href = result.redirect;
+        // 3.3: the deny path already redirects with error=access_denied, so a
+        // missing redirect means the POST failed (e.g. a 400 for a redirect_uri
+        // mismatch or non-S256 challenge). Surface the message and re-enable the
+        // buttons instead of dead-ending with both permanently disabled.
+        if (!result.redirect) {
+          setError(result.message || 'Authorization failed');
+          setSubmitting(false);
+          return;
         }
+        window.location.href = result.redirect;
       } catch {
         setError('Failed to process authorization');
         setSubmitting(false);
@@ -223,11 +241,20 @@ export default function OAuthAuthorizePage() {
               will be able to:
             </div>
             <ul className="text-[14px] list-disc list-inside space-y-[4px]">
-              {requestedScopes.map((s) => (
-                <li key={s}>
-                  {SCOPE_LABELS[s] || s}
-                </li>
-              ))}
+              {requestedScopes.map((s) =>
+                SCOPE_LABELS[s] ? (
+                  <li key={s}>{SCOPE_LABELS[s]}</li>
+                ) : (
+                  // 3.3: never render a client-authored scope string as prose (it
+                  // could be a reassuring sentence that diverges from the actual
+                  // floored grant). Show the raw id in monospace, muted, with an
+                  // explicit "Unrecognized scope" prefix.
+                  <li key={s} className="text-gray-500">
+                    Unrecognized scope:{' '}
+                    <code className="font-mono text-gray-400">{s}</code>
+                  </li>
+                )
+              )}
             </ul>
           </div>
 

@@ -8,7 +8,10 @@ import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 import { Readable } from 'stream';
 import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
-import { requireWrite } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+import {
+  parseOrg,
+  requireWrite,
+} from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 // Mirror FileService's MAX_IMPORT_SIZE (not exported) — cap remote reads at 512 MB.
 const MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
@@ -60,10 +63,9 @@ so the attachment passes the upload-domain validation. Returns the hosted media 
       }),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        requireWrite(context as any);
-        const org = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        );
+        const ctx = context as any;
+        requireWrite(ctx);
+        const org = parseOrg(ctx);
 
         const response = await safeFetch(inputData.url);
 

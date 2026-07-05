@@ -447,14 +447,16 @@ const ConfirmCommentReplyCard: FC<{
         : `/posts/${postId}/social-comments`;
       const res = await fetch(url, {
         method: 'POST',
-        // guardrail:true re-runs the org output guardrail on the approved (possibly
-        // human-edited) text server-side — the human approval is the trust boundary,
-        // never a model-supplied flag (see commentReply tool: ui sessions only draft).
+        // The org output guardrail is always enforced server-side on approve; the
+        // human approval is the trust boundary. `guardrail` is deprecated/ignored but
+        // sent for wire back-compat (see commentReply tool: ui sessions only draft).
         body: JSON.stringify({ message, guardrail: true }),
       });
       if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(text || t('failed_to_send', 'Failed to send reply'));
+        // Extract the 422 GuardrailViolation reason from the JSON body, not statusText.
+        throw new Error(
+          await errorMessageFromResponse(res, t('failed_to_send', 'Failed to send reply'))
+        );
       }
       toaster.show(t('reply_sent', 'Reply sent'), 'success');
       onRespond({ sent: true });
@@ -841,12 +843,52 @@ const ToolCallCard: FC<{
 // (the sub-agent returned the draft as its result); approving here dispatches the
 // outward action via its REST route — the human click, not any model output, is the
 // authorization. Local state resolves the card so it can't be double-submitted.
-const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
+// Pull a human message out of a Nest error Response body ({message}/{error}),
+// falling back to raw text then a generic label — so a 422 GuardrailViolation shows
+// its reason (from the JSON body, not the generic statusText) instead of "Action
+// failed" (3.1).
+const errorMessageFromResponse = async (
+  res: Response,
+  fallback: string,
+): Promise<string> => {
+  const text = await res.text().catch(() => '');
+  if (!text) return fallback;
+  try {
+    const body = JSON.parse(text);
+    const msg = body?.message ?? body?.error;
+    if (Array.isArray(msg)) return msg.join(', ') || fallback;
+    if (typeof msg === 'string' && msg) return msg;
+  } catch {
+    /* not JSON — fall through to raw text */
+  }
+  return text || fallback;
+};
+
+// `crypto.randomUUID` only exists in a secure context (https or localhost); fall
+// back so the approve card never crashes on a plain-http dev origin. An idempotency
+// key needs uniqueness, not cryptographic strength.
+function makeIdempotencyKey(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    /* fall through to the non-crypto fallback */
+  }
+  return `idem-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
   const fetch = useFetch();
   const toaster = useToaster();
   const t = useT();
   const [loading, setLoading] = useState(false);
   const [resolved, setResolved] = useState<'sent' | 'rejected' | null>(null);
+  // One idempotency key per card: a retry after an ambiguous failure (the POST
+  // succeeded server-side but the client saw a timeout) re-sends the SAME key, so
+  // the server short-circuits and cannot double-dispatch a comment / start a second
+  // paid media job (3.2). Stable for this card's whole lifetime.
+  const idempotencyKey = useRef(makeIdempotencyKey()).current;
 
   const approve = async () => {
     setLoading(true);
@@ -858,15 +900,22 @@ const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
           : `/posts/${d.postId}/social-comments`;
         const res = await fetch(url, {
           method: 'POST',
-          // guardrail:true re-runs the org output guardrail server-side on approve.
+          headers: { 'X-Idempotency-Key': idempotencyKey },
+          // The org output guardrail is now always enforced server-side; the
+          // deprecated `guardrail` flag is ignored but sent for wire back-compat.
           body: JSON.stringify({ message: d.message, guardrail: true }),
         });
-        if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'Failed');
+        if (!res.ok) {
+          throw new Error(
+            await errorMessageFromResponse(res, t('action_failed', 'Action failed'))
+          );
+        }
         toaster.show(t('reply_sent', 'Reply sent'), 'success');
       } else {
         const d = pending.draft;
         const res = await fetch(`/media/studio/${d.provider}/generate`, {
           method: 'POST',
+          headers: { 'X-Idempotency-Key': idempotencyKey },
           body: JSON.stringify({
             operation: d.operation,
             model: d.model,
@@ -875,7 +924,11 @@ const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
             folderId: d.folderId,
           }),
         });
-        if (!res.ok) throw new Error((await res.text().catch(() => '')) || 'Failed');
+        if (!res.ok) {
+          throw new Error(
+            await errorMessageFromResponse(res, t('action_failed', 'Action failed'))
+          );
+        }
         toaster.show(t('generation_submitted', 'Generation submitted'), 'success');
       }
       setResolved('sent');
@@ -909,10 +962,20 @@ const PendingApprovalCard: FC<{ pending: PendingDraft }> = ({ pending }) => {
           {pending.draft.message}
         </div>
       ) : (
-        <div className="text-[12px] text-newTableText mb-[8px]">
-          {pending.draft.provider} · {pending.draft.operation}
-          {pending.draft.model ? ` · ${pending.draft.model}` : ''}
-        </div>
+        <>
+          {typeof pending.draft.input?.prompt === 'string' &&
+            pending.draft.input.prompt && (
+              // Show the prompt the user is approving — a paid generation must not
+              // be approved blind on just provider·operation·model (3.2).
+              <div className="rounded-[6px] border border-newTableBorder bg-newBgColorInner p-[8px] text-[12px] text-textColor mb-[8px] whitespace-pre-wrap">
+                {pending.draft.input.prompt as string}
+              </div>
+            )}
+          <div className="text-[12px] text-newTableText mb-[8px]">
+            {pending.draft.provider} · {pending.draft.operation}
+            {pending.draft.model ? ` · ${pending.draft.model}` : ''}
+          </div>
+        </>
       )}
       <div className="flex gap-[8px] justify-end">
         <button

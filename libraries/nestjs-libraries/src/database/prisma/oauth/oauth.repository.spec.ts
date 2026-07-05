@@ -4,6 +4,13 @@ import { OAuthRepository } from './oauth.repository';
 /**
  * 2.1 — an expired-but-unrevoked pos_ token must not authenticate forever.
  * findByAccessToken must scope on both revokedAt AND tokenExpiresAt.
+ *
+ * NOTE (4.5): this is a DELIBERATE white-box spec — it asserts the exact Prisma
+ * `where` shape (the `OR` branches + `revokedAt: null`). A semantically-equivalent
+ * rewrite of the query would falsely fail here. That coupling is intentional for a
+ * security-critical filter: the change-detector is the point (any edit to the
+ * expiry/revocation predicate must be re-reviewed), so keep it white-box rather
+ * than loosening it to a behavior-style matcher.
  */
 describe('OAuthRepository.findByAccessToken', () => {
   const makeRepo = () => {

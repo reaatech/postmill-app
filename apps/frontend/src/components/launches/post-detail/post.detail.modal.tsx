@@ -133,9 +133,11 @@ export const PostDetailModal: FC<PostDetailModalProps> = ({ postId }) => {
     }
   }, [postId, mutate, fetch]);
 
-  // Producer for the `/agents` view context: while this post's detail is open,
-  // expose its id so the agent ("move this post to Monday") can resolve it.
-  // Clears its own key on unmount so the id doesn't leak to a later view.
+  // Producer for the `/agents` view context (2.3): while this post's detail is
+  // open, expose its id (merged on top of the launches keys) so the agent
+  // ("move this post to Monday") can resolve it. On unmount the snapshot is KEPT
+  // and flagged stale (`leftViewAt`) as the user's last-viewed context; a fresh
+  // producer mount clears the stale marker so a newer view wins.
   useEffect(() => {
     return pushAgentUiContext({ currentPostId: postId });
   }, [postId]);

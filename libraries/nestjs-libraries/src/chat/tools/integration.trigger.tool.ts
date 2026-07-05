@@ -8,7 +8,10 @@ import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abst
 import { timer } from '@gitroom/helpers/utils/timer';
 import { checkAuth } from '@gitroom/nestjs-libraries/chat/auth.context';
 import { RefreshIntegrationService } from '@gitroom/nestjs-libraries/integrations/refresh.integration.service';
-import { requireRead } from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
+import {
+  parseOrg,
+  requireRead,
+} from '@gitroom/nestjs-libraries/chat/tools/tool.helpers';
 
 @Injectable()
 export class IntegrationTriggerTool implements AgentToolInterface {
@@ -60,11 +63,10 @@ export class IntegrationTriggerTool implements AgentToolInterface {
       ]),
       execute: async (inputData, context) => {
         checkAuth(inputData, context);
-        requireRead(context as any);
+        const ctx = context as any;
+        requireRead(ctx);
         this._logger.debug(`triggerTool ${JSON.stringify(inputData)}`);
-        const organizationId = JSON.parse(
-          (context?.requestContext as any)?.get('organization') as string
-        ).id;
+        const organizationId = parseOrg(ctx).id;
 
         const getIntegration =
           await this._integrationService.getIntegrationById(

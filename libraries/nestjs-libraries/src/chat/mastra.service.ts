@@ -16,7 +16,7 @@ export class MastraService {
 
   async mastra() {
     if (!MastraService._mastraPromise) {
-      MastraService._mastraPromise = (async () =>
+      const build = (async () =>
         new Mastra({
           storage: pStore,
           agents: {
@@ -26,6 +26,19 @@ export class MastraService {
             level: 'info',
           }),
         }))();
+
+      // Memoize the in-flight promise, but reset the cache if the build REJECTS
+      // (transient DB error in Memory/pStore) so the next caller rebuilds instead
+      // of receiving the same permanently-rejected promise. Concurrent awaiters of
+      // this build still all reject together; the identity check (against the cached
+      // wrapper itself) stops a late rejection from clobbering a newer build.
+      const wrapped: Promise<Mastra> = build.catch((e) => {
+        if (MastraService._mastraPromise === wrapped) {
+          MastraService._mastraPromise = null;
+        }
+        throw e;
+      });
+      MastraService._mastraPromise = wrapped;
     }
 
     return MastraService._mastraPromise;

@@ -310,6 +310,14 @@ only — it is a separate axis from the org owner role. See
 OAuth flows enforce redirect-URI matching, PKCE code challenges, scope validation, and token
 hashing. See [OAuth / SSO](./oauth-sso.md).
 
+> **Operator action (AI-agent remediation).** Two behavior changes ship without a schema migration:
+> (1) **expired `pos_` OAuth access tokens now return `401`** — any external MCP client presenting a
+> past-dated token must re-authenticate through the normal OAuth flow (refresh / re-issue) to get a
+> fresh token; (2) **AI budget caps unified onto `scopeCaps.agent`** — `scopeCaps.mcp` and
+> `scopeCaps.generator` are retired, so migrate any values you had set under those keys onto
+> `scopeCaps.agent`. Both the MCP entrypoints and the LangGraph generator now gate by and accrue to
+> the single `agent` scope (the generator previously recorded `$0` and enforced nothing).
+
 ### Open-redirect allowlisting
 
 Return URLs in integration/OAuth flows are validated against `INTEGRATION_RETURN_URL_ALLOWLIST`

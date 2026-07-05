@@ -174,7 +174,15 @@ export class LoadToolsService {
       }
       if (ctx.currentPostId) parts.push(`currentPostId: ${ctx.currentPostId}`);
       if (parts.length === 0) return '';
-      return `\n      Current view:\n        - ${parts.join('\n        - ')}\n`;
+      // Word by staleness (2.3): the producers never co-mount with the agent
+      // chat, so `leftViewAt` (stamped on producer unmount) means this is a
+      // last-viewed snapshot, not the live view. Never treat stale ids as
+      // implicit targets — the Confirmations section below already requires the
+      // model to confirm before outward actions.
+      const header = ctx.leftViewAt
+        ? 'The user most recently viewed (may be stale — confirm the intended target before acting on these ids):'
+        : 'The user is currently viewing:';
+      return `\n      ${header}\n        - ${parts.join('\n        - ')}\n`;
     } catch {
       return '';
     }

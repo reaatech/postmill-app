@@ -24,6 +24,16 @@ now real); and the dead `/a2a` bridge is deferred (was 500-ing on a non-existent
 env: `CONTENT_PIPELINE_TOTAL_TIMEOUT_MS`, `BACKEND_URL`, `MEDIA_MCP_AUDIT_LOG_PATH`. See
 `docs/developer-docs/agent-architecture.md`.
 
+Round-2 follow-up fixes carry two **operator-visible breaking changes** (no schema change): (1)
+expired `pos_` OAuth tokens now `401` at deploy — external MCP clients on a past-dated token must
+re-authenticate via the normal OAuth flow; (2) `scopeCaps.mcp` and `scopeCaps.generator` are retired
+in favor of `scopeCaps.agent` — migrate any per-scope cap values onto `scopeCaps.agent` (an org with
+a tight `agent` cap now sees generator/MCP runs both gated by and accruing to it, the
+previously-missing enforcement). The same round also fixed the inbox tool skipping comments 26–50 of
+every page, the generator recording `$0` spend, the generator wizard hanging on the 429 contract,
+discarded guardrail redaction, a wedged `MastraService` build promise, and made the media-generate /
+comment-reply approve paths idempotent (`X-Idempotency-Key`).
+
 **Analytics upgrade — anomaly alerts, Insights tab, campaign scope.** The `/analytics` dashboard is
 reshaped: Best time + Recommendations + a new **Alerts** section merge into a single **Insights** tab
 (the kebab overflow is gone; tabs are now Overview | Channels | Posts | Insights | Links | Watchlist).
