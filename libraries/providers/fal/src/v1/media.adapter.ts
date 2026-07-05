@@ -29,6 +29,10 @@ interface FalResultResponse {
   seed?: number;
 }
 
+// 2.1 — a 429/5xx on a status/result poll is transient: THROW so the lifecycle retries the
+// render rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
 const DEFAULT_IMAGE_MODEL = 'fal-ai/flux/schnell';
 const DEFAULT_VIDEO_MODEL = 'fal-ai/kling-video/v1.6/standard/text-to-video';
 const DEFAULT_AUDIO_MODEL = 'fal-ai/stable-audio';
@@ -134,12 +138,20 @@ export class FalAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a config error → terminal failed (matches openai/Sora), not a thrown
+    // error the lifecycle would retry to the 24h timeout.
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'fal.ai API key is required' };
+
     const { model, requestId } = decodeJobId(jobId);
     const statusRes = await this._fetch(
       `https://queue.fal.run/${model}/requests/${requestId}/status`,
       { headers: this._headers(options) },
     );
-    if (!statusRes.ok) return { status: 'failed', error: await statusRes.text() };
+    if (!statusRes.ok) {
+      const body = await statusRes.text();
+      if (isTransientStatus(statusRes.status)) throw new Error(`fal.ai status poll transient error ${statusRes.status}: ${body}`);
+      return { status: 'failed', error: body };
+    }
     const status = (await statusRes.json()) as FalQueueStatusResponse;
 
     if (status.status === 'COMPLETED') {
@@ -147,7 +159,12 @@ export class FalAdapter implements MediaProviderAdapter {
         `https://queue.fal.run/${model}/requests/${requestId}`,
         { headers: this._headers(options) },
       );
-      if (!resultRes.ok) return { status: 'failed', error: await resultRes.text() };
+      // Post-success result fetch: a 429/5xx here must retry (the render already succeeded).
+      if (!resultRes.ok) {
+        const body = await resultRes.text();
+        if (isTransientStatus(resultRes.status)) throw new Error(`fal.ai result fetch transient error ${resultRes.status}: ${body}`);
+        return { status: 'failed', error: body };
+      }
       const result = (await resultRes.json()) as FalResultResponse;
       const artifactUrl =
         result.video?.url ||

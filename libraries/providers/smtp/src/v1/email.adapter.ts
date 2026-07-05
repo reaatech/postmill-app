@@ -46,11 +46,29 @@ export class SmtpAdapter implements EmailCapability {
       from: `${params.fromName} <${params.fromAddress}>`,
       to: params.to,
       subject: params.subject,
-      text: params.html,
+      // Never put raw HTML into the text/plain part — derive a stripped-text
+      // alternative so text-only clients don't render markup.
+      text: this.htmlToText(params.html),
       html: params.html,
       ...(params.replyTo ? { replyTo: params.replyTo } : {}),
     });
     return { providerMessageId: info.messageId };
+  }
+
+  private htmlToText(html: string): string {
+    return html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<\/(p|div|br|h[1-6]|li|tr)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
   }
 }
 

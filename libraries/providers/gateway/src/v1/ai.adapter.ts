@@ -3,6 +3,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { metadata as providerMetadata } from './metadata';
 import {
+  BoundedProviderCache,
   type AiCapability as AIProviderAdapter,
   type AiCredentialField as CredentialField,
   type AiModelInfo as ModelInfo,
@@ -15,7 +16,8 @@ import {
 } from '@gitroom/provider-kernel';
 
 export class GatewayAdapter implements AIProviderAdapter {
-  private _gatewayCache = new Map<string, ReturnType<typeof createGateway>>();
+  // 4.11: bounded LRU so rotated keys age out instead of being retained forever.
+  private _gatewayCache = new BoundedProviderCache<ReturnType<typeof createGateway>>();
 
   private _getGateway(creds: Record<string, string>) {
     const key = `${creds.apiKey}||${creds.baseURL || ''}`;
@@ -49,16 +51,14 @@ export class GatewayAdapter implements AIProviderAdapter {
 
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
+    // 5.15: cheap authenticated metadata call (getAvailableModels) instead of a
+    // paid `doGenerate` ping — verifies the key without running billable inference.
     try {
       const provider = createGateway({
         apiKey: creds.apiKey,
         baseURL: creds.baseURL || undefined,
       });
-      const model = provider.languageModel('openai/gpt-4o-mini');
-      await (model as any).doGenerate({
-        prompt: [{ role: 'user', content: [{ type: 'text' as const, text: 'ping' }] }],
-        maxOutputTokens: 1,
-      });
+      await (provider as any).getAvailableModels();
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: err.message || 'Unknown error' };

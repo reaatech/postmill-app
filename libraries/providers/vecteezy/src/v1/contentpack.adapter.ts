@@ -77,7 +77,7 @@ export class VecteezyContentPack implements ContentPackCapabilityContract {
   }
 
   async resolveDownload(id: string, _capability: ContentPackCapability = 'photos'): Promise<string> {
-    const res = await this._fetch(`${BASE_URL}/resources/${id}/download`, { headers: this._headers });
+    const res = await this._fetch(`${BASE_URL}/resources/${encodeURIComponent(id)}/download`, { headers: this._headers });
     if (res.status === 429) {
       throw new ContentPackDailyCapError('Vecteezy rate limit reached. Check your Vecteezy plan.');
     }

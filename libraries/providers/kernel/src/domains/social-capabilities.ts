@@ -252,21 +252,6 @@ export const PROVIDER_CAPABILITIES: Record<string, ProviderCapability> = {
     refreshToken: false,
     watchlist: false,
   },
-  // Custom Mastodon instances inherit the base MastodonProvider behavior
-  // (analytics()/postAnalytics()/comments), so mirror the `mastodon` entry.
-  'mastodon-custom': {
-    analytics: true,
-    comments: true,
-    firstComment: true,
-    poll: false,
-    video: true,
-    carousel: false,
-    altText: true,
-    maxMedia: 4,
-    linkPreview: false,
-    refreshToken: false,
-    watchlist: false,
-  },
   'bluesky': {
     analytics: true,
     comments: true,

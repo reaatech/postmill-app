@@ -6,6 +6,10 @@ describe('x provider conformance', () => {
   it('social module conforms', () => {
     const social = defaultModules.find((m) => m.manifest.domain === 'social');
     expect(social).toBeDefined();
+    // Only the methods the X provider actually implements. The kernel bridge now
+    // exposes optional capabilities conditionally (2.6), so listing an unsupported
+    // method (e.g. fetchPageInformation — X has no "pages") correctly fails instead
+    // of being masked by an always-present stub.
     runDomainConformance('social', social!, {
       requiredMethods: [
         'post',
@@ -15,13 +19,8 @@ describe('x provider conformance', () => {
         'maxLength',
         'checkValidity',
         'mentionFormat',
-        'fetchPageInformation',
-        'externalUrl',
         'analytics',
         'postAnalytics',
-        'changeNickname',
-        'changeProfilePicture',
-        'missing',
         'comment',
         'fetchComments',
         'replyToComment',

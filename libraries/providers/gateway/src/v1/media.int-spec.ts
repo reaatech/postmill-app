@@ -1,6 +1,28 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { makeCtx, res } from '@gitroom/provider-kernel/testing/media-int-helpers';
 import { gatewayMediaModule } from './media.adapter';
+
+// 5.7 — the gateway video path calls AI SDK's experimental_generateVideo directly (not ctx.fetch),
+// so a size-guard test must mock that SDK. We use a per-test scoped vi.doMock + resetModules so the
+// mock never leaks to the co-running gateway AI-adapter spec (a top-level vi.mock('ai') does).
+async function loadWithVideoResult(videoResult: unknown) {
+  vi.resetModules();
+  vi.doMock('ai', async (importOriginal) => {
+    const actual = await importOriginal<typeof import('ai')>();
+    return {
+      ...actual,
+      createGateway: () => ({ video: (m: string) => m }),
+      experimental_generateVideo: vi.fn().mockResolvedValue(videoResult),
+    };
+  });
+  const mod = await import('./media.adapter');
+  return mod.gatewayMediaModule;
+}
+
+afterEach(() => {
+  vi.doUnmock('ai');
+  vi.resetModules();
+});
 
 // Recorded-fixture integration test (plan B4) — no network.
 //
@@ -59,6 +81,29 @@ describe('gateway media adapter (AI-SDK delegation)', () => {
     await expect(adapter.generateVideo('x', { model: 'm' })).rejects.toThrow(
       'Vercel AI API key is required',
     );
+  });
+
+  it('5.7: an oversize video is rejected before base64-inflating (no huge allocation)', async () => {
+    // uint8Array with a huge .length but no backing buffer — the guard reads .length and throws
+    // BEFORE Buffer.from() would allocate/copy it.
+    const mod = await loadWithVideoResult({
+      videos: [{ uint8Array: { length: 600 * 1024 * 1024 } as unknown as Uint8Array }],
+    });
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = mod.create(ctx as any);
+    await expect(adapter.generateVideo('a long clip', { model: 'video-1', apiKey: 'vck_test' })).rejects.toThrow(
+      /exceeds the size limit/,
+    );
+  });
+
+  it('5.7: an under-cap video passes and is inlined as a data URL', async () => {
+    const mod = await loadWithVideoResult({
+      videos: [{ base64: Buffer.from('SMALLVIDEO').toString('base64'), mediaType: 'video/mp4' }],
+    });
+    const { ctx } = makeCtx(() => res({}));
+    const adapter: any = mod.create(ctx as any);
+    const sub = await adapter.generateVideo('a short clip', { model: 'video-1', apiKey: 'vck_test' });
+    expect(sub.artifactUrl).toBe(`data:video/mp4;base64,${Buffer.from('SMALLVIDEO').toString('base64')}`);
   });
 
   it('generateImage rejects a missing model; audio/avatar are unsupported', async () => {

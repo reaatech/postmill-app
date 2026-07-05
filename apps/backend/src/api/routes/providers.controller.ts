@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -17,6 +18,7 @@ import {
   IsArray,
   IsInt,
   IsString,
+  Max,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -25,6 +27,7 @@ import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.req
 import {
   ProviderKernel,
   ProviderDomain,
+  isProviderDomain,
   isProviderVerified,
 } from '@gitroom/provider-kernel';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
@@ -34,25 +37,24 @@ import {
   AuthorizationActions,
   Sections,
 } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
-import { PoliciesGuard } from '@gitroom/backend/services/auth/permissions/permissions.guard';
+import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
 
-const DOMAINS: ProviderDomain[] = [
-  'ai',
-  'media',
-  'shortlink',
-  'vpn',
-  'social',
-  'storage',
-  'email',
-  'auth',
-  'contentpack',
-];
+// PROVIDER_REMEDIATION 3.3: `isProviderDomain` + the domain set are now a single
+// source of truth exported from the kernel (`@gitroom/provider-kernel`), shared
+// with `featured-provider.service.ts` — no local duplicate that could drift.
 
-function isProviderDomain(value: string): value is ProviderDomain {
-  return DOMAINS.includes(value as ProviderDomain);
+// PROVIDER_REMEDIATION 3.3: an invalid `?domain=` must fail closed with a 400 —
+// previously an unknown value mapped to `undefined` and returned the full
+// cross-domain catalog (fails open / info leak).
+function resolveDomainFilter(domain?: string): ProviderDomain | undefined {
+  if (domain === undefined || domain === '') return undefined;
+  if (!isProviderDomain(domain)) {
+    throw new BadRequestException(`Unknown provider domain: ${domain}`);
+  }
+  return domain;
 }
 
-class FeaturedProviderDto {
+export class FeaturedProviderDto {
   @IsString()
   domain: string;
 
@@ -61,6 +63,7 @@ class FeaturedProviderDto {
 
   @IsInt()
   @Min(0)
+  @Max(2147483647)
   sortOrder: number;
 }
 
@@ -78,6 +81,7 @@ class FeaturedReorderEntryDto {
 
   @IsInt()
   @Min(0)
+  @Max(2147483647)
   sortOrder: number;
 }
 
@@ -102,14 +106,11 @@ export class ProvidersController {
 
   @Get('/catalog')
   async catalog(@Query('domain') domain?: string) {
-    const manifests = this._kernel.listManifests(
-      domain && isProviderDomain(domain) ? domain : undefined,
-    );
+    const domainFilter = resolveDomainFilter(domain);
+    const manifests = this._kernel.listManifests(domainFilter);
     // Featured curation, keyed by `${domain}/${providerId}` (version-agnostic —
     // all version-entries of a featured provider carry the badge/order).
-    const featured = await this._featured.getFeaturedKeyed(
-      domain && isProviderDomain(domain) ? domain : undefined,
-    );
+    const featured = await this._featured.getFeaturedKeyed(domainFilter);
 
     return manifests.map((m) => {
       const featuredKey = `${m.domain}/${m.providerId}`;
@@ -144,7 +145,10 @@ export class ProvidersController {
 
 @ApiTags('Admin Providers')
 @Controller('/admin/providers')
-@UseGuards(PoliciesGuard)
+// PROVIDER_REMEDIATION 3.2 + 6.2: SuperAdminGuard is the class-level structural
+// backstop. The redundant `@UseGuards(PoliciesGuard)` was removed — PoliciesGuard is
+// already registered as a global APP_GUARD (it was running twice per request).
+@UseGuards(SuperAdminGuard)
 export class AdminProvidersController {
   constructor(
     @Inject(PROVIDER_KERNEL) private readonly _kernel: ProviderKernel,
@@ -166,18 +170,17 @@ export class AdminProvidersController {
   health(@GetUserFromRequest() user: User, @Query('domain') domain?: string) {
     this._assertSuperAdmin(user);
 
-    const manifests = this._kernel.listManifests(
-      domain && isProviderDomain(domain) ? domain : undefined,
-    );
+    const manifests = this._kernel.listManifests(resolveDomainFilter(domain));
 
     return manifests.map((m) => {
-      const mod = this._kernel.get(m.domain, m.providerId, m.version);
+      // PROVIDER_REMEDIATION 4.6: health is kernel-owned (keyed by keyString), no
+      // longer mutated onto the provider module — read it via kernel.getHealth.
       return {
         domain: m.domain,
         providerId: m.providerId,
         version: m.version,
         status: m.status,
-        health: mod?.health,
+        health: this._kernel.getHealth(m.domain, m.providerId, m.version),
       };
     });
   }

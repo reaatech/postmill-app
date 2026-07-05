@@ -83,14 +83,25 @@ export class SesAdapter implements EmailCapability {
       const payload = JSON.parse(rawBody.toString());
       const msgType = headers['x-amz-sns-message-type'];
 
+      // Fail closed: webhooks are always enabled for this adapter, so the
+      // TopicArn pin is mandatory. Without EMAIL_WEBHOOK_SECRET set we cannot
+      // trust any topic — reject rather than accept-any (mail-DoS otherwise).
+      const expectedTopic = process.env.EMAIL_WEBHOOK_SECRET || '';
+      if (!expectedTopic) {
+        this._logger.warn('SNS webhook rejected: EMAIL_WEBHOOK_SECRET (TopicArn pin) is not set');
+        return false;
+      }
+      if (payload.TopicArn !== expectedTopic) return false;
+
       if (msgType === 'SubscriptionConfirmation') {
         const subscribeUrl = payload.SubscribeURL;
         if (!subscribeUrl || typeof subscribeUrl !== 'string') return false;
 
         if (!this._isValidSnsHost(new URL(subscribeUrl))) return false;
 
-        const expectedTopic = process.env.EMAIL_WEBHOOK_SECRET || '';
-        if (expectedTopic && payload.TopicArn !== expectedTopic) return false;
+        // Verify the message signature before confirming the subscription —
+        // an unsigned/forged confirmation must never self-confirm a topic.
+        if (!(await this._verifySnsSignature(payload, msgType))) return false;
 
         try {
           const response = await this._fetch(subscribeUrl, { method: 'GET' });
@@ -107,10 +118,7 @@ export class SesAdapter implements EmailCapability {
       }
 
       if (msgType === 'Notification') {
-        const expectedTopic = process.env.EMAIL_WEBHOOK_SECRET || '';
-        if (expectedTopic && payload.TopicArn !== expectedTopic) return false;
-
-        return this._verifySnsSignature(payload);
+        return this._verifySnsSignature(payload, msgType);
       }
 
       return false;
@@ -124,7 +132,7 @@ export class SesAdapter implements EmailCapability {
     return /^sns\.[a-z0-9-]+\.amazonaws\.com$/.test(hostname);
   }
 
-  private async _verifySnsSignature(payload: any): Promise<boolean> {
+  private async _verifySnsSignature(payload: any, msgType?: string): Promise<boolean> {
     const certUrl = payload.SigningCertURL ?? payload.SigningCertUrl;
     if (!certUrl) return false;
 
@@ -138,7 +146,7 @@ export class SesAdapter implements EmailCapability {
     const signature = payload.Signature;
     if (!signature) return false;
 
-    const signingString = this._buildSnsSigningString(payload);
+    const signingString = this._buildSnsSigningString(payload, msgType);
 
     try {
       const certResponse = await this._fetch(certUrl, { method: 'GET' });
@@ -163,18 +171,31 @@ export class SesAdapter implements EmailCapability {
     }
   }
 
-  private _buildSnsSigningString(payload: any): string {
+  private _buildSnsSigningString(payload: any, msgType?: string): string {
     const lines: string[] = [];
+    // SubscriptionConfirmation / UnsubscribeConfirmation sign a different set of
+    // canonical fields (SubscribeURL + Token) than Notification (Subject).
+    const isSubscription =
+      msgType === 'SubscriptionConfirmation' ||
+      msgType === 'UnsubscribeConfirmation';
+
     lines.push('Message');
     lines.push(payload.Message ?? '');
     lines.push('MessageId');
     lines.push(payload.MessageId ?? '');
-    if (payload.Subject != null) {
+    if (isSubscription) {
+      lines.push('SubscribeURL');
+      lines.push(payload.SubscribeURL ?? '');
+    } else if (payload.Subject != null) {
       lines.push('Subject');
       lines.push(payload.Subject);
     }
     lines.push('Timestamp');
     lines.push(payload.Timestamp ?? '');
+    if (isSubscription) {
+      lines.push('Token');
+      lines.push(payload.Token ?? '');
+    }
     lines.push('TopicArn');
     lines.push(payload.TopicArn ?? '');
     lines.push('Type');

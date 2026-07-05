@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, BadRequestException } from '@nestjs/common'
 import { createHash } from 'node:crypto';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
+import { OrgProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.repository';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
@@ -62,6 +63,11 @@ export class OrgVpnConfigService {
     private _dispatcher: VpnDispatcherService,
     private _resolution: ProviderResolutionService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
+    // layering: sanctioned leaf-read — OrgProviderConfigService depends back on
+    // this service (channel VPN validation), so routing "up" through it would
+    // create a Nest DI cycle. 3.7: used only to clear orphaned channel
+    // vpnSelection rows when a VPN provider is deleted.
+    private _channelConfigRepository: OrgProviderConfigRepository,
   ) {}
 
   // Effective region catalog for an adapter: derived from config for dynamic
@@ -228,10 +234,15 @@ export class OrgVpnConfigService {
     },
   ) {
     const config = await this._repository.getByIdentifier(orgId, identifier);
-    const version =
-      config?.version ??
-      this._resolution.latestActiveVersion('vpn', identifier) ??
-      'v1';
+    // 1.1: validate the pinned version against the lifecycle before persisting —
+    // a deprecated version rejects the write, retired is 410, unknown is 400.
+    // Replaces the unvalidated `latestActive ?? 'v1'`. VPN config bodies carry no
+    // client version, so the existing pin (else latest-active) is validated.
+    const version = this._resolution.resolveWriteVersion(
+      'vpn',
+      identifier,
+      config?.version ?? undefined,
+    );
 
     let adapter;
     try {
@@ -288,13 +299,65 @@ export class OrgVpnConfigService {
 
     // Drop any pooled dispatchers so a cred/region/enabled change takes effect now.
     this._dispatcher.invalidate(orgId, identifier);
+    // 1.3a: evict the cached kernel capability so the next resolve rebuilds it.
+    this._resolution.invalidate('vpn', identifier, orgId);
     return result;
   }
 
   async delete(orgId: string, identifier: string) {
     const result = await this._repository.delete(orgId, identifier);
     this._dispatcher.invalidate(orgId, identifier);
+    // 1.3a: evict the cached kernel capability for this provider.
+    this._resolution.invalidate('vpn', identifier, orgId);
+    // 3.7: clear any channel configs still pointing their egress at this VPN
+    // provider — otherwise resolveProxyForChannel returns null and posts
+    // silently egress from the server's real IP (a privacy regression).
+    await this._clearOrphanedChannelSelections(orgId, identifier);
     return result;
+  }
+
+  // 3.7: null out the vpnSelection on every channel config in the org that
+  // referenced the just-deleted VPN provider, logging each so an operator can
+  // see the egress fell back to the server IP. Non-fatal — a failure here must
+  // never break the delete.
+  private async _clearOrphanedChannelSelections(
+    orgId: string,
+    identifier: string,
+  ): Promise<void> {
+    try {
+      const channels = await this._channelConfigRepository.getByOrg(orgId);
+      for (const channel of channels) {
+        const sel = this._parseVpnSelection(
+          (channel as { vpnSelection?: string | null }).vpnSelection,
+        );
+        if (sel?.enabled && sel.identifier === identifier) {
+          await this._channelConfigRepository.updateById(channel.id, {
+            vpnSelection: null,
+          });
+          this._logger.warn(
+            `Cleared VPN selection on channel config ${channel.id} (org=${orgId}) ` +
+              `after deleting VPN provider "${identifier}" — this channel now egresses ` +
+              `from the server IP until a new VPN is selected.`,
+          );
+        }
+      }
+    } catch (err) {
+      this._logger.warn(
+        `Failed to clear channel VPN selections for "${identifier}" (org=${orgId}): ${(err as Error)?.message}`,
+      );
+    }
+  }
+
+  private _parseVpnSelection(
+    raw: string | null | undefined,
+  ): { enabled?: boolean; identifier?: string } | null {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch {
+      return null;
+    }
   }
 
   async testConnection(orgId: string, identifier: string) {

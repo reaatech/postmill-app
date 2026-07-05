@@ -21,6 +21,10 @@ import {
 // lifecycle lands each as its own sibling render-queue job.
 const BASE = 'https://api.sunoapi.org';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
 interface SunoGenerateResponse {
   code?: number;
   msg?: string;
@@ -143,11 +147,23 @@ export class SunoAdapter extends BearerTokenMediaAdapter {
   // `data.response.sunoData[].audioUrl` path are grounded in the sunoapi.org docs, not a live
   // response — smoke-test both against a real key (and confirm 2 clips are returned).
   async pollJob(taskId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a config error → terminal failed (matches openai/Sora), not a thrown
+    // error the lifecycle would retry to the 24h timeout.
+    let headers: Record<string, string>;
+    try {
+      headers = this._headers(options);
+    } catch (err) {
+      return { status: 'failed', error: (err as Error).message };
+    }
     const res = await this._fetch(
       `${BASE}/api/v1/generate/record-info?taskId=${encodeURIComponent(taskId)}`,
-      { headers: this._headers(options) },
+      { headers },
     );
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Suno poll transient error ${res.status}: ${body}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as SunoRecordResponse;
     const status = (data.data?.status || '').toUpperCase();
 
@@ -187,7 +203,11 @@ export class SunoAdapter extends BearerTokenMediaAdapter {
       const res = await this._fetch(`${BASE}/api/v1/generate/credit`, { headers });
       if (res.status === 401 || res.status === 403)
         return { ok: false, message: 'Invalid Suno API key' };
-      return { ok: true, message: 'Connection successful' };
+      // 5.6 — only an expected status (2xx / 404 / 422) counts as connected; a 5xx or other
+      // unexpected status must NOT be reported as success.
+      if (res.ok || res.status === 404 || res.status === 422)
+        return { ok: true, message: 'Connection successful' };
+      return { ok: false, message: `Suno returned ${res.status}` };
     } catch (err) {
       return { ok: false, message: (err as Error).message };
     }

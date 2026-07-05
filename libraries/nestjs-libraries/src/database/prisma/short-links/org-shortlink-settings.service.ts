@@ -132,10 +132,12 @@ export class OrgShortLinkSettingsService {
       ? this._encryption.encrypt(JSON.stringify(data.extraConfig))
       : undefined;
 
-    const version =
-      data.version ?? this._resolution.latestActiveVersion('shortlink', identifier) ?? 'v1';
+    // 1.1: validate the client-supplied (or defaulted) version against the
+    // lifecycle before pinning — a deprecated version rejects the write, retired
+    // is 410, unknown is 400. Replaces the unvalidated `latestActive ?? 'v1'`.
+    const version = this._resolution.resolveWriteVersion('shortlink', identifier, data.version);
 
-    return this._repository.upsert(orgId, identifier, {
+    const result = await this._repository.upsert(orgId, identifier, {
       ...data,
       credentials: encryptedCredentials,
       extraConfig: encryptedExtraConfig,
@@ -144,6 +146,9 @@ export class OrgShortLinkSettingsService {
       accountFingerprint: data.accountFingerprint,
       version,
     });
+    // 1.3a: drop any cached capability so the next resolve rebuilds with fresh creds.
+    this._resolution.invalidate('shortlink', identifier, orgId);
+    return result;
   }
 
   async setActive(orgId: string, identifier: string, version?: string) {
@@ -169,13 +174,19 @@ export class OrgShortLinkSettingsService {
   }
 
   async delete(orgId: string, identifier: string) {
-    return this._repository.delete(orgId, identifier);
+    const result = await this._repository.delete(orgId, identifier);
+    // 1.3a: evict the cached capability so a re-add rebuilds it fresh.
+    this._resolution.invalidate('shortlink', identifier, orgId);
+    return result;
   }
 
   async deleteById(orgId: string, id: string) {
     const config = await this._repository.getById(orgId, id);
     if (!config) throw new Error('Configuration not found');
-    return this._repository.deleteById(id);
+    const result = await this._repository.deleteById(id);
+    // 1.3a: evict the cached capability for this provider.
+    this._resolution.invalidate('shortlink', config.identifier, orgId);
+    return result;
   }
 
   getLinksForOrg(orgId: string) {

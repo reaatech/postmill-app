@@ -46,7 +46,8 @@ export class ShortioAdapter implements ShortLinkCapability {
   }
 
   async createShortLink(ctx: ShortLinkContext, originalUrl: string): Promise<{ shortUrl: string; providerLinkId?: string }> {
-    const domain = ctx.credentials.domain || this.defaultDomain;
+    // Honour the org's configured customDomain (capabilities.customDomain: true) — was ignored.
+    const domain = this.resolveDomain(ctx);
     const body: Record<string, any> = {
       originalURL: originalUrl,
       domain,
@@ -64,7 +65,14 @@ export class ShortioAdapter implements ShortLinkCapability {
       throw new Error(`Short.io create failed (${response.status}): ${text}`);
     }
     const data = (await response.json()) as any;
-    return { shortUrl: `https://${domain}/${data.idString || data.shortURL || data.path}`, providerLinkId: data.idString || data.id };
+    // SPECULATIVE (needs a live key): prefer the API's canonical `shortURL`. Short.io
+    // returns it as a full short URL — use it directly when it looks like one, else
+    // compose from the resolved domain + id/path.
+    const shortUrl =
+      typeof data.shortURL === 'string' && /^https?:\/\//.test(data.shortURL)
+        ? data.shortURL
+        : `https://${domain}/${data.shortURL || data.idString || data.path}`;
+    return { shortUrl, providerLinkId: data.idString || data.id };
   }
 
   async expandShortLink(ctx: ShortLinkContext, shortUrl: string): Promise<string> {
@@ -104,6 +112,9 @@ export class ShortioAdapter implements ShortLinkCapability {
             original: data.originalURL || '',
             clicks: String(data.clicks || '0'),
           });
+        } else {
+          // Keep one entry per input (base-class contract) — don't drop the link on a non-2xx.
+          results.push({ short: link, original: '', clicks: '0' });
         }
       } catch {
         results.push({ short: link, original: '', clicks: '0' });

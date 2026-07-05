@@ -126,6 +126,54 @@ describe('openai media adapter — Sora Videos API', () => {
     expect(sub.artifactUrl).toBe(`data:audio/mpeg;base64,${clip.toString('base64')}`);
   });
 
+  it('2.1: a 503 on the status poll THROWS (transient) — render not permanently failed', async () => {
+    const { ctx } = makeCtx(() => json('busy', false, 503));
+    const adapter: any = openaiMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('video_abc', { apiKey: 'sk-test' })).rejects.toThrow(/transient/i);
+  });
+
+  it('2.1: a failed content download (post-success) THROWS — a paid render is not discarded', async () => {
+    const { ctx } = makeCtx((url) =>
+      url.endsWith('/content') ? json('down', false, 500) : json({ id: 'video_abc', status: 'completed' }),
+    );
+    const adapter: any = openaiMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('video_abc', { apiKey: 'sk-test' })).rejects.toThrow(/content download failed/i);
+  });
+
+  it('2.1: a provider status:failed → returned { status: failed }; 4xx poll → failed', async () => {
+    const f = makeCtx(() => json({ id: 'video_abc', status: 'failed', error: { message: 'bad prompt' } }));
+    const a1: any = openaiMediaModule.create(f.ctx as any);
+    const r = await a1.pollJob('video_abc', { apiKey: 'sk-test' });
+    expect(r.status).toBe('failed');
+    expect(r.error).toBe('bad prompt');
+
+    const four = makeCtx(() => json('bad', false, 404));
+    const a2: any = openaiMediaModule.create(four.ctx as any);
+    expect((await a2.pollJob('video_abc', { apiKey: 'sk-test' })).status).toBe('failed');
+  });
+
+  it('5.7: an oversize content-length is rejected BEFORE buffering (returned failed)', async () => {
+    const huge = String(600 * 1024 * 1024);
+    let contentBuffered = false;
+    const bigContent = {
+      ok: true,
+      status: 200,
+      headers: { get: (k: string) => (k.toLowerCase() === 'content-length' ? huge : 'video/mp4') },
+      arrayBuffer: async () => {
+        contentBuffered = true;
+        return new ArrayBuffer(8);
+      },
+    };
+    const { ctx } = makeCtx((url) =>
+      url.endsWith('/content') ? bigContent : json({ id: 'video_abc', status: 'completed' }),
+    );
+    const adapter: any = openaiMediaModule.create(ctx as any);
+    const r = await adapter.pollJob('video_abc', { apiKey: 'sk-test' });
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/size limit/);
+    expect(contentBuffered).toBe(false);
+  });
+
   it('rejects avatar generation (unsupported)', async () => {
     const { ctx } = makeCtx(() => json({}));
     const adapter: any = openaiMediaModule.create(ctx as any);

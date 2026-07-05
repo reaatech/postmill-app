@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+const { GoogleAuthMock } = vi.hoisted(() => {
+  const getAccessTokenMock = vi.fn().mockResolvedValue({ token: 'minted-token' });
+  const getClientMock = vi.fn().mockResolvedValue({ getAccessToken: getAccessTokenMock });
+  return { GoogleAuthMock: vi.fn(function () { return { getClient: getClientMock }; }) };
+});
+
 vi.mock('@ai-sdk/google-vertex', () => ({
   createVertex: vi.fn(() => ({
     languageModel: vi.fn(() => ({
@@ -10,7 +16,12 @@ vi.mock('@ai-sdk/google-vertex', () => ({
   })),
 }));
 
+vi.mock('google-auth-library', () => ({
+  GoogleAuth: GoogleAuthMock,
+}));
+
 import { VertexAdapter } from '../ai.adapter';
+import { createVertex } from '@ai-sdk/google-vertex';
 
 describe('VertexAdapter', () => {
   let adapter: VertexAdapter;
@@ -110,6 +121,41 @@ describe('VertexAdapter', () => {
       const result = await adapter.validateCredentials({ project: 'my-project', location: 'us-central1' });
       expect(result.ok).toBe(false);
       expect(result.error).toBe('GCP service account JSON is required');
+    });
+
+    // 2.2: corrupt service-account JSON must NOT fall through to platform ADC.
+    it('rejects corrupt googleCredentials JSON without minting a token (2.2)', async () => {
+      const result = await adapter.validateCredentials({
+        project: 'my-project',
+        location: 'us-central1',
+        googleCredentials: '{not valid json',
+      });
+      expect(result).toEqual({ ok: false, error: 'GCP service account JSON is not valid JSON' });
+      // Never resolved any auth path (no ADC, no token mint).
+      expect(GoogleAuthMock).not.toHaveBeenCalled();
+    });
+
+    // 5.15: valid creds validate via a cheap token mint, not a paid generation.
+    it('validates via a token-mint probe, not a paid generation (5.15)', async () => {
+      const result = await adapter.validateCredentials(validCreds);
+      expect(result).toEqual({ ok: true });
+      expect(GoogleAuthMock).toHaveBeenCalledWith(
+        expect.objectContaining({ scopes: ['https://www.googleapis.com/auth/cloud-platform'] }),
+      );
+      // No inference SDK client built for validation.
+      expect(createVertex).not.toHaveBeenCalled();
+    });
+  });
+
+  // 2.2: the build path itself must throw on corrupt JSON (never resolve ADC).
+  describe('_buildProvider (2.2)', () => {
+    it('throws on corrupt googleCredentials instead of falling back to ADC', () => {
+      expect(() =>
+        adapter.createLanguageModel(
+          { project: 'p', location: 'us-central1', googleCredentials: '{bad' },
+          'gemini-2.5-flash',
+        ),
+      ).toThrow('Vertex AI service account JSON is not valid JSON');
     });
   });
 

@@ -66,17 +66,12 @@ export class BedrockAdapter implements AIProviderAdapter {
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.region) return { ok: false, error: 'AWS region is required' };
     if (!creds.accessKeyId || !creds.secretAccessKey) return { ok: false, error: 'AWS credentials are required' };
-    try {
-      const provider = this._buildProvider(creds);
-      const model = provider.languageModel('amazon.nova-lite-v1:0');
-      await (model as any).doGenerate({
-        prompt: [{ role: 'user', content: [{ type: 'text' as const, text: 'ping' }] }],
-        maxOutputTokens: 1,
-      });
-      return { ok: true };
-    } catch (err: any) {
-      return { ok: false, error: err.message || 'Unknown error' };
-    }
+    // 5.15: do NOT burn paid inference (the previous `doGenerate` ping) to
+    // validate. Bedrock exposes no free auth probe through the AI-SDK provider
+    // (a control-plane ListFoundationModels call would require hand-rolled
+    // SigV4), so validate that the required credentials are present and defer
+    // real auth failures to first use.
+    return { ok: true };
   }
 
   /** @note bedrock SDK returns specificationVersion "v1" — cast through unknown to satisfy the v2 interface */

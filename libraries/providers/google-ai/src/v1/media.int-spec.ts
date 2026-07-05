@@ -123,6 +123,59 @@ describe('google-ai media adapter (Gemini Developer API)', () => {
     expect(out.image).toBe('data:image/png;base64,SU1H');
   });
 
+  it('2.1: a 503 on the Veo operation poll THROWS (transient) — render not permanently failed', async () => {
+    const { ctx } = makeCtx(() => json('busy', false, 503));
+    const adapter: any = googleaiMediaModule.create(ctx as any);
+    await expect(adapter.pollJob('models/veo/operations/op-1', { apiKey: 'AIza-test' })).rejects.toThrow(/transient/i);
+  });
+
+  it('2.1: a failed file download (post-success) THROWS — a paid render is not discarded', async () => {
+    const opName = 'models/veo/operations/op-1';
+    const { ctx } = makeCtx((url) => {
+      if (url.includes('/operations/'))
+        return json({ name: opName, done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://gen/file' } }] } } });
+      return json('down', false, 500); // the file uri download
+    });
+    const adapter: any = googleaiMediaModule.create(ctx as any);
+    await expect(adapter.pollJob(opName, { apiKey: 'AIza-test' })).rejects.toThrow(/download failed/i);
+  });
+
+  it('2.1: an operation error → returned failed; missing key on poll → terminal failed', async () => {
+    const err = makeCtx(() => json({ name: 'op', done: true, error: { message: 'quota' } }));
+    const a1: any = googleaiMediaModule.create(err.ctx as any);
+    expect((await a1.pollJob('op', { apiKey: 'AIza-test' })).status).toBe('failed');
+
+    const nokey = makeCtx(() => json({}));
+    const a2: any = googleaiMediaModule.create(nokey.ctx as any);
+    const r = await a2.pollJob('op', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/Gemini API key/);
+  });
+
+  it('5.7: an oversize content-length on the file download is rejected before buffering', async () => {
+    const opName = 'models/veo/operations/op-1';
+    let buffered = false;
+    const bigFile = {
+      ok: true,
+      status: 200,
+      headers: { get: (k: string) => (k.toLowerCase() === 'content-length' ? String(600 * 1024 * 1024) : 'video/mp4') },
+      arrayBuffer: async () => {
+        buffered = true;
+        return new ArrayBuffer(8);
+      },
+    };
+    const { ctx } = makeCtx((url) => {
+      if (url.includes('/operations/'))
+        return json({ name: opName, done: true, response: { generateVideoResponse: { generatedSamples: [{ video: { uri: 'https://gen/file' } }] } } });
+      return bigFile;
+    });
+    const adapter: any = googleaiMediaModule.create(ctx as any);
+    const r = await adapter.pollJob(opName, { apiKey: 'AIza-test' });
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/size limit/);
+    expect(buffered).toBe(false);
+  });
+
   it('testConnection lists models; audio/avatar and missing key throw', async () => {
     const { recs, ctx } = makeCtx(() => json({ models: [] }));
     const adapter: any = googleaiMediaModule.create(ctx as any);

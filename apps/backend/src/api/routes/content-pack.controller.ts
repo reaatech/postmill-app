@@ -25,6 +25,10 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import {
+  UpsertContentPackConfigDto,
+  ProviderTestConnectionDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 @ApiTags('Org Content Pack Settings')
 @Controller('/settings/content-packs')
@@ -74,7 +78,7 @@ export class ContentPackController {
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { credentials?: Record<string, string>; extraConfig?: Record<string, any> }
+    @Body() body: UpsertContentPackConfigDto
   ) {
     if (!this.#meta(identifier)) {
       throw new BadRequestException('Unknown content pack provider');
@@ -118,7 +122,7 @@ export class ContentPackController {
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { credentials?: Record<string, string> }
+    @Body() body: ProviderTestConnectionDto
   ) {
     const meta = this.#meta(identifier);
     if (!meta) {

@@ -156,53 +156,130 @@ describe('SesAdapter', () => {
     const snsCertUrl = 'https://sns.us-east-1.amazonaws.com/SimpleNotificationService-certificate.pem';
 
     describe('SubscriptionConfirmation', () => {
-      it('validates TopicArn matches EMAIL_WEBHOOK_SECRET', async () => {
-        vi.mocked(safeFetch).mockResolvedValue({ ok: true } as any);
+      // Canonical SNS signing string for SubscriptionConfirmation includes
+      // SubscribeURL + Token (not Subject).
+      const buildSubSigningString = (payload: any): string => {
+        const lines: string[] = [];
+        lines.push('Message');
+        lines.push(payload.Message ?? '');
+        lines.push('MessageId');
+        lines.push(payload.MessageId ?? '');
+        lines.push('SubscribeURL');
+        lines.push(payload.SubscribeURL ?? '');
+        lines.push('Timestamp');
+        lines.push(payload.Timestamp ?? '');
+        lines.push('Token');
+        lines.push(payload.Token ?? '');
+        lines.push('TopicArn');
+        lines.push(payload.TopicArn ?? '');
+        lines.push('Type');
+        lines.push(payload.Type ?? '');
+        return lines.join('\n') + '\n';
+      };
 
-        const rawBody = Buffer.from(JSON.stringify({
+      // Build a validly-signed SubscriptionConfirmation payload + matching cert.
+      const signedSubPayload = () => {
+        const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+          modulusLength: 2048,
+          publicKeyEncoding: { type: 'spki', format: 'pem' },
+          privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+        });
+        const payload: any = {
+          Type: 'SubscriptionConfirmation',
+          MessageId: 'sub-uuid-1234',
           TopicArn: defaultTopicArn,
+          Message: 'You have chosen to subscribe',
           SubscribeURL: snsSubscribeUrl,
-        }));
-        const headers = { 'x-amz-sns-message-type': 'SubscriptionConfirmation' };
+          Token: 'token-abc',
+          Timestamp: '2024-01-01T00:00:00.000Z',
+          SigningCertUrl: snsCertUrl,
+        };
+        payload.Signature = crypto
+          .sign('sha1WithRSAEncryption', Buffer.from(buildSubSigningString(payload)), privateKey)
+          .toString('base64');
+        return { payload, publicKey };
+      };
 
-        const result = await adapter.verifyWebhook(rawBody, headers);
+      it('confirms a validly-signed, pinned SubscriptionConfirmation', async () => {
+        const { payload, publicKey } = signedSubPayload();
+        vi.mocked(safeFetch).mockImplementation((url: string) =>
+          Promise.resolve(
+            url === snsCertUrl
+              ? ({ ok: true, text: () => Promise.resolve(publicKey as string) } as any)
+              : ({ ok: true } as any),
+          ),
+        );
+
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify(payload)),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
         expect(result).toBe(true);
+        expect(safeFetch).toHaveBeenCalledWith(snsSubscribeUrl, { method: 'GET' });
       });
 
-      it('rejects wrong TopicArn', async () => {
-        const rawBody = Buffer.from(JSON.stringify({
-          TopicArn: 'arn:aws:sns:us-east-1:123456789012:different-topic',
-          SubscribeURL: snsSubscribeUrl,
-        }));
-        const headers = { 'x-amz-sns-message-type': 'SubscriptionConfirmation' };
+      it('rejects wrong TopicArn (non-pinned topic)', async () => {
+        const { payload } = signedSubPayload();
+        payload.TopicArn = 'arn:aws:sns:us-east-1:123456789012:different-topic';
 
-        const result = await adapter.verifyWebhook(rawBody, headers);
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify(payload)),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
         expect(result).toBe(false);
+      });
+
+      it('rejects when EMAIL_WEBHOOK_SECRET is unset (fails closed)', async () => {
+        delete process.env.EMAIL_WEBHOOK_SECRET;
+        const { payload } = signedSubPayload();
+
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify(payload)),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
+        expect(result).toBe(false);
+        // must not self-confirm the topic
+        expect(safeFetch).not.toHaveBeenCalledWith(snsSubscribeUrl, { method: 'GET' });
+      });
+
+      it('rejects an unsigned SubscriptionConfirmation', async () => {
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify({
+            Type: 'SubscriptionConfirmation',
+            TopicArn: defaultTopicArn,
+            SubscribeURL: snsSubscribeUrl,
+          })),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
+        expect(result).toBe(false);
+        expect(safeFetch).not.toHaveBeenCalledWith(snsSubscribeUrl, { method: 'GET' });
+      });
+
+      it('rejects an invalid-signature SubscriptionConfirmation', async () => {
+        const { payload, publicKey } = signedSubPayload();
+        payload.Signature = 'aW52YWxpZFNpZ25hdHVyZQ==';
+        vi.mocked(safeFetch).mockResolvedValue({
+          ok: true,
+          text: () => Promise.resolve(publicKey as string),
+        } as any);
+
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify(payload)),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
+        expect(result).toBe(false);
+        expect(safeFetch).not.toHaveBeenCalledWith(snsSubscribeUrl, { method: 'GET' });
       });
 
       it('rejects non-sns hostname in SubscribeURL', async () => {
-        const rawBody = Buffer.from(JSON.stringify({
-          TopicArn: defaultTopicArn,
-          SubscribeURL: 'https://evil.com/confirm',
-        }));
-        const headers = { 'x-amz-sns-message-type': 'SubscriptionConfirmation' };
+        const { payload } = signedSubPayload();
+        payload.SubscribeURL = 'https://evil.com/confirm';
 
-        const result = await adapter.verifyWebhook(rawBody, headers);
+        const result = await adapter.verifyWebhook(
+          Buffer.from(JSON.stringify(payload)),
+          { 'x-amz-sns-message-type': 'SubscriptionConfirmation' },
+        );
         expect(result).toBe(false);
-      });
-
-      it('fetches SubscribeURL via safeFetch', async () => {
-        vi.mocked(safeFetch).mockResolvedValue({ ok: true } as any);
-
-        const rawBody = Buffer.from(JSON.stringify({
-          TopicArn: defaultTopicArn,
-          SubscribeURL: snsSubscribeUrl,
-        }));
-        const headers = { 'x-amz-sns-message-type': 'SubscriptionConfirmation' };
-
-        await adapter.verifyWebhook(rawBody, headers);
-
-        expect(safeFetch).toHaveBeenCalledWith(snsSubscribeUrl, { method: 'GET' });
       });
     });
 
@@ -229,6 +306,18 @@ describe('SesAdapter', () => {
       it('returns false when TopicArn does not match EMAIL_WEBHOOK_SECRET', async () => {
         const rawBody = Buffer.from(JSON.stringify({
           TopicArn: 'arn:aws:sns:us-east-1:123456789012:wrong-topic',
+          Type: 'Notification',
+        }));
+        const headers = { 'x-amz-sns-message-type': 'Notification' };
+
+        const result = await adapter.verifyWebhook(rawBody, headers);
+        expect(result).toBe(false);
+      });
+
+      it('returns false when EMAIL_WEBHOOK_SECRET is unset (fails closed)', async () => {
+        delete process.env.EMAIL_WEBHOOK_SECRET;
+        const rawBody = Buffer.from(JSON.stringify({
+          TopicArn: defaultTopicArn,
           Type: 'Notification',
         }));
         const headers = { 'x-amz-sns-message-type': 'Notification' };

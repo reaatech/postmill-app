@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   Inject,
   Optional,
@@ -34,12 +35,30 @@ import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service'
 import { OrgMediaProviderSettingsService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/org-media-provider-settings.service';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
+import { SuperAdminGuard } from '@gitroom/backend/services/auth/rbac/super-admin.guard';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, DEFAULT_VERSION, parseQualified, qualify } from '@gitroom/provider-kernel';
+import {
+  SaveAiProviderDto,
+  TestAiProviderDto,
+  SetActiveAiProviderDto,
+  PreviewAiProviderDto,
+  SaveRagSettingsDto,
+  SaveMediaProviderDto,
+  TriggerRagBackfillDto,
+  UpdateSecretSettingsDto,
+  UpsertOrgProviderConfigDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/admin-ai-settings.dtos';
 
+// PROVIDER_REMEDIATION 0.1a/0.1b + 3.2: this controller writes the platform-global
+// AIProviderConfig/AISystemSettings singletons and, via :orgId path params, ANY
+// tenant's AIOrgProviderConfig. It was gated only by `@RequirePermission('ai-config',
+// 'manage')`, which the RBAC seeder grants to every org owner — a cross-tenant
+// privilege escalation. The class-level SuperAdminGuard is the structural backstop;
+// each handler also calls `_assertSuperAdmin` (defense in depth).
 @ApiTags('AI Settings')
 @Controller('/admin/ai-settings')
-@UseGuards(OrgRbacGuard)
+@UseGuards(SuperAdminGuard, OrgRbacGuard)
 export class AiSettingsController {
   private readonly SENSITIVE_KEY_PATTERNS = [
     'apikey',
@@ -67,6 +86,15 @@ export class AiSettingsController {
     @Inject(PROVIDER_KERNEL)
     private _kernel?: ProviderKernel,
   ) {}
+
+  // PROVIDER_REMEDIATION 0.1a/0.1b: platform-global + cross-org AI config is
+  // super-admin only. `isSuperAdmin` is DB-resolved by AuthMiddleware (not
+  // token-trusted). Mirrors AdminProvidersController._assertSuperAdmin.
+  private _assertSuperAdmin(user: User) {
+    if (!user?.isSuperAdmin) {
+      throw new ForbiddenException('Super admin access required');
+    }
+  }
 
   // Resolve a single AI adapter through the ProviderKernel; undefined for an
   // unknown/unregistered provider (mirrors the old registry.getAdapter).
@@ -168,6 +196,7 @@ export class AiSettingsController {
   @Get('/providers')
   @RequirePermission('ai-config', 'manage')
   async listProviders(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const adapters = this._listAdapters();
     const dbConfigs = await this._aiSettingsService.getProviderConfigs();
     const dbConfigMap = new Map(dbConfigs.map((c) => [c.identifier, c]));
@@ -198,6 +227,7 @@ export class AiSettingsController {
     @Param('identifier') identifier: string,
     @Query('version') version?: string,
   ) {
+    this._assertSuperAdmin(user);
     const adapter = this._resolveAdapter(identifier, version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -236,15 +266,9 @@ export class AiSettingsController {
   async saveProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      enabled?: boolean;
-      credentials?: Record<string, string>;
-      defaultModel?: string;
-      reasoningModel?: string;
-      extraConfig?: Record<string, any>;
-    },
+    @Body() body: SaveAiProviderDto,
   ) {
+    this._assertSuperAdmin(user);
     const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -289,8 +313,9 @@ export class AiSettingsController {
   async testProvider(
     @GetUserFromRequest() user: User,
     @Param('identifier') identifier: string,
-    @Body() body: { credentials?: Record<string, string> },
+    @Body() body: TestAiProviderDto,
   ) {
+    this._assertSuperAdmin(user);
     const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -312,8 +337,9 @@ export class AiSettingsController {
   @RequirePermission('ai-config', 'manage')
   async setActive(
     @GetUserFromRequest() user: User,
-    @Body() body: { provider?: string | null; model?: string | null },
+    @Body() body: SetActiveAiProviderDto,
   ) {
+    this._assertSuperAdmin(user);
     if (!body.provider) {
       await this._aiSettingsService.upsertSystemSettings({
         activeProvider: null,
@@ -368,6 +394,7 @@ export class AiSettingsController {
   @Get('/governance')
   @RequirePermission('ai-config', 'manage')
   async getGovernance(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getSystemSettings();
     if (!settings) return {};
 
@@ -397,6 +424,7 @@ export class AiSettingsController {
     @GetUserFromRequest() user: User,
     @Body() body: SaveGovernanceDto,
   ) {
+    this._assertSuperAdmin(user);
     await this._aiSettingsService.upsertSystemSettings({
       guardrailSettings: body.guardrailSettings,
       budgetSettings: body.budgetSettings,
@@ -422,12 +450,14 @@ export class AiSettingsController {
   @Get('/audit')
   @RequirePermission('ai-config', 'manage')
   async getAudit(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     return this._aiSettingsService.getAuditLogs();
   }
 
   @Get('/health')
   @RequirePermission('ai-config', 'manage')
   async getHealth(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const settings = await this._aiSettingsManager.getSettings();
     return {
       hasActiveGlobalConfig: !!settings?.activeProvider,
@@ -442,8 +472,9 @@ export class AiSettingsController {
   async previewProvider(
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: { prompt?: string },
+    @Body() body: PreviewAiProviderDto,
   ) {
+    this._assertSuperAdmin(user);
     const adapter = this._resolveAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -497,6 +528,7 @@ export class AiSettingsController {
   @Get('/rag')
   @RequirePermission('ai-config', 'manage')
   async getRagSettings(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getSystemSettings();
     return settings?.ragSettings ? JSON.parse(settings.ragSettings) : {};
   }
@@ -505,8 +537,9 @@ export class AiSettingsController {
   @RequirePermission('ai-config', 'manage')
   async saveRagSettings(
     @GetUserFromRequest() user: User,
-    @Body() body: { ragSettings: Record<string, any> },
+    @Body() body: SaveRagSettingsDto,
   ) {
+    this._assertSuperAdmin(user);
     const rag = body.ragSettings;
     if (rag.vectorStore && !['pgvector', 'qdrant'].includes(rag.vectorStore)) {
       throw new BadRequestException('vectorStore must be "pgvector" or "qdrant"');
@@ -526,6 +559,7 @@ export class AiSettingsController {
   @Get('/media-providers')
   @RequirePermission('ai-config', 'manage')
   async listMediaProviders(@GetUserFromRequest() user: User) {
+    this._assertSuperAdmin(user);
     const adapters = this._listAdapters().filter(
       (a) =>
         typeof a.createImageModel === 'function' ||
@@ -579,8 +613,9 @@ export class AiSettingsController {
   async saveMediaProvider(
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: { enabled?: boolean; operations?: string[]; c2paAvailable?: boolean },
+    @Body() body: SaveMediaProviderDto,
   ) {
+    this._assertSuperAdmin(user);
     const adapter = this._resolveAdapter(id);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
@@ -611,8 +646,9 @@ export class AiSettingsController {
   @RequirePermission('ai-config', 'manage')
   async triggerRagBackfill(
     @GetUserFromRequest() user: User,
-    @Body() body: { organizationId?: string },
+    @Body() body: TriggerRagBackfillDto,
   ) {
+    this._assertSuperAdmin(user);
     const orgId = body.organizationId;
     if (!orgId) {
       throw new BadRequestException('organizationId is required for RAG backfill');
@@ -649,8 +685,9 @@ export class AiSettingsController {
   @RequirePermission('ai-config', 'manage')
   async updateSecretSettings(
     @GetUserFromRequest() user: User,
-    @Body() body: { secretSettings: Record<string, string> },
+    @Body() body: UpdateSecretSettingsDto,
   ) {
+    this._assertSuperAdmin(user);
     const settings = await this._aiSettingsService.getDecryptedSystemSettings();
     const existing = settings?.secretSettings || {};
     const merged = { ...existing, ...body.secretSettings };
@@ -672,6 +709,7 @@ export class AiSettingsController {
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
   ) {
+    this._assertSuperAdmin(user);
     const configs = await this._aiSettingsService.getOrgProviderConfigs(orgId);
     return configs.map((c) => ({
       id: c.id,
@@ -692,15 +730,9 @@ export class AiSettingsController {
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      enabled?: boolean;
-      credentials?: Record<string, string>;
-      defaultModel?: string;
-      reasoningModel?: string;
-      extraConfig?: Record<string, any>;
-    },
+    @Body() body: UpsertOrgProviderConfigDto,
   ) {
+    this._assertSuperAdmin(user);
     const before = await this._aiSettingsService.getOrgProviderConfig(orgId, identifier);
     const result = await this._aiSettingsService.upsertOrgProviderConfig(
       orgId,
@@ -755,6 +787,7 @@ export class AiSettingsController {
     @Param('orgId') orgId: string,
     @Param('identifier') identifier: string,
   ) {
+    this._assertSuperAdmin(user);
     await this._aiSettingsService.deleteOrgProviderConfig(orgId, identifier);
 
     await this._aiSettingsService.createAuditLog({

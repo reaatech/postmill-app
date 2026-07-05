@@ -30,6 +30,7 @@ import { OAuthUrlDto } from '@gitroom/nestjs-libraries/dtos/short-links/oauth-ur
 import { OAuthCallbackDto } from '@gitroom/nestjs-libraries/dtos/short-links/oauth-callback.dto';
 import { isAllowedReturnUrl } from '@gitroom/nestjs-libraries/security/return-url.validator';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
+import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 
 @ApiTags('Org ShortLink Settings')
 @Controller('/settings/shortlinks')
@@ -91,11 +92,36 @@ export class OrgShortLinkSettingsController {
       customDomain: body.customDomain,
       extraConfig: body.extraConfig,
       name: body.name,
-      accountFingerprint: body.accountFingerprint,
+      // PROVIDER_REMEDIATION 6.6: compute the fingerprint SERVER-SIDE with the shared
+      // util (as Storage does) and ignore any client-supplied `body.accountFingerprint`
+      // — a client-controlled value lets an attacker mint unlimited duplicate rows /
+      // defeat dedupe.
+      accountFingerprint: this._computeAccountFingerprint(
+        identifier,
+        body.credentials,
+        body.customDomain,
+      ),
       version: body.version,
     });
 
     return { identifier, success: true };
+  }
+
+  // Deterministic, credential-derived fingerprint (server-side only). Undefined when
+  // no credentials are supplied so passthrough/empty configs aren't wrongly deduped.
+  private _computeAccountFingerprint(
+    identifier: string,
+    credentials?: Record<string, string>,
+    customDomain?: string,
+  ): string | undefined {
+    if (!credentials || Object.keys(credentials).length === 0) {
+      return undefined;
+    }
+    const canonical = Object.keys(credentials)
+      .sort()
+      .map((k) => `${k}=${credentials[k]}`)
+      .join('&');
+    return accountFingerprint(identifier, customDomain ?? '', canonical);
   }
 
   @Post('/config/:identifier/set-active')

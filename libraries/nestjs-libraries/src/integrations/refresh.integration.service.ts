@@ -29,7 +29,10 @@ export class RefreshIntegrationService {
   ): Promise<false | AuthTokenDetails> {
     const socialProvider =
       this._integrationManager.getSocialIntegrationUnchecked(
-        integration.providerIdentifier
+        integration.providerIdentifier,
+        // 4.13: pin the row's stored version so a retired adapter stops
+        // refreshing (no silent 410 bypass) once a social v2 ships.
+        integration.providerVersion ?? undefined
       );
 
     const refresh = await this.refreshProcess(

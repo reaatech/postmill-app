@@ -73,7 +73,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
 
   async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const response = await (
-      await fetch('https://api.whop.com/oauth/token', {
+      await this.fetch('https://api.whop.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -85,7 +85,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     ).json();
 
     const userInfo = await (
-      await fetch('https://api.whop.com/oauth/userinfo', {
+      await this.fetch('https://api.whop.com/oauth/userinfo', {
         headers: { Authorization: `Bearer ${response.access_token}` },
       })
     ).json();
@@ -138,7 +138,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     }`;
 
     const tokenResponse = await (
-      await fetch('https://api.whop.com/oauth/token', {
+      await this.fetch('https://api.whop.com/oauth/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -158,7 +158,7 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     }
 
     const userInfo = await (
-      await fetch('https://api.whop.com/oauth/userinfo', {
+      await this.fetch('https://api.whop.com/oauth/userinfo', {
         headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
       })
     ).json();
@@ -177,13 +177,14 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
   @Tool({ description: 'Companies', dataSchema: [] })
   async companies(accessToken: string, params: any, id: string) {
     try {
-      const response = await fetch(
+      const response = await this.fetch(
         'https://api.whop.com/api/v1/companies?first=50',
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-        }
+        },
+        'whop companies'
       );
 
       const { data } = await response.json();
@@ -202,13 +203,14 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
     try {
       if (!params?.id) return [];
 
-      const response = await fetch(
+      const response = await this.fetch(
         `https://api.whop.com/api/v1/forums?company_id=${params.id}&first=50`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-        }
+        },
+        'whop experiences'
       );
 
       const { data } = await response.json();
@@ -253,7 +255,10 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
       ).json();
 
       if (createFileResponse.upload_url) {
-        await fetch(createFileResponse.upload_url, {
+        // The upload URL is provider-returned (a presigned storage URL) — treat
+        // it as a user-influenced URL and route through safeFetch, which enforces
+        // isSafePublicHttpsUrl + per-hop re-validation before PUTing file bytes.
+        await safeFetch(createFileResponse.upload_url, {
           method: 'PUT',
           headers: createFileResponse.upload_headers || {},
           body: fileBuffer,

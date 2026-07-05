@@ -7,6 +7,7 @@ describe('OrgProviderConfigService audit (F2c)', () => {
   let record: ReturnType<typeof vi.fn>;
   let repository: any;
   let service: OrgProviderConfigService;
+  let resolution: any;
 
   beforeEach(() => {
     record = vi.fn().mockResolvedValue(undefined);
@@ -17,7 +18,13 @@ describe('OrgProviderConfigService audit (F2c)', () => {
     };
     const encryption = { encrypt: (v: string) => `enc:${v}`, decrypt: (v: string) => v } as any;
     const vpn = { listEnabledRegions: vi.fn().mockResolvedValue([]) } as any;
-    const resolution = { latestActiveVersion: vi.fn().mockReturnValue('v1') } as any;
+    resolution = {
+      latestActiveVersion: vi.fn().mockReturnValue('v1'),
+      // 1.1: write paths validate the version through this.
+      resolveWriteVersion: vi.fn((_d: string, _p: string, v?: string) => v ?? 'v1'),
+      // 1.3a: cache invalidation on create/update/delete.
+      invalidate: vi.fn(),
+    } as any;
     service = new OrgProviderConfigService(
       repository,
       encryption,
@@ -103,5 +110,65 @@ describe('OrgProviderConfigService audit (F2c)', () => {
         'u1'
       )
     ).resolves.toBeDefined();
+  });
+
+  // 1.1: the pinned version is validated through resolveWriteVersion.
+  it('validates the version through resolveWriteVersion on create', async () => {
+    repository.create.mockResolvedValue(baseRow());
+    await service.createConfig(
+      'o1',
+      { identifier: 'twitter', name: 'App', enabled: false, version: 'v2' },
+      'u1'
+    );
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('social', 'twitter', 'v2');
+    expect(repository.create).toHaveBeenCalledWith(
+      'o1',
+      expect.objectContaining({ version: 'v2' })
+    );
+  });
+
+  it('propagates a resolveWriteVersion rejection on create', async () => {
+    resolution.resolveWriteVersion.mockImplementation(() => {
+      throw new Error('version deprecated for write');
+    });
+    await expect(
+      service.createConfig('o1', { identifier: 'twitter', name: 'App', enabled: false }, 'u1')
+    ).rejects.toThrow('deprecated');
+  });
+
+  // 1.3a: kernel cache invalidation on create / update / delete.
+  it('invalidates the resolution cache on create/update/delete', async () => {
+    repository.create.mockResolvedValue(baseRow());
+    await service.createConfig('o1', { identifier: 'twitter', name: 'App', enabled: false }, 'u1');
+    expect(resolution.invalidate).toHaveBeenCalledWith('social', 'twitter', 'o1');
+
+    resolution.invalidate.mockClear();
+    repository.getById.mockResolvedValue(baseRow());
+    repository.updateById.mockResolvedValue(baseRow());
+    await service.updateConfig('o1', 'cfg1', { clientSecret: 'x' }, 'u1');
+    expect(resolution.invalidate).toHaveBeenCalledWith('social', 'twitter', 'o1');
+
+    resolution.invalidate.mockClear();
+    repository.getById.mockResolvedValue(baseRow());
+    repository.deleteById = vi.fn().mockResolvedValue(undefined);
+    await service.deleteConfig('o1', 'cfg1', 'u1');
+    expect(resolution.invalidate).toHaveBeenCalledWith('social', 'twitter', 'o1');
+  });
+
+  // 6.7: testConnection must not echo the decrypted OAuth clientId back.
+  describe('testConnection (6.7 no clientId leak)', () => {
+    it('returns only a boolean, never the decrypted clientId', async () => {
+      repository.getById.mockResolvedValue(baseRow({ clientId: 'enc:super-secret-client-id' }));
+      const result = await service.testConnection('o1', 'cfg1');
+      expect(result).toEqual({ success: true });
+      expect(result).not.toHaveProperty('authUrl');
+      expect(JSON.stringify(result)).not.toContain('super-secret-client-id');
+    });
+
+    it('reports not-configured without a clientId', async () => {
+      repository.getById.mockResolvedValue(baseRow({ clientId: null }));
+      const result = await service.testConnection('o1', 'cfg1');
+      expect(result).toEqual({ success: false, error: 'Client ID not configured' });
+    });
   });
 });

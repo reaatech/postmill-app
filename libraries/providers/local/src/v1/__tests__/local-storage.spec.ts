@@ -179,5 +179,23 @@ describe('LocalStorage', () => {
       await adapter.deleteFile('2026/01/15/abc.png');
       expect(fs.unlink).toHaveBeenCalled();
     });
+
+    it('blocks a key containing ../ path traversal', async () => {
+      const adapter = new LocalStorage(uploadDir);
+      await expect(
+        adapter.deleteFile('../../etc/passwd'),
+      ).rejects.toThrow(/path traversal/i);
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('removeFile', () => {
+    it('blocks a /uploads/ path escaping the upload directory', async () => {
+      const adapter = new LocalStorage(uploadDir);
+      await expect(
+        adapter.removeFile('/uploads/../../etc/passwd'),
+      ).rejects.toThrow(/path traversal/i);
+      expect(fs.unlink).not.toHaveBeenCalled();
+    });
   });
 });

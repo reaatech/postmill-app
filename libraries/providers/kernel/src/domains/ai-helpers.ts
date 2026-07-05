@@ -15,6 +15,42 @@ import type {
   AiCapabilities,
   AiModelOptions,
 } from './ai';
+import type { SafeFetchPort } from '../ports';
+
+/**
+ * Tiny bounded LRU used to cache built provider clients keyed by credential
+ * material. Capped so rotated keys age out instead of being retained
+ * indefinitely, and so the map can't grow without bound (4.11, companion to the
+ * resolution-service cache invalidation in 1.3). Read refreshes recency.
+ */
+export class BoundedProviderCache<V> {
+  private readonly _map = new Map<string, V>();
+  constructor(private readonly _max = 256) {}
+
+  get(key: string): V | undefined {
+    const value = this._map.get(key);
+    if (value !== undefined) {
+      // Refresh recency: re-insert so it becomes the most-recently-used entry.
+      this._map.delete(key);
+      this._map.set(key, value);
+    }
+    return value;
+  }
+
+  set(key: string, value: V): void {
+    if (this._map.has(key)) {
+      this._map.delete(key);
+    } else if (this._map.size >= this._max) {
+      const oldest = this._map.keys().next().value;
+      if (oldest !== undefined) this._map.delete(oldest);
+    }
+    this._map.set(key, value);
+  }
+
+  get size(): number {
+    return this._map.size;
+  }
+}
 
 /**
  * Shared OpenAI-compatible AI adapter base. Lives in the kernel so the nine
@@ -35,7 +71,16 @@ export class OpenAICompatibleAdapter implements AiCapability {
   };
   private readonly _defaultModels: AiModelInfo[];
   private readonly _defaultBaseURL: string;
-  private _providerCache = new Map<string, ReturnType<typeof createOpenAI>>();
+  private _providerCache = new BoundedProviderCache<ReturnType<typeof createOpenAI>>();
+  // 0.4: the SSRF-safe fetch, injected by each provider module's create(ctx).
+  // When absent (isolated unit context) the `${baseURL}/models` call is skipped
+  // rather than falling back to the global fetch against a tenant baseURL.
+  private _safeFetch?: SafeFetchPort;
+
+  /** Inject the SSRF-safe fetch (called from the provider module's create/validate). */
+  setSafeFetch(fetch: SafeFetchPort): void {
+    this._safeFetch = fetch;
+  }
 
   constructor(
     identifier: string,
@@ -81,10 +126,12 @@ export class OpenAICompatibleAdapter implements AiCapability {
 
   async listModels(creds: Record<string, string>): Promise<AiModelInfo[]> {
     const resolvedBaseURL = creds.baseURL || this._defaultBaseURL;
-    if (resolvedBaseURL && creds.apiKey) {
+    // 0.4: only reach out over the SSRF-safe fetch. Without it, return the
+    // static catalog instead of hitting a tenant-supplied baseURL with `fetch`.
+    if (this._safeFetch && resolvedBaseURL && creds.apiKey) {
       try {
         const baseURL = resolvedBaseURL.replace(/(?<![/])\/+$/, '');
-        const response = await fetch(`${baseURL}/models`, {
+        const response = await this._safeFetch(`${baseURL}/models`, {
           headers: { Authorization: `Bearer ${creds.apiKey}` },
         });
         if (response.ok) {
@@ -124,20 +171,21 @@ export class OpenAICompatibleAdapter implements AiCapability {
 
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
-    try {
-      const baseURL = (creds.baseURL || this._defaultBaseURL || '').replace(/(?<![/])\/+$/, '');
-      if (baseURL) {
-        const response = await fetch(`${baseURL}/models`, {
-          headers: { Authorization: `Bearer ${creds.apiKey}` },
-        });
-        if (response.ok) return { ok: true };
-        const errorText = await response.text().catch(() => '');
-        return { ok: false, error: `API error: ${response.status} ${errorText}` };
-      }
-      return { ok: false, error: 'Base URL is required to validate credentials' };
-    } catch (err: any) {
-      return { ok: false, error: err.message || 'Unknown error' };
+    // 0.4: without the SSRF-safe fetch we cannot validate a tenant baseURL — do
+    // NOT fall back to the global fetch. Return a generic non-validated result.
+    if (!this._safeFetch) return { ok: false, error: 'cannot validate' };
+    const baseURL = (creds.baseURL || this._defaultBaseURL || '').replace(/(?<![/])\/+$/, '');
+    if (!baseURL) return { ok: false, error: 'Base URL is required to validate credentials' };
+    // safeFetch throws on a private/non-public URL (SSRF) — let it propagate
+    // rather than reflecting a fetched body back to the tenant.
+    const response = await this._safeFetch(`${baseURL}/models`, {
+      headers: { Authorization: `Bearer ${creds.apiKey}` },
+    });
+    if (response.ok) return { ok: true };
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, error: 'Invalid API key' };
     }
+    return { ok: false, error: `Unexpected response: ${response.status}` };
   }
 
   createLanguageModel(creds: Record<string, string>, modelId: string, _opts?: AiModelOptions): LanguageModelV2 {

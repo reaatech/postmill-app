@@ -1,5 +1,5 @@
 import { ProviderDomain, ProviderKey, keyString, DEFAULT_VERSION } from './identity';
-import { ProviderManifest, validateManifest, manifestKeyString } from './manifest';
+import { ProviderManifest, ProviderHealth, validateManifest, manifestKeyString } from './manifest';
 import { ProviderMetadata } from './domains/metadata';
 import { ProviderModule, ProviderRuntimeContext } from './module';
 import { TelemetryPort } from './ports';
@@ -7,6 +7,7 @@ import {
   ProviderNotFoundError,
   ProviderVersionRetiredError,
   ProviderVersionDeprecatedForWriteError,
+  ProviderVersionPreviewError,
   ProviderManifestError,
 } from './errors';
 
@@ -26,9 +27,45 @@ function compareVersions(a: string, b: string): number {
   const rankA = versionRank(a);
   const rankB = versionRank(b);
   if (rankA !== Number.NEGATIVE_INFINITY && rankB !== Number.NEGATIVE_INFINITY) {
-    return rankA - rankB;
+    // 6.3: same-major suffixed versions (v2 vs v2-hotfix) rank equally by major;
+    // tie-break lexicographically so latestActive is deterministic, not
+    // registration-order-dependent.
+    if (rankA !== rankB) return rankA - rankB;
+    return a.localeCompare(b);
   }
   return a.localeCompare(b);
+}
+
+function freshHealth(): ProviderHealth {
+  return {
+    lastSuccessAt: null,
+    lastErrorAt: null,
+    successCount: 0,
+    errorCount: 0,
+    consecutiveErrors: 0,
+  };
+}
+
+/**
+ * 4.3: provider adapters embed response bodies / `?key=…` URLs in thrown error
+ * messages. Scrub obvious secrets and cap length before handing to the
+ * telemetry port so secrets/PII never land in telemetry storage.
+ */
+function scrubErrorMessage(message?: string): string | undefined {
+  if (!message) return message;
+  let out = message
+    // Bearer / api key tokens
+    .replace(/(bearer\s+)[A-Za-z0-9._\-]+/gi, '$1[redacted]')
+    .replace(/\b(sk|pk|pos|pca|pcs|rk)[_-][A-Za-z0-9]{6,}/g, '[redacted]')
+    // key/secret/token/password query params or json values
+    .replace(
+      /((?:api[_-]?key|apikey|secret|token|password|authorization|access[_-]?token)["'\s]*[:=]["'\s]*)[^"'\s,&}]+/gi,
+      '$1[redacted]',
+    )
+    // ?key=… / &api_key=… in URLs
+    .replace(/([?&](?:key|api[_-]?key|token|secret|access_token)=)[^&\s]+/gi, '$1[redacted]');
+  if (out.length > 500) out = out.slice(0, 500) + '…';
+  return out;
 }
 
 export class ProviderKernel {
@@ -36,6 +73,10 @@ export class ProviderKernel {
     string,
     Map<string, Map<string, ProviderModule>>
   >();
+  // 4.6: health state is kernel-owned, keyed by keyString, so two kernel
+  // instances in one process (app + test) do not cross-pollute counters via a
+  // shared module-level constant.
+  private readonly _health = new Map<string, ProviderHealth>();
   private readonly _telemetry?: TelemetryPort;
 
   constructor(options: KernelOptions = {}) {
@@ -71,19 +112,22 @@ export class ProviderKernel {
       );
     }
 
-    if (!module.health) {
-      (module as any).health = {
-        lastSuccessAt: null,
-        lastErrorAt: null,
-        successCount: 0,
-        errorCount: 0,
-        consecutiveErrors: 0,
-      };
-    }
+    // 4.6: initialise kernel-owned health rather than mutating the shared
+    // module constant.
+    this._health.set(manifestKeyString(manifest), freshHealth());
 
     providerMap.set(manifest.version, module);
     domainMap.set(manifest.providerId, providerMap);
     this._store.set(manifest.domain, domainMap);
+  }
+
+  /** Kernel-owned health for a provider version (4.6). */
+  getHealth(
+    domain: ProviderDomain,
+    providerId: string,
+    version: string,
+  ): ProviderHealth | undefined {
+    return this._health.get(keyString({ domain, providerId, version }));
   }
 
   get<Caps, Capability>(
@@ -146,11 +190,9 @@ export class ProviderKernel {
         throw new ProviderVersionDeprecatedForWriteError({ domain, providerId, version });
       }
       if (mod.manifest.status === 'preview' && !opts?.allowPreview) {
-        throw new ProviderVersionDeprecatedForWriteError({
-          domain,
-          providerId,
-          version,
-        });
+        // 4.12: distinct error so callers can special-case preview opt-in vs a
+        // deprecated version that can never be pinned.
+        throw new ProviderVersionPreviewError({ domain, providerId, version });
       }
       return mod;
     }
@@ -206,36 +248,34 @@ export class ProviderKernel {
     return out;
   }
 
-  recordSuccess(key: ProviderKey): void {
-    const mod = this.get(key.domain, key.providerId, key.version);
-    if (!mod || !mod.health) return;
-    const now = Date.now();
-    mod.health.lastSuccessAt = now;
-    mod.health.successCount += 1;
-    mod.health.consecutiveErrors = 0;
+  recordSuccess(key: ProviderKey, latencyMs = 0): void {
+    const health = this._health.get(keyString(key));
+    if (!health) return;
+    health.lastSuccessAt = Date.now();
+    health.successCount += 1;
+    health.consecutiveErrors = 0;
     this._telemetry?.recordCall({
       domain: key.domain,
       providerId: key.providerId,
       version: key.version,
       ok: true,
-      latencyMs: 0,
+      latencyMs,
     });
   }
 
-  recordError(key: ProviderKey, error?: string): void {
-    const mod = this.get(key.domain, key.providerId, key.version);
-    if (!mod || !mod.health) return;
-    const now = Date.now();
-    mod.health.lastErrorAt = now;
-    mod.health.errorCount += 1;
-    mod.health.consecutiveErrors += 1;
+  recordError(key: ProviderKey, error?: string, latencyMs = 0): void {
+    const health = this._health.get(keyString(key));
+    if (!health) return;
+    health.lastErrorAt = Date.now();
+    health.errorCount += 1;
+    health.consecutiveErrors += 1;
     this._telemetry?.recordCall({
       domain: key.domain,
       providerId: key.providerId,
       version: key.version,
       ok: false,
-      latencyMs: 0,
-      error,
+      latencyMs,
+      error: scrubErrorMessage(error),
     });
   }
 }

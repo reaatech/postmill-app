@@ -1,7 +1,7 @@
 import { createVertex } from '@ai-sdk/google-vertex';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { LanguageModelV2, ImageModelV2, EmbeddingModelV2 } from '@ai-sdk/provider-v5';
-import type { GoogleAuthOptions } from 'google-auth-library';
+import { GoogleAuth, type GoogleAuthOptions } from 'google-auth-library';
 import { metadata as providerMetadata } from './metadata';
 import {
   type AiCapability as AIProviderAdapter,
@@ -26,6 +26,8 @@ const VERTEX_CREDENTIAL_FIELDS: CredentialField[] = [
   { key: 'location', label: 'GCP Location', type: 'string', required: true, placeholder: 'us-central1' },
   { key: 'googleCredentials', label: 'GCP Service Account JSON', type: 'textarea', required: true, placeholder: 'Paste your service account key JSON' },
 ];
+
+const VERTEX_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
 const VERTEX_MODELS: ModelInfo[] = [
   { id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro', kind: 'text', capabilities: { ...VERTEX_CAPABILITIES, embeddings: false }, reasoning: true },
@@ -52,12 +54,18 @@ export class VertexAdapter implements AIProviderAdapter {
   private _buildProvider(creds: Record<string, string>) {
     let googleAuthOptions: GoogleAuthOptions | undefined;
     if (creds.googleCredentials) {
+      // 2.2: THROW on unparseable service-account JSON. Previously this fell
+      // through to `googleAuthOptions: undefined`, which resolves platform
+      // Application Default Credentials — a tenant with corrupt JSON would then
+      // run inference on the deployment's GCP identity/billing. Mirrors the
+      // media twin (media.adapter.ts).
+      let parsed: object;
       try {
-        const parsed = JSON.parse(creds.googleCredentials);
-        googleAuthOptions = { credentials: parsed };
+        parsed = JSON.parse(creds.googleCredentials);
       } catch {
-        console.warn('[vertex] Invalid googleCredentials JSON — falling back to ADC');
+        throw new Error('Vertex AI service account JSON is not valid JSON');
       }
+      googleAuthOptions = { credentials: parsed };
     }
     return createVertex({
       project: creds.project,
@@ -74,13 +82,21 @@ export class VertexAdapter implements AIProviderAdapter {
     if (!creds.project) return { ok: false, error: 'GCP project ID is required' };
     if (!creds.location) return { ok: false, error: 'GCP location is required' };
     if (!creds.googleCredentials) return { ok: false, error: 'GCP service account JSON is required' };
+    // 2.2: reject corrupt JSON before touching any auth path (never resolve ADC).
+    let parsed: object;
     try {
-      const provider = this._buildProvider(creds);
-      const model = provider.languageModel('gemini-2.5-flash');
-      await (model as any).doGenerate({
-        prompt: [{ role: 'user', content: [{ type: 'text' as const, text: 'ping' }] }],
-        maxOutputTokens: 1,
-      });
+      parsed = JSON.parse(creds.googleCredentials);
+    } catch {
+      return { ok: false, error: 'GCP service account JSON is not valid JSON' };
+    }
+    // 5.15: cheap authenticated token-mint probe instead of a paid generation.
+    // Minting an access token from the service-account JSON verifies the
+    // credentials without running (billable) inference. Mirrors the media twin.
+    try {
+      const auth = new GoogleAuth({ credentials: parsed, scopes: [VERTEX_SCOPE] });
+      const client = await auth.getClient();
+      const token = (await client.getAccessToken()).token;
+      if (!token) return { ok: false, error: 'Could not mint an access token from the service account' };
       return { ok: true };
     } catch (err: any) {
       return { ok: false, error: err.message || 'Unknown error' };

@@ -291,6 +291,8 @@ describe('OrgShortLinkSettingsController', () => {
         credentials: body.credentials,
         customDomain: body.customDomain,
         extraConfig: body.extraConfig,
+        // PROVIDER_REMEDIATION 6.6: fingerprint is now computed server-side.
+        accountFingerprint: expect.any(String),
         version: undefined,
       });
       expect(result).toEqual({ identifier: 'bitly', success: true });
@@ -311,9 +313,41 @@ describe('OrgShortLinkSettingsController', () => {
         credentials: body.credentials,
         customDomain: body.customDomain,
         extraConfig: body.extraConfig,
+        accountFingerprint: expect.any(String),
         version: 'v2',
       });
       expect(result).toEqual({ identifier: 'bitly', success: true });
+    });
+
+    // PROVIDER_REMEDIATION 6.6: the fingerprint is derived server-side and any
+    // client-supplied `accountFingerprint` is ignored (prevents duplicate-row minting).
+    it('ignores a client-supplied accountFingerprint and computes it server-side', async () => {
+      const adapter = stubAdapter();
+      mockResolveShortLink.mockReturnValue(adapter);
+      mockUpsert.mockResolvedValue({});
+
+      await controller.upsertConfig(org, 'bitly', {
+        credentials: { apiKey: 'test-key' },
+        customDomain: 'short.myco.com',
+        accountFingerprint: 'client-forged-value',
+      } as any);
+
+      const passed = mockUpsert.mock.calls[0][2];
+      expect(passed.accountFingerprint).toEqual(expect.any(String));
+      expect(passed.accountFingerprint).not.toBe('client-forged-value');
+    });
+
+    it('leaves the fingerprint undefined when no credentials are provided', async () => {
+      const adapter = stubAdapter();
+      mockResolveShortLink.mockReturnValue(adapter);
+      mockUpsert.mockResolvedValue({});
+
+      await controller.upsertConfig(org, 'bitly', {
+        customDomain: 'short.myco.com',
+      } as any);
+
+      const passed = mockUpsert.mock.calls[0][2];
+      expect(passed.accountFingerprint).toBeUndefined();
     });
   });
 

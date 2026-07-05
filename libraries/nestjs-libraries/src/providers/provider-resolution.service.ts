@@ -1,4 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  GoneException,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import {
   ProviderKernel,
   ProviderKey,
@@ -9,6 +15,10 @@ import {
   ProviderDomain,
   ContentPackCapability,
   ProviderManifest,
+  ProviderNotFoundError,
+  ProviderVersionRetiredError,
+  ProviderVersionDeprecatedForWriteError,
+  ProviderVersionPreviewError,
 } from '@gitroom/provider-kernel';
 import { accountFingerprint } from '@gitroom/nestjs-libraries/utils/account-fingerprint';
 import { AIProviderAdapter } from '@gitroom/nestjs-libraries/ai/ai-provider.interface';
@@ -35,53 +45,95 @@ function makeTelemetryProxy<T extends object>(
   logger: Logger,
   kernel: ProviderKernel,
 ): T {
-  return new Proxy(target, {
+  const keyStr = `${key.domain}/${key.providerId}@${key.version}`;
+  // 6.4: cache one wrapper per property so `adapter.m === adapter.m` and
+  // referential identity is preserved across accesses.
+  const wrapperCache = new Map<string | symbol, unknown>();
+  const proxy: T = new Proxy(target, {
     get(obj, prop) {
       const value = (obj as Record<string | symbol, unknown>)[prop];
       if (typeof value !== 'function') {
         return value;
       }
+      const cached = wrapperCache.get(prop);
+      if (cached) return cached;
       const operation = String(prop);
-      const keyStr = `${key.domain}/${key.providerId}@${key.version}`;
-      return function (...args: unknown[]) {
+      const wrapped = function (...args: unknown[]) {
         const start = performance.now();
         logger.debug(`provider-call ${keyStr}.${operation}`, {
           keyString: keyStr,
           operation,
         });
-        // G4: provider-call span. `trace.getTracer` is a no-op when no OTel SDK is
-        // started, so this is zero-cost and behaviour-neutral on the production default.
-        const span = trace
-          .getTracer('postmill')
-          .startSpan(`provider.${key.domain}.${key.providerId}`);
-        span.setAttribute('keyString', keyStr);
-        span.setAttribute('provider.operation', operation);
-        try {
-          const result = (value as (...args: unknown[]) => unknown).apply(obj, args);
-          if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
-            return (result as Promise<unknown>)
-              .then((res) => {
-                kernel.recordSuccess(key);
-                span.end();
-                return res;
-              })
-              .catch((err: Error) => {
-                kernel.recordError(key, err.message);
-                span.end();
-                throw err;
-              });
-          }
-          kernel.recordSuccess(key);
-          span.end();
-          return result;
-        } catch (err) {
-          kernel.recordError(key, (err as Error).message);
-          span.end();
-          throw err;
+        const result = (value as (...args: unknown[]) => unknown).apply(obj, args);
+        // 4.2: only asynchronous (promise-returning) results are counted as
+        // provider calls. Synchronous local helpers (resolveRegions,
+        // generateAuthUrl, capability getters) and synchronous validation
+        // throws must not inflate successCount / consecutiveErrors.
+        if (result && typeof (result as PromiseLike<unknown>).then === 'function') {
+          // G4: provider-call span. `trace.getTracer` is a no-op when no OTel SDK
+          // is started, so this is zero-cost on the production default.
+          const span = trace
+            .getTracer('postmill')
+            .startSpan(`provider.${key.domain}.${key.providerId}`);
+          span.setAttribute('keyString', keyStr);
+          span.setAttribute('provider.operation', operation);
+          return (result as Promise<unknown>)
+            .then((res) => {
+              kernel.recordSuccess(key, performance.now() - start); // 4.1
+              span.end();
+              // 6.4: if the method returned the adapter itself, hand back the
+              // proxy so telemetry wrapping survives the escape.
+              return res === target ? proxy : res;
+            })
+            .catch((err: Error) => {
+              kernel.recordError(key, err?.message, performance.now() - start); // 4.1/4.3
+              span.end();
+              throw err;
+            });
         }
+        return result === target ? proxy : result;
       };
+      wrapperCache.set(prop, wrapped);
+      return wrapped;
     },
   }) as T;
+  return proxy;
+}
+
+/**
+ * 1.3: size-capped LRU so rotated-credential fingerprints and deleted-org
+ * entries age out even if a caller forgets to invalidate. Insertion order in a
+ * JS Map is iteration order; re-inserting on read marks an entry most-recent.
+ */
+class LruMap<V> {
+  private readonly _map = new Map<string, V>();
+  constructor(private readonly _max: number) {}
+  get(key: string): V | undefined {
+    const v = this._map.get(key);
+    if (v !== undefined) {
+      this._map.delete(key);
+      this._map.set(key, v);
+    }
+    return v;
+  }
+  set(key: string, value: V): void {
+    if (this._map.has(key)) this._map.delete(key);
+    this._map.set(key, value);
+    while (this._map.size > this._max) {
+      const oldest = this._map.keys().next().value as string | undefined;
+      if (oldest === undefined) break;
+      this._map.delete(oldest);
+    }
+  }
+  delete(key: string): void {
+    this._map.delete(key);
+  }
+  keys(): IterableIterator<string> {
+    return this._map.keys();
+  }
+  get size(): number {
+    return this._map.size;
+  }
 }
 
 @Injectable()
@@ -100,7 +152,7 @@ export class ProviderResolutionService {
    * adapters per request; the cache preserves the de-facto singleton behaviour
    * the social VPN-egress AsyncLocalStorage path assumes.
    */
-  private readonly _capabilityCache = new Map<string, unknown>();
+  private readonly _capabilityCache = new LruMap<unknown>(2048);
 
   private _buildContext(options: ResolutionOptions): ProviderRuntimeContext {
     return this._runtimeContext.build({
@@ -116,8 +168,19 @@ export class ProviderResolutionService {
     version: string,
     options: ResolutionOptions,
   ): string {
+    // 0.5: fold `extras` into the key. S3/storage and content-pack adapters bind
+    // `extras` (bucket/region/endpoint/publicUrl, extraConfig) at create time and
+    // are stateful — two configs in one org with the same credentials but a
+    // different bucket must NOT share a cached adapter, or uploads land in the
+    // wrong bucket. Credentials + extras are fingerprinted together into one
+    // stable hash.
     const fingerprint = accountFingerprint(
-      options.credentials ? JSON.stringify(options.credentials) : null,
+      options.credentials || options.extras
+        ? JSON.stringify({
+            credentials: options.credentials ?? null,
+            extras: options.extras ?? null,
+          })
+        : null,
     );
     return `${domain}/${providerId}@${version}:${options.orgId ?? 'global'}:${fingerprint}`;
   }
@@ -132,7 +195,13 @@ export class ProviderResolutionService {
     providerId: string,
     options: ResolutionOptions,
   ): ResolvedProvider<C> {
-    const version = options.version ?? DEFAULT_VERSION;
+    // 1.2: when no version is pinned, resolve the latest ACTIVE version rather
+    // than hard-defaulting to v1 — otherwise the moment a provider ships v2 and
+    // retires v1 every no-version caller 404/410s a provider that is active.
+    const version =
+      options.version ??
+      this._kernel.latestActive(domain, providerId)?.manifest.version ??
+      DEFAULT_VERSION;
     const mod = this._kernel.resolveForRead<unknown, C>(
       domain,
       providerId,
@@ -280,6 +349,42 @@ export class ProviderResolutionService {
 
   latestActiveVersion(domain: ProviderDomain, providerId: string): string | undefined {
     return this._kernel.latestActive(domain, providerId)?.manifest.version;
+  }
+
+  /**
+   * 1.1: single entry point every settings write path must call before pinning a
+   * config to a version. Validates the (client-supplied or defaulted) version
+   * against the lifecycle — a deprecated version rejects new writes, a retired
+   * version is 410, an unknown version is a 400 — and returns the resolved
+   * version to persist. When no version is supplied it resolves latest-active.
+   */
+  resolveWriteVersion(
+    domain: ProviderDomain,
+    providerId: string,
+    version?: string,
+    opts?: { allowPreview?: boolean },
+  ): string {
+    try {
+      return this._kernel.resolveForWrite(domain, providerId, version, opts)
+        .manifest.version;
+    } catch (err) {
+      if (err instanceof ProviderVersionRetiredError) {
+        throw new GoneException(err.message);
+      }
+      if (
+        err instanceof ProviderVersionDeprecatedForWriteError ||
+        err instanceof ProviderVersionPreviewError ||
+        err instanceof ProviderNotFoundError
+      ) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  /** Kernel-owned per-version health counters (4.6). */
+  getHealth(domain: ProviderDomain, providerId: string, version: string) {
+    return this._kernel.getHealth(domain, providerId, version);
   }
 
   keyString(domain: string, providerId: string, version?: string): string {

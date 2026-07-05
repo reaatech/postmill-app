@@ -1,10 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { AiSettingsRepository } from './ai-settings.repository';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
+import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 
 @Injectable()
 export class AiSettingsService {
-  constructor(private _repository: AiSettingsRepository) {}
+  constructor(
+    private _repository: AiSettingsRepository,
+    private _encryption: EncryptionService,
+  ) {}
 
   // ── AIProviderConfig ──
 
@@ -263,8 +267,15 @@ export class AiSettingsService {
       }
     }
 
+    // 3.9: per-org AIOrgProviderConfig rows are read back at runtime by
+    // OrgAiSettingsService / OrgMediaProviderSettingsService via EncryptionService
+    // (AES-GCM). The admin write must use the SAME crypto route — not the global
+    // AuthService.fixedEncryption used for the deployment-wide AIProviderConfig —
+    // per the "never mix per-org and global crypto routes" invariant. (Vacuous
+    // today since both derive from JWT_SECRET, but diverges the moment a dedicated
+    // ENCRYPTION_KEY is set, which would leave these rows undecryptable → {}.)
     const encryptedCredentials = data.credentials
-      ? AuthService.fixedEncryption(JSON.stringify(data.credentials))
+      ? this._encryption.encrypt(JSON.stringify(data.credentials))
       : undefined;
 
     return this._repository.upsertOrgProviderConfig(organizationId, identifier, {

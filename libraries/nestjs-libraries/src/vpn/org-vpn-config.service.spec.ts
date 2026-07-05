@@ -20,6 +20,7 @@ import hidemeModules from '@gitroom/provider-hideme';
 import mozillavpnModules from '@gitroom/provider-mozillavpn';
 import customproxyModules from '@gitroom/provider-custom-proxy';
 import { OrgVpnConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/vpn/org-vpn-config.repository';
+import { OrgProviderConfigRepository } from '@gitroom/nestjs-libraries/database/prisma/provider-configs/org-provider-config.repository';
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ProviderKernel, ProviderNotFoundError } from '@gitroom/provider-kernel';
@@ -52,6 +53,7 @@ describe('OrgVpnConfigService', () => {
   let kernel: ProviderKernel;
   let dispatcher: VpnDispatcherService;
   let resolution: ProviderResolutionService;
+  let channelConfigRepository: OrgProviderConfigRepository;
 
   beforeEach(() => {
     repository = {
@@ -104,9 +106,26 @@ describe('OrgVpnConfigService', () => {
         return adapter;
       }),
       latestActiveVersion: vi.fn().mockReturnValue('v1'),
+      // 1.1: write paths validate + resolve the version through this.
+      resolveWriteVersion: vi.fn((_d: string, _p: string, v?: string) => v ?? 'v1'),
+      // 1.3a: cache invalidation on upsert/delete.
+      invalidate: vi.fn(),
     } as unknown as ProviderResolutionService;
 
-    service = new OrgVpnConfigService(repository, encryption, dispatcher, resolution, kernel);
+    // 3.7: channel-config repo — used only to clear orphaned vpnSelection on delete.
+    channelConfigRepository = {
+      getByOrg: vi.fn().mockResolvedValue([]),
+      updateById: vi.fn().mockResolvedValue({}),
+    } as unknown as OrgProviderConfigRepository;
+
+    service = new OrgVpnConfigService(
+      repository,
+      encryption,
+      dispatcher,
+      resolution,
+      kernel,
+      channelConfigRepository,
+    );
   });
 
   it('returns provider metadata with all adapters', () => {
@@ -187,6 +206,62 @@ describe('OrgVpnConfigService', () => {
     await service.delete('org-1', 'nordvpn');
     expect(repository.delete).toHaveBeenCalledWith('org-1', 'nordvpn');
     expect(dispatcher.invalidate).toHaveBeenCalledWith('org-1', 'nordvpn');
+  });
+
+  // 1.1: the write version is validated through resolveWriteVersion.
+  it('validates the version through resolveWriteVersion on upsert', async () => {
+    await service.upsert('org-1', 'nordvpn', {
+      credentials: { serviceCredentials: 'user:pass' },
+    });
+    expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('vpn', 'nordvpn', undefined);
+  });
+
+  it('propagates a resolveWriteVersion rejection (deprecated/unknown version)', async () => {
+    (resolution.resolveWriteVersion as any).mockImplementation(() => {
+      throw new Error('version deprecated for write');
+    });
+    await expect(
+      service.upsert('org-1', 'nordvpn', { credentials: { serviceCredentials: 'user:pass' } }),
+    ).rejects.toThrow('deprecated');
+  });
+
+  // 1.3a: kernel cache invalidation on upsert + delete.
+  it('invalidates the resolution cache on upsert', async () => {
+    await service.upsert('org-1', 'nordvpn', { credentials: { serviceCredentials: 'user:pass' } });
+    expect(resolution.invalidate).toHaveBeenCalledWith('vpn', 'nordvpn', 'org-1');
+  });
+
+  it('invalidates the resolution cache on delete', async () => {
+    await service.delete('org-1', 'nordvpn');
+    expect(resolution.invalidate).toHaveBeenCalledWith('vpn', 'nordvpn', 'org-1');
+  });
+
+  // 3.7: deleting a VPN provider clears orphaned channel vpnSelection rows.
+  describe('delete clears orphaned channel VPN selections (3.7)', () => {
+    it('nulls vpnSelection on channels that referenced the deleted provider', async () => {
+      (channelConfigRepository.getByOrg as any).mockResolvedValue([
+        { id: 'ch-1', vpnSelection: JSON.stringify({ enabled: true, identifier: 'nordvpn', regionId: 'us-atlanta' }) },
+        { id: 'ch-2', vpnSelection: JSON.stringify({ enabled: true, identifier: 'surfshark', regionId: 'x' }) },
+        { id: 'ch-3', vpnSelection: null },
+      ]);
+      await service.delete('org-1', 'nordvpn');
+      expect(channelConfigRepository.updateById).toHaveBeenCalledTimes(1);
+      expect(channelConfigRepository.updateById).toHaveBeenCalledWith('ch-1', { vpnSelection: null });
+    });
+
+    it('is non-fatal when clearing selections throws', async () => {
+      (channelConfigRepository.getByOrg as any).mockRejectedValue(new Error('db down'));
+      await expect(service.delete('org-1', 'nordvpn')).resolves.toBeDefined();
+      expect(repository.delete).toHaveBeenCalledWith('org-1', 'nordvpn');
+    });
+
+    it('does not touch channels selecting a different provider', async () => {
+      (channelConfigRepository.getByOrg as any).mockResolvedValue([
+        { id: 'ch-2', vpnSelection: JSON.stringify({ enabled: true, identifier: 'surfshark', regionId: 'x' }) },
+      ]);
+      await service.delete('org-1', 'nordvpn');
+      expect(channelConfigRepository.updateById).not.toHaveBeenCalled();
+    });
   });
 
   describe('regions', () => {

@@ -19,6 +19,7 @@ const mockIntegration = {
   id: 'integration-1',
   organizationId: 'org-1',
   providerIdentifier: 'x',
+  providerVersion: 'v1',
   name: 'My X Account',
   picture: 'https://example.com/avatar.png',
   internalId: 'internal-1',
@@ -82,7 +83,8 @@ describe('RefreshIntegrationService', () => {
   describe('refresh', () => {
     it('successfully refreshes token and updates integration', async () => {
       const result = await service.refresh(mockIntegration as any);
-      expect(mockIntegrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('x');
+      // 4.13: the refresh path now pins the row's stored version.
+      expect(mockIntegrationManager.getSocialIntegrationUnchecked).toHaveBeenCalledWith('x', 'v1');
       expect(mockRefreshToken).toHaveBeenCalledWith('old-refresh-token', expect.any(Object));
       expect(mockIntegrationService.createOrUpdateIntegration).toHaveBeenCalledWith(
         undefined,

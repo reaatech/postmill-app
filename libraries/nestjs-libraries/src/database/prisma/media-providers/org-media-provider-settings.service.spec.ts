@@ -14,7 +14,12 @@ function makeService() {
     decrypt: vi.fn((v: string) => v.replace(/^enc\((.*)\)$/, '$1')),
   };
   const kernel = { listManifests: vi.fn().mockReturnValue([]) };
-  const resolution = { resolveMedia: vi.fn(), latestActiveVersion: vi.fn().mockReturnValue('v1') };
+  const resolution = {
+    resolveMedia: vi.fn(),
+    latestActiveVersion: vi.fn().mockReturnValue('v1'),
+    resolveWriteVersion: vi.fn((_domain: string, _id: string, version?: string) => version ?? 'v1'),
+    invalidate: vi.fn(),
+  };
   const mediaRepository = {
     findFoldersByParent: vi.fn().mockResolvedValue([]),
     createFolder: vi.fn().mockImplementation(async (_org: string, data: { name: string }) => ({
@@ -77,8 +82,8 @@ describe('OrgMediaProviderSettingsService', () => {
   });
 
   describe('upsert', () => {
-    it('encrypts credentials at rest', async () => {
-      const { service, repository } = makeService();
+    it('encrypts credentials at rest and invalidates the cache (1.3a)', async () => {
+      const { service, repository, resolution } = makeService();
       await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' } });
       expect(repository.upsert).toHaveBeenCalledWith(
         'org-1',
@@ -89,13 +94,14 @@ describe('OrgMediaProviderSettingsService', () => {
         }),
         'v1',
       );
+      expect(resolution.invalidate).toHaveBeenCalledWith('media', 'openai', 'org-1');
     });
 
-    it('pins kernel.latestActive version when no explicit version is provided', async () => {
+    it('validates + pins the version via resolveWriteVersion when none is provided (1.1)', async () => {
       const { service, repository, resolution } = makeService();
-      resolution.latestActiveVersion.mockReturnValue('v2');
+      resolution.resolveWriteVersion.mockReturnValue('v2');
       await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' } });
-      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('media', 'openai');
+      expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('media', 'openai', undefined);
       expect(repository.upsert).toHaveBeenCalledWith(
         'org-1',
         'openai',
@@ -104,16 +110,28 @@ describe('OrgMediaProviderSettingsService', () => {
       );
     });
 
-    it('uses explicit body.version when provided', async () => {
+    it('routes an explicit body.version through resolveWriteVersion (1.1)', async () => {
       const { service, repository, resolution } = makeService();
+      resolution.resolveWriteVersion.mockReturnValue('v3');
       await service.upsert('org-1', 'openai', { enabled: true, credentials: { apiKey: 'sk-1' }, version: 'v3' });
-      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+      expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('media', 'openai', 'v3');
       expect(repository.upsert).toHaveBeenCalledWith(
         'org-1',
         'openai',
         expect.anything(),
         'v3',
       );
+    });
+
+    it('propagates a rejected write version from resolveWriteVersion (1.1)', async () => {
+      const { service, repository, resolution } = makeService();
+      resolution.resolveWriteVersion.mockImplementation(() => {
+        throw new Error('retired version');
+      });
+      await expect(
+        service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk-1' }, version: 'v0' }),
+      ).rejects.toThrow('retired');
+      expect(repository.upsert).not.toHaveBeenCalled();
     });
 
     it('live-links openai/minimax credentials to the AI surface (§11.4)', async () => {
@@ -319,6 +337,63 @@ describe('OrgMediaProviderSettingsService', () => {
       repository.getByIdentifier.mockResolvedValue({ enabled: true, extraConfig: null });
       expect(await service.isProviderEnabledForOperation('org-1', 'luma', 'video')).toBe(true);
     });
+
+    it('inherits enabled for a universal provider with no row but an AI key (1.7)', async () => {
+      const { service, repository, orgAiRepository } = makeService();
+      repository.getByIdentifier.mockResolvedValue(null);
+      orgAiRepository.getByIdentifier.mockResolvedValue({
+        credentials: `enc(${JSON.stringify({ apiKey: 'k' })})`,
+      });
+      expect(await service.isProviderEnabledForOperation('org-1', 'qwen', 'image')).toBe(true);
+    });
+
+    it('an explicit enabled:false universal row is OFF even with an AI key (1.7)', async () => {
+      const { service, repository, orgAiRepository } = makeService();
+      repository.getByIdentifier.mockResolvedValue({ enabled: false, extraConfig: null });
+      orgAiRepository.getByIdentifier.mockResolvedValue({
+        credentials: `enc(${JSON.stringify({ apiKey: 'k' })})`,
+      });
+      expect(await service.isProviderEnabledForOperation('org-1', 'qwen', 'image')).toBe(false);
+    });
+  });
+
+  describe('enabled:false enforcement (1.7)', () => {
+    it('getConfigForProvider skips the AI-key fallback for a disabled universal row (stops spend)', async () => {
+      const { service, repository, orgAiRepository } = makeService();
+      // Qwen has an explicit media row disabled to stop spend, but no own creds.
+      repository.getByIdentifier.mockResolvedValue({
+        identifier: 'qwen',
+        enabled: false,
+        credentials: null,
+        storageProviderId: null,
+        storageRootFolderId: null,
+        version: 'v1',
+      });
+      orgAiRepository.getByIdentifier.mockResolvedValue({
+        credentials: `enc(${JSON.stringify({ apiKey: 'dashscope-key' })})`,
+      });
+
+      const config = await service.getConfigForProvider('org-1', 'qwen');
+      // The AI-key fallback must NOT fire → empty creds → generation path blocks.
+      expect(config?.credentials).toEqual({});
+    });
+
+    it('getProviders reports a disabled universal row as disabled even with an AI key', async () => {
+      const { service, kernel, repository, orgAiRepository } = makeService();
+      kernel.listManifests.mockReturnValue([
+        { providerId: 'qwen', displayName: 'Qwen', capabilities: { image: true } },
+      ]);
+      repository.getByOrg.mockResolvedValue([
+        { identifier: 'qwen', enabled: false, credentials: null, storageProviderId: null, storageRootFolderId: null },
+      ]);
+      orgAiRepository.getByIdentifier.mockResolvedValue({
+        credentials: `enc(${JSON.stringify({ apiKey: 'k' })})`,
+      });
+
+      const providers = await service.getProviders('org-1');
+      const qwen = providers.find((p) => p.identifier === 'qwen');
+      expect(qwen?.enabled).toBe(false);
+    });
   });
 
   describe('getProviders / getActiveProviders / delete / testConnection', () => {
@@ -349,10 +424,11 @@ describe('OrgMediaProviderSettingsService', () => {
       expect(active).toEqual([{ identifier: 'fal', storageProviderId: null, storageRootFolderId: null }]);
     });
 
-    it('delete delegates to the repository', async () => {
-      const { service, repository } = makeService();
+    it('delete delegates to the repository and invalidates the cache (1.3a)', async () => {
+      const { service, repository, resolution } = makeService();
       await service.delete('org-1', 'fal');
       expect(repository.delete).toHaveBeenCalledWith('org-1', 'fal');
+      expect(resolution.invalidate).toHaveBeenCalledWith('media', 'fal', 'org-1');
     });
 
     it('testConnection runs a probe generation with decrypted credentials', async () => {

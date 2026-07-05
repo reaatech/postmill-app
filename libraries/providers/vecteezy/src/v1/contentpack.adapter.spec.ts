@@ -40,4 +40,12 @@ describe('VecteezyContentPack', () => {
     mockFetch.mockResolvedValueOnce(jsonResponse({}, 429));
     await expect(pack.search('photos', 'x', 1)).rejects.toBeInstanceOf(ContentPackDailyCapError);
   });
+
+  it('percent-encodes a traversal id instead of path-traversing the download URL', async () => {
+    mockFetch.mockResolvedValueOnce(jsonResponse({ data: { url: 'https://v/dl.jpg' } }));
+    await pack.resolveDownload('../../admin', 'photos');
+    const [url] = mockFetch.mock.calls[0];
+    expect(url).toBe('https://api.vecteezy.com/v1/resources/..%2F..%2Fadmin/download');
+    expect(url).not.toContain('/../');
+  });
 });

@@ -59,18 +59,34 @@ describe('AnthropicAdapter', () => {
   });
 
   describe('listModels', () => {
-    it('returns Claude models', async () => {
+    // 2.5: current live IDs — the never-existed/retired ids were removed.
+    const LIVE_IDS = ['claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5'];
+    const DEAD_IDS = ['claude-4-20250514', 'claude-3-opus-20240229', 'claude-3-5-sonnet-20241022'];
+
+    it('returns current live Claude models', async () => {
       const models = await adapter.listModels({});
       expect(Array.isArray(models)).toBe(true);
       expect(models.length).toBeGreaterThan(0);
 
-      const opus = models.find((m) => m.id === 'claude-opus-4-20250514');
+      const opus = models.find((m) => m.id === 'claude-opus-4-8');
       expect(opus).toBeDefined();
       expect(opus?.kind).toBe('text');
       expect(opus?.capabilities.text).toBe(true);
 
-      const sonnet = models.find((m) => m.id === 'claude-sonnet-4-20250514');
+      const sonnet = models.find((m) => m.id === 'claude-sonnet-5');
       expect(sonnet).toBeDefined();
+    });
+
+    it('no longer carries the never-existed / retired model ids', async () => {
+      const ids = (await adapter.listModels({})).map((m) => m.id);
+      for (const dead of DEAD_IDS) expect(ids).not.toContain(dead);
+    });
+
+    it('marks a LIVE model as reasoning:true (high-reasoning auto-pick target)', async () => {
+      const models = await adapter.listModels({});
+      const reasoning = models.filter((m) => m.reasoning);
+      expect(reasoning.length).toBeGreaterThan(0);
+      for (const m of reasoning) expect(LIVE_IDS).toContain(m.id);
     });
 
     it('returns models even with empty credentials', async () => {

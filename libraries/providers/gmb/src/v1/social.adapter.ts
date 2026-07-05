@@ -251,11 +251,15 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       }
       const url = `https://mybusinessaccountmanagement.googleapis.com/v1/accounts${params.toString() ? `?${params}` : ''}`;
 
-      const accountsResponse = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
+      const accountsResponse = await this.fetch(
+        url,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
         },
-      });
+        'gmb list accounts'
+      );
       const accountsData = await accountsResponse.json();
 
       if (accountsData.accounts) {
@@ -292,13 +296,14 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
             params.set('pageToken', locationsPageToken);
           }
 
-          const locationsResponse = await fetch(
+          const locationsResponse = await this.fetch(
             `https://mybusinessbusinessinformation.googleapis.com/v1/${accountName}/locations?${params}`,
             {
               headers: {
                 Authorization: `Bearer ${accessToken}`,
               },
-            }
+            },
+            'gmb list locations'
           );
           const locationsData = await locationsResponse.json();
 
@@ -312,13 +317,14 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
               // Get profile photo if available
               let photoUrl = '';
               try {
-                const mediaResponse = await fetch(
+                const mediaResponse = await this.fetch(
                   `https://mybusinessbusinessinformation.googleapis.com/v1/${location.name}/media`,
                   {
                     headers: {
                       Authorization: `Bearer ${accessToken}`,
                     },
-                  }
+                  },
+                  'gmb location media'
                 );
                 const mediaData = await mediaResponse.json();
                 if (mediaData.mediaItems && mediaData.mediaItems.length > 0) {
@@ -368,26 +374,28 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
     // data.id is the full resource path: accounts/{accountId}/locations/{locationId}
     // data.locationName is the v1 API format: locations/{locationId}
     // Fetch location details using the v1 API format
-    const locationResponse = await fetch(
+    const locationResponse = await this.fetch(
       `https://mybusinessbusinessinformation.googleapis.com/v1/${data.locationName}?readMask=name,title,storefrontAddress,metadata`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
-      }
+      },
+      'gmb location details'
     );
     const locationData = await locationResponse.json();
 
     // Try to get profile photo
     let photoUrl = '';
     try {
-      const mediaResponse = await fetch(
+      const mediaResponse = await this.fetch(
         `https://mybusinessbusinessinformation.googleapis.com/v1/${data.locationName}/media`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-        }
+        },
+        'gmb location media'
       );
       const mediaData = await mediaResponse.json();
       if (mediaData.mediaItems && mediaData.mediaItems.length > 0) {
@@ -584,7 +592,7 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
       const locationPath = `locations/${locationId}`;
 
       // Use the Business Profile Performance API
-      const response = await fetch(
+      const response = await this.fetch(
         `https://businessprofileperformance.googleapis.com/v1/${locationPath}:fetchMultiDailyMetricsTimeSeries?dailyMetrics=WEBSITE_CLICKS&dailyMetrics=CALL_CLICKS&dailyMetrics=BUSINESS_DIRECTION_REQUESTS&dailyMetrics=BUSINESS_IMPRESSIONS_DESKTOP_MAPS&dailyMetrics=BUSINESS_IMPRESSIONS_MOBILE_MAPS&dailyRange.startDate.year=${dayjs(
           startDate
         ).year()}&dailyRange.startDate.month=${
@@ -600,7 +608,8 @@ export class GmbProvider extends SocialAbstract implements SocialProvider {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-        }
+        },
+        'gmb analytics'
       );
 
       const data = await response.json();

@@ -176,16 +176,6 @@ export class LemmyProvider extends SocialAbstract implements SocialProvider {
     const valueArray: PostResponse[] = [];
 
     for (const lemmy of firstPost.settings.subreddit) {
-      console.log({
-        community_id: +lemmy.value.id,
-        name: lemmy.value.title,
-        body: firstPost.message,
-        ...(lemmy.value.url ? { url: lemmy.value.url } : {}),
-        ...(firstPost.media?.length
-          ? { custom_thumbnail: firstPost.media[0].path }
-          : {}),
-        nsfw: false,
-      });
       const { post_view } = await (
         await safeFetch(service + '/api/v3/post', {
           body: JSON.stringify({

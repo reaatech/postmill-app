@@ -184,7 +184,11 @@ export class MediaJobLifecycleService {
     let adapter;
     try {
       adapter = this._resolution.resolveMedia(job.provider, {
-        version: config.version ?? job.version ?? 'v1',
+        // 4.10: an in-flight render must be polled through the version it was
+        // CREATED under (pinned on the job row) — not the config's current
+        // version, which may have been upgraded mid-render and parse the
+        // namespaced `<op>:<id>` provider ref differently.
+        version: job.version ?? config.version ?? 'v1',
         credentials: config.credentials,
         orgId: job.organizationId,
       });

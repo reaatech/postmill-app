@@ -121,6 +121,10 @@ describe('OrgShortLinkSettingsService', () => {
         return adapter;
       }),
       latestActiveVersion: vi.fn().mockReturnValue('v1'),
+      // 1.1: write paths now validate + resolve the version through this.
+      resolveWriteVersion: vi.fn((_d: string, _p: string, v?: string) => v ?? 'v1'),
+      // 1.3a: cache invalidation on upsert/delete.
+      invalidate: vi.fn(),
     } as any;
 
     service = new OrgShortLinkSettingsService(
@@ -281,14 +285,14 @@ describe('OrgShortLinkSettingsService', () => {
       );
     });
 
-    it('pins kernel.latestActive version when no explicit version is provided', async () => {
-      (resolution.latestActiveVersion as any).mockReturnValue('v2');
+    it('resolves the pin through resolveWriteVersion when no explicit version is provided', async () => {
+      (resolution.resolveWriteVersion as any).mockReturnValue('v2');
       await service.upsert(orgId, 'bitly', {
         enabled: true,
         credentials: { accessToken: 'token123' },
       });
 
-      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('shortlink', 'bitly');
+      expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('shortlink', 'bitly', undefined);
       expect(repository.upsert).toHaveBeenCalledWith(
         orgId,
         'bitly',
@@ -296,19 +300,35 @@ describe('OrgShortLinkSettingsService', () => {
       );
     });
 
-    it('uses explicit body.version when provided', async () => {
+    it('validates the explicit body.version through resolveWriteVersion', async () => {
       await service.upsert(orgId, 'bitly', {
         enabled: true,
         credentials: { accessToken: 'token123' },
         version: 'v3',
       });
 
-      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+      expect(resolution.resolveWriteVersion).toHaveBeenCalledWith('shortlink', 'bitly', 'v3');
       expect(repository.upsert).toHaveBeenCalledWith(
         orgId,
         'bitly',
         expect.objectContaining({ version: 'v3' }),
       );
+    });
+
+    // 1.1: a deprecated/retired/unknown version rejects the write.
+    it('propagates resolveWriteVersion rejection (deprecated/unknown version)', async () => {
+      (resolution.resolveWriteVersion as any).mockImplementation(() => {
+        throw new Error('version deprecated for write');
+      });
+      await expect(
+        service.upsert(orgId, 'bitly', { credentials: { accessToken: 't' }, version: 'v9' }),
+      ).rejects.toThrow('deprecated');
+    });
+
+    // 1.3a: the cache is invalidated so a later resolve rebuilds with fresh creds.
+    it('invalidates the resolution cache after upsert', async () => {
+      await service.upsert(orgId, 'bitly', { credentials: { accessToken: 'token123' } });
+      expect(resolution.invalidate).toHaveBeenCalledWith('shortlink', 'bitly', orgId);
     });
 
     it('does not encrypt credentials when not provided', async () => {
@@ -403,6 +423,37 @@ describe('OrgShortLinkSettingsService', () => {
     it('delegates to repository.delete', async () => {
       await service.delete(orgId, 'bitly');
       expect(repository.delete).toHaveBeenCalledWith(orgId, 'bitly');
+    });
+
+    // 1.3a: cache invalidation on delete.
+    it('invalidates the resolution cache after delete', async () => {
+      await service.delete(orgId, 'bitly');
+      expect(resolution.invalidate).toHaveBeenCalledWith('shortlink', 'bitly', orgId);
+    });
+  });
+
+  // 1.4: getPinnedVersion (the reference implementation) resolves the stored
+  // row's version, else latestActive, else v1 — never a hardcoded v1.
+  describe('getPinnedVersion (1.4)', () => {
+    it('returns the stored config version when present', async () => {
+      (repository.getByIdentifier as any).mockResolvedValue(dbConfig('bitly', { version: 'v2' } as any));
+      // dbConfig doesn't set version by default; inject it explicitly.
+      (repository.getByIdentifier as any).mockResolvedValue({ ...dbConfig('bitly'), version: 'v2' });
+      expect(await service.getPinnedVersion(orgId, 'bitly')).toBe('v2');
+      expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
+    });
+
+    it('falls back to latestActive when the row has no version', async () => {
+      (resolution.latestActiveVersion as any).mockReturnValue('v5');
+      (repository.getByIdentifier as any).mockResolvedValue({ ...dbConfig('bitly'), version: null });
+      expect(await service.getPinnedVersion(orgId, 'bitly')).toBe('v5');
+      expect(resolution.latestActiveVersion).toHaveBeenCalledWith('shortlink', 'bitly');
+    });
+
+    it('falls back to v1 when no row and no active version', async () => {
+      (resolution.latestActiveVersion as any).mockReturnValue(undefined);
+      (repository.getByIdentifier as any).mockResolvedValue(null);
+      expect(await service.getPinnedVersion(orgId, 'bitly')).toBe('v1');
     });
   });
 

@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { GetOrgFromRequest } from '@gitroom/nestjs-libraries/user/org.from.request';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
-import { Organization, StorageProviderType, User } from '@prisma/client';
+import { Organization, User } from '@prisma/client';
 import { ApiTags } from '@nestjs/swagger';
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
@@ -21,6 +21,13 @@ import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permis
 import { AuthorizationActions, Sections } from '@gitroom/backend/services/auth/permissions/permission.exception.class';
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
+import {
+  CreateStorageConfigDto,
+  UpdateStorageConfigDto,
+  MigrateStorageDto,
+  SetOrgQuotaDto,
+  SetDefaultFolderDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 @ApiTags('Storage Settings')
 @Controller('/settings/storage')
@@ -44,18 +51,7 @@ export class StorageController {
   async createProvider(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
-    @Body()
-    body: {
-      type: StorageProviderType;
-      name: string;
-      credentials?: Record<string, string>;
-      region?: string;
-      bucket?: string;
-      endpoint?: string;
-      publicUrl?: string;
-      quotaBytes?: number;
-      version?: string;
-    }
+    @Body() body: CreateStorageConfigDto
   ) {
     const created = await this._storageService.createConfig(
       org.id,
@@ -93,17 +89,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body()
-    body: {
-      name?: string;
-      credentials?: Record<string, string>;
-      region?: string;
-      bucket?: string;
-      endpoint?: string;
-      publicUrl?: string;
-      quotaBytes?: number;
-      version?: string;
-    }
+    @Body() body: UpdateStorageConfigDto
   ) {
     return this.#stripBigInts(
       await this._storageService.updateConfig(
@@ -188,7 +174,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @Param('sourceId') sourceId: string,
     @Param('targetId') targetId: string,
-    @Body() body: { cursor?: string; limit?: number }
+    @Body() body: MigrateStorageDto
   ) {
     const limit = body?.limit
       ? Math.min(100, Math.max(1, Math.floor(body.limit)))
@@ -234,7 +220,7 @@ export class StorageController {
   async setOrgQuota(
     @GetUserFromRequest() user: User,
     @Param('orgId') orgId: string,
-    @Body() body: { quotaBytes: number }
+    @Body() body: SetOrgQuotaDto
   ) {
     if (!user.isSuperAdmin) {
       throw new ForbiddenException('Super-admin required');
@@ -294,7 +280,7 @@ export class StorageController {
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
     @Param('id') id: string,
-    @Body() body: { folderId?: string | null }
+    @Body() body: SetDefaultFolderDto
   ) {
     return this._storageService.setDefaultFolderForProvider(
       id,

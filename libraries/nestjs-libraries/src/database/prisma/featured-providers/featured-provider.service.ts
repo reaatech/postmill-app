@@ -1,23 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
-import { ProviderDomain } from '@gitroom/provider-kernel';
+import { ProviderDomain, isProviderDomain } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { FeaturedProviderRepository } from './featured-provider.repository';
 
-const DOMAINS: ProviderDomain[] = [
-  'ai',
-  'media',
-  'shortlink',
-  'vpn',
-  'social',
-  'storage',
-  'email',
-  'auth',
-  'contentpack',
-];
-
-function isProviderDomain(value: string): value is ProviderDomain {
-  return (DOMAINS as string[]).includes(value);
-}
+// 3.3: domain set + guard now come from the shared kernel export (single source
+// of truth) instead of a local duplicate that could drift.
 
 /**
  * Platform-wide "featured providers" curation. Featured providers are surfaced

@@ -147,13 +147,17 @@ const authenticatedController = [
   DeepgramController,
   AiDesignerController,
   AdminProvidersController,
+  // PROVIDER_REMEDIATION 3.1: `/providers/catalog` was fully anonymous. It is
+  // org-agnostic but must be authenticated — it fingerprints the deployment's exact
+  // release + the `verified:false` beta cohort. Moved into the authenticated group so
+  // AuthMiddleware/CsrfMiddleware apply (still no org-scoping in the handler).
+  ProvidersController,
 ];
 @Module({
   imports: [UploadModule, InngestModule, ReplicateStudioModule, HeyGenModule, MediaStudioModule, DeepgramModule, AiDesignerModule],
   controllers: [
     RootController,
     HealthController,
-    ProvidersController,
     StripeController,
     AuthController,
     PublicController,

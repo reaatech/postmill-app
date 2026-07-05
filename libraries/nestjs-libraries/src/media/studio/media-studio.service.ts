@@ -55,6 +55,12 @@ export class MediaStudioService {
       }
     }
 
+    // 1.7: a provider the org has explicitly disabled (or an unconfigured
+    // universal provider) exposes no model catalog.
+    if (!(await this._orgMediaProviderSettings.isProviderEnabledForOperation(orgId, provider, operation))) {
+      return [];
+    }
+
     const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider, version);
     if (!config?.credentials || Object.keys(config.credentials).length === 0) return [];
 
@@ -127,6 +133,13 @@ export class MediaStudioService {
     provider: string,
     params: StudioGenerateParams,
   ): Promise<{ jobId: string }> {
+    // 1.7: block a provider the org has disabled (explicit `enabled:false` row) —
+    // including the universal-credential providers whose AI-key fallback would
+    // otherwise keep billing after the org disabled media to stop spend.
+    if (!(await this._orgMediaProviderSettings.isProviderEnabledForOperation(orgId, provider, params.operation))) {
+      throw new ForbiddenException(`${provider} is disabled for this organization. Enable it in Settings → Media.`);
+    }
+
     const config = await this._orgMediaProviderSettings.getConfigForProvider(orgId, provider, params.version);
     const credentials = config?.credentials;
     if (!credentials || Object.keys(credentials).length === 0) {

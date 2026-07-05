@@ -8,8 +8,7 @@ import {
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
 import { PinterestSettingsDto } from '@gitroom/provider-kernel';
-import axios from 'axios';
-import FormData from 'form-data';
+import { safeFetch } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 import {
   BadBody,
@@ -130,7 +129,7 @@ export class PinterestProvider
 
   async refreshToken(refreshToken: string, clientInformation?: ClientInformation): Promise<AuthTokenDetails> {
     const { access_token, expires_in } = await (
-      await fetch('https://api.pinterest.com/v5/oauth/token', {
+      await this.fetch('https://api.pinterest.com/v5/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -148,7 +147,7 @@ export class PinterestProvider
     ).json();
 
     const { id, profile_image, username } = await (
-      await fetch('https://api.pinterest.com/v5/user_account', {
+      await this.fetch('https://api.pinterest.com/v5/user_account', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -191,7 +190,7 @@ export class PinterestProvider
     clientInformation?: ClientInformation
   ) {
     const { access_token, refresh_token, expires_in, scope } = await (
-      await fetch('https://api.pinterest.com/v5/oauth/token', {
+      await this.fetch('https://api.pinterest.com/v5/oauth/token', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
@@ -210,7 +209,7 @@ export class PinterestProvider
     this.checkScopes(this.scopes, scope);
 
     const { id, profile_image, username } = await (
-      await fetch('https://api.pinterest.com/v5/user_account', {
+      await this.fetch('https://api.pinterest.com/v5/user_account', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${access_token}`,
@@ -232,7 +231,7 @@ export class PinterestProvider
   @Tool({ description: 'List of boards', dataSchema: [] })
   async boards(accessToken: string) {
     const { items } = await (
-      await fetch('https://api.pinterest.com/v5/boards?page_size=250', {
+      await this.fetch('https://api.pinterest.com/v5/boards?page_size=250', {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -275,22 +274,38 @@ export class PinterestProvider
         })
       ).json();
 
-      const { data, status } = await axios.get(
-        postDetails?.[0]?.media?.[0]?.path!,
-        {
-          responseType: 'stream',
-        }
+      // Download the source media through safeFetch (SSRF-validated). safeFetch
+      // returns non-2xx responses without throwing, so guard `ok` before reading
+      // (otherwise a 404/403 body would be uploaded as the "video").
+      const mediaResponse = await safeFetch(
+        postDetails?.[0]?.media?.[0]?.path!
       );
-
-      const formData = Object.keys(upload_parameters)
+      if (!mediaResponse.ok) {
+        throw new BadBody(
+          'pinterest',
+          JSON.stringify({}),
+          {} as any,
+          `Failed to download media for upload (status ${mediaResponse.status})`
+        );
+      }
+      // Use the web FormData/Blob so undici streams the file bytes from the Blob
+      // rather than materializing a second full multipart copy (form-data's
+      // getBuffer would). Presigned fields first, `file` last (S3-style ordering).
+      const fileBlob = await mediaResponse.blob();
+      const formData = new FormData();
+      Object.keys(upload_parameters)
         .filter((f) => f)
-        .reduce((acc, key) => {
-          acc.append(key, upload_parameters[key]);
-          return acc;
-        }, new FormData());
+        .forEach((key) => formData.append(key, upload_parameters[key]));
+      formData.append('file', fileBlob);
 
-      formData.append('file', data);
-      await axios.post(upload_url, formData);
+      // upload_url is provider-returned (a presigned storage URL) — treat it as
+      // a user-influenced URL and route through safeFetch, which enforces
+      // isSafePublicHttpsUrl + per-hop re-validation before uploading file bytes.
+      // No manual Content-Type: fetch derives the multipart boundary from FormData.
+      await safeFetch(upload_url, {
+        method: 'POST',
+        body: formData,
+      });
 
       let statusCode = '';
       while (statusCode !== 'succeeded') {
@@ -390,7 +405,7 @@ export class PinterestProvider
     const {
       all: { daily_metrics },
     } = await (
-      await fetch(
+      await this.fetch(
         `https://api.pinterest.com/v5/user_account/analytics?start_date=${since}&end_date=${until}`,
         {
           method: 'GET',

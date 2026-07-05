@@ -91,10 +91,33 @@ describe('OrgAiSettingsRepository', () => {
     });
   });
 
-  describe('getBudget', () => {
-    it('parses stored budget settings JSON', async () => {
-      systemSettings.findUnique.mockResolvedValue({ budgetSettings: JSON.stringify({ monthlyCap: 50 }) });
+  // 0.3: budget caps are per-org, scoped under budgetSettings.perOrgCaps[orgId].
+  describe('getBudget (0.3 per-org scoping)', () => {
+    it("returns only this org's perOrgCaps slice (translated to DTO keys)", async () => {
+      // stored slice uses BudgetService's keys (monthly/daily); read translates to monthlyCap/dailyCap
+      systemSettings.findUnique.mockResolvedValue({
+        budgetSettings: JSON.stringify({ perOrgCaps: { org1: { monthly: 50 }, org2: { monthly: 99 } } }),
+      });
       expect(await repository.getBudget('org1')).toEqual({ monthlyCap: 50 });
+    });
+
+    it('never returns the whole blob or other orgs perOrgCaps', async () => {
+      systemSettings.findUnique.mockResolvedValue({
+        budgetSettings: JSON.stringify({
+          monthlyCap: 1000,
+          perOrgCaps: { org1: { monthly: 50 }, org2: { monthly: 99 } },
+        }),
+      });
+      const result = await repository.getBudget('org1');
+      expect(result).toEqual({ monthlyCap: 50 });
+      expect(result).not.toHaveProperty('perOrgCaps');
+    });
+
+    it('returns null when this org has no slice', async () => {
+      systemSettings.findUnique.mockResolvedValue({
+        budgetSettings: JSON.stringify({ perOrgCaps: { org2: { monthly: 99 } } }),
+      });
+      expect(await repository.getBudget('org1')).toBeNull();
     });
 
     it('returns null when no settings row', async () => {
@@ -113,20 +136,56 @@ describe('OrgAiSettingsRepository', () => {
     });
   });
 
-  describe('upsertBudget', () => {
-    it('merges into existing budget settings', async () => {
-      systemSettings.findUnique.mockResolvedValue({ budgetSettings: JSON.stringify({ monthlyCap: 50, dailyCap: 5 }) });
+  describe('upsertBudget (0.3 per-org scoping + 3.10 parse guard)', () => {
+    it("merges into this org's slice, preserving other orgs", async () => {
+      systemSettings.findUnique.mockResolvedValue({
+        budgetSettings: JSON.stringify({ perOrgCaps: { org1: { monthly: 50, daily: 5 }, org2: { monthly: 99 } } }),
+      });
       await repository.upsertBudget('org1', { dailyCap: 10 });
       const arg = (systemSettings.upsert as any).mock.calls[0][0];
-      expect(JSON.parse(arg.create.budgetSettings)).toEqual({ monthlyCap: 50, dailyCap: 10 });
-      expect(JSON.parse(arg.update.budgetSettings)).toEqual({ monthlyCap: 50, dailyCap: 10 });
+      const written = JSON.parse(arg.update.budgetSettings);
+      // translated to BudgetService's keys (monthly/daily)
+      expect(written.perOrgCaps.org1).toEqual({ monthly: 50, daily: 10 });
+      expect(written.perOrgCaps.org2).toEqual({ monthly: 99 });
+    });
+
+    // Regression guard for the key-mismatch bug: the DTO uses monthlyCap/dailyCap
+    // but BudgetService.checkBudget enforces perOrgCaps[org].monthly/.daily.
+    it('stores under the keys BudgetService enforces (monthly/daily), and getBudget round-trips to DTO keys', async () => {
+      systemSettings.findUnique.mockResolvedValue(null);
+      await repository.upsertBudget('org1', { monthlyCap: 50, dailyCap: 5, alertThresholdPct: 80 });
+      const arg = (systemSettings.upsert as any).mock.calls[0][0];
+      const written = JSON.parse(arg.create.budgetSettings);
+      expect(written.perOrgCaps.org1).toEqual({ monthly: 50, daily: 5, alertThresholdPct: 80 });
+      // and read translates back to the client contract
+      systemSettings.findUnique.mockResolvedValue({ budgetSettings: arg.create.budgetSettings });
+      expect(await repository.getBudget('org1')).toEqual({ monthlyCap: 50, dailyCap: 5, alertThresholdPct: 80 });
+    });
+
+    it('does not alter another org slice when this org writes', async () => {
+      systemSettings.findUnique.mockResolvedValue({
+        budgetSettings: JSON.stringify({ perOrgCaps: { orgA: { daily: 5 } } }),
+      });
+      await repository.upsertBudget('orgB', { dailyCap: 0.01 });
+      const arg = (systemSettings.upsert as any).mock.calls[0][0];
+      const written = JSON.parse(arg.update.budgetSettings);
+      expect(written.perOrgCaps.orgA).toEqual({ daily: 5 });
+      expect(written.perOrgCaps.orgB).toEqual({ daily: 0.01 });
     });
 
     it('starts from empty when no prior settings', async () => {
       systemSettings.findUnique.mockResolvedValue(null);
       await repository.upsertBudget('org1', { monthlyCap: 99 });
       const arg = (systemSettings.upsert as any).mock.calls[0][0];
-      expect(JSON.parse(arg.create.budgetSettings)).toEqual({ monthlyCap: 99 });
+      expect(JSON.parse(arg.create.budgetSettings)).toEqual({ perOrgCaps: { org1: { monthly: 99 } } });
+    });
+
+    // 3.10: a corrupt/legacy blob must not throw — fall back to {} and still write.
+    it('does not throw on a corrupt existing blob', async () => {
+      systemSettings.findUnique.mockResolvedValue({ budgetSettings: '{corrupt' });
+      await expect(repository.upsertBudget('org1', { monthlyCap: 42 })).resolves.toBeDefined();
+      const arg = (systemSettings.upsert as any).mock.calls[0][0];
+      expect(JSON.parse(arg.update.budgetSettings)).toEqual({ perOrgCaps: { org1: { monthly: 42 } } });
     });
   });
 });

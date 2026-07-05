@@ -90,6 +90,30 @@ describe('suno media adapter (sunoapi.org async music)', () => {
     expect(r.status).toBe('failed');
   });
 
+  it('2.1: a 503 on poll THROWS (transient); missing key on poll → terminal failed', async () => {
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = sunoMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob('task-abc', { apiKey: 'suno-key' })).rejects.toThrow(/transient/i);
+
+    const nokey = makeCtx(() => res({}));
+    const a2: any = sunoMediaModule.create(nokey.ctx as any);
+    const r = await a2.pollJob('task-abc', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/key is required/);
+  });
+
+  it('2.1: a 4xx on poll → returned failed (not thrown)', async () => {
+    const { ctx } = makeCtx(() => res('bad', false, 404));
+    const adapter: any = sunoMediaModule.create(ctx as any);
+    expect((await adapter.pollJob('task-abc', { apiKey: 'k' })).status).toBe('failed');
+  });
+
+  it('5.6: testConnection rejects a 5xx as NOT connected', async () => {
+    const { ctx } = makeCtx(() => res('down', false, 500));
+    const adapter: any = sunoMediaModule.create(ctx as any);
+    expect((await adapter.testConnection({ apiKey: 'k' })).ok).toBe(false);
+  });
+
   it('rejects unsupported image/video/avatar and a missing key', async () => {
     const { ctx } = makeCtx(() => res({}));
     const adapter: any = sunoMediaModule.create(ctx as any);

@@ -143,12 +143,16 @@ export class KickProvider extends SocialAbstract implements SocialProvider {
   ): Promise<{ id: string; name: string; username: string; picture?: string }> {
     // Use token introspect to get basic info, then fetch user details
     // Try to get full user info from the API
-    const userResponse = await fetch('https://api.kick.com/public/v1/users', {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
+    const userResponse = await this.fetch(
+      'https://api.kick.com/public/v1/users',
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
       },
-    });
+      'kick user info'
+    );
 
     const userData = await userResponse.json();
     const user = userData.data?.[0] || userData.data;

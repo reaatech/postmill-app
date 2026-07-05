@@ -216,13 +216,21 @@ export class StorageService {
     },
     userId?: string
   ) {
-    await this.#getOrgScopedConfig(id, orgId);
+    const config = await this.#getOrgScopedConfig(id, orgId);
 
     const updateData: any = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.credentials !== undefined) {
       updateData.credentials = this._encryptionService.encrypt(
         JSON.stringify(data.credentials)
+      );
+      // 3.5: recompute the account fingerprint on credential rotation. Only
+      // createConfig computed it, so a rotated credential kept the stale
+      // fingerprint — blocking re-adding the old account and failing to dedupe
+      // the new one. Uses the stored row's type (updateConfig can't change type).
+      updateData.accountFingerprint = this.#computeFingerprint(
+        config.type,
+        data.credentials
       );
     }
     if (data.region !== undefined) updateData.region = data.region;
@@ -233,7 +241,8 @@ export class StorageService {
     if (data.version !== undefined) updateData.version = data.version;
 
     const updated = await this._storageRepository.update(id, updateData);
-    this.#audit('update', orgId, updated, userId);
+    // 6.5: await the audit write so the row is not dropped on process exit.
+    await this.#audit('update', orgId, updated, userId);
     return this.#sanitize(updated);
   }
 
@@ -482,7 +491,8 @@ export class StorageService {
     }
 
     const done = page.length < limit;
-    this.#audit('migrate', orgId, source);
+    // 6.5: await the audit write so the row is not dropped on process exit.
+    await this.#audit('migrate', orgId, source);
     return {
       migrated,
       failed,

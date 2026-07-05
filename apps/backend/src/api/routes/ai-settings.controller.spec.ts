@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { REQUIRE_PERMISSION_KEY } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 
 const mockAdapter = {
@@ -295,6 +295,87 @@ describe('AiSettingsController', () => {
       expect(aiSettings.createSpendLog).toHaveBeenCalledWith(
         expect.objectContaining({ scope: 'backfill' }),
       );
+    });
+  });
+
+  // PROVIDER_REMEDIATION 0.1a: every handler writes platform-global singletons and
+  // must be super-admin only (RBAC 'ai-config:manage' is granted to every org owner).
+  describe('super-admin gating (0.1a)', () => {
+    it('rejects a non-super-admin on setActive', async () => {
+      await expect(
+        controller.setActive(regularUser, { provider: 'openai', model: 'gpt-4.1' }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(aiSettings.upsertSystemSettings).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-super-admin on saveProvider', async () => {
+      await expect(
+        controller.saveProvider(regularUser, 'openai', { enabled: true, credentials: { apiKey: 'sk' } }),
+      ).rejects.toThrow(ForbiddenException);
+      expect(aiSettings.upsertProviderConfig).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-super-admin on saveGovernance', async () => {
+      await expect(
+        controller.saveGovernance(regularUser, {} as any),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects a non-super-admin on updateSecretSettings', async () => {
+      await expect(
+        controller.updateSecretSettings(regularUser, { secretSettings: { a: 'b' } }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('rejects a non-super-admin on triggerRagBackfill', async () => {
+      await expect(
+        controller.triggerRagBackfill(regularUser, { organizationId: 'org-1' }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('allows a super-admin on setActive', async () => {
+      (aiSettings as any).getProviderConfigByIdentifier.mockResolvedValue({
+        identifier: 'openai',
+        enabled: true,
+        credentials: 'encrypted',
+      });
+      await expect(
+        controller.setActive(superAdmin, { provider: 'openai', model: 'gpt-4.1' }),
+      ).resolves.toBeTruthy();
+    });
+  });
+
+  // PROVIDER_REMEDIATION 0.1b: the :orgId path handlers are a cross-org IDOR (write
+  // ANY tenant's AI credentials + mirror into their MediaProviderConfig). The
+  // super-admin gate must fire BEFORE any service call so no victim row is touched.
+  describe('org-providers cross-org IDOR gating (0.1b)', () => {
+    it('rejects a non-super-admin reading another org via listOrgProviderConfigs', async () => {
+      (aiSettings as any).getOrgProviderConfigs = vi.fn();
+      await expect(
+        controller.listOrgProviderConfigs(regularUser, 'org-B'),
+      ).rejects.toThrow(ForbiddenException);
+      expect((aiSettings as any).getOrgProviderConfigs).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-super-admin writing another org via upsertOrgProviderConfig', async () => {
+      (aiSettings as any).getOrgProviderConfig = vi.fn();
+      (aiSettings as any).upsertOrgProviderConfig = vi.fn();
+      await expect(
+        controller.upsertOrgProviderConfig(regularUser, 'org-B', 'openai', {
+          credentials: { apiKey: 'sk', baseUrl: 'https://attacker.example' },
+        }),
+      ).rejects.toThrow(ForbiddenException);
+      expect((aiSettings as any).upsertOrgProviderConfig).not.toHaveBeenCalled();
+      // No mirrored MediaProviderConfig write either.
+      expect(orgMediaProviderSettings.upsert).not.toHaveBeenCalled();
+    });
+
+    it('rejects a non-super-admin deleting another org config', async () => {
+      (aiSettings as any).deleteOrgProviderConfig = vi.fn();
+      await expect(
+        controller.deleteOrgProviderConfig(regularUser, 'org-B', 'openai'),
+      ).rejects.toThrow(ForbiddenException);
+      expect((aiSettings as any).deleteOrgProviderConfig).not.toHaveBeenCalled();
     });
   });
 

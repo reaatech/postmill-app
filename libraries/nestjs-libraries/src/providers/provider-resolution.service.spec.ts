@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Logger } from '@nestjs/common';
+import { BadRequestException, GoneException, Logger } from '@nestjs/common';
 import {
   ProviderKernel,
   ProviderModule,
@@ -109,6 +109,81 @@ describe('ProviderResolutionService', () => {
 
   it('latestActiveVersion returns undefined for unknown provider', () => {
     expect(service.latestActiveVersion('ai', 'unknown')).toBeUndefined();
+  });
+
+  // 1.2 — unpinned resolution resolves latest-active, not a hard v1.
+  it('resolves latest-active version when no version is pinned', () => {
+    const cap = service.resolveAI('openai');
+    expect((cap as any).model).toBe('v2');
+  });
+
+  it('resolves a v2-only provider (v1 retired) with no version pinned', () => {
+    const k = new ProviderKernel();
+    k.register(makeAiModule({}, 'v1', 'retired'));
+    k.register(makeAiModule({}, 'v2'));
+    const svc = createResolutionService(k);
+    expect((svc.resolveAI('openai') as any).model).toBe('v2');
+  });
+
+  // 0.5 — extras must partition the capability cache (stateful storage adapters).
+  it('does not share a cached adapter across configs with different extras', () => {
+    let builds = 0;
+    const k = new ProviderKernel();
+    k.register({
+      manifest: {
+        domain: 'storage',
+        providerId: 's3',
+        version: 'v1',
+        displayName: 'S3',
+        status: 'active',
+        credentialFields: [],
+        capabilities: {},
+      },
+      create: (ctx) => {
+        builds += 1;
+        return { bucket: (ctx.extras as any)?.bucket } as any;
+      },
+      validateCredentials: async () => ({ ok: true }),
+    } as ProviderModule);
+    const svc = createResolutionService(k);
+    const a = svc.resolveStorage('s3', {
+      orgId: 'o1',
+      credentials: { key: 'same' },
+      extras: { bucket: 'bucket-a' },
+    });
+    const b = svc.resolveStorage('s3', {
+      orgId: 'o1',
+      credentials: { key: 'same' },
+      extras: { bucket: 'bucket-b' },
+    });
+    expect((a as any).bucket).toBe('bucket-a');
+    expect((b as any).bucket).toBe('bucket-b');
+    expect(builds).toBe(2);
+  });
+
+  // 1.3 — invalidate() rebuilds the capability with fresh config.
+  it('invalidate() forces a rebuild on the next resolve', () => {
+    const cap1 = service.resolveAI('openai', { version: 'v1', orgId: 'o1' });
+    const cap2 = service.resolveAI('openai', { version: 'v1', orgId: 'o1' });
+    expect(cap1).toBe(cap2); // cached
+    service.invalidate('ai', 'openai', 'o1');
+    const cap3 = service.resolveAI('openai', { version: 'v1', orgId: 'o1' });
+    expect(cap3).not.toBe(cap1); // rebuilt
+  });
+
+  // resolveWriteVersion — 1.1 lifecycle mapping to HTTP.
+  it('resolveWriteVersion maps a retired version to 410 Gone', () => {
+    expect(() => service.resolveWriteVersion('ai', 'openai', 'v3')).toThrow(
+      GoneException,
+    );
+  });
+  it('resolveWriteVersion maps an unknown version to 400', () => {
+    expect(() => service.resolveWriteVersion('ai', 'openai', 'v9')).toThrow(
+      BadRequestException,
+    );
+  });
+  it('resolveWriteVersion returns latest-active when unpinned', () => {
+    expect(service.resolveWriteVersion('ai', 'openai')).toBe('v2');
   });
 
   it('resolveContentPack returns the versioned content-pack capability', () => {

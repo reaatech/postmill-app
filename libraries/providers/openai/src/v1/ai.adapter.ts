@@ -11,6 +11,7 @@ import {
   type AiCapabilities as AICapabilities,
   type AiModelOptions as AIModelOptions,
   type ProviderModule,
+  type SafeFetchPort,
 } from '@gitroom/provider-kernel';
 
 const OPENAI_CAPABILITIES: AICapabilities = {
@@ -76,6 +77,15 @@ export class OpenAIAdapter implements AIProviderAdapter {
     description: 'OpenAI API — data not used for training by default',
   };
 
+  // 0.4: SSRF-safe fetch, injected by the provider module's create(ctx). baseURL
+  // is a free-text credential; without the safe fetch we must not validate it.
+  private _safeFetch?: SafeFetchPort;
+
+  /** Inject the SSRF-safe fetch (called from the provider module's create/validate). */
+  setSafeFetch(fetch: SafeFetchPort): void {
+    this._safeFetch = fetch;
+  }
+
   private _buildProvider(creds: Record<string, string>) {
     return createOpenAI({
       apiKey: creds.apiKey,
@@ -92,31 +102,19 @@ export class OpenAIAdapter implements AIProviderAdapter {
     if (!creds.apiKey) {
       return { ok: false, error: 'API key is required' };
     }
-    try {
-      const baseURL = (creds.baseURL || 'https://api.openai.com/v1').replace(/\/+$/, '');
-      const response = await fetch(`${baseURL}/models`, {
-        headers: { Authorization: `Bearer ${creds.apiKey}` },
-      });
-      if (response.ok) return { ok: true };
-      if (response.status === 401 || response.status === 403) {
-        return { ok: false, error: 'Invalid API key' };
-      }
-      return { ok: false, error: `Unexpected response: ${response.status}` };
-    } catch (origErr) {
-      try {
-        const provider = this._buildProvider(creds);
-        const model = provider.languageModel('gpt-4o-mini');
-        await (model as any).doGenerate({
-          prompt: [
-            { role: 'user', content: [{ type: 'text' as const, text: 'ping' }] },
-          ],
-          maxOutputTokens: 1,
-        });
-        return { ok: true };
-      } catch {
-        return { ok: false, error: (origErr as any)?.message || 'Unknown error validating credentials' };
-      }
+    // 0.4: only over the SSRF-safe fetch — never the global fetch on a tenant baseURL.
+    if (!this._safeFetch) return { ok: false, error: 'cannot validate' };
+    const baseURL = (creds.baseURL || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    // 5.15: cheap authenticated GET /models — no paid-generation fallback.
+    // safeFetch throws on an SSRF/private URL; let it propagate.
+    const response = await this._safeFetch(`${baseURL}/models`, {
+      headers: { Authorization: `Bearer ${creds.apiKey}` },
+    });
+    if (response.ok) return { ok: true };
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, error: 'Invalid API key' };
     }
+    return { ok: false, error: `Unexpected response: ${response.status}` };
   }
 
   createLanguageModel(
@@ -184,6 +182,12 @@ export const openaiAiModule: ProviderModule<any, any> = {
     credentialFields: (adapter as any).credentialFields || [],
     capabilities: (adapter as any).capabilities,
   },
-  create: () => adapter as any,
-  validateCredentials: async (ctx) => adapter.validateCredentials(ctx.credentials),
+  create: (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter as any;
+  },
+  validateCredentials: async (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter.validateCredentials(ctx.credentials);
+  },
 };

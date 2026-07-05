@@ -201,8 +201,14 @@ export class IntegrationManager {
   getAllowedSocialsIntegrations() {
     return this.getSocialProviders().map((p) => p.identifier);
   }
-  async getSocialIntegration(integration: string, orgId?: string): Promise<SocialProvider> {
-    const provider = this.getSocialIntegrationUnchecked(integration);
+  async getSocialIntegration(
+    integration: string,
+    orgId?: string,
+    version?: string
+  ): Promise<SocialProvider> {
+    // When the caller pins the connected row's stored version, resolve that exact
+    // adapter and reject a retired version (see getSocialIntegrationUnchecked).
+    const provider = this.getSocialIntegrationUnchecked(integration, version);
     if (!provider) {
       throw new NotFoundException(`Unknown integration: ${integration}`);
     }
@@ -234,6 +240,18 @@ export class IntegrationManager {
       ? this._kernel.get('social', integration, version)
       : this._kernel.get('social', integration, DEFAULT_VERSION) ??
         this._kernel.latestActive('social', integration);
+
+    // When a caller pins the config's stored version (publish/refresh resolving
+    // the exact adapter for a connected row), reject a retired version — a
+    // retired adapter must not keep publishing/refreshing with no 410. Version-less
+    // listing paths keep their existing, status-agnostic behaviour. Latent today
+    // (all social providers are v1), so this is behaviour-neutral for real data.
+    if (version && mod?.manifest.status === 'retired') {
+      throw new NotFoundException(
+        `Integration version retired: ${integration}@${version}`
+      );
+    }
+
     return mod?.legacyProvider as SocialProvider | undefined;
   }
 

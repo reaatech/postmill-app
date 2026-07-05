@@ -1,4 +1,4 @@
-import { ProviderDomain, ProviderKey, keyString } from './identity';
+import { ProviderDomain, ProviderKey, keyString, PROVIDER_DOMAINS } from './identity';
 
 export type ProviderVersionStatus = 'preview' | 'active' | 'deprecated' | 'retired';
 
@@ -48,8 +48,23 @@ export function validateManifest<Caps>(manifest: ProviderManifest<Caps>): void {
   if (!manifest.domain) {
     throw new Error('Manifest missing domain');
   }
+  // 4.5: reject an unknown domain (e.g. a 'shortlinks' typo) — it would register
+  // into an unreachable bucket and surface only as a runtime 404.
+  if (!(PROVIDER_DOMAINS as readonly string[]).includes(manifest.domain)) {
+    throw new Error(`Manifest invalid domain: ${JSON.stringify(manifest.domain)}`);
+  }
   if (!manifest.providerId || typeof manifest.providerId !== 'string') {
     throw new Error('Manifest missing providerId');
+  }
+  // 4.5: providerId is a routing segment in `domain/providerId@version`; a '/',
+  // '@' or whitespace breaks round-tripping the qualified id.
+  if (
+    manifest.providerId.includes('/') ||
+    manifest.providerId.includes('@') ||
+    manifest.providerId !== manifest.providerId.trim() ||
+    /\s/.test(manifest.providerId)
+  ) {
+    throw new Error(`Manifest invalid providerId format: ${JSON.stringify(manifest.providerId)}`);
   }
   if (!manifest.version || typeof manifest.version !== 'string') {
     throw new Error('Manifest missing version');

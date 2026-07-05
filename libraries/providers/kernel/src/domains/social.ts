@@ -128,19 +128,6 @@ export interface SocialCommentsIntegration {
   likeComment?(id: string, accessToken: string, postId: string, commentId: string, like: boolean, integration: any, clientInformation?: SocialClientInformation): Promise<{ liked: boolean; likeCount?: number }>;
 }
 
-export interface SocialProviderMatrixRow {
-  analytics: boolean;
-  comments: boolean;
-  firstComment: boolean;
-  polls: boolean;
-  video: boolean;
-  carousel: boolean;
-  altText: boolean;
-  maxMedia: number;
-  linkPreview: boolean;
-  refreshToken: boolean;
-}
-
 export interface SocialCapability extends SocialAuthenticator, SocialMediaIntegration, SocialCommentsIntegration {
   identifier: string;
   name: string;

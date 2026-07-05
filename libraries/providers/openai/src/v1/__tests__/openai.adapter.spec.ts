@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { createOpenAI } from '@ai-sdk/openai';
 import { OpenAIAdapter } from '../ai.adapter';
 
 vi.mock('@ai-sdk/openai', () => ({
@@ -82,6 +83,40 @@ describe('OpenAIAdapter', () => {
       const result = await adapter.validateCredentials({});
       expect(result.ok).toBe(false);
       expect(result.error).toBeDefined();
+    });
+
+    // 0.4: baseURL is free-text — no global fetch without the injected safe fetch.
+    it('returns cannot-validate when no safe fetch is injected', async () => {
+      const result = await adapter.validateCredentials({ apiKey: 'sk-test' });
+      expect(result).toEqual({ ok: false, error: 'cannot validate' });
+    });
+
+    it('uses the injected safe fetch and does not run a paid generation (5.15)', async () => {
+      const safeFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
+      adapter.setSafeFetch(safeFetch);
+      const result = await adapter.validateCredentials({ apiKey: 'sk-test', baseURL: 'https://api.openai.com/v1' });
+      expect(result).toEqual({ ok: true });
+      expect(safeFetch).toHaveBeenCalledWith(
+        'https://api.openai.com/v1/models',
+        expect.objectContaining({ headers: expect.anything() }),
+      );
+      // 5.15: no paid doGenerate fallback — the SDK provider is never built here.
+      expect(createOpenAI).not.toHaveBeenCalled();
+    });
+
+    it('propagates an SSRF rejection instead of reflecting a body (0.4)', async () => {
+      const safeFetch = vi.fn().mockRejectedValue(new Error('SSRF: non-public host'));
+      adapter.setSafeFetch(safeFetch);
+      await expect(
+        adapter.validateCredentials({ apiKey: 'sk-test', baseURL: 'http://169.254.169.254/latest' }),
+      ).rejects.toThrow(/SSRF/);
+    });
+
+    it('maps 401 to a generic invalid-key message', async () => {
+      const safeFetch = vi.fn().mockResolvedValue(new Response('internal', { status: 401 }));
+      adapter.setSafeFetch(safeFetch);
+      const result = await adapter.validateCredentials({ apiKey: 'bad', baseURL: 'https://api.openai.com/v1' });
+      expect(result).toEqual({ ok: false, error: 'Invalid API key' });
     });
   });
 

@@ -113,8 +113,19 @@ export class LocalStorage implements StorageCapability {
     );
   }
 
+  // Resolve `relative` against the upload directory and assert the result stays
+  // within it — defends deleteFile/removeFile against `../` path traversal.
+  private _safeJoin(relative: string): string {
+    const root = path.resolve(this.uploadDirectory);
+    const resolved = path.resolve(root, relative);
+    if (resolved !== root && !resolved.startsWith(root + path.sep)) {
+      throw new Error('Invalid storage key: path traversal detected');
+    }
+    return resolved;
+  }
+
   async deleteFile(key: string): Promise<void> {
-    const filePath = path.join(this.uploadDirectory, key.replace(/^\//, ''));
+    const filePath = this._safeJoin(key.replace(/^\//, ''));
     return new Promise((resolve, reject) => {
       unlink(filePath, (err) => {
         if (err) reject(err);
@@ -252,15 +263,11 @@ export class LocalStorage implements StorageCapability {
     let targetPath = filePath;
     const frontendUrl = process.env.FRONTEND_URL || '';
     if (targetPath.startsWith(frontendUrl + '/uploads/')) {
-      targetPath = path.join(
-        this.uploadDirectory,
+      targetPath = this._safeJoin(
         targetPath.slice((frontendUrl + '/uploads/').length),
       );
     } else if (targetPath.startsWith('/uploads/')) {
-      targetPath = path.join(
-        this.uploadDirectory,
-        targetPath.slice('/uploads/'.length),
-      );
+      targetPath = this._safeJoin(targetPath.slice('/uploads/'.length));
     }
     return new Promise((resolve, reject) => {
       unlink(targetPath, (err) => {

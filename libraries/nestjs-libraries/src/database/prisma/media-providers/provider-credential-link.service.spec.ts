@@ -2,15 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ProviderCredentialLinkService } from './provider-credential-link.service';
 
 function makeService() {
-  const mediaRepository = { upsert: vi.fn().mockResolvedValue({}) };
-  const aiRepository = { upsert: vi.fn().mockResolvedValue({}) };
+  const mediaRepository = {
+    upsert: vi.fn().mockResolvedValue({}),
+    getByIdentifier: vi.fn().mockResolvedValue(null),
+  };
+  const aiRepository = {
+    upsert: vi.fn().mockResolvedValue({}),
+    getByIdentifier: vi.fn().mockResolvedValue(null),
+  };
   const encryption = { encrypt: vi.fn((v: string) => `enc(${v})`) };
+  const resolution = { latestActiveVersion: vi.fn().mockReturnValue('v1') };
   const service = new ProviderCredentialLinkService(
     mediaRepository as never,
     aiRepository as never,
     encryption as never,
+    resolution as never,
   );
-  return { service, mediaRepository, aiRepository, encryption };
+  return { service, mediaRepository, aiRepository, encryption, resolution };
 }
 
 describe('ProviderCredentialLinkService (§11.4 auto-config live-link)', () => {
@@ -28,10 +36,31 @@ describe('ProviderCredentialLinkService (§11.4 auto-config live-link)', () => {
     const { service, mediaRepository } = makeService();
     await service.syncFromAiProvider('org-1', 'openai', { apiKey: 'sk-123' });
 
-    expect(mediaRepository.upsert).toHaveBeenCalledWith('org-1', 'openai', {
-      enabled: true,
-      credentials: `enc(${JSON.stringify({ apiKey: 'sk-123' })})`,
-    });
+    expect(mediaRepository.upsert).toHaveBeenCalledWith(
+      'org-1',
+      'openai',
+      {
+        enabled: true,
+        credentials: `enc(${JSON.stringify({ apiKey: 'sk-123' })})`,
+      },
+      'v1',
+    );
+  });
+
+  it('pins the mirror-target row version instead of hardcoding v1 (1.4)', async () => {
+    const { service, mediaRepository, resolution } = makeService();
+    // existing media row is pinned to v2 → the mirror write must target v2.
+    mediaRepository.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v2' });
+
+    await service.syncFromAiProvider('org-1', 'openai', { apiKey: 'sk-123' });
+
+    expect(mediaRepository.upsert).toHaveBeenCalledWith(
+      'org-1',
+      'openai',
+      expect.objectContaining({ enabled: true }),
+      'v2',
+    );
+    expect(resolution.latestActiveVersion).not.toHaveBeenCalled();
   });
 
   it('does not touch the media row\'s storage binding (only credentials/enabled)', async () => {
@@ -45,10 +74,15 @@ describe('ProviderCredentialLinkService (§11.4 auto-config live-link)', () => {
     const { service, aiRepository } = makeService();
     await service.syncFromMediaProvider('org-1', 'minimax', { apiKey: 'mm-key' });
 
-    expect(aiRepository.upsert).toHaveBeenCalledWith('org-1', 'minimax', {
-      enabled: true,
-      credentials: `enc(${JSON.stringify({ apiKey: 'mm-key' })})`,
-    });
+    expect(aiRepository.upsert).toHaveBeenCalledWith(
+      'org-1',
+      'minimax',
+      {
+        enabled: true,
+        credentials: `enc(${JSON.stringify({ apiKey: 'mm-key' })})`,
+      },
+      'v1',
+    );
   });
 
   it('ignores non-linked providers in both directions', async () => {

@@ -245,7 +245,7 @@ export class R2Storage implements StorageCapability {
         stream: file.buffer as any,
       };
     } catch (err) {
-      console.error('Error uploading file to R2:', err);
+      console.warn(`R2 upload failed: ${(err as Error).message}`);
       throw err;
     }
   }
@@ -271,13 +271,19 @@ export class R2Storage implements StorageCapability {
     fileHash?: string,
   ): Promise<{ uploadId: string; key: string }> {
     const mimeType = this.getMimeByExtension(fileName);
+    // Enforce the same allowlist as single uploads — multipart must not be a
+    // bypass for arbitrary file types (magic-byte sniffing isn't possible at
+    // create time, so gate on the extension→MIME allowlist here).
+    if (!mimeType) {
+      throw new Error('Unsupported file type.');
+    }
     const randomFilename = this.generateRandomKey(fileName);
 
     const response = await this.client.send(
       new CreateMultipartUploadCommand({
         Bucket: this.bucket,
         Key: randomFilename,
-        ContentType: mimeType || 'application/octet-stream',
+        ContentType: mimeType,
         Metadata: fileHash ? { 'x-amz-meta-file-hash': fileHash } : undefined,
       }),
     );

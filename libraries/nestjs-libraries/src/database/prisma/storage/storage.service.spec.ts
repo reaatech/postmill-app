@@ -342,6 +342,77 @@ describe('StorageService — version pin-on-write', () => {
   });
 });
 
+describe('StorageService — updateConfig fingerprint recompute (3.5) + audit await (6.5)', () => {
+  const s3Row = {
+    id: 's3-1',
+    organizationId: 'org-1',
+    type: StorageProviderType.S3,
+    version: 'v1',
+    name: 'S3',
+    credentials: 'enc:{}',
+    region: 'us-east-1',
+    bucket: 'b',
+    endpoint: null,
+    publicUrl: null,
+    mounted: false,
+  };
+
+  it('recomputes accountFingerprint when credentials are rotated', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    const auditService = { create: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await service.updateConfig(
+      's3-1',
+      'org-1',
+      { credentials: { accessKeyId: 'rotated-key', secretAccessKey: 'x' } },
+    );
+
+    const updateArg = (repo.update as any).mock.calls[0][1];
+    expect(updateArg).toHaveProperty('accountFingerprint');
+    expect(typeof updateArg.accountFingerprint).toBe('string');
+    expect(updateArg.accountFingerprint.length).toBeGreaterThan(0);
+  });
+
+  it('does not set accountFingerprint when credentials are not supplied', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    const auditService = { create: vi.fn().mockResolvedValue(undefined) } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await service.updateConfig('s3-1', 'org-1', { name: 'Renamed' });
+
+    const updateArg = (repo.update as any).mock.calls[0][1];
+    expect(updateArg).not.toHaveProperty('accountFingerprint');
+  });
+
+  it('awaits the audit write on update (6.5 — not a floating promise)', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Row),
+      update: vi.fn().mockResolvedValue({ ...s3Row }),
+    });
+    let resolveAudit!: () => void;
+    const auditGate = new Promise<void>((r) => (resolveAudit = r));
+    const create = vi.fn().mockReturnValue(auditGate);
+    const auditService = { create } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    let settled = false;
+    const p = service.updateConfig('s3-1', 'org-1', { name: 'x' }).then(() => (settled = true));
+    await Promise.resolve();
+    expect(settled).toBe(false); // still waiting on the audit write
+    resolveAudit();
+    await p;
+    expect(settled).toBe(true);
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('StorageService — health tracking (#62)', () => {
   it('updates health on successful test', async () => {
     const repo = makeRepo({

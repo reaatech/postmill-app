@@ -97,6 +97,35 @@ describe('higgsfield media adapter (submit-and-poll, two-part key)', () => {
     expect(out.status).toBe('failed');
   });
 
+  it('2.1: a 503 on poll THROWS (transient); missing creds on poll → terminal failed', async () => {
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = higgsfieldMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob('req-9', { credentials: { keyId: 'KID', keySecret: 'SEC' } })).rejects.toThrow(/transient/i);
+
+    const nokey = makeCtx(() => res({}));
+    const a2: any = higgsfieldMediaModule.create(nokey.ctx as any);
+    const r = await a2.pollJob('req-9', {});
+    expect(r.status).toBe('failed');
+    expect(r.error).toMatch(/Key ID and Key Secret/);
+  });
+
+  it('5.6: testConnection rejects a wrong keySecret (403) and a 5xx as NOT connected', async () => {
+    const forbidden = makeCtx(() => res('forbidden', false, 403));
+    const a1: any = higgsfieldMediaModule.create(forbidden.ctx as any);
+    expect((await a1.testConnection({ credentials: { keyId: 'KID', keySecret: 'WRONG' } })).ok).toBe(false);
+
+    const down = makeCtx(() => res('down', false, 500));
+    const a2: any = higgsfieldMediaModule.create(down.ctx as any);
+    expect((await a2.testConnection({ credentials: { keyId: 'KID', keySecret: 'SEC' } })).ok).toBe(false);
+  });
+
+  it('5.12: a combined "id:secret" with a colon IN the secret is not truncated', async () => {
+    const { recs, ctx } = makeCtx(() => res('', true, 404));
+    const adapter: any = higgsfieldMediaModule.create(ctx as any);
+    await adapter.testConnection({ apiKey: 'KID:sec:with:colons' });
+    expect(recs[0].headers.Authorization).toBe('Key KID:sec:with:colons');
+  });
+
   it('testConnection ok, and missing credentials throw', async () => {
     const { ctx } = makeCtx(() => res('', true, 404));
     const adapter: any = higgsfieldMediaModule.create(ctx as any);

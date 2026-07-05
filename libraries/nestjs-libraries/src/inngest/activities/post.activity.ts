@@ -185,7 +185,9 @@ export class PostActivity {
 
   async isCommentable(integration: Integration) {
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     return !!getIntegration.comment;
@@ -201,7 +203,9 @@ export class PostActivity {
     }
 
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     return !!getIntegration.comment;
@@ -214,7 +218,9 @@ export class PostActivity {
     posts: Post[]
   ) {
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     const newPosts = await this._postService.updateTags(
@@ -264,7 +270,9 @@ export class PostActivity {
     firstComment: string,
   ) {
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     const clientInformation = await this._integrationManager.requireClientInformation(
@@ -325,7 +333,9 @@ export class PostActivity {
     }
 
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     const newPosts = await this._postService.updateTags(
@@ -601,7 +611,9 @@ export class PostActivity {
     integration: Integration
   ): Promise<false | AuthTokenDetails> {
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     try {
@@ -628,7 +640,9 @@ export class PostActivity {
     cause: string
   ): Promise<false | AuthTokenDetails> {
     const getIntegration = await this._integrationManager.getSocialIntegration(
-      integration.providerIdentifier
+      integration.providerIdentifier,
+      integration.organizationId,
+      integration.providerVersion
     );
 
     try {

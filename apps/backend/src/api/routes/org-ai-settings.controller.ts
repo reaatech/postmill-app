@@ -33,6 +33,12 @@ import { ProviderConfigDto } from '@gitroom/nestjs-libraries/types/provider-conf
 import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-permission.decorator';
 import { PROVIDER_KERNEL } from '@gitroom/nestjs-libraries/providers/providers.module';
 import { ProviderKernel, DEFAULT_VERSION } from '@gitroom/provider-kernel';
+import {
+  UpsertOrgAiConfigDto,
+  UpdateBudgetDto,
+  SetActiveVersionDto,
+  ProviderTestConnectionDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 export type ProviderConfigSummary = Pick<
   ProviderConfigDto,
@@ -162,19 +168,17 @@ export class OrgAiSettingsController {
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      credentials?: Record<string, string>;
-      defaultModel?: string;
-      reasoningModel?: string;
-      version?: string;
-    },
+    @Body() body: UpsertOrgAiConfigDto,
   ) {
     const adapter = this._resolveAdapter(identifier, body.version);
     if (!adapter) throw new BadRequestException('Unknown provider');
 
     await this._orgAiSettings.upsert(org.id, identifier, {
-      enabled: true,
+      // Configuring defaults to enabled; the kit's On/Off toggle PUTs an explicit
+      // `{ enabled: false }` to disable without clearing credentials (mirrors the
+      // media surface). Previously hardcoded `true`, which both ignored the toggle
+      // and — once this body became a whitelisted DTO — 400'd on `{ enabled }`.
+      enabled: body.enabled ?? true,
       credentials: body.credentials,
       defaultModel: body.defaultModel,
       reasoningModel: body.reasoningModel,
@@ -196,7 +200,7 @@ export class OrgAiSettingsController {
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { version?: string } = {},
+    @Body() body: SetActiveVersionDto = {},
   ) {
     try {
       const result = await this._orgAiSettings.setActive(org.id, identifier, body.version);
@@ -218,7 +222,7 @@ export class OrgAiSettingsController {
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { credentials?: Record<string, string> },
+    @Body() body: ProviderTestConnectionDto,
   ) {
     const adapter = this._resolveAdapter(identifier);
     if (!adapter) throw new BadRequestException('Unknown provider');
@@ -262,13 +266,7 @@ export class OrgAiSettingsController {
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   async updateBudget(
     @GetOrgFromRequest() org: Organization,
-    @Body()
-    body: {
-      monthlyCap?: number;
-      dailyCap?: number;
-      alertThresholdPct?: number;
-      enabled?: boolean;
-    },
+    @Body() body: UpdateBudgetDto,
   ) {
     await this._orgAiSettings.updateBudget(org.id, body);
     return { success: true };

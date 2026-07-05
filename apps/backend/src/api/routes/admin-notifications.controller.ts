@@ -14,6 +14,11 @@ import { RequirePermission } from '@gitroom/backend/services/auth/rbac/require-p
 import { OrgRbacGuard } from '@gitroom/backend/services/auth/rbac/org-rbac.guard';
 import { BroadcastNotificationDto } from '@gitroom/nestjs-libraries/dtos/notifications/notification-preference.dto';
 
+// PROVIDER_REMEDIATION 3.2 audit: this controller is intentionally NOT super-admin
+// gated. Per the plan's Phase-0 audit it is org-scoped by construction — the
+// broadcast reads getTeam(org.id), intersects targets to the caller's own members
+// and notify()s with the caller's orgId, so it cannot touch another tenant. An org
+// admin announcing to their own team (RBAC notifications:manage) is intended.
 @ApiTags('Admin Notifications')
 @Controller('/admin/notifications')
 @UseGuards(OrgRbacGuard)

@@ -190,6 +190,26 @@ describe('MediaJobLifecycleService (§11.2 async job lifecycle)', () => {
       expect(aiSettings.updateMediaJob).toHaveBeenCalledWith('job-1', { status: 'processing' });
     });
 
+    it('polls through the version pinned on the job, not the config current version (4.10)', async () => {
+      const { service, jobs, pollJob, resolution, orgSettings } = makeService();
+      // job was created under v1; the org config has since been upgraded to v2.
+      jobs.set('job-1', makeJob({ version: 'v1' }));
+      orgSettings.getConfigForProvider.mockResolvedValue({
+        credentials: { apiKey: 'luma-key' },
+        storageProviderId: null,
+        storageRootFolderId: null,
+        version: 'v2',
+      });
+      pollJob.mockResolvedValue({ status: 'pending' });
+
+      await service.processJob('job-1');
+
+      expect(resolution.resolveMedia).toHaveBeenCalledWith(
+        'luma',
+        expect.objectContaining({ version: 'v1' }),
+      );
+    });
+
     it('treats transient poll errors as pending (retried next sweep)', async () => {
       const { service, jobs, pollJob } = makeService();
       jobs.set('job-1', makeJob());

@@ -27,6 +27,14 @@ import { ProviderKernel } from '@gitroom/provider-kernel';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
 import { ioRedis } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { MediaProviderAdapter } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
+import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
+import {
+  UpsertMediaConfigDto,
+  SetMediaStorageDto,
+  SetActiveVersionDto,
+  ProviderTestConnectionDto,
+} from '@gitroom/nestjs-libraries/dtos/providers/provider-config.dtos';
 
 @ApiTags('Org Media Provider Settings')
 @Controller('/settings/media')
@@ -36,6 +44,8 @@ export class MediaProviderController {
     private _defaultsSeed: DefaultsSeedService,
     @Inject(PROVIDER_KERNEL) private _kernel: ProviderKernel,
     private _resolution: ProviderResolutionService,
+    private _storageService: StorageService,
+    private _fileService: FileService,
   ) {}
 
   private _bustDefaultsCatalogCache(orgId: string): void {
@@ -99,12 +109,7 @@ export class MediaProviderController {
   async upsertConfig(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      credentials?: Record<string, string>;
-      version?: string;
-      enabled?: boolean;
-    },
+    @Body() body: UpsertMediaConfigDto,
   ) {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
@@ -131,14 +136,19 @@ export class MediaProviderController {
   async setStorage(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body()
-    body: {
-      storageProviderId: string;
-      storageRootFolderId?: string;
-    },
+    @Body() body: SetMediaStorageDto,
   ) {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
+
+    // PROVIDER_REMEDIATION 3.6: validate the storage provider + root folder belong to
+    // this org at WRITE time. Cross-org use is otherwise blocked only at job completion
+    // (no leak, but the failure is deferred until after a paid render).
+    await this._assertStorageOwnership(
+      org.id,
+      body.storageProviderId,
+      body.storageRootFolderId,
+    );
 
     await this._orgMediaProviderSettings.upsert(org.id, identifier, {
       storageProviderId: body.storageProviderId,
@@ -149,13 +159,40 @@ export class MediaProviderController {
     return { identifier, success: true };
   }
 
+  private async _assertStorageOwnership(
+    orgId: string,
+    storageProviderId: string,
+    storageRootFolderId?: string,
+  ): Promise<void> {
+    // `getProviderConfigs` is org-scoped (findByOrg) and includes the synthetic
+    // `__virtual_local__` id for the default local provider.
+    const configs = await this._storageService.getProviderConfigs(orgId);
+    if (!configs.some((c) => c.id === storageProviderId)) {
+      throw new BadRequestException(
+        'storageProviderId does not belong to this organization',
+      );
+    }
+
+    if (storageRootFolderId) {
+      // `getFolder` throws (404) when the folder is missing or owned by another org;
+      // normalise to a 400 for a bad write payload.
+      try {
+        await this._fileService.getFolder(orgId, storageRootFolderId);
+      } catch {
+        throw new BadRequestException(
+          'storageRootFolderId does not belong to this organization',
+        );
+      }
+    }
+  }
+
   @Post('/config/:identifier/set-active')
   @CheckPolicies([AuthorizationActions.Create, Sections.ADMIN])
   @RequirePermission('media-config', 'manage')
   async setActive(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { version?: string },
+    @Body() body: SetActiveVersionDto,
   ) {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');
@@ -186,7 +223,7 @@ export class MediaProviderController {
   async testConnection(
     @GetOrgFromRequest() org: Organization,
     @Param('identifier') identifier: string,
-    @Body() body: { credentials?: Record<string, string> },
+    @Body() body: ProviderTestConnectionDto,
   ) {
     const adapter = this._resolveMedia(identifier);
     if (!adapter) throw new BadRequestException('Unknown media provider');

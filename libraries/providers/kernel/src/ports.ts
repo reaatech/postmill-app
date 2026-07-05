@@ -4,10 +4,11 @@ export interface EncryptionPort {
 }
 
 export interface SafeFetchPort {
-  (
-    input: string | URL | Request,
-    init?: RequestInit,
-  ): Promise<Response>;
+  // 4.4: narrowed to string|URL. The nestjs `adaptSafeFetch` delegate resolves
+  // the URL to a string for SSRF validation; a `Request` object was previously
+  // stringified to the literal "[object Request]", silently dropping its
+  // method/headers/body — so `Request` is not an accepted input.
+  (input: string | URL, init?: RequestInit): Promise<Response>;
 }
 
 export interface LoggerPort {

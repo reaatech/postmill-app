@@ -30,6 +30,14 @@ const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_IMAGE_MODEL = 'gemini-2.5-flash-image';
 const DEFAULT_VIDEO_MODEL = 'veo-3.0-generate-001';
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
+// 5.7 — the auth-only MP4 is buffered then base64-inflated; reject via content-length BEFORE
+// buffering. Matches the lifecycle's MAX_ARTIFACT_BYTES.
+const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
+
 interface PredictResponse {
   predictions?: { bytesBase64Encoded?: string; mimeType?: string }[];
 }
@@ -175,10 +183,17 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
-    const key = this._key(options);
+    // Missing key is a config error → terminal failed (matches openai/Sora), not a thrown
+    // error the lifecycle would retry to the 24h timeout.
+    const key = resolveApiKey(options);
+    if (!key) return { status: 'failed', error: 'Google AI Studio requires a Gemini API key' };
     const headers = this._headers(key);
     const res = await this._fetch(`${BASE}/${jobId}`, { headers });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Veo poll transient error ${res.status}: ${body}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as VeoOperation;
 
     if (!data.done) return { status: 'pending' };
@@ -197,8 +212,15 @@ export class GoogleAiMediaAdapter implements MediaProviderAdapter {
       // The file URI is auth-only — download with the key and inline it as a data URL so the
       // lifecycle's unauthenticated re-download doesn't 401 (the Sora pattern).
       const fileRes = await this._fetch(video.uri, { headers });
-      if (!fileRes.ok) return { status: 'failed', error: `Veo video download failed: ${fileRes.status}` };
-      const base64 = Buffer.from(await fileRes.arrayBuffer()).toString('base64');
+      // Post-success download: the render already succeeded, so ANY failure is transient →
+      // THROW to retry rather than permanently discard a paid render.
+      if (!fileRes.ok) throw new Error(`Veo video download failed: ${fileRes.status}`);
+      // 5.7 — reject oversize via content-length before buffering + base64-inflating.
+      const declared = Number(fileRes.headers.get('content-length') || 0);
+      if (declared > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Veo video exceeds the size limit' };
+      const buffer = Buffer.from(await fileRes.arrayBuffer());
+      if (buffer.length > MAX_ARTIFACT_BYTES) return { status: 'failed', error: 'Veo video exceeds the size limit' };
+      const base64 = buffer.toString('base64');
       return {
         status: 'completed',
         artifactUrl: `data:${mime};base64,${base64}`,

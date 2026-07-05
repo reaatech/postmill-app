@@ -91,6 +91,9 @@ export class DubAdapter implements ShortLinkCapability {
         if (response.ok) {
           const data = (await response.json()) as any;
           results.push({ short: data.shortLink || link, original: data.url || '', clicks: String(data.clicks || data.timeseries?.length || '0') });
+        } else {
+          // Keep one entry per input (base-class contract) — don't drop the link on a non-2xx.
+          results.push({ short: link, original: '', clicks: '0' });
         }
       } catch {
         results.push({ short: link, original: '', clicks: '0' });

@@ -144,6 +144,30 @@ describe('ShortioAdapter', () => {
       fetchSpy.mockRestore();
     });
 
+    it('honors the configured customDomain when building the short URL', async () => {
+      const ctx: ShortLinkContext = { ...mockContext, customDomain: 'go.acme.dev' };
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(200, { idString: 'abc123' }));
+
+      const result = await adapter.createShortLink(ctx, 'https://example.com/long-url');
+      expect(result.shortUrl).toBe('https://go.acme.dev/abc123');
+      // The customDomain is also sent to the API in the request body.
+      const [, init] = safeFetch.mock.calls.find(([u]: [string]) => u.endsWith('/api/links')) as any;
+      expect(JSON.parse(init.body).domain).toBe('go.acme.dev');
+
+      fetchSpy.mockRestore();
+    });
+
+    it('prefers the API canonical full shortURL when present (speculative)', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+        mockResponse(200, { idString: 'abc123', shortURL: 'https://myshort.io/canon' })
+      );
+
+      const result = await adapter.createShortLink(mockContext, 'https://example.com/long-url');
+      expect(result.shortUrl).toBe('https://myshort.io/canon');
+
+      fetchSpy.mockRestore();
+    });
+
     it('throws on API error response', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(400, 'Bad Request', false));
 
@@ -201,11 +225,14 @@ describe('ShortioAdapter', () => {
       fetchSpy.mockRestore();
     });
 
-    it('returns empty results on non-ok response (skips without error)', async () => {
-      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(404, 'Not Found', false));
+    it('pushes a 0-click fallback on non-ok response (one entry per input)', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(mockResponse(500, 'Server Error', false));
 
-      const result = await adapter.linkStatistics(mockContext, ['https://myshort.io/a']);
-      expect(result).toEqual([]);
+      const result = await adapter.linkStatistics(mockContext, ['https://myshort.io/a', 'https://myshort.io/b']);
+      expect(result).toEqual([
+        { short: 'https://myshort.io/a', original: '', clicks: '0' },
+        { short: 'https://myshort.io/b', original: '', clicks: '0' },
+      ]);
 
       fetchSpy.mockRestore();
     });

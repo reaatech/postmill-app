@@ -27,6 +27,10 @@ const BASE = 'https://dashscope.aliyuncs.com/api/v1';
 // all other native params ride into `parameters`.
 const INPUT_KEYS = new Set(['negative_prompt', 'img_url']);
 
+// 2.1 — a 429/5xx on a status poll is transient: THROW so the lifecycle retries the render
+// rather than permanently failing a job whose generation may still be fine.
+const isTransientStatus = (s: number): boolean => s === 429 || s >= 500;
+
 interface DashScopeTaskCreate {
   output?: { task_id?: string; task_status?: string };
 }
@@ -140,8 +144,15 @@ export class QwenMediaAdapter implements MediaProviderAdapter {
   }
 
   async pollJob(jobId: string, options?: MediaCredentialOptions): Promise<MediaPollResult> {
+    // Missing key is a config error → terminal failed (matches openai/Sora), not a thrown
+    // error the lifecycle would retry to the 24h timeout.
+    if (!resolveApiKey(options)) return { status: 'failed', error: 'Qwen (DashScope) API key is required' };
     const res = await this._fetch(`${BASE}/tasks/${jobId}`, { headers: this._headers(options) });
-    if (!res.ok) return { status: 'failed', error: await res.text() };
+    if (!res.ok) {
+      const body = await res.text();
+      if (isTransientStatus(res.status)) throw new Error(`Qwen poll transient error ${res.status}: ${body}`);
+      return { status: 'failed', error: body };
+    }
     const data = (await res.json()) as DashScopeTaskStatus;
     const status = data.output?.task_status;
 

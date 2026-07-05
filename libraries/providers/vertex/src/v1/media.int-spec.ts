@@ -87,6 +87,49 @@ describe('vertex media adapter (Imagen image + Veo long-running video)', () => {
     expect(done.artifactUrl).toBe('data:video/mp4;base64,VklE');
   });
 
+  it('2.1: a 503 on the operation poll THROWS (transient); an op error → returned failed', async () => {
+    const opName = 'projects/p/locations/us-central1/publishers/google/models/veo-2.0-generate-001/operations/op-1';
+    const t = makeCtx(() => res('busy', false, 503));
+    const a1: any = vertexMediaModule.create(t.ctx as any);
+    await expect(a1.pollJob(opName, { credentials: CREDS })).rejects.toThrow(/transient/i);
+
+    const err = makeCtx(() => res({ name: opName, done: true, error: { message: 'quota' } }));
+    const a2: any = vertexMediaModule.create(err.ctx as any);
+    expect((await a2.pollJob(opName, { credentials: CREDS })).status).toBe('failed');
+  });
+
+  it('5.14: a gcsUri completion is downloaded with the token and inlined as a data: URL', async () => {
+    const opName = 'projects/my-proj/locations/us-central1/publishers/google/models/veo-2.0-generate-001/operations/op-1';
+    const { recs, ctx } = makeCtx((url, _i) =>
+      url.includes(':fetchPredictOperation')
+        ? res({ name: opName, done: true, response: { videos: [{ gcsUri: 'gs://my-bucket/renders/out.mp4', mimeType: 'video/mp4' }] } })
+        : res('MP4DATA'),
+    );
+    const adapter: any = vertexMediaModule.create(ctx as any);
+
+    const done = await adapter.pollJob(opName, { credentials: CREDS });
+    expect(done.status).toBe('completed');
+    // The gs:// URI is turned into the authenticated JSON-API media download URL (bucket + %2F-encoded object).
+    const dl = recs.find((r) => r.url.startsWith('https://storage.googleapis.com'));
+    expect(dl?.url).toBe(
+      'https://storage.googleapis.com/storage/v1/b/my-bucket/o/renders%2Fout.mp4?alt=media',
+    );
+    expect(dl?.headers.Authorization).toBe('Bearer tok-1');
+    // No longer returns the raw gs:// URL (which the lifecycle's safeFetch could not download).
+    expect(done.artifactUrl).toBe(`data:video/mp4;base64,${Buffer.from('MP4DATA').toString('base64')}`);
+  });
+
+  it('2.1/5.14: a failed GCS download (post-success) THROWS — a paid render is not discarded', async () => {
+    const opName = 'projects/my-proj/locations/us-central1/publishers/google/models/veo-2.0-generate-001/operations/op-1';
+    const { ctx } = makeCtx((url) =>
+      url.includes(':fetchPredictOperation')
+        ? res({ name: opName, done: true, response: { videos: [{ gcsUri: 'gs://b/o.mp4' }] } })
+        : res('down', false, 500),
+    );
+    const adapter: any = vertexMediaModule.create(ctx as any);
+    await expect(adapter.pollJob(opName, { credentials: CREDS })).rejects.toThrow(/GCS download failed/i);
+  });
+
   it('rejects missing GCP credentials and unsupported operations', async () => {
     const { ctx } = makeCtx(() => res({}));
     const adapter: any = vertexMediaModule.create(ctx as any);
