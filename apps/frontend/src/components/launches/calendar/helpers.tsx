@@ -15,7 +15,7 @@ import { Post } from '@prisma/client';
 import { Composer } from '@gitroom/frontend/components/composer/composer';
 import { Button } from '@gitroom/react/form/button';
 import { ColorPicker } from '@gitroom/frontend/components/ui/color-picker';
-import { StatisticsModal } from '@gitroom/frontend/components/launches/statistics';
+import { PostAnalyticsDrawer } from '@gitroom/frontend/components/analytics-v2/post-analytics.drawer';
 import { MissingReleaseModal } from '@gitroom/frontend/components/launches/missing-release.modal';
 import { PostDetailModal } from '@gitroom/frontend/components/launches/post-detail/post.detail.modal';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
@@ -227,6 +227,7 @@ export const usePostActions = (onMutate?: () => void) => {
   const toaster = useToaster();
   const router = useRouter();
   const { integrations, reloadCalendarView } = useCalendar();
+  const [statsPostId, setStatsPostId] = useState<string | null>(null);
 
   const mutate = useCallback(() => {
     reloadCalendarView();
@@ -339,19 +340,9 @@ export const usePostActions = (onMutate?: () => void) => {
 
   const openStatistics = useCallback(
     (id: string) => () => {
-      modal.openModal({
-        title: t('statistics', 'Statistics'),
-        closeOnClickOutside: true,
-        closeOnEscape: true,
-        withCloseButton: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px]',
-        },
-        children: <StatisticsModal postId={id} />,
-        size: '80%',
-      });
+      setStatsPostId(id);
     },
-    [modal, t]
+    []
   );
 
   const openMissingRelease = useCallback(
@@ -365,7 +356,11 @@ export const usePostActions = (onMutate?: () => void) => {
           modal: 'w-[100%] max-w-[800px]',
         },
         children: (
-          <MissingReleaseModal postId={id} onSuccess={mutate} />
+          <MissingReleaseModal
+            postId={id}
+            onSuccess={mutate}
+            onShowStatistics={setStatsPostId}
+          />
         ),
         size: '60%',
       });
@@ -415,5 +410,13 @@ export const usePostActions = (onMutate?: () => void) => {
     [modal, fetch, mutate, toaster, t]
   );
 
-  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor };
+  const postAnalyticsDrawer = (
+    <PostAnalyticsDrawer
+      postId={statsPostId ?? ''}
+      open={!!statsPostId}
+      onClose={() => setStatsPostId(null)}
+    />
+  );
+
+  return { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor, postAnalyticsDrawer };
 };

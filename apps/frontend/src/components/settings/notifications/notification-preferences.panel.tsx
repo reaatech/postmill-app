@@ -16,7 +16,8 @@ export type NotificationCategory =
   | 'media'
   | 'announcements'
   | 'streak'
-  | 'agent';
+  | 'agent'
+  | 'analytics';
 
 export interface ChannelToggles {
   email: boolean;
@@ -45,6 +46,7 @@ const CATEGORY_ORDER: NotificationCategory[] = [
   'announcements',
   'streak',
   'agent',
+  'analytics',
 ];
 
 const CATEGORY_LABEL_KEYS: Record<NotificationCategory, [string, string]> = {
@@ -57,6 +59,7 @@ const CATEGORY_LABEL_KEYS: Record<NotificationCategory, [string, string]> = {
   announcements: ['notification_cat_announcements', 'Announcements'],
   streak: ['notification_cat_streak', 'Streak reminders'],
   agent: ['notification_cat_agent', 'Agent briefs'],
+  analytics: ['notification_cat_analytics', 'Analytics alerts'],
 };
 
 const CHANNEL_ORDER: NotificationChannel[] = ['email', 'push', 'inApp'];

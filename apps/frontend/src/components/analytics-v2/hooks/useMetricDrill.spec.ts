@@ -59,6 +59,18 @@ describe('useMetricDrill', () => {
     expect(key).toContain('compare=true');
   });
 
+  it('appends campaigns to the key when present, and omits it when absent (1.6)', () => {
+    stubSwr({ isLoading: true });
+
+    renderHook(() => useMetricDrill({ ...params, campaigns: ['c1', 'c2'] }));
+    expect(mockUseSWR.mock.calls[0][0] as string).toContain(
+      'campaigns=c1%2Cc2'
+    );
+
+    renderHook(() => useMetricDrill(params));
+    expect(mockUseSWR.mock.calls[1][0] as string).not.toContain('campaigns=');
+  });
+
   it('does not fetch when metric is empty string', () => {
     stubSwr({});
 

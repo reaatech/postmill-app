@@ -9,6 +9,15 @@ import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/c
 import { SocialCommentsService } from '@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service';
 import type { CampaignEntityType, State } from '@prisma/client';
 
+// Pre-computed campaign analytics, composed by the controller (from AnalyticsService)
+// and threaded into the report — CampaignReportService never injects AnalyticsService
+// (controller composition; see plan §1.5 / §3.4).
+export interface CampaignReportAnalytics {
+  series: Record<string, { date: string; value: number; previousValue?: number }[]>;
+  byChannel: any[];
+  window: { from: string; to: string };
+}
+
 export interface CampaignReport {
   campaign: any;
   engagement: {
@@ -24,6 +33,7 @@ export interface CampaignReport {
   channelBreakdown: Record<string, { views: number; likes: number; comments: number; posts: number }>;
   itemInventory: Record<string, any[]>;
   goals: Array<{ metric: string; target: number; current: number; pct: number }>;
+  analytics?: CampaignReportAnalytics;
 }
 
 @Injectable()
@@ -36,7 +46,22 @@ export class CampaignReportService {
     private _socialCommentsService: SocialCommentsService,
   ) {}
 
-  async buildReport(id: string, organizationId: string): Promise<CampaignReport> {
+  // Resolve a share token to the campaign's identity so the controller can
+  // compute analytics before rendering the public report. Returns null when the
+  // token is unknown or sharing is disabled (controller → 404).
+  async resolveShareToken(
+    token: string
+  ): Promise<{ id: string; organizationId: string } | null> {
+    const campaign = await this._campaignsRepository.findByShareToken(token);
+    if (!campaign || !campaign.shareEnabled) return null;
+    return { id: campaign.id, organizationId: campaign.organizationId };
+  }
+
+  async buildReport(
+    id: string,
+    organizationId: string,
+    analytics?: CampaignReportAnalytics
+  ): Promise<CampaignReport> {
     const campaign = await this._campaignsRepository.findById(id, organizationId);
     if (!campaign) {
       throw new Error('Campaign not found');
@@ -84,14 +109,15 @@ export class CampaignReportService {
       channelBreakdown,
       itemInventory,
       goals,
+      ...(analytics ? { analytics } : {}),
     };
   }
 
-  async toJson(id: string, organizationId: string) {
-    return this.buildReport(id, organizationId);
+  async toJson(id: string, organizationId: string, analytics?: CampaignReportAnalytics) {
+    return this.buildReport(id, organizationId, analytics);
   }
 
-  async toPublicJson(token: string) {
+  async toPublicJson(token: string, analytics?: CampaignReportAnalytics) {
     const campaign = await this._campaignsRepository.findByShareToken(token);
     if (!campaign || !campaign.shareEnabled) {
       throw new Error('Campaign not found');
@@ -133,6 +159,23 @@ export class CampaignReportService {
           items.map(sanitizeItem),
         ])
       ),
+      // Explicit analytics whitelist (3.4 / R2.3): only the trend series, the
+      // per-channel display name + provider identifier + KPIs, and the window —
+      // never an integrationId, a picture, or any internal campaign field.
+      // Mirrors AnalyticsShareService.buildPublicReport's byChannel whitelist.
+      ...(analytics
+        ? {
+            analytics: {
+              series: analytics.series,
+              byChannel: analytics.byChannel.map((c: any) => ({
+                name: c.name,
+                identifier: c.identifier,
+                kpis: c.kpis,
+              })),
+              window: analytics.window,
+            },
+          }
+        : {}),
     };
   }
 

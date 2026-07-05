@@ -1,7 +1,9 @@
 'use client';
 
-import { FC, useEffect, useRef } from 'react';
+import { FC } from 'react';
 import { DayDetailResponse } from '../utils';
+import { Drawer } from '../kit/drawer';
+import { ChannelAvatar } from '../kit/channel-avatar';
 
 interface DayDetailPanelProps {
   data?: DayDetailResponse;
@@ -10,25 +12,10 @@ interface DayDetailPanelProps {
 }
 
 export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose }) => {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    if (open) document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
-
-  if (!open || !data) return null;
+  if (!data) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end">
-      <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-[520px] bg-newBgColorInner border-l border-newTableBorder h-full overflow-y-auto animate-fadeIn"
-      >
+    <Drawer open={open} onClose={onClose} ariaLabel={data.metric}>
         <div className="sticky top-0 bg-newBgColorInner border-b border-newTableBorder px-[20px] py-[14px] flex items-center justify-between z-10">
           <div>
             <h3 className="text-[16px] font-semibold">{data.metric}</h3>
@@ -52,7 +39,7 @@ export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose })
               <div className="space-y-[6px]">
                 {data.byChannel.map((ch) => (
                   <div key={ch.integrationId} className="flex items-center gap-[10px] px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
-                    <img src={ch.picture} alt="" className="w-[24px] h-[24px] rounded-[6px]" />
+                    <ChannelAvatar src={ch.picture} name={ch.name} identifier={ch.identifier} size={24} className="rounded-[6px] object-cover" />
                     <span className="flex-1 text-[13px] truncate">{ch.name}</span>
                     <span className="text-[14px] font-semibold tabular-nums">
                       {new Intl.NumberFormat().format(Math.round(ch.value))}
@@ -71,7 +58,7 @@ export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose })
                   <div key={post.postId} className="px-[12px] py-[8px] bg-newTableHeader rounded-[8px]">
                     <div className="text-[13px] truncate">{post.content}</div>
                     <div className="flex items-center gap-[8px] mt-[4px]">
-                      <img src={post.integration.picture} alt="" className="w-[14px] h-[14px] rounded-[3px]" />
+                      <ChannelAvatar src={post.integration.picture} name={post.integration.name} identifier={post.integration.identifier} size={14} className="rounded-[3px] object-cover" />
                       <span className="text-[11px] text-newTableText">{post.integration.name}</span>
                     </div>
                   </div>
@@ -80,7 +67,6 @@ export const DayDetailPanel: FC<DayDetailPanelProps> = ({ data, open, onClose })
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 };

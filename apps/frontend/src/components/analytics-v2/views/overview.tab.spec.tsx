@@ -19,6 +19,18 @@ vi.mock('../hooks/useDayDrill', () => ({
   useDayDrill: (...args: any[]) => mockUseDayDrill(...args),
 }));
 
+// OverviewTab renders the AnomalyOverviewStrip, which reads useAnomalies — stub
+// it empty so the strip stays hidden and no real fetch runs in these tests.
+vi.mock('../hooks/useAnomalies', () => ({
+  useAnomalies: () => ({
+    data: [],
+    isLoading: false,
+    error: undefined,
+    dismiss: vi.fn(),
+    mutate: vi.fn(),
+  }),
+}));
+
 vi.mock('chart.js/auto', () => ({
   default: class {
     destroy() {}
@@ -191,12 +203,53 @@ describe('OverviewTab', () => {
         onSelectMetric={onSelectMetric}
       />
     );
-    const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBeGreaterThanOrEqual(1);
-    const closeBtn = buttons.find((b) => b.querySelector('svg'));
-    if (closeBtn) {
-      closeBtn.click();
-      expect(onSelectMetric).toHaveBeenCalledWith('');
-    }
+    // Target the panel's labelled close button directly — clickable StatTiles
+    // are now role="button" (a11y), so the old "first button with an svg"
+    // heuristic would match a KPI tile instead.
+    const closeBtn = screen.getByRole('button', { name: /close/i });
+    closeBtn.click();
+    expect(onSelectMetric).toHaveBeenCalledWith('');
+  });
+
+  it('suppresses the metric panel while the day drawer is open (F8)', () => {
+    // A chart point click sets focusDate + a defaulted metric — only the day
+    // drawer may open, not two stacked drawers.
+    mockUseMetricDrill.mockReturnValue({
+      data: {
+        metric: 'impressions',
+        label: 'Impressions',
+        format: 'count',
+        total: 50000,
+        previousTotal: 40000,
+        percentageChange: 25,
+        series: [],
+        byChannel: [],
+        topPosts: [],
+        movers: { up: [], down: [] },
+      },
+    });
+    mockUseDayDrill.mockReturnValue({
+      data: {
+        date: '2024-01-02',
+        metric: 'impressions',
+        value: 8000,
+        byChannel: [],
+        posts: [],
+      },
+    });
+    render(
+      <OverviewTab
+        {...baseProps}
+        loading={false}
+        data={sampleData}
+        selectedMetric="impressions"
+        selectedDate="2024-01-02"
+        onSelectDate={vi.fn()}
+      />
+    );
+    const dialogs = screen.getAllByRole('dialog');
+    expect(dialogs).toHaveLength(1);
+    // The one open drawer is the day panel (aria-label = the day's metric).
+    expect(dialogs[0].getAttribute('aria-label')).toBe('impressions');
   });
 });

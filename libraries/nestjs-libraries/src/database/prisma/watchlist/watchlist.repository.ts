@@ -21,6 +21,24 @@ export class WatchlistRepository {
     });
   }
 
+  // Org-scoped single lookup (6.3) — null when the id isn't this org's (or is
+  // soft-deleted), so the service can 404 instead of leaking a cross-org row.
+  findByIdForOrg(id: string, organizationId: string) {
+    return this._prisma.watchedAccount.findFirst({
+      where: { id, organizationId, deletedAt: null },
+    });
+  }
+
+  // Time-series read of WatchedAccountMetric (6.3 competitor overlay). Ordered
+  // oldest-first for direct charting; empty when nothing has been probed yet.
+  getMetricSeries(watchedAccountId: string, metric: string) {
+    return this._prisma.watchedAccountMetric.findMany({
+      where: { watchedAccountId, metric },
+      orderBy: { capturedAt: 'asc' },
+      select: { metric: true, value: true, capturedAt: true },
+    });
+  }
+
   create(data: {
     organizationId: string;
     provider: string;

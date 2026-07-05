@@ -3,7 +3,8 @@
 import React, { useMemo } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useShortLinks, useShortLinksTimeseries } from '../hooks/useShortLinks';
-import { KpiCard } from '../cards/kpi.card';
+import { StatTile } from '../kit/stat-tile';
+import { TabSkeleton, ErrorState } from '../kit/states';
 import { useShortlinksConfig } from '@gitroom/frontend/components/settings/shortlinks/hooks/useShortlinksConfig';
 import { DataTable } from '@gitroom/frontend/components/ui/data-table';
 import type { Column } from '@gitroom/frontend/components/ui/data-table';
@@ -25,15 +26,11 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
   const totalLinks = links?.length || 0;
 
   if (error) {
-    return (
-      <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[24px] flex flex-col items-center gap-[12px]">
-        <span className="text-[14px] text-red-500">{t('failed_to_load', 'Failed to load short links')}</span>
-      </div>
-    );
+    return <ErrorState title={t('failed_to_load', 'Failed to load short links')} />;
   }
 
   if (isLoading) {
-    return <div className="animate-pulse">{t('loading', 'Loading...')}</div>;
+    return <TabSkeleton variant="list" />;
   }
 
   if (!links || links.length === 0) {
@@ -51,8 +48,8 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
   return (
     <div className="flex flex-col gap-[16px]">
       <div className="flex gap-[16px]">
-        <KpiCard label={t('total_clicks', 'Total Clicks')} value={String(totalClicks)} />
-        <KpiCard label={t('total_links', 'Total Links')} value={String(totalLinks)} />
+        <StatTile label={t('total_clicks', 'Total Clicks')} value={String(totalClicks)} />
+        <StatTile label={t('total_links', 'Total Links')} value={String(totalLinks)} />
       </div>
 
       <div className="flex flex-col gap-[8px]">

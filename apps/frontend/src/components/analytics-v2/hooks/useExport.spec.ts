@@ -41,6 +41,33 @@ describe('useExport', () => {
     clickSpy.mockRestore();
   });
 
+  it('appends campaigns when present, omits it when absent (1.6)', async () => {
+    mockFetch.mockResolvedValue({ ok: true, blob: async () => new Blob(['a']) });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const { result } = renderHook(() => useExport());
+    await act(async () => {
+      await result.current.download({
+        from: '2024-01-01',
+        to: '2024-01-07',
+        format: 'csv',
+        campaigns: ['c1', 'c2'],
+      });
+    });
+    expect(mockFetch.mock.calls[0][0] as string).toContain(
+      'campaigns=c1%2Cc2'
+    );
+
+    await act(async () => {
+      await result.current.download({
+        from: '2024-01-01',
+        to: '2024-01-07',
+        format: 'csv',
+      });
+    });
+    expect(mockFetch.mock.calls[1][0] as string).not.toContain('campaigns=');
+  });
+
   it('omits integrations when none are selected and throws on a failed response', async () => {
     mockFetch.mockResolvedValue({ ok: false });
     const { result } = renderHook(() => useExport());

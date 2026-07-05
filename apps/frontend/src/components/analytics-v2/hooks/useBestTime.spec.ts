@@ -27,6 +27,18 @@ describe('useBestTime', () => {
     expect(result.current.HOUR_LABELS[12]).toBe('12p');
   });
 
+  it('always sends the browser IANA timezone (6.4)', () => {
+    renderHook(() => useBestTime());
+    expect(mockUseSWR.mock.calls[0][0]).toContain('tz=');
+  });
+
+  it('a single-channel selection sends `integration` and not `integrations` (6.4)', () => {
+    renderHook(() => useBestTime(['i1', 'i2'], 'i1'));
+    const key = mockUseSWR.mock.calls[0][0] as string;
+    expect(key).toContain('integration=i1');
+    expect(key).not.toContain('integrations=');
+  });
+
   it('load fetcher hits the best-time endpoint and throws on failure', async () => {
     renderHook(() => useBestTime());
     const load = mockUseSWR.mock.calls[0][1] as () => Promise<any>;

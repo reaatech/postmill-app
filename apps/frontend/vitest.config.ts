@@ -44,6 +44,7 @@ export default defineConfig({
       'src/components/media-tools/ai-designer/*.spec.{ts,tsx}',
       'src/components/media-tools/*.spec.{ts,tsx}',
       'src/components/composer/picks.socials.component.spec.{ts,tsx}',
+      'src/components/campaigns/**/*.spec.{ts,tsx}',
       'src/redirects.config.spec.ts',
     ],
     coverage: {

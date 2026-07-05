@@ -10,6 +10,37 @@ has the full per-commit detail.
 
 ### Unreleased
 
+**Analytics upgrade — anomaly alerts, Insights tab, campaign scope.** The `/analytics` dashboard is
+reshaped: Best time + Recommendations + a new **Alerts** section merge into a single **Insights** tab
+(the kebab overflow is gone; tabs are now Overview | Channels | Posts | Insights | Links | Watchlist).
+The daily Inngest sweep gains a `detect-anomalies` step — a pure detector
+(`analytics/anomaly.detection.ts`, trailing-28d mean/σ, flow-vs-stock, z-threshold + absolute floor)
+persists idempotent `AnalyticsAnomaly` rows (migration `20260704120000_analytics_anomaly`;
+cooldown-deduped, capped 3/org/day) and fires a new **Analytics alerts** notification category
+(`analytics`, email + in-app on by default). Anomalies surface as an Overview strip and in
+Insights → Alerts. The dashboard **campaign filter** now truly scopes aggregation to a campaign's
+posts (post-snapshot-scoped, live-fallback skipped, `scope: 'campaign-posts'`), and campaign
+analytics (trend + per-channel breakdown) appear in the Campaign Hub dashboard and public report.
+New endpoints: `GET /analytics/v2/anomalies`, `POST /analytics/v2/anomalies/:id/dismiss`,
+`GET /campaigns/:id/analytics`, plus public-API parity `GET /analytics/campaign/:id` and
+`GET /analytics/anomalies`; date-range endpoints accept a `campaigns` param. Newly connected social
+channels emit `analytics/backfill` for instant history, post-snapshots roll up weekly (past the
+90-day cliff), and the live-fallback coverage heuristic is now per-integration. New env vars
+`ANALYTICS_ANOMALY_Z` (default 3) and `ANALYTICS_ANOMALY_COOLDOWN_DAYS` (default 3). See
+[Analytics](../user-guide/analytics.md) and [Analytics API](../developer-docs/analytics-api.md).
+
+**Analytics review remediation (`feat/stats-upgrade`).** `PostAnalyticsSnapshot.value` is a
+**cumulative lifetime level** for every metric, and campaign-scoped aggregation now differences
+levels at read time against a per-post baseline (level just before the window) — fixing 10–20×
+inflated campaign KPIs/series (overview, drill, Campaign Hub, public report, public API). The weekly
+post rollup keeps the **week's latest level** for every metric (was summing ~7 cumulative dailies →
+~7× inflation) and only compacts a bounded 30-day window per sweep. All mutating `/analytics/v2`
+routes require the `analytics:update` RBAC permission and `POST /analytics/v2/narrate` is
+AI-billing-gated; the public campaign report no longer leaks `integrationId`/`picture` in
+`byChannel`; campaign `from`/`to` are validated (400) and window-capped; the legacy public
+`GET /analytics/overview` is un-shadowed. The public `/share/analytics/[token]` and
+`/share/campaign/[token]` pages render again (public root layout + proxy exemption).
+
 **AI Designer Foundations.** The server now owns the `DesignerDoc` contract with a single zod
 schema (`libraries/nestjs-libraries/src/media/designer-doc/designer-doc.schema.ts`) shared as a
 type-only import by the frontend store and renderer. `DesignerDocService` provides `validate`,

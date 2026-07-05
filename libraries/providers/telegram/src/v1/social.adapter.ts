@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   PostDetails,
   PostResponse,
@@ -15,9 +16,11 @@ import { Integration } from '@prisma/client';
 import striptags from 'striptags';
 import { getOrgCredential } from '@gitroom/provider-kernel';
 import { ClientInformation } from '@gitroom/provider-kernel';
+import { Logger } from '@nestjs/common';
 
 import { metadata as providerMetadata } from './metadata';
 export class TelegramProvider extends SocialAbstract implements SocialProvider {
+  private readonly logger = new Logger(TelegramProvider.name);
   override maxConcurrentJob = 3; // Telegram has moderate bot API limits
   identifier = 'telegram';
   name = 'Telegram';
@@ -437,6 +440,36 @@ export class TelegramProvider extends SocialAbstract implements SocialProvider {
   ): Promise<{ liked: boolean; likeCount?: number }> {
     // Platform does not support native comment likes
     return { liked: like };
+  }
+
+  // Channel-level analytics: subscriber (member) count via the Bot API's
+  // getChatMemberCount. `accessToken` is the chat id (see authenticate()).
+  // Per-post `views` are NOT retrievable through the Bot API (they require
+  // MTProto) — see su-provider-analytics.md, so there is no postAnalytics().
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number,
+    clientInformation?: ClientInformation
+  ): Promise<AnalyticsData[]> {
+    try {
+      const bot = this.createBot(clientInformation?.client_id || '');
+      const count = await bot.getChatMemberCount(accessToken);
+      if (count === undefined || count === null) {
+        return [];
+      }
+      return [
+        {
+          label: 'Followers',
+          data: [
+            { total: String(count), date: dayjs().format('YYYY-MM-DD') },
+          ],
+        },
+      ];
+    } catch (err) {
+      this.logger.warn('Telegram analytics failed');
+      return [];
+    }
   }
 
   async botIsAdmin(chatId: number, botId: number, orgId?: string): Promise<boolean> {

@@ -11,6 +11,24 @@
 ## Unreleased
 
 ### Added
+- **Analytics anomaly alerts + Insights tab + true campaign scope.** The `/analytics` dashboard
+  merges Best time, Recommendations, and a new Alerts section into a single **Insights** tab (tabs
+  are now Overview | Channels | Posts | Insights | Links | Watchlist; the kebab overflow is gone).
+  The daily Inngest sweep gains a `detect-anomalies` step: a pure detector
+  (`analytics/anomaly.detection.ts` — trailing-28-day mean/σ, flow-vs-stock differencing, z-threshold
+  plus an absolute floor) persists idempotent `AnalyticsAnomaly` rows (migration
+  `20260704120000_analytics_anomaly`), cooldown-deduped and capped at 3 per org per day, and fires a
+  new **Analytics alerts** notification category (`analytics`; email + in-app on by default).
+  Anomalies show as an Overview strip and in Insights → Alerts. The dashboard **campaign filter** now
+  scopes aggregation to a campaign's posts server-side (post-snapshot-scoped, live-fallback skipped,
+  `scope: 'campaign-posts'`), and campaign analytics (trend + per-channel breakdown) appear in the
+  Campaign Hub dashboard and public report. New endpoints `GET /analytics/v2/anomalies`,
+  `POST /analytics/v2/anomalies/:id/dismiss`, `GET /campaigns/:id/analytics`, and public-API parity
+  `GET /analytics/campaign/:id` + `GET /analytics/anomalies`; date-range endpoints accept a
+  `campaigns` param. Newly connected social channels emit `analytics/backfill` for instant history;
+  post-snapshots roll up weekly past the 90-day cliff; the live-fallback coverage heuristic is now
+  per-integration. New env vars `ANALYTICS_ANOMALY_Z` (default 3) and
+  `ANALYTICS_ANOMALY_COOLDOWN_DAYS` (default 3).
 - **Setup onboarding gate (`/setup`).** One-time wizard for new organizations that walks the first
   user through provider configuration (LLM required; AI media, channels, content packs, storage,
   shortlinks, VPN optional). Completion persists in `Organization.setupCompletedAt`; existing orgs
@@ -133,6 +151,37 @@
   for existing orgs on deploy.
 
 ### Fixed
+- **Analytics post-snapshot level semantics + `feat/stats-upgrade` review remediation.**
+  `PostAnalyticsSnapshot.value` is now treated as a **cumulative lifetime level** for every metric
+  (matching what every provider `postAnalytics()` returns), and all post-scoped consumers difference
+  levels at read time: campaign overview/detail KPIs and series subtract a per-post baseline (the
+  level just before the window) instead of summing the running totals — fixing 10–20× inflated
+  campaign KPIs on `/campaigns/:id/analytics`, `?campaigns=`, the Campaign Hub, the public report,
+  and the public API. `score`/`upvote_ratio` are reclassified as stock. The weekly post rollup now
+  keeps the **week's latest level** for every metric (was summing ~7 cumulative dailies → ~7×
+  inflation past the 90-day cliff) and only re-reads/re-writes a bounded 30-day window per sweep
+  (was the org's entire pre-cutoff history in one transaction; skipped-row counts are logged, never
+  silently truncated). Also: all mutating `/analytics/v2` routes (share mint/disable, alert-rule
+  CRUD, dismiss, refresh, watchlist CUD) now require the `analytics:update` RBAC permission and
+  `POST /analytics/v2/narrate` is AI-billing-gated; the public campaign report whitelists
+  `analytics.byChannel` to `{ name, identifier, kpis }` (no `integrationId`/`picture` leak);
+  campaign-analytics `from`/`to` are validated (400, not 500) and window-capped; alert-rule
+  `threshold`/`integrationId`/`rangePreset` are bounded and org-checked; the legacy public
+  `GET /analytics/overview` is un-shadowed from `GET /analytics/:integration`. The public
+  `/share/analytics/[token]` and `/share/campaign/[token]` pages render again (public root layout +
+  proxy exemption + backend `baseUrl`), the alerts "View top post" link opens the post drawer, and
+  the anomaly notification deep link carries the URI-encoded metric **key** (not the display label).
+  Follow-up review fixes on the same branch: alert-rule `integrationId` accepts cuids (a `@IsUUID()`
+  check made every channel-scoped rule impossible); every date route — including the newly reachable
+  public `GET /analytics/overview` — validates `from`/`to` and caps the window at 400 days; the Posts
+  tab / recommendations / weekly digest read each post's **latest level** instead of summing snapshot
+  rows (and top-post lists dedup to one entry per post); anomaly detection excludes today's partial
+  day (no more false "drop" alerts at the 02:00 sweep) and evaluates only complete days; the campaign
+  baseline read runs as a DB-side `DISTINCT ON` (Prisma's client-side `distinct` shipped the full
+  pre-window history per request); `AnalyticsAlertRule.integrationId` gains a cascade FK (migration
+  `20260705100000_alert_rule_integration_fk`); `GET /analytics/v2/share` is RBAC-gated like
+  mint/disable; campaign-scoped derived ratios use level-differenced totals; the watchlist growth
+  overlay aligns both series on a shared date axis.
 - **Designer safe-zone insets on story formats.** `getSafeZoneInset` treated a preset's `safeZones`
   (unsafe overlay rects, e.g. the IG story top bar / bottom UI strip) as if they were the safe area,
   degenerating to a zero-size box on `ig-story`/`ig-reel`/`fb-story`/`tiktok` and clamping reflowed

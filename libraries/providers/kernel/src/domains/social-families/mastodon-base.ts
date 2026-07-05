@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   ClientInformation,
   PostDetails,
@@ -412,6 +413,74 @@ export class MastodonProvider extends SocialAbstract implements SocialProvider {
       // optimistic toggle and tell the user, rather than reporting a fake state.
       this.logger.error('Mastodon likeComment error:', err);
       throw err;
+    }
+  }
+
+  async analytics(
+    id: string,
+    accessToken: string,
+    date: number,
+    clientInformation?: ClientInformation
+  ): Promise<AnalyticsData[]> {
+    try {
+      const instanceUrl =
+        clientInformation?.instanceUrl || 'https://mastodon.social';
+      const account = (await (
+        await this.fetch(`${instanceUrl}/api/v1/accounts/${id}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      ).json()) as any;
+
+      const followers = account?.followers_count;
+      if (followers === undefined || followers === null) {
+        return [];
+      }
+      return [
+        {
+          label: 'Followers',
+          data: [
+            { total: String(followers), date: dayjs().format('YYYY-MM-DD') },
+          ],
+        },
+      ];
+    } catch (err) {
+      this.logger.warn(`Mastodon analytics failed: ${(err as Error)?.message}`);
+      return [];
+    }
+  }
+
+  async postAnalytics(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    date: number,
+    clientInformation?: ClientInformation
+  ): Promise<AnalyticsData[]> {
+    try {
+      const instanceUrl =
+        clientInformation?.instanceUrl || 'https://mastodon.social';
+      const status = (await (
+        await this.fetch(`${instanceUrl}/api/v1/statuses/${postId}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        })
+      ).json()) as any;
+
+      const today = dayjs().format('YYYY-MM-DD');
+      const result: AnalyticsData[] = [];
+      const push = (label: string, value: unknown) => {
+        if (value !== undefined && value !== null) {
+          result.push({ label, data: [{ total: String(value), date: today }] });
+        }
+      };
+
+      push('Favourites', status?.favourites_count);
+      push('Reblogs', status?.reblogs_count);
+      push('Replies', status?.replies_count);
+
+      return result;
+    } catch (err) {
+      this.logger.warn(`Mastodon postAnalytics failed: ${(err as Error)?.message}`);
+      return [];
     }
   }
 }

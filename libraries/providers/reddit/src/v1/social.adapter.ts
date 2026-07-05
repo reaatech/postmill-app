@@ -1,4 +1,5 @@
 import {
+  AnalyticsData,
   AuthTokenDetails,
   ClientInformation,
   PostDetails,
@@ -7,6 +8,7 @@ import {
   SocialProvider,
 } from '@gitroom/provider-kernel';
 import { makeId } from '@gitroom/provider-kernel';
+import dayjs from 'dayjs';
 import { RedditSettingsDto } from '@gitroom/provider-kernel';
 import { timer } from '@gitroom/helpers/utils/timer';
 import { decodeHtmlEntities } from '@gitroom/helpers/utils/html.to.text';
@@ -682,6 +684,82 @@ export class RedditProvider extends SocialAbstract implements SocialProvider {
         content: message,
         createdAt: new Date().toISOString(),
       };
+    }
+  }
+
+  // Reddit exposes no per-account channel analytics, so there is no analytics();
+  // per-post metrics come from the public /api/info listing (score / upvote
+  // ratio / comment count), subreddit-agnostic — same fetch path as fetchComments.
+  async postAnalytics(
+    integrationId: string,
+    accessToken: string,
+    postId: string,
+    date: number
+  ): Promise<AnalyticsData[]> {
+    try {
+      // A multi-subreddit publish stores its `releaseId` comma-joined, so
+      // prefix each id with `t3_` (if not already) and re-join for /api/info.
+      const ids = postId
+        .split(',')
+        .map((raw) => raw.trim())
+        .filter(Boolean)
+        .map((raw) => (raw.startsWith('t3_') ? raw : `t3_${raw}`))
+        .join(',');
+      const info = (await (
+        await this.fetch(
+          `https://oauth.reddit.com/api/info?id=${ids}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          }
+        )
+      ).json()) as any;
+
+      const children: any[] = (info?.data?.children ?? [])
+        .map((c: any) => c?.data)
+        .filter(Boolean);
+      if (!children.length) {
+        return [];
+      }
+
+      // Aggregate across all children: score / comments sum, ratio averages.
+      let score = 0;
+      let numComments = 0;
+      let ratioSum = 0;
+      let ratioCount = 0;
+      for (const data of children) {
+        if (data.score !== undefined && data.score !== null) {
+          score += Number(data.score) || 0;
+        }
+        if (data.num_comments !== undefined && data.num_comments !== null) {
+          numComments += Number(data.num_comments) || 0;
+        }
+        if (data.upvote_ratio !== undefined && data.upvote_ratio !== null) {
+          ratioSum += Number(data.upvote_ratio) || 0;
+          ratioCount += 1;
+        }
+      }
+
+      const today = dayjs().format('YYYY-MM-DD');
+      const result: AnalyticsData[] = [];
+      const push = (label: string, value: unknown) => {
+        if (value !== undefined && value !== null) {
+          result.push({ label, data: [{ total: String(value), date: today }] });
+        }
+      };
+
+      push('Score', score);
+      push(
+        'Upvote Ratio',
+        ratioCount ? Math.round((ratioSum / ratioCount) * 10000) / 10000 : undefined
+      );
+      push('Comments', numComments);
+
+      return result;
+    } catch (err) {
+      this.logger.warn(`Reddit postAnalytics failed: ${(err as Error)?.message}`);
+      return [];
     }
   }
 }

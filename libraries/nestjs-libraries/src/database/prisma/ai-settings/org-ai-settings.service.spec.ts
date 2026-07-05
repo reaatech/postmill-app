@@ -6,6 +6,9 @@ const mockRepo = {
   getByOrg: vi.fn(),
   getByIdentifier: vi.fn(),
   setActive: vi.fn(),
+  delete: vi.fn(),
+  getBudget: vi.fn(),
+  upsertBudget: vi.fn(),
 };
 
 const mockEncryption = {
@@ -108,5 +111,322 @@ describe('OrgAiSettingsService.upsert auto-activation', () => {
     await service.upsert('org-1', 'anthropic', { credentials: { apiKey: 'sk-test' } });
 
     expect(mockRepo.setActive).not.toHaveBeenCalled();
+  });
+
+  it('serializes an object extraConfig and skips encryption when no credentials', async () => {
+    mockRepo.getByOrg.mockResolvedValue([{ id: 'x', identifier: 'openai' }]);
+    mockRepo.upsert.mockResolvedValue({ id: 'x' });
+
+    await service.upsert('org-1', 'openai', {
+      enabled: true,
+      extraConfig: { region: 'us' },
+    });
+
+    // 3rd positional arg to repo.upsert is the payload
+    const payload = mockRepo.upsert.mock.calls[0][2];
+    expect(payload.credentials).toBeUndefined();
+    expect(payload.extraConfig).toBe(JSON.stringify({ region: 'us' }));
+    expect(mockEncryption.encrypt).not.toHaveBeenCalled();
+  });
+
+  it('passes a string extraConfig through unchanged', async () => {
+    mockRepo.getByOrg.mockResolvedValue([{ id: 'x', identifier: 'openai' }]);
+    mockRepo.upsert.mockResolvedValue({ id: 'x' });
+
+    await service.upsert('org-1', 'openai', { extraConfig: 'raw-string' });
+
+    const payload = mockRepo.upsert.mock.calls[0][2];
+    expect(payload.extraConfig).toBe('raw-string');
+  });
+
+  it('does not auto-activate a first provider that is missing required credentials', async () => {
+    mockRepo.getByOrg.mockResolvedValue([]);
+    mockRepo.upsert.mockResolvedValue({ id: 'x' });
+    mockResolution.resolveAI.mockReturnValue({
+      identifier: 'openai',
+      credentialFields: [{ key: 'apiKey', required: true }],
+    });
+
+    // credentials present (so isFirstProvider true) but the required apiKey is blank
+    await service.upsert('org-1', 'openai', { credentials: { apiKey: '   ' } });
+
+    expect(mockRepo.setActive).not.toHaveBeenCalled();
+  });
+
+  it('swallows an auto-activation failure of the first provider', async () => {
+    mockRepo.getByOrg.mockResolvedValue([]);
+    mockRepo.upsert.mockResolvedValue({ id: 'x' });
+    mockRepo.getByIdentifier.mockResolvedValue({
+      identifier: 'openai',
+      version: 'v1',
+      credentials: 'enc:{"apiKey":"sk"}',
+    });
+    mockResolution.resolveAI.mockReturnValue({
+      identifier: 'openai',
+      credentialFields: [{ key: 'apiKey', required: true }],
+    });
+    mockRepo.setActive.mockRejectedValue(new Error('db down'));
+
+    // Should not throw despite the setActive rejection.
+    await expect(
+      service.upsert('org-1', 'openai', { credentials: { apiKey: 'sk' } }),
+    ).resolves.toEqual({ id: 'x' });
+  });
+});
+
+describe('OrgAiSettingsService reads/mutations', () => {
+  let service: OrgAiSettingsService;
+
+  const adapter = {
+    identifier: 'openai',
+    name: 'OpenAI',
+    type: 'llm',
+    capabilities: ['text'],
+    credentialFields: [{ key: 'apiKey', required: true }],
+    validateCredentials: vi.fn(),
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    service = new OrgAiSettingsService(
+      mockRepo as any,
+      mockEncryption as any,
+      mockResolution as any,
+      mockKernel as any,
+      undefined,
+    );
+  });
+
+  describe('getProviders', () => {
+    it('maps each registered adapter, marking configured/enabled from db config', async () => {
+      mockKernel.listManifests.mockReturnValue([
+        { providerId: 'openai', version: 'v1' },
+        { providerId: 'openai', version: 'v2' }, // duplicate providerId → deduped
+      ]);
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockRepo.getByOrg.mockResolvedValue([
+        {
+          identifier: 'openai',
+          enabled: true,
+          isActive: true,
+          credentials: 'enc:{"apiKey":"sk-x"}',
+          defaultModel: 'gpt-4',
+          reasoningModel: 'o1',
+          version: 'v1',
+          createdAt: null,
+          updatedAt: null,
+        },
+      ]);
+
+      const res = await service.getProviders('org-1');
+      expect(res).toHaveLength(1);
+      expect(res[0]).toMatchObject({
+        identifier: 'openai',
+        enabled: true,
+        isActive: true,
+        isConfigured: true,
+        defaultModel: 'gpt-4',
+      });
+    });
+
+    it('defaults unset fields when there is no matching db config', async () => {
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'openai', version: 'v1' }]);
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockRepo.getByOrg.mockResolvedValue([]);
+
+      const res = await service.getProviders('org-1');
+      expect(res[0]).toMatchObject({
+        enabled: false,
+        isActive: false,
+        isConfigured: false,
+        defaultModel: '',
+        reasoningModel: '',
+        version: 'v1',
+        createdAt: null,
+        updatedAt: null,
+      });
+    });
+
+    it('skips manifests whose adapter fails to resolve', async () => {
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'ghost', version: 'v1' }]);
+      mockResolution.resolveAI.mockImplementation(() => {
+        throw new Error('unregistered');
+      });
+      mockRepo.getByOrg.mockResolvedValue([]);
+
+      expect(await service.getProviders('org-1')).toHaveLength(0);
+    });
+  });
+
+  describe('getActiveProvider', () => {
+    it('returns null when no active config', async () => {
+      mockRepo.getActive.mockResolvedValue(null);
+      expect(await service.getActiveProvider('org-1')).toBeNull();
+    });
+
+    it('returns null when the active provider adapter is unknown', async () => {
+      mockRepo.getActive.mockResolvedValue({ identifier: 'ghost', version: 'v1', credentials: null });
+      mockResolution.resolveAI.mockImplementation(() => {
+        throw new Error('unregistered');
+      });
+      expect(await service.getActiveProvider('org-1')).toBeNull();
+    });
+
+    it('returns the decrypted active provider', async () => {
+      mockRepo.getActive.mockResolvedValue({
+        identifier: 'openai',
+        version: null,
+        enabled: true,
+        isActive: true,
+        defaultModel: 'gpt-4',
+        reasoningModel: 'o1',
+        credentials: 'enc:{"apiKey":"sk-x"}',
+      });
+      mockResolution.resolveAI.mockReturnValue(adapter);
+
+      const res = await service.getActiveProvider('org-1');
+      expect(res).toMatchObject({
+        identifier: 'openai',
+        version: 'v1',
+        name: 'OpenAI',
+        credentials: { apiKey: 'sk-x' },
+      });
+    });
+  });
+
+  describe('getByIdentifier', () => {
+    it('returns null when config missing', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue(null);
+      expect(await service.getByIdentifier('org-1', 'openai')).toBeNull();
+    });
+
+    it('returns null when adapter missing', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: null });
+      mockResolution.resolveAI.mockImplementation(() => {
+        throw new Error('x');
+      });
+      expect(await service.getByIdentifier('org-1', 'openai')).toBeNull();
+    });
+
+    it('returns the decrypted config with defaulted models', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue({
+        identifier: 'openai',
+        version: 'v2',
+        enabled: true,
+        isActive: false,
+        defaultModel: null,
+        reasoningModel: null,
+        credentials: 'enc:{"apiKey":"sk-x"}',
+      });
+      mockResolution.resolveAI.mockReturnValue(adapter);
+
+      const res = await service.getByIdentifier('org-1', 'openai', 'v2');
+      expect(res).toMatchObject({
+        version: 'v2',
+        defaultModel: '',
+        reasoningModel: '',
+        credentials: { apiKey: 'sk-x' },
+      });
+    });
+  });
+
+  describe('setActive', () => {
+    it('throws when the provider is not configured', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue(null);
+      await expect(service.setActive('org-1', 'openai')).rejects.toThrow('not configured');
+    });
+
+    it('throws when the provider adapter is unknown', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: 'enc:{}' });
+      mockResolution.resolveAI.mockImplementation(() => {
+        throw new Error('x');
+      });
+      await expect(service.setActive('org-1', 'openai')).rejects.toThrow('Unknown provider');
+    });
+
+    it('throws when required credentials are missing', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: 'enc:{}' });
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      await expect(service.setActive('org-1', 'openai')).rejects.toThrow('not fully configured');
+    });
+
+    it('activates when fully configured', async () => {
+      mockKernel.latestActive.mockReturnValue({ manifest: { version: 'v1' } });
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: 'enc:{"apiKey":"sk-x"}' });
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockRepo.setActive.mockResolvedValue({ ok: true });
+      await service.setActive('org-1', 'openai');
+      expect(mockRepo.setActive).toHaveBeenCalledWith('org-1', 'openai', 'v1');
+    });
+  });
+
+  describe('testConnection', () => {
+    it('throws when not configured', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue(null);
+      await expect(service.testConnection('org-1', 'openai')).rejects.toThrow('not configured');
+    });
+
+    it('throws when adapter unknown', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: null, credentials: 'enc:{}' });
+      mockResolution.resolveAI.mockImplementation(() => {
+        throw new Error('x');
+      });
+      await expect(service.testConnection('org-1', 'openai')).rejects.toThrow('Unknown provider');
+    });
+
+    it('validates credentials with the resolved adapter', async () => {
+      mockRepo.getByIdentifier.mockResolvedValue({ identifier: 'openai', version: 'v1', credentials: 'enc:{"apiKey":"sk-x"}' });
+      const validate = vi.fn().mockResolvedValue({ valid: true });
+      mockResolution.resolveAI.mockReturnValue({ ...adapter, validateCredentials: validate });
+      const res = await service.testConnection('org-1', 'openai');
+      expect(validate).toHaveBeenCalledWith({ apiKey: 'sk-x' });
+      expect(res).toEqual({ valid: true });
+    });
+  });
+
+  describe('delete + budget pass-throughs', () => {
+    it('delete delegates to the repository', async () => {
+      mockRepo.delete.mockResolvedValue({ ok: true });
+      await service.delete('org-1', 'openai');
+      expect(mockRepo.delete).toHaveBeenCalledWith('org-1', 'openai');
+    });
+
+    it('getBudget delegates to the repository', async () => {
+      mockRepo.getBudget.mockResolvedValue({ monthlyCap: 10 });
+      expect(await service.getBudget('org-1')).toEqual({ monthlyCap: 10 });
+    });
+
+    it('updateBudget delegates to the repository', async () => {
+      mockRepo.upsertBudget.mockResolvedValue({ ok: true });
+      await service.updateBudget('org-1', { dailyCap: 5 });
+      expect(mockRepo.upsertBudget).toHaveBeenCalledWith('org-1', { dailyCap: 5 });
+    });
+  });
+
+  describe('credential decryption', () => {
+    it('treats undecryptable credentials as not configured', async () => {
+      mockKernel.listManifests.mockReturnValue([{ providerId: 'openai', version: 'v1' }]);
+      mockResolution.resolveAI.mockReturnValue(adapter);
+      mockEncryption.decrypt.mockImplementationOnce(() => {
+        throw new Error('bad key');
+      });
+      mockRepo.getByOrg.mockResolvedValue([{ identifier: 'openai', credentials: 'enc:garbage' }]);
+
+      const res = await service.getProviders('org-1');
+      expect(res[0].isConfigured).toBe(false);
+    });
+
+    it('_resolveVersion falls back to DEFAULT_VERSION when kernel has no active', async () => {
+      mockKernel.latestActive.mockReturnValue(undefined);
+      mockRepo.getByIdentifier.mockResolvedValue(null);
+      // exercises the `latest?.manifest.version ?? DEFAULT_VERSION` fallback
+      await service.getByIdentifier('org-1', 'openai');
+      expect(mockRepo.getByIdentifier).toHaveBeenCalledWith('org-1', 'openai', 'v1');
+    });
   });
 });

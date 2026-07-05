@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { WatchlistRepository } from '@gitroom/nestjs-libraries/database/prisma/watchlist/watchlist.repository';
 import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
+import dayjs from 'dayjs';
 
 @Injectable()
 export class WatchlistService {
@@ -33,6 +34,36 @@ export class WatchlistService {
 
   getEnabledAccounts(organizationId: string) {
     return this._watchlistRepository.findEnabledByOrg(organizationId);
+  }
+
+  /**
+   * Competitor-overlay series (6.3): the watched account's metric time-series
+   * (followers by default). Org-scoped — a cross-org / missing id 404s. Returns
+   * an empty `series` when nothing has been probed yet.
+   */
+  async getSeries(
+    id: string,
+    organizationId: string,
+    metric = 'followers',
+  ) {
+    const account = await this._watchlistRepository.findByIdForOrg(id, organizationId);
+    if (!account) {
+      throw new NotFoundException('Watched account not found');
+    }
+
+    const rows = await this._watchlistRepository.getMetricSeries(id, metric);
+
+    return {
+      id: account.id,
+      provider: account.provider,
+      handle: account.handle,
+      displayName: account.displayName,
+      metric,
+      series: rows.map((r) => ({
+        date: dayjs(r.capturedAt).format('YYYY-MM-DD'),
+        value: r.value,
+      })),
+    };
   }
 
   /**

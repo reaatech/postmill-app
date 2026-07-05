@@ -24,7 +24,7 @@ export const ListView = () => {
       ? t('no_published_posts', 'No published posts')
       : t('no_posts', 'No posts');
 
-  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor } = usePostActions();
+  const { editPost, deletePost, copyDebugJson, openStatistics, openMissingRelease, openPostDetail, changeColor, postAnalyticsDrawer } = usePostActions();
 
   // The list renders the same date-range window as the calendar. Both the state
   // filter (Scheduled/Draft/Published) and engagement filter are already applied
@@ -60,6 +60,7 @@ export const ListView = () => {
 
   return (
     <div className="flex flex-col gap-[10px] flex-1 relative min-h-0">
+      {postAnalyticsDrawer}
       <div className="flex-1 relative">
         <div className="absolute inset-0 flex flex-col overflow-auto scrollbar scrollbar-thumb-fifth scrollbar-track-newBgColor">
           {loading ? (

@@ -1,9 +1,14 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useCallback, useEffect, useState } from 'react';
 import { ChannelDetailResponse, SeriesPoint } from '../utils';
 import { AreaChart } from '../charts/area.chart';
 import { useChannelMetric } from '../hooks/useChannelMetric';
+import { CHART_PALETTE } from '../kit/palette';
+import { Drawer } from '../kit/drawer';
+import { ChannelAvatar } from '../kit/channel-avatar';
+import { RefreshButton } from '../kit/refresh-button';
+import { useT } from '@gitroom/react/translation/get.transation.service.client';
 
 interface ChannelDetailPanelProps {
   channel: {
@@ -20,15 +25,6 @@ interface ChannelDetailPanelProps {
   compare: boolean;
 }
 
-const CHART_COLORS = [
-  'var(--chart-1, #2b5cd3)',
-  'var(--chart-2, #32d583)',
-  'var(--chart-3, #1d9bf0)',
-  'var(--chart-4, #f97066)',
-  'var(--chart-5, #ffac30)',
-  'var(--chart-6, #8b90ff)',
-];
-
 export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
   channel,
   data,
@@ -38,7 +34,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
   to,
   compare,
 }) => {
-  const panelRef = useRef<HTMLDivElement>(null);
+  const t = useT();
   const [drillMetric, setDrillMetric] = useState<string | null>(null);
 
   const { data: metricData, isLoading: metricLoading } = useChannelMetric({
@@ -49,42 +45,30 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
     compare,
   });
 
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (drillMetric) {
-          setDrillMetric(null);
-        } else {
-          onClose();
-        }
-      }
-    };
-    if (open) document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose, drillMetric]);
+  // Esc closes the inner metric drill first, then the whole drawer.
+  const handleEscape = useCallback(() => {
+    if (drillMetric) setDrillMetric(null);
+    else onClose();
+  }, [drillMetric, onClose]);
 
   useEffect(() => {
     if (!open) setDrillMetric(null);
   }, [open]);
 
-  if (!open) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end">
-      <div
-        className="absolute inset-0 bg-black/20 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div
-        ref={panelRef}
-        className="relative w-full max-w-[520px] bg-newBgColorInner border-l border-newTableBorder h-full overflow-y-auto animate-fadeIn"
-      >
+    <Drawer
+      open={open}
+      onClose={onClose}
+      onEscape={handleEscape}
+      ariaLabel={channel.name}
+    >
         <div className="sticky top-0 bg-newBgColorInner border-b border-newTableBorder px-[20px] py-[14px] flex items-center justify-between z-10">
           <div className="flex items-center gap-[10px]">
-            <img
+            <ChannelAvatar
               src={channel.picture}
-              alt=""
-              className="w-[28px] h-[28px] rounded-[8px]"
+              name={channel.name}
+              identifier={channel.identifier}
+              size={28}
             />
             <div>
               <h3 className="text-[16px] font-semibold">{channel.name}</h3>
@@ -93,24 +77,29 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-[6px] hover:bg-boxHover rounded-[6px] transition-colors shrink-0"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="none"
+          <div className="flex items-center gap-[4px] shrink-0">
+            {channel.integrationId && (
+              <RefreshButton integrationId={channel.integrationId} />
+            )}
+            <button
+              onClick={onClose}
+              className="p-[6px] hover:bg-boxHover rounded-[6px] transition-colors shrink-0"
             >
-              <path
-                d="M4 4L12 12M12 4L4 12"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 16 16"
+                fill="none"
+              >
+                <path
+                  d="M4 4L12 12M12 4L4 12"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div className="p-[20px] space-y-[20px]">
@@ -129,7 +118,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
             <div>
               <button
                 onClick={() => setDrillMetric(null)}
-                className="flex items-center gap-[6px] text-[13px] text-newTableText hover:text-newTableText/80 transition-colors mb-[16px]"
+                className="flex items-center gap-[6px] text-[13px] text-newTableText hover:text-newTableText transition-colors mb-[16px]"
               >
                 <svg
                   width="14"
@@ -213,7 +202,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                   <div className="h-[200px]">
                     <AreaChart
                       data={metricData.series}
-                      color={CHART_COLORS[0]}
+                      color={CHART_PALETTE[0]}
                       height={200}
                       format={
                         metricData.format === 'percent'
@@ -309,8 +298,19 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
               return (
                 <div
                   key={kpi.metric}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={t('view_metric_details', 'View {{label}} details', {
+                    label: kpi.label,
+                  })}
                   onClick={() => setDrillMetric(kpi.metric)}
-                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText/30 transition-colors"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setDrillMetric(kpi.metric);
+                    }
+                  }}
+                  className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] cursor-pointer hover:border-newTableText transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent/60"
                 >
                   <div className="flex items-center justify-between mb-[8px]">
                     <span className="text-[13px] font-medium text-newTableText uppercase tracking-wide">
@@ -350,7 +350,7 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
                     <div className="h-[100px]">
                       <AreaChart
                         data={series}
-                        color={CHART_COLORS[i % CHART_COLORS.length]}
+                        color={CHART_PALETTE[i % CHART_PALETTE.length]}
                         height={100}
                         format={
                           kpi.format === 'percent' ? 'percent' : 'number'
@@ -406,7 +406,6 @@ export const ChannelDetailPanel: FC<ChannelDetailPanelProps> = ({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </Drawer>
   );
 };

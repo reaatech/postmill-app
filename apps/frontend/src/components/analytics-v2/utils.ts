@@ -14,6 +14,14 @@ export interface SeriesPoint {
   previousValue?: number;
 }
 
+// Derived (computed, never stored) secondary metrics (6.2). Either value is
+// null when its denominator is zero/missing — the UI hides the tile in that
+// case rather than rendering a misleading 0.
+export interface DerivedMetrics {
+  engagementRate: number | null;
+  reachPerFollower: number | null;
+}
+
 export interface ChannelKPI {
   integrationId: string;
   name: string;
@@ -21,6 +29,9 @@ export interface ChannelKPI {
   picture: string;
   kpis: { metric: string; label: string; format: string; total: number; previousTotal: number; percentageChange: number }[];
   value?: number;
+  // Per-channel derived metrics (6.2). Present only when the backend can compute
+  // at least one; each field may still be null when its denominator is 0.
+  derived?: DerivedMetrics;
 }
 
 export interface ByPlatform {
@@ -34,6 +45,11 @@ export interface OverviewResponse {
   series: Record<string, SeriesPoint[]>;
   byChannel: ChannelKPI[];
   breakdown: { byPlatform: ByPlatform[] };
+  // Org-wide derived metrics (6.2) — engagement rate + reach-per-follower.
+  derived?: DerivedMetrics;
+  // Present only under a campaign filter (1.3/1.6): metrics derive from post
+  // snapshots only, so the UI labels them "post metrics only".
+  scope?: 'campaign-posts';
 }
 
 export interface ChannelDetailResponse {
@@ -90,7 +106,7 @@ export interface DrillState {
   focusIntegration?: string;
   focusDate?: string;
   focusPost?: string;
-  tab?: 'overview' | 'channels' | 'posts' | 'best-time' | 'recommendations' | 'watchlist' | 'shortlinks';
+  tab?: 'overview' | 'channels' | 'posts' | 'insights' | 'best-time' | 'recommendations' | 'watchlist' | 'shortlinks';
 }
 
 export interface ChannelMetricResponse {

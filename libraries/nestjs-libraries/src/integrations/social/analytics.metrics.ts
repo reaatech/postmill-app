@@ -88,6 +88,14 @@ export const METRIC_REGISTRY: Record<string, MetricDef> = {
   reactions: { label: 'Reactions', format: 'count', kind: 'flow' },
   outbound_clicks: { label: 'Outbound Clicks', format: 'count', kind: 'flow' },
   favorites: { label: 'Favorites', format: 'count', kind: 'flow' },
+  // Reddit per-post metrics (7.1): net score and the upvote ratio are distinct
+  // from likes/engagement — keep them on their own canonical keys so they
+  // don't collapse onto a semantically different metric.
+  // Levels even in isolation (net score, point-in-time ratio) — cumulative like
+  // total_likes (kind:'stock'), not per-window flows. Post-snapshot consumers
+  // difference them at read time.
+  score: { label: 'Score', format: 'count', kind: 'stock' },
+  upvote_ratio: { label: 'Upvote Ratio', format: 'percent', kind: 'stock' },
 };
 
 export const PROVIDER_METRIC_MAP: Record<string, Record<string, string>> = {
@@ -187,6 +195,14 @@ export const PROVIDER_METRIC_MAP: Record<string, Record<string, string>> = {
     Reposts: 'reposts',
     Quotes: 'quotes',
   },
+  dribbble: {
+    // Dribbble API v2 stats (shot views/likes/comments, user followers, buckets).
+    Views: 'views',
+    Likes: 'likes',
+    Comments: 'comments',
+    Followers: 'followers',
+    Saves: 'saves',
+  },
   x: {
     // Channel-level (analytics) — labels are derived via key.toUpperCase()
     IMPRESSION: 'impressions',
@@ -202,6 +218,49 @@ export const PROVIDER_METRIC_MAP: Record<string, Record<string, string>> = {
     Replies: 'replies',
     Quotes: 'quotes',
     Bookmarks: 'bookmarks',
+  },
+  // --- Phase 7.1 (wave 1) ---
+  bluesky: {
+    // Channel-level (analytics) — public appview getProfile
+    Followers: 'followers',
+    // Post-level (postAnalytics) — public appview getPosts
+    Likes: 'likes',
+    Reposts: 'reposts',
+    Replies: 'replies',
+  },
+  mastodon: {
+    // Channel-level (analytics) — account followers_count
+    Followers: 'followers',
+    // Post-level (postAnalytics) — status favourites/reblogs/replies counts
+    Favourites: 'favorites',
+    Reblogs: 'reposts',
+    Replies: 'replies',
+  },
+  // Mastodon custom-instance provider extends MastodonProvider and inherits the
+  // same analytics()/postAnalytics(), so it emits identical labels — map it too
+  // or its snapshots silently drop (the B2 lesson).
+  'mastodon-custom': {
+    Followers: 'followers',
+    Favourites: 'favorites',
+    Reblogs: 'reposts',
+    Replies: 'replies',
+  },
+  reddit: {
+    // Post-level only (postAnalytics) — Reddit exposes no per-account channel
+    // analytics; subreddit-agnostic per-post metrics via /api/info.
+    Score: 'score',
+    'Upvote Ratio': 'upvote_ratio',
+    Comments: 'comments',
+  },
+  // --- Phase 7.2 (wave 2) ---
+  telegram: {
+    // Channel-level (analytics) — getChatMemberCount. Per-post `views` require
+    // MTProto (not the Bot API) — documented BLOCKED in su-provider-analytics.md.
+    Followers: 'followers',
+  },
+  discord: {
+    // Channel-level (analytics) — guild approximate_member_count.
+    Members: 'followers',
   },
 };
 

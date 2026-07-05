@@ -8,12 +8,12 @@ import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { Button } from '@gitroom/react/form/button';
-import { StatisticsModal } from '@gitroom/frontend/components/launches/statistics';
 
 export const MissingReleaseModal: FC<{
   postId: string;
   onSuccess: () => void;
-}> = ({ postId, onSuccess }) => {
+  onShowStatistics?: (postId: string) => void;
+}> = ({ postId, onSuccess, onShowStatistics }) => {
   const t = useT();
   const fetch = useFetch();
   const modal = useModals();
@@ -40,17 +40,7 @@ export const MissingReleaseModal: FC<{
       });
       onSuccess();
       modal.closeAll();
-      modal.openModal({
-        title: t('statistics', 'Statistics'),
-        closeOnClickOutside: true,
-        closeOnEscape: true,
-        withCloseButton: true,
-        classNames: {
-          modal: 'w-[100%] max-w-[1400px]',
-        },
-        children: <StatisticsModal postId={postId} />,
-        size: '80%',
-      });
+      onShowStatistics?.(postId);
     } catch {
       toaster.show(
         t('release_id_update_failed', 'Failed to connect post'),

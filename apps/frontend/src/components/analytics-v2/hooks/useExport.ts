@@ -9,6 +9,8 @@ interface ExportParams {
   format: 'csv' | 'json';
   integrations?: string[];
   compare?: boolean;
+  /** Campaign filter (1.6) — server-scopes the export to these campaigns' posts. */
+  campaigns?: string[];
 }
 
 function serializeParams(p: ExportParams): string {
@@ -22,6 +24,9 @@ function serializeParams(p: ExportParams): string {
   }
   if (p.compare !== undefined) {
     params.set('compare', String(p.compare));
+  }
+  if (p.campaigns?.length) {
+    params.set('campaigns', p.campaigns.join(','));
   }
   return `/analytics/v2/export?${params.toString()}`;
 }

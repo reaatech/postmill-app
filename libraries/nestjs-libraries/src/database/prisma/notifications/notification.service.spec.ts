@@ -208,4 +208,78 @@ describe('NotificationService', () => {
 
     expect(emailService.sendEmail).not.toHaveBeenCalled();
   });
+
+  it('notifyAnalyticsAnomaly fires an analytics-category, digest notification with a deep link', async () => {
+    const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+
+    await service.notifyAnalyticsAnomaly({
+      orgId: 'org-1',
+      integrationName: 'Instagram',
+      // R4.5: human display label vs canonical key — the link must use the key.
+      metric: 'Unique Impressions',
+      metricKey: 'unique_impressions',
+      direction: 'spike',
+      value: 5000,
+      baseline: 1200,
+      deviation: 3.2,
+      integrationId: 'int-1',
+      topPostTitle: 'Best post ever',
+    });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        category: 'analytics',
+        digest: true,
+        // R4.5: the deep link carries the URI-encoded metric KEY, not the label
+        // ("Unique Impressions" would be an invalid, un-matchable query string).
+        link: '/analytics?tab=insights&integrations=int-1&metric=unique_impressions',
+        channels: { email: true, push: false, inApp: true },
+        metadata: {
+          integrationId: 'int-1',
+          metric: 'Unique Impressions',
+          direction: 'spike',
+          deviation: 3.2,
+        },
+      })
+    );
+
+    const payload = notifySpy.mock.calls[0][0];
+    expect(payload.title).toContain('Spike');
+    expect(payload.title).toContain('Unique Impressions');
+    expect(payload.message).toContain('Best post ever');
+  });
+
+  it('notifyWeeklyAnalyticsSummary fires an analytics-category, non-digest notification deep-linking to /analytics', async () => {
+    const notifySpy = vi.spyOn(service, 'notify').mockResolvedValue(undefined);
+
+    await service.notifyWeeklyAnalyticsSummary({
+      orgId: 'org-1',
+      metrics: [
+        { label: 'Impressions', thisWeek: 1234, changePct: 12 },
+        { label: 'Likes', thisWeek: 456, changePct: -3 },
+      ],
+      topPostTitle: 'Best post ever',
+      bestChannelName: 'Instagram',
+      anomalyRecap: '1 analytics alert flagged this week',
+    });
+
+    expect(notifySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        orgId: 'org-1',
+        category: 'analytics',
+        digest: false,
+        link: '/analytics',
+        channels: { email: true, push: false, inApp: true },
+      })
+    );
+
+    const payload = notifySpy.mock.calls[0][0];
+    expect(payload.title).toBe('Your week in numbers');
+    expect(payload.message).toContain('Impressions 1,234 (+12%)');
+    expect(payload.message).toContain('Likes 456 (-3%)');
+    expect(payload.message).toContain('Best channel: Instagram');
+    expect(payload.message).toContain('Top post: "Best post ever"');
+    expect(payload.message).toContain('1 analytics alert flagged this week');
+  });
 });

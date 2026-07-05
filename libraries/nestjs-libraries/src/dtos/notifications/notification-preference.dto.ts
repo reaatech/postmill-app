@@ -11,7 +11,8 @@ export type NotificationCategory =
   | 'media'
   | 'announcements'
   | 'streak'
-  | 'agent';
+  | 'agent'
+  | 'analytics';
 
 export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   'post_published',
@@ -23,6 +24,7 @@ export const NOTIFICATION_CATEGORIES: NotificationCategory[] = [
   'announcements',
   'streak',
   'agent',
+  'analytics',
 ];
 
 export type DigestFrequency = 'instant' | 'daily' | 'weekly' | 'never';
@@ -93,6 +95,11 @@ export class NotificationPreferenceCategoriesDto {
   @ValidateNested()
   @Type(() => ChannelTogglesDto)
   agent?: ChannelTogglesDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ChannelTogglesDto)
+  analytics?: ChannelTogglesDto;
 }
 
 export class UpdateNotificationPreferenceDto {

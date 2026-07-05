@@ -4,7 +4,7 @@ Campaigns are org-scoped command centers for organizing, planning, and reporting
 related social posts. A campaign groups posts together with tags (channels, brands, files, VPNs,
 LLMs, storage, sets, signatures), goals, drafts, and a shareable report.
 
-> Verified against v3.9.0
+> Verified against v4.5.0
 
 ## Creating a Campaign
 
@@ -31,10 +31,25 @@ Click a campaign card to open its dashboard (`/campaigns/:id`). The dashboard sh
   the same number shown in the Comments section — not the platform-reported engagement total.
 - **Tagged Items**: quick-access panels for each entity type attached to the campaign. Use the
   "Add items" picker to tag channels, brands, files, VPNs, LLMs, storage, sets, or signatures.
+- **Analytics**: a trend chart plus a per-channel breakdown scoped to the campaign's posts (see
+  [Campaign Analytics](#campaign-analytics) below).
 - **Posts**: a table of all campaign posts with engagement.
 - **Planning Workspace**: campaign drafts, approval status, and promote actions.
 - **Comments**: view and reply to every synced comment across the campaign's posts (see below).
 - **Changelog**: recent activity such as added tags, copies, approvals, and promotions.
+
+## Campaign Analytics
+
+The dashboard's **Analytics** section shows how the campaign is performing, scoped to the posts that
+belong to it:
+
+- **Trend chart**: a headline metric over the campaign's date range.
+- **Per-channel breakdown**: engagement split across the channels the campaign publishes to.
+
+Campaign analytics are **post-scoped** — they aggregate only the campaign's posts, so channel-level
+metrics like followers (which belong to the channel, not the post) are not included. The default
+window is the campaign's start→end dates. The same trend and per-channel breakdown also appear on the
+[shareable public report](#reports-and-public-share) when analytics are available.
 
 ## Campaign Comments
 

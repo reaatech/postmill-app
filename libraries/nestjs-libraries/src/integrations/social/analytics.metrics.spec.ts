@@ -17,6 +17,7 @@ describe('METRIC_REGISTRY', () => {
       'pin_clicks', 'pin_click_rate', 'website_clicks', 'phone_calls',
       'direction_requests', 'desktop_map_views', 'mobile_map_views',
       'organic_followers', 'paid_followers', 'reposts',
+      'score', 'upvote_ratio',
     ];
 
     for (const key of keys) {
@@ -27,6 +28,12 @@ describe('METRIC_REGISTRY', () => {
     }
   });
 
+  it('classifies score and upvote_ratio as stock (cumulative levels, R1.1)', () => {
+    expect(METRIC_REGISTRY['score'].kind).toBe('stock');
+    expect(METRIC_REGISTRY['upvote_ratio'].kind).toBe('stock');
+    expect(METRIC_REGISTRY['upvote_ratio'].format).toBe('percent');
+  });
+
   it('has no duplicate labels', () => {
     const labels = Object.values(METRIC_REGISTRY).map((d) => d.label);
     expect(new Set(labels).size).toBe(labels.length);
@@ -34,7 +41,7 @@ describe('METRIC_REGISTRY', () => {
 });
 
 describe('PROVIDER_METRIC_MAP', () => {
-  const providers = ['facebook', 'instagram', 'instagram-standalone', 'linkedin-page', 'tiktok', 'youtube', 'gmb', 'pinterest', 'threads', 'x'];
+  const providers = ['facebook', 'instagram', 'instagram-standalone', 'linkedin-page', 'tiktok', 'youtube', 'gmb', 'pinterest', 'threads', 'x', 'bluesky', 'mastodon', 'mastodon-custom', 'reddit', 'telegram', 'discord'];
 
   it('covers all expected providers', () => {
     for (const p of providers) {
@@ -165,6 +172,15 @@ describe('normalizeMetric', () => {
     expect(normalizeMetric('threads', 'Quotes')).toBe('quotes');
   });
 
+  it('resolves dribbble labels to valid METRIC_REGISTRY keys', () => {
+    const labels = ['Views', 'Likes', 'Comments', 'Followers', 'Saves'];
+    for (const label of labels) {
+      const metric = normalizeMetric('dribbble', label);
+      expect(metric, `dribbble "${label}" did not resolve`).toBeDefined();
+      expect(METRIC_REGISTRY[metric!], `dribbble "${label}" -> "${metric}" not in METRIC_REGISTRY`).toBeDefined();
+    }
+  });
+
   it('resolves x labels correctly', () => {
     expect(normalizeMetric('x', 'IMPRESSION')).toBe('impressions');
     expect(normalizeMetric('x', 'BOOKMARK')).toBe('bookmarks');
@@ -172,6 +188,34 @@ describe('normalizeMetric', () => {
     expect(normalizeMetric('x', 'QUOTE')).toBe('quotes');
     expect(normalizeMetric('x', 'REPLY')).toBe('replies');
     expect(normalizeMetric('x', 'RETWEET')).toBe('retweets');
+  });
+
+  it('resolves bluesky labels correctly (7.1)', () => {
+    expect(normalizeMetric('bluesky', 'Followers')).toBe('followers');
+    expect(normalizeMetric('bluesky', 'Likes')).toBe('likes');
+    expect(normalizeMetric('bluesky', 'Reposts')).toBe('reposts');
+    expect(normalizeMetric('bluesky', 'Replies')).toBe('replies');
+  });
+
+  it('resolves mastodon labels correctly (7.1)', () => {
+    expect(normalizeMetric('mastodon', 'Followers')).toBe('followers');
+    expect(normalizeMetric('mastodon', 'Favourites')).toBe('favorites');
+    expect(normalizeMetric('mastodon', 'Reblogs')).toBe('reposts');
+    expect(normalizeMetric('mastodon', 'Replies')).toBe('replies');
+    // mastodon-custom inherits the same adapter methods → same labels.
+    expect(normalizeMetric('mastodon-custom', 'Followers')).toBe('followers');
+    expect(normalizeMetric('mastodon-custom', 'Favourites')).toBe('favorites');
+  });
+
+  it('resolves reddit labels correctly (7.1)', () => {
+    expect(normalizeMetric('reddit', 'Score')).toBe('score');
+    expect(normalizeMetric('reddit', 'Upvote Ratio')).toBe('upvote_ratio');
+    expect(normalizeMetric('reddit', 'Comments')).toBe('comments');
+  });
+
+  it('resolves telegram/discord labels correctly (7.2)', () => {
+    expect(normalizeMetric('telegram', 'Followers')).toBe('followers');
+    expect(normalizeMetric('discord', 'Members')).toBe('followers');
   });
 
   it('returns undefined for unknown label', () => {

@@ -333,6 +333,109 @@ export class NotificationService {
     });
   }
 
+  async notifyAnalyticsAnomaly(params: {
+    orgId: string;
+    integrationName: string;
+    metric: string;
+    // R4.5: the canonical metric KEY (e.g. `unique_impressions`) for the deep
+    // link — distinct from `metric`, which is the human display label.
+    metricKey: string;
+    direction: 'spike' | 'drop';
+    value: number;
+    baseline: number;
+    deviation: number;
+    integrationId: string;
+    topPostTitle?: string;
+  }) {
+    const {
+      orgId,
+      integrationName,
+      metric,
+      metricKey,
+      direction,
+      value,
+      baseline,
+      deviation,
+      integrationId,
+      topPostTitle,
+    } = params;
+
+    const verb = direction === 'spike' ? 'Spike' : 'Drop';
+    const title = `${verb} in ${integrationName} ${metric}`;
+
+    let message = `${metric} ${
+      direction === 'spike' ? 'jumped to' : 'fell to'
+    } ${value.toLocaleString()} vs a 28-day average of ${baseline.toLocaleString()}.`;
+    if (topPostTitle) {
+      message += ` — likely driven by "${topPostTitle}"`;
+    }
+
+    const link = `/analytics?tab=insights&integrations=${integrationId}&metric=${encodeURIComponent(
+      metricKey
+    )}`;
+
+    await this.notify({
+      orgId,
+      category: 'analytics',
+      title,
+      message,
+      link,
+      metadata: { integrationId, metric, direction, deviation },
+      digest: true,
+      channels: { email: true, push: false, inApp: true },
+    });
+  }
+
+  // 6.9: weekly "your week in numbers" summary. Category `analytics` (shares the
+  // anomaly toggle), digest: false — this IS the weekly digest, so it should not
+  // be re-batched. Deep-links to /analytics. Modeled on notifyAnalyticsAnomaly.
+  async notifyWeeklyAnalyticsSummary(params: {
+    orgId: string;
+    metrics: { label: string; thisWeek: number; changePct: number | null }[];
+    topPostTitle?: string;
+    bestChannelName?: string;
+    anomalyRecap?: string;
+  }) {
+    const { orgId, metrics, topPostTitle, bestChannelName, anomalyRecap } =
+      params;
+
+    const title = 'Your week in numbers';
+
+    const metricParts = metrics.map((m) => {
+      const change =
+        m.changePct === null
+          ? ''
+          : ` (${m.changePct >= 0 ? '+' : ''}${m.changePct}%)`;
+      return `${m.label} ${m.thisWeek.toLocaleString()}${change}`;
+    });
+
+    let message = metricParts.length
+      ? `Here's your week in numbers — ${metricParts.join(', ')}.`
+      : `Here's your week in numbers.`;
+    if (bestChannelName) message += ` Best channel: ${bestChannelName}.`;
+    if (topPostTitle) message += ` Top post: "${topPostTitle}".`;
+    if (anomalyRecap) message += ` ${anomalyRecap}.`;
+
+    await this.notify({
+      orgId,
+      category: 'analytics',
+      title,
+      message,
+      link: '/analytics',
+      metadata: {
+        metrics: metrics.map((m) => ({
+          label: m.label,
+          value: m.thisWeek,
+          changePct: m.changePct,
+        })),
+        bestChannel: bestChannelName,
+        topPost: topPostTitle,
+      },
+      digest: false,
+      channels: { email: true, push: false, inApp: true },
+    });
+  }
+
   async notifyCommentDigest(
     orgId: string,
     totalNewComments: number,

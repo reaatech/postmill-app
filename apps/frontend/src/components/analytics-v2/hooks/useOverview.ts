@@ -10,6 +10,8 @@ interface OverviewParams {
   to: string;
   integrations: string[];
   compare: boolean;
+  /** Campaign filter (1.6) — server-scopes metrics to these campaigns' posts. */
+  campaigns?: string[];
 }
 
 function serializeParams(p: OverviewParams): string {
@@ -19,6 +21,9 @@ function serializeParams(p: OverviewParams): string {
     integrations: p.integrations.join(','),
     compare: String(p.compare),
   });
+  if (p.campaigns?.length) {
+    params.set('campaigns', p.campaigns.join(','));
+  }
   return `/analytics/v2/overview?${params.toString()}`;
 }
 

@@ -2,6 +2,10 @@ import { inngest } from '@gitroom/nestjs-libraries/inngest/inngest.client';
 import { AnalyticsActivity } from '@gitroom/nestjs-libraries/inngest/activities/analytics.activity';
 import { InngestRunRepository } from '@gitroom/nestjs-libraries/database/prisma/inngest-runs/inngest-run.repository';
 import { trackRun } from './track-run';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 // The cron only fans out one `analytics/sync-org` event per org; the per-org work runs in
 // `analytics-sync-org` (below) with its own concurrency cap. A slow org never blocks the rest
@@ -55,6 +59,14 @@ export const createAnalyticsSyncOrg = (analyticsActivity: AnalyticsActivity) =>
       await step.run('collect-post', () =>
         analyticsActivity.collectPostSnapshots(organizationId, 30)
       );
+      // Detect anomalies on the fresh channel snapshots, BEFORE prune so the
+      // latest day is present. Durable + idempotent (unique key), and the
+      // activity swallows its own errors — never fail the sweep.
+      await step
+        .run('detect-anomalies', () =>
+          analyticsActivity.detectAnomalies(organizationId)
+        )
+        .catch(() => {});
       await step.run('prune', () =>
         analyticsActivity.pruneAndRollupSnapshots(organizationId)
       );
@@ -77,6 +89,19 @@ export const createAnalyticsSyncOrg = (analyticsActivity: AnalyticsActivity) =>
         .run('shortlink-prune', () =>
           analyticsActivity.pruneShortLinkSnapshots(organizationId)
         )
+        .catch(() => {});
+
+      // 6.9: fire the weekly "your week in numbers" digest once per week per org,
+      // on Monday (UTC — the sweep's cron is TZ=UTC), after the sweep so the
+      // numbers include the freshest snapshots. The day check runs inside the
+      // step so it's memoized on replay; the activity is itself non-fatal and the
+      // step swallows errors, so this can never fail the sweep. Respects the
+      // `analytics` category preference automatically (via NotificationService).
+      await step
+        .run('weekly-summary', () => {
+          if (dayjs.utc().day() !== 1) return Promise.resolve();
+          return analyticsActivity.buildWeeklySummary(organizationId);
+        })
         .catch(() => {});
     }
   );

@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { AnalyticsService } from './analytics.service';
+import {
+  computeDerivedMetrics,
+  computeContentInsights,
+  bestTimeConfidence,
+} from './analytics-aggregation';
 import { METRIC_REGISTRY, isKnownMetric } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import dayjs from 'dayjs';
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository', () => {
@@ -15,8 +20,13 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repositor
     AnalyticsRepository: class MockAnalyticsRepository {
       getSnapshots = mkMock();
       getPostSnapshots = mkMock();
+      getPostSnapshotsByCampaigns = mkMock();
+      getLatestPostSnapshotsBeforeByCampaigns = mkMock();
+      getPostsByCampaigns = mkMock();
+      countPostsByCampaigns = (() => { const fn = vi.fn(); fn.mockResolvedValue(0); return fn; })();
       getIntegrations = mkMock();
       checkCoverage = mkMock();
+      sumFlowMetric = (() => { const fn = vi.fn(); fn.mockResolvedValue({}); return fn; })();
       findPosts = mkMock();
       countPosts = mkMock();
       findPost = mkMock();
@@ -29,6 +39,10 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repositor
       getBestTimeIntegrations = mkMock();
       getBestTimePosts = mkMock();
       getBestTimeSnapshots = mkMock();
+      getLastSnapshotDates = mkMock();
+      getContentInsightPosts = mkMock();
+      upsertChannelSnapshot = mkMock();
+      listAnomalies = mkMock();
     },
   };
 });
@@ -46,6 +60,15 @@ vi.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.serv
 vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({
   PostsService: class MockService {
     checkPostAnalytics = vi.fn();
+  },
+}));
+
+// 7.5: insights injects AIModelProvider — mock the heavy module so importing the
+// insights service in the spec doesn't drag in the whole AI stack.
+vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
+  AIModelProvider: class MockAIModelProvider {
+    resolveConfigForScope = vi.fn().mockResolvedValue(null);
+    generateText = vi.fn().mockResolvedValue('');
   },
 }));
 
@@ -77,6 +100,14 @@ import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/a
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { OrgShortLinkSettingsService } from '@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service';
+// 5.3: the facade delegates to these sibling services. They are constructed
+// from the same mocks so every assertion below still exercises the real logic
+// through the facade — no behaviour change, only the wiring moved.
+import { AnalyticsLiveFallbackService } from './analytics-live-fallback';
+import { AnalyticsOverviewService } from './analytics-overview.service';
+import { AnalyticsDetailService } from './analytics-detail.service';
+import { AnalyticsInsightsService } from './analytics-insights.service';
+import { AnalyticsExportService } from './analytics-export.service';
 
 // Helper: create local-midnight dates to avoid timezone offset in dayjs formatting
 const d = (y: number, m: number, day: number) => new Date(y, m - 1, day);
@@ -87,6 +118,7 @@ describe('AnalyticsService', () => {
   let integrationService: IntegrationService;
   let postsService: PostsService;
   let shortLinkSettingsService: OrgShortLinkSettingsService;
+  let aiModelProvider: any;
 
   const mockOrg = { id: 'org1', name: 'Test Org' } as any;
 
@@ -107,12 +139,35 @@ describe('AnalyticsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     analyticsRepository = new AnalyticsRepository();
-    const manager = {} as any;
+    // 0.6: checkCoverage now excludes no-analytics providers from the denominator
+    // via manager.getSocialIntegrationUnchecked(...).analytics. The fixtures use
+    // instagram/tiktok integrations, which implement analytics() in production.
+    const withAnalytics = [
+      'instagram', 'tiktok', 'facebook', 'linkedin', 'linkedin-page',
+      'youtube', 'x', 'pinterest', 'threads', 'bluesky', 'mastodon', 'reddit',
+    ];
+    const manager = {
+      getSocialIntegrationUnchecked: vi.fn((identifier: string) =>
+        withAnalytics.includes(identifier) ? { analytics: vi.fn() } : {},
+      ),
+    } as any;
     integrationService = new IntegrationService();
     postsService = new PostsService();
     shortLinkSettingsService = new OrgShortLinkSettingsService();
     const mockRedisService = { get: vi.fn().mockResolvedValue(null), set: vi.fn().mockResolvedValue('OK'), del: vi.fn().mockResolvedValue(1), exists: vi.fn().mockResolvedValue(0), client: {} };
-    service = new AnalyticsService(analyticsRepository, manager, integrationService, postsService, mockRedisService as any, shortLinkSettingsService);
+    const liveFallback = new AnalyticsLiveFallbackService(analyticsRepository, manager, integrationService);
+    const overview = new AnalyticsOverviewService(analyticsRepository, liveFallback, postsService, mockRedisService as any, integrationService);
+    const detail = new AnalyticsDetailService(analyticsRepository, liveFallback);
+    // 7.5: insights now injects AIModelProvider (narration) + the overview
+    // service (narrate assembles the overview). Stubbed so the existing
+    // best-time / recommendations tests keep exercising the real logic.
+    aiModelProvider = {
+      resolveConfigForScope: vi.fn().mockResolvedValue(null),
+      generateText: vi.fn().mockResolvedValue('narrative text'),
+    } as any;
+    const insights = new AnalyticsInsightsService(analyticsRepository, aiModelProvider, overview);
+    const exportSvc = new AnalyticsExportService();
+    service = new AnalyticsService(analyticsRepository, shortLinkSettingsService, overview, detail, insights, exportSvc, liveFallback);
   });
 
   // ============ EXISTING TESTS (kept exactly) ============
@@ -288,40 +343,65 @@ describe('AnalyticsService', () => {
     });
   });
 
-  describe('checkCoverage', () => {
+  describe('checkCoverage (0.6 — per-integration denominator)', () => {
     const from = d(2024, 1, 1);
-    const to = d(2024, 1, 3);
+    const to = d(2024, 1, 3); // 3-day window
+    const ig = (id: string) => ({ id, providerIdentifier: 'instagram' });
+    const discord = (id: string) => ({ id, providerIdentifier: 'discord' });
+    const pair = (id: string, date: Date) => ({ integrationId: id, date });
 
-    it('returns 1.0 when all days have snapshots', async () => {
+    it('returns 1.0 when the single channel is fully covered', async () => {
       (analyticsRepository.checkCoverage as any).mockResolvedValue([
-        { date: d(2024, 1, 1) }, { date: d(2024, 1, 2) }, { date: d(2024, 1, 3) },
+        pair('i1', d(2024, 1, 1)), pair('i1', d(2024, 1, 2)), pair('i1', d(2024, 1, 3)),
       ]);
-      expect(await (service as any).checkCoverage('org1', ['i1'], from, to)).toBe(1);
+      expect(await (service as any).checkCoverage('org1', [ig('i1')], from, to)).toBe(1);
     });
 
-    it('returns partial coverage', async () => {
-      (analyticsRepository.checkCoverage as any).mockResolvedValue([{ date: d(2024, 1, 1) }]);
-      expect(await (service as any).checkCoverage('org1', ['i1'], from, to)).toBeCloseTo(1 / 3, 5);
+    it('returns partial coverage for one channel', async () => {
+      (analyticsRepository.checkCoverage as any).mockResolvedValue([pair('i1', d(2024, 1, 1))]);
+      expect(await (service as any).checkCoverage('org1', [ig('i1')], from, to)).toBeCloseTo(1 / 3, 5);
     });
 
-    it('returns 0 when no distinct dates', async () => {
+    // Headline 0.6 case: two channels, one fully covered, one empty → 0.5 (was 1.0).
+    it('returns 0.5 when one of two channels is entirely missing', async () => {
+      (analyticsRepository.checkCoverage as any).mockResolvedValue([
+        pair('i1', d(2024, 1, 1)), pair('i1', d(2024, 1, 2)), pair('i1', d(2024, 1, 3)),
+      ]);
+      expect(
+        await (service as any).checkCoverage('org1', [ig('i1'), ig('i2')], from, to),
+      ).toBeCloseTo(0.5, 5);
+    });
+
+    // No-analytics providers must not count toward the denominator.
+    it('excludes no-analytics providers from the denominator', async () => {
+      (analyticsRepository.checkCoverage as any).mockResolvedValue([
+        pair('i1', d(2024, 1, 1)), pair('i1', d(2024, 1, 2)), pair('i1', d(2024, 1, 3)),
+      ]);
+      // i1 instagram (supports analytics) fully covered, i2 discord (no analytics)
+      // excluded → denominator is 1 channel × 3 days → 1.0, not 0.5.
+      expect(
+        await (service as any).checkCoverage('org1', [ig('i1'), discord('i2')], from, to),
+      ).toBe(1);
+    });
+
+    it('returns 1 (skips fallback) when no channel supports analytics', async () => {
+      expect(
+        await (service as any).checkCoverage('org1', [discord('i1'), discord('i2')], from, to),
+      ).toBe(1);
+    });
+
+    it('returns 0 when the covered channel has no pairs', async () => {
       (analyticsRepository.checkCoverage as any).mockResolvedValue([]);
-      expect(await (service as any).checkCoverage('org1', ['i1'], from, to)).toBe(0);
-    });
-
-    it('returns 0 when integrationIds empty', async () => {
-      expect(await (service as any).checkCoverage('org1', [], from, to)).toBe(0);
+      expect(await (service as any).checkCoverage('org1', [ig('i1')], from, to)).toBe(0);
     });
 
     it('returns 0 when from or to null', async () => {
-      expect(await (service as any).checkCoverage('org1', ['i1'], null, to)).toBe(0);
+      expect(await (service as any).checkCoverage('org1', [ig('i1')], null, to)).toBe(0);
     });
 
     it('returns 0 when totalDays <= 0', async () => {
       (analyticsRepository.checkCoverage as any).mockResolvedValue([]);
-      const later = d(2024, 1, 5);
-      const earlier = d(2024, 1, 1);
-      expect(await (service as any).checkCoverage('org1', ['i1'], later, earlier)).toBe(0);
+      expect(await (service as any).checkCoverage('org1', [ig('i1')], d(2024, 1, 5), d(2024, 1, 1))).toBe(0);
     });
   });
 
@@ -599,6 +679,101 @@ describe('AnalyticsService', () => {
     });
   });
 
+  describe('getOverview (campaign scope, 1.3)', () => {
+    const from = '2024-01-01';
+    const to = '2024-01-03';
+
+    it('sums only the campaign post snapshots, skips live fallback, sets scope', async () => {
+      // The repo returns only campaign A's rows (campaign B shares integration
+      // i1 but is filtered out in the repo — see the repository spec).
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p2', integrationId: 'i1', metric: 'impressions', value: 200, date: d(2024, 1, 2), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+
+      const r = await service.getOverview(mockOrg as any, from, to, [], false, { campaignIds: ['A'] });
+
+      expect(r.scope).toBe('campaign-posts');
+      expect(r.kpis[0]).toMatchObject({ metric: 'impressions', total: 300 });
+      expect(r.byChannel[0].integrationId).toBe('i1');
+      expect(analyticsRepository.getPostSnapshotsByCampaigns).toHaveBeenCalledWith(
+        'org1', ['A'], expect.any(Date), expect.any(Date), undefined,
+      );
+      // Campaign scope must NOT touch channel snapshots / coverage / live fallback.
+      expect(analyticsRepository.getSnapshots).not.toHaveBeenCalled();
+      expect(analyticsRepository.checkCoverage).not.toHaveBeenCalled();
+      expect(integrationService.checkAnalytics).not.toHaveBeenCalled();
+    });
+
+    it('differences cumulative post LEVELS against a prior baseline (R1.4)', async () => {
+      // One post, cumulative lifetime levels 100→150→220 across the 3-day
+      // window, with a prior level of 90 just before it. The KPI total must be
+      // the WINDOW DELTA 220−90 = 130 (the old bug summed the in-window rows =
+      // 470), and the trend the per-day deltas [10, 50, 70].
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 150, date: d(2024, 1, 2), createdAt: new Date() },
+        { id: 'ps3', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 220, date: d(2024, 1, 3), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([
+        { postId: 'p1', metric: 'impressions', value: 90 },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+
+      const r = await service.getOverview(mockOrg as any, from, to, [], false, { campaignIds: ['A'] });
+
+      expect(r.kpis[0]).toMatchObject({ metric: 'impressions', total: 130 });
+      expect(r.series.impressions.map((p: any) => p.value)).toEqual([10, 50, 70]);
+      expect(r.byChannel[0].kpis[0]).toMatchObject({ total: 130 });
+      // baseline was read for the current window (before = window start).
+      expect(analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns).toHaveBeenCalledWith(
+        'org1', ['A'], expect.any(Date), undefined,
+      );
+    });
+
+    it('leaves the unscoped overview output unchanged (no scope field)', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.checkCoverage as any).mockResolvedValueOnce([{ date: d(2024, 1, 1) }, { date: d(2024, 1, 2) }, { date: d(2024, 1, 3) }]);
+      (analyticsRepository.getSnapshots as any).mockResolvedValueOnce([
+        { id: 's1', organizationId: 'org1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date(), integration: {} as any },
+      ]);
+
+      const r = await service.getOverview(mockOrg as any, from, to, ['i1'], false);
+
+      expect(r.scope).toBeUndefined();
+      expect(r.kpis[0]).toMatchObject({ metric: 'impressions', total: 100 });
+      // 6.1 — granularity is a campaign-scope-only label; the org overview
+      // series stays unlabeled.
+      expect(r.series.impressions[0].granularity).toBeUndefined();
+      expect(analyticsRepository.getPostSnapshotsByCampaigns).not.toHaveBeenCalled();
+    });
+
+    it('labels each series point daily (≤90d) or weekly (>90d) under campaign scope (6.1)', async () => {
+      const oldDay = dayjs().subtract(200, 'day');
+      const recentDay = dayjs().subtract(1, 'day');
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: oldDay.toDate(), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p2', integrationId: 'i1', metric: 'impressions', value: 200, date: recentDay.toDate(), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+
+      const r = await service.getOverview(
+        mockOrg as any,
+        oldDay.format('YYYY-MM-DD'),
+        recentDay.format('YYYY-MM-DD'),
+        [],
+        false,
+        { campaignIds: ['A'] },
+      );
+
+      const points = r.series.impressions;
+      // oldest point (>90d) rides a weekly rollup row; newest (≤90d) is daily.
+      expect(points[0].granularity).toBe('weekly');
+      expect(points[points.length - 1].granularity).toBe('daily');
+    });
+  });
+
   describe('getChannel', () => {
     it('returns overview with channel info', async () => {
       (analyticsRepository.getIntegrations as any).mockResolvedValueOnce([mockIntegration]).mockResolvedValueOnce([mockIntegration]);
@@ -635,6 +810,21 @@ describe('AnalyticsService', () => {
       id, content: `Content ${id}`, publishDate: d(2024, 1, 2),
       organizationId: 'org1', integrationId: intId, deletedAt: null,
       integration: { id: intId, name: 'Channel', providerIdentifier: 'insta', picture: null },
+    });
+
+    it('uses the LAST snapshot level per (post, metric) — never the sum of rows', async () => {
+      // Post-snapshot values are cumulative lifetime levels; a post snapshotted
+      // daily must show its latest level (150), not the row sum (250) which
+      // inflates by snapshot-day count and biases sort toward older posts.
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getPostSnapshots as any).mockResolvedValue([
+        { postId: 'p1', metric: 'likes', value: 100, date: d(2024, 1, 1) },
+        { postId: 'p1', metric: 'likes', value: 150, date: d(2024, 1, 2) },
+      ]);
+      (analyticsRepository.findPosts as any).mockResolvedValue([mkPost('p1')]);
+      (analyticsRepository.countPosts as any).mockResolvedValue(1);
+      const r = await service.getPosts(mockOrg as any, from, to, ['i1']);
+      expect(r.posts[0].metrics).toEqual({ likes: 150 });
     });
 
     it('returns paginated posts with default page/limit', async () => {
@@ -868,6 +1058,61 @@ describe('AnalyticsService', () => {
       expect(r.previousTotal).toBeNull();
       expect(r.series).toHaveLength(3);
       expect(r.movers).toEqual({ up: [], down: [] });
+    });
+
+    it('campaign scope: total is the window delta of post LEVELS, matching the overview KPI (R1.5)', async () => {
+      // Same fixture as the overview R1.4 test: cumulative levels 100→150→220
+      // with a prior baseline of 90 ⇒ total 130, series [10,50,70].
+      (analyticsRepository.getPostSnapshotsByCampaigns as any).mockResolvedValue([
+        { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 1), createdAt: new Date() },
+        { id: 'ps2', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 150, date: d(2024, 1, 2), createdAt: new Date() },
+        { id: 'ps3', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 220, date: d(2024, 1, 3), createdAt: new Date() },
+      ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([
+        { postId: 'p1', metric: 'impressions', value: 90 },
+      ]);
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getMetricDetailTopPosts as any).mockResolvedValue([]);
+
+      const r = await service.getMetricDetail(
+        mockOrg as any, 'impressions', from, to, [], false, { campaignIds: ['A'] }
+      );
+
+      expect(r.total).toBe(130);
+      expect(r.series.map((p: any) => p.value)).toEqual([10, 50, 70]);
+      expect(r.byChannel[0].value).toBe(130);
+      // no live fallback under campaign scope
+      expect(integrationService.checkAnalytics).not.toHaveBeenCalled();
+    });
+
+    it('campaign scope: previous window uses the explicit filter (or none), not the derived channel set (R1.6)', async () => {
+      // No explicit integration filter passed. Current window derives channels
+      // from its own snapshots; the previous window must still pass `undefined`
+      // so a channel that only posted in the prior window is included.
+      (analyticsRepository.getPostSnapshotsByCampaigns as any)
+        .mockResolvedValueOnce([
+          { id: 'ps1', organizationId: 'org1', postId: 'p1', integrationId: 'i1', metric: 'impressions', value: 100, date: d(2024, 1, 3), createdAt: new Date() },
+        ])
+        .mockResolvedValueOnce([
+          { id: 'ps2', organizationId: 'org1', postId: 'p2', integrationId: 'i2', metric: 'impressions', value: 80, date: d(2023, 12, 30), createdAt: new Date() },
+        ]);
+      (analyticsRepository.getLatestPostSnapshotsBeforeByCampaigns as any).mockResolvedValue([]);
+      // No explicit filter → getIntegrations([]) returns [] (Prisma `in: []`);
+      // the derived-channel lookup then resolves the campaign's channels.
+      (analyticsRepository.getIntegrations as any)
+        .mockResolvedValueOnce([])
+        .mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getMetricDetailTopPosts as any).mockResolvedValue([]);
+
+      await service.getMetricDetail(
+        mockOrg as any, 'impressions', from, to, [], true, { campaignIds: ['A'] }
+      );
+
+      const calls = (analyticsRepository.getPostSnapshotsByCampaigns as any).mock.calls;
+      // current window (call 0) and previous window (call 1) both pass the
+      // explicit filter — here `undefined` — as the 5th arg.
+      expect(calls[0][4]).toBeUndefined();
+      expect(calls[1][4]).toBeUndefined();
     });
 
     it('returns with compare=true and movers (up)', async () => {
@@ -1243,6 +1488,347 @@ describe('AnalyticsService', () => {
       const result = await service.getAggregatedClicks('org1', from, to);
       expect(shortLinkSettingsService.getAggregatedClicks).toHaveBeenCalledWith('org1', from, to);
       expect(result).toEqual(mockClicks);
+    });
+  });
+
+  describe('getRecommendations (0.1 — real previous-window baseline)', () => {
+    const seedCurrent = (impressions: number) => {
+      (analyticsRepository.getBestTimeIntegrations as any).mockResolvedValue([
+        { id: 'i1', name: 'IG', providerIdentifier: 'instagram', picture: null },
+      ]);
+      (analyticsRepository.getSnapshots as any).mockResolvedValue([
+        { integrationId: 'i1', metric: 'impressions', value: impressions, date: d(2024, 6, 1) },
+      ]);
+    };
+
+    it('fires "underperforming" when current is well below the real prior window', async () => {
+      seedCurrent(500);
+      (analyticsRepository.sumFlowMetric as any).mockResolvedValue({ i1: 1000 }); // 500 < 1000*0.75
+      const { recommendations: recs } = await service.getRecommendations(mockOrg as any);
+      expect(recs.some((r: any) => r.type === 'underperforming')).toBe(true);
+    });
+
+    it('does NOT fire when current ≈ prior window (no real decline)', async () => {
+      seedCurrent(500);
+      (analyticsRepository.sumFlowMetric as any).mockResolvedValue({ i1: 500 }); // 500 !< 375
+      const { recommendations: recs } = await service.getRecommendations(mockOrg as any);
+      expect(recs.some((r: any) => r.type === 'underperforming')).toBe(false);
+    });
+
+    it('does NOT fire when the prior window is empty/below floor (no *0.7 fabrication)', async () => {
+      seedCurrent(500);
+      (analyticsRepository.sumFlowMetric as any).mockResolvedValue({}); // prev 0 < 100 floor
+      const { recommendations: recs } = await service.getRecommendations(mockOrg as any);
+      expect(recs.some((r: any) => r.type === 'underperforming')).toBe(false);
+    });
+  });
+
+  // ── 6.2: engagement-rate derived metrics (pure math) ──
+  describe('computeDerivedMetrics (6.2)', () => {
+    const snap = (metric: string, value: number) => ({
+      integrationId: 'i1', metric, value, date: d(2024, 1, 1),
+    });
+
+    it('computes engagement rate = (likes+comments+shares)/impressions', () => {
+      const r = computeDerivedMetrics([
+        snap('impressions', 1000),
+        snap('likes', 50),
+        snap('comments', 30),
+        snap('shares', 20),
+      ]);
+      expect(r.engagementRate).toBeCloseTo(0.1); // 100/1000
+    });
+
+    it('computes reach-per-follower = reach/followers', () => {
+      const r = computeDerivedMetrics([
+        snap('reach', 2000),
+        snap('followers', 500),
+      ]);
+      expect(r.reachPerFollower).toBeCloseTo(4); // 2000/500
+    });
+
+    it('returns null (NOT 0) for engagement rate when impressions are 0/missing', () => {
+      const r = computeDerivedMetrics([snap('likes', 50)]);
+      expect(r.engagementRate).toBeNull();
+    });
+
+    it('returns null (NOT 0) for reach-per-follower when followers are 0/missing', () => {
+      const r = computeDerivedMetrics([snap('reach', 2000)]);
+      expect(r.reachPerFollower).toBeNull();
+    });
+
+    it('empty input → both null', () => {
+      expect(computeDerivedMetrics([])).toEqual({ engagementRate: null, reachPerFollower: null });
+    });
+
+    it('surfaces derived on the overview response (org-wide + per-channel)', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getSnapshots as any).mockResolvedValue([
+        { integrationId: 'i1', metric: 'impressions', value: 1000, date: d(2024, 1, 1) },
+        { integrationId: 'i1', metric: 'likes', value: 100, date: d(2024, 1, 1) },
+      ]);
+      const r = await service.getOverview(mockOrg as any, '2024-01-01', '2024-01-02', ['i1'], false);
+      expect(r.derived).toBeDefined();
+      expect(r.derived!.engagementRate).toBeCloseTo(0.1);
+      expect(r.byChannel[0].derived).toBeDefined();
+      expect(r.byChannel[0].derived!.engagementRate).toBeCloseTo(0.1);
+    });
+  });
+
+  // ── 6.4: best-time v2 (tz + confidence) ──
+  describe('getBestTimeData (6.4)', () => {
+    const seedPost = (isoUtc: string) => ({
+      id: 'p' + isoUtc, publishDate: new Date(isoUtc), integrationId: 'i1',
+      lastViews: 10, lastLikes: 0, lastComments: 0,
+    });
+
+    beforeEach(() => {
+      (analyticsRepository.getBestTimeIntegrations as any).mockResolvedValue([
+        { id: 'i1', name: 'IG', providerIdentifier: 'instagram', picture: null },
+      ]);
+      (analyticsRepository.getBestTimeSnapshots as any).mockResolvedValue([]);
+    });
+
+    it('tz shifts the bucket by the zone offset vs UTC', async () => {
+      // 2024-01-02T02:00Z → in America/New_York (UTC-5) that is 2024-01-01 21:00
+      (analyticsRepository.getBestTimePosts as any).mockResolvedValue([
+        seedPost('2024-01-02T02:00:00.000Z'),
+      ]);
+
+      const utcRes = await service.getBestTimeData('org1', ['i1'], 'UTC');
+      const nyRes = await service.getBestTimeData('org1', ['i1'], 'America/New_York');
+
+      const utcSlot = utcRes.heatmap.find((h) => h.postCount > 0)!;
+      const nySlot = nyRes.heatmap.find((h) => h.postCount > 0)!;
+
+      expect(utcSlot.hour).toBe(2);
+      expect(nySlot.hour).toBe(21); // shifted back 5 hours
+      expect(nySlot.day).not.toBe(utcSlot.day); // crossed midnight → prev day
+    });
+
+    it('flags low-sample slots with a confidence tier', async () => {
+      (analyticsRepository.getBestTimePosts as any).mockResolvedValue([
+        seedPost('2024-01-02T02:00:00.000Z'), // 1 post at that slot → low
+      ]);
+      const res = await service.getBestTimeData('org1', ['i1'], 'UTC');
+      const slot = res.heatmap.find((h) => h.postCount === 1)!;
+      expect(slot.confidence).toBe('low');
+      const empty = res.heatmap.find((h) => h.postCount === 0)!;
+      expect(empty.confidence).toBe('none');
+    });
+
+    it('bestTimeConfidence thresholds', () => {
+      expect(bestTimeConfidence(0)).toBe('none');
+      expect(bestTimeConfidence(1)).toBe('low');
+      expect(bestTimeConfidence(4)).toBe('medium');
+      expect(bestTimeConfidence(10)).toBe('high');
+    });
+  });
+
+  // ── 6.6: data-health panel ──
+  describe('getDataHealth (6.6)', () => {
+    it('labels unsupported providers and flags stale/coverage', async () => {
+      (analyticsRepository.getBestTimeIntegrations as any).mockResolvedValue([
+        { id: 'i1', name: 'IG', providerIdentifier: 'instagram', picture: null }, // supports analytics
+        { id: 'i2', name: 'Disc', providerIdentifier: 'discord', picture: null }, // no analytics
+      ]);
+      // i1 has 4 distinct covered days in the 7-day window
+      (analyticsRepository.checkCoverage as any).mockResolvedValue([
+        { integrationId: 'i1', date: d(2024, 1, 1) },
+        { integrationId: 'i1', date: d(2024, 1, 2) },
+        { integrationId: 'i1', date: d(2024, 1, 3) },
+        { integrationId: 'i1', date: d(2024, 1, 4) },
+      ]);
+      // i1's last snapshot is old → stale
+      (analyticsRepository.getLastSnapshotDates as any).mockResolvedValue([
+        { integrationId: 'i1', date: d(2020, 1, 1) },
+      ]);
+
+      const rows = await service.getDataHealth(mockOrg as any);
+      const i1 = rows.find((r) => r.integrationId === 'i1')!;
+      const i2 = rows.find((r) => r.integrationId === 'i2')!;
+
+      expect(i1.supportsAnalytics).toBe(true);
+      expect(i1.coverage).toBeCloseTo(4 / 7);
+      expect(i1.stale).toBe(true);
+      // unsupported channel is labeled, not zeroed as "broken"
+      expect(i2.supportsAnalytics).toBe(false);
+      expect(i2.coverage).toBe(0);
+      expect(i2.stale).toBe(false);
+      expect(i2.lastSnapshotDate).toBeNull();
+    });
+
+    it('empty org → empty array', async () => {
+      (analyticsRepository.getBestTimeIntegrations as any).mockResolvedValue([]);
+      expect(await service.getDataHealth(mockOrg as any)).toEqual([]);
+    });
+  });
+
+  // ── 6.7: on-demand channel refresh ──
+  describe('refreshChannel (6.7)', () => {
+    it('persists the returned series via upsertChannelSnapshot', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (integrationService.checkAnalytics as any).mockResolvedValue([
+        { label: 'Likes', data: [{ date: dayjs().format('YYYY-MM-DD'), total: 42 }] },
+      ]);
+
+      const result = await service.refreshChannel(mockOrg as any, 'i1');
+
+      expect(integrationService.checkAnalytics).toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
+      expect((analyticsRepository.upsertChannelSnapshot as any).mock.calls[0][0]).toMatchObject({
+        integrationId: 'i1', metric: 'likes', value: 42,
+      });
+      expect(result.persisted).toBe(1);
+    });
+
+    it('404s an unknown integration', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([]);
+      await expect(service.refreshChannel(mockOrg as any, 'nope')).rejects.toThrow(NotFoundException);
+    });
+
+    it('surfaces provider errors as a 502 (never swallowed)', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (integrationService.checkAnalytics as any).mockRejectedValue(new Error('provider down'));
+      await expect(service.refreshChannel(mockOrg as any, 'i1')).rejects.toMatchObject({ status: 502 });
+    });
+  });
+
+  // ── 7.4: content-attribute intelligence (pure fn + service) ──
+  describe('computeContentInsights (7.4)', () => {
+    const post = (over: Partial<{ image: string | null; content: string; campaignId: string | null; publishDate: Date; engagement: number }>) => ({
+      image: null, content: '', campaignId: null, publishDate: d(2024, 1, 1), engagement: 0, ...over,
+    });
+
+    it('surfaces a bucket that outperforms the org mean with ≥5 samples', () => {
+      const posts = [
+        // 5 video posts averaging 1000 engagement
+        ...Array.from({ length: 5 }, () => post({ image: JSON.stringify([{ path: 'a.mp4' }]), engagement: 1000 })),
+        // 5 image posts averaging 100 engagement
+        ...Array.from({ length: 5 }, () => post({ image: JSON.stringify([{ path: 'a.jpg' }]), engagement: 100 })),
+      ];
+      const { findings } = computeContentInsights(posts);
+      const video = findings.find((f) => f.dimension === 'media' && f.bucket === 'video');
+      expect(video).toBeDefined();
+      expect(video!.direction).toBe('up');
+      expect(video!.sampleSize).toBe(5);
+      expect(video!.ratio).toBeGreaterThan(1);
+    });
+
+    it('suppresses under-sampled buckets (<5)', () => {
+      const posts = [
+        ...Array.from({ length: 3 }, () => post({ image: JSON.stringify([{ path: 'a.mp4' }]), engagement: 5000 })),
+        ...Array.from({ length: 6 }, () => post({ image: JSON.stringify([{ path: 'a.jpg' }]), engagement: 100 })),
+      ];
+      const { findings } = computeContentInsights(posts);
+      expect(findings.some((f) => f.bucket === 'video')).toBe(false); // only 3 samples
+    });
+
+    it('zero posts → empty findings', () => {
+      expect(computeContentInsights([])).toEqual({ findings: [], totalPosts: 0, orgMean: 0 });
+    });
+
+    it('parses Post.image defensively (malformed JSON → no media, no throw)', () => {
+      const posts = Array.from({ length: 5 }, () => post({ image: 'not-json{', engagement: 500 }));
+      const { findings, totalPosts } = computeContentInsights(posts);
+      expect(totalPosts).toBe(5);
+      // all fall in the "none" media bucket; no crash
+      expect(findings.every((f) => f.bucket !== 'video')).toBe(true);
+    });
+
+    it('service delegates to the repo + pure fn', async () => {
+      (analyticsRepository.getContentInsightPosts as any).mockResolvedValue([
+        { id: 'p1', content: 'hi', image: null, campaignId: null, publishDate: d(2024, 1, 1), lastViews: 5, lastLikes: 5, lastComments: 0 },
+      ]);
+      const r = await service.getContentInsights(mockOrg as any);
+      expect(analyticsRepository.getContentInsightPosts).toHaveBeenCalled();
+      expect(r.totalPosts).toBe(1);
+      expect(r.orgMean).toBe(10);
+    });
+  });
+
+  // ── 7.5: LLM-narrated summary (no-provider rule + stubbed model) ──
+  describe('narrate (7.5)', () => {
+    it('AI-off org → standard "AI not configured" error, no generateText call', async () => {
+      aiModelProvider.resolveConfigForScope.mockResolvedValue(null);
+      await expect(service.narrate(mockOrg as any, '2024-01-01', '2024-01-07'))
+        .rejects.toThrow(/AI is not configured/);
+      expect(aiModelProvider.generateText).not.toHaveBeenCalled();
+    });
+
+    it('with an active provider, assembles context and returns the narrative', async () => {
+      aiModelProvider.resolveConfigForScope.mockResolvedValue({ providerId: 'openai' });
+      aiModelProvider.generateText.mockResolvedValue('Your impressions grew.');
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository.getSnapshots as any).mockResolvedValue([
+        { integrationId: 'i1', metric: 'impressions', value: 1000, date: d(2024, 1, 1) },
+      ]);
+      (analyticsRepository.getContentInsightPosts as any).mockResolvedValue([]);
+      (analyticsRepository.listAnomalies as any).mockResolvedValue([]);
+
+      const r = await service.narrate(mockOrg as any, '2024-01-01', '2024-01-07');
+      expect(aiModelProvider.generateText).toHaveBeenCalledWith(
+        'utility', expect.any(String), expect.objectContaining({ orgId: 'org1' }),
+      );
+      expect(r.narrative).toBe('Your impressions grew.');
+    });
+  });
+
+  // R2.5 — a provided alert-rule integrationId must belong to the org.
+  describe('alert-rule integrationId org-ownership (R2.5)', () => {
+    const UUID = '11111111-1111-4111-8111-111111111111';
+
+    it('createAlertRule throws 400 when integrationId is not the org\'s channel', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([]);
+      (analyticsRepository as any).createAlertRule = vi.fn();
+
+      await expect(
+        service.createAlertRule('org1', {
+          integrationId: UUID,
+          metric: 'followers',
+          comparator: 'gte',
+          threshold: 100,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(analyticsRepository.getIntegrations).toHaveBeenCalledWith('org1', [UUID]);
+      expect((analyticsRepository as any).createAlertRule).not.toHaveBeenCalled();
+    });
+
+    it('createAlertRule persists when the integrationId belongs to the org', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([mockIntegration]);
+      (analyticsRepository as any).createAlertRule = vi.fn().mockResolvedValue({ id: 'r1' });
+
+      const res = await service.createAlertRule('org1', {
+        integrationId: mockIntegration.id,
+        metric: 'followers',
+        comparator: 'gte',
+        threshold: 100,
+      });
+      expect(res).toEqual({ id: 'r1' });
+      expect((analyticsRepository as any).createAlertRule).toHaveBeenCalledOnce();
+    });
+
+    it('createAlertRule skips the ownership check when no integrationId is given', async () => {
+      (analyticsRepository as any).createAlertRule = vi.fn().mockResolvedValue({ id: 'r2' });
+      const spy = analyticsRepository.getIntegrations as any;
+
+      await service.createAlertRule('org1', {
+        metric: 'followers',
+        comparator: 'gte',
+        threshold: 100,
+      });
+      expect(spy).not.toHaveBeenCalled();
+      expect((analyticsRepository as any).createAlertRule).toHaveBeenCalledOnce();
+    });
+
+    it('updateAlertRule throws 400 for a foreign integrationId before touching the row', async () => {
+      (analyticsRepository.getIntegrations as any).mockResolvedValue([]);
+      (analyticsRepository as any).updateAlertRule = vi.fn();
+
+      await expect(
+        service.updateAlertRule('org1', 'r1', { integrationId: UUID }),
+      ).rejects.toThrow(BadRequestException);
+      expect((analyticsRepository as any).updateAlertRule).not.toHaveBeenCalled();
     });
   });
 });

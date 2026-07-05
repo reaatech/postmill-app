@@ -9,6 +9,7 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useCampaignDashboard } from '@gitroom/frontend/components/campaigns/hooks/campaign.hooks';
 import { DashboardHeader } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-header';
 import { DashboardKpis } from '@gitroom/frontend/components/campaigns/dashboard/dashboard-kpis';
+import { CampaignAnalyticsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-analytics-section';
 import { TaggedItemsPanels } from '@gitroom/frontend/components/campaigns/dashboard/tagged-items-panels';
 import { CampaignChannelsSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-channels-section';
 import { CampaignFilesSection } from '@gitroom/frontend/components/campaigns/dashboard/campaign-files-section';
@@ -142,6 +143,11 @@ export const CampaignDashboardPage: FC = () => {
     <div className="w-full flex flex-col gap-[24px] p-[24px]">
       <DashboardHeader campaign={data.campaign} onMutate={mutate} />
       <DashboardKpis dashboard={data} />
+      <CampaignAnalyticsSection
+        campaignId={id}
+        startDate={data.campaign?.startDate}
+        endDate={data.campaign?.endDate}
+      />
 
       {/* Section tabs — first 3 inline; the rest fold into a kebab on mobile, inline on desktop.
           The kebab lives OUTSIDE the horizontally-scrolling track so its menu isn't clipped. */}
