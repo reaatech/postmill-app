@@ -108,6 +108,60 @@ export class CampaignsService {
     return this._campaignsRepository.getEngagement(id, organizationId);
   }
 
+  async getSummaries(organizationId: string, limit = 6) {
+    const campaigns = await this._campaignsRepository.findActiveCampaigns(
+      organizationId,
+      limit
+    );
+    if (campaigns.length === 0) return [];
+
+    const campaignIds = campaigns.map((c) => c.id);
+    const [posts] = await Promise.all([
+      this._campaignsRepository.getSummaryPosts(organizationId, campaignIds),
+    ]);
+
+    const postIds = posts.map((p) => p.id);
+    const clickTotals = await this._campaignsRepository.getClickTotalsForPosts(
+      organizationId,
+      postIds
+    );
+
+    const postsByCampaign = new Map<string, typeof posts>();
+    for (const p of posts) {
+      const list = postsByCampaign.get(p.campaignId!) || [];
+      list.push(p);
+      postsByCampaign.set(p.campaignId!, list);
+    }
+
+    return campaigns.map((campaign) => {
+      const campaignPosts = postsByCampaign.get(campaign.id) || [];
+      const stateCounts: Record<string, number> = {};
+      const engagement = { totalViews: 0, totalLikes: 0, totalComments: 0 };
+      let clickTotal = 0;
+
+      for (const p of campaignPosts) {
+        stateCounts[p.state] = (stateCounts[p.state] || 0) + 1;
+        engagement.totalViews += p.lastViews || 0;
+        engagement.totalLikes += p.lastLikes || 0;
+        engagement.totalComments += p.lastComments || 0;
+        clickTotal += clickTotals.get(p.id) || 0;
+      }
+
+      return {
+        id: campaign.id,
+        name: campaign.name,
+        endDate: campaign.endDate,
+        postCounts: {
+          queue: stateCounts['QUEUE'] || 0,
+          published: stateCounts['PUBLISHED'] || 0,
+          draft: stateCounts['DRAFT'] || 0,
+          error: stateCounts['ERROR'] || 0,
+        },
+        goals: computeGoalProgress(campaign.goals, engagement, stateCounts, clickTotal),
+      };
+    });
+  }
+
   async getDashboard(id: string, organizationId: string) {
     const campaign = await this._campaignsRepository.findById(id, organizationId);
     if (!campaign) throw new NotFoundException('Campaign not found');
@@ -137,27 +191,29 @@ export class CampaignsService {
     engagement.totalComments = syncedCommentCount;
 
     const itemPanels: Record<string, any[]> = {};
-    for (const row of itemCounts) {
-      const slug = ENTITY_ENUM_TO_SLUG[row.entityType];
-      const capped = await this._campaignsRepository.getCappedItemsByCampaign(
-        id,
-        organizationId,
-        row.entityType,
-        10
-      );
-      const resolved = await this._campaignItemResolver.resolveBatch(
-        organizationId,
-        row.entityType,
-        capped.map((c) => c.entityId)
-      );
-      itemPanels[slug] = capped
-        .map((c) => {
-          const r = resolved.get(c.entityId);
-          if (!r) return null;
-          return { ...r, entityType: slug, taggedAt: c.createdAt };
-        })
-        .filter(Boolean) as any[];
-    }
+    await Promise.all(
+      itemCounts.map(async (row) => {
+        const slug = ENTITY_ENUM_TO_SLUG[row.entityType];
+        const capped = await this._campaignsRepository.getCappedItemsByCampaign(
+          id,
+          organizationId,
+          row.entityType,
+          10
+        );
+        const resolved = await this._campaignItemResolver.resolveBatch(
+          organizationId,
+          row.entityType,
+          capped.map((c) => c.entityId)
+        );
+        itemPanels[slug] = capped
+          .map((c) => {
+            const r = resolved.get(c.entityId);
+            if (!r) return null;
+            return { ...r, entityType: slug, taggedAt: c.createdAt };
+          })
+          .filter(Boolean) as any[];
+      })
+    );
 
     // Resolve changelog user names in one batch.
     const userIds = [...new Set(recentChangelog.map((l: any) => l.userId).filter(Boolean))];

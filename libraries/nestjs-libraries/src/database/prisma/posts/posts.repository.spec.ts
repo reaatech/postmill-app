@@ -134,3 +134,54 @@ describe('PostsRepository', () => {
     });
   });
 });
+
+describe('1.1 / 1.3 / 1.4 — dashboard repository queries', () => {
+  it('getFailedPosts filters to live ERROR root posts within the window', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+    (repository as any)._post = { model: { post: { findMany } } };
+
+    const since = new Date('2026-06-04T00:00:00.000Z');
+    await repository.getFailedPosts('org-1', since, 10);
+
+    const args = findMany.mock.calls[0][0];
+    expect(args.where.state).toBe('ERROR');
+    expect(args.where.deletedAt).toBeNull();
+    expect(args.where.parentPostId).toBeNull();
+    expect(args.where.updatedAt.gte).toBe(since);
+    expect(args.orderBy).toEqual({ updatedAt: 'desc' });
+    expect(args.take).toBe(10);
+    expect(args.select.integration.select).not.toHaveProperty('token');
+  });
+
+  it('getPendingApprovalPosts filters to pending draft approvals', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+    (repository as any)._post = { model: { post: { findMany } } };
+
+    await repository.getPendingApprovalPosts('org-1', 5);
+
+    const args = findMany.mock.calls[0][0];
+    expect(args.where.state).toBe('DRAFT');
+    expect(args.where.approvalStatus).toBe('pending');
+    expect(args.where.deletedAt).toBeNull();
+    expect(args.orderBy).toEqual({ createdAt: 'asc' });
+    expect(args.select.campaign).toBeDefined();
+  });
+
+  it('getScheduledPostDates selects only publishDate in the window', async () => {
+    const findMany = vi.fn().mockResolvedValue([]);
+    const repository = Object.create(PostsRepository.prototype) as PostsRepository;
+    (repository as any)._post = { model: { post: { findMany } } };
+
+    const from = new Date('2026-06-11T00:00:00.000Z');
+    const to = new Date('2026-06-17T23:59:59.999Z');
+    await repository.getScheduledPostDates('org-1', from, to);
+
+    const args = findMany.mock.calls[0][0];
+    expect(args.where.state).toBe('QUEUE');
+    expect(args.where.publishDate.gte).toBe(from);
+    expect(args.where.publishDate.lte).toBe(to);
+    expect(args.select).toEqual({ publishDate: true });
+  });
+});

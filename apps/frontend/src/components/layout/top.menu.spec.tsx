@@ -1,8 +1,9 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 let mockIsGeneral = true;
 let mockBillingEnabled = false;
+let mockPathname = '/dashboard';
 
 vi.mock('@gitroom/react/helpers/variable.context', () => ({
   useVariables: () => ({ isGeneral: mockIsGeneral, billingEnabled: mockBillingEnabled }),
@@ -34,7 +35,7 @@ vi.mock('@gitroom/frontend/components/layout/agent.media.modal', () => ({
 }));
 
 vi.mock('next/navigation', () => ({
-  usePathname: () => '/posts',
+  usePathname: () => mockPathname || '/dashboard',
 }));
 
 let mockPermissions = {
@@ -52,7 +53,7 @@ vi.mock('@gitroom/frontend/components/layout/use-permissions', () => ({
   usePermissions: () => mockPermissions,
 }));
 
-import { TopMenu } from './top.menu';
+import { TopMenu, useMenuItem } from './top.menu';
 
 describe('TopMenu', () => {
   describe('Posts rename (was Schedule/Launches)', () => {
@@ -119,6 +120,33 @@ describe('TopMenu', () => {
       mockPermissions.hasPermission = () => false;
       render(<TopMenu />);
       expect(screen.getByTitle('Settings')).toBeDefined();
+    });
+  });
+
+  describe('Home navigation (2.4)', () => {
+    beforeEach(() => {
+      mockIsGeneral = true;
+      mockBillingEnabled = false;
+      mockPathname = '/dashboard';
+    });
+
+    it('pins Home first in firstMenu', () => {
+      const { result } = renderHook(() => useMenuItem());
+      expect(result.current.firstMenu[0].path).toBe('/dashboard');
+      expect(result.current.firstMenu[0].name).toBe('Home');
+    });
+
+    it('keeps the remaining firstMenu items sorted alphabetically', () => {
+      const { result } = renderHook(() => useMenuItem());
+      const remaining = result.current.firstMenu.slice(1).map((i) => i.name);
+      expect(remaining).toEqual([...remaining].sort((a, b) => a.localeCompare(b)));
+    });
+
+    it('highlights Home as active on /dashboard', () => {
+      mockPathname = '/dashboard';
+      render(<TopMenu />);
+      const homeLink = screen.getByTitle('Home');
+      expect(homeLink.className).toContain('bg-boxFocused');
     });
   });
 });

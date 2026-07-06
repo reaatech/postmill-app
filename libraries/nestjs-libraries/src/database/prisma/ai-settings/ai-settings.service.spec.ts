@@ -33,6 +33,7 @@ const mockRepo = {
   createMediaJob: vi.fn(),
   updateMediaJob: vi.fn(),
   getMediaJobs: vi.fn(),
+  getMediaJobStatusCounts: vi.fn(),
   // AIPromptLibraryItem
   getPromptLibraryItems: vi.fn(),
   createPromptLibraryItem: vi.fn(),
@@ -914,6 +915,20 @@ describe('AiSettingsService', () => {
       // Non-sensitive values pass through
       expect(stored.name).toBe('openai');
       expect(stored.model).toBe('gpt-4');
+    });
+  });
+
+  describe('getMediaJobsWithCounts', () => {
+    it('returns jobs and status counts in one call', async () => {
+      mockRepo.getMediaJobs.mockResolvedValue([{ id: 'j1', provider: 'openai', status: 'pending' }]);
+      mockRepo.getMediaJobStatusCounts.mockResolvedValue({ pending: 1, processing: 0, failed7d: 2 });
+
+      const result = await service.getMediaJobsWithCounts('org-1', 20);
+
+      expect(result.jobs).toHaveLength(1);
+      expect(result.counts).toEqual({ pending: 1, processing: 0, failed7d: 2 });
+      expect(mockRepo.getMediaJobs).toHaveBeenCalledWith('org-1', 20);
+      expect(mockRepo.getMediaJobStatusCounts).toHaveBeenCalledWith('org-1');
     });
   });
 });

@@ -233,6 +233,11 @@ export class IntegrationService {
     return this._integrationRepository.getIntegrationsList(org);
   }
 
+  async getHealthSummary(org: string) {
+    const list = await this._integrationRepository.getIntegrationsHealth(org);
+    return list.filter((i) => i.refreshNeeded || i.disabled);
+  }
+
   updateNameAndUrl(id: string, name: string, url: string) {
     return this._integrationRepository.updateNameAndUrl(id, name, url);
   }

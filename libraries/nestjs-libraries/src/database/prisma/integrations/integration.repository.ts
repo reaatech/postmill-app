@@ -494,6 +494,24 @@ export class IntegrationRepository {
     }).then((integrations) => integrations.map(decryptIntegrationTokens));
   }
 
+  getIntegrationsHealth(org: string) {
+    return this._integration.model.integration.findMany({
+      where: {
+        organizationId: org,
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        providerIdentifier: true,
+        picture: true,
+        refreshNeeded: true,
+        disabled: true,
+        tokenExpiration: true,
+      },
+    });
+  }
+
 
   async disableChannel(org: string, id: string) {
     await this._integration.model.integration.update({

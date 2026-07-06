@@ -1,10 +1,11 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useCallback, useMemo, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import clsx from 'clsx';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { useDashboardSummary } from './hooks/useDashboardSummary';
+import { SectionCard } from './kit/section-card';
 
 const SETUP_STEPS = [
   { key: 'ai', label: 'Connect an AI (LLM) Provider', hint: 'OpenAI, Anthropic, DeepSeek', href: '/settings/ai/llm-providers' },
@@ -15,16 +16,47 @@ const SETUP_STEPS = [
   { key: 'team', label: 'Invite a Team Member', hint: 'Colleague, Contractor, Client', href: '/settings/team' },
 ];
 
+const DISMISS_KEY = 'onboarding_dismissed';
+const DISMISS_EVENT = 'onboarding-dismiss-change';
+
+const readDismissedRaw = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(DISMISS_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const parseDismissed = (raw: string | null) => raw === 'true';
+
+const writeDismissed = (value: boolean) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(DISMISS_KEY, String(value));
+    window.dispatchEvent(new CustomEvent(DISMISS_EVENT));
+  } catch {
+    /* ignore */
+  }
+};
+
+const subscribeDismissed = (callback: () => void) => {
+  if (typeof window === 'undefined') return () => {};
+  const handler = () => callback();
+  window.addEventListener(DISMISS_EVENT, handler);
+  return () => window.removeEventListener(DISMISS_EVENT, handler);
+};
+
 export const DashboardSetup: FC = () => {
   const router = useRouter();
   const { data: integrations } = useIntegrationList();
   const { data: summary } = useDashboardSummary();
-  const [dismissed, setDismissed] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('onboarding_dismissed') === 'true';
-    }
-    return false;
-  });
+  const dismissedRaw = useSyncExternalStore(
+    subscribeDismissed,
+    readDismissedRaw,
+    () => null
+  );
+  const dismissed = parseDismissed(dismissedRaw);
 
   const steps: Record<string, boolean> = useMemo(() => ({
     ai: summary?.aiProviderActive === true,
@@ -39,21 +71,15 @@ export const DashboardSetup: FC = () => {
   const allComplete = completedCount === SETUP_STEPS.length;
 
   const handleDismiss = useCallback(() => {
-    setDismissed(true);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('onboarding_dismissed', 'true');
-    }
+    writeDismissed(true);
   }, []);
 
   if (dismissed || allComplete) return null;
 
   return (
-    <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] mobile:p-[20px] mb-[24px]">
+    <SectionCard id="setup" title="Welcome to Postmill">
       <div className="flex items-center justify-between mb-[16px]">
-        <div>
-          <h2 className="text-[16px] font-[600]">Welcome to Postmill</h2>
-          <p className="text-[12px] text-newTableText">Let&apos;s get you set up</p>
-        </div>
+        <p className="text-[12px] text-newTableText">Let&apos;s get you set up</p>
         <button onClick={handleDismiss} className="text-[12px] text-newTableText hover:text-textColor cursor-pointer" type="button">Dismiss</button>
       </div>
 
@@ -101,6 +127,6 @@ export const DashboardSetup: FC = () => {
           );
         })}
       </div>
-    </div>
+    </SectionCard>
   );
 };

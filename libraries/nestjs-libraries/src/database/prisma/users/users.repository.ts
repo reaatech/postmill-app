@@ -108,6 +108,7 @@ export class UsersRepository {
           select: {
             name: true,
             avatarUrl: true,
+            timezone: true,
             picture: {
               select: {
                 id: true,

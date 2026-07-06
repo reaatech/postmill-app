@@ -248,6 +248,19 @@ Before writing any component, look at:
 
 All `--color-custom*` variables are **deprecated** — do not use them.
 
+### Dashboard
+The `/dashboard` page is the app's primary composition surface. New dashboard widgets should follow the
+existing pattern:
+
+- Backend aggregation belongs in `libraries/nestjs-libraries/src/dashboard/dashboard.service.ts` (or a
+  sibling service such as `dashboard-brief.service.ts`), not in the controller.
+- Widgets consume `/dashboard/*` endpoints through dedicated `use*` hooks in
+  `apps/frontend/src/components/dashboard/hooks/`.
+- Every widget is wrapped in `SectionCard` (`apps/frontend/src/components/dashboard/kit/section-card.tsx`)
+  with a stable `id` and an optional RBAC `permission` prop.
+- Section visibility is controlled by `useDashboardPrefs` (`localStorage['dashboard_prefs']`);
+  the Customize popover filters sections by `usePermissions`.
+
 ## Database
 
 The schema is authored in `libraries/nestjs-libraries/src/database/prisma/schema.prisma`, and changes
