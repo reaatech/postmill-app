@@ -12,12 +12,22 @@ import {
 } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 import { BrandsService } from '@gitroom/nestjs-libraries/brands/brands.service';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { z } from 'zod';
 import { AiDesignerSkillRouter } from '../../skills/ai-designer-skill-router.service';
 import type {
   AiDesignerConfig,
   DesignBrief,
   DesignPlan,
 } from '../../ai-designer.types';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
+
+const PlanResponseSchema = z.object({
+  type: z.string(),
+  plans: z.array(z.any()),
+});
 
 interface PlanRequest {
   type: 'plan-request';
@@ -56,7 +66,16 @@ export class AiDesignerArtDirectorService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context: ContextPacket
   ): Promise<AgentResponse> => {
-    const request = this._parseRequest(context.raw_input);
+    const request = parseAgentInput<PlanRequest>(context.raw_input);
+    if (isAgentInputError(request)) {
+      return {
+        content: JSON.stringify(request),
+        workflow_complete: false,
+      };
+    }
+    if (request.type !== 'plan-request') {
+      throw new Error(`Unexpected request type: ${(request as any).type}`);
+    }
     const orgId =
       typeof context.metadata?.orgId === 'string'
         ? context.metadata.orgId
@@ -97,14 +116,6 @@ export class AiDesignerArtDirectorService implements OnModuleInit {
       workflow_complete: false,
     };
   };
-
-  private _parseRequest(rawInput: string): PlanRequest {
-    const parsed = JSON.parse(rawInput) as PlanRequest;
-    if (parsed.type !== 'plan-request') {
-      throw new Error(`Unexpected request type: ${parsed.type}`);
-    }
-    return parsed;
-  }
 
   private async _enrichBrief(
     brief: DesignBrief,
@@ -202,7 +213,7 @@ export class AiDesignerArtDirectorService implements OnModuleInit {
     const result = await this._modelProvider.generateObject<{
       type: string;
       plans?: DesignPlan[];
-    }>('agent', prompt, undefined, {
+    }>('agent', prompt, PlanResponseSchema, {
       system: skillSystemPrompt,
       orgId,
     });
@@ -211,7 +222,50 @@ export class AiDesignerArtDirectorService implements OnModuleInit {
       throw new Error('AI response did not match expected plans shape');
     }
 
-    return result.plans;
+    const validPlans: DesignPlan[] = [];
+    for (const item of result.plans) {
+      if (this._isValidPlanItem(item)) {
+        validPlans.push(item as DesignPlan);
+      } else {
+        this._logger.warn(
+          'Art director received an invalid plan item; replacing with fallback.'
+        );
+        validPlans.push(this._fallbackPlan(skillId, brief, sizes));
+      }
+    }
+
+    if (validPlans.length === 0) {
+      throw new Error('AI response contained no valid plan items');
+    }
+
+    return validPlans;
+  }
+
+  private _isValidPlanItem(item: unknown): boolean {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) {
+      return false;
+    }
+    const candidate = item as Record<string, unknown>;
+
+    if (typeof candidate.concept !== 'string') {
+      return false;
+    }
+    if (!Array.isArray(candidate.slots)) {
+      return false;
+    }
+    for (const slot of candidate.slots) {
+      if (!slot || typeof slot !== 'object' || Array.isArray(slot)) {
+        return false;
+      }
+      if (typeof (slot as Record<string, unknown>).id !== 'string') {
+        return false;
+      }
+    }
+    if ('assetNeeds' in candidate && !Array.isArray(candidate.assetNeeds)) {
+      return false;
+    }
+
+    return true;
   }
 
   private _designPlanSchema(): Record<string, unknown> {

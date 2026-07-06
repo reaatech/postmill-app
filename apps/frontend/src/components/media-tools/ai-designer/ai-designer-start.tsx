@@ -13,6 +13,7 @@ import {
 import { useBrands } from '@gitroom/frontend/components/settings/brand/use-brands';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
+import { useImportStockMedia } from './ai-designer.hooks';
 import { markdownToHtml } from './markdown-lite';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 import type {
@@ -28,16 +29,29 @@ interface AiDesignerStartProps {
   isStarting?: boolean;
   /** Socket connection state — Start is disabled until the socket is up. */
   isConnected?: boolean;
+  /** Manual reconnect trigger for when auto-retries are exhausted. */
+  onReconnect?: () => void;
   /** Markdown guidance from the server (e.g. missing model defaults). */
   notice?: string | null;
 }
 
 const makeId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
+const NoticeContent: React.FC<{ notice: string }> = ({ notice }) => {
+  const html = useMemo(() => markdownToHtml(notice), [notice]);
+  return (
+    <SafeContent
+      content={html}
+      className="space-y-2 [&_a]:text-designerAccent [&_a]:underline"
+    />
+  );
+};
+
 export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
   onStart,
   isStarting = false,
   isConnected = true,
+  onReconnect,
   notice,
 }) => {
   const toaster = useToaster();
@@ -54,8 +68,10 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
   const [brandProfileId, setBrandProfileId] = useState('');
   const [variants, setVariants] = useState(3);
   const [referenceItems, setReferenceItems] = useState<MediaSelectorItem[]>([]);
+  const [referenceImporting, setReferenceImporting] = useState(false);
   const [showMediaPicker, setShowMediaPicker] = useState(false);
   const [prompt, setPrompt] = useState('');
+  const importStockMedia = useImportStockMedia();
 
   const imagePresets = useMemo(
     () => CHANNEL_PRESETS.filter((p) => p.category !== 'video'),
@@ -80,6 +96,16 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
 
   const removeCustomSize = (id: string) => {
     setCustomSizes((prev) => prev.filter((s) => s.id !== id));
+  };
+
+  const mergeReferenceItems = (
+    prev: MediaSelectorItem[],
+    next: MediaSelectorItem[]
+  ) => {
+    const map = new Map<string, MediaSelectorItem>();
+    for (const item of prev) map.set(`${item.source}-${item.url}`, item);
+    for (const item of next) map.set(`${item.source}-${item.url}`, item);
+    return Array.from(map.values());
   };
 
   const handleStart = () => {
@@ -140,10 +166,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
         <div className="max-w-3xl mx-auto space-y-6">
           {notice && (
             <div className="rounded-lg border border-amber-600/40 bg-amber-600/10 p-3 text-[13px] text-amber-600">
-              <SafeContent
-                content={markdownToHtml(notice)}
-                className="space-y-2 [&_a]:text-designerAccent [&_a]:underline"
-              />
+              <NoticeContent notice={notice} />
             </div>
           )}
 
@@ -202,7 +225,11 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
               Custom sizes
             </h2>
             <div className="flex items-center gap-2">
+              <label htmlFor="custom-width" className="sr-only">
+                Custom width
+              </label>
               <input
+                id="custom-width"
                 type="number"
                 value={customW}
                 onChange={(e) => setCustomW(e.target.value)}
@@ -210,7 +237,11 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 className="w-24 h-[40px] rounded-lg border border-studioBorder bg-newBgColorInner px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/40">×</span>
+              <label htmlFor="custom-height" className="sr-only">
+                Custom height
+              </label>
               <input
+                id="custom-height"
                 type="number"
                 value={customH}
                 onChange={(e) => setCustomH(e.target.value)}
@@ -311,9 +342,15 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
                 type="button"
                 secondary
                 onClick={() => setShowMediaPicker(true)}
+                disabled={referenceImporting}
               >
-                Add reference
+                {referenceImporting ? 'Importing…' : 'Add reference'}
               </Button>
+              {referenceImporting && (
+                <span className="text-[12px] text-textColor/50">
+                  Importing stock reference…
+                </span>
+              )}
               {referenceItems.map((item) => (
                 <div
                   key={`${item.source}-${item.url}`}
@@ -352,8 +389,14 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           {/* Prompt (prompt mode) */}
           {mode === 'prompt' && (
             <section className="space-y-2">
-              <h2 className="text-[14px] font-semibold text-textColor">Prompt</h2>
+              <label
+                htmlFor="ai-designer-prompt"
+                className="block text-[14px] font-semibold text-textColor"
+              >
+                Prompt
+              </label>
               <textarea
+                id="ai-designer-prompt"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 placeholder="Describe the design you want…"
@@ -363,7 +406,7 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
             </section>
           )}
 
-          <div className="pt-2">
+          <div className="pt-2 flex items-center gap-2">
             <Button
               type="button"
               loading={isStarting}
@@ -371,11 +414,17 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
               disabled={
                 (selectedChannels.length === 0 && customSizes.length === 0) ||
                 isStarting ||
-                !isConnected
+                !isConnected ||
+                referenceImporting
               }
             >
               {isConnected ? 'Start designing' : 'Connecting…'}
             </Button>
+            {!isConnected && onReconnect && (
+              <Button type="button" secondary onClick={onReconnect}>
+                Retry
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -386,14 +435,33 @@ export const AiDesignerStart: React.FC<AiDesignerStartProps> = ({
           onClose={() => setShowMediaPicker(false)}
           kinds={['image']}
           multiple
-          onConfirm={(items) => {
-            setReferenceItems((prev) => {
-              const map = new Map<string, MediaSelectorItem>();
-              for (const item of prev) map.set(`${item.source}-${item.url}`, item);
-              for (const item of items) map.set(`${item.source}-${item.url}`, item);
-              return Array.from(map.values());
-            });
+          onConfirm={async (items) => {
             setShowMediaPicker(false);
+            const stockItems = items.filter(
+              (item) => item.source === 'stock' || !item.fileId
+            );
+            const fileItems = items.filter(
+              (item) => item.source === 'file' && item.fileId
+            );
+            setReferenceItems((prev) => mergeReferenceItems(prev, fileItems));
+            if (stockItems.length === 0) return;
+
+            setReferenceImporting(true);
+            try {
+              const imported = await Promise.all(
+                stockItems.map((item) => importStockMedia(item))
+              );
+              setReferenceItems((prev) =>
+                mergeReferenceItems(prev, imported)
+              );
+            } catch (e) {
+              toaster.show(
+                (e as Error).message || 'Failed to import reference image',
+                'warning'
+              );
+            } finally {
+              setReferenceImporting(false);
+            }
           }}
         />
       )}

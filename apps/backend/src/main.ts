@@ -37,7 +37,6 @@ import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/o
 // BigInt") — 500ing every endpoint that returns such an entity (e.g.
 // /user/organizations). Serialize BigInt as a JS number, matching the
 // numeric shape the frontend already expects from storage endpoints.
-// eslint-disable-next-line @typescript-eslint/no-redeclare
 (BigInt.prototype as any).toJSON = function () {
   return Number(this);
 };
@@ -167,18 +166,20 @@ async function start() {
   // CONFIG_CHECK_STRICT is set) a fatal-missing secret exits non-zero before listen.
   checkConfiguration();
 
-  // Multi-replica collaboration hazard (A4): the websocket holds a live Y.Doc per room
-  // in-process. Warn loudly if the operator opted out of single-instance without wiring a
-  // Redis adapter (not yet implemented — tracked follow-up).
+  // Multi-replica websocket hazard (A4): the collaboration gateway holds a live Y.Doc
+  // per room, and the AI Designer gateway keeps in-memory rate buckets, Socket.IO rooms,
+  // and conductor pipeline state. Warn loudly if the operator opted out of single-instance
+  // without wiring a Redis adapter (not yet implemented — tracked follow-up).
   if (
     process.env.COLLAB_SINGLE_INSTANCE === 'false' &&
     !process.env.COLLAB_REDIS_ADAPTER
   ) {
     new Logger('Bootstrap').warn(
-      'COLLAB_SINGLE_INSTANCE=false but COLLAB_REDIS_ADAPTER is not set. The collaboration ' +
-        'websocket keeps per-room state in memory; running multiple replicas without a shared ' +
-        'Redis adapter will silently diverge and lose edits. Pin collaboration to one replica ' +
-        '(sticky sessions) or configure a Redis adapter. See docs/operations-guide/scaling.md.'
+      'COLLAB_SINGLE_INSTANCE=false but COLLAB_REDIS_ADAPTER is not set. The /collaboration ' +
+        'and /ai-designer websockets keep per-room state in memory; running multiple replicas ' +
+        'without a shared Redis adapter will silently diverge and lose edits or AI Designer ' +
+        'sessions. Pin these namespaces to one replica (sticky sessions) or configure a Redis ' +
+        'adapter. See docs/operations-guide/scaling.md and docs/developer-docs/designer.md.'
     );
   }
 

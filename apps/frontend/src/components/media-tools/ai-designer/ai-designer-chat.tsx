@@ -87,9 +87,12 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
       pendingSendRef.current = null;
       setSending(false);
     }
-    // The conductor emits no terminal progress event — any real message means
-    // the in-flight progress bubble is stale.
-    setProgress(null);
+    // The conductor emits no terminal progress event — any real agent message
+    // means the in-flight progress bubble is stale. Skip this for the user's
+    // own echo so an in-flight render stays visible.
+    if (msg.role !== 'user') {
+      setProgress(null);
+    }
     setMessages((prev) => {
       const next = msg.nonce
         ? prev.filter(
@@ -116,6 +119,9 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
           return Array.from(map.values());
         });
       }
+      // A state hydrate means the current render finished before we reconnected;
+      // any stale progress bubble is bogus.
+      setProgress(null);
     },
     []
   );
@@ -301,7 +307,7 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
       >
         {allMessages.length === 0 && !progress && !preview && (
           <div className="text-center text-[14px] text-textColor/50 py-10">
-            {mode === 'prompt'
+            {(displaySession?.mode ?? mode) === 'prompt'
               ? 'Your prompt has been sent. The agent will respond here.'
               : 'Describe what you want to design.'}
           </div>
@@ -343,7 +349,11 @@ export const AiDesignerChat: React.FC<AiDesignerChatProps> = ({
 
       <div className="border-t border-studioBorder p-[12px] shrink-0">
         <div className="flex items-end gap-[10px]">
+          <label htmlFor="ai-designer-message-input" className="sr-only">
+            Message
+          </label>
           <textarea
+            id="ai-designer-message-input"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

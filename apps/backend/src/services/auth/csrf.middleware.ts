@@ -1,6 +1,7 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
+import * as crypto from 'crypto';
 
 const CSRF_COOKIE = 'csrf_token';
 const CSRF_HEADER = 'x-csrf-token';
@@ -26,11 +27,17 @@ export class CsrfMiddleware implements NestMiddleware {
       return;
     }
 
-    // Validate CSRF token
+    // Validate CSRF token with a constant-time compare to avoid leaking
+    // cookie/header equality through timing side channels.
     const csrfCookie = req.cookies?.[CSRF_COOKIE];
     const csrfHeader = req.headers?.[CSRF_HEADER] as string | undefined;
 
-    if (!csrfCookie || !csrfHeader || csrfCookie !== csrfHeader) {
+    if (
+      typeof csrfCookie !== 'string' ||
+      typeof csrfHeader !== 'string' ||
+      csrfCookie.length !== csrfHeader.length ||
+      !crypto.timingSafeEqual(Buffer.from(csrfCookie), Buffer.from(csrfHeader))
+    ) {
       res.status(403).json({ error: 'Invalid or missing CSRF token' });
       return;
     }

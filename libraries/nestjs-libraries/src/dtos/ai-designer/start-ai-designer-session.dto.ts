@@ -1,5 +1,6 @@
 import {
   ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -10,13 +11,35 @@ import {
   Max,
   MaxLength,
   Min,
+  Validate,
   ValidateNested,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
 
 // Every field here arrives over the AI Designer websocket, where each accepted
 // payload can fan out into LLM dispatches and full renders — the numeric and
 // size bounds below are the cost ceiling, not cosmetics. Keep them tight.
+
+const VALID_CHANNEL_IDS = CHANNEL_PRESETS.map((p) => p.id);
+
+@ValidatorConstraint({ name: 'isAiDesignerChannelPreset', async: false })
+class IsAiDesignerChannelPresetConstraint
+  implements ValidatorConstraintInterface
+{
+  validate(value: unknown): boolean {
+    return (
+      Array.isArray(value) &&
+      value.every((v) => typeof v === 'string' && VALID_CHANNEL_IDS.includes(v))
+    );
+  }
+
+  defaultMessage(): string {
+    return `channels must be valid preset ids: ${VALID_CHANNEL_IDS.join(', ')}`;
+  }
+}
 
 class AiDesignerCustomSizeDto {
   @IsNumber()
@@ -37,9 +60,11 @@ class AiDesignerCustomSizeDto {
 
 export class AiDesignerConfigDto {
   @IsArray()
+  @ArrayMinSize(1)
   @ArrayMaxSize(20)
   @IsString({ each: true })
   @MaxLength(100, { each: true })
+  @Validate(IsAiDesignerChannelPresetConstraint)
   channels!: string[];
 
   @IsOptional()

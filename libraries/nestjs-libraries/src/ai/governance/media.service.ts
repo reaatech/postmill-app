@@ -10,6 +10,7 @@ import { OrgAiSettingsRepository } from '@gitroom/nestjs-libraries/database/pris
 import { EncryptionService } from '@gitroom/nestjs-libraries/encryption/encryption.service';
 import { MediaJobLifecycleService } from '@gitroom/nestjs-libraries/database/prisma/media-providers/media-job-lifecycle.service';
 import { ProviderResolutionService } from '@gitroom/nestjs-libraries/providers/provider-resolution.service';
+import { BudgetService } from './budget.service';
 import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
@@ -211,6 +212,7 @@ export class AiMediaService {
     @Optional() private _orgAiSettingsRepository?: OrgAiSettingsRepository,
     @Optional() private _encryptionService?: EncryptionService,
     @Optional() private _moduleRef?: ModuleRef,
+    @Optional() private _budget?: BudgetService,
   ) {}
 
   async getJob(id: string) {
@@ -710,6 +712,25 @@ export class AiMediaService {
         this._logger.warn(`Cost ledger charge failed: ${(err as Error)?.message}`);
       }
     }
+
+    // Mirror media generation spend into the AI budget ledger so org caps
+    // cover image/video/audio/etc. Failures are non-fatal — the job already ran.
+    if (this._budget) {
+      try {
+        await this._budget.recordSpend({
+          scope: 'media',
+          organizationId: orgId,
+          provider,
+          model,
+          inputTokens: 0,
+          outputTokens: 0,
+          costUsd: usd,
+        });
+      } catch (err) {
+        this._logger.warn(`Media spend recording failed: ${(err as Error)?.message}`);
+      }
+    }
+
     return usd;
   }
 
@@ -924,8 +945,11 @@ export class AiMediaService {
       }
     }
 
+    if (lastError) {
+      throw lastError;
+    }
     throw new CapabilityNotAvailable(
-      `All configured ${operation} providers failed${lastError ? `: ${lastError.message}` : ''}`,
+      `No media provider with ${operation} capability is configured. Configure one in Settings > Media.`,
       operation === 'audio' ? 'speech' : 'video',
     );
   }
@@ -937,14 +961,15 @@ export class AiMediaService {
     try {
       return await this._startAsyncJob('video', prompt, options);
     } catch (err) {
-      // Behaviour-preserving fallback: orgs with no video provider get an image instead.
+      // Only degrade to a static image when no video provider is configured.
+      // Actual provider failures are surfaced to the caller so a video request
+      // never silently returns an image URL.
       if (err instanceof CapabilityNotAvailable) {
         this._logger.warn('Video generation not available — falling back to image');
-      } else {
-        this._logger.error(`Video generation failed: ${(err as Error).message}`);
+        const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
+        return model.generate(prompt, { size: '1024x1024' });
       }
-      const model = await this._aiModelProvider.imageModel('utility', options?.orgId);
-      return model.generate(prompt, { size: '1024x1024' });
+      throw err;
     }
   }
 
@@ -1274,6 +1299,7 @@ export class AiMediaService {
       );
     }
     // Lazy require (not a top-level import) to avoid the circular boot-time require — see note at imports.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { SlideService } = require('@gitroom/nestjs-libraries/media/slide/slide.service');
     const slideService = this._moduleRef.get<SlideService>(SlideService, {
       strict: false,
@@ -1300,6 +1326,7 @@ export class AiMediaService {
       );
     }
     // Lazy require (not a top-level import) to avoid the circular boot-time require — see note at imports.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { CaptionService } = require('@gitroom/nestjs-libraries/media/caption/caption.service');
     const captionService = this._moduleRef.get<CaptionService>(CaptionService, {
       strict: false,

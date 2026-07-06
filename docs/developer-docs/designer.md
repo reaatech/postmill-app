@@ -120,7 +120,15 @@ foundations. It is **image-only** in this release; video is out of scope.
   user-message echoes carry the client `nonce` for optimistic reconciliation.
   **Deployment note:** the gateway uses Socket.IO's in-memory adapter and the conductor keeps its
   pipeline mutex / prompt correlation / circuit breakers in-process — run the backend as a single
-  instance (or behind sticky sessions) until a Redis adapter + shared stores are added.
+  instance (or behind sticky sessions) until a Redis adapter + shared stores are added. Setting
+  `COLLAB_SINGLE_INSTANCE=false` without `COLLAB_REDIS_ADAPTER` emits a startup warning for both
+  `/collaboration` and `/ai-designer`.
+  - **Reverse proxies:** by default the connect-rate bucket keys on the transport address, so all
+    clients behind a reverse proxy share one bucket. Set `TRUST_PROXY_HOPS` to the number of trusted
+    proxies to key the bucket on the Nth-from-right entry of `X-Forwarded-For` instead.
+  - **Stuck sessions:** if a session is in `planning` or `executing` and untouched for longer than
+    `AI_DESIGNER_STUCK_SESSION_MINUTES` (default 15), reconnecting rolls it back to `awaiting_plan`
+    so the user can retry.
 - **Session model:** `AiDesignerSession` + `AiDesignerMessage` (additive Prisma tables). State
   machine: `intake → planning → awaiting_plan → executing → delivered → revising`. Sessions are
   pruned by the daily `retention-purge` cron after `AI_DESIGNER_SESSION_RETENTION_DAYS` (default 90;
@@ -130,7 +138,8 @@ foundations. It is **image-only** in this release; video is out of scope.
   (`libraries/nestjs-libraries/src/ai-designer/agent-mesh/`). The agent registry is **bundled TS
   data** (`agent-registry.data.ts`, validated against `AgentRegistrySchema` at boot) — not a YAML
   asset, which would not survive `nest build` — with `AI_DESIGNER_AGENT_REGISTRY` as an optional
-  directory-of-YAML override. The mesh session/breaker stores default to **Redis**;
+  directory-of-YAML override (mapped to the package's `AGENT_REGISTRY_DIR` at import time). The mesh
+  session/breaker stores default to **Redis**;
   `AI_DESIGNER_MESH_STORE=postgres` opts into the package's Postgres stores (runs its own DDL on a
   second connection pool — deliberately not the default, and it requires a **dedicated**
   `AI_DESIGNER_MESH_DATABASE_URL`: never the Prisma `DATABASE_URL`, where third-party DDL would

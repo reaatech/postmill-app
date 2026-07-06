@@ -1,4 +1,4 @@
-import { Global, Module } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { AiModule } from '@gitroom/nestjs-libraries/ai/ai.module';
 import { AiDesignerService } from './ai-designer.service';
 import { AiDesignerSessionRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-designer/ai-designer-session.repository';
@@ -16,8 +16,8 @@ import { AiDesignerVisionCriticService } from './agents/vision-critic/ai-designe
 import { AiDesignerSaverService } from './ai-designer-saver.service';
 import { AiDesignerSkillRouter } from './skills/ai-designer-skill-router.service';
 import { AiDesignerConductorService } from './conductor/ai-designer-conductor.service';
+import { AiDesignerInputPolicyService } from './ai-designer-input-policy.service';
 
-@Global()
 @Module({
   imports: [AiModule, AiDesignerAgentMeshModule],
   providers: [
@@ -36,11 +36,10 @@ import { AiDesignerConductorService } from './conductor/ai-designer-conductor.se
     AiDesignerSaverService,
     AiDesignerSkillRouter,
     AiDesignerConductorService,
+    AiDesignerInputPolicyService,
   ],
   exports: [
     AiDesignerService,
-    AiDesignerSessionRepository,
-    AiDesignerMessageRepository,
     AiDesignerBudgetGuard,
     AiDesignerDefaultsGate,
     AiDesignerIdempotencyService,
@@ -53,6 +52,7 @@ import { AiDesignerConductorService } from './conductor/ai-designer-conductor.se
     AiDesignerSaverService,
     AiDesignerSkillRouter,
     AiDesignerConductorService,
+    AiDesignerInputPolicyService,
   ],
 })
 export class AiDesignerModule {}

@@ -818,5 +818,53 @@ describe('AIModelProvider', () => {
       expect(guardrails.checkOutput).toHaveBeenCalled();
       expect(health.recordSuccess).toHaveBeenCalledWith('openai');
     });
+
+    it('rejects with BudgetExceeded when budget check disallows text generation', async () => {
+      const createLanguageModel = vi.fn();
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
+        if (id === 'openai') {
+          return {
+            identifier: 'openai',
+            credentialFields: [{ key: 'apiKey', required: true }],
+            createLanguageModel,
+          };
+        }
+        return undefined;
+      });
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+      (budget.checkBudget as any).mockResolvedValueOnce({ allowed: false, reason: 'monthly cap hit' });
+
+      await expect(
+        provider.generateTextWithModel('org-123', 'openai', 'v1', 'gpt-4.1', { prompt: 'Hello' }),
+      ).rejects.toThrow(BudgetExceeded);
+
+      expect(createLanguageModel).not.toHaveBeenCalled();
+    });
+
+    it('rejects with BudgetExceeded when budget check disallows object generation', async () => {
+      const createLanguageModel = vi.fn();
+      (resolution.resolveAI as any).mockImplementation((id: string) => {
+        if (id === 'openai') {
+          return {
+            identifier: 'openai',
+            credentialFields: [{ key: 'apiKey', required: true }],
+            createLanguageModel,
+          };
+        }
+        return undefined;
+      });
+      mockGetByIdentifier.mockResolvedValue({
+        credentials: { apiKey: 'sk-test' },
+      });
+      (budget.checkBudget as any).mockResolvedValueOnce({ allowed: false, reason: 'daily cap hit' });
+
+      await expect(
+        provider.generateObjectWithModel('org-123', 'openai', 'v1', 'gpt-4.1', { prompt: 'JSON' }),
+      ).rejects.toThrow(BudgetExceeded);
+
+      expect(createLanguageModel).not.toHaveBeenCalled();
+    });
   });
 });

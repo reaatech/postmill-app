@@ -1,6 +1,5 @@
 import '@gitroom/nestjs-libraries/ai-designer/agent-mesh/agent-mesh-env.shim';
 import {
-  Global,
   Logger,
   Module,
   OnModuleDestroy,
@@ -35,7 +34,6 @@ import {
  * Individual agents register their in-process handlers in their own
  * `OnModuleInit` via `registerInProcessAgent` from `@reaatech/agent-mesh-router`.
  */
-@Global()
 @Module({})
 export class AiDesignerAgentMeshModule
   implements OnModuleInit, OnModuleDestroy
@@ -44,7 +42,7 @@ export class AiDesignerAgentMeshModule
   private _pgPool: { end(): Promise<void> } | null = null;
 
   async onModuleInit() {
-    // None of these may throw: this is a @Global() module on AppModule, so an
+    // None of these may throw: this module sits on AppModule, so an
     // onModuleInit rejection would crash-loop the whole backend for a feature
     // subsystem. Failures log and degrade instead.
     await this._step('registry', () => this._loadRegistry());
@@ -74,17 +72,19 @@ export class AiDesignerAgentMeshModule
 
   private async _loadRegistry() {
     // Operator override: a directory of per-agent YAML files (the
-    // agent-mesh-registry format — one agent per file).
-    const overrideDir = process.env.AI_DESIGNER_AGENT_REGISTRY;
+    // agent-mesh-registry format — one agent per file). `agent-mesh-env.stash`
+    // already maps `AI_DESIGNER_AGENT_REGISTRY` to `AGENT_REGISTRY_DIR` before
+    // the package import; honor either source here.
+    const overrideDir =
+      process.env.AI_DESIGNER_AGENT_REGISTRY || process.env.AGENT_REGISTRY_DIR;
     if (overrideDir) {
-      process.env.AGENT_REGISTRY_DIR = overrideDir;
       try {
         const registry = await loadRegistry();
         registryState.swap(registry);
         return;
       } catch (err) {
         this._logger.warn(
-          `AI_DESIGNER_AGENT_REGISTRY (${overrideDir}) failed to load: ${
+          `AI Designer agent registry override (${overrideDir}) failed to load: ${
             (err as Error).message
           } — falling back to the bundled registry`
         );
@@ -141,7 +141,11 @@ export class AiDesignerAgentMeshModule
   }
 
   private _pgPoolMax(): number {
-    const env = process.env.DATABASE_CONNECTION_LIMIT;
+    // Prefer the mesh-specific limit; fall back to the main Prisma pool limit
+    // for backward compatibility.
+    const env =
+      process.env.AI_DESIGNER_MESH_CONNECTION_LIMIT ||
+      process.env.DATABASE_CONNECTION_LIMIT;
     const parsed = env ? parseInt(env, 10) : NaN;
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 10;
   }

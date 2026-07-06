@@ -2,14 +2,19 @@
 
 import React, { useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
+import { useToaster } from '@gitroom/react/toaster/toaster';
 import {
   MediaSelectorModal,
   type MediaSelectorItem,
 } from '@gitroom/frontend/components/media-tools/media-selector-modal';
+import { useImportStockMedia } from './ai-designer.hooks';
 import type { FormField } from '@gitroom/nestjs-libraries/ai-designer/ai-designer.types';
 
 /** Slimmed media-pick value submitted to the server. */
-type MediaValue = Pick<MediaSelectorItem, 'fileId' | 'url' | 'type' | 'name'>;
+type MediaValue = Pick<
+  MediaSelectorItem,
+  'fileId' | 'url' | 'type' | 'name' | 'stockSource' | 'attribution' | 'downloadLocation'
+>;
 
 interface InteractiveFormProps {
   prompt: string;
@@ -42,6 +47,9 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
 
   const [values, setValues] = useState<Record<string, unknown>>(initialValues);
   const [mediaPickField, setMediaPickField] = useState<string | null>(null);
+  const [mediaImporting, setMediaImporting] = useState(false);
+  const toaster = useToaster();
+  const importStockMedia = useImportStockMedia();
 
   const setValue = (name: string, value: unknown) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -80,12 +88,13 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
       <p className="text-[14px] text-textColor">{prompt}</p>
       {fields.map((field) => (
         <div key={field.name} className="flex flex-col gap-1.5">
-          <label className="text-[13px] font-medium text-textColor">
+          <label htmlFor={field.name} className="text-[13px] font-medium text-textColor">
             {field.label}
           </label>
 
           {field.type === 'text' && (
             <input
+              id={field.name}
               type="text"
               value={(values[field.name] as string) || ''}
               placeholder={field.placeholder}
@@ -96,8 +105,13 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
 
           {field.type === 'number' && (
             <input
+              id={field.name}
               type="number"
-              value={(values[field.name] as string) || ''}
+              value={
+                values[field.name] === '' || values[field.name] == null
+                  ? ''
+                  : String(values[field.name])
+              }
               placeholder={field.placeholder}
               onChange={(e) =>
                 setValue(
@@ -112,6 +126,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
           {field.type === 'color' && (
             <div className="flex items-center gap-2">
               <input
+                id={field.name}
                 type="color"
                 value={(values[field.name] as string) || '#000000'}
                 onChange={(e) => setValue(field.name, e.target.value)}
@@ -125,6 +140,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
 
           {field.type === 'select' && (
             <select
+              id={field.name}
               value={(values[field.name] as string) || ''}
               onChange={(e) => setValue(field.name, e.target.value)}
               className="h-[40px] rounded-lg border border-studioBorder bg-newBgColorInner px-3 text-[14px] text-textColor outline-none focus:border-designerAccent"
@@ -146,12 +162,15 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
                   ? Array.isArray(values[field.name]) &&
                     (values[field.name] as string[]).includes(opt.value)
                   : values[field.name] === opt.value;
+                const optionId = `${field.name}-${opt.value}`;
                 return (
                   <label
                     key={opt.value}
+                    htmlFor={optionId}
                     className="flex items-center gap-2 text-[13px] text-textColor cursor-pointer"
                   >
                     <input
+                      id={optionId}
                       type={isCheckbox ? 'checkbox' : 'radio'}
                       name={field.name}
                       value={opt.value}
@@ -175,11 +194,14 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
               <button
                 type="button"
                 onClick={() => setMediaPickField(field.name)}
-                className="px-3 py-2 rounded-lg border border-studioBorder bg-newBgColorInner text-[13px] text-textColor hover:border-designerAccent transition-colors"
+                disabled={mediaImporting}
+                className="px-3 py-2 rounded-lg border border-studioBorder bg-newBgColorInner text-[13px] text-textColor hover:border-designerAccent transition-colors disabled:opacity-60"
               >
-                {values[field.name]
-                  ? 'Change media'
-                  : 'Pick media'}
+                {mediaImporting
+                  ? 'Importing…'
+                  : values[field.name]
+                    ? 'Change media'
+                    : 'Pick media'}
               </button>
               {values[field.name] && (
                 <div className="mt-2 text-[12px] text-textColor/70">
@@ -192,7 +214,7 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
       ))}
 
       <div className="flex justify-end pt-2">
-        <Button type="submit" disabled={!canSubmit}>
+        <Button type="submit" disabled={!canSubmit || mediaImporting}>
           {submitLabel}
         </Button>
       </div>
@@ -202,17 +224,32 @@ export const InteractiveForm: React.FC<InteractiveFormProps> = ({
           open
           onClose={() => setMediaPickField(null)}
           kinds={['image']}
-          onSelect={(item) => {
-            // Ship only what the server consumes — never the whole selector
-            // item (thumbnails, attribution, …) over the socket.
-            const value: MediaValue = {
-              fileId: item.fileId,
-              url: item.url,
-              type: item.type,
-              name: item.name,
-            };
-            setValue(mediaPickField, value);
+          onSelect={async (item) => {
             setMediaPickField(null);
+            setMediaImporting(true);
+            try {
+              const imported = await importStockMedia(item);
+              // Ship only what the server consumes — never the whole selector
+              // item (thumbnails, …) over the socket. Keep stock metadata so
+              // the backend can record attribution when present.
+              const value: MediaValue = {
+                fileId: imported.fileId,
+                url: imported.url,
+                type: imported.type,
+                name: imported.name,
+                stockSource: imported.stockSource,
+                attribution: imported.attribution,
+                downloadLocation: imported.downloadLocation,
+              };
+              setValue(mediaPickField, value);
+            } catch (e) {
+              toaster.show(
+                (e as Error).message || 'Failed to import media',
+                'warning'
+              );
+            } finally {
+              setMediaImporting(false);
+            }
           }}
         />
       )}
