@@ -11,6 +11,7 @@ import {
   useState,
 } from 'react';
 import { AiDesignerStart } from '@gitroom/frontend/components/media-tools/ai-designer/ai-designer-start';
+import { useAiDesignerSession } from '@gitroom/frontend/components/media-tools/ai-designer/ai-designer.hooks';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import {
   useAiDesignerSocket,
@@ -43,12 +44,15 @@ function AiDesignerPageInner() {
   const [sessionId, setSessionId] = useState<string | null>(
     () => searchParams.get('session')
   );
+  const { data: hydrate, isLoading: hydrateLoading } =
+    useAiDesignerSession(sessionId);
   const [mode, setMode] = useState<AiDesignerMode>('chat');
   const [starting, setStarting] = useState(false);
   const [pendingNonce, setPendingNonce] = useState<string | null>(null);
   // Guidance the gateway posts as a markdown message before rejecting a start
   // (e.g. missing model defaults) — rendered inline above the start form.
   const [startNotice, setStartNotice] = useState<string | null>(null);
+  const startingRef = useRef(false);
   const startTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearStartTimer = useCallback(() => {
@@ -70,6 +74,7 @@ function AiDesignerPageInner() {
           clearStartTimer();
           setSessionId(session.id);
           setPendingNonce(null);
+          startingRef.current = false;
           setStarting(false);
           router.replace(`${pathname}?session=${session.id}`);
         }
@@ -77,8 +82,10 @@ function AiDesignerPageInner() {
       // The gateway posts guidance (e.g. missing model defaults) as a
       // markdown message before rejecting a start — surface it on the form
       // instead of dropping it (only the error toast would show otherwise).
+      // Gate on the start being in flight so a stray greeting can't flash as a
+      // warning when the socket is just sitting on the start screen.
       onMessage: (msg: AiDesignerServerMessage) => {
-        if (msg.content?.kind === 'markdown') {
+        if (msg.content?.kind === 'markdown' && startingRef.current) {
           setStartNotice(msg.content.md);
         }
       },
@@ -86,6 +93,7 @@ function AiDesignerPageInner() {
         if (err.nonce && err.nonce !== pendingNonce) return;
         toaster.show(err.message || err.code || 'AI Designer error', 'warning');
         clearStartTimer();
+        startingRef.current = false;
         setStarting(false);
         setPendingNonce(null);
       },
@@ -102,6 +110,7 @@ function AiDesignerPageInner() {
       payload: Omit<AiDesignerStartPayload, 'nonce'> & { mode: AiDesignerMode }
     ) => {
       setStarting(true);
+      startingRef.current = true;
       setMode(payload.mode);
       setStartNotice(null);
       const nonce = socket.start(payload);
@@ -111,6 +120,7 @@ function AiDesignerPageInner() {
       if (startTimerRef.current) clearTimeout(startTimerRef.current);
       startTimerRef.current = setTimeout(() => {
         startTimerRef.current = null;
+        startingRef.current = false;
         setStarting(false);
         setPendingNonce(null);
         toaster.show(
@@ -126,9 +136,28 @@ function AiDesignerPageInner() {
     clearStartTimer();
     setSessionId(null);
     setPendingNonce(null);
+    startingRef.current = false;
     setStarting(false);
+    setStartNotice(null);
     router.replace(pathname);
   }, [router, pathname, clearStartTimer]);
+
+  // Invalid or expired ?session= query: once hydration finishes without a
+  // result, drop back to the start screen instead of wedging on an empty chat.
+  // Defer the reset to the next tick to avoid a synchronous setState cascade
+  // inside the effect body.
+  useEffect(() => {
+    if (sessionId && !hydrateLoading && hydrate === null) {
+      const t = setTimeout(() => {
+        toaster.show(
+          'Session expired or not found. Starting a new design.',
+          'warning'
+        );
+        handleReset();
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [sessionId, hydrateLoading, hydrate, toaster, handleReset]);
 
   if (sessionId) {
     return <AiDesignerChat sessionId={sessionId} mode={mode} onReset={handleReset} />;
@@ -139,6 +168,7 @@ function AiDesignerPageInner() {
       onStart={handleStart}
       isStarting={starting}
       isConnected={socket.connected}
+      onReconnect={socket.reconnect}
       notice={startNotice}
     />
   );

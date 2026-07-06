@@ -18,6 +18,10 @@ const auditMock = {
   createLog: vi.fn(),
 };
 
+const fileMock = {
+  getFiles: vi.fn(),
+};
+
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
     getProviderConfigs = serviceMock.getProviderConfigs;
@@ -37,6 +41,7 @@ import { StorageController } from './storage.controller';
 import { HttpException } from '@nestjs/common';
 import type { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import type { AuditService } from '@gitroom/nestjs-libraries/database/prisma/audit/audit.service';
+import type { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 
 const org: Organization = { id: 'org-1' } as any;
 const user: User = { id: 'user-1' } as any;
@@ -44,7 +49,8 @@ const user: User = { id: 'user-1' } as any;
 function makeController() {
   return new StorageController(
     serviceMock as unknown as StorageService,
-    auditMock as unknown as AuditService
+    auditMock as unknown as AuditService,
+    fileMock as unknown as FileService
   );
 }
 

@@ -40,6 +40,10 @@ export interface DesignBrief {
   fixedCopy?: string;
   referenceCues?: string[];
   questionsAsked?: string[];
+  lastPlans?: DesignPlan[];
+  pendingReviseTarget?: string;
+  answeredPromptIds?: string[];
+  skillId?: string;
   [key: string]: unknown;
 }
 

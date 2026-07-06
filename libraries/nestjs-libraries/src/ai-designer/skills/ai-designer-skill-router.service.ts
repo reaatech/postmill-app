@@ -38,12 +38,6 @@ export class AiDesignerSkillRouter {
     };
   }
 
-  getRequiredFields(skillId: string): string[] {
-    return (
-      DESIGN_SKILLS.find((s) => s.id === skillId)?.requiredBriefFields ?? []
-    );
-  }
-
   getSkillPrompt(skillId: string): string {
     return DESIGN_SKILLS.find((s) => s.id === skillId)?.systemPrompt ?? '';
   }

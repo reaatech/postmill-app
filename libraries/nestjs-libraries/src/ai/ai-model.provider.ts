@@ -907,7 +907,10 @@ export class AIModelProvider {
         span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, effectiveModel);
         if (orgId) span.setAttribute('ai.organizationId', orgId);
 
-        await this._budget.checkBudget('utility', orgId);
+        const check = await this._budget.checkBudget('utility', orgId);
+        if (!check.allowed) {
+          throw new BudgetExceeded(check.reason ?? 'AI budget exceeded', 'utility', orgId);
+        }
 
         const model = adapter.createLanguageModel(creds, effectiveModel, {
           temperature: args.temperature,
@@ -967,7 +970,10 @@ export class AIModelProvider {
         span.setAttribute(TelemetryService.ATTR_GEN_AI_REQUEST_MODEL, effectiveModel);
         if (orgId) span.setAttribute('ai.organizationId', orgId);
 
-        await this._budget.checkBudget('utility', orgId);
+        const check = await this._budget.checkBudget('utility', orgId);
+        if (!check.allowed) {
+          throw new BudgetExceeded(check.reason ?? 'AI budget exceeded', 'utility', orgId);
+        }
 
         const model = adapter.createLanguageModel(creds, effectiveModel, {
           temperature: args.temperature,

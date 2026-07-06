@@ -6,7 +6,13 @@ import {
 } from '@reaatech/agent-mesh-router';
 import type { AgentResponse, ContextPacket } from '@reaatech/agent-mesh';
 import { AIModelProvider } from '@gitroom/nestjs-libraries/ai/ai-model.provider';
+import { repair } from '@reaatech/structured-repair-core';
+import { z } from 'zod';
 import type { DesignPlan } from '../../ai-designer.types';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
 
 interface CopyBrand {
   instructions?: string;
@@ -33,7 +39,13 @@ export class AiDesignerCopywriterService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context: ContextPacket
   ): Promise<AgentResponse> => {
-    const payload = JSON.parse(context.raw_input) as CopywriterInput;
+    const payload = parseAgentInput<CopywriterInput>(context.raw_input);
+    if (isAgentInputError(payload)) {
+      return {
+        content: JSON.stringify(payload),
+        workflow_complete: false,
+      };
+    }
     const texts = await this._writeCopy(
       payload.plan,
       payload.brand,
@@ -75,7 +87,7 @@ export class AiDesignerCopywriterService implements OnModuleInit {
       orgId,
     });
 
-    const parsed = this._parseRawCopy(raw, textSlots.map((s) => s.id));
+    const parsed = await this._parseRawCopy(raw, textSlots.map((s) => s.id));
 
     // For a revise request, keep unchanged slots from the existing copy.
     if (existingTexts) {
@@ -170,11 +182,29 @@ export class AiDesignerCopywriterService implements OnModuleInit {
     return lines.join('\n');
   }
 
-  private _parseRawCopy(
+  private async _parseRawCopy(
     raw: string,
     slotIds: string[]
-  ): Record<string, string> {
+  ): Promise<Record<string, string>> {
     const result: Record<string, string> = {};
+
+    // Try structured repair first so fenced JSON and slightly malformed
+    // model replies are normalized before the hand-rolled fallbacks.
+    try {
+      const repaired = await repair(z.record(z.string()), raw);
+      if (repaired && typeof repaired === 'object' && !Array.isArray(repaired)) {
+        for (const id of slotIds) {
+          if (typeof repaired[id] === 'string') {
+            result[id] = repaired[id];
+          }
+        }
+        if (Object.keys(result).length > 0) {
+          return result;
+        }
+      }
+    } catch {
+      // Fall through to JSON.parse / line extraction.
+    }
 
     try {
       const parsed = JSON.parse(raw);
@@ -195,8 +225,15 @@ export class AiDesignerCopywriterService implements OnModuleInit {
     for (const line of raw.split('\n')) {
       const idx = line.indexOf(':');
       if (idx === -1) continue;
-      const id = line.slice(0, idx).trim();
-      const text = line.slice(idx + 1).trim();
+      const id = line
+        .slice(0, idx)
+        .trim()
+        .replace(/^["'`]+|["'`]+$/g, '');
+      const text = line
+        .slice(idx + 1)
+        .trim()
+        .replace(/,$/, '')
+        .replace(/^["'`]+|["'`]+$/g, '');
       if (slotIds.includes(id) && text) {
         result[id] = text;
       }

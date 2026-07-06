@@ -14,6 +14,8 @@ import { AiDesignerSaverService } from '../ai-designer-saver.service';
 import { AiDesignerComposerService } from '../agents/composer/ai-designer-composer.service';
 import { AiDesignerBudgetGuard } from '../guards/ai-designer-budget.guard';
 import { AiDesignerSkillRouter } from '../skills/ai-designer-skill-router.service';
+import { AiDesignerInputPolicyService } from '../ai-designer-input-policy.service';
+import { raceWithTimeout } from '../util/race-with-timeout';
 import type {
   AiDesignerAgentContext,
   AiDesignerConfig,
@@ -124,7 +126,8 @@ export class AiDesignerConductorService {
     private readonly _designService: DesignService,
     private readonly _composer: AiDesignerComposerService,
     private readonly _budgetGuard: AiDesignerBudgetGuard,
-    private readonly _fileService: FileService
+    private readonly _fileService: FileService,
+    private readonly _policy: AiDesignerInputPolicyService
   ) {}
 
   private _config(session: { config?: unknown }): AiDesignerConfig {
@@ -143,6 +146,16 @@ export class AiDesignerConductorService {
     emitter: AiDesignerEmitter,
     mode: 'chat' | 'prompt' = 'prompt'
   ) {
+    const policy = await this._policy.check(
+      { values: {}, instruction: prompt },
+      ctx.orgId
+    );
+    if (policy.ok === false) {
+      this._emitPolicyError(emitter, policy.reason, policy.message);
+      return;
+    }
+    prompt = policy.instruction;
+
     // Intake/planning is mutex- and abort-guarded like accept/revise: a
     // concurrent start/message for the same session must not double the
     // planning LLM spend, and `cancel` must genuinely stop the run.
@@ -175,6 +188,16 @@ export class AiDesignerConductorService {
     text: string,
     emitter: AiDesignerEmitter
   ) {
+    const policy = await this._policy.check(
+      { values: {}, instruction: text },
+      ctx.orgId
+    );
+    if (policy.ok === false) {
+      this._emitPolicyError(emitter, policy.reason, policy.message);
+      return;
+    }
+    text = policy.instruction as string;
+
     const session = await this._service.getSessionForUser(sessionId, ctx.orgId, ctx.userId);
     if (!session) return;
 
@@ -296,18 +319,26 @@ export class AiDesignerConductorService {
     if (this._isStaleReply(sessionId, replyTo)) return;
     this._clearOutstanding(sessionId);
 
-    // Server-owned brief keys (lastPlans, pendingReviseTarget, …) must never
-    // come from the client — a forged `lastPlans` would let accept:plan
-    // execute an unbounded, attacker-shaped plan list. The merge is also
-    // size-bounded (a brief rides into every later agent prompt).
-    const safeValues = sanitizeBriefValues(values);
-    const existing = (session.brief ?? {}) as DesignBrief;
-    const brief = mergeBriefValues(existing, safeValues, replyTo);
-    await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, { brief });
+    // Shared input policy: size/depth bounds, key validation, and the org's
+    // guardrail chain run before anything is persisted or dispatched.
+    const policy = await this._policy.check({ values }, ctx.orgId);
+    if (policy.ok === false) {
+      this._emitPolicyError(emitter, policy.reason, policy.message);
+      return;
+    }
+    values = policy.values;
 
     const config = this._config(session);
 
     if (session.state === 'delivered' || session.state === 'revising') {
+      // Server-owned brief keys (lastPlans, pendingReviseTarget, …) must never
+      // come from the client — a forged `lastPlans` would let accept:plan
+      // execute an unbounded, attacker-shaped plan list. The merge is also
+      // size-bounded (a brief rides into every later agent prompt).
+      const safeValues = sanitizeBriefValues(values);
+      const existing = (session.brief ?? {}) as DesignBrief;
+      const brief = mergeBriefValues(existing, safeValues, replyTo);
+      await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, { brief });
       await this._handleDeliveryFormSubmit(
         sessionId,
         ctx,
@@ -326,6 +357,12 @@ export class AiDesignerConductorService {
         return;
       }
       try {
+        // Persist the merged brief only after acquiring the mutex: a rejected
+        // busy path must not write the brief (plan §4.5).
+        const safeValues = sanitizeBriefValues(values);
+        const existing = (session.brief ?? {}) as DesignBrief;
+        const brief = mergeBriefValues(existing, safeValues, replyTo);
+        await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, { brief });
         await this._runChatIntake(sessionId, ctx, config, emitter);
       } catch (err) {
         if (this._wasCancelled(err)) {
@@ -352,9 +389,35 @@ export class AiDesignerConductorService {
     if (!session) return;
 
     const activeDesignIds = (session.activeDesignIds ?? []) as string[];
+    const brief = this._brief(session);
+    const answeredPromptIds = (brief.answeredPromptIds ?? []) as string[];
+
+    // A double-submit of the same delivery form (e.g. double-click) carries a
+    // fresh nonce, so Redis idempotency does not dedupe it. Track answered
+    // prompt ids on the brief so the second submit is a silent no-op.
+    if (answeredPromptIds.includes(replyTo)) {
+      await this._emitText(
+        sessionId,
+        ctx,
+        emitter,
+        'conversationalist',
+        'That request was already submitted.'
+      );
+      return;
+    }
+
+    // Mark this prompt answered immediately so a concurrent duplicate cannot
+    // create duplicate templates/revisions. Keep the last ~20 ids.
+    const nextBrief: DesignBrief = {
+      ...brief,
+      answeredPromptIds: [...answeredPromptIds, replyTo].slice(-20),
+    };
+    await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, {
+      brief: nextBrief,
+    });
+
     const instruction = String(values.instruction || '').trim();
     if (instruction) {
-      const brief = this._brief(session);
       const targetDesignId =
         (brief.pendingReviseTarget as string | undefined) ||
         activeDesignIds[0];
@@ -371,20 +434,30 @@ export class AiDesignerConductorService {
 
     const action = String(values.action || '');
     const selectedVariant = String(values.variantId || '');
+    const chosenDesignId = selectedVariant || activeDesignIds[0];
+
+    if (!activeDesignIds.includes(chosenDesignId)) {
+      await this._emitText(
+        sessionId,
+        ctx,
+        emitter,
+        'conversationalist',
+        'That variant is no longer available.'
+      );
+      return;
+    }
+
     const optedOut =
       Array.isArray(values.dontSaveTemplate) &&
       values.dontSaveTemplate.includes('yes');
 
     // Auto-save on accept unless the user opted out (plan §10).
     if (action === 'accept' && !optedOut && activeDesignIds.length > 0) {
-      const chosenId = selectedVariant
-        ? activeDesignIds.find((id) => id === selectedVariant) || activeDesignIds[0]
-        : activeDesignIds[0];
-      const genre = this._brief(session).skillId as string | undefined;
-      await this._createTemplate(
+      const genre = brief.skillId as string | undefined;
+      const saved = await this._createTemplate(
         ctx.orgId,
-        chosenId,
-        chosenId.slice(0, 8),
+        chosenDesignId,
+        chosenDesignId.slice(0, 8),
         genre
       );
       await this._emitText(
@@ -392,15 +465,13 @@ export class AiDesignerConductorService {
         ctx,
         emitter,
         'conversationalist',
-        'Template saved.'
+        saved
+          ? 'Template saved.'
+          : "Couldn't save the template — the design is still available; try again from the delivery form."
       );
     }
 
     if (action === 'revise') {
-      const targetDesignId = selectedVariant
-        ? activeDesignIds.find((id) => id === selectedVariant) || activeDesignIds[0]
-        : activeDesignIds[0];
-
       const msg = await this._service.appendMessage({
         sessionId,
         role: 'assistant',
@@ -424,9 +495,8 @@ export class AiDesignerConductorService {
       this._setOutstanding(sessionId, msg.id);
 
       // Store the target design id on the session brief so the next turn can use it.
-      const brief = this._brief(session);
       await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, {
-        brief: { ...brief, pendingReviseTarget: targetDesignId },
+        brief: { ...nextBrief, pendingReviseTarget: chosenDesignId },
       });
       return;
     }
@@ -471,14 +541,33 @@ export class AiDesignerConductorService {
       return;
     }
 
+    const brief = this._brief(session);
+    const config = this._config(session);
+
+    // Execute the plans the user actually accepted (persisted at plan
+    // presentation) — re-dispatching the art director here would generate
+    // different plans than the ones shown. `variantId` narrows to one.
+    const storedPlans = (brief.lastPlans as DesignPlan[] | undefined) ?? [];
+    const acceptedPlans = variantId
+      ? storedPlans.filter((p) => p.variantId === variantId)
+      : storedPlans;
+
+    if (variantId && acceptedPlans.length === 0) {
+      await this._emitText(
+        sessionId,
+        ctx,
+        emitter,
+        'conversationalist',
+        'That variant is no longer available — please re-request plans.'
+      );
+      return;
+    }
+
     if (!this._tryAcquire(sessionId)) {
       await this._emitBusy(sessionId, ctx, emitter);
       return;
     }
     this._clearOutstanding(sessionId);
-
-    const brief = this._brief(session);
-    const config = this._config(session);
 
     await this._service.updateSession(sessionId, ctx.orgId, ctx.userId, { state: 'executing' });
     await this._emitText(
@@ -490,14 +579,6 @@ export class AiDesignerConductorService {
     );
 
     try {
-      // Execute the plans the user actually accepted (persisted at plan
-      // presentation) — re-dispatching the art director here would generate
-      // different plans than the ones shown. `variantId` narrows to one.
-      const storedPlans = (brief.lastPlans as DesignPlan[] | undefined) ?? [];
-      const acceptedPlans = variantId
-        ? storedPlans.filter((p) => p.variantId === variantId)
-        : storedPlans;
-
       const results = await this._executePipeline(
         sessionId,
         ctx,
@@ -519,7 +600,7 @@ export class AiDesignerConductorService {
       // the default auto-save with its own opt-out).
       if (saveTemplate && results.length > 0) {
         const genre = (brief.skillId as string | undefined) ?? undefined;
-        await this._createTemplate(
+        const saved = await this._createTemplate(
           ctx.orgId,
           results[0].designId,
           results[0].designId.slice(0, 8),
@@ -530,7 +611,9 @@ export class AiDesignerConductorService {
           ctx,
           emitter,
           'conversationalist',
-          'Template saved.'
+          saved
+            ? 'Template saved.'
+            : "Couldn't save the template — the design is still available; try again from the delivery form."
         );
       }
     } catch (err) {
@@ -559,8 +642,38 @@ export class AiDesignerConductorService {
     const session = await this._service.getSessionForUser(sessionId, ctx.orgId, ctx.userId);
     if (!session) return;
 
+    if (session.state !== 'delivered' && session.state !== 'revising') {
+      await this._emitText(
+        sessionId,
+        ctx,
+        emitter,
+        'conversationalist',
+        'This design is not available for revision right now.'
+      );
+      return;
+    }
+
+    // The instruction is guardrail-checked here so every entry point
+    // (websocket, HTTP, MCP, Inngest) gets the same enforcement.
+    const policy = await this._policy.check(
+      { values: {}, instruction: payload.instruction },
+      ctx.orgId
+    );
+    if (policy.ok === false) {
+      this._emitPolicyError(emitter, policy.reason, policy.message);
+      return;
+    }
+    const instruction = policy.instruction as string;
+
     const activeDesignIds = (session.activeDesignIds ?? []) as string[];
-    const targetDesignId = payload.targetDesignId || activeDesignIds[0];
+    let targetDesignId = payload.targetDesignId || activeDesignIds[0];
+    if (payload.targetDesignId && !activeDesignIds.includes(payload.targetDesignId)) {
+      this._logger.warn(
+        `Revise target ${payload.targetDesignId} is not in session active designs; falling back to ${activeDesignIds[0]}.`,
+        AiDesignerConductorService.name
+      );
+      targetDesignId = activeDesignIds[0];
+    }
     if (!targetDesignId) {
       await this._emitText(
         sessionId,
@@ -571,11 +684,6 @@ export class AiDesignerConductorService {
       );
       return;
     }
-
-    // The instruction is guardrail-checked at the gateway on every path into
-    // here (`message` free text, `revise` event, `form:submit` values) — no
-    // second pass.
-    const instruction = payload.instruction;
 
     if (!this._tryAcquire(sessionId)) {
       await this._emitBusy(sessionId, ctx, emitter);
@@ -661,7 +769,7 @@ export class AiDesignerConductorService {
       mode: 'prompt',
     });
 
-    const plans = this._parsePlans(planResponse);
+    const plans = this._parsePlans(planResponse, config);
     await this._emitPlan(sessionId, ctx, emitter, brief, plans);
   }
 
@@ -754,7 +862,7 @@ export class AiDesignerConductorService {
       config,
       mode: 'chat',
     });
-    const plans = this._parsePlans(planResponse);
+    const plans = this._parsePlans(planResponse, config);
 
     await this._emitPlan(sessionId, ctx, emitter, enriched, plans);
   }
@@ -775,7 +883,7 @@ export class AiDesignerConductorService {
         config,
         mode: 'prompt',
       });
-      plans = this._parsePlans(planResponse);
+      plans = this._parsePlans(planResponse, config);
     }
     if (plans.length === 0) {
       throw new Error('No design plans were generated');
@@ -786,6 +894,11 @@ export class AiDesignerConductorService {
     // never execute more plans than the session legitimately requested.
     const maxPlans = Math.min(10, Math.max(1, config.variants ?? 1));
     plans = plans.slice(0, maxPlans);
+
+    const outputs = this._resolveOutputs(config);
+    if (outputs.length === 0) {
+      throw new Error('No valid output formats');
+    }
 
     // Persist the routed genre so template tagging (category + doc metadata) and
     // the revise vision re-check can resolve it later.
@@ -803,7 +916,6 @@ export class AiDesignerConductorService {
     const assetResponse = await this._dispatchAgent(ctx, 'asset', {
       type: 'asset-request',
       assetNeeds: this._collectAssetNeeds(plans),
-      orgId: ctx.orgId,
       referenceFileIds: config.referenceFileIds,
     });
     const assets = this._parseAssets(assetResponse);
@@ -811,52 +923,71 @@ export class AiDesignerConductorService {
     const results: AiDesignerRenderResult[] = [];
     const total = plans.length;
     let done = 0;
+    let lastError: unknown;
 
     for (const plan of plans) {
-      this._throwIfCancelled(sessionId);
-      done++;
-      emitter.progress(
-        'composer',
-        `Composing variant ${plan.variantId}`,
-        Math.round((done / total) * 100),
-        `Variant ${done}/${total}`
-      );
+      try {
+        this._throwIfCancelled(sessionId);
+        done++;
+        emitter.progress(
+          'composer',
+          `Composing variant ${plan.variantId}`,
+          Math.round((done / total) * 100),
+          `Variant ${done}/${total}`
+        );
 
-      const copyResponse = await this._dispatchAgent(ctx, 'copywriter', {
-        type: 'copy-request',
-        plan,
-        brand: null,
-      });
-      const copy = this._parseCopy(copyResponse);
+        const copyResponse = await this._dispatchAgent(ctx, 'copywriter', {
+          type: 'copy-request',
+          plan,
+          brand: null,
+        });
+        const copy = this._parseCopy(copyResponse);
 
-      const outputs = this._resolveOutputs(config);
-      const composerResponse = await this._dispatchAgent(ctx, 'composer', {
-        type: 'compose-request',
-        plan,
-        copy,
-        assets,
-        outputs,
-        orgId: ctx.orgId,
-        userId: ctx.userId,
-      });
-      // The composer returns the doc without persisting — the saver is the
-      // single Design writer (one row per variant, no orphans).
-      const composedDoc = this._parseDesignDoc(composerResponse);
+        const composerResponse = await this._dispatchAgent(ctx, 'composer', {
+          type: 'compose-request',
+          plan,
+          copy,
+          assets,
+          outputs,
+          orgId: ctx.orgId,
+          userId: ctx.userId,
+        });
+        // The composer returns the doc without persisting — the saver is the
+        // single Design writer (one row per variant, no orphans).
+        const composedDoc = this._parseDesignDoc(composerResponse);
 
-      this._throwIfCancelled(sessionId);
-      const render = await this._saver.saveDesign(
-        ctx.orgId,
-        ctx.userId,
-        plan.variantId,
-        composedDoc,
-        {
-          name: `${plan.skill}-${plan.variantId}`,
-          saveFolderId,
-        }
-      );
+        this._throwIfCancelled(sessionId);
+        const render = await this._saver.saveDesign(
+          ctx.orgId,
+          ctx.userId,
+          plan.variantId,
+          composedDoc,
+          {
+            name: `${plan.skill}-${plan.variantId}`,
+            saveFolderId,
+          }
+        );
 
-      results.push(render);
-      emitter.preview(render);
+        results.push(render);
+        emitter.preview(render);
+      } catch (err) {
+        if (this._wasCancelled(err)) throw err;
+        lastError = err;
+        this._logger.warn(
+          `Variant ${plan.variantId} failed: ${(err as Error).message}`,
+          AiDesignerConductorService.name
+        );
+        emitter.progress(
+          'composer',
+          `Variant ${plan.variantId} failed — continuing`,
+          undefined,
+          `variant ${plan.variantId} failed`
+        );
+      }
+    }
+
+    if (results.length === 0 && lastError) {
+      throw lastError;
     }
 
     // K=1 auto-revision: run Vision Critic on each contact sheet and re-render
@@ -870,12 +1001,13 @@ export class AiDesignerConductorService {
       if (!result.contactSheetUrl) continue;
 
       try {
+        const planForVariant = plans.find((p) => p.variantId === result.variantId);
         const criticResponse = await this._dispatchAgent(ctx, 'vision-critic', {
           type: 'critique-request',
           contactSheetUrl: result.contactSheetUrl,
           plans,
-          outputs: this._resolveOutputs(config),
-          rubric: this._skillRouter.getRubric(plans[0]?.skill ?? 'meme'),
+          outputs,
+          rubric: this._skillRouter.getRubric(planForVariant?.skill ?? plans[0]?.skill ?? 'meme'),
           outputPreviews: result.outputPreviews.map((o) => ({
             formatId: o.formatId,
             url: o.url,
@@ -1051,9 +1183,9 @@ export class AiDesignerConductorService {
         name: 'variantId',
         type: 'radio',
         label: 'Choose a variant',
-        options: results.map((r) => ({
-          value: r.variantId,
-          label: `Variant ${r.variantId.slice(0, 8)}`,
+        options: results.map((r, i) => ({
+          value: r.designId,
+          label: `Variant ${i + 1}`,
         })),
       });
     }
@@ -1104,10 +1236,10 @@ export class AiDesignerConductorService {
     designId: string,
     label: string,
     genre?: string
-  ) {
+  ): Promise<boolean> {
     try {
       const design = await this._designService.getDesign(orgId, designId);
-      if (!design || !design.doc) return;
+      if (!design || !design.doc) return false;
       // Tag by genre in the indexed `category` (filterable), and stamp the
       // AI-Designer source markers into the doc metadata (Json, no migration —
       // plan §10 / F-002). No `source`/`genre` column exists or is added.
@@ -1128,11 +1260,13 @@ export class AiDesignerConductorService {
         category: genre || 'ai-designer',
         doc,
       });
+      return true;
     } catch (err) {
       this._logger.warn(
         `Template creation failed: ${(err as Error).message}`,
         AiDesignerConductorService.name
       );
+      return false;
     }
   }
 
@@ -1309,36 +1443,12 @@ export class AiDesignerConductorService {
 
     const timeoutMs = this._agentTimeoutMs();
     const signal = this._aborts.get(ctx.sessionId)?.signal;
-    if (signal?.aborted) {
-      throw new PipelineCancelledError();
-    }
-    let timer: NodeJS.Timeout | undefined;
-    let onAbort: (() => void) | undefined;
+    // NOTE: a lost race (timeout/cancel) ABANDONS the dispatch, it does not
+    // abort it — dispatchToAgent accepts no signal, so the underlying
+    // agent/LLM call keeps running (and billing) in the background; only
+    // subsequent steps stop.
     try {
-      const racers: Promise<never>[] = [
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(
-                new Error(`Agent ${agentId} timed out after ${timeoutMs}ms`)
-              ),
-            timeoutMs
-          );
-        }),
-      ];
-      if (signal) {
-        racers.push(
-          new Promise<never>((_, reject) => {
-            onAbort = () => reject(new PipelineCancelledError());
-            signal.addEventListener('abort', onAbort, { once: true });
-          })
-        );
-      }
-      // NOTE: a lost race (timeout/cancel) ABANDONS the dispatch, it does not
-      // abort it — dispatchToAgent accepts no signal, so the underlying
-      // agent/LLM call keeps running (and billing) in the background; only
-      // subsequent steps stop.
-      const response = await Promise.race([
+      const response = await raceWithTimeout(
         dispatchToAgent(agent, {
           sessionId: ctx.sessionId,
           employeeId: ctx.userId,
@@ -1355,11 +1465,20 @@ export class AiDesignerConductorService {
             sessionId: ctx.sessionId,
           },
         }),
-        ...racers,
-      ]);
+        timeoutMs,
+        { signal, label: `Agent ${agentId}` }
+      );
       this._breakers.delete(breakerKey);
       return response;
     } catch (err) {
+      // The helper rejects with a generic cancellation message; promote it to
+      // the conductor's own error type so the rest of the pipeline recognises
+      // a user cancel and the breaker logic stays intact.
+      const isCancel =
+        err instanceof Error && err.message === 'Cancelled';
+      if (isCancel) {
+        throw new PipelineCancelledError();
+      }
       // A user cancel is not a provider failure — it must not trip the breaker.
       if (!(err instanceof PipelineCancelledError)) {
         const prev = this._breakers.get(breakerKey);
@@ -1378,13 +1497,6 @@ export class AiDesignerConductorService {
         });
       }
       throw err;
-    } finally {
-      if (timer) {
-        clearTimeout(timer);
-      }
-      if (signal && onAbort) {
-        signal.removeEventListener('abort', onAbort);
-      }
     }
   }
 
@@ -1455,6 +1567,16 @@ export class AiDesignerConductorService {
    */
   private _wasCancelled(err: unknown): boolean {
     return err instanceof PipelineCancelledError;
+  }
+
+  private _emitPolicyError(
+    emitter: AiDesignerEmitter,
+    reason: 'guardrail_blocked' | 'value_bounds' | 'invalid_key',
+    message: string
+  ) {
+    const code =
+      reason === 'guardrail_blocked' ? 'guardrail_blocked' : 'invalid_payload';
+    emitter.error(code, message);
   }
 
   private async _emitBusy(
@@ -1536,13 +1658,60 @@ export class AiDesignerConductorService {
     }
   }
 
-  private _parsePlans(response: AgentResponse): DesignPlan[] {
+  // Plans are stored JSON and ride into later prompts, so both count and
+  // serialized size must be bounded. 64 KB matches the brief-value byte guard.
+  private static readonly MAX_PLANS_BYTES = 64 * 1024;
+
+  private _parsePlans(
+    response: AgentResponse,
+    config: AiDesignerConfig
+  ): DesignPlan[] {
     const parsed = this._safeJson(response.content) as any;
+    let raw: DesignPlan[] = [];
     if (parsed?.type === 'plans' && Array.isArray(parsed.plans)) {
-      return parsed.plans as DesignPlan[];
+      raw = parsed.plans as DesignPlan[];
+    } else if (Array.isArray(parsed)) {
+      raw = parsed as DesignPlan[];
     }
-    if (Array.isArray(parsed)) return parsed as DesignPlan[];
-    return [];
+
+    const validPlans: DesignPlan[] = [];
+    for (const plan of raw) {
+      if (
+        plan &&
+        typeof plan.variantId === 'string' &&
+        plan.variantId &&
+        typeof plan.skill === 'string' &&
+        plan.skill
+      ) {
+        validPlans.push(plan);
+      } else {
+        this._logger.warn(
+          'Dropping invalid plan item missing variantId or skill.',
+          AiDesignerConductorService.name
+        );
+      }
+    }
+
+    const maxPlans = Math.min(config.variants ?? 10, 10);
+    const kept = validPlans.slice(0, maxPlans);
+
+    while (
+      kept.length > 1 &&
+      JSON.stringify(kept).length > AiDesignerConductorService.MAX_PLANS_BYTES
+    ) {
+      kept.pop();
+    }
+    if (
+      kept.length > 0 &&
+      JSON.stringify(kept).length > AiDesignerConductorService.MAX_PLANS_BYTES
+    ) {
+      this._logger.warn(
+        'A single plan exceeded the 64 KB brief limit; keeping it for inspection.',
+        AiDesignerConductorService.name
+      );
+    }
+
+    return kept;
   }
 
   private _parseAssets(response: AgentResponse): Record<string, AssetResult> {
@@ -1571,6 +1740,9 @@ export class AiDesignerConductorService {
 
   private _parseFindings(response: AgentResponse): VisionFinding[] {
     const parsed = this._safeJson(response.content) as any;
+    if (parsed?.type === 'error') {
+      throw new Error(parsed.message || 'Vision critic returned an error');
+    }
     const findings =
       parsed?.type === 'findings' && Array.isArray(parsed.findings)
         ? (parsed.findings as VisionFinding[])

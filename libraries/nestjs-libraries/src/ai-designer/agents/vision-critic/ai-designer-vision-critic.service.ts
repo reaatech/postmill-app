@@ -5,15 +5,44 @@ import {
   type InProcessHandler,
 } from '@reaatech/agent-mesh-router';
 import type { AgentResponse, ContextPacket } from '@reaatech/agent-mesh';
+import { readFile } from 'fs/promises';
+import path from 'path';
 import { AiDefaultsService } from '@gitroom/nestjs-libraries/ai/defaults/ai-defaults.service';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { CHANNEL_PRESETS } from '@gitroom/nestjs-libraries/integrations/social/channel-presets';
+import { isSafePublicHttpsUrl } from '@gitroom/nestjs-libraries/dtos/webhooks/webhook.url.validator';
+import { fromBuffer } from '@gitroom/nestjs-libraries/upload/file-type.compat';
 import type {
   DesignPlan,
   Fix,
   FixScope,
   VisionFinding,
 } from '../../ai-designer.types';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
+
+const VISION_CRITIC_MAX_INLINE_BYTES = 2 * 1024 * 1024;
+
+const VISION_CRITIC_SCHEMA_BLOCK = `Return ONLY a JSON object in this exact shape:
+{
+  "findings": [
+    {
+      "formatId": "ig-reel",
+      "slotId": "bottom-caption",
+      "issue": "Caption text is positioned too low and overlaps the bottom UI safe zone.",
+      "fix": {
+        "scope": "format-only",
+        "targetSlots": ["bottom-caption"],
+        "geometry": { "y": 1500, "fontSize": 64 },
+        "style": { "fill": "#000000", "opacity": 1 },
+        "text": { "slotId": "bottom-caption", "newText": "Updated text" },
+        "note": "Move caption above the bottom 200px safe zone and increase size for readability."
+      }
+    }
+  ]
+}`;
 
 interface CritiqueRequest {
   type: 'critique-request';
@@ -55,21 +84,23 @@ export class AiDesignerVisionCriticService implements OnModuleInit {
     if (!orgId) {
       return {
         content: JSON.stringify({
-          type: 'findings',
-          findings: [
-            {
-              issue:
-                'Vision critic could not run: missing orgId in agent context metadata.',
-            },
-          ],
+          type: 'error',
+          message:
+            'Vision critic could not run: missing orgId in agent context metadata.',
         }),
         workflow_complete: false,
       };
     }
 
-    const payload = JSON.parse(context.raw_input) as
-      | CritiqueRequest
-      | InterpretRequest;
+    const payload = parseAgentInput<CritiqueRequest | InterpretRequest>(
+      context.raw_input
+    );
+    if (isAgentInputError(payload)) {
+      return {
+        content: JSON.stringify(payload),
+        workflow_complete: false,
+      };
+    }
 
     if (payload.type === 'interpret-request') {
       const cues = await this.interpretReferences(orgId, payload.fileIds);
@@ -97,9 +128,11 @@ export class AiDesignerVisionCriticService implements OnModuleInit {
           const file = await this._fileService.getFileById(id);
           // Defense-in-depth: ensure the reference file belongs to this org.
           if (!file || !file.path || file.organizationId !== orgId) return;
+          const imageUrl = await this._resolveImageUrl(orgId, file.path);
+          if (!imageUrl) return;
           const prompt =
             'Describe this image concisely for a design assistant. List the dominant colors, mood/style, any text or logos, and the main subject. Keep it under 80 words.';
-          const raw = await this._aiDefaults.vision(orgId, file.path, prompt);
+          const raw = await this._aiDefaults.vision(orgId, imageUrl, prompt);
           const text = typeof raw === 'string' ? raw : String(raw);
           if (text.trim()) cues.push(text.trim());
         } catch (err) {
@@ -116,12 +149,13 @@ export class AiDesignerVisionCriticService implements OnModuleInit {
     orgId: string,
     payload: CritiqueRequest
   ): Promise<VisionFinding[]> {
+    const imageUrl = await this._resolveImageUrl(orgId, payload.contactSheetUrl);
+    if (!imageUrl) {
+      return [];
+    }
+
     const prompt = this._buildPrompt(payload);
-    const raw = await this._aiDefaults.vision(
-      orgId,
-      payload.contactSheetUrl,
-      prompt
-    );
+    const raw = await this._aiDefaults.vision(orgId, imageUrl, prompt);
 
     const findings = this._extractFindings(raw);
     if (findings.length === 0 || !payload.outputPreviews) {
@@ -197,22 +231,7 @@ Look at the contact sheet and identify concrete, actionable visual issues. For e
   - "text": { slotId, newText }
   - "note": free-text guidance when no numeric edit is possible
 
-Return ONLY a JSON object in this exact shape:
-{
-  "findings": [
-    {
-      "formatId": "ig-reel",
-      "slotId": "bottom-caption",
-      "issue": "Caption text is positioned too low and overlaps the bottom UI safe zone.",
-      "fix": {
-        "scope": "format-only",
-        "targetSlots": ["bottom-caption"],
-        "geometry": { "y": 1500, "fontSize": 64 },
-        "note": "Move caption above the bottom 200px safe zone and increase size for readability."
-      }
-    }
-  ]
-}
+${VISION_CRITIC_SCHEMA_BLOCK}
 
 If the contact sheet looks good, return { "findings": [] }.`;
   }
@@ -240,8 +259,10 @@ If the contact sheet looks good, return { "findings": [] }.`;
         .filter((o) => escalatedFormats.has(o.formatId))
         .map(async (o) => {
           try {
-            const prompt = `Review this full-resolution design for the "${o.formatId}" output. Focus on legibility, safe-zone compliance, and whether any text or important detail would be lost at real size. Return a JSON object { "findings": [...] } with the same shape as before; keep it brief.`;
-            const raw = await this._aiDefaults.vision(orgId, o.url, prompt);
+            const imageUrl = await this._resolveImageUrl(orgId, o.url);
+            if (!imageUrl) return;
+            const prompt = `Review this full-resolution design for the "${o.formatId}" output. Focus on legibility, safe-zone compliance, and whether any text or important detail would be lost at real size. ${VISION_CRITIC_SCHEMA_BLOCK}; keep it brief.`;
+            const raw = await this._aiDefaults.vision(orgId, imageUrl, prompt);
             const parsed = this._extractFindings(raw);
             for (const f of parsed) {
               if (!f.formatId) f.formatId = o.formatId;
@@ -362,5 +383,59 @@ If the contact sheet looks good, return { "findings": [] }.`;
     const end = trimmed.lastIndexOf('}');
     if (start === -1 || end === -1 || end <= start) return null;
     return JSON.parse(trimmed.slice(start, end + 1));
+  }
+
+  private async _resolveImageUrl(
+    orgId: string,
+    url: string
+  ): Promise<string | null> {
+    if (await isSafePublicHttpsUrl(url)) {
+      return url;
+    }
+
+    if (!this._isLocalStorageUrl(url)) {
+      this._logger.warn(
+        `Vision critic skipping non-public, non-local image URL: ${url}`
+      );
+      return null;
+    }
+
+    try {
+      const buffer = await readFile(this._localPathFromUrl(url));
+      if (buffer.length > VISION_CRITIC_MAX_INLINE_BYTES) {
+        this._logger.warn(
+          'vision critic disabled: storage not provider-reachable'
+        );
+        return null;
+      }
+      const detected = await fromBuffer(buffer);
+      const mime = detected?.mime || 'image/png';
+      return `data:${mime};base64,${buffer.toString('base64')}`;
+    } catch (err) {
+      this._logger.warn(
+        `Vision critic failed to inline local image: ${(err as Error).message}`
+      );
+      return null;
+    }
+  }
+
+  private _isLocalStorageUrl(url: string): boolean {
+    const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    return (
+      (frontendUrl && url.startsWith(`${frontendUrl}/uploads/`)) ||
+      url.startsWith('/uploads/')
+    );
+  }
+
+  private _localPathFromUrl(url: string): string {
+    const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    let key = url;
+    if (frontendUrl && key.startsWith(`${frontendUrl}/uploads/`)) {
+      key = key.slice(`${frontendUrl}/uploads/`.length);
+    } else if (key.startsWith('/uploads/')) {
+      key = key.slice('/uploads/'.length);
+    }
+    const uploadDirectory = process.env.UPLOAD_DIRECTORY || './uploads';
+    return path.join(uploadDirectory, key);
   }
 }

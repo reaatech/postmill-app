@@ -3,8 +3,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockDownload = vi.fn();
+const mockShow = vi.fn();
 vi.mock('./hooks/useExport', () => ({
   useExport: () => ({ download: mockDownload }),
+}));
+vi.mock('@gitroom/react/toaster/toaster', () => ({
+  useToaster: () => ({ show: mockShow }),
+}));
+vi.mock('@gitroom/react/translation/get.transation.service.client', () => ({
+  useT: () => (key: string, fallback?: string) => fallback ?? key,
 }));
 
 import { ExportButton } from './export.button';

@@ -121,6 +121,7 @@ import { DesignBulkService } from '@gitroom/nestjs-libraries/media/design-render
 import { FontLoaderService } from '@gitroom/nestjs-libraries/media/design-render/font-loader.service';
 import { VideoRenderService } from '@gitroom/nestjs-libraries/media/design-render/video-render.service';
 import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render/video-render.module';
+import { AuthContextResolver } from '@gitroom/nestjs-libraries/auth/auth-context.resolver';
 
 @Global()
 @Module({
@@ -242,6 +243,7 @@ import { VideoRenderModule } from '@gitroom/nestjs-libraries/media/design-render
     DesignRenderService,
     DesignBulkService,
     FontLoaderService,
+    AuthContextResolver,
     {
       provide: 'RBAC_SEED_ON_INIT',
       useFactory: (seeder: RbacSeeder, backfill: BackfillService) => {

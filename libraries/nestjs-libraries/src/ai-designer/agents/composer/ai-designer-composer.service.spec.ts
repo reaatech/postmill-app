@@ -171,4 +171,35 @@ describe('AiDesignerComposerService.applyFixes', () => {
     expect(model.generateText).not.toHaveBeenCalled();
     expect(result).toBe(doc);
   });
+
+  it('skips a format-only fix with an unknown formatId', async () => {
+    const doc = makeDoc();
+    const findings: VisionFinding[] = [
+      {
+        issue: 'Spacing issue',
+        formatId: 'unknown-format',
+        fix: { scope: 'format-only', geometry: { y: 40 } },
+      },
+    ];
+
+    const result = await service.applyFixes(doc, findings, 'org1');
+
+    expect(docService.applyOps).not.toHaveBeenCalled();
+    expect(result).toBe(doc);
+  });
+
+  it('skips an unscoped format-only fix with a missing formatId', async () => {
+    const doc = makeDoc();
+    const findings: VisionFinding[] = [
+      {
+        issue: 'Spacing issue',
+        fix: { scope: 'format-only', geometry: { y: 40 } },
+      },
+    ];
+
+    const result = await service.applyFixes(doc, findings, 'org1');
+
+    expect(docService.applyOps).not.toHaveBeenCalled();
+    expect(result).toBe(doc);
+  });
 });

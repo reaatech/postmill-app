@@ -48,4 +48,30 @@ describe('markdownToHtml', () => {
     );
     expect(markdownToHtml('`<b>`')).toBe('<p><code>&lt;b&gt;</code></p>');
   });
+
+  it('does not ReDoS on unclosed bracket pumps', () => {
+    const pump = '['.repeat(50000);
+    const start = performance.now();
+    const result = markdownToHtml(pump);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(50);
+    expect(result).toBe(`<p>${pump}</p>`);
+  });
+
+  it('does not ReDoS on repeated malformed link pumps', () => {
+    // Calibrated to stay well under a CI-safe bound while still representing
+    // the original 20000-repeat pump that blocked for seconds with the old regex.
+    const pump = '[x](http://a'.repeat(2000);
+    const start = performance.now();
+    const result = markdownToHtml(pump);
+    const elapsed = performance.now() - start;
+    expect(elapsed).toBeLessThan(200);
+    expect(result).toBe(`<p>${pump}</p>`);
+  });
+
+  it('still links well-formed URLs after the regex hardening', () => {
+    expect(markdownToHtml('[a](https://b)')).toBe(
+      '<p><a href="https://b" target="_blank" rel="noopener noreferrer">a</a></p>'
+    );
+  });
 });

@@ -1,5 +1,5 @@
 import '@gitroom/nestjs-libraries/ai-designer/agent-mesh/agent-mesh-env.shim';
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   registerInProcessAgent,
   type InProcessHandler,
@@ -11,9 +11,17 @@ import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { StockMediaService } from '@gitroom/nestjs-libraries/media/stock/stock-media.service';
 import type { AssetResult } from '../../ai-designer.types';
+import { raceWithTimeout } from '../../util/race-with-timeout';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
+import type { ContextPacket } from '@reaatech/agent-mesh';
 
-const AI_DESIGNER_ASSET_TIMEOUT_MS =
-  Number(process.env.AI_DESIGNER_ASSET_TIMEOUT_MS) || 90000;
+// Hard ceiling on asset generation per request. The asset agent fans out over
+// every need, so without a cap one request could request hundreds of parallel
+// text-to-image generations. Match the conductor's MAX_ASSET_NEEDS.
+const MAX_ASSET_NEEDS = 8;
 
 // Provider-returned data: URLs bypass `importFromUrl`'s allowlist/size guard,
 // so this path enforces its own: raster-image MIMEs only (no SVG — it can
@@ -36,12 +44,13 @@ interface AssetNeed {
 interface AssetRequestInput {
   type: 'asset-request';
   assetNeeds: AssetNeed[];
-  orgId: string;
   referenceFileIds?: string[];
 }
 
 @Injectable()
 export class AiDesignerAssetService implements OnModuleInit {
+  private readonly _logger = new Logger(AiDesignerAssetService.name);
+
   constructor(
     private readonly _aiDefaults: AiDefaultsService,
     private readonly _fileService: FileService,
@@ -54,14 +63,44 @@ export class AiDesignerAssetService implements OnModuleInit {
   }
 
   private _handler: InProcessHandler = async (
-    context
+    context: ContextPacket
   ): Promise<AgentResponse> => {
-    const payload = JSON.parse(context.raw_input) as AssetRequestInput;
+    const orgId =
+      context.metadata && typeof context.metadata.orgId === 'string'
+        ? context.metadata.orgId
+        : '';
+
+    if (!orgId) {
+      return {
+        content: JSON.stringify({
+          type: 'error',
+          message: 'Asset agent could not run: missing orgId in agent context metadata.',
+        }),
+        workflow_complete: false,
+      };
+    }
+
+    const payload = parseAgentInput<AssetRequestInput>(context.raw_input);
+    if (isAgentInputError(payload)) {
+      return {
+        content: JSON.stringify(payload),
+        workflow_complete: false,
+      };
+    }
+
+    const assetNeeds = payload.assetNeeds.slice(0, MAX_ASSET_NEEDS);
+    if (payload.assetNeeds.length > MAX_ASSET_NEEDS) {
+      this._logger.warn(
+        `Asset request contained ${payload.assetNeeds.length} needs; clamping to ${MAX_ASSET_NEEDS}.`,
+        AiDesignerAssetService.name
+      );
+    }
+
     const assets: Record<string, AssetResult> = {};
 
     await Promise.all(
-      payload.assetNeeds.map(async (need) => {
-        const result = await this._resolveAsset(payload.orgId, need);
+      assetNeeds.map(async (need) => {
+        const result = await this._resolveAsset(orgId, need);
         if (result) {
           assets[need.slotId] = result;
         }
@@ -110,23 +149,11 @@ export class AiDesignerAssetService implements OnModuleInit {
     orgId: string,
     brief: string
   ): Promise<string> {
-    let timer: NodeJS.Timeout | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timer = setTimeout(
-        () => reject(new Error('Asset generation timed out')),
-        AI_DESIGNER_ASSET_TIMEOUT_MS
-      );
+    const raw = Number(process.env.AI_DESIGNER_ASSET_TIMEOUT_MS);
+    const timeoutMs = Number.isFinite(raw) && raw > 0 ? raw : 90_000;
+    return raceWithTimeout(this._aiDefaults.textToImage(orgId, brief), timeoutMs, {
+      label: 'Asset generation',
     });
-    try {
-      return await Promise.race([
-        this._aiDefaults.textToImage(orgId, brief),
-        timeout,
-      ]);
-    } finally {
-      if (timer) {
-        clearTimeout(timer);
-      }
-    }
   }
 
   private async _tryStock(

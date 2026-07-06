@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SafeContent } from '@gitroom/frontend/components/shared/safe-content';
 import { Button } from '@gitroom/react/form/button';
 import { InteractiveForm } from './interactive-form';
@@ -70,19 +70,22 @@ const TextMessage: React.FC<{ content: string }> = ({ content }) => (
   <div className="text-[14px] text-textColor whitespace-pre-wrap">{content}</div>
 );
 
-const MarkdownMessage: React.FC<{ md: string }> = ({ md }) => (
-  <SafeContent
-    content={markdownToHtml(md)}
-    className="text-[14px] text-textColor max-w-none space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:ps-5 [&_ol]:ps-5 [&_code]:text-[13px] [&_code]:bg-boxHover [&_code]:rounded [&_code]:px-1 [&_a]:text-designerAccent [&_a]:underline"
-  />
-);
+const MarkdownMessage: React.FC<{ md: string }> = ({ md }) => {
+  const html = useMemo(() => markdownToHtml(md), [md]);
+  return (
+    <SafeContent
+      content={html}
+      className="text-[14px] text-textColor max-w-none space-y-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:ps-5 [&_ol]:ps-5 [&_code]:text-[13px] [&_code]:bg-boxHover [&_code]:rounded [&_code]:px-1 [&_a]:text-designerAccent [&_a]:underline"
+    />
+  );
+};
 
 const MediaMessage: React.FC<{
   items: Extract<AiDesignerMsgContent, { kind: 'media' }>['items'];
 }> = ({ items }) => (
   <div className="flex flex-wrap gap-3">
-    {items.map((item) => (
-      <div key={item.fileId || item.url} className="flex flex-col gap-1">
+    {items.map((item, idx) => (
+      <div key={`${item.fileId || item.url}-${idx}`} className="flex flex-col gap-1">
         {item.type === 'video' ? (
           <video
             src={item.url}

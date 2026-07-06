@@ -11,6 +11,10 @@ import type {
   FormField,
   RevisionRequest,
 } from '../../ai-designer.types';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
 
 interface ChatInput {
   type: 'chat';
@@ -45,7 +49,14 @@ export class AiDesignerConversationalistService implements OnModuleInit {
     context: ContextPacket,
     _agent: AgentConfig
   ): Promise<AgentResponse> => {
-    const input = this._parseInput(context.raw_input);
+    const parsed = parseAgentInput<ChatInput>(context.raw_input);
+    if (isAgentInputError(parsed)) {
+      return {
+        content: JSON.stringify(parsed),
+        workflow_complete: false,
+      };
+    }
+    const input = this._normalizeInput(parsed);
     const orgId = this._extractOrgId(context);
 
     const classification = await this._classify(input, orgId);
@@ -58,32 +69,18 @@ export class AiDesignerConversationalistService implements OnModuleInit {
     };
   };
 
-  private _parseInput(rawInput: string): ChatInput {
-    try {
-      const parsed = JSON.parse(rawInput) as ChatInput;
-      return {
-        type: parsed.type ?? 'chat',
-        text: parsed.text ?? '',
-        session: {
-          mode: parsed.session?.mode ?? 'chat',
-          state: parsed.session?.state ?? 'intake',
-          brief: parsed.session?.brief ?? { intent: '' },
-          questionsAsked: parsed.session?.questionsAsked ?? [],
-          activeDesignIds: parsed.session?.activeDesignIds,
-        },
-      };
-    } catch {
-      return {
-        type: 'chat',
-        text: rawInput,
-        session: {
-          mode: 'chat',
-          state: 'intake',
-          brief: { intent: '' },
-          questionsAsked: [],
-        },
-      };
-    }
+  private _normalizeInput(parsed: ChatInput): ChatInput {
+    return {
+      type: parsed.type ?? 'chat',
+      text: parsed.text ?? '',
+      session: {
+        mode: parsed.session?.mode ?? 'chat',
+        state: parsed.session?.state ?? 'intake',
+        brief: parsed.session?.brief ?? { intent: '' },
+        questionsAsked: parsed.session?.questionsAsked ?? [],
+        activeDesignIds: parsed.session?.activeDesignIds,
+      },
+    };
   }
 
   private _extractOrgId(context: ContextPacket): string | undefined {

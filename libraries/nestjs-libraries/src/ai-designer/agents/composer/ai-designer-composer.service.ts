@@ -25,6 +25,11 @@ import type {
   SlotTextMap,
   VisionFinding,
 } from '../../ai-designer.types';
+import { raceWithTimeout } from '../../util/race-with-timeout';
+import {
+  isAgentInputError,
+  parseAgentInput,
+} from '../../util/parse-agent-input';
 
 // Keys accepted from a Vision Critic fix, matching Fix['geometry']/['style']
 // (and all valid under the strict updateElement patch schema).
@@ -57,7 +62,13 @@ export class AiDesignerComposerService implements OnModuleInit {
   private _handler: InProcessHandler = async (
     context
   ): Promise<AgentResponse> => {
-    const payload = JSON.parse(context.raw_input) as ComposerInput;
+    const payload = parseAgentInput<ComposerInput>(context.raw_input);
+    if (isAgentInputError(payload)) {
+      return {
+        content: JSON.stringify(payload),
+        workflow_complete: false,
+      };
+    }
     const doc = await this.compose(payload);
     return {
       content: JSON.stringify({ type: 'doc', doc }),
@@ -331,43 +342,13 @@ export class AiDesignerComposerService implements OnModuleInit {
     orgId: string,
     signal?: AbortSignal
   ): Promise<string> {
-    if (signal?.aborted) {
-      throw new Error('Revise cancelled');
-    }
     const raw = Number(process.env.AI_DESIGNER_AGENT_TIMEOUT_MS);
     const timeoutMs = Number.isFinite(raw) && raw > 0 ? raw : 120_000;
-    let timer: NodeJS.Timeout | undefined;
-    let onAbort: (() => void) | undefined;
-    try {
-      const racers: Promise<never>[] = [
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () =>
-              reject(new Error(`LLM revise timed out after ${timeoutMs}ms`)),
-            timeoutMs
-          );
-        }),
-      ];
-      if (signal) {
-        racers.push(
-          new Promise<never>((_, reject) => {
-            onAbort = () => reject(new Error('Revise cancelled'));
-            signal.addEventListener('abort', onAbort, { once: true });
-          })
-        );
-      }
-      return await Promise.race([
-        this._model.generateText('agent', prompt, { orgId }),
-        ...racers,
-      ]);
-    } finally {
-      if (timer) {
-        clearTimeout(timer);
-      }
-      if (signal && onAbort) {
-        signal.removeEventListener('abort', onAbort);
-      }
-    }
+    return raceWithTimeout(
+      this._model.generateText('agent', prompt, { orgId }),
+      timeoutMs,
+      { signal, label: 'LLM revise' }
+    );
   }
 
   private _composeDeterministic(
@@ -568,9 +549,23 @@ export class AiDesignerComposerService implements OnModuleInit {
       return doc.outputs.map((_, i) => i);
     }
 
-    if (formatId) {
+    if (scope === 'format-only') {
+      if (!formatId) {
+        this._logger.warn(
+          'Skipping format-only fix with missing formatId (unscoped).',
+          AiDesignerComposerService.name
+        );
+        return [];
+      }
       const idx = doc.outputs.findIndex((o) => o.formatId === formatId);
-      return idx >= 0 ? [idx] : [0];
+      if (idx < 0) {
+        this._logger.warn(
+          `Skipping format-only fix for unknown formatId "${formatId}".`,
+          AiDesignerComposerService.name
+        );
+        return [];
+      }
+      return [idx];
     }
 
     return doc.outputs.map((_, i) => i);

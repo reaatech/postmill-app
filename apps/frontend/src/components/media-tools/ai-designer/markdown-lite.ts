@@ -34,7 +34,7 @@ function inline(s: string): string {
       '$1<em>$2</em>'
     )
     .replace(
-      /\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/g,
+      /\[([^\[\]]+)\]\((https?:\/\/[^)\s]{1,2000})\)/g,
       '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
     );
   return out.replace(/\u0000(\d+)\u0000/g, (_m, i: string) => codes[Number(i)]);

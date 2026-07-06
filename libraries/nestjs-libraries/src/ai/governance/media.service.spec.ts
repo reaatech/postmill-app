@@ -15,10 +15,20 @@ vi.mock('@gitroom/nestjs-libraries/ai/ai-model.provider', () => ({
 }));
 
 const mockCreateMediaJob = vi.fn().mockResolvedValue({ id: 'job-1' });
+const mockCreateSpendLog = vi.fn();
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service', () => ({
   AiSettingsService: class MockAiSettings {
     createMediaJob = mockCreateMediaJob;
+    createSpendLog = mockCreateSpendLog;
+  },
+}));
+
+const mockRecordSpend = vi.fn();
+vi.mock('@gitroom/nestjs-libraries/ai/governance/budget.service', () => ({
+  BudgetService: class MockBudget {
+    recordSpend = mockRecordSpend;
+    checkBudget = vi.fn().mockResolvedValue({ allowed: true });
   },
 }));
 
@@ -54,6 +64,7 @@ import {
   MediaProviderAdapter,
   MediaProviderCapabilities,
 } from '@gitroom/nestjs-libraries/media/media-provider-adapter.interface';
+import { BudgetService } from '@gitroom/nestjs-libraries/ai/governance/budget.service';
 
 const NO_CAPS: MediaProviderCapabilities = {
   image: false,
@@ -110,7 +121,8 @@ function setup(
   adapters: MediaProviderAdapter[],
   enabledIdentifiers?: string[],
   defaultsResolution?: { resolve: ReturnType<typeof vi.fn> },
-): TestSetup & { service: AiMediaService } {
+  budget = new (BudgetService as never)(),
+): TestSetup & { service: AiMediaService; budget: BudgetService } {
   const map = new Map(adapters.map((a) => [a.identifier, a]));
   const enabled = (enabledIdentifiers ?? adapters.map((a) => a.identifier)).map((identifier) => ({
     identifier,
@@ -146,9 +158,13 @@ function setup(
     defaultsResolution as never,
     orgSettings as never,
     lifecycle as never,
+    undefined as never,
+    undefined as never,
+    undefined as never,
+    budget,
   );
 
-  return { service, resolution, orgSettings, lifecycle };
+  return { service, resolution, orgSettings, lifecycle, budget };
 }
 
 function bareService() {
@@ -211,6 +227,25 @@ describe('AiMediaService', () => {
       const service = bareService();
       await service.generateImage('a cat');
       expect(mockCreateMediaJob).not.toHaveBeenCalled();
+    });
+
+    it('records media generation spend in the AI budget ledger when orgId is provided', async () => {
+      const budget = new (BudgetService as never)();
+      const { service } = setup([], [], undefined, budget);
+
+      await service.generateImage('a cat', { orgId: 'org-123' });
+
+      expect(budget.recordSpend).toHaveBeenCalledWith(
+        expect.objectContaining({
+          scope: 'media',
+          organizationId: 'org-123',
+          provider: 'ai-media',
+          model: 'ai-media',
+          costUsd: 0.04,
+          inputTokens: 0,
+          outputTokens: 0,
+        }),
+      );
     });
 
     it('signs C2PA provenance when enabled in settings', async () => {
@@ -408,14 +443,13 @@ describe('AiMediaService', () => {
       expect(working.generateVideo).toHaveBeenCalled();
     });
 
-    it('falls back to image when every provider fails', async () => {
+    it('throws when every provider fails', async () => {
       const failing = makeAdapter('luma', { video: true }, {
         generateVideo: vi.fn().mockRejectedValue(new Error('down')),
       });
       const { service } = setup([failing]);
 
-      const result = await service.generateVideo('a sunset', { orgId: 'org-1' });
-      expect(result).toBe('https://cdn.example.com/image.png');
+      await expect(service.generateVideo('a sunset', { orgId: 'org-1' })).rejects.toThrow('down');
     });
 
     it('submits untracked when there is no org context', async () => {
@@ -756,7 +790,7 @@ describe('AiMediaService', () => {
       );
     });
 
-    it('throws CapabilityNotAvailable when every untracked provider fails (audio path)', async () => {
+    it('throws CapabilityNotAvailable when org media settings are unavailable (audio path)', async () => {
       const adapter = makeAdapter('fal', { audio: true }, {
         generateAudio: vi.fn().mockRejectedValue(new Error('down')),
       });
@@ -771,6 +805,8 @@ describe('AiMediaService', () => {
           storageRootFolderId: null,
         }),
       };
+      // Note: orgSettings is passed as _defaultsResolution here; _orgMediaProviderSettings
+      // stays undefined, so resolution returns no candidates before any adapter is called.
       const service = new AiMediaService(
         new (AiSettingsService as never)(),
         new (AIModelProvider as never)(),

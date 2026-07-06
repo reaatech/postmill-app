@@ -1,12 +1,9 @@
 import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { AuthService } from '@gitroom/helpers/auth/auth.service';
-import { User } from '@prisma/client';
-import { OrganizationService } from '@gitroom/nestjs-libraries/database/prisma/organizations/organization.service';
-import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+import { AuthContextResolver } from '@gitroom/nestjs-libraries/auth/auth-context.resolver';
 import { getCookieUrlFromDomain } from '@gitroom/helpers/subdomain/subdomain.management';
 import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
-import { MastraService } from '@gitroom/nestjs-libraries/chat/mastra.service';
 import { issueCsrfToken } from '@gitroom/backend/services/auth/csrf.middleware';
 
 export const removeAuth = (res: Response) => {
@@ -27,99 +24,59 @@ export const removeAuth = (res: Response) => {
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
-  constructor(
-    private _organizationService: OrganizationService,
-    private _userService: UsersService
-  ) {}
+  constructor(private _authContextResolver: AuthContextResolver) {}
+
   async use(req: Request, res: Response, next: NextFunction) {
     const auth = req.headers.auth || req.cookies.auth;
     if (!auth) {
+      removeAuth(res);
       throw new HttpForbiddenException();
     }
-    try {
-      // Verify the JWT signature only. Never trust authorization-relevant
-      // claims (id, isSuperAdmin, activated) from the token body — always
-      // re-resolve the user from the database using the id.
-      const payload = AuthService.verifyJWT(auth) as
-        | (User & { exp?: number })
-        | null;
-      const orgHeader = req.cookies.showorg || req.headers.showorg;
 
-      if (!payload?.id) {
-        throw new HttpForbiddenException();
-      }
+    const result = await this._authContextResolver.resolve({
+      jwt: auth as string,
+      showOrgId: req.cookies.showorg || req.headers.showorg,
+      impersonateOrgUserId: req.cookies.impersonate || req.headers.impersonate,
+    });
 
-      let user = (await this._userService.getUserById(payload.id)) as User | null;
-
-      if (!user) {
-        throw new HttpForbiddenException();
-      }
-
-      if (!user.activated) {
-        throw new HttpForbiddenException();
-      }
-
-      const impersonate = req.cookies.impersonate || req.headers.impersonate;
-      if (user?.isSuperAdmin && impersonate) {
-        const loadImpersonate = await this._organizationService.getUserOrg(
-          impersonate
-        );
-
-        if (loadImpersonate) {
-          user = loadImpersonate.user;
-          user.isSuperAdmin = true;
-          delete user.password;
-
-          // @ts-expect-error
-          req.user = user;
-
-          loadImpersonate.organization.users =
-            loadImpersonate.organization.users.filter(
-              (f) => f.userId === user.id
-            );
-          // @ts-expect-error
-          req.org = loadImpersonate.organization;
-          next();
-          return;
-        }
-      }
-
-      delete user.password;
-      const organization = (
-        await this._organizationService.getOrgsByUserId(user.id)
-      ).filter((f) => !f.users[0].disabled);
-      const setOrg =
-        organization.find((org) => org.id === orgHeader) || organization[0];
-
-      if (!organization) {
-        throw new HttpForbiddenException();
-      }
-
-      // @ts-expect-error
-      req.user = user;
-
-      // @ts-expect-error
-      req.org = setOrg;
-      // Sliding re-issue: if token is within 7 days of expiry, re-issue a new 30-day token
-      const expMs = payload?.exp;
-      if (expMs && expMs * 1000 - Date.now() < 7 * 24 * 60 * 60 * 1000) {
-        const newJwt = AuthService.signJWT(user);
-        res.cookie('auth', newJwt, {
-          domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
-          ...(!process.env.NOT_SECURED
-            ? {
-                secure: true,
-                httpOnly: true,
-                sameSite: 'none',
-              }
-            : {}),
-          expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
-        });
-        issueCsrfToken(res);
-      }
-    } catch (err) {
+    if (!result.ok) {
+      removeAuth(res);
       throw new HttpForbiddenException();
     }
+
+    const { user, org, impersonated } = result.context;
+
+    // @ts-expect-error
+    req.user = user;
+    // @ts-expect-error
+    req.org = org;
+
+    if (impersonated) {
+      // Super-admin impersonation stops here: do not re-issue a JWT for the
+      // impersonated user (that would replace the admin's own session cookie).
+      next();
+      return;
+    }
+
+    // Sliding re-issue: if token is within 7 days of expiry, re-issue a new 30-day token.
+    // Only the HTTP middleware re-issues; sockets do not.
+    const expMs = result.context.expiresAt;
+    if (expMs && expMs * 1000 - Date.now() < 7 * 24 * 60 * 60 * 1000) {
+      const newJwt = AuthService.signJWT(user);
+      res.cookie('auth', newJwt, {
+        domain: getCookieUrlFromDomain(process.env.FRONTEND_URL!),
+        ...(!process.env.NOT_SECURED
+          ? {
+              secure: true,
+              httpOnly: true,
+              sameSite: 'none',
+            }
+          : {}),
+        expires: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30),
+      });
+      issueCsrfToken(res);
+    }
+
     next();
   }
 }
