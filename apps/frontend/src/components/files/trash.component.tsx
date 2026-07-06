@@ -3,11 +3,13 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useToaster } from '@gitroom/react/toaster/toaster';
+import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 
 export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) => {
   const fetch = useFetch();
   const toast = useToaster();
+  const mediaDirectory = useMediaDirectory();
   const [trashedMedia, setTrashedMedia] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -100,8 +102,10 @@ export const TrashComponent: React.FC<{ onClose?: () => void }> = ({ onClose }) 
             >
               {media.path && (
                 <div className="aspect-square bg-newTableHeader flex items-center justify-center">
+                  {/* Trash thumbnails load dynamic storage URLs; onError drives the broken-image fallback. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions */}
                   <img
-                    src={media.path}
+                    src={mediaDirectory.set(media.path)}
                     alt={media.name}
                     className="w-full h-full object-cover"
                     onError={(e) => {

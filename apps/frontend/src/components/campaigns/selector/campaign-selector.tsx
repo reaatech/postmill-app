@@ -19,7 +19,8 @@ export const CampaignSelector: FC<{
   entityId?: string;
   label?: string;
   compact?: boolean;
-}> = ({ entityType, entityId, label, compact }) => {
+  id?: string;
+}> = ({ entityType, entityId, label, compact, id }) => {
   const t = useT();
   const fetch = useFetch();
   const toaster = useToaster();
@@ -81,7 +82,7 @@ export const CampaignSelector: FC<{
   return (
     <div className="flex flex-col gap-[6px]">
       {!compact && (
-        <label className="text-[14px] font-[500]">{label || t('campaigns', 'Campaigns')}</label>
+        <label htmlFor={id} className="text-[14px] font-[500]">{label || t('campaigns', 'Campaigns')}</label>
       )}
       {!entityId ? (
         <div className="text-[12px] text-newTableText">
@@ -115,6 +116,7 @@ export const CampaignSelector: FC<{
           )}
           <div className="relative">
             <input
+              id={id}
               type="text"
               value={query}
               placeholder={t('add_to_campaign', 'Add to campaign…')}

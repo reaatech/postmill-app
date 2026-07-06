@@ -1,6 +1,6 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useState } from 'react';
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -33,15 +33,25 @@ export const FileList: FC<{
   const fetch = useFetch();
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState('');
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renamingId) {
+      renameInputRef.current?.focus();
+    }
+  }, [renamingId]);
+
+  const renamingNameRef = useRef(renamingName);
 
   const handleRename = useCallback(async (id: string) => {
-    if (!renamingName.trim()) return;
+    const name = renamingNameRef.current.trim();
+    if (!name) return;
     await fetch(`/files/${id}/rename`, {
       method: 'PUT',
-      body: JSON.stringify({ name: renamingName.trim() }),
+      body: JSON.stringify({ name }),
     });
     setRenamingId(null);
-  }, [renamingName, fetch]);
+  }, [fetch]);
 
   const columns: Column<FileItem>[] = useMemo(() => [
     {
@@ -62,8 +72,12 @@ export const FileList: FC<{
                 </svg>
               </div>
             ) : isVideo ? (
-              <video src={mediaDirectory.set(file.path)} className="w-full h-full object-cover" muted preload="metadata" />
+              <video src={mediaDirectory.set(file.path)} className="w-full h-full object-cover" muted preload="metadata">
+                <track kind="captions" src="" label="No captions" default />
+              </video>
             ) : (
+              // Remote upload URLs cannot be pre-configured in next/image domains; use native img for thumbnails.
+              // eslint-disable-next-line @next/next/no-img-element
               <img src={mediaDirectory.set(file.path)} alt="" className="w-full h-full object-cover" loading="lazy" />
             )}
           </div>
@@ -78,9 +92,12 @@ export const FileList: FC<{
         if (renamingId === file.id) {
           return (
             <input
-              autoFocus
+              ref={renameInputRef}
               value={renamingName}
-              onChange={(e) => setRenamingName(e.target.value)}
+              onChange={(e) => {
+                setRenamingName(e.target.value);
+                renamingNameRef.current = e.target.value;
+              }}
               onBlur={() => handleRename(file.id)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleRename(file.id);
@@ -91,12 +108,13 @@ export const FileList: FC<{
           );
         }
         return (
-          <div
-            className="text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate max-w-[200px]"
+          <button
+            type="button"
+            className="text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate max-w-[200px] text-left"
             onDoubleClick={() => { setRenamingId(file.id); setRenamingName(file.name); }}
           >
             {file.originalName || file.name}
-          </div>
+          </button>
         );
       },
     },
@@ -113,7 +131,7 @@ export const FileList: FC<{
     { key: 'createdAt', header: 'Created', sortable: true, render: (file: FileItem) => (
       <span className="text-[12px] text-textColor/60 whitespace-nowrap">{formatDate(file.createdAt)}</span>
     )},
-  ], [renamingId, renamingName, mediaDirectory]);
+  ], [renamingId, renamingName, mediaDirectory, handleRename]);
 
   return (
     <DataTable

@@ -90,6 +90,7 @@ const FileTile: FC<{
               className="w-full h-full object-cover"
               muted
               preload="metadata"
+              aria-label={file.alt || file.name}
             />
           ) : (
             // Graceful placeholder for a missing/unrenderable source.

@@ -57,7 +57,9 @@ const Thumb: FC<{ file: FileItem }> = ({ file }) => {
         className="w-full h-full object-cover"
         muted
         preload="metadata"
-      />
+      >
+        <track kind="captions" src="" label="No captions" default />
+      </video>
     );
   }
   return (
@@ -101,15 +103,19 @@ export const FileGrid: FC<{
 
   if (!files?.length) return null;
 
+  const selectedIds = new Set(selectedFiles.map(f => f.id));
+
   return (
     <div className="flex flex-wrap gap-[3px]">
       {files.map((file) => {
-        const isSelected = !!selectedFiles.find(f => f.id === file.id);
+        const isSelected = selectedIds.has(file.id);
         const tags = file.tags ? JSON.parse(file.tags) : [];
 
         return (
           <div
             key={file.id}
+            role="button"
+            tabIndex={0}
             draggable
             onDragStart={(e) => handleDragStart(e, file.id)}
             className={clsx(
@@ -124,6 +130,16 @@ export const FileGrid: FC<{
               }
             }}
             onDoubleClick={() => !onSelect && onFileClick(file)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (onSelect) {
+                  onSelect([file]);
+                } else {
+                  onToggleSelect(file);
+                }
+              }
+            }}
           >
             <div className="w-full aspect-square overflow-hidden rounded-t-[5px] bg-newBgColorInner relative">
               <Thumb file={file} />

@@ -177,11 +177,20 @@ export const FileManager: FC<{
         )}
       >
         <div
+          role="button"
+          tabIndex={folderDrawerOpen ? 0 : -1}
+          aria-label="Close folder drawer"
           className={clsx(
             'absolute inset-0 bg-black/50 transition-opacity duration-200',
             folderDrawerOpen ? 'opacity-100' : 'opacity-0'
           )}
           onClick={() => setFolderDrawerOpen(false)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+              e.preventDefault();
+              setFolderDrawerOpen(false);
+            }
+          }}
         />
         <div
           className={clsx(
@@ -382,7 +391,7 @@ export const FileManager: FC<{
                   onClick={() => setPage(pageNum)}
                   className={clsx('w-[36px] h-[36px] rounded-[6px] text-[13px] font-medium transition-all',
                     page === pageNum
-                      ? 'bg-[#2B5CD3] text-white'
+                      ? 'bg-[#2B5CD3] text-textColor'
                       : 'text-textColor hover:bg-boxHover border border-newColColor')}
                 >
                   {pageNum + 1}
@@ -417,8 +426,17 @@ export const FileManager: FC<{
       {detailsFile && (
         <div className="fixed inset-0 z-[210] flex justify-end lg:hidden">
           <div
+            role="button"
+            tabIndex={0}
+            aria-label="Close details drawer"
             className="absolute inset-0 bg-black/50"
             onClick={() => setDetailsFile(null)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+                e.preventDefault();
+                setDetailsFile(null);
+              }
+            }}
           />
           <div className="relative h-full w-[340px] max-w-[90vw] bg-newBgColor border-s border-studioBorder shadow-2xl flex flex-col">
             <FileDetailsPanel
@@ -433,7 +451,23 @@ export const FileManager: FC<{
       )}
 
       {showTrash && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[20px]">
+        <div
+          role="button"
+          tabIndex={0}
+          aria-label="Close trash"
+          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-[20px]"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowTrash(false);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') {
+              e.preventDefault();
+              setShowTrash(false);
+            }
+          }}
+        >
           <div className="bg-newBgColorInner rounded-[12px] w-full max-w-4xl max-h-[80vh] overflow-auto p-[24px]">
             <TrashComponent onClose={() => setShowTrash(false)} />
           </div>

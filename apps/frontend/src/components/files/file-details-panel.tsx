@@ -96,10 +96,10 @@ export const FileDetailsPanel: FC<{
   }, [file, mediaDirectory, toaster]);
 
   const handleDelete = useCallback(async () => {
-    await fetch(`/files/${file.id}`, { method: 'DELETE' });
+    await fetch(`/files/${file.id}/trash`, { method: 'POST' });
     onRefresh();
     onClose();
-    toaster.show('File deleted', 'success');
+    toaster.show('File moved to trash', 'success');
   }, [file, fetch, onRefresh, onClose, toaster]);
 
   const handleDownload = useCallback(() => {
@@ -133,17 +133,25 @@ export const FileDetailsPanel: FC<{
           {isAudio ? (
             <div className="p-[12px]"><AudioPlayer src={mediaDirectory.set(file.path)} /></div>
           ) : isVideo ? (
-            <video src={mediaDirectory.set(file.path)} className="w-full aspect-video object-cover" controls />
+            <video src={mediaDirectory.set(file.path)} className="w-full aspect-video object-cover" controls>
+              <track kind="captions" src="" label="No captions" default />
+            </video>
           ) : (
+            // User-uploaded previews come from dynamic storage URLs; next/image is
+            // impractical without a configured loader/known domains, so a native img is used.
+            // eslint-disable-next-line @next/next/no-img-element
             <img src={mediaDirectory.set(file.path)} alt="" className="w-full aspect-square object-cover" />
           )}
         </div>
 
         <div className="space-y-[14px]">
           <div>
-            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Name</label>
+            <label htmlFor="file-details-name" className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Name</label>
             {editingName ? (
               <input
+                id="file-details-name"
+                // Input replaces the clicked name; autofocus keeps keyboard focus on the newly revealed control.
+                // eslint-disable-next-line jsx-a11y/no-autofocus
                 autoFocus
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -153,8 +161,13 @@ export const FileDetailsPanel: FC<{
               />
             ) : (
               <div
+                id="file-details-name"
+                role="button"
+                tabIndex={0}
+                aria-label="Edit name"
                 className="mt-[4px] text-[13px] text-textColor cursor-pointer hover:text-[#2B5CD3] truncate"
                 onClick={() => setEditingName(true)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setEditingName(true); } }}
               >
                 {name}
               </div>
@@ -162,8 +175,9 @@ export const FileDetailsPanel: FC<{
           </div>
 
           <div>
-            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Description</label>
+            <label htmlFor="file-details-description" className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Description</label>
             <textarea
+              id="file-details-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               onBlur={handleSaveDescription}
@@ -174,7 +188,7 @@ export const FileDetailsPanel: FC<{
           </div>
 
           <div>
-            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Tags</label>
+            <label htmlFor="file-details-tags" className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500]">Tags</label>
             <div className="flex flex-wrap gap-[6px] mt-[6px]">
               {tags.map((tag) => (
                 <span
@@ -193,6 +207,7 @@ export const FileDetailsPanel: FC<{
                 </span>
               ))}
               <input
+                id="file-details-tags"
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -206,8 +221,18 @@ export const FileDetailsPanel: FC<{
           </div>
 
           <div className="border-t border-newBorder pt-[14px]">
-            <label className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500] block mb-[6px]">Campaigns</label>
-            <CampaignSelector entityType="file" entityId={file.id} compact />
+            <label
+              htmlFor="file-details-campaigns"
+              className="text-[11px] text-textColor/40 uppercase tracking-wider font-[500] block mb-[6px]"
+            >
+              Campaigns
+            </label>
+            <CampaignSelector
+              id="file-details-campaigns"
+              entityType="file"
+              entityId={file.id}
+              compact
+            />
           </div>
 
           <div className="border-t border-newBorder pt-[14px] space-y-[8px]">
@@ -246,18 +271,14 @@ export const FileDetailsPanel: FC<{
               Download
             </button>
             <button
-              onClick={() => {
-                const a = document.createElement('a');
-                a.href = mediaDirectory.set(file.path);
-                a.download = file.name;
-                a.click();
-              }}
+              onClick={handleDownload}
               className="w-full flex items-center gap-[8px] px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                <path d="M2 2H12M2 7H12M2 12H12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M10 7H4M4 7l3-3M4 7l3 3" />
+                <path d="M2 11h10" />
               </svg>
-              Create Post
+              Open file
             </button>
             <button
               onClick={handleDelete}

@@ -7,8 +7,6 @@ import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 
-type StorageProviderInfo = { type: string; name: string };
-
 interface SaveToFilesModalProps {
   url: string;
   name: string;
@@ -41,19 +39,6 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
       if (!res.ok) return [];
       return res.json();
     }
-  );
-
-  const { data: providersMap } = useSWR<Record<string, StorageProviderInfo>>(
-    'save-folders-storage-providers',
-    async () => {
-      const res = await fetch('/settings/storage');
-      if (!res.ok) return {};
-      const providers = await res.json();
-      const map: Record<string, StorageProviderInfo> = {};
-      for (const p of providers) map[p.id] = { type: p.type, name: p.name };
-      return map;
-    },
-    { revalidateOnFocus: false, dedupingInterval: 60000 }
   );
 
   const handleCreateFolder = useCallback(async () => {
@@ -129,11 +114,13 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
 
   const renderFolderTree = (items: any[], depth: number = 0): React.ReactNode => {
     return (items || []).map((folder: any) => {
-      const providerInfo = folder.storageProviderId && providersMap?.[folder.storageProviderId];
+      const providerInfo = folder.storageProvider;
       return (
         <div key={folder.id}>
-          <div
-            className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
+          <button
+            type="button"
+            aria-pressed={selectedFolderId === folder.id}
+            className={`flex items-center w-full text-left gap-[8px] px-[8px] py-[6px] rounded-[6px] text-[13px] transition-all ${
               selectedFolderId === folder.id ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-newColColor/50'
             }`}
             style={{ paddingLeft: `${12 + depth * 16}px` }}
@@ -150,7 +137,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
               </span>
             )}
             <span className="text-[11px] text-newTextColor/40">{folder._count?.files || 0}</span>
-          </div>
+          </button>
           {folder.children?.length ? renderFolderTree(folder.children, depth + 1) : null}
         </div>
       );
@@ -199,8 +186,10 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
       <div>
         <div className="text-[13px] font-[500] text-textColor mb-[6px]">Destination</div>
         <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
-          <div
-            className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
+          <button
+            type="button"
+            aria-pressed={selectedFolderId === null}
+            className={`flex items-center w-full text-left gap-[8px] px-[8px] py-[6px] rounded-[6px] text-[13px] transition-all ${
               selectedFolderId === null ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-newColColor/50'
             }`}
             onClick={() => setSelectedFolderId(null)}
@@ -210,7 +199,7 @@ export const SaveToFilesModal: FC<SaveToFilesModalProps> = ({ url, name, source,
               <path d="M1 6H15" stroke="currentColor" strokeWidth="1.3" />
             </svg>
             <span className="flex-1 truncate">All Files (root)</span>
-          </div>
+          </button>
           {folders && renderFolderTree(folders)}
         </div>
       </div>

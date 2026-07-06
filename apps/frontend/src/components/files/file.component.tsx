@@ -5,14 +5,12 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
-import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import clsx from 'clsx';
 import { VideoFrame } from '@gitroom/react/helpers/video.frame';
@@ -121,14 +119,16 @@ export const Pagination: FC<{
   return (
     <ul className="flex flex-row items-center gap-1 justify-center mt-[15px]">
       <li className={clsx(current === 0 && 'opacity-20 pointer-events-none')}>
-        <div
+        <button
+          type="button"
           className="cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 ps-2.5 text-gray-400 hover:text-white border-[#1F1F1F] hover:bg-boxHover"
           aria-label="Go to previous page"
           onClick={() => setPage(current - 1)}
+          disabled={current === 0}
         >
           <ChevronLeftIcon className="lucide lucide-chevron-left h-4 w-4" />
           <span>{t('previous', 'Previous')}</span>
-        </div>
+        </button>
       </li>
       {paginationItems.map((item, index) => (
         <li key={index}>
@@ -137,9 +137,11 @@ export const Pagination: FC<{
               ...
             </span>
           ) : (
-            <div
-              aria-current="page"
+            <button
+              type="button"
+              aria-current={current === item - 1 ? 'page' : undefined}
               onClick={() => setPage(item - 1)}
+              disabled={current === item - 1}
               className={clsx(
                 'cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border hover:bg-boxHover h-10 w-10 hover:text-white border-newBorder',
                 current === item - 1
@@ -148,7 +150,7 @@ export const Pagination: FC<{
               )}
             >
               {item}
-            </div>
+            </button>
           )}
         </li>
       ))}
@@ -162,6 +164,7 @@ export const Pagination: FC<{
           className="text-textColor hover:text-white group cursor-pointer inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-10 px-4 py-2 gap-1 pe-2.5 text-gray-400 border-[#1F1F1F] hover:bg-boxHover"
           aria-label="Go to next page"
           onClick={() => setPage(current + 1)}
+          disabled={current + 1 === totalPages}
         >
           <span>{t('next', 'Next')}</span>
           <ChevronRightIcon className="lucide lucide-chevron-right h-4 w-4" />
@@ -234,16 +237,9 @@ export const MultiFileComponent: FC<{
   // outage must not silently kill the AI buttons). Gates AI Image / AI Video so we don't
   // offer a generation the org has no provider for (it would 409 server-side).
   const { operationAvailable } = useMediaToolsStatus();
-  const [currentMedia, setCurrentMedia] = useState(value);
   const [pendingMedia, setPendingMedia] = useState<
     { key: string; url: string; thumbnail?: string }[]
   >([]);
-
-  useEffect(() => {
-    if (value) {
-      setCurrentMedia(value);
-    }
-  }, [value]);
 
   const mediaDirectory = useMediaDirectory();
   const changeMedia = useCallback(
@@ -261,16 +257,14 @@ export const MultiFileComponent: FC<{
           }[]
     ) => {
       const mediaArray = Array.isArray(m) ? m : [m];
-      const newMedia = [...(currentMedia || []), ...mediaArray];
-      setCurrentMedia(newMedia);
       onChange({
         target: {
           name,
-          value: newMedia,
+          value: [...(value || []), ...mediaArray],
         },
       });
     },
-    [currentMedia]
+    [name, onChange, value]
   );
 
   const importStock = useCallback(
@@ -371,16 +365,14 @@ export const MultiFileComponent: FC<{
 
   const clearMedia = useCallback(
     (topIndex: number) => () => {
-      const newMedia = currentMedia?.filter((f, index) => index !== topIndex);
-      setCurrentMedia(newMedia);
       onChange({
         target: {
           name,
-          value: newMedia,
+          value: (value || []).filter((_, index) => index !== topIndex),
         },
       });
     },
-    [currentMedia]
+    [name, onChange, value]
   );
 
   const clearPending = useCallback(
@@ -394,23 +386,24 @@ export const MultiFileComponent: FC<{
     <>
       <div className="b1 flex flex-col gap-[8px] rounded-bl-[8px] select-none w-full">
         <div className="flex gap-[10px] px-[12px]">
-          {!!currentMedia && (
+          {!!value && (
             <ReactSortable
-              list={currentMedia}
-              setList={(value) =>
-                onChange({ target: { name: 'upload', value } })
+              list={value}
+              setList={(newList) =>
+                onChange({ target: { name, value: newList } })
               }
               className="flex gap-[10px] sortable-container"
               animation={200}
               swap={true}
               handle=".dragging"
             >
-              {currentMedia.map((media, index) => (
+              {value.map((media, index) => (
                   <div key={media.id} className="cursor-pointer rounded-[5px] w-[40px] h-[40px] border-2 border-newTableBorder relative flex transition-all">
                     <DragHandleIcon className="z-[20] dragging absolute pe-[1px] pb-[3px] -start-[4px] -top-[4px] cursor-move" />
 
                     <div className="w-full h-full relative group">
-                      <div
+                      <button
+                        type="button"
                         onClick={async () => {
                           modals.openModal({
                             title: t('media_settings', 'Media Settings'),
@@ -418,15 +411,15 @@ export const MultiFileComponent: FC<{
                               <MediaComponentInner
                                 media={media as any}
                                 onClose={close}
-                                onSelect={(value: any) => {
+                                onSelect={(selectedValue: any) => {
                                   onChange({
                                     target: {
-                                      name: 'upload',
-                                      value: currentMedia.map((p) => {
+                                      name,
+                                      value: (value || []).map((p) => {
                                         if (p.id === media.id) {
                                           return {
                                             ...p,
-                                            ...value,
+                                            ...selectedValue,
                                           };
                                         }
                                         return p;
@@ -438,10 +431,11 @@ export const MultiFileComponent: FC<{
                             ),
                           });
                         }}
-                        className="absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] bg-black/80 rounded-[10px] opacity-0 group-hover:opacity-100 transition-opacity z-[9]"
+                        className="absolute top-[50%] left-[50%] -translate-x-[50%] -translate-y-[50%] bg-black/80 rounded-[10px] opacity-0 group-hover:opacity-100 transition-opacity z-[9] p-0 border-0"
+                        aria-label={t('media_settings', 'Media Settings')}
                       >
                         <MediaSettingsIcon className="cursor-pointer relative z-[200]" />
-                      </div>
+                      </button>
                       {hasExtension(media?.path, 'mp4') ? (
                         <VideoFrame url={mediaDirectory.set(media?.path)} />
                       ) : hasExtension(media?.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
@@ -453,6 +447,7 @@ export const MultiFileComponent: FC<{
                           </svg>
                         </div>
                       ) : (
+                        // eslint-disable-next-line @next/next/no-img-element -- Media URLs may point to arbitrary external storage endpoints configured per org; next/image remotePatterns would need dynamic per-org configuration.
                         <img
                           alt="Media"
                           className="w-full h-full object-cover rounded-[4px]"
@@ -486,7 +481,8 @@ export const MultiFileComponent: FC<{
         <div className="flex flex-nowrap items-center gap-[8px] px-[12px] border-t border-newColColor w-full b1 text-textColor overflow-x-auto scrollbar-none">
           {!mediaNotAvailable && (
             <div className="flex flex-nowrap shrink-0 py-[10px] b2 items-center gap-[4px]">
-              <div
+              <button
+                type="button"
                 onClick={() => setPickerOpen(true)}
                 className="cursor-pointer h-[30px] rounded-[6px] justify-center items-center flex bg-newColColor px-[8px]"
               >
@@ -498,7 +494,7 @@ export const MultiFileComponent: FC<{
                     {t('insert_media', 'Insert Media')}
                   </div>
                 </div>
-              </div>
+              </button>
               {!!user?.tier?.ai && (
                 <ToolbarDropdown
                   label={t('ai_tools', 'AI')}
@@ -588,21 +584,25 @@ export const FileComponent: FC<{
 
   const { name, type, label, description, onChange, value, width, height } =
     props;
-  const { getValues } = useSettings();
   const permissions = usePermissions();
   const fetch = useFetch();
   const toaster = useToaster();
-  const [currentMedia, setCurrentMedia] = useState(value);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [importing, setImporting] = useState(false);
-  useEffect(() => {
-    const settings = getValues()[props.name];
-    if (settings) {
-      setCurrentMedia(settings);
-    }
-  }, []);
   const modals = useModals();
   const mediaDirectory = useMediaDirectory();
+
+  const changeMedia = useCallback(
+    (m: { path: string; id: string; thumbnail?: string }[]) => {
+      onChange({
+        target: {
+          name,
+          value: m[0],
+        },
+      });
+    },
+    [name, onChange]
+  );
 
   const showDesignModal = useCallback(() => {
     if (!permissions.hasPermission('media', 'read')) return;
@@ -622,19 +622,7 @@ export const FileComponent: FC<{
         />
       ),
     });
-  }, [t, permissions, width, height, modals]);
-  const changeMedia = useCallback(
-    (m: { path: string; id: string; thumbnail?: string }[]) => {
-      setCurrentMedia(m[0]);
-      onChange({
-        target: {
-          name,
-          value: m[0],
-        },
-      });
-    },
-    [name, onChange]
-  );
+  }, [t, permissions, width, height, modals, changeMedia]);
 
   const handleSelect = useCallback(
     async (item: MediaSelectorItem) => {
@@ -677,7 +665,6 @@ export const FileComponent: FC<{
   );
 
   const clearMedia = useCallback(() => {
-    setCurrentMedia(undefined);
     onChange({
       target: {
         name,
@@ -689,32 +676,35 @@ export const FileComponent: FC<{
     <div className="flex flex-col gap-[8px]">
       <div className="text-[14px]">{label}</div>
       <div className="text-[12px]">{description}</div>
-      {!!currentMedia && (
+      {!!value && (
         <div className="my-[20px] w-[200px] h-[200px] border-2 border-newTableBorder">
           {type === 'audio' ||
-          hasExtension(currentMedia.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+          hasExtension(value.path, 'mp3', 'wav', 'ogg', 'm4a') ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption -- User-uploaded media preview; captions are not available.
             <audio
               controls
               className="w-full h-full"
-              src={mediaDirectory.set(currentMedia.path)}
+              src={mediaDirectory.set(value.path)}
             />
-          ) : type === 'video' || hasExtension(currentMedia.path, 'mp4') ? (
+          ) : type === 'video' || hasExtension(value.path, 'mp4') ? (
+            // eslint-disable-next-line jsx-a11y/media-has-caption -- User-uploaded media preview; captions are not available.
             <video
               controls
               className="w-full h-full object-cover"
-              src={mediaDirectory.set(currentMedia.path)}
+              src={mediaDirectory.set(value.path)}
             />
           ) : (
             <button
               type="button"
               aria-label="Open media preview"
               className="w-full h-full cursor-pointer"
-              onClick={() => window.open(mediaDirectory.set(currentMedia.path))}
+              onClick={() => window.open(mediaDirectory.set(value.path))}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element -- Media URLs may point to arbitrary external storage endpoints configured per org; next/image remotePatterns would need dynamic per-org configuration. */}
               <img
                 alt="Media preview"
                 className="w-full h-full object-cover"
-                src={currentMedia.path}
+                src={value.path}
               />
             </button>
           )}
