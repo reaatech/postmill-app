@@ -6,18 +6,12 @@ import {
 import { fromBuffer, fromFile } from './file-type.compat';
 import { statSync } from 'fs';
 import { promises as fs } from 'fs';
+import {
+  checkUploadLimit,
+  UPLOAD_ALLOWED_MIME_TYPES,
+} from './upload-limits';
 
-const ALLOWED_MIME_TYPES = new Set<string>([
-  'image/jpeg',
-  'image/png',
-  'image/gif',
-  'image/webp',
-  'image/avif',
-  'image/bmp',
-  'image/tiff',
-  'video/mp4',
-  'audio/mpeg', 'audio/mp4', 'audio/wav', 'audio/ogg',
-]);
+const ALLOWED_MIME_TYPES = UPLOAD_ALLOWED_MIME_TYPES;
 
 @Injectable()
 export class CustomFileValidationPipe implements PipeTransform {
@@ -49,11 +43,11 @@ export class CustomFileValidationPipe implements PipeTransform {
         try { value.size = statSync(value.path).size; } catch {}
       }
 
-      const maxSize = this.getMaxSize(detected.mime);
-      if (value.size > maxSize) {
-        throw new BadRequestException(
-          `File size exceeds the maximum allowed size of ${maxSize} bytes.`
-        );
+      const limitCheck = checkUploadLimit(
+        { size: value.size, mimetype: detected.mime },
+      );
+      if (!limitCheck.ok) {
+        throw new BadRequestException(limitCheck.reason);
       }
 
       value.mimetype = detected.mime;
@@ -67,18 +61,6 @@ export class CustomFileValidationPipe implements PipeTransform {
     } catch (e) {
       if (value?.path) { try { await fs.unlink(value.path); } catch {} }
       throw e;
-    }
-  }
-
-  private getMaxSize(mimeType: string): number {
-    if (mimeType.startsWith('image/')) {
-      return 10 * 1024 * 1024; // 10 MB
-    } else if (mimeType.startsWith('video/')) {
-      return 1024 * 1024 * 1024; // 1 GB
-    } else if (mimeType.startsWith('audio/')) {
-      return 50 * 1024 * 1024; // 50 MB
-    } else {
-      throw new BadRequestException('Unsupported file type.');
     }
   }
 }

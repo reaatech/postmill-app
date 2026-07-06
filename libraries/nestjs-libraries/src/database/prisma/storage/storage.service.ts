@@ -414,17 +414,23 @@ export class StorageService {
   async assertWithinProviderQuota(
     adapter: IStorageAdapter,
     orgId: string,
-    incomingBytes: number
+    incomingBytes: number,
+    configId?: string | null
   ) {
     if (adapter.type === StorageProviderType.LOCAL) {
       return this.assertWithinQuota(orgId, incomingBytes);
     }
 
-    const configs = await this._storageRepository.findByOrg(orgId);
-    const config = configs.find((c) => {
-      const built = this.#buildAdapter(c as StorageConfigRow);
-      return built.type === adapter.type && built.constructor === adapter.constructor;
-    });
+    let config: StorageConfigRow | undefined;
+    if (configId) {
+      const byId = await this._storageRepository.findById(configId);
+      if (byId && byId.organizationId === orgId) {
+        config = byId as StorageConfigRow;
+      }
+    }
+
+    // Quota is always resolved by the stable config id. Callers that do not
+    // have a config id (e.g. legacy paths) skip the per-provider quota check.
 
     if (!config || !config.quotaBytes) return;
 
@@ -644,6 +650,33 @@ export class StorageService {
     return { byFolder, byProvider };
   }
 
+  /**
+   * Return the set of public URL prefixes that storage objects for this org may
+   * have. Used by /files/save-media and /files/bulk/save to validate that a
+   * client-supplied path actually belongs to the org's storage.
+   */
+  async getOrgStoragePublicPrefixes(orgId: string): Promise<string[]> {
+    const prefixes: string[] = [];
+    const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
+    if (frontendUrl) {
+      prefixes.push(`${frontendUrl}/uploads/`);
+    }
+
+    const configs = await this._storageRepository.findByOrg(orgId);
+    for (const config of configs) {
+      if (config.publicUrl) {
+        prefixes.push(config.publicUrl.replace(/\/$/, '') + '/');
+      } else if (config.bucket && config.region) {
+        // Default S3 virtual-hosted URL when no custom publicUrl/CDN is set.
+        prefixes.push(
+          `https://${config.bucket}.s3.${config.region}.amazonaws.com/`
+        );
+      }
+    }
+
+    return [...new Set(prefixes)];
+  }
+
   // Resolve the storage adapter for a given folder by walking the parentId
   // chain up to a mount-root folder carrying storageProviderId. No folder
   // or null folder → org LOCAL fallback. Never returns null.
@@ -651,8 +684,21 @@ export class StorageService {
     folderId: string | null | undefined,
     orgId: string
   ): Promise<IStorageAdapter> {
+    const { adapter } = await this.resolveAdapterForFolderWithConfigId(folderId, orgId);
+    return adapter;
+  }
+
+  /**
+   * Same as `resolveAdapterForFolder`, but also returns the resolved config id
+   * so callers can do stable quota/identity lookups without relying on class
+   * identity.
+   */
+  async resolveAdapterForFolderWithConfigId(
+    folderId: string | null | undefined,
+    orgId: string
+  ): Promise<{ adapter: IStorageAdapter; configId: string | null }> {
     if (!folderId) {
-      return this.getLocalAdapterForOrg(orgId, true);
+      return { adapter: await this.getLocalAdapterForOrg(orgId, true), configId: null };
     }
 
     const seen = new Set<string>();
@@ -664,14 +710,19 @@ export class StorageService {
       }
       seen.add(currentId);
 
-      // eslint-disable-next-line no-await-in-loop
       const folder = await this._storageRepository.findFolderWithProvider(currentId);
       if (!folder) break;
+      if (folder.organizationId !== orgId) {
+        throw new HttpException('Folder not found', 404);
+      }
 
       if (folder.storageProviderId) {
         const config = await this._storageRepository.findById(folder.storageProviderId);
         if (config && config.organizationId === orgId) {
-          return this.#buildAdapter(config as StorageConfigRow);
+          return {
+            adapter: this.#buildAdapter(config as StorageConfigRow),
+            configId: config.id,
+          };
         }
         break;
       }
@@ -679,7 +730,7 @@ export class StorageService {
       currentId = folder.parentId;
     }
 
-    return this.getLocalAdapterForOrg(orgId, true);
+    return { adapter: await this.getLocalAdapterForOrg(orgId, true), configId: null };
   }
 
   // Legacy — delegates to the ancestor-aware resolver. Kept for backward compat

@@ -7,7 +7,7 @@ const storageMock = {
 };
 
 const storageSvcMock = {
-  resolveAdapterForFolder: vi.fn().mockResolvedValue(storageMock),
+  resolveAdapterForFolderWithConfigId: vi.fn().mockResolvedValue({ adapter: storageMock, configId: null }),
   assertWithinProviderQuota: vi.fn(),
 };
 
@@ -17,7 +17,7 @@ const fileSvcMock = {
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
-    resolveAdapterForFolder = storageSvcMock.resolveAdapterForFolder;
+    resolveAdapterForFolderWithConfigId = storageSvcMock.resolveAdapterForFolderWithConfigId;
     assertWithinProviderQuota = storageSvcMock.assertWithinProviderQuota;
   },
 }));
@@ -58,8 +58,8 @@ describe('FilesController — quota enforcement', () => {
         controller.uploadServer(org, file)
       ).rejects.toThrow('Storage quota exceeded');
 
-      expect(storageSvcMock.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
-      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 1000);
+      expect(storageSvcMock.resolveAdapterForFolderWithConfigId).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 1000, null);
     });
 
     it('allows upload when within quota', async () => {
@@ -82,7 +82,7 @@ describe('FilesController — quota enforcement', () => {
 
       const result = await controller.uploadServer(org, file);
 
-      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 100);
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 100, null);
       expect(storageMock.uploadFile).toHaveBeenCalled();
       expect(result).toBeDefined();
     });
@@ -105,8 +105,8 @@ describe('FilesController — quota enforcement', () => {
         controller.uploadSimple(org, file)
       ).rejects.toThrow('Over quota');
 
-      expect(storageSvcMock.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
-      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 2000);
+      expect(storageSvcMock.resolveAdapterForFolderWithConfigId).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 2000, null);
     });
 
     it('skips saving when preventSave is true', async () => {

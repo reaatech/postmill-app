@@ -1,4 +1,4 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Injectable, Logger } from '@nestjs/common';
 import { FileRepository } from '@gitroom/nestjs-libraries/database/prisma/file/file.repository';
 import { Organization } from '@prisma/client';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
@@ -25,13 +25,40 @@ const MAX_IMPORT_SIZE = 512 * 1024 * 1024; // 512 MB
 
 @Injectable()
 export class FileService {
+  private readonly _logger = new Logger(FileService.name);
+
   constructor(
     private _fileRepository: FileRepository,
     private _storageService: StorageService
   ) {}
 
+  /**
+   * Permanently delete a file: remove the underlying storage object, then
+   * hard-delete the DB row. This is the lifecycle endpoint for trash emptying.
+   */
   async deleteFile(org: string, id: string) {
-    return this._fileRepository.deleteFile(org, id);
+    const file = await this._fileRepository.getFileById(id);
+    if (!file || file.organizationId !== org) {
+      throw new HttpException('File not found', 404);
+    }
+
+    const adapter = await this._storageService.resolveAdapterForFolder(
+      file.folderId,
+      org
+    );
+
+    try {
+      await adapter.removeFile(file.path);
+    } catch (err) {
+      // Log but continue: the DB row must still be removable even if the
+      // storage object is already gone. This prevents a missing object from
+      // blocking trash emptying.
+      this._logger?.warn?.(
+        `Could not remove storage object for file ${id}: ${(err as Error).message}`
+      );
+    }
+
+    return this._fileRepository.hardDelete(org, id);
   }
 
   getFileById(id: string) {
@@ -46,8 +73,15 @@ export class FileService {
     return this._fileRepository.getFileByPath(org, filePath);
   }
 
-  saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
-    return this._fileRepository.saveFile(org, fileName, filePath, originalName, folderId);
+  saveFile(
+    org: string,
+    fileName: string,
+    filePath: string,
+    originalName?: string,
+    folderId?: string,
+    fileSize?: number
+  ) {
+    return this._fileRepository.saveFile(org, fileName, filePath, originalName, folderId, fileSize);
   }
 
   getFiles(
@@ -171,7 +205,7 @@ export class FileService {
     if (!folder || folder.organizationId !== org) {
       throw new HttpException('Folder not found', 404);
     }
-    return this._fileRepository.updateFolder(id, data);
+    return this._fileRepository.updateFolder(org, id, data);
   }
 
   async deleteFolder(org: string, id: string) {
@@ -179,7 +213,7 @@ export class FileService {
     if (!folder || folder.organizationId !== org) {
       throw new HttpException('Folder not found', 404);
     }
-    return this._fileRepository.deleteFolder(id);
+    return this._fileRepository.deleteFolder(org, id);
   }
 
   async getFolderTree(org: string) {
@@ -205,7 +239,7 @@ export class FileService {
       }
     }
 
-    return this._fileRepository.moveFile(fileId, folderId);
+    return this._fileRepository.moveFile(org, fileId, folderId);
   }
 
   async bulkDelete(org: string, ids: string[]) {
@@ -234,8 +268,8 @@ export class FileService {
     return this._fileRepository.getFilesByFolder(org, folderId, page);
   }
 
-  getFolderContents(folderId: string) {
-    return this._fileRepository.getFolderContents(folderId);
+  getFolderContents(org: string, folderId: string) {
+    return this._fileRepository.getFolderContents(org, folderId);
   }
 
   async updateFileTags(org: string, fileId: string, tags: string[]) {
@@ -243,7 +277,7 @@ export class FileService {
     if (!file || file.organizationId !== org) {
       throw new HttpException('File not found', 404);
     }
-    return this._fileRepository.updateFileTags(fileId, tags);
+    return this._fileRepository.updateFileTags(org, fileId, tags);
   }
 
   async updateFileDescription(org: string, fileId: string, description: string) {
@@ -251,7 +285,7 @@ export class FileService {
     if (!file || file.organizationId !== org) {
       throw new HttpException('File not found', 404);
     }
-    return this._fileRepository.updateFileDescription(fileId, description);
+    return this._fileRepository.updateFileDescription(org, fileId, description);
   }
 
   async renameFile(org: string, fileId: string, name: string) {
@@ -259,13 +293,23 @@ export class FileService {
     if (!file || file.organizationId !== org) {
       throw new HttpException('File not found', 404);
     }
-    return this._fileRepository.renameFile(fileId, name);
+    return this._fileRepository.renameFile(org, fileId, name);
   }
 
-  async bulkSave(org: string, items: Array<{ name: string; path: string; originalName?: string }>) {
+  async bulkSave(
+    org: string,
+    items: Array<{ name: string; path: string; originalName?: string; fileSize?: number }>
+  ) {
     return Promise.all(
       items.map((item) =>
-        this._fileRepository.saveFile(org, item.name, item.path, item.originalName)
+        this._fileRepository.saveFile(
+          org,
+          item.name,
+          item.path,
+          item.originalName,
+          undefined,
+          item.fileSize
+        )
       )
     );
   }
@@ -275,7 +319,7 @@ export class FileService {
     if (!file || file.organizationId !== org) {
       throw new HttpException('File not found', 404);
     }
-    return this._fileRepository.softDeleteFile(fileId);
+    return this._fileRepository.softDeleteFile(org, fileId);
   }
 
   async restore(fileId: string, org: string) {
@@ -283,7 +327,7 @@ export class FileService {
     if (!file || file.organizationId !== org) {
       throw new HttpException('File not found', 404);
     }
-    return this._fileRepository.restoreFile(fileId);
+    return this._fileRepository.restoreFile(org, fileId);
   }
 
   async getTrashed(org: string) {
@@ -307,7 +351,11 @@ export class FileService {
     // org owns, else fall back to the org's default folder (null).
     const ownedFolderId = await this.resolveOwnedFolderId(orgId, data.folderId);
 
-    const adapter = await this._storageService.resolveAdapterForFolder(ownedFolderId, orgId);
+    const { adapter, configId } =
+      await this._storageService.resolveAdapterForFolderWithConfigId(
+        ownedFolderId,
+        orgId
+      );
 
     const response = await safeFetch(data.url);
     if (!response.ok) {
@@ -342,7 +390,12 @@ export class FileService {
       );
     }
 
-    await this._storageService.assertWithinProviderQuota(adapter, orgId, buffer.length);
+    await this._storageService.assertWithinProviderQuota(
+      adapter,
+      orgId,
+      buffer.length,
+      configId
+    );
 
     // Validate the ACTUAL downloaded MIME, not the caller's category hint
     // (`data.type` is 'photo'/'audio'/… — not a MIME — and would never match).

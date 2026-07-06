@@ -8,14 +8,22 @@ import { FilesController } from './files.controller';
 const org: Organization = { id: 'org-1' } as any;
 
 function makeController() {
+  const adapter = {
+    readFile: vi.fn(),
+  };
   const fileService = {
     getFolder: vi.fn().mockResolvedValue({ id: 'f1', organizationId: 'org-1' }),
     getFolderContents: vi.fn().mockResolvedValue({ count: 3 }),
     getByIds: vi.fn().mockResolvedValue([]),
     bulkMove: vi.fn().mockResolvedValue({ count: 0 }),
     importFromUrl: vi.fn().mockResolvedValue({ id: 'file-1' }),
+    saveFile: vi.fn().mockResolvedValue({ id: 'file-1' }),
+    bulkSave: vi.fn().mockResolvedValue([{ id: 'file-1' }, { id: 'file-2' }]),
   };
-  const storageService = {};
+  const storageService = {
+    getOrgStoragePublicPrefixes: vi.fn().mockResolvedValue(['https://app.example.com/uploads/']),
+    resolveAdapterForFolder: vi.fn().mockResolvedValue(adapter),
+  };
   const stockMediaService = {
     resolveContentPackDownload: vi.fn().mockResolvedValue('https://cdn/licensed.jpg'),
     triggerDownload: vi.fn().mockResolvedValue(undefined),
@@ -29,7 +37,7 @@ function makeController() {
     stockMediaService as any,
     resolution as any,
   );
-  return { ctrl, fileService, stockMediaService, resolution };
+  return { ctrl, fileService, storageService, adapter, stockMediaService, resolution };
 }
 
 beforeEach(() => vi.clearAllMocks());
@@ -42,7 +50,7 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
       const result = await ctrl.getFolderContents(org, 'folder-b');
 
       expect(fileService.getFolder).toHaveBeenCalledWith('org-1', 'folder-b');
-      expect(fileService.getFolderContents).toHaveBeenCalledWith('folder-b');
+      expect(fileService.getFolderContents).toHaveBeenCalledWith('org-1', 'folder-b');
       expect(result).toEqual({ count: 3 });
     });
 
@@ -136,6 +144,109 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
         status: 502,
         message: 'Could not retrieve the licensed asset',
       });
+    });
+  });
+
+  describe('1.4 path ownership validation for save-media', () => {
+    it('rejects a foreign-origin URL with 400', async () => {
+      const { ctrl, storageService, fileService } = makeController();
+
+      await expect(
+        ctrl.saveMedia(org, 'name', 'https://evil.com/uploads/x.png', 'x.png'),
+      ).rejects.toMatchObject({ status: 400, message: 'Invalid storage path' });
+
+      expect(storageService.resolveAdapterForFolder).not.toHaveBeenCalled();
+      expect(fileService.saveFile).not.toHaveBeenCalled();
+    });
+
+    it('rejects a matching-prefix but non-existent object with 404', async () => {
+      const { ctrl, adapter, storageService, fileService } = makeController();
+      adapter.readFile.mockRejectedValue(new Error('NoSuchKey'));
+
+      await expect(
+        ctrl.saveMedia(org, 'name', 'https://app.example.com/uploads/missing.png', 'missing.png'),
+      ).rejects.toMatchObject({ status: 404, message: 'Storage object not found' });
+
+      expect(storageService.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(fileService.saveFile).not.toHaveBeenCalled();
+    });
+
+    it('accepts a valid org-owned object and persists it', async () => {
+      const { ctrl, adapter, storageService, fileService } = makeController();
+      adapter.readFile.mockResolvedValue(Buffer.from('bytes'));
+
+      const result = await ctrl.saveMedia(
+        org,
+        'saved.png',
+        'https://app.example.com/uploads/owned.png',
+        'owned.png',
+      );
+
+      expect(storageService.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
+      expect(adapter.readFile).toHaveBeenCalledWith('https://app.example.com/uploads/owned.png');
+      expect(fileService.saveFile).toHaveBeenCalledWith(
+        'org-1',
+        'saved.png',
+        'https://app.example.com/uploads/owned.png',
+        'owned.png',
+        undefined,
+        5,
+      );
+      expect(result).toEqual({ id: 'file-1' });
+    });
+  });
+
+  describe('1.4 path ownership validation for bulk/save', () => {
+    it('rejects the batch if any path is foreign', async () => {
+      const { ctrl, fileService } = makeController();
+
+      await expect(
+        ctrl.bulkSaveFiles(org, {
+          items: [
+            { name: 'a.png', path: 'https://app.example.com/uploads/a.png' },
+            { name: 'b.png', path: 'https://evil.com/uploads/b.png' },
+          ],
+        } as any),
+      ).rejects.toMatchObject({ status: 400, message: 'Invalid storage path' });
+
+      expect(fileService.bulkSave).not.toHaveBeenCalled();
+    });
+
+    it('rejects the batch if any object does not exist', async () => {
+      const { ctrl, adapter, fileService } = makeController();
+      adapter.readFile
+        .mockResolvedValueOnce(Buffer.from('bytes'))
+        .mockRejectedValueOnce(new Error('NoSuchKey'));
+
+      await expect(
+        ctrl.bulkSaveFiles(org, {
+          items: [
+            { name: 'a.png', path: 'https://app.example.com/uploads/a.png' },
+            { name: 'b.png', path: 'https://app.example.com/uploads/b.png' },
+          ],
+        } as any),
+      ).rejects.toMatchObject({ status: 404, message: 'Storage object not found' });
+
+      expect(fileService.bulkSave).not.toHaveBeenCalled();
+    });
+
+    it('saves the batch when every path is valid and reachable', async () => {
+      const { ctrl, adapter, fileService } = makeController();
+      adapter.readFile.mockResolvedValue(Buffer.from('bytes'));
+
+      const result = await ctrl.bulkSaveFiles(org, {
+        items: [
+          { name: 'a.png', path: 'https://app.example.com/uploads/a.png' },
+          { name: 'b.png', path: 'https://app.example.com/uploads/b.png' },
+        ],
+      } as any);
+
+      expect(adapter.readFile).toHaveBeenCalledTimes(2);
+      expect(fileService.bulkSave).toHaveBeenCalledWith('org-1', [
+        { name: 'a.png', path: 'https://app.example.com/uploads/a.png', fileSize: 5 },
+        { name: 'b.png', path: 'https://app.example.com/uploads/b.png', fileSize: 5 },
+      ]);
+      expect(result).toEqual([{ id: 'file-1' }, { id: 'file-2' }]);
     });
   });
 });

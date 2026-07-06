@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { MigrationLedgerRepository } from '@gitroom/nestjs-libraries/database/prisma/migration-ledger/migration-ledger.repository';
 import { DefaultsSeedService } from '@gitroom/nestjs-libraries/ai/defaults/defaults-seed.service';
+import { stat } from 'node:fs/promises';
+import { safeFetch } from '@gitroom/nestjs-libraries/dtos/webhooks/safe.fetch';
 
 // Pre-drop User rows still carry the profile columns that moved to UserProfile;
 // the current Prisma client no longer types them, so model the legacy shape here.
@@ -99,6 +101,16 @@ export class BackfillService {
     await this._runStep(
       'budget global-cap cleanup',
       (tx) => this.cleanupLeakedGlobalBudgetCaps(tx),
+      true,
+    );
+    await this._runStep(
+      'file metadata JSON object',
+      (tx) => this.backfillFileMetadataJson(tx),
+      true,
+    );
+    await this._runStep(
+      'file size zero rows',
+      (tx) => this.backfillFileSize(tx),
       true,
     );
   }
@@ -474,5 +486,86 @@ export class BackfillService {
       where: { id: aiSettings.id },
       data: { ragSettings: JSON.stringify(remainingRag) },
     });
+  }
+
+  /**
+   * Backfill File rows whose `metadata` column was stored as a JSON string
+   * literal (legacy double-encoding) and rewrite them as JSON objects.
+   */
+  private async backfillFileMetadataJson(tx: Prisma.TransactionClient) {
+    const rows = await tx.$queryRaw<
+      Array<{ id: string; metadata: unknown }>
+    >(
+      Prisma.sql`
+        SELECT id, metadata
+        FROM "File"
+        WHERE metadata IS NOT NULL
+          AND jsonb_typeof(metadata::jsonb) = 'string'
+      `,
+    );
+
+    for (const row of rows) {
+      const raw = row.metadata;
+      let parsed: Record<string, unknown> | null = null;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          this._logger.warn(`Could not parse metadata for file ${row.id}`);
+          continue;
+        }
+      } else if (typeof raw === 'object' && raw !== null) {
+        parsed = raw as Record<string, unknown>;
+      }
+
+      if (parsed) {
+        await tx.file.update({
+          where: { id: row.id },
+          data: { metadata: parsed as Prisma.InputJsonValue },
+        });
+      }
+    }
+  }
+
+  /**
+   * Backfill File rows with fileSize = 0. For local absolute paths, stat the
+   * file. For cloud (https://) paths, issue a HEAD request to read the
+   * Content-Length. Skips rows where the size cannot be determined.
+   */
+  private async backfillFileSize(tx: Prisma.TransactionClient) {
+    const rows = await tx.file.findMany({
+      where: { fileSize: 0, deletedAt: null },
+      select: { id: true, path: true, metadata: true },
+    });
+
+    for (const row of rows) {
+      let size = 0;
+      try {
+        if (row.path.startsWith('/')) {
+          const s = await stat(row.path);
+          size = s.size;
+        } else if (row.path.startsWith('http://') || row.path.startsWith('https://')) {
+          const res = await safeFetch(row.path, { method: 'HEAD' });
+          const len = res.headers.get('content-length');
+          if (len) size = parseInt(len, 10);
+        }
+      } catch (err) {
+        this._logger.warn(
+          `Could not resolve size for file ${row.id}: ${(err as Error).message}`,
+        );
+        continue;
+      }
+
+      if (size > 0) {
+        const metadata =
+          typeof row.metadata === 'object' && row.metadata !== null
+            ? { ...(row.metadata as Record<string, unknown>), fileSize: size }
+            : { fileSize: size };
+        await tx.file.update({
+          where: { id: row.id },
+          data: { fileSize: size, metadata: metadata as Prisma.InputJsonValue },
+        });
+      }
+    }
   }
 }

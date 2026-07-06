@@ -1,6 +1,7 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { SaveMediaInformationDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.information.dto';
+import { Prisma } from '@prisma/client';
 import { stat } from 'fs/promises';
 import { extname } from 'path';
 
@@ -55,7 +56,14 @@ export class FileRepository {
     private _fileFolder: PrismaRepository<'fileFolder'>
   ) {}
 
-  async saveFile(org: string, fileName: string, filePath: string, originalName?: string, folderId?: string) {
+  async saveFile(
+    org: string,
+    fileName: string,
+    filePath: string,
+    originalName?: string,
+    folderId?: string,
+    fileSize?: number
+  ) {
     const mimeType = mimeFromName(fileName);
     const fileType = mimeType.startsWith('audio/') ? 'audio' : mimeType.startsWith('video/') ? 'video' : 'image';
     const meta: Record<string, unknown> = {
@@ -63,21 +71,29 @@ export class FileRepository {
       originalName: originalName || fileName,
     };
 
-    try {
-      const s = await stat(filePath);
-      meta.fileSize = s.size;
+    let resolvedFileSize = fileSize ?? 0;
 
-      if (IMAGE_EXTS.has(extname(fileName).toLowerCase())) {
-        try {
-          const sharp = (await import('sharp')).default;
-          const metadata = await sharp(filePath).metadata();
-          meta.dimensions = { width: metadata.width, height: metadata.height };
-        } catch {
+    // Only stat local absolute paths. Cloud adapters return public URLs
+    // (https://…) where stat() will fail; the caller must supply fileSize.
+    if (resolvedFileSize === 0 && filePath.startsWith('/')) {
+      try {
+        const s = await stat(filePath);
+        resolvedFileSize = s.size;
+
+        if (IMAGE_EXTS.has(extname(fileName).toLowerCase())) {
+          try {
+            const sharp = (await import('sharp')).default;
+            const metadata = await sharp(filePath).metadata();
+            meta.dimensions = { width: metadata.width, height: metadata.height };
+          } catch {
+          }
         }
+      } catch {
+        this._logger.warn(`Could not stat file for metadata: ${filePath}`);
       }
-    } catch {
-      this._logger.warn(`Could not stat file for metadata: ${filePath}`);
     }
+
+    meta.fileSize = resolvedFileSize;
 
     const data: any = {
       organization: {
@@ -89,8 +105,8 @@ export class FileRepository {
       type: fileType,
       path: filePath,
       originalName: originalName || null,
-      fileSize: (meta.fileSize as number) || 0,
-      metadata: JSON.stringify(meta),
+      fileSize: resolvedFileSize,
+      metadata: meta as Prisma.InputJsonValue,
     };
 
     if (folderId) {
@@ -130,7 +146,9 @@ export class FileRepository {
         type: data.type,
         fileSize: data.fileSize ?? 0,
         ...(data.folderId ? { folder: { connect: { id: data.folderId } } } : {}),
-        ...(data.metadata ? { metadata: JSON.stringify(data.metadata) } : {}),
+        ...(data.metadata
+          ? { metadata: data.metadata as Prisma.InputJsonValue }
+          : {}),
       },
       select: {
         id: true,
@@ -180,14 +198,15 @@ export class FileRepository {
     });
   }
 
-  deleteFile(org: string, id: string) {
-    return this._file.model.file.update({
+  /**
+   * Permanently remove the DB row. Callers must delete the underlying storage
+   * object before invoking this.
+   */
+  async hardDelete(org: string, id: string) {
+    return this._file.model.file.delete({
       where: {
         id,
         organizationId: org,
-      },
-      data: {
-        deletedAt: new Date(),
       },
     });
   }
@@ -347,14 +366,18 @@ export class FileRepository {
     });
   }
 
-  updateFolder(id: string, data: {
-    name?: string;
-    description?: string;
-    tags?: string[];
-    color?: string;
-  }) {
+  updateFolder(
+    org: string,
+    id: string,
+    data: {
+      name?: string;
+      description?: string;
+      tags?: string[];
+      color?: string;
+    }
+  ) {
     return this._fileFolder.model.fileFolder.update({
-      where: { id },
+      where: { id, organizationId: org },
       data: {
         ...(data.name !== undefined ? { name: data.name } : {}),
         ...(data.description !== undefined ? { description: data.description } : {}),
@@ -364,21 +387,28 @@ export class FileRepository {
     });
   }
 
-  async deleteFolder(id: string) {
+  async deleteFolder(org: string, id: string) {
     const folder = await this._fileFolder.model.fileFolder.findUnique({
-      where: { id },
-      include: { _count: { select: { files: true, children: true } } },
+      where: { id, organizationId: org },
+      include: { _count: { select: { children: true } } },
     });
 
     if (!folder) {
       return null;
     }
 
-    if (folder._count.files > 0 || folder._count.children > 0) {
+    // Exclude soft-deleted files: a folder with only trashed files is deletable.
+    const activeFiles = await this._file.model.file.count({
+      where: { folderId: id, organizationId: org, deletedAt: null },
+    });
+
+    if (activeFiles > 0 || folder._count.children > 0) {
       throw new Error('Folder is not empty');
     }
 
-    return this._fileFolder.model.fileFolder.delete({ where: { id } });
+    return this._fileFolder.model.fileFolder.delete({
+      where: { id, organizationId: org },
+    });
   }
 
   async getFolderTree(org: string) {
@@ -387,6 +417,9 @@ export class FileRepository {
       include: {
         _count: {
           select: { files: true, children: true },
+        },
+        storageProvider: {
+          select: { id: true, type: true, name: true },
         },
       },
       orderBy: { name: 'asc' },
@@ -406,9 +439,9 @@ export class FileRepository {
 
   // ── File Operations ─────────────────────────────────────────
 
-  moveFile(fileId: string, folderId: string | null) {
+  moveFile(org: string, fileId: string, folderId: string | null) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { folderId },
     });
   }
@@ -530,13 +563,13 @@ export class FileRepository {
     return { pages, results };
   }
 
-  async getFolderContents(folderId: string) {
+  async getFolderContents(org: string, folderId: string) {
     const [fileCount, childFolders] = await Promise.all([
       this._file.model.file.count({
-        where: { folderId, deletedAt: null as null },
+        where: { folderId, organizationId: org, deletedAt: null as null },
       }),
       this._fileFolder.model.fileFolder.findMany({
-        where: { parentId: folderId },
+        where: { parentId: folderId, organizationId: org },
         select: { id: true, name: true, _count: { select: { files: true } } },
       }),
     ]);
@@ -544,37 +577,37 @@ export class FileRepository {
     return { fileCount, childFolders };
   }
 
-  updateFileTags(fileId: string, tags: string[]) {
+  updateFileTags(org: string, fileId: string, tags: string[]) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { tags: JSON.stringify(tags) },
     });
   }
 
-  updateFileDescription(fileId: string, description: string) {
+  updateFileDescription(org: string, fileId: string, description: string) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { description },
     });
   }
 
-  renameFile(fileId: string, name: string) {
+  renameFile(org: string, fileId: string, name: string) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { name },
     });
   }
 
-  softDeleteFile(fileId: string) {
+  softDeleteFile(org: string, fileId: string) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { deletedAt: new Date() },
     });
   }
 
-  restoreFile(fileId: string) {
+  restoreFile(org: string, fileId: string) {
     return this._file.model.file.update({
-      where: { id: fileId },
+      where: { id: fileId, organizationId: org },
       data: { deletedAt: null },
     });
   }

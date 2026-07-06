@@ -23,6 +23,7 @@ const mockModel = {
     findMany: vi.fn(),
     count: vi.fn(),
     aggregate: vi.fn(),
+    groupBy: vi.fn(),
     update: vi.fn(),
   },
   organization: {
@@ -260,6 +261,67 @@ describe('StorageRepository', () => {
       const result = await repo.getStorageUsedByOrg('org-1');
 
       expect(result).toBe(BigInt(0));
+    });
+  });
+
+  describe('getUsageByFolder — bounded Prisma queries (#67)', () => {
+    it('uses only one groupBy and one batched folder lookup for many folders', async () => {
+      mockModel.file.groupBy.mockResolvedValue([
+        { folderId: 'f1', _sum: { fileSize: 100 } },
+        { folderId: 'f2', _sum: { fileSize: 200 } },
+        { folderId: 'f3', _sum: { fileSize: 300 } },
+      ]);
+      mockModel.fileFolder.findMany.mockResolvedValue([
+        { id: 'f1', name: 'A' },
+        { id: 'f2', name: 'B' },
+        { id: 'f3', name: 'C' },
+      ]);
+      const repo = makeRepo();
+
+      const result = await repo.getUsageByFolder('org-1');
+
+      expect(result).toHaveLength(3);
+      expect(mockModel.file.groupBy).toHaveBeenCalledTimes(1);
+      expect(mockModel.fileFolder.findMany).toHaveBeenCalledTimes(1);
+      expect(mockModel.fileFolder.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ id: { in: ['f1', 'f2', 'f3'] } }),
+        }),
+      );
+    });
+  });
+
+  describe('getUsageByProvider — bounded Prisma queries (#67)', () => {
+    it('uses one groupBy, one batched folder lookup, and one provider lookup', async () => {
+      mockModel.file.groupBy.mockResolvedValue([
+        { folderId: 'f1', _sum: { fileSize: 100 } },
+        { folderId: 'f2', _sum: { fileSize: 200 } },
+        { folderId: 'f3', _sum: { fileSize: 300 } },
+        { folderId: null, _sum: { fileSize: 50 } },
+      ]);
+      mockModel.fileFolder.findMany.mockResolvedValue([
+        { id: 'f1', storageProviderId: 's3-1' },
+        { id: 'f2', storageProviderId: 's3-1' },
+        { id: 'f3', storageProviderId: 'r2-1' },
+      ]);
+      mockModel.storageProviderConfig.findMany.mockResolvedValue([
+        { id: 's3-1', name: 'S3' },
+        { id: 'r2-1', name: 'R2' },
+      ]);
+      const repo = makeRepo();
+
+      const result = await repo.getUsageByProvider('org-1');
+
+      expect(result).toHaveLength(3);
+      expect(result.map((r) => r.providerId)).toEqual(
+        expect.arrayContaining(['s3-1', 'r2-1', 'local']),
+      );
+      expect(mockModel.file.groupBy).toHaveBeenCalledTimes(1);
+      expect(mockModel.fileFolder.findMany).toHaveBeenCalledTimes(1);
+      expect(mockModel.storageProviderConfig.findMany).toHaveBeenCalledTimes(1);
+      expect(mockModel.storageProviderConfig.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: 'org-1' } }),
+      );
     });
   });
 

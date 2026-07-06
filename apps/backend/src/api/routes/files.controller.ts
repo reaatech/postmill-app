@@ -6,6 +6,7 @@ import {
   HttpException,
   Logger,
   Param,
+  ParseIntPipe,
   Post,
   Put,
   Query,
@@ -37,11 +38,14 @@ import { UpdateMediaTagsDto } from '@gitroom/nestjs-libraries/dtos/file/update.m
 import { UpdateMediaDescriptionDto } from '@gitroom/nestjs-libraries/dtos/file/update.media.description.dto';
 import { BulkDeleteMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.delete.media.dto';
 import { BulkMoveMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.move.media.dto';
+import { BulkSaveMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.save.media.dto';
+import { GetFilesQueryDto } from '@gitroom/nestjs-libraries/dtos/file/get.files.query.dto';
 import { diskStorage } from 'multer';
 import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
 import fs from 'fs';
 import * as path from 'path';
+import { UPLOAD_LIMITS } from '@gitroom/nestjs-libraries/upload/upload-limits';
 
 const TMP_UPLOAD_DIR = path.join(tmpdir(), 'postmill-uploads');
 try { mkdirSync(TMP_UPLOAD_DIR, { recursive: true }); } catch {}
@@ -76,6 +80,36 @@ export class FilesController {
     private _resolution: ProviderResolutionService
   ) {}
 
+  /**
+   * Validate a client-supplied storage path before persisting it. The path must
+   * match one of the org's configured storage public URL prefixes and the object
+   * must be reachable by the resolved adapter.
+   */
+  private async _assertPathBelongsToOrg(
+    orgId: string,
+    filePath: string,
+    folderId?: string
+  ): Promise<Buffer> {
+    const prefixes = await this._storageService.getOrgStoragePublicPrefixes(orgId);
+    const matchesPrefix = prefixes.some((prefix) => filePath.startsWith(prefix));
+    if (!matchesPrefix) {
+      throw new HttpException('Invalid storage path', 400);
+    }
+
+    const adapter = await this._storageService.resolveAdapterForFolder(
+      folderId,
+      orgId
+    );
+    try {
+      return await adapter.readFile(filePath);
+    } catch (err) {
+      this._logger.warn(
+        `save-media path probe failed for org=${orgId}: ${(err as Error).message}`
+      );
+      throw new HttpException('Storage object not found', 404);
+    }
+  }
+
   // ── File CRUD ────────────────────────────────────────────
 
   @Get('/')
@@ -83,25 +117,18 @@ export class FilesController {
   @RequirePermission('media', 'read')
   getFiles(
     @GetOrgFromRequest() org: Organization,
-    @Query('page') page: number,
-    @Query('search') search?: string,
-    @Query('folderId') folderId?: string,
-    @Query('type') type?: string,
-    @Query('tag') tag?: string,
-    @Query('sort') sort?: string,
-    @Query('order') order?: string,
-    @Query('limit') limit?: string
+    @Query() query: GetFilesQueryDto
   ) {
     return this._fileService.getFiles(
       org.id,
-      page,
-      search,
-      folderId,
-      type,
-      tag,
-      sort,
-      order,
-      limit ? parseInt(limit, 10) : undefined
+      query.page,
+      query.search,
+      query.folderId,
+      query.type,
+      query.tag,
+      query.sort,
+      query.order,
+      query.limit
     );
   }
 
@@ -112,7 +139,7 @@ export class FilesController {
       storage: diskStorage({
           destination: TMP_UPLOAD_DIR,
       }),
-      limits: { fileSize: parseInt(process.env.MEDIA_UPLOAD_MAX_BYTES || String(1024 * 1024 * 1024), 10) }
+      limits: { fileSize: UPLOAD_LIMITS.maxBytes }
   }))
   @UsePipes(new CustomFileValidationPipe())
   async uploadServer(
@@ -121,8 +148,8 @@ export class FilesController {
     @Body('folderId') folderId?: string
   ) {
     try {
-      const adapter = await this._storageService.resolveAdapterForFolder(folderId, org.id);
-      await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0);
+      const { adapter, configId } = await this._storageService.resolveAdapterForFolderWithConfigId(folderId, org.id);
+      await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0, configId);
       const originalName = file?.originalname || '';
       const uploadedFile = await adapter.uploadFile(file);
       return this._fileService.saveFile(
@@ -130,7 +157,8 @@ export class FilesController {
         uploadedFile.originalname,
         uploadedFile.path,
         originalName,
-        folderId
+        folderId,
+        file?.size
       );
     } finally {
       if (file?.path) { try { await fs.promises.unlink(file.path); } catch { /* best-effort */ } }
@@ -140,7 +168,7 @@ export class FilesController {
   @Post('/upload-simple')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: UPLOAD_LIMITS.maxBytes } }))
   @UsePipes(new CustomFileValidationPipe())
   async uploadSimple(
     @GetOrgFromRequest() org: Organization,
@@ -148,8 +176,8 @@ export class FilesController {
     @Body('preventSave') preventSave: string = 'false',
     @Body('folderId') folderId?: string
   ) {
-    const adapter = await this._storageService.resolveAdapterForFolder(folderId, org.id);
-    await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0);
+    const { adapter, configId } = await this._storageService.resolveAdapterForFolderWithConfigId(folderId, org.id);
+    await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0, configId);
     const originalName = file.originalname;
     const getFile = await adapter.uploadFile(file);
 
@@ -163,7 +191,8 @@ export class FilesController {
       getFile.originalname,
       getFile.path,
       originalName,
-      folderId
+      folderId,
+      file?.size
     );
   }
 
@@ -173,10 +202,6 @@ export class FilesController {
   async saveMedia(
     @GetOrgFromRequest() org: Organization,
     @Body('name') name: string,
-    // NOTE (6.3): `path` is a client-supplied storage path persisted without an
-    // ownership check. Low impact today — object names are `randomBytes` and
-    // served publicly — but the correct fix is to derive it from a server-issued
-    // upload token. Tracked follow-up; do not widen this to accept arbitrary URLs.
     @Body('path') path: string,
     @Body('originalName') originalName: string,
     @Body('folderId') folderId?: string
@@ -184,20 +209,23 @@ export class FilesController {
     if (!name) {
       return false;
     }
+    const buffer = await this._assertPathBelongsToOrg(org.id, path, folderId);
     return this._fileService.saveFile(
       org.id,
       name,
       path,
       originalName || undefined,
-      folderId
+      folderId,
+      buffer.length
     );
   }
 
   @Delete('/:id')
   @CheckPolicies([AuthorizationActions.Delete, Sections.MEDIA])
   @RequirePermission('media', 'delete')
-  deleteFile(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
-    return this._fileService.deleteFile(org.id, id);
+  async deleteFile(@GetOrgFromRequest() org: Organization, @Param('id') id: string) {
+    await this._fileService.deleteFile(org.id, id);
+    return { success: true };
   }
 
   @Post('/information')
@@ -217,6 +245,18 @@ export class FilesController {
   @RequirePermission('media', 'read')
   getFolderTree(@GetOrgFromRequest() org: Organization) {
     return this._fileService.getFolderTree(org.id);
+  }
+
+  @Get('/limits')
+  @CheckPolicies([AuthorizationActions.Read, Sections.MEDIA])
+  @RequirePermission('media', 'read')
+  getUploadLimits() {
+    return {
+      maxBytes: UPLOAD_LIMITS.maxBytes,
+      image: UPLOAD_LIMITS.image,
+      video: UPLOAD_LIMITS.video,
+      audio: UPLOAD_LIMITS.audio,
+    };
   }
 
   @Post('/folders')
@@ -338,7 +378,7 @@ export class FilesController {
   getFilesByFolder(
     @GetOrgFromRequest() org: Organization,
     @Param('folderId') folderId: string,
-    @Query('page') page: number
+    @Query('page', new ParseIntPipe({ optional: true })) page?: number
   ) {
     return this._fileService.getFilesByFolder(org.id, folderId, page);
   }
@@ -353,20 +393,23 @@ export class FilesController {
     // 1.1: this was the lone folder route missing an ownership check — validate
     // the folder belongs to the caller's org before disclosing its contents.
     await this._fileService.getFolder(org.id, folderId);
-    return this._fileService.getFolderContents(folderId);
+    return this._fileService.getFolderContents(org.id, folderId);
   }
 
   @Post('/bulk/save')
   @CheckPolicies([AuthorizationActions.Create, Sections.MEDIA])
   @RequirePermission('media', 'create')
-  bulkSaveFiles(
+  async bulkSaveFiles(
     @GetOrgFromRequest() org: Organization,
-    // NOTE (6.3): like save-media, each item's `path` is a client-supplied
-    // storage path persisted without an ownership check (low impact — random
-    // object names, public serving). Tracked: derive from a server-issued token.
-    @Body() body: { items: Array<{ name: string; path: string; originalName?: string }> }
+    @Body() body: BulkSaveMediaDto
   ) {
-    return this._fileService.bulkSave(org.id, body.items);
+    const items = await Promise.all(
+      body.items.map(async (item) => {
+        const buffer = await this._assertPathBelongsToOrg(org.id, item.path);
+        return { ...item, fileSize: buffer.length };
+      })
+    );
+    return this._fileService.bulkSave(org.id, items);
   }
 
   @Post('/:id/trash')
