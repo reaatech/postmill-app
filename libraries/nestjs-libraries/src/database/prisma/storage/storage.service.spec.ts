@@ -256,6 +256,66 @@ describe('StorageService — quota status (#61)', () => {
   });
 });
 
+describe('StorageService — cloud quota enforcement by config id (#57)', () => {
+  const s3Config = {
+    id: 's3-1',
+    organizationId: 'org-1',
+    type: StorageProviderType.S3,
+    version: 'v1',
+    name: 'S3',
+    credentials: 'enc:{}',
+    region: 'us-east-1',
+    bucket: 'my-bucket',
+    endpoint: null,
+    publicUrl: null,
+    mounted: false,
+    quotaBytes: BigInt(150),
+  };
+
+  it('throws 413 when the write would exceed the provider quota', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Config),
+    });
+    adapterMock.getUsageBytes.mockResolvedValue(BigInt(100));
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await expect(
+      service.assertWithinProviderQuota(adapterMock, 'org-1', 100, 's3-1'),
+    ).rejects.toMatchObject({ status: 413 });
+
+    expect(repo.findById).toHaveBeenCalledWith('s3-1');
+    expect(adapterMock.getUsageBytes).toHaveBeenCalled();
+  });
+
+  it('allows a write that stays within the provider quota', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue(s3Config),
+    });
+    adapterMock.getUsageBytes.mockResolvedValue(BigInt(50));
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await expect(
+      service.assertWithinProviderQuota(adapterMock, 'org-1', 50, 's3-1'),
+    ).resolves.toBeUndefined();
+  });
+
+  it('skips quota check when the config has no quotaBytes', async () => {
+    const repo = makeRepo({
+      findById: vi.fn().mockResolvedValue({ ...s3Config, quotaBytes: null }),
+    });
+    const auditService = { create: vi.fn() } as unknown as AuditService;
+    const service = new StorageService(repo, auditService, encryption, makeResolution());
+
+    await expect(
+      service.assertWithinProviderQuota(adapterMock, 'org-1', 9999999, 's3-1'),
+    ).resolves.toBeUndefined();
+
+    expect(adapterMock.getUsageBytes).not.toHaveBeenCalled();
+  });
+});
+
 describe('StorageService — usage breakdown (#65)', () => {
   it('returns usage grouped by folder and provider', async () => {
     const repo = makeRepo({

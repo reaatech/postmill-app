@@ -6,7 +6,7 @@ const storageMock = {
 };
 
 const storageSvcMock = {
-  resolveAdapterForFolder: vi.fn().mockResolvedValue(storageMock),
+  resolveAdapterForFolderWithConfigId: vi.fn().mockResolvedValue({ adapter: storageMock, configId: null }),
   assertWithinProviderQuota: vi.fn(),
 };
 
@@ -16,7 +16,7 @@ const fileSvcMock = {
 
 vi.mock('@gitroom/nestjs-libraries/database/prisma/storage/storage.service', () => ({
   StorageService: class {
-    resolveAdapterForFolder = storageSvcMock.resolveAdapterForFolder;
+    resolveAdapterForFolderWithConfigId = storageSvcMock.resolveAdapterForFolderWithConfigId;
     assertWithinProviderQuota = storageSvcMock.assertWithinProviderQuota;
   },
 }));

@@ -63,8 +63,12 @@ export const FilePreviewModal: FC<{
       ) : (
         <div className="rounded-[8px] overflow-hidden bg-black/30 flex items-center justify-center max-h-[60vh]">
           {isVideo ? (
-            <video controls src={url} className="w-full max-h-[60vh] object-contain" />
+            <video controls src={url} className="w-full max-h-[60vh] object-contain">
+              <track kind="captions" src="" label="No captions" default />
+            </video>
           ) : (
+            // User-uploaded previews come from dynamic storage URLs; next/image is
+            // impractical without a configured loader/known domains, so a native img is used.
             // eslint-disable-next-line @next/next/no-img-element
             <img src={url} alt={file.alt || ''} className="w-full max-h-[60vh] object-contain" />
           )}

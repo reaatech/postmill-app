@@ -163,15 +163,22 @@ export const BulkToolbar: FC<{
       </button>
 
       {showMoveDialog && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50" onClick={() => setShowMoveDialog(false)}>
-          <div className="bg-newBgColorInner border border-newBorder rounded-[12px] p-[20px] min-w-[300px] shadow-menu" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50"
+          role="button"
+          tabIndex={0}
+          aria-label="Close move dialog"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowMoveDialog(false); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') setShowMoveDialog(false); }}
+        >
+          <div className="bg-newBgColorInner border border-newBorder rounded-[12px] p-[20px] min-w-[300px] shadow-menu">
             <div className="text-[14px] font-[600] text-textColor mb-[12px]">Move to Folder</div>
             <div className="space-y-[4px] max-h-[250px] overflow-y-auto scrollbar scrollbar-thumb-newColColor">
               <button
                 onClick={() => setTargetFolderId(null)}
                 className={clsx(
                   'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                  targetFolderId === null ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-boxHover'
+                  targetFolderId === null ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-boxHover'
                 )}
               >
                 Root (no folder)
@@ -182,7 +189,7 @@ export const BulkToolbar: FC<{
                   onClick={() => setTargetFolderId(f.id)}
                   className={clsx(
                     'w-full text-left px-[10px] py-[6px] rounded-[6px] text-[13px] transition-all',
-                    targetFolderId === f.id ? 'bg-[#2B5CD3]/20 text-white' : 'text-textColor hover:bg-boxHover'
+                    targetFolderId === f.id ? 'bg-[#2B5CD3]/20 text-textColor' : 'text-textColor hover:bg-boxHover'
                   )}
                   style={{ paddingLeft: `${10 + f.depth * 16}px` }}
                 >

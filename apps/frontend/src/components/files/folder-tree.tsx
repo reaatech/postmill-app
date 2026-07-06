@@ -7,11 +7,6 @@ import useSWR from 'swr';
 import clsx from 'clsx';
 import ProviderIcon from '@gitroom/frontend/components/shared/provider-icon';
 
-type StorageProviderInfo = {
-  type: string;
-  name: string;
-};
-
 type FolderItem = {
   id: string;
   name: string;
@@ -22,6 +17,7 @@ type FolderItem = {
   children: FolderItem[];
   _count: { files: number; children: number };
   storageProviderId?: string | null;
+  storageProvider?: { id: string; type: string; name: string } | null;
 };
 
 export const FolderTree: FC<{
@@ -42,23 +38,6 @@ export const FolderTree: FC<{
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; folderId: string } | null>(null);
   const [dragOverFolderId, setDragOverFolderId] = useState<string | null>(null);
   const dragCounterRef = useRef<Map<string, number>>(new Map());
-
-  const fetchProviders = useCallback(async () => {
-    const res = await fetch('/settings/storage');
-    if (!res.ok) return {};
-    const providers = await res.json();
-    const map: Record<string, StorageProviderInfo> = {};
-    for (const p of providers) {
-      map[p.id] = { type: p.type, name: p.name };
-    }
-    return map;
-  }, [fetch]);
-
-  const { data: providersMap } = useSWR<Record<string, StorageProviderInfo>>(
-    'folder-tree-storage-providers',
-    fetchProviders,
-    { revalidateOnFocus: false, dedupingInterval: 60000 }
-  );
 
   const toggleCollapse = (id: string) => {
     setCollapsed(prev => {
@@ -168,21 +147,30 @@ export const FolderTree: FC<{
     const isDragOver = dragOverFolderId === folder.id;
     const hasChildren = folder.children && folder.children.length > 0;
     const folderColor = folder.color || '#2B5CD3';
-    const providerInfo = folder.storageProviderId && providersMap?.[folder.storageProviderId];
+    const providerInfo = folder.storageProvider;
 
     return (
       <div key={folder.id}>
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={isSelected}
           className={clsx(
             'flex items-center gap-[6px] px-[8px] py-[6px] rounded-[6px] cursor-pointer group transition-all text-[13px]',
             isSelected
-              ? 'bg-[#2B5CD3]/20 text-white'
+              ? 'bg-[#2B5CD3]/20 text-textColor'
               : isDragOver
-                ? 'bg-[#2B5CD3]/30 text-white'
+                ? 'bg-[#2B5CD3]/30 text-textColor'
                 : 'text-textColor hover:bg-newColColor/50'
           )}
           style={{ paddingLeft: `${12 + depth * 16}px` }}
           onClick={() => onSelectFolder(folder.id)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onSelectFolder(folder.id);
+            }
+          }}
           onContextMenu={(e) => handleContextMenu(e, folder.id)}
           onDragOver={(e) => handleDragOver(e, folder.id)}
           onDragEnter={() => handleDragEnter(folder.id)}
@@ -204,8 +192,7 @@ export const FolderTree: FC<{
           </svg>
 
           {renamingId === folder.id ? (
-            <input
-              autoFocus
+            <AutoFocusInput
               value={renamingName}
               onChange={(e) => setRenamingName(e.target.value)}
               onBlur={() => handleRename(folder.id)}
@@ -259,7 +246,16 @@ export const FolderTree: FC<{
 
       <div className="flex-1 overflow-y-auto scrollbar scrollbar-thumb-newColColor scrollbar-track-transparent py-[4px]">
         <div
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedFolderId === null}
           onClick={() => onSelectFolder(null)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onSelectFolder(null);
+            }
+          }}
           onDragOver={(e) => handleDragOver(e, null)}
           onDragEnter={() => handleDragEnter(null)}
           onDragLeave={() => handleDragLeave(null)}
@@ -267,9 +263,9 @@ export const FolderTree: FC<{
           className={clsx(
             'flex items-center gap-[8px] px-[12px] py-[8px] cursor-pointer text-[13px] transition-all',
             selectedFolderId === null
-              ? 'bg-[#2B5CD3]/20 text-white'
+              ? 'bg-[#2B5CD3]/20 text-textColor'
               : dragOverFolderId === null
-                ? 'bg-[#2B5CD3]/30 text-white'
+                ? 'bg-[#2B5CD3]/30 text-textColor'
                 : 'text-textColor hover:bg-newColColor/50'
           )}
         >
@@ -284,8 +280,7 @@ export const FolderTree: FC<{
 
         {newFolderParent !== null && (
           <div className="flex items-center gap-[6px] px-[12px] py-[6px]" style={{ paddingLeft: '20px' }}>
-            <input
-              autoFocus
+            <AutoFocusInput
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               onBlur={() => handleCreateFolder(newFolderParent)}
@@ -338,6 +333,14 @@ export const FolderTree: FC<{
     </div>
   );
 };
+
+function AutoFocusInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    ref.current?.focus();
+  }, []);
+  return <input ref={ref} {...props} />;
+}
 
 function findFolder(folders: FolderItem[], id: string): FolderItem | null {
   for (const f of folders) {

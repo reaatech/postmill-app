@@ -208,18 +208,25 @@ export class StorageRepository {
       where: { organizationId: orgId },
       _sum: { fileSize: true },
     });
-    const withNames = await Promise.all(
-      result.map(async (row) => {
-        const folder = row.folderId
-          ? await this._folder.model.fileFolder.findUnique({ where: { id: row.folderId } })
-          : null;
-        return {
-          folderId: row.folderId || 'unfoldered',
-          folderName: folder?.name || 'Unfoldered',
-          totalBytes: BigInt(row._sum?.fileSize ?? 0),
-        };
-      })
-    );
+
+    const folderIds = result.map((row) => row.folderId).filter(Boolean) as string[];
+    const nameById = new Map<string, string>();
+    if (folderIds.length > 0) {
+      const folders = await this._folder.model.fileFolder.findMany({
+        where: { id: { in: folderIds } },
+        select: { id: true, name: true },
+      });
+      for (const folder of folders) {
+        nameById.set(folder.id, folder.name);
+      }
+    }
+
+    const withNames = result.map((row) => ({
+      folderId: row.folderId || 'unfoldered',
+      folderName: row.folderId ? nameById.get(row.folderId) || 'Unknown' : 'Unfoldered',
+      totalBytes: BigInt(row._sum?.fileSize ?? 0),
+    }));
+
     return withNames.sort((a, b) => (b.totalBytes > a.totalBytes ? 1 : -1));
   }
 
@@ -231,18 +238,32 @@ export class StorageRepository {
       where: { organizationId: orgId },
       _sum: { fileSize: true },
     });
+
+    const folderIds = result.map((row) => row.folderId).filter(Boolean) as string[];
+    const providerByFolderId = new Map<string, string | null>();
+    if (folderIds.length > 0) {
+      const folders = await this._folder.model.fileFolder.findMany({
+        where: { id: { in: folderIds } },
+        select: { id: true, storageProviderId: true },
+      });
+      for (const folder of folders) {
+        providerByFolderId.set(folder.id, folder.storageProviderId);
+      }
+    }
+
     const byProvider = new Map<string, bigint>();
     for (const row of result) {
-      const folder = row.folderId
-        ? await this._folder.model.fileFolder.findUnique({ where: { id: row.folderId } })
-        : null;
-      const providerId = folder?.storageProviderId || 'local';
+      const providerId = row.folderId
+        ? providerByFolderId.get(row.folderId) || 'local'
+        : 'local';
       const currentBytes = byProvider.get(providerId) || BigInt(0);
       byProvider.set(providerId, currentBytes + BigInt(row._sum?.fileSize ?? 0));
     }
+
     const providers = await this._storage.model.storageProviderConfig.findMany({
       where: { organizationId: orgId },
     });
+
     return Array.from(byProvider.entries())
       .map(([providerId, totalBytes]) => {
         const provider = providers.find((p) => p.id === providerId);

@@ -1,11 +1,12 @@
 'use client';
 
-import React, { FC, useCallback, useMemo, useRef, useState } from 'react';
+import React, { FC, useCallback, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import { Dashboard } from '@uppy/react';
 import { PlusIcon } from '@gitroom/frontend/components/ui/icons';
+import { UPLOAD_ALLOWED_MIME_TYPES } from '@gitroom/nestjs-libraries/upload/upload-limits';
 
 export const FileUploader: FC<{
   folderId: string | null;
@@ -17,7 +18,7 @@ export const FileUploader: FC<{
 
   const uppy = useUppyUploader({
     folderId,
-    allowedFileTypes: 'image/*,video/mp4,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.zip',
+    allowedFileTypes: Array.from(UPLOAD_ALLOWED_MIME_TYPES).join(','),
     onUploadSuccess: async () => {
       onUploadComplete();
     },
