@@ -1163,6 +1163,169 @@ export class PostsRepository {
     });
   }
 
+  getFailedPosts(orgId: string, since: Date, limit: number) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        state: State.ERROR,
+        deletedAt: null,
+        parentPostId: null,
+        updatedAt: { gte: since },
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        content: true,
+        error: true,
+        publishDate: true,
+        updatedAt: true,
+        integration: {
+          select: {
+            id: true,
+            name: true,
+            providerIdentifier: true,
+            picture: true,
+          },
+        },
+      },
+    });
+  }
+
+  getFailedPostCount(orgId: string, since: Date) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        state: State.ERROR,
+        deletedAt: null,
+        parentPostId: null,
+        updatedAt: { gte: since },
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getTopPosts(orgId: string, since: Date, limit: number) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        state: State.PUBLISHED,
+        deletedAt: null,
+        parentPostId: null,
+        publishDate: { gte: since },
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { publishDate: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        content: true,
+        publishDate: true,
+        lastViews: true,
+        lastLikes: true,
+        lastComments: true,
+        integration: {
+          select: {
+            id: true,
+            name: true,
+            providerIdentifier: true,
+            picture: true,
+          },
+        },
+      },
+    });
+  }
+
+  getPendingApprovalPosts(orgId: string, limit: number) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        state: State.DRAFT,
+        approvalStatus: 'pending',
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+      select: {
+        id: true,
+        content: true,
+        publishDate: true,
+        createdAt: true,
+        campaign: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        integration: {
+          select: {
+            id: true,
+            name: true,
+            providerIdentifier: true,
+            picture: true,
+          },
+        },
+      },
+    });
+  }
+
+  getPendingApprovalPostCount(orgId: string) {
+    return this._post.model.post.count({
+      where: {
+        organizationId: orgId,
+        state: State.DRAFT,
+        approvalStatus: 'pending',
+        deletedAt: null,
+        parentPostId: null,
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+    });
+  }
+
+  getScheduledPostDates(orgId: string, from: Date, to: Date) {
+    return this._post.model.post.findMany({
+      where: {
+        organizationId: orgId,
+        state: State.QUEUE,
+        deletedAt: null,
+        parentPostId: null,
+        publishDate: { gte: from, lte: to },
+        integration: { deletedAt: null, organizationId: orgId },
+      },
+      select: {
+        publishDate: true,
+      },
+      orderBy: { publishDate: 'asc' },
+    });
+  }
+
+  async retryPost(id: string, orgId: string, publishDate: Date) {
+    return this._post.model.post.update({
+      where: {
+        id,
+        organizationId: orgId,
+      },
+      data: {
+        state: State.QUEUE,
+        error: null,
+        publishDate,
+      },
+      include: {
+        integration: {
+          select: {
+            id: true,
+            name: true,
+            providerIdentifier: true,
+            picture: true,
+          },
+        },
+      },
+    });
+  }
+
   getCampaignDrafts(campaignId: string, orgId: string) {
     return this._post.model.post.findMany({
       where: {

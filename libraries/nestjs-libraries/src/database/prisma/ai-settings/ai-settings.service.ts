@@ -365,6 +365,14 @@ export class AiSettingsService {
     return this._repository.getMediaJobs(organizationId, limit);
   }
 
+  async getMediaJobsWithCounts(organizationId: string, limit = 20) {
+    const [jobs, counts] = await Promise.all([
+      this._repository.getMediaJobs(organizationId, limit),
+      this._repository.getMediaJobStatusCounts(organizationId),
+    ]);
+    return { jobs, counts };
+  }
+
   getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {
     return this._repository.getMediaJobsByProvider(organizationId, provider, limit);
   }

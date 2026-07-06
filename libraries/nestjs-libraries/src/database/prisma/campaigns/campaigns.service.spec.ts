@@ -19,6 +19,9 @@ function makeService(overrides: any = {}) {
     getCappedItemsByCampaign: vi
       .fn()
       .mockResolvedValue([{ entityId: 'i3', createdAt: new Date(0) }]),
+    findActiveCampaigns: vi.fn().mockResolvedValue([]),
+    getSummaryPosts: vi.fn().mockResolvedValue([]),
+    getClickTotalsForPosts: vi.fn().mockResolvedValue(new Map()),
     ...overrides.campaignsRepository,
   };
   const campaignItems = {
@@ -102,5 +105,29 @@ describe('CampaignsService', () => {
       email: 'm@a.test',
       avatarUrl: null,
     });
+  });
+
+  it('returns batched active campaign summaries with post counts and goals', async () => {
+    const { service, campaignsRepository } = makeService({
+      campaignsRepository: {
+        findActiveCampaigns: vi.fn().mockResolvedValue([
+          { id: 'c1', name: 'Launch', endDate: null, goals: [{ metric: 'posts', target: 10 }] },
+          { id: 'c2', name: 'Relaunch', endDate: null, goals: [{ metric: 'likes', target: 100 }] },
+        ]),
+        getSummaryPosts: vi.fn().mockResolvedValue([
+          { id: 'p1', campaignId: 'c1', state: 'QUEUE', lastViews: 0, lastLikes: 5, lastComments: 1 },
+          { id: 'p2', campaignId: 'c1', state: 'PUBLISHED', lastViews: 100, lastLikes: 20, lastComments: 3 },
+          { id: 'p3', campaignId: 'c2', state: 'ERROR', lastViews: 0, lastLikes: 0, lastComments: 0 },
+        ]),
+        getClickTotalsForPosts: vi.fn().mockResolvedValue(new Map([['p2', 42]])),
+      },
+    });
+
+    const result = await service.getSummaries('org1', 6);
+
+    expect(result).toHaveLength(2);
+    expect(result[0].postCounts).toEqual({ queue: 1, published: 1, draft: 0, error: 0 });
+    expect(result[0].goals).toContainEqual({ metric: 'posts', target: 10, current: 2, pct: 20 });
+    expect(result[1].postCounts).toEqual({ queue: 0, published: 0, draft: 0, error: 1 });
   });
 });

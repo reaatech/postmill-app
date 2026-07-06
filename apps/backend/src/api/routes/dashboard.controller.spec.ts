@@ -2,93 +2,116 @@ import 'reflect-metadata';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UnauthorizedException } from '@nestjs/common';
 
-vi.mock('@gitroom/nestjs-libraries/database/prisma/posts/posts.service', () => ({
-  PostsService: class {},
+vi.mock('@gitroom/nestjs-libraries/dashboard/dashboard.service', () => ({
+  DashboardService: class {},
 }));
-vi.mock('@gitroom/nestjs-libraries/database/prisma/integrations/integration.service', () => ({
-  IntegrationService: class {},
+vi.mock('@gitroom/nestjs-libraries/dashboard/dashboard-brief.service', () => ({
+  DashboardBriefService: class {},
 }));
-vi.mock('@gitroom/nestjs-libraries/database/prisma/social-comments/social.comments.service', () => ({
-  SocialCommentsService: class {},
-}));
-vi.mock('@gitroom/nestjs-libraries/database/prisma/organizations/organization.service', () => ({
-  OrganizationService: class {},
-}));
-vi.mock('@gitroom/nestjs-libraries/database/prisma/ai-settings/org-ai-settings.service', () => ({
-  OrgAiSettingsService: class {},
-}));
-vi.mock('@gitroom/nestjs-libraries/database/prisma/short-links/org-shortlink-settings.service', () => ({
-  OrgShortLinkSettingsService: class {},
-}));
-vi.mock('@gitroom/nestjs-libraries/ai/governance/media.service', () => ({
-  AiMediaService: class {},
+vi.mock('@gitroom/backend/services/auth/permissions/permissions.service', () => ({
+  PermissionsService: class {},
 }));
 
 import { DashboardController } from './dashboard.controller';
-import type { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
+import type { DashboardService } from '@gitroom/nestjs-libraries/dashboard/dashboard.service';
+import type { DashboardBriefService } from '@gitroom/nestjs-libraries/dashboard/dashboard-brief.service';
 
-const org = { id: 'org-1' } as any;
+const org = { id: 'org-1', timezone: 'UTC', createdAt: new Date('2024-01-01') } as any;
 const user = { id: 'user-1' } as any;
 
+const summaryFixture = {
+  totalPosts: 12,
+  scheduledPosts: 3,
+  publishedNext7: 5,
+  channelsConnected: 2,
+  drafts: 2,
+  upcomingPosts: [
+    {
+      id: 'post-1',
+      content: 'Hello world',
+      publishDate: new Date('2026-06-11T10:00:00.000Z'),
+      channelName: 'My X',
+      providerIdentifier: 'x',
+    },
+  ],
+  commentUnreadCount: 4,
+  aiProviderActive: true,
+  mediaProviderActive: true,
+  storageProviderActive: false,
+  teamMembers: 3,
+};
+
 describe('DashboardController', () => {
-  let postsService: any;
-  let integrationService: any;
-  let socialCommentsService: any;
-  let organizationService: any;
-  let orgAiSettingsService: any;
-  let orgShortLinkSettingsService: any;
-  let aiMediaService: any;
-  let storageService: { getProviderConfigs: ReturnType<typeof vi.fn> };
+  let dashboardService: {
+    getSummary: ReturnType<typeof vi.fn>;
+    getSchedule: ReturnType<typeof vi.fn>;
+    getCampaignSummaries: ReturnType<typeof vi.fn>;
+    getMediaJobs: ReturnType<typeof vi.fn>;
+    getAttention: ReturnType<typeof vi.fn>;
+  };
+  let briefService: {
+    getCachedBrief: ReturnType<typeof vi.fn>;
+    generateBrief: ReturnType<typeof vi.fn>;
+  };
+  let permissionsService: {
+    getPackageOptions: ReturnType<typeof vi.fn>;
+  };
+  let postsService: {
+    countPostsFromDay: ReturnType<typeof vi.fn>;
+  };
+  let integrationService: {
+    getIntegrationsList: ReturnType<typeof vi.fn>;
+  };
+  let organizationService: {
+    getTeam: ReturnType<typeof vi.fn>;
+  };
+  let rolesService: {
+    getEffectivePermissions: ReturnType<typeof vi.fn>;
+  };
   let controller: DashboardController;
 
   beforeEach(() => {
+    dashboardService = {
+      getSummary: vi.fn().mockResolvedValue(summaryFixture),
+      getSchedule: vi.fn().mockResolvedValue({ days: [], gaps: [] }),
+      getCampaignSummaries: vi.fn().mockResolvedValue([]),
+      getMediaJobs: vi.fn().mockResolvedValue({ jobs: [], counts: {} }),
+      getAttention: vi.fn().mockResolvedValue({ items: [] }),
+    };
+    briefService = {
+      getCachedBrief: vi.fn().mockResolvedValue({ cached: false }),
+      generateBrief: vi.fn().mockResolvedValue({ brief: 'Brief text', generatedAt: '2026-01-01T00:00:00Z' }),
+    };
+    permissionsService = {
+      getPackageOptions: vi.fn().mockResolvedValue({
+        subscription: { subscriptionTier: 'PRO', createdAt: new Date('2024-01-01') },
+        options: { posts_per_month: 1000, channel: -10, team_members: 5 },
+      }),
+    };
     postsService = {
-      getTotalCount: vi.fn().mockResolvedValue(12),
-      getScheduledCount: vi.fn().mockResolvedValue(3),
-      getPublishedCountSince: vi.fn().mockResolvedValue(5),
-      getDraftCount: vi.fn().mockResolvedValue(2),
-      getUpcomingPosts: vi.fn().mockResolvedValue([
-        {
-          id: 'post-1',
-          content: 'Hello world',
-          publishDate: new Date('2026-06-11T10:00:00.000Z'),
-          integration: { name: 'My X', providerIdentifier: 'x' },
-        },
-      ]),
+      countPostsFromDay: vi.fn().mockResolvedValue(12),
     };
     integrationService = {
-      getIntegrationsList: vi.fn().mockResolvedValue([{ id: 'i1' }, { id: 'i2' }]),
-    };
-    socialCommentsService = {
-      getInboxUnreadCount: vi.fn().mockResolvedValue({ unreadCount: 4 }),
+      getIntegrationsList: vi.fn().mockResolvedValue([{ id: 'i1', refreshNeeded: false }]),
     };
     organizationService = {
-      getTeam: vi.fn().mockResolvedValue({ users: [{}, {}, {}] }),
+      getTeam: vi.fn().mockResolvedValue({ users: [{}, {}] }),
     };
-    orgAiSettingsService = {
-      getActiveProvider: vi.fn().mockResolvedValue({ identifier: 'openai' }),
-    };
-    orgShortLinkSettingsService = {
-      getActiveProvider: vi.fn().mockResolvedValue(null),
-    };
-    aiMediaService = {
-      getMediaProviderSummary: vi
-        .fn()
-        .mockResolvedValue([{ available: false }, { available: true }]),
-    };
-    storageService = {
-      getProviderConfigs: vi.fn().mockResolvedValue([]),
+    rolesService = {
+      getEffectivePermissions: vi.fn().mockResolvedValue({
+        role: 'owner',
+        permissions: ['posts:read', 'billing:read', 'comments:read', 'media:read', 'analytics:read', 'posts:update'],
+      }),
     };
 
     controller = new DashboardController(
-      postsService,
-      integrationService,
-      socialCommentsService,
-      organizationService,
-      orgAiSettingsService,
-      orgShortLinkSettingsService,
-      aiMediaService,
-      storageService as unknown as StorageService,
+      dashboardService as unknown as DashboardService,
+      permissionsService as any,
+      postsService as any,
+      integrationService as any,
+      organizationService as any,
+      rolesService as any,
+      briefService as unknown as DashboardBriefService,
     );
   });
 
@@ -99,90 +122,154 @@ describe('DashboardController', () => {
     await expect(controller.getSummary({} as any, user)).rejects.toThrow(
       UnauthorizedException,
     );
-    expect(postsService.getTotalCount).not.toHaveBeenCalled();
+    expect(dashboardService.getSummary).not.toHaveBeenCalled();
   });
 
   it('returns the summary shape the dashboard frontend relies on', async () => {
     const result = await controller.getSummary(org, user);
+    expect(result).toEqual(summaryFixture);
+  });
 
-    expect(result).toEqual({
-      totalPosts: 12,
-      scheduledPosts: 3,
-      publishedNext7: 5,
-      channelsConnected: 2,
-      drafts: 2,
-      upcomingPosts: [
-        {
-          id: 'post-1',
-          content: 'Hello world',
-          publishDate: new Date('2026-06-11T10:00:00.000Z'),
-          channelName: 'My X',
-          providerIdentifier: 'x',
-        },
-      ],
-      commentUnreadCount: 4,
-      shortLinkClicks: 0,
-      aiProviderActive: true,
-      shortlinkProviderActive: false,
-      mediaProviderActive: true,
-      storageProviderActive: false,
-      teamMembers: 3,
+  it('scopes the summary lookup to the requesting org and user', async () => {
+    await controller.getSummary(org, user);
+    expect(dashboardService.getSummary).toHaveBeenCalledWith(org, user);
+  });
+
+  it('returns usage numbers when billing is enabled', async () => {
+    process.env.STRIPE_PUBLISHABLE_KEY = 'pk_test';
+    const result = await controller.getUsage(org);
+
+    expect(result.billingEnabled).toBe(true);
+    expect(result.usage.postsThisCycle).toBe(12);
+    expect(result.usage.channels).toBe(1);
+    expect(result.usage.teamMembers).toBe(2);
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+  });
+
+  it('returns minimal usage payload when billing is disabled', async () => {
+    delete process.env.STRIPE_PUBLISHABLE_KEY;
+    const result = await controller.getUsage(org);
+    expect(result).toEqual({ billingEnabled: false });
+  });
+
+  it('filters attention kinds by effective permissions', async () => {
+    await controller.getAttention(org, user);
+    expect(dashboardService.getAttention).toHaveBeenCalledWith(
+      'org-1',
+      'user-1',
+      expect.arrayContaining(['failed-posts', 'channel-health', 'pending-approvals', 'unread-comments', 'schedule-gaps', 'budget', 'failed-media-jobs', 'anomalies']),
+      expect.any(Object),
+      undefined,
+    );
+  });
+
+  it('GET /brief returns the cached brief response', async () => {
+    briefService.getCachedBrief.mockResolvedValue({
+      brief: 'Already cached',
+      generatedAt: '2026-01-01T00:00:00Z',
+    });
+
+    const result = await controller.getBrief(org, user);
+
+    expect(briefService.getCachedBrief).toHaveBeenCalledWith(org, user);
+    expect(result).toEqual({ brief: 'Already cached', generatedAt: '2026-01-01T00:00:00Z' });
+  });
+
+  it('POST /brief delegates to brief service with permitted kinds and plan usage', async () => {
+    const result = await controller.generateBrief(org, user);
+
+    expect(briefService.generateBrief).toHaveBeenCalledWith(
+      org,
+      user,
+      expect.arrayContaining(['failed-posts', 'channel-health', 'pending-approvals', 'unread-comments', 'schedule-gaps', 'budget', 'failed-media-jobs', 'anomalies']),
+      expect.any(Object),
+    );
+    expect(result).toEqual({ brief: 'Brief text', generatedAt: '2026-01-01T00:00:00Z' });
+  });
+
+  describe('GET /schedule', () => {
+    it('returns the schedule from the dashboard service', async () => {
+      const schedule = { days: [{ date: '2026-06-11' }], gaps: [] as any[] };
+      dashboardService.getSchedule.mockResolvedValue(schedule);
+
+      const result = await controller.getSchedule(org, 14, 'America/New_York');
+
+      expect(dashboardService.getSchedule).toHaveBeenCalledWith(
+        'org-1',
+        14,
+        'America/New_York',
+      );
+      expect(result).toEqual(schedule);
+    });
+
+    it('clamps days to [1, 30] and falls back to UTC when timezone is omitted', async () => {
+      await controller.getSchedule(org, 0);
+      expect(dashboardService.getSchedule).toHaveBeenCalledWith('org-1', 1, 'UTC');
+
+      await controller.getSchedule(org, 365);
+      expect(dashboardService.getSchedule).toHaveBeenCalledWith('org-1', 30, 'UTC');
+    });
+
+    it('throws UnauthorizedException when org is missing', async () => {
+      await expect(controller.getSchedule(undefined as any, 7)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(dashboardService.getSchedule).not.toHaveBeenCalled();
     });
   });
 
-  it('scopes every lookup to the requesting org', async () => {
-    await controller.getSummary(org, user);
+  describe('GET /campaigns', () => {
+    it('returns campaign summaries from the dashboard service', async () => {
+      const campaigns = [{ id: 'c1', name: 'Launch' }];
+      dashboardService.getCampaignSummaries.mockResolvedValue(campaigns);
 
-    expect(integrationService.getIntegrationsList).toHaveBeenCalledWith('org-1');
-    expect(organizationService.getTeam).toHaveBeenCalledWith('org-1');
-    expect(orgAiSettingsService.getActiveProvider).toHaveBeenCalledWith('org-1');
-    expect(orgShortLinkSettingsService.getActiveProvider).toHaveBeenCalledWith('org-1');
-    expect(postsService.getTotalCount).toHaveBeenCalledWith('org-1');
-    expect(postsService.getScheduledCount).toHaveBeenCalledWith('org-1');
-    expect(postsService.getDraftCount).toHaveBeenCalledWith('org-1');
-    expect(postsService.getPublishedCountSince).toHaveBeenCalledWith(
-      'org-1',
-      expect.any(Date),
-    );
-    expect(postsService.getUpcomingPosts).toHaveBeenCalledWith('org-1', 5);
-    expect(socialCommentsService.getInboxUnreadCount).toHaveBeenCalledWith(
-      'org-1',
-      'user-1',
-    );
+      const result = await controller.getCampaigns(org, 10);
+
+      expect(dashboardService.getCampaignSummaries).toHaveBeenCalledWith(
+        'org-1',
+        10,
+      );
+      expect(result).toEqual(campaigns);
+    });
+
+    it('clamps limit to [1, 50]', async () => {
+      await controller.getCampaigns(org, 0);
+      expect(dashboardService.getCampaignSummaries).toHaveBeenCalledWith(
+        'org-1',
+        1,
+      );
+
+      await controller.getCampaigns(org, 100);
+      expect(dashboardService.getCampaignSummaries).toHaveBeenCalledWith(
+        'org-1',
+        50,
+      );
+    });
+
+    it('throws UnauthorizedException when org is missing', async () => {
+      await expect(controller.getCampaigns(undefined as any, 6)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(dashboardService.getCampaignSummaries).not.toHaveBeenCalled();
+    });
   });
 
-  it('truncates upcoming post content to 100 characters', async () => {
-    postsService.getUpcomingPosts.mockResolvedValue([
-      {
-        id: 'post-long',
-        content: 'x'.repeat(250),
-        publishDate: new Date(),
-        integration: { name: 'ch', providerIdentifier: 'x' },
-      },
-    ]);
+  describe('GET /media-jobs', () => {
+    it('returns media jobs from the dashboard service', async () => {
+      const jobs = { jobs: [{ id: 'j1' }], counts: {} };
+      dashboardService.getMediaJobs.mockResolvedValue(jobs);
 
-    const result = await controller.getSummary(org, user);
-    expect(result.upcomingPosts[0].content).toHaveLength(100);
-  });
+      const result = await controller.getMediaJobs(org);
 
-  it('reports provider flags as inactive when nothing is configured', async () => {
-    orgAiSettingsService.getActiveProvider.mockResolvedValue(null);
-    aiMediaService.getMediaProviderSummary.mockResolvedValue([
-      { available: false },
-    ]);
+      expect(dashboardService.getMediaJobs).toHaveBeenCalledWith('org-1');
+      expect(result).toEqual(jobs);
+    });
 
-    const result = await controller.getSummary(org, user);
-    expect(result.aiProviderActive).toBe(false);
-    expect(result.shortlinkProviderActive).toBe(false);
-    expect(result.mediaProviderActive).toBe(false);
-  });
-
-  it('defaults teamMembers and commentUnreadCount when lookups return nothing', async () => {
-    organizationService.getTeam.mockResolvedValue(null);
-    socialCommentsService.getInboxUnreadCount.mockResolvedValue(undefined);
-
-    const result = await controller.getSummary(org, user);
-    expect(result.teamMembers).toBe(0);
-    expect(result.commentUnreadCount).toBe(0);
+    it('throws UnauthorizedException when org is missing', async () => {
+      await expect(controller.getMediaJobs(undefined as any)).rejects.toThrow(
+        UnauthorizedException,
+      );
+      expect(dashboardService.getMediaJobs).not.toHaveBeenCalled();
+    });
   });
 });

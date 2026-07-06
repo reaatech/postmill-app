@@ -576,6 +576,8 @@ function makePostsService(overrides: Record<string, any> = {}) {
     changeState: vi.fn().mockResolvedValue(undefined),
     changeDate: vi.fn().mockResolvedValue({ date: '2030-01-01' }),
     countPostsFromDay: vi.fn().mockResolvedValue(0),
+    getScheduledPostDates: vi.fn().mockResolvedValue([]),
+    retryPost: vi.fn().mockResolvedValue({}),
     ...overrides.postRepository,
   };
   const integrationManager = {
@@ -859,5 +861,98 @@ describe('4.1b — changeDate guards', () => {
 
     expect(postRepository.changeDate).toHaveBeenCalled();
     expect(startSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('1.4 — schedule-per-day counts + gap suppression', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-11T12:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('returns day counts and gaps for empty days when org posts >=1/day', async () => {
+    const { service, postRepository } = makePostsService({
+      postRepository: {
+        getScheduledPostDates: vi.fn().mockResolvedValue([
+          { publishDate: new Date('2026-06-11T10:00:00.000Z') },
+          { publishDate: new Date('2026-06-12T10:00:00.000Z') },
+          { publishDate: new Date('2026-06-15T10:00:00.000Z') },
+        ]),
+        countPostsFromDay: vi.fn().mockResolvedValue(14),
+      },
+    });
+
+    const result = await service.getSchedule('org-1', 7, 'UTC');
+
+    expect(result.days.map((d: any) => d.count)).toEqual([1, 1, 0, 0, 1, 0, 0]);
+    expect(result.gaps).toEqual(['2026-06-13', '2026-06-14', '2026-06-16', '2026-06-17']);
+  });
+
+  it('suppresses gaps for low-volume orgs', async () => {
+    const { service, postRepository } = makePostsService({
+      postRepository: {
+        getScheduledPostDates: vi.fn().mockResolvedValue([]),
+        countPostsFromDay: vi.fn().mockResolvedValue(7),
+      },
+    });
+
+    const result = await service.getSchedule('org-1', 7, 'UTC');
+    expect(result.gaps).toEqual([]);
+  });
+});
+
+describe('1.2 — retry post', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-06-11T12:00:00.000Z'));
+    vi.mocked(isInngestEnabled).mockReturnValue(true);
+    vi.mocked(inngest.send).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('resets ERROR post to QUEUE and re-emits publish', async () => {
+    const { service, postRepository } = makePostsService({
+      postRepository: {
+        getPostById: vi.fn().mockResolvedValue({
+          id: 'p1',
+          organizationId: 'org-1',
+          state: 'ERROR',
+          publishDate: new Date('2026-06-11T10:00:00.000Z'),
+          integration: { providerIdentifier: 'x' },
+        }),
+      },
+    });
+    const startSpy = vi.spyOn(service, 'startWorkflow').mockResolvedValue(undefined);
+
+    await service.retryPost('org-1', 'p1');
+
+    expect(postRepository.retryPost).toHaveBeenCalledWith(
+      'p1',
+      'org-1',
+      expect.any(Date),
+    );
+    expect(startSpy).toHaveBeenCalledWith('x', 'p1', 'org-1', State.QUEUE);
+  });
+
+  it('rejects non-ERROR posts', async () => {
+    const { service, postRepository } = makePostsService({
+      postRepository: {
+        getPostById: vi.fn().mockResolvedValue({
+          id: 'p1',
+          organizationId: 'org-1',
+          state: 'PUBLISHED',
+          integration: { providerIdentifier: 'x' },
+        }),
+      },
+    });
+
+    await expect(service.retryPost('org-1', 'p1')).rejects.toThrow('not in an error state');
   });
 });

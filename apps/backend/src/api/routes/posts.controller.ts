@@ -79,6 +79,16 @@ export class PostsController {
     return this._postsService.updateReleaseId(org.id, id, releaseId);
   }
 
+  @Post('/:id/retry')
+  @RequirePermission('posts', 'update')
+  @CheckPolicies([AuthorizationActions.Create, Sections.POSTS_PER_MONTH])
+  async retryPost(
+    @GetOrgFromRequest() org: Organization,
+    @Param('id') id: string,
+  ) {
+    return this._postsService.retryPost(org.id, id);
+  }
+
   @Post('/should-shortlink')
   @CheckPolicies([AuthorizationActions.Create, Sections.AI])
   @Throttle({ default: { limit: 30, ttl: 60000 } })

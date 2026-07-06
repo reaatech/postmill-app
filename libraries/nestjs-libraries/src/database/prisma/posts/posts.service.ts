@@ -33,6 +33,7 @@ import { CreateGeneratedPostsDto } from '@gitroom/nestjs-libraries/dtos/generato
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
 import { FileService } from '@gitroom/nestjs-libraries/database/prisma/file/file.service';
 import { ShortLinkService } from '@gitroom/nestjs-libraries/short-linking/short.link.service';
 import { CreateTagDto } from '@gitroom/nestjs-libraries/dtos/posts/create.tag.dto';
@@ -45,6 +46,7 @@ import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storag
 import { Readable } from 'stream';
 import { OpenaiService } from '@gitroom/nestjs-libraries/openai/openai.service';
 dayjs.extend(utc);
+dayjs.extend(timezone);
 import * as Sentry from '@sentry/nestjs';
 import { RagService } from '@gitroom/nestjs-libraries/ai/governance/rag.service';
 import { inngest, isInngestEnabled } from '@gitroom/nestjs-libraries/inngest/inngest.client';
@@ -1920,5 +1922,109 @@ export class PostsService {
 
   getUpcomingPosts(orgId: string, limit: number) {
     return this._postRepository.getUpcomingPosts(orgId, limit);
+  }
+
+  getFailedPosts(orgId: string, since: Date, limit: number) {
+    return this._postRepository.getFailedPosts(orgId, since, limit);
+  }
+
+  getFailedPostCount(orgId: string, since: Date) {
+    return this._postRepository.getFailedPostCount(orgId, since);
+  }
+
+  async getTopPosts(orgId: string, since: Date, limit: number) {
+    const posts = await this._postRepository.getTopPosts(orgId, since, limit);
+    return posts
+      .map((p: any) => ({
+        ...p,
+        engagement: (p.lastViews || 0) + (p.lastLikes || 0) + (p.lastComments || 0),
+      }))
+      .sort((a: any, b: any) => b.engagement - a.engagement)
+      .slice(0, limit);
+  }
+
+  getPendingApprovalPosts(orgId: string, limit: number) {
+    return this._postRepository.getPendingApprovalPosts(orgId, limit);
+  }
+
+  getPendingApprovalPostCount(orgId: string) {
+    return this._postRepository.getPendingApprovalPostCount(orgId);
+  }
+
+  async getSchedule(orgId: string, days: number, tz: string) {
+    const safeTz = tz || 'UTC';
+    const now = dayjs().tz(safeTz);
+    const from = now.startOf('day').toDate();
+    const to = now.add(days - 1, 'day').endOf('day').toDate();
+
+    const [dates, trailingCount] = await Promise.all([
+      this._postRepository.getScheduledPostDates(orgId, from, to),
+      this._postRepository.countPostsFromDay(
+        orgId,
+        now.subtract(14, 'day').startOf('day').toDate()
+      ),
+    ]);
+
+    const dayMap = new Map<string, number>();
+    for (let i = 0; i < days; i++) {
+      const d = now.add(i, 'day').format('YYYY-MM-DD');
+      dayMap.set(d, 0);
+    }
+
+    for (const { publishDate } of dates) {
+      const key = dayjs(publishDate).tz(safeTz).format('YYYY-MM-DD');
+      if (dayMap.has(key)) {
+        dayMap.set(key, dayMap.get(key)! + 1);
+      }
+    }
+
+    const daysArray = Array.from(dayMap.entries()).map(([date, count]) => ({
+      date,
+      count,
+    }));
+
+    const avg = trailingCount / 14;
+    const gaps =
+      avg >= 1
+        ? daysArray.filter((d) => d.count === 0).map((d) => d.date)
+        : [];
+
+    return { days: daysArray, gaps };
+  }
+
+  async retryPost(orgId: string, postId: string) {
+    const post = await this._postRepository.getPostById(postId, orgId);
+    if (!post || post.organizationId !== orgId) {
+      throw new BadRequestException('Post not found');
+    }
+
+    if (post.state !== State.ERROR) {
+      throw new BadRequestException('Post is not in an error state');
+    }
+
+    let publishDate = post.publishDate;
+    if (dayjs(publishDate).isBefore(dayjs())) {
+      publishDate = dayjs().add(1, 'minute').toDate();
+    }
+
+    await this._postRepository.retryPost(postId, orgId, publishDate);
+
+    try {
+      await this.startWorkflow(
+        post.integration!.providerIdentifier,
+        post.id,
+        orgId,
+        State.QUEUE
+      );
+    } catch (err) {
+      Logger.warn(
+        `Failed to re-emit post/publish for retried post ${postId}: ${
+          (err as Error)?.message
+        }`,
+        PostsService.name
+      );
+    }
+
+    return { success: true };
   }
 }

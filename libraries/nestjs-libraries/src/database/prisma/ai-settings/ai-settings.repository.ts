@@ -1,5 +1,9 @@
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { Injectable } from '@nestjs/common';
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+
+dayjs.extend(utc);
 
 @Injectable()
 export class AiSettingsRepository {
@@ -276,6 +280,35 @@ export class AiSettingsRepository {
       orderBy: { createdAt: 'desc' },
       take: limit,
     });
+  }
+
+  async getMediaJobStatusCounts(organizationId: string) {
+    const sevenDaysAgo = dayjs.utc().subtract(7, 'day').toDate();
+    const [groups, failed7d] = await Promise.all([
+      this._aiMediaJob.model.aIMediaJob.groupBy({
+        by: ['status'],
+        where: { organizationId },
+        _count: { status: true },
+      }),
+      this._aiMediaJob.model.aIMediaJob.count({
+        where: {
+          organizationId,
+          status: 'failed',
+          createdAt: { gte: sevenDaysAgo },
+        },
+      }),
+    ]);
+
+    const counts: Record<string, number> = {};
+    for (const g of groups) {
+      counts[g.status] = g._count.status;
+    }
+
+    return {
+      pending: counts['pending'] ?? 0,
+      processing: counts['processing'] ?? 0,
+      failed7d,
+    };
   }
 
   getMediaJobsByProvider(organizationId: string, provider: string, limit = 50) {

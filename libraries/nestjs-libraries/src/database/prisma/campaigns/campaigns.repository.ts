@@ -227,4 +227,79 @@ export class CampaignsRepository {
     });
     return result._sum.clicks || 0;
   }
+
+  findActiveCampaigns(organizationId: string, limit: number) {
+    const now = dayjs.utc().toDate();
+    return this._prisma.campaign.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+        OR: [{ endDate: null }, { endDate: { gte: now } }],
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        endDate: true,
+        goals: true,
+      },
+    });
+  }
+
+  getSummaryPosts(organizationId: string, campaignIds: string[]) {
+    return this._prisma.post.findMany({
+      where: {
+        organizationId,
+        campaignId: { in: campaignIds },
+        deletedAt: null,
+        parentPostId: null,
+      },
+      select: {
+        id: true,
+        campaignId: true,
+        state: true,
+        lastViews: true,
+        lastLikes: true,
+        lastComments: true,
+      },
+    });
+  }
+
+  async getClickTotalsForPosts(organizationId: string, postIds: string[]) {
+    if (postIds.length === 0) return new Map<string, number>();
+
+    const links = await this._prisma.shortLink.findMany({
+      where: {
+        organizationId,
+        postId: { in: postIds },
+      },
+      select: { id: true, postId: true },
+    });
+    if (links.length === 0) return new Map<string, number>();
+
+    const linkIds = links.map((l) => l.id);
+    const snapshots = await this._prisma.shortLinkSnapshot.groupBy({
+      by: ['shortLinkId'],
+      where: {
+        organizationId,
+        shortLinkId: { in: linkIds },
+      },
+      _sum: { clicks: true },
+    });
+
+    const clicksByLink = new Map<string, number>();
+    for (const s of snapshots) {
+      clicksByLink.set(s.shortLinkId, s._sum.clicks || 0);
+    }
+
+    const postIdByLink = new Map(links.map((l) => [l.id, l.postId!]));
+    const result = new Map<string, number>();
+    for (const [linkId, clicks] of clicksByLink) {
+      const postId = postIdByLink.get(linkId);
+      if (!postId) continue;
+      result.set(postId, (result.get(postId) || 0) + clicks);
+    }
+    return result;
+  }
 }
