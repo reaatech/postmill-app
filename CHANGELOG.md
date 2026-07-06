@@ -58,6 +58,20 @@ but external clients / budget config may need action:
   it (this is the intended, previously-missing enforcement).
 
 ### Added
+- **Dashboard v2 — operational command center.** The post-login landing page (`/dashboard`) is
+  rebuilt as a prioritized command center: **Needs Attention** feed (failed posts with per-post
+  retry, channel health, pending approvals, unread comments, schedule gaps, budget, failed media
+  jobs, analytics anomalies), a scrollable **Next 7 Days** schedule with gap-fill composer links,
+  rich KPIs + 7-day engagement sparkline, **Inbox**, **Active Campaigns**, **Media Queue**,
+  **Usage & Budget**, and an on-demand **AI Daily Brief**. Sections are wrapped in a reusable
+  `SectionCard` kit and can be shown/hidden via a Customize popover; RBAC gates hide sections the
+  member cannot access. Home navigation is pinned first in the desktop sidebar and mobile bottom
+  tab bar. All data is served by a new `DashboardService` with 60s Redis caching and single-flight
+  miss handling; the brief is cached per org per calendar day. New endpoints:
+  `GET /dashboard/schedule`, `GET /dashboard/campaigns`, `GET /dashboard/media-jobs`,
+  `GET /dashboard/usage`, `GET /dashboard/attention`, `GET /dashboard/brief`,
+  `POST /dashboard/brief`, and `POST /posts/:id/retry`. Docs:
+  `docs/user-guide/dashboard.md`, `docs/developer-docs/dashboard.md`.
 - **Analytics anomaly alerts + Insights tab + true campaign scope.** The `/analytics` dashboard
   merges Best time, Recommendations, and a new Alerts section into a single **Insights** tab (tabs
   are now Overview | Channels | Posts | Insights | Links | Watchlist; the kebab overflow is gone).

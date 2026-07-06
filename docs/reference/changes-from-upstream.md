@@ -115,6 +115,18 @@ reactions, one-level threaded replies, pin/resolve, and edit/delete-your-own. Ne
 `CampaignNote` / `CampaignNoteReaction`; new routes under `/campaigns/:id/notes`. Note HTML is
 sanitized on write and on render.
 
+**Dashboard v2.** The post-login landing page is rebuilt as an operational command center. A
+**Needs Attention** feed surfaces failed posts (with inline retry), channel health, pending draft
+approvals, unread comments, schedule gaps, budget overruns, failed media jobs, and analytics
+anomalies. The **Next 7 Days** schedule is scrollable with one-click gap-fill; new widgets cover
+inbox, active campaigns, media queue, usage/budget, and an on-demand **AI Daily Brief**. Sections
+can be shown/hidden via a Customize popover and are automatically filtered by RBAC. Home is pinned
+first in the sidebar and mobile bottom tab bar. Data is aggregated by a new `DashboardService` in
+`nestjs-libraries` with Redis caching; new endpoints are `GET /dashboard/schedule`,
+`/dashboard/campaigns`, `/dashboard/media-jobs`, `/dashboard/usage`, `/dashboard/attention`,
+`/dashboard/brief`, `POST /dashboard/brief`, and `POST /posts/:id/retry`. Documentation in
+`docs/user-guide/dashboard.md` and `docs/developer-docs/dashboard.md`.
+
 ### v4.0.0 (June 2026)
 
 **Unified, versioned provider framework.** All provider domains — AI, Media, Storage, Short-link,
