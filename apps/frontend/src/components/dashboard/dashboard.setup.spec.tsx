@@ -20,6 +20,10 @@ vi.mock('./hooks/useDashboardSummary', () => ({
   useDashboardSummary: () => ({ data: mockSummary }),
 }));
 
+vi.mock('@gitroom/frontend/components/layout/use-permissions', () => ({
+  usePermissions: () => ({ isResolved: true, hasPermission: () => true }),
+}));
+
 // Explicit extension: stray compiled `dashboard.setup.js` artifacts in this
 // directory would otherwise shadow the .tsx source under Vite's resolve order.
 import { DashboardSetup } from './dashboard.setup.tsx';

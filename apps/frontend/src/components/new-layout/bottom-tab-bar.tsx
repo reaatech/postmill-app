@@ -11,9 +11,10 @@ import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useHasOpenModals } from '@gitroom/frontend/components/layout/new-modal';
 import { MenuItemRow } from './menu-item-row';
 
-// Primary destinations pinned to the bottom bar (rendered alphabetically → Analytics,
-// Campaigns, Media). Everything else — including Schedule — goes into the "More" sheet.
-const PRIMARY_PATHS = ['/analytics', '/campaigns', '/media'];
+// Primary destinations pinned to the bottom bar. Home is always first; the remaining
+// primary items are rendered alphabetically (Analytics, Campaigns, Media). Everything
+// else — including Schedule — goes into the "More" sheet.
+const PRIMARY_PATHS = ['/dashboard', '/analytics', '/campaigns', '/media'];
 
 const MoreIcon = (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -63,6 +64,11 @@ export const BottomTabBar: FC = () => {
   const primary = (PRIMARY_PATHS.map((p) => all.find((i) => i.path === p)).filter(
     Boolean
   ) as any[]).sort((a, b) => a.name.localeCompare(b.name));
+  const homePrimaryIndex = primary.findIndex((i) => i.path === '/dashboard');
+  if (homePrimaryIndex > 0) {
+    const [home] = primary.splice(homePrimaryIndex, 1);
+    primary.unshift(home);
+  }
   const primaryPaths = new Set(primary.map((i) => i.path));
   const rest = all.filter((i) => !primaryPaths.has(i.path));
 
@@ -114,7 +120,9 @@ export const BottomTabBar: FC = () => {
 
       {moreOpen && (
         <div className="mobile:block hidden fixed inset-0 z-[210]">
-          <div
+          <button
+            type="button"
+            aria-label="Close menu"
             className="absolute inset-0 bg-black/50"
             onClick={() => setMoreOpen(false)}
           />

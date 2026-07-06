@@ -46,6 +46,7 @@ export default defineConfig({
       'src/components/settings/roles/**/*.spec.{ts,tsx}',
       'src/components/new-layout/layout.component.spec.{ts,tsx}',
       'src/components/new-layout/user-avatar-menu.spec.{ts,tsx}',
+      'src/components/new-layout/bottom-tab-bar.spec.{ts,tsx}',
       'src/components/setup/**/*.spec.{ts,tsx}',
       'src/components/media-tools/designer/*.spec.{ts,tsx}',
       'src/components/media-tools/ai-designer/*.spec.{ts,tsx}',
