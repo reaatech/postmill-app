@@ -18,12 +18,12 @@ export class CustomFileValidationPipe implements PipeTransform {
   async transform(value: any) {
     try {
       if (!value || typeof value !== 'object') {
-        return value;
+        throw new BadRequestException('Invalid file upload.');
       }
 
       // Skip non-file parameters (org, body, query, etc.)
       if (!('buffer' in value) && !('mimetype' in value) && !('fieldname' in value)) {
-        return value;
+        throw new BadRequestException('Invalid file upload.');
       }
 
       const detected = value.buffer && Buffer.isBuffer(value.buffer)
