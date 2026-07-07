@@ -1,6 +1,5 @@
 import { CreatePostDto } from '@gitroom/nestjs-libraries/dtos/posts/create.post.dto';
 import { GetPostsDto } from '@gitroom/nestjs-libraries/dtos/posts/get.posts.dto';
-import fetch, { FormData } from 'node-fetch';
 
 function toQueryString(obj: Record<string, any>): string {
   const params = new URLSearchParams();
@@ -43,7 +42,7 @@ export default class Postmill {
     ).json();
   }
 
-  async upload(file: Buffer, extension: string) {
+  async upload(file: BlobPart | Buffer, extension: string) {
     const formData = new FormData();
     const type =
       extension === 'png'
@@ -56,7 +55,9 @@ export default class Postmill {
         ? 'image/jpeg'
         : 'image/jpeg';
 
-    const blob = new Blob([file], { type });
+    // Node Buffer → browser Blob; cast through unknown because Node's Buffer
+    // generic uses ArrayBufferLike while DOM types expect ArrayBuffer.
+    const blob = new Blob([file as unknown as BlobPart], { type });
     formData.append('file', blob, extension);
 
     return (

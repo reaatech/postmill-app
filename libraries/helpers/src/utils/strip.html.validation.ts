@@ -1,5 +1,34 @@
 import striptags from 'striptags';
-import { parseFragment, serialize } from 'parse5';
+import DOMPurify from 'isomorphic-dompurify';
+
+/**
+ * Normalize an HTML fragment. isomorphic-dompurify runs in both Node and the
+ * browser, so the helper stays client-safe and never pulls a Node-only parser
+ * into frontend bundles.
+ */
+const normalizeHtml = (html: string): string => {
+  // Explicit allow-list: these tags + attributes are what the downstream
+  // `stripHtmlValidation` branches need (mentions, html/markdown/normal paths).
+  // `false` does NOT mean "allow all" in DOMPurify, so a concrete list is
+  // required to avoid silently stripping spans, mention attributes, etc.
+  const config: any = {
+    ALLOWED_TAGS: [
+      'a',
+      'br',
+      'h1',
+      'h2',
+      'h3',
+      'li',
+      'p',
+      'span',
+      'strong',
+      'u',
+      'ul',
+    ],
+    ALLOWED_ATTR: ['href', 'data-mention-id', 'data-mention-name'],
+  };
+  return String(DOMPurify.sanitize(html, config));
+};
 
 const bold = {
   a: '𝗮',
@@ -143,7 +172,7 @@ export const stripHtmlValidation = (
     return val;
   }
 
-  const value = serialize(parseFragment(val));
+  const value = normalizeHtml(val);
 
   if (type === 'none') {
     return striptags(value)
