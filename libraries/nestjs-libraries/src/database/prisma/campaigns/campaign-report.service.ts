@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
-import { PostsRepository } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.repository';
+import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { ENTITY_ENUM_TO_SLUG } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-entity.types';
 import { campaignReportHtml } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-report.html';
 import { computeGoalProgress } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-goal-progress';
@@ -16,6 +16,16 @@ export interface CampaignReportAnalytics {
   series: Record<string, { date: string; value: number; previousValue?: number }[]>;
   byChannel: any[];
   window: { from: string; to: string };
+}
+
+function sanitizeCsvCell(value: unknown): string {
+  let cell = String(value ?? '');
+  // Neutralize CSV formula-injection payloads by prefixing a single quote when
+  // a cell starts with one of the characters spreadsheet apps interpret as formulas.
+  if (/^[+=\-@\t\r\n]/.test(cell)) {
+    cell = `'${cell}`;
+  }
+  return `"${cell.replace(/"/g, '""')}"`;
 }
 
 export interface CampaignReport {
@@ -42,7 +52,7 @@ export class CampaignReportService {
     private _campaignsRepository: CampaignsRepository,
     private _campaignItems: CampaignItemRepository,
     private _campaignItemResolver: CampaignItemResolverRepository,
-    private _postsRepository: PostsRepository,
+    private _postsService: PostsService,
     private _socialCommentsService: SocialCommentsService,
   ) {}
 
@@ -69,7 +79,7 @@ export class CampaignReportService {
 
     const [engagement, posts, stateCounts, clickTotal, itemCounts, syncedCommentCount] = await Promise.all([
       this._campaignsRepository.getEngagement(id, organizationId),
-      this._postsRepository.getCampaignPosts(id, organizationId),
+      this._postsService.getCampaignPosts(organizationId, id),
       this._campaignsRepository.getPostStateCounts(id, organizationId),
       this._campaignsRepository.getCampaignClickTotal(id, organizationId),
       this._campaignItems.countByCampaignGroupedByType(id, organizationId),
@@ -102,8 +112,11 @@ export class CampaignReportService {
 
     const goals = computeGoalProgress(campaign.goals, engagement, stateCounts, clickTotal);
 
+    // Share tokens are internal-only; never let them leak through report exports.
+    const { shareToken: _shareToken, shareEnabled: _shareEnabled, ...campaignForReport } = campaign;
+
     return {
-      campaign,
+      campaign: campaignForReport,
       engagement: { ...engagement, clickTotal },
       posts,
       channelBreakdown,
@@ -193,7 +206,7 @@ export class CampaignReportService {
     }));
 
     const headers = ['id', 'title', 'channel', 'state', 'publishDate', 'views', 'likes', 'comments'];
-    const lines = [headers.join(','), ...rows.map((r) => headers.map((h) => `"${String((r as any)[h] ?? '').replace(/"/g, '""')}"`).join(','))];
+    const lines = [headers.join(','), ...rows.map((r) => headers.map((h) => sanitizeCsvCell((r as any)[h])).join(','))];
     return lines.join('\n');
   }
 
@@ -202,9 +215,21 @@ export class CampaignReportService {
     const html = campaignReportHtml(report);
 
     const puppeteer = (await import('puppeteer')).default;
+
+    // Only disable Chromium's sandbox in CI/container environments where a real
+    // user namespace is unavailable. Production defaults to sandboxed mode.
+    const disableSandbox =
+      process.env.CI === 'true' || process.env.PUPPETEER_DISABLE_SANDBOX === 'true';
+    const args = [
+      ...(disableSandbox
+        ? ['--no-sandbox', '--disable-setuid-sandbox']
+        : []),
+      '--disable-dev-shm-usage',
+    ];
+
     const browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args,
     });
     try {
       const page = await browser.newPage();

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { CampaignsRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.repository';
 import { CampaignItemRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.repository';
 import { CampaignItemResolverRepository } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaign-item.resolver';
@@ -13,6 +13,8 @@ import { randomBytes } from 'crypto';
 
 @Injectable()
 export class CampaignsService {
+  private readonly logger = new Logger(CampaignsService.name);
+
   constructor(
     private _campaignsRepository: CampaignsRepository,
     private _campaignItems: CampaignItemRepository,
@@ -45,22 +47,40 @@ export class CampaignsService {
     return ids.map((fid) => byId.get(fid)).filter(Boolean);
   }
 
-  async list(organizationId: string) {
-    const rows = await this._campaignsRepository.findByOrg(organizationId);
-    // Expose each campaign's distinct channel ids (from its posts) as
-    // `integrationIds`; strip the raw posts join from the response.
-    return rows.map(({ posts, ...campaign }) => ({
+  private mapCampaign(row: any) {
+    const { posts, shareToken, shareEnabled, ...campaign } = row;
+    return {
       ...campaign,
       integrationIds: [
         ...new Set(
           (posts as { integrationId: string }[]).map((p) => p.integrationId)
         ),
       ],
-    }));
+    };
   }
 
-  get(id: string, organizationId: string) {
-    return this._campaignsRepository.findById(id, organizationId);
+  async list(organizationId: string) {
+    const rows = await this._campaignsRepository.findByOrg(organizationId);
+    // Expose each campaign's distinct channel ids (from its posts) as
+    // `integrationIds`; strip the raw posts join and sharing fields from the
+    // response.
+    return rows.map((row) => this.mapCampaign(row));
+  }
+
+  async listPaged(organizationId: string, take: number, skip: number) {
+    const rows = await this._campaignsRepository.findByOrg(
+      organizationId,
+      take,
+      skip
+    );
+    return rows.map((row) => this.mapCampaign(row));
+  }
+
+  async get(id: string, organizationId: string) {
+    const campaign = await this._campaignsRepository.findById(id, organizationId);
+    if (!campaign) return null;
+    const { shareToken, shareEnabled, ...safeCampaign } = campaign;
+    return safeCampaign;
   }
 
   create(params: {
@@ -271,8 +291,10 @@ export class CampaignsService {
       createdBy = profiles.get(campaign.createdById) || null;
     }
 
+    const { shareToken, shareEnabled, ...campaignWithoutShare } = campaign as any;
+
     return {
-      campaign: { ...campaign, createdBy },
+      campaign: { ...campaignWithoutShare, createdBy },
       engagement,
       stateCounts,
       upcoming,
@@ -308,6 +330,10 @@ export class CampaignsService {
       endDate: shiftDate(source.endDate),
       goals: source.goals,
       createdById: userId,
+      utmEnabled: source.utmEnabled,
+      client: source.client,
+      project: source.project,
+      tags: source.tags,
     });
 
     await this._campaignItems.copyAllToCampaign(id, copy.id, organizationId, userId);
@@ -317,20 +343,26 @@ export class CampaignsService {
       for (const draft of group) {
         const dto = this._postsService.buildCreateDtoFromPost(draft);
         dto.campaignId = copy.id;
-        dto.date = options.resetSchedule
-          ? new Date().toISOString()
-          : new Date(
-              new Date(draft.publishDate).getFullYear(),
-              new Date(draft.publishDate).getMonth() + (options.shiftDates ? 1 : 0),
-              new Date(draft.publishDate).getDate()
-            ).toISOString();
+        dto.date =
+          options.resetSchedule || !draft.publishDate
+            ? new Date().toISOString()
+            : new Date(
+                new Date(draft.publishDate).getFullYear(),
+                new Date(draft.publishDate).getMonth() +
+                  (options.shiftDates ? 1 : 0),
+                new Date(draft.publishDate).getDate()
+              ).toISOString();
         try {
           const created = await this._postsService.createPost(organizationId, dto, 'WEB');
           for (const c of created) {
             await this._postsService.setDraftPending(organizationId, c.postId);
           }
         } catch (err) {
-          // Skip drafts that fail re-validation; continue cloning the rest.
+          this.logger.warn(
+            `Failed to copy draft ${draft.id} (${draft.title || 'untitled'}) from campaign ${id}: ${
+              err instanceof Error ? err.message : String(err)
+            }`
+          );
         }
       }
     }

@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   NotFoundException,
   Param,
@@ -221,14 +222,14 @@ export class CampaignsController {
   ) {
     // J2 — bound the previously-unbounded campaigns list. Back-compat: the
     // response is still a plain array; absent paging params we cap at the hard
-    // max rather than returning everything.
-    const all = await this._campaignsService.list(org.id);
+    // max rather than returning everything. Pagination is now pushed to the
+    // repository so the full list is not loaded into memory.
     const offset = Math.max(0, parseInt(cursor ?? '0', 10) || 0);
     const size = Math.min(
       CAMPAIGNS_MAX_LIMIT,
       Math.max(1, parseInt(limit ?? '', 10) || CAMPAIGNS_MAX_LIMIT),
     );
-    return all.slice(offset, offset + size);
+    return this._campaignsService.listPaged(org.id, size, offset);
   }
 
   @Get('/:id')
@@ -441,8 +442,13 @@ export class CampaignsController {
   async approveDraft(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
+    @Param('id') id: string,
     @Param('postId') postId: string,
   ) {
+    const post = await this._postsService.getPostById(postId, org.id);
+    if (!post || post.campaignId !== id) {
+      throw new ForbiddenException('Post does not belong to this campaign');
+    }
     return this._postsService.approveDraft(org.id, postId, user.id);
   }
 
@@ -452,8 +458,13 @@ export class CampaignsController {
   async rejectDraft(
     @GetOrgFromRequest() org: Organization,
     @GetUserFromRequest() user: User,
+    @Param('id') id: string,
     @Param('postId') postId: string,
   ) {
+    const post = await this._postsService.getPostById(postId, org.id);
+    if (!post || post.campaignId !== id) {
+      throw new ForbiddenException('Post does not belong to this campaign');
+    }
     return this._postsService.rejectDraft(org.id, postId, user.id);
   }
 

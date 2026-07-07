@@ -9,10 +9,12 @@ export class CampaignsRepository {
     private _prisma: PrismaService,
   ) {}
 
-  findByOrg(organizationId: string) {
+  findByOrg(organizationId: string, take?: number, skip?: number) {
     return this._prisma.campaign.findMany({
       where: { organizationId, deletedAt: null },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
       include: {
         _count: { select: { posts: true } },
         // Distinct channels the campaign publishes to — lets the analytics
