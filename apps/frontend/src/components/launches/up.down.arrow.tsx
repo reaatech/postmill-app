@@ -1,3 +1,4 @@
+'use client';
 import { FC, useCallback } from 'react';
 import clsx from 'clsx';
 import { ChevronUpIcon } from '@gitroom/frontend/components/ui/icons';

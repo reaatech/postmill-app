@@ -1,3 +1,4 @@
+'use client';
 import { Button } from '@gitroom/react/form/button';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
 import { FC, useCallback } from 'react';

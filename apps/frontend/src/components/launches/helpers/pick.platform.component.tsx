@@ -1,3 +1,4 @@
+'use client';
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { Integrations } from '@gitroom/frontend/components/launches/calendar.context';
 import { useMoveToIntegrationListener } from '@gitroom/frontend/components/launches/helpers/use.move.to.integration';
@@ -27,45 +28,6 @@ export const PickPlatforms: FC<{
     selectedIntegrations.slice(0).map((p) => ({
       ...p,
     }))
-  );
-  useEffect(() => {
-    if (
-      props.singleSelect &&
-      selectedAccounts.length &&
-      integrations.indexOf(selectedAccounts?.[0]) === -1
-    ) {
-      addPlatform(integrations[0])();
-    }
-  }, [integrations, selectedAccounts]);
-  const checkLeftRight = (test = true) => {
-    const scrollWidth = ref.current?.scrollWidth;
-    const offsetWidth = +(ref.current?.offsetWidth || 0);
-    const scrollOffset = ref.current?.scrollLeft || 0;
-    const totalScroll = scrollOffset + offsetWidth + 100;
-    setIsLeft(!!scrollOffset);
-    setIsRight(!!scrollWidth && !!offsetWidth && scrollWidth > totalScroll);
-  };
-  const changeOffset = useCallback(
-    (offset: number) => () => {
-      if (ref.current) {
-        ref.current.scrollLeft += offset;
-        checkLeftRight();
-      }
-    },
-    [selectedIntegrations, integrations, selectedAccounts]
-  );
-  useEffect(() => {
-    checkLeftRight();
-  }, [selectedIntegrations, integrations]);
-  useMoveToIntegrationListener(
-    [integrations],
-    props.singleSelect,
-    ({ identifier, toPreview }: { identifier: string; toPreview: boolean }) => {
-      const findIntegration = integrations.find((p) => p.id === identifier);
-      if (findIntegration) {
-        addPlatform(findIntegration)();
-      }
-    }
   );
   const addPlatform = useCallback(
     (integration: Integrations) => async () => {
@@ -135,20 +97,59 @@ export const PickPlatforms: FC<{
     },
     [onChange, props.singleSelect, selectedAccounts, setSelectedAccounts]
   );
-  const handler = async ({ integrationsId }: { integrationsId: string[] }) => {
-    const selected = selectedIntegrations.map((p) => p.id);
-    const notToRemove = selected.filter((p) => integrationsId.includes(p));
-    const toAdd = integrationsId.filter((p) => !selected.includes(p));
-    const newIntegrations = [...notToRemove, ...toAdd]
-      .map((id) => integrations.find((p) => p.id === id)!)
-      .filter((p) => p);
-    setSelectedAccounts(newIntegrations, () => {
-      console.log('changed');
-    });
-    onChange(newIntegrations, () => {
-      console.log('changed');
-    });
-  };
+  useEffect(() => {
+    if (
+      props.singleSelect &&
+      selectedAccounts.length &&
+      integrations.indexOf(selectedAccounts?.[0]) === -1
+    ) {
+      addPlatform(integrations[0])();
+    }
+  }, [integrations, selectedAccounts, props.singleSelect, addPlatform]);
+  const checkLeftRight = useCallback(() => {
+    const scrollWidth = ref.current?.scrollWidth;
+    const offsetWidth = +(ref.current?.offsetWidth || 0);
+    const scrollOffset = ref.current?.scrollLeft || 0;
+    const totalScroll = scrollOffset + offsetWidth + 100;
+    setIsLeft(!!scrollOffset);
+    setIsRight(!!scrollWidth && !!offsetWidth && scrollWidth > totalScroll);
+  }, []);
+  const changeOffset = useCallback(
+    (offset: number) => () => {
+      if (ref.current) {
+        ref.current.scrollLeft += offset;
+        checkLeftRight();
+      }
+    },
+    [checkLeftRight]
+  );
+  useEffect(() => {
+    const id = requestAnimationFrame(checkLeftRight);
+    return () => cancelAnimationFrame(id);
+  }, [selectedIntegrations, integrations, checkLeftRight]);
+  useMoveToIntegrationListener(
+    [integrations],
+    props.singleSelect,
+    ({ identifier, toPreview }: { identifier: string; toPreview: boolean }) => {
+      const findIntegration = integrations.find((p) => p.id === identifier);
+      if (findIntegration) {
+        addPlatform(findIntegration)();
+      }
+    }
+  );
+  const handler = useCallback(
+    async ({ integrationsId }: { integrationsId: string[] }) => {
+      const selected = selectedIntegrations.map((p) => p.id);
+      const notToRemove = selected.filter((p) => integrationsId.includes(p));
+      const toAdd = integrationsId.filter((p) => !selected.includes(p));
+      const newIntegrations = [...notToRemove, ...toAdd]
+        .map((id) => integrations.find((p) => p.id === id)!)
+        .filter((p) => p);
+      setSelectedAccounts(newIntegrations, () => undefined);
+      onChange(newIntegrations, () => undefined);
+    },
+    [selectedIntegrations, integrations, setSelectedAccounts, onChange]
+  );
   // CopilotKit readable/action registration lives in a bridge mounted only
   // when an AI provider is configured (the provider isn't mounted otherwise).
   const aiActive = useAiActive();
@@ -171,6 +172,7 @@ export const PickPlatforms: FC<{
             onChange,
             props.singleSelect,
             setSelectedAccounts,
+            handler,
           ]}
         />
       )}

@@ -12,7 +12,7 @@ import { AiMediaService } from '@gitroom/nestjs-libraries/ai/governance/media.se
 import { StorageService } from '@gitroom/nestjs-libraries/database/prisma/storage/storage.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
-import { AnalyticsRepository } from '@gitroom/nestjs-libraries/database/prisma/analytics/analytics.repository';
+import { AnalyticsService } from '@gitroom/nestjs-libraries/analytics/analytics.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
 import { RedisService } from '@gitroom/nestjs-libraries/redis/redis.service';
 import { singleFlight } from '@gitroom/nestjs-libraries/utils/concurrency';
@@ -135,7 +135,7 @@ export class DashboardService {
     private _storageService: StorageService,
     private _aiSettingsService: AiSettingsService,
     private _campaignsService: CampaignsService,
-    private _analyticsRepository: AnalyticsRepository,
+    private _analyticsService: AnalyticsService,
     private _aiSettingsManager: AiSettingsManager,
     private _redisService: RedisService
   ) {}
@@ -478,7 +478,7 @@ export class DashboardService {
 
     if (allowed('anomalies')) {
       try {
-        const anomalies = await this._analyticsRepository.listAnomalies(orgId, {
+        const anomalies = await this._analyticsService.listAnomalies(orgId, {
           includeDismissed: false,
           limit: 3,
         });
@@ -517,8 +517,17 @@ export class DashboardService {
     _planUsage?: PlanUsageSnapshot
   ): Promise<AttentionItem | null> {
     const settings = await this._aiSettingsManager.getSettings();
-    const budgetSettings: { monthlyCap?: number; alertThresholdPct?: number } | undefined =
-      settings?.budgetSettings ? JSON.parse(settings.budgetSettings) : undefined;
+    let budgetSettings: { monthlyCap?: number; alertThresholdPct?: number } | undefined;
+    if (settings?.budgetSettings) {
+      try {
+        budgetSettings = JSON.parse(settings.budgetSettings);
+      } catch (err) {
+        this._logger.warn(
+          `Invalid budgetSettings JSON for org ${orgId}: ${(err as Error).message}`
+        );
+        budgetSettings = undefined;
+      }
+    }
 
     if (!budgetSettings?.monthlyCap) {
       return null;

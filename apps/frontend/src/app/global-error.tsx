@@ -27,7 +27,7 @@ export default function GlobalError({
       lang: 'en',
     });
 
-  }, [error]);
+  }, [error, sentryDsn]);
   return (
     <html lang="en">
       <body>

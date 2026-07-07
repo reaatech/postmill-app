@@ -154,3 +154,208 @@ describe('AnalyticsRepository — campaign scope (1.1)', () => {
     expect(count.mock.calls[0][0].where.campaignId).toEqual({ in: ['A'] });
   });
 });
+
+
+describe('AnalyticsRepository — org-scoped integration lookup (ANALYTICS-01)', () => {
+  const makeRepo = (findFirst: ReturnType<typeof vi.fn>) => {
+    const repo = Object.create(AnalyticsRepository.prototype) as AnalyticsRepository;
+    (repo as any)._integration = {
+      model: { integration: { findFirst } },
+    };
+    return repo;
+  };
+
+  it('returns the integration when it belongs to the requested org', async () => {
+    const integration = {
+      id: 'i1',
+      organizationId: 'org1',
+      providerIdentifier: 'x',
+    };
+    const findFirst = vi.fn().mockResolvedValue(integration);
+    const repo = makeRepo(findFirst);
+
+    const result = await repo.findIntegrationByIdRaw('i1', 'org1');
+
+    expect(result).toEqual(integration);
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'i1', organizationId: 'org1' },
+    });
+  });
+
+  it('returns null when the integration belongs to a different organization', async () => {
+    const findFirst = vi.fn().mockResolvedValue(null);
+    const repo = makeRepo(findFirst);
+
+    const result = await repo.findIntegrationByIdRaw('i1', 'org2');
+
+    expect(result).toBeNull();
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'i1', organizationId: 'org2' },
+    });
+  });
+
+  it('omits organizationId filter when not provided', async () => {
+    const integration = {
+      id: 'i1',
+      organizationId: 'org1',
+      providerIdentifier: 'x',
+    };
+    const findFirst = vi.fn().mockResolvedValue(integration);
+    const repo = makeRepo(findFirst);
+
+    await repo.findIntegrationByIdRaw('i1');
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { id: 'i1' },
+    });
+  });
+});
+
+describe('AnalyticsRepository — batch snapshot upserts (ANALYTICS-04 / ANALYTICS-05)', () => {
+  const makePrismaRepo = () => {
+    const analyticsDeleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const analyticsCreateMany = vi.fn().mockResolvedValue({ count: 2 });
+    const postAnalyticsDeleteMany = vi.fn().mockResolvedValue({ count: 1 });
+    const postAnalyticsCreateMany = vi.fn().mockResolvedValue({ count: 2 });
+    const $transaction = vi.fn(async (ops: any[]) => {
+      for (const op of ops) await op;
+      return [await ops[0], await ops[1]];
+    });
+
+    const repo = Object.create(AnalyticsRepository.prototype) as AnalyticsRepository;
+    (repo as any)._prisma = {
+      $transaction,
+      analyticsSnapshot: { deleteMany: analyticsDeleteMany, createMany: analyticsCreateMany },
+      postAnalyticsSnapshot: {
+        deleteMany: postAnalyticsDeleteMany,
+        createMany: postAnalyticsCreateMany,
+      },
+    };
+
+    return {
+      repo,
+      $transaction,
+      analyticsDeleteMany,
+      analyticsCreateMany,
+      postAnalyticsDeleteMany,
+      postAnalyticsCreateMany,
+    };
+  };
+
+  it('upsertChannelSnapshots deletes then creates rows keyed by org + integration + metric + date', async () => {
+    const {
+      repo,
+      $transaction,
+      analyticsDeleteMany,
+      analyticsCreateMany,
+    } = makePrismaRepo();
+
+    const rows = [
+      {
+        organizationId: 'org1',
+        integrationId: 'i1',
+        metric: 'likes',
+        value: 10,
+        date: new Date('2024-01-01'),
+      },
+      {
+        organizationId: 'org1',
+        integrationId: 'i1',
+        metric: 'views',
+        value: 100,
+        date: new Date('2024-01-02'),
+      },
+    ];
+
+    await repo.upsertChannelSnapshots(rows);
+
+    expect($transaction).toHaveBeenCalledTimes(1);
+    expect(analyticsDeleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          {
+            organizationId: 'org1',
+            integrationId: 'i1',
+            metric: 'likes',
+            date: rows[0].date,
+          },
+          {
+            organizationId: 'org1',
+            integrationId: 'i1',
+            metric: 'views',
+            date: rows[1].date,
+          },
+        ],
+      },
+    });
+    expect(analyticsCreateMany).toHaveBeenCalledWith({
+      data: rows,
+      skipDuplicates: true,
+    });
+  });
+
+  it('upsertPostSnapshots deletes then creates rows keyed by org + post + metric + date', async () => {
+    const {
+      repo,
+      $transaction,
+      postAnalyticsDeleteMany,
+      postAnalyticsCreateMany,
+    } = makePrismaRepo();
+
+    const rows = [
+      {
+        organizationId: 'org1',
+        postId: 'p1',
+        integrationId: 'i1',
+        metric: 'likes',
+        value: 10,
+        date: new Date('2024-01-01'),
+      },
+      {
+        organizationId: 'org1',
+        postId: 'p1',
+        integrationId: 'i1',
+        metric: 'views',
+        value: 100,
+        date: new Date('2024-01-02'),
+      },
+    ];
+
+    await repo.upsertPostSnapshots(rows);
+
+    expect($transaction).toHaveBeenCalledTimes(1);
+    expect(postAnalyticsDeleteMany).toHaveBeenCalledWith({
+      where: {
+        OR: [
+          {
+            organizationId: 'org1',
+            postId: 'p1',
+            metric: 'likes',
+            date: rows[0].date,
+          },
+          {
+            organizationId: 'org1',
+            postId: 'p1',
+            metric: 'views',
+            date: rows[1].date,
+          },
+        ],
+      },
+    });
+    expect(postAnalyticsCreateMany).toHaveBeenCalledWith({
+      data: rows,
+      skipDuplicates: true,
+    });
+  });
+
+  it('batch upserts short-circuit on empty rows', async () => {
+    const { repo, $transaction } = makePrismaRepo();
+
+    const channelResult = await repo.upsertChannelSnapshots([]);
+    const postResult = await repo.upsertPostSnapshots([]);
+
+    expect($transaction).not.toHaveBeenCalled();
+    expect(channelResult).toEqual({ count: 0 });
+    expect(postResult).toEqual({ count: 0 });
+  });
+});

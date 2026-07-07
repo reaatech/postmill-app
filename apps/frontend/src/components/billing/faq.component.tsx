@@ -127,8 +127,8 @@ export const FAQComponent: FC = () => {
         {t('frequently_asked_questions', 'Frequently Asked Questions')}
       </h3>
       <div className="gap-[24px] flex-col flex select-none  mt-[48px] mb-[40px] tablet:mt-[80px]">
-        {list.map((item, index) => (
-          <FAQSection key={index} {...item} />
+        {list.map((item) => (
+          <FAQSection key={item.title} {...item} />
         ))}
       </div>
     </div>

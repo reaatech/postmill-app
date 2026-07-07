@@ -103,7 +103,7 @@ export function RegisterAfter({
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const fireEvents = useFireEvents();
-  const track = useTrack();
+  const track = useTrack(undefined);
   const [datafast_visitor_id] = useCookie('datafast_visitor_id');
   const isAfterProvider = useMemo(() => {
     return !!token && !!provider;

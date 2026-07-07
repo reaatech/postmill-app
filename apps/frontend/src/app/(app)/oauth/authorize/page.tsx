@@ -17,11 +17,6 @@ const SCOPE_LABELS: Record<string, string> = {
 export default function OAuthAuthorizePage() {
   const searchParams = useSearchParams();
   const fetch = useFetch();
-  const [appInfo, setAppInfo] = useState<any>(null);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-
   const clientId = searchParams.get('client_id');
   const responseType = searchParams.get('response_type');
   const state = searchParams.get('state');
@@ -32,6 +27,21 @@ export default function OAuthAuthorizePage() {
   const codeChallenge = searchParams.get('code_challenge');
   const codeChallengeMethod = searchParams.get('code_challenge_method');
   const scope = searchParams.get('scope');
+
+  const [appInfo, setAppInfo] = useState<any>(null);
+  const [error, setError] = useState(() => {
+    if (!clientId || !responseType) {
+      return 'Missing required parameters (client_id, response_type)';
+    }
+    if (responseType !== 'code') {
+      return 'Only response_type=code is supported';
+    }
+    return '';
+  });
+  const [loading, setLoading] = useState(() => {
+    return !!clientId && responseType === 'code';
+  });
+  const [submitting, setSubmitting] = useState(false);
 
   const requestedScopes = useMemo(
     () =>
@@ -48,20 +58,13 @@ export default function OAuthAuthorizePage() {
   );
 
   useEffect(() => {
-    if (!clientId || !responseType) {
-      setError('Missing required parameters (client_id, response_type)');
-      setLoading(false);
-      return;
-    }
-    if (responseType !== 'code') {
-      setError('Only response_type=code is supported');
-      setLoading(false);
+    if (!loading) {
       return;
     }
 
     const params = new URLSearchParams({
-      client_id: clientId,
-      response_type: responseType,
+      client_id: clientId!,
+      response_type: responseType!,
       ...(state ? { state } : {}),
       // 3.3: include redirect_uri (and scope) so a redirect_uri mismatch errors
       // here — before the user ever sees an Authorize button — instead of only at
@@ -84,7 +87,7 @@ export default function OAuthAuthorizePage() {
         setError('Failed to validate OAuth request');
         setLoading(false);
       });
-  }, [clientId, responseType, state, redirectUri, scope]);
+  }, [clientId, responseType, state, redirectUri, scope, fetch, loading]);
 
   const handleAction = useCallback(
     async (action: 'approve' | 'deny') => {

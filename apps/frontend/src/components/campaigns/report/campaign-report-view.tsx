@@ -369,8 +369,8 @@ export const CampaignReportView: FC<{ report: CampaignReport; publicMode?: boole
         <div className="bg-newBgColorInner border border-newTableBorder rounded-[12px] p-[16px] flex flex-col gap-[16px]">
           <h2 className="text-[16px] font-[600] text-textColor">{t('goals', 'Goals')}</h2>
           <div className="flex flex-col gap-[14px]">
-            {report.goals.map((goal) => (
-              <div key={goal.metric} className="flex flex-col gap-[6px]">
+            {report.goals.map((goal, idx) => (
+              <div key={`${goal.metric}-${goal.target}-${idx}`} className="flex flex-col gap-[6px]">
                 <div className="flex items-center justify-between text-[13px]">
                   <span className="text-textColor capitalize">{metricLabel(goal.metric)}</span>
                   <span className="text-newTableText">

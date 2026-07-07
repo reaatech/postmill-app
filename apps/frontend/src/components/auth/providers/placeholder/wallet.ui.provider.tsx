@@ -1,3 +1,5 @@
+'use client';
+
 import { FC } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 

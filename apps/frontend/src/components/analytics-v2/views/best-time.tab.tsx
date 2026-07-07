@@ -90,9 +90,9 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
       <div className="overflow-x-auto">
         <div className="grid grid-cols-[40px_repeat(24,1fr)] md:grid-cols-[60px_repeat(24,1fr)] gap-[2px] min-w-[560px] md:min-w-[800px]">
           <div className="text-[11px] text-newTableText font-medium" />
-          {HOUR_LABELS.map((label, i) => (
+          {HOUR_LABELS.map((label) => (
             <div
-              key={i}
+              key={label}
               className="text-[9px] md:text-[10px] text-newTableText text-center font-medium"
             >
               {label}
@@ -135,13 +135,13 @@ export const BestTimeTab: FC<BestTimeTabProps> = ({ integrations }) => {
             {t('top_slots', 'Top Posting Slots')}
           </h3>
           <div className="flex flex-wrap gap-[8px]">
-            {data.bestSlots.map((slot, i) => {
+            {data.bestSlots.map((slot) => {
               const low = slot.confidence
                 ? slot.confidence === 'low' || slot.confidence === 'none'
                 : (slot.postCount ?? 0) < 3;
               return (
                 <div
-                  key={i}
+                  key={`${slot.day}-${slot.hour}`}
                   className={`bg-newBgColorInner border border-newTableBorder rounded-[8px] px-[12px] py-[8px] text-[13px] ${
                     low ? 'opacity-60' : ''
                   }`}

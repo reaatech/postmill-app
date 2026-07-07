@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useCallback, useEffect, useMemo, useState } from 'react';
+import { FC, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import {
@@ -50,10 +50,21 @@ export const CampaignCommentsSection: FC<CampaignCommentsSectionProps> = ({
 
   const { data, isLoading, error, mutate } = useCampaignComments(campaignId, swrFilters);
 
-  // A fresh page-1 payload (filters changed / revalidation) resets paging + selection.
+  // Reset paging + selection only when the page-1 comment list actually changes,
+  // not on every SWR revalidation (which only refreshes object identity).
+  const prevCommentIdsRef = useRef<string[]>([]);
   useEffect(() => {
-    setExtraPages([]);
-    setSelected(new Set());
+    const currentIds = (data?.comments || []).map((c) => c.id);
+    const prevIds = prevCommentIdsRef.current;
+    const same =
+      currentIds.length === prevIds.length &&
+      currentIds.every((id, i) => id === prevIds[i]);
+
+    if (!same) {
+      setExtraPages([]);
+      setSelected(new Set());
+      prevCommentIdsRef.current = currentIds;
+    }
   }, [data]);
 
   const refresh = useCallback(() => {

@@ -1,3 +1,5 @@
+'use client';
+
 import { ReactNode } from 'react';
 import { useT } from './get.transation.service.client';
 

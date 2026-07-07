@@ -9,9 +9,10 @@ export const Redirect: FC<{
   const { url, delay } = props;
   const router = useRouter();
   useEffect(() => {
-    setTimeout(() => {
+    const timeout = setTimeout(() => {
       router.push(url);
     }, delay);
-  }, []);
+    return () => clearTimeout(timeout);
+  }, [url, delay, router]);
   return null;
 };

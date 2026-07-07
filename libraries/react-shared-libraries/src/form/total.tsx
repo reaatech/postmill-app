@@ -1,3 +1,5 @@
+'use client';
+
 import { FC, useCallback, useEffect } from 'react';
 import { clsx } from 'clsx';
 import { useFormContext } from 'react-hook-form';
@@ -49,7 +51,7 @@ export const Total: FC<{
               />
             </svg>
           </div>
-          <div className="flex-1 text-white text-[14px] text-center">
+          <div className="flex-1 text-textColor text-[14px] text-center">
             {value}
           </div>
           <div onClick={changeNumber(value + 1)}>

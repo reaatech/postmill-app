@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useEffect, useMemo } from 'react';
+import { FC, useCallback, useEffect, useMemo } from 'react';
 import { orderBy } from 'lodash';
 import { CalendarWeekProvider } from '@gitroom/frontend/components/launches/calendar.context';
 import { useCalendar } from '@gitroom/frontend/components/launches/calendar';
@@ -106,7 +106,7 @@ export const LaunchesComponent = () => {
     );
   }, [integrations]);
 
-  const isSameOrigin = (opener: Window | null) => {
+  const isSameOrigin = useCallback((opener: Window | null) => {
     // Reading `.location.origin` on a cross-origin window throws a SecurityError
     // (a throwing getter is NOT guarded by optional chaining) — swallow it and
     // treat cross-origin as "not same origin" so the calendar never crashes.
@@ -115,7 +115,7 @@ export const LaunchesComponent = () => {
     } catch {
       return false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -151,7 +151,7 @@ export const LaunchesComponent = () => {
     if (window.opener && (search.get('msg') || search.get('added'))) {
       window.close();
     }
-  }, []);
+  }, [search, toast, fireEvents, t, isSameOrigin]);
 
   if (isLoading) {
     return (

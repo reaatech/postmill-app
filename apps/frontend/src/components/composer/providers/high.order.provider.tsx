@@ -144,7 +144,18 @@ export const withProvider = function <T extends object>(params: {
               )
         );
       }
-    }, [justCurrent, current, isGlobal, setTotalChars]);
+    }, [
+      justCurrent,
+      current,
+      isGlobal,
+      setTotalChars,
+      setChars,
+      props.id,
+      selectedIntegration,
+      setComments,
+      setPostComment,
+      setEditor,
+    ]);
 
     const getInternalPlugs = useCallback(async () => {
       return (
@@ -152,7 +163,7 @@ export const withProvider = function <T extends object>(params: {
           `/integrations/${selectedIntegration.integration.identifier}/internal-plugs`
         )
       ).json();
-    }, [selectedIntegration.integration.identifier]);
+    }, [fetch, selectedIntegration.integration.identifier]);
     const { data, isLoading } = useSWR(
       `internal-${selectedIntegration.integration.identifier}`,
       getInternalPlugs,
@@ -167,7 +178,7 @@ export const withProvider = function <T extends object>(params: {
       }
 
       return global;
-    }, [internal, global, isGlobal]);
+    }, [internal, global]);
 
     const form = useForm({
       resolver: classValidatorResolver(dto || Empty),
@@ -222,7 +233,7 @@ export const withProvider = function <T extends object>(params: {
           return form.trigger();
         },
       }),
-      [value]
+      [value, form, props.id, selectedIntegration, setCurrent, setHide]
     );
 
     return (

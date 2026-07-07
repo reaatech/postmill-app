@@ -22,9 +22,7 @@
   ],
   "author": "Nevo David",
   "license": "AGPL-3.0",
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  },
+  "dependencies": {},
   "devDependencies": {
     "tsup": "^8.5.1"
   }

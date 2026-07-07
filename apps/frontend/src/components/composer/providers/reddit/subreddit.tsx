@@ -13,6 +13,7 @@ import { Canonical } from '@gitroom/react/form/canonical';
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
+import { useShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
 export const RenderOptions: FC<{
   options: Array<'self' | 'link' | 'media'>;
   onClick: (current: 'self' | 'link' | 'media') => void;
@@ -35,7 +36,7 @@ export const RenderOptions: FC<{
       id: p,
       onClick: () => onClick(p),
     })) || [];
-  }, [options]);
+  }, [options, onClick]);
   return (
     <div className="flex">
       {mapValues.map((p) => (
@@ -65,6 +66,7 @@ export const Subreddit: FC<{
   const t = useT();
 
   const { date } = useIntegration();
+  const postSelector = useShowPostSelector(date);
   const dummy = useLaunchStore((state) => state.dummy);
   const split = name.split('.');
   const [loading, setLoading] = useState(false);
@@ -106,7 +108,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [name, onChange, value]
   );
   const setType = useCallback(
     (e: string) => {
@@ -120,7 +122,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [name, onChange, value]
   );
   const setMedia = useCallback(
     (e: any) => {
@@ -134,7 +136,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [name, onChange, value]
   );
   const setURL = useCallback(
     (e: any) => {
@@ -148,7 +150,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [name, onChange, value]
   );
   const setFlair = useCallback(
     (e: any) => {
@@ -162,7 +164,7 @@ export const Subreddit: FC<{
         },
       });
     },
-    [value]
+    [name, onChange, value]
   );
   const search = useDebouncedCallback(
     useCallback(async (e: FormEvent<HTMLInputElement>) => {
@@ -176,7 +178,7 @@ export const Subreddit: FC<{
       const results = await func.get('subreddits', { word: e.target.value });
       // @ts-ignore
       setResults(results);
-    }, []),
+    }, [func]),
     500
   );
   return (
@@ -224,6 +226,7 @@ export const Subreddit: FC<{
           {value.type === 'link' && (
             <Canonical
               date={date}
+              postSelector={postSelector}
               error={errors?.url?.message}
               value={value.url}
               label="URL"

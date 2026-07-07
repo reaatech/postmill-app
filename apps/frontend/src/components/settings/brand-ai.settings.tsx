@@ -204,10 +204,14 @@ export const BrandVoiceSection = () => {
 
   useEffect(() => {
     if (data) {
+      /* Reset form state to the loaded profile once SWR returns. This only runs
+         when the remote payload arrives, so it does not cause cascading renders. */
+      /* eslint-disable react-hooks/set-state-in-effect */
       setInstructions(data.instructions || '');
       setLanguage(data.language || 'en');
       setEnabled(data.enabled ?? false);
       setPlatformInstructions(data.platformInstructions || {});
+      /* eslint-enable react-hooks/set-state-in-effect */
     }
   }, [data]);
 

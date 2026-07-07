@@ -1,4 +1,6 @@
-import { FC, ReactNode, useCallback, useEffect, useState } from 'react';
+'use client';
+
+import { FC, ReactNode, useEffect, useState } from 'react';
 import Loading from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { timer } from '@gitroom/helpers/utils/timer';
@@ -19,7 +21,7 @@ export const CheckPaymentInner: FC<{
   check: string;
   mutate: () => void;
   children: ReactNode;
-}> = (props) => {
+}> = ({ check, mutate, children }) => {
   const [showLoader, setShowLoader] = useState(true);
   const fetch = useFetch();
   const toaster = useToaster();
@@ -39,32 +41,38 @@ export const CheckPaymentInner: FC<{
     }
   }, [showLoader]);
 
-  const checkSubscription = useCallback(async () => {
-    const { status } = await (
-      await fetch('/billing/check/' + props.check)
-    ).json();
-    if (status === 0) {
-      await timer(1000);
-      return checkSubscription();
-    }
-    if (status === 1) {
-      modal.open({
-        title: 'Invalid Payment',
-        onlyApprove: true,
-        approveLabel: 'OK',
-        description:
-          'We could not validate your payment method, please try again',
-      });
-      setShowLoader(false);
-    }
-    if (status === 2) {
-      setShowLoader(false);
-      props.mutate();
-    }
-  }, []);
   useEffect(() => {
+    let mounted = true;
+
+    const checkSubscription = async () => {
+      const { status } = await (await fetch('/billing/check/' + check)).json();
+      if (!mounted) return;
+      if (status === 0) {
+        await timer(1000);
+        return checkSubscription();
+      }
+      if (status === 1) {
+        modal.open({
+          title: 'Invalid Payment',
+          onlyApprove: true,
+          approveLabel: 'OK',
+          description:
+            'We could not validate your payment method, please try again',
+        });
+        setShowLoader(false);
+      }
+      if (status === 2) {
+        setShowLoader(false);
+        mutate();
+      }
+    };
+
     checkSubscription();
-  }, []);
+
+    return () => {
+      mounted = false;
+    };
+  }, [fetch, modal, check, mutate]);
   if (showLoader) {
     return (
       <div className="fixed bg-black/40 w-full h-full flex justify-center items-center z-[400]">
@@ -74,5 +82,5 @@ export const CheckPaymentInner: FC<{
       </div>
     );
   }
-  return props.children;
+  return <>{children}</>;
 };

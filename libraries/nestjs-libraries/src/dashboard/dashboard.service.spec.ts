@@ -78,7 +78,7 @@ function buildService(overrides: {
     getSummaries: vi.fn().mockResolvedValue([]),
   } as any;
 
-  const analyticsRepository = {
+  const analyticsService = {
     listAnomalies: vi.fn().mockResolvedValue([]),
   } as any;
 
@@ -97,7 +97,7 @@ function buildService(overrides: {
     storageService,
     aiSettingsService,
     campaignsService,
-    analyticsRepository,
+    analyticsService,
     aiSettingsManager,
     redisService,
   );
@@ -113,7 +113,7 @@ function buildService(overrides: {
     storageService,
     aiSettingsService,
     campaignsService,
-    analyticsRepository,
+    analyticsService,
     aiSettingsManager,
     redisService,
   };
@@ -219,7 +219,7 @@ describe('DashboardService.getAttention', () => {
   });
 
   it('returns items for every fired probe, sorted by severity', async () => {
-    const { service, postsService, integrationService, socialCommentsService, aiSettingsService, analyticsRepository } = buildService({
+    const { service, postsService, integrationService, socialCommentsService, aiSettingsService, analyticsService } = buildService({
       posts: {
         getFailedPosts: vi.fn().mockResolvedValue([{ id: 'p1', content: 'x' }]),
         getFailedPostCount: vi.fn().mockResolvedValue(1),
@@ -230,7 +230,7 @@ describe('DashboardService.getAttention', () => {
     integrationService.getHealthSummary = vi.fn().mockResolvedValue([{ id: 'i1' }]);
     socialCommentsService.getInboxUnreadCount = vi.fn().mockResolvedValue({ unreadCount: 3 });
     aiSettingsService.getMediaJobsWithCounts = vi.fn().mockResolvedValue({ jobs: [], counts: { failed7d: 1 } });
-    analyticsRepository.listAnomalies = vi.fn().mockResolvedValue([{ id: 'a1', title: 'Drop' }]);
+    analyticsService.listAnomalies = vi.fn().mockResolvedValue([{ id: 'a1', title: 'Drop' }]);
 
     const result = await service.getAttention('org-1', 'user-1', allKinds, {
       postsThisCycle: 900,

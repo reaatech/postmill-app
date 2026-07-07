@@ -15,7 +15,7 @@ export const HtmlComponent: FC = () => {
     return () => {
       settings.off('languageChanged', handler);
     };
-  }, []);
+  }, [settings]);
 
   useEffect(() => {
     const htmlElement = document.querySelector('html');

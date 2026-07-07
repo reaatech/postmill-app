@@ -15,10 +15,12 @@ import { useMediaDirectory } from '@gitroom/react/helpers/use.media.directory';
 import clsx from 'clsx';
 import { FileComponent } from '@gitroom/frontend/components/files/file.component';
 import { Canonical } from '@gitroom/react/form/canonical';
+import { useShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
 
 const HashnodeSettings: FC = () => {
   const form = useSettings();
   const { date } = useIntegration();
+  const postSelector = useShowPostSelector(date);
   return (
     <>
       <Input label="Title" {...form.register('title')} />
@@ -26,6 +28,7 @@ const HashnodeSettings: FC = () => {
       <Canonical
         date={date}
         label="Canonical Link"
+        postSelector={postSelector}
         {...form.register('canonical')}
       />
       <FileComponent

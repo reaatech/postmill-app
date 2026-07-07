@@ -61,7 +61,7 @@ export const TagsInput: FC<{
     <div className="flex flex-wrap items-center gap-[6px] px-[8px] py-[6px] bg-newBgColor border border-newTableBorder rounded-[8px] min-h-[40px]">
       {value.map((tag, idx) => (
         <span
-          key={`${tag}-${idx}`}
+          key={tag}
           className="flex items-center gap-[4px] px-[8px] py-[2px] rounded-full bg-btnPrimary/15 text-btnPrimary text-[12px]"
         >
           {tag}

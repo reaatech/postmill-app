@@ -1,21 +1,19 @@
 'use client';
 
-import { FC, useEffect, useRef, useState } from 'react';
+import { FC, useEffect, useMemo, useRef, useState } from 'react';
 import * as Sentry from '@sentry/nextjs';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
 
 export const AttachToFeedbackIcon: FC = () => {
   const { sentryDsn } = useVariables();
-  const [feedback, setFeedback] = useState<any>();
   const buttonRef = useRef<HTMLButtonElement | null>(null);
 
-  useEffect(() => {
-    if (!sentryDsn) return;
+  const feedback = useMemo(() => {
+    if (!sentryDsn) return undefined;
     try {
-      const fb = (Sentry as any).getFeedback?.();
-      setFeedback(fb);
+      return (Sentry as any).getFeedback?.();
     } catch (e) {
-      setFeedback(undefined);
+      return undefined;
     }
   }, [sentryDsn]);
 

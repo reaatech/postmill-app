@@ -15,12 +15,6 @@ export const AfterActivate = () => {
   const t = useT();
   const [datafast_visitor_id] = useCookie('datafast_visitor_id');
 
-  useEffect(() => {
-    if (!run.current) {
-      run.current = true;
-      loadCode();
-    }
-  }, []);
   const loadCode = useCallback(async () => {
     if (params.code) {
       const { can } = await (
@@ -39,7 +33,16 @@ export const AfterActivate = () => {
         setShowLoader(false);
       }
     }
-  }, []);
+  }, [params.code, datafast_visitor_id, fetch]);
+
+  useEffect(() => {
+    // Guard against double-invocation in React StrictMode
+    if (!run.current) {
+      run.current = true;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      loadCode();
+    }
+  }, [loadCode]);
   return (
     <>
       {showLoader ? (

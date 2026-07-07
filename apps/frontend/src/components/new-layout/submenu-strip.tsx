@@ -73,7 +73,7 @@ export const SubmenuStrip: FC<{ items: StripItem[]; ariaLabel?: string }> = ({
           );
 
           return (
-            <Fragment key={i}>
+            <Fragment key={it.label}>
               {showSection && (
                 <span className="shrink-0 pl-[6px] pr-[2px] text-[10px] font-semibold uppercase tracking-wider text-newTableText select-none">
                   {it.section}

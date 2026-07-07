@@ -6,8 +6,11 @@ export const createAnalyticsBackfill = (analyticsActivity: AnalyticsActivity) =>
     { id: 'analytics-backfill' },
     { event: 'analytics/backfill' },
     async ({ step, event }) => {
-      await step.run('backfill', () =>
-        analyticsActivity.backfillIntegration(event.data.integrationId)
-      );
+      await step.run('backfill', () => {
+        const { integrationId, organizationId } = event.data;
+        return analyticsActivity.backfillIntegration(
+          organizationId ? { integrationId, organizationId } : integrationId
+        );
+      });
     }
   );

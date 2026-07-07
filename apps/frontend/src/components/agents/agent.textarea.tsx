@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 
 interface AutoResizingTextareaProps {
@@ -44,7 +46,7 @@ const AutoResizingTextarea = forwardRef<HTMLTextAreaElement, AutoResizingTextare
       };
 
       calculateMaxHeight();
-    }, [maxRows]);
+    }, [maxRows, autoFocus]);
 
     useEffect(() => {
       const textarea = internalTextareaRef.current;

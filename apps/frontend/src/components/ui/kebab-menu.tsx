@@ -117,10 +117,11 @@ export const KebabMenu: FC<KebabMenuProps> = ({
             }
             const it = item as Exclude<KebabMenuItem, { divider: true }>;
             const cls = clsx(itemCls, it.danger ? 'text-red-500 hover:bg-red-500/10' : 'text-textColor');
+            const itemKey = it.href || (typeof it.label === 'string' ? it.label : `item-${i}`);
             if (it.href) {
               return (
                 <a
-                  key={i}
+                  key={itemKey}
                   role="menuitem"
                   href={it.href}
                   download={it.download}
@@ -137,7 +138,7 @@ export const KebabMenu: FC<KebabMenuProps> = ({
             }
             return (
               <button
-                key={i}
+                key={itemKey}
                 type="button"
                 role="menuitem"
                 onClick={(e) => {

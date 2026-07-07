@@ -64,7 +64,7 @@ export const PostDetailBody: FC<PostDetailBodyProps> = ({
             </div>
             <div className="grid grid-cols-2 gap-[8px]">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-[64px] bg-newTableHeader rounded-[8px]" />
+                <div key={`metric-skeleton-${i}`} className="h-[64px] bg-newTableHeader rounded-[8px]" />
               ))}
             </div>
           </div>

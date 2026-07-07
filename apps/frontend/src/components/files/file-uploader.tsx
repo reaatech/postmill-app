@@ -6,7 +6,7 @@ import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useUppyUploader } from '@gitroom/frontend/components/files/new.uploader';
 import { Dashboard } from '@uppy/react';
 import { PlusIcon } from '@gitroom/frontend/components/ui/icons';
-import { UPLOAD_ALLOWED_MIME_TYPES } from '@gitroom/nestjs-libraries/upload/upload-limits';
+import { UPLOAD_ALLOWED_MIME_TYPES } from '@gitroom/helpers/upload-limits.client';
 
 export const FileUploader: FC<{
   folderId: string | null;

@@ -65,7 +65,16 @@ export const Composer: FC<ComposerProps> = (props) => {
       useLaunchStore.getState().setCampaignId(null);
       useLaunchStore.getState().setBrandId(null);
     };
-  }, []);
+  }, [
+    props.dummy,
+    props.date,
+    props.allIntegrations,
+    props.addEditSets,
+    setDummy,
+    setDate,
+    setAllIntegrations,
+    setIsCreateSet,
+  ]);
 
   // Looser guard than the old modal wrapper: on the standalone route the store's
   // `integrations` start empty (channels arrive via the `allIntegrations` prop),
@@ -130,7 +139,14 @@ const ComposerInner: FC<ComposerProps> = (props) => {
         }
       }
     }
-  }, [integrations]);
+  }, [
+    integrations,
+    props.set?.posts,
+    props.selectedChannels,
+    existingData.integration,
+    existingData.settings,
+    addOrRemoveSelectedIntegration,
+  ]);
 
   if (existingData.integration && selectedIntegrations.length === 0) {
     return null;
@@ -301,7 +317,20 @@ const ComposerInnerInner: FC<ComposerProps> = (props) => {
     return () => {
       reset();
     };
-  }, []);
+  }, [
+    existingData,
+    props.focusedChannel,
+    props.onlyValues,
+    props.set,
+    isNewPost,
+    setRepeater,
+    setTags,
+    addInternalValue,
+    setCurrent,
+    setEditor,
+    addGlobalValue,
+    reset,
+  ]);
 
   if (!global.length && !internal.length) {
     // Seeding is still in flight (waiting on the auto-signature fetch and the init

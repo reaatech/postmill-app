@@ -27,6 +27,7 @@ import {
   DEFAULT_ANOMALY_FLOORS,
   MetricKind,
 } from '@gitroom/nestjs-libraries/analytics/anomaly.detection';
+import { getRetentionDays } from '@gitroom/nestjs-libraries/analytics/analytics-aggregation';
 
 dayjs.extend(isoWeek);
 
@@ -64,21 +65,6 @@ const DEFAULT_POST_RETENTION_DAYS = 90;
 // so bounded delete+recreate stays correct and — with R1.7 latest-wins —
 // idempotent. Rows that miss the window after a >30-day sweep outage stay daily.
 const POST_ROLLUP_LOOKBACK_DAYS = 30;
-
-function retentionDays(envKey: string, fallback: number): number {
-  const raw = process.env[envKey];
-  if (raw === undefined || raw === '') {
-    return fallback;
-  }
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    Logger.warn(
-      `AnalyticsActivity: invalid ${envKey}="${raw}", falling back to ${fallback}`
-    );
-    return fallback;
-  }
-  return Math.floor(parsed);
-}
 
 // Float env reader (for ANALYTICS_ANOMALY_Z) — invalid/≤0 falls back.
 function envFloat(envKey: string, fallback: number): number {
@@ -153,6 +139,14 @@ export class AnalyticsActivity {
         }
       }
 
+      const channelRows: {
+        organizationId: string;
+        integrationId: string;
+        metric: string;
+        value: number;
+        date: Date;
+      }[] = [];
+
       try {
         const clientInformation = await this._integrationManager.requireClientInformation(
           integration.providerIdentifier,
@@ -178,7 +172,7 @@ export class AnalyticsActivity {
             const val = parseFloat(String(point.total));
             if (isNaN(val)) continue;
 
-            await this._analyticsRepository.upsertChannelSnapshot({
+            channelRows.push({
               organizationId: orgId,
               integrationId: integration.id,
               metric: canonical,
@@ -186,6 +180,10 @@ export class AnalyticsActivity {
               date: dayjs(point.date).startOf('day').toDate(),
             });
           }
+        }
+
+        if (channelRows.length > 0) {
+          await this._analyticsRepository.upsertChannelSnapshots(channelRows);
         }
       } catch (err: any) {
         if (err instanceof RefreshToken) {
@@ -208,8 +206,8 @@ export class AnalyticsActivity {
     const BATCH_SIZE = 500;
     let cursor: string | undefined;
 
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    let hasMore = true;
+    while (hasMore) {
       const posts = (
         await this._analyticsRepository.findPostsForSnapshots(
           orgId,
@@ -222,117 +220,130 @@ export class AnalyticsActivity {
       if (posts.length === 0) break;
 
       for (const post of posts) {
-      if (!post.releaseId || post.releaseId === 'missing') continue;
+        if (!post.releaseId || post.releaseId === 'missing') continue;
 
-      try {
-        const provider = this._integrationManager.getSocialIntegrationUnchecked(
-          post.integration.providerIdentifier
-        );
-        if (!provider?.postAnalytics) continue;
+        const postRows: {
+          organizationId: string;
+          postId: string;
+          integrationId: string;
+          metric: string;
+          value: number;
+          date: Date;
+        }[] = [];
 
-        let token = post.integration.token;
-        if (
-          post.integration.tokenExpiration &&
-          dayjs(post.integration.tokenExpiration).isBefore(dayjs())
-        ) {
-          const refreshed = await this._refreshIntegrationService.refresh(
-            post.integration
+        try {
+          const provider = this._integrationManager.getSocialIntegrationUnchecked(
+            post.integration.providerIdentifier
           );
-          if (!refreshed || !refreshed.accessToken) continue;
-          token = refreshed.accessToken;
-          if (provider.refreshWait) {
-            await timer(10000);
+          if (!provider?.postAnalytics) continue;
+
+          let token = post.integration.token;
+          if (
+            post.integration.tokenExpiration &&
+            dayjs(post.integration.tokenExpiration).isBefore(dayjs())
+          ) {
+            const refreshed = await this._refreshIntegrationService.refresh(
+              post.integration
+            );
+            if (!refreshed || !refreshed.accessToken) continue;
+            token = refreshed.accessToken;
+            if (provider.refreshWait) {
+              await timer(10000);
+            }
           }
-        }
 
-        const clientInformation = await this._integrationManager.requireClientInformation(
-          post.integration.providerIdentifier,
-          post.integration.organizationId,
-          post.integration.providerConfigId
-        ).catch(() => undefined);
-
-        const data = await provider.postAnalytics(
-          post.integration.internalId,
-          token,
-          post.releaseId,
-          2,
-          clientInformation
-        );
-
-        for (const entry of data) {
-          const canonical = normalizeMetric(
+          const clientInformation = await this._integrationManager.requireClientInformation(
             post.integration.providerIdentifier,
-            entry.label
+            post.integration.organizationId,
+            post.integration.providerConfigId
+          ).catch(() => undefined);
+
+          const data = await provider.postAnalytics(
+            post.integration.internalId,
+            token,
+            post.releaseId,
+            2,
+            clientInformation
           );
-          if (!canonical) continue;
 
-          for (const point of entry.data) {
-            const val = parseFloat(String(point.total));
-            if (isNaN(val)) continue;
+          for (const entry of data) {
+            const canonical = normalizeMetric(
+              post.integration.providerIdentifier,
+              entry.label
+            );
+            if (!canonical) continue;
 
-            await this._analyticsRepository.upsertPostSnapshot({
-              organizationId: orgId,
-              postId: post.id,
-              integrationId: post.integrationId,
-              metric: canonical,
-              value: val,
-              date: dayjs(point.date).startOf('day').toDate(),
-            });
+            for (const point of entry.data) {
+              const val = parseFloat(String(point.total));
+              if (isNaN(val)) continue;
+
+              postRows.push({
+                organizationId: orgId,
+                postId: post.id,
+                integrationId: post.integrationId,
+                metric: canonical,
+                value: val,
+                date: dayjs(point.date).startOf('day').toDate(),
+              });
+            }
           }
-        }
 
-        // Update denormalized counters on the Post record
-        const latestSnapshots =
-          await this._analyticsRepository.getLatestPostSnapshots(orgId, [post.id], [
-            'views',
-            'likes',
-            'comments',
-            'impressions',
-            'reactions',
-            'replies',
-          ]);
-
-        const latestByMetric: Record<string, number> = {};
-        for (const snap of latestSnapshots) {
-          if (!(snap.metric in latestByMetric)) {
-            latestByMetric[snap.metric] = snap.value;
+          if (postRows.length > 0) {
+            await this._analyticsRepository.upsertPostSnapshots(postRows);
           }
-        }
 
-        const updateData: Record<string, number> = {};
-        const views = latestByMetric['views'] || latestByMetric['impressions'];
-        const likes = latestByMetric['likes'] || latestByMetric['reactions'];
-        const comments = latestByMetric['comments'] || latestByMetric['replies'];
-        if (views !== undefined) updateData.lastViews = views;
-        if (likes !== undefined) updateData.lastLikes = likes;
-        if (comments !== undefined) updateData.lastComments = comments;
+          // Update denormalized counters on the Post record
+          const latestSnapshots =
+            await this._analyticsRepository.getLatestPostSnapshots(orgId, [post.id], [
+              'views',
+              'likes',
+              'comments',
+              'impressions',
+              'reactions',
+              'replies',
+            ]);
 
-        if (Object.keys(updateData).length > 0) {
-          await this._analyticsRepository.updatePostCounters(
-            post.id,
-            updateData
+          const latestByMetric: Record<string, number> = {};
+          for (const snap of latestSnapshots) {
+            if (!(snap.metric in latestByMetric)) {
+              latestByMetric[snap.metric] = snap.value;
+            }
+          }
+
+          const updateData: Record<string, number> = {};
+          const views = latestByMetric['views'] || latestByMetric['impressions'];
+          const likes = latestByMetric['likes'] || latestByMetric['reactions'];
+          const comments = latestByMetric['comments'] || latestByMetric['replies'];
+          if (views !== undefined) updateData.lastViews = views;
+          if (likes !== undefined) updateData.lastLikes = likes;
+          if (comments !== undefined) updateData.lastComments = comments;
+
+          if (Object.keys(updateData).length > 0) {
+            await this._analyticsRepository.updatePostCounters(
+              post.id,
+              updateData
+            );
+          }
+        } catch (err: any) {
+          if (err instanceof RefreshToken) {
+            continue;
+          }
+          this.logger.error(
+            `AnalyticsActivity: Error collecting post analytics for ${post.id}:`,
+            { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
           );
         }
-      } catch (err: any) {
-        if (err instanceof RefreshToken) {
-          continue;
-        }
-        this.logger.error(
-          `AnalyticsActivity: Error collecting post analytics for ${post.id}:`,
-          { postId: post.id, integrationId: post.integrationId, providerId: post.integration?.providerIdentifier, error: err?.message }
-        );
       }
-    }
 
       cursor = posts[posts.length - 1].id;
-      if (posts.length < BATCH_SIZE) break;
+      hasMore = posts.length === BATCH_SIZE;
     }
   }
 
   async pruneAndRollupSnapshots(orgId: string): Promise<void> {
     const dailyCutoff = dayjs()
       .subtract(
-        retentionDays(
+        getRetentionDays(
           'ANALYTICS_DAILY_RETENTION_DAYS',
           DEFAULT_DAILY_RETENTION_DAYS
         ),
@@ -342,7 +353,7 @@ export class AnalyticsActivity {
       .toDate();
     const postCutoff = dayjs()
       .subtract(
-        retentionDays(
+        getRetentionDays(
           'ANALYTICS_POST_RETENTION_DAYS',
           DEFAULT_POST_RETENTION_DAYS
         ),
@@ -524,7 +535,7 @@ export class AnalyticsActivity {
   async detectAnomalies(orgId: string): Promise<void> {
     try {
       const z = envFloat('ANALYTICS_ANOMALY_Z', 3);
-      const cooldownDays = retentionDays('ANALYTICS_ANOMALY_COOLDOWN_DAYS', 3);
+      const cooldownDays = getRetentionDays('ANALYTICS_ANOMALY_COOLDOWN_DAYS', 3);
 
       const since = dayjs().subtract(35, 'day').startOf('day').toDate();
       const loaded =
@@ -584,6 +595,19 @@ export class AnalyticsActivity {
       };
       const pending: Pending[] = [];
 
+      type FiredGroup = {
+        integrationId: string;
+        metric: string;
+        candidateDate: Date;
+        result: {
+          value: number;
+          baseline: number;
+          deviation: number;
+          direction: string;
+        };
+      };
+      const fired: FiredGroup[] = [];
+
       for (const g of groups.values()) {
         const def = METRIC_REGISTRY[g.metric];
         const kind: MetricKind = def?.kind === 'stock' ? 'stock' : 'flow';
@@ -593,57 +617,144 @@ export class AnalyticsActivity {
         });
         if (!result) continue;
 
-        const candidateDate = g.series[g.series.length - 1].date;
+        fired.push({
+          integrationId: g.integrationId,
+          metric: g.metric,
+          candidateDate: g.series[g.series.length - 1].date,
+          result,
+        });
+      }
 
-        // Root-cause hint (4.9): for post-attributable metrics, find the top
-        // post on the anomalous day. Channel-level metrics (followers) → null.
-        let topPostId: string | null = null;
-        let topPostTitle: string | undefined;
-        try {
-          const dayStart = dayjs(candidateDate).startOf('day').toDate();
-          const dayEnd = dayjs(candidateDate).endOf('day').toDate();
-          const dayPosts = await this._analyticsRepository.getDayPostSnapshots(
-            orgId,
-            [g.integrationId],
-            g.metric,
-            dayStart,
-            dayEnd,
-          );
-          if (dayPosts.length > 0) {
-            const top = dayPosts.reduce((a, b) => (b.value > a.value ? b : a));
-            topPostId = top.postId;
-            const content = (top as any).post?.content as string | undefined;
-            if (content) {
-              topPostTitle = content.replace(/<[^>]*>/g, '').slice(0, 80).trim();
+      // Root-cause hint (4.9): batch-read the top post for every fired group in
+      // one query (ANALYTICS-06). Falls back to one query per group when the
+      // batch method is unavailable (e.g. older test mocks).
+      const rootCauseByGroup = new Map<
+        string,
+        { topPostId: string | null; topPostTitle?: string }
+      >();
+      if (fired.length > 0) {
+        if (
+          typeof this._analyticsRepository.getDayPostSnapshotsForGroups ===
+          'function'
+        ) {
+          try {
+            const starts = fired.map((f) => dayjs(f.candidateDate).startOf('day'));
+            const ends = fired.map((f) => dayjs(f.candidateDate).endOf('day'));
+            const dayStart = starts
+              .reduce((min, d) => (d.isBefore(min) ? d : min))
+              .toDate();
+            const dayEnd = ends
+              .reduce((max, d) => (d.isAfter(max) ? d : max))
+              .toDate();
+            const allDayPosts =
+              await this._analyticsRepository.getDayPostSnapshotsForGroups(
+                orgId,
+                fired.map((f) => ({
+                  integrationId: f.integrationId,
+                  metric: f.metric,
+                })),
+                dayStart,
+                dayEnd
+              );
+
+            const firedMap = new Map(
+              fired.map((f) => [`${f.integrationId}::${f.metric}`, f])
+            );
+            const grouped = new Map<string, typeof allDayPosts>();
+            for (const row of allDayPosts) {
+              const key = `${row.integrationId}::${row.metric}`;
+              const fg = firedMap.get(key);
+              if (
+                !fg ||
+                !dayjs(row.date).isSame(dayjs(fg.candidateDate), 'day')
+              ) {
+                continue;
+              }
+              if (!grouped.has(key)) grouped.set(key, []);
+              grouped.get(key)!.push(row);
+            }
+
+            for (const fg of fired) {
+              const key = `${fg.integrationId}::${fg.metric}`;
+              const rows = grouped.get(key) || [];
+              if (rows.length === 0) continue;
+              const top = rows.reduce((a, b) =>
+                b.value > a.value ? b : a
+              );
+              const content = (top as any).post?.content as
+                | string
+                | undefined;
+              rootCauseByGroup.set(key, {
+                topPostId: top.postId,
+                topPostTitle: content
+                  ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+                  : undefined,
+              });
+            }
+          } catch {
+            // root-cause is best-effort; never block an anomaly on it
+          }
+        } else {
+          for (const fg of fired) {
+            try {
+              const dayStart = dayjs(fg.candidateDate).startOf('day').toDate();
+              const dayEnd = dayjs(fg.candidateDate).endOf('day').toDate();
+              const dayPosts = await this._analyticsRepository.getDayPostSnapshots(
+                orgId,
+                [fg.integrationId],
+                fg.metric,
+                dayStart,
+                dayEnd
+              );
+              if (dayPosts.length > 0) {
+                const top = dayPosts.reduce((a, b) =>
+                  b.value > a.value ? b : a
+                );
+                const content = (top as any).post?.content as
+                  | string
+                  | undefined;
+                rootCauseByGroup.set(`${fg.integrationId}::${fg.metric}`, {
+                  topPostId: top.postId,
+                  topPostTitle: content
+                    ? content.replace(/<[^>]*>/g, '').slice(0, 80).trim()
+                    : undefined,
+                });
+              }
+            } catch {
+              // root-cause is best-effort
             }
           }
-        } catch {
-          // root-cause is best-effort; never block an anomaly on it
         }
+      }
+
+      for (const fg of fired) {
+        const key = `${fg.integrationId}::${fg.metric}`;
+        const rc = rootCauseByGroup.get(key);
 
         const recent = await this._analyticsRepository.getRecentAnomaly(
           orgId,
-          g.integrationId,
-          g.metric,
-          result.direction,
+          fg.integrationId,
+          fg.metric,
+          fg.result.direction,
           cooldownFrom,
         );
 
         pending.push({
           row: {
             organizationId: orgId,
-            integrationId: g.integrationId,
-            metric: g.metric,
-            date: candidateDate,
-            value: result.value,
-            baseline: result.baseline,
-            deviation: result.deviation,
-            direction: result.direction,
-            topPostId,
+            integrationId: fg.integrationId,
+            metric: fg.metric,
+            date: fg.candidateDate,
+            value: fg.result.value,
+            baseline: fg.result.baseline,
+            deviation: fg.result.deviation,
+            direction: fg.result.direction,
+            topPostId: rc?.topPostId ?? null,
           },
           canNotify: !recent,
-          integrationName: intById.get(g.integrationId)?.name || 'a channel',
-          topPostTitle,
+          integrationName:
+            intById.get(fg.integrationId)?.name || 'a channel',
+          topPostTitle: rc?.topPostTitle,
         });
       }
 
@@ -1055,9 +1166,21 @@ export class AnalyticsActivity {
     }
   }
 
-  async backfillIntegration(integrationId: string): Promise<void> {
+  async backfillIntegration(
+    payload: string | { integrationId: string; organizationId: string }
+  ): Promise<void> {
+    const integrationId =
+      typeof payload === 'string' ? payload : payload.integrationId;
+    const organizationId =
+      typeof payload === 'string' ? undefined : payload.organizationId;
+
     const integration = decryptIntegrationTokens(
-      await this._analyticsRepository.findIntegrationByIdRaw(integrationId)
+      organizationId
+        ? await this._analyticsRepository.findIntegrationByIdRaw(
+            integrationId,
+            organizationId
+          )
+        : await this._analyticsRepository.findIntegrationByIdRaw(integrationId)
     );
     if (!integration || integration.type !== 'social') return;
 
@@ -1083,6 +1206,14 @@ export class AnalyticsActivity {
       }
     }
 
+    const backfillRows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[] = [];
+
     try {
       const clientInformation = await this._integrationManager.requireClientInformation(
         integration.providerIdentifier,
@@ -1103,7 +1234,7 @@ export class AnalyticsActivity {
           const val = parseFloat(String(point.total));
           if (isNaN(val)) continue;
 
-          await this._analyticsRepository.upsertChannelSnapshot({
+          backfillRows.push({
             organizationId: integration.organizationId,
             integrationId: integration.id,
             metric: canonical,
@@ -1111,6 +1242,10 @@ export class AnalyticsActivity {
             date: dayjs(point.date).startOf('day').toDate(),
           });
         }
+      }
+
+      if (backfillRows.length > 0) {
+        await this._analyticsRepository.upsertChannelSnapshots(backfillRows);
       }
     } catch (err: any) {
       if (err instanceof RefreshToken) return;
@@ -1237,13 +1372,7 @@ export class AnalyticsActivity {
   }
 
   async pruneShortLinkSnapshots(orgId: string): Promise<void> {
-    const retentionDays = (() => {
-      const raw = process.env.ANALYTICS_POST_RETENTION_DAYS;
-      if (raw === undefined || raw === '') return 90;
-      const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed <= 0) return 90;
-      return Math.floor(parsed);
-    })();
+    const retentionDays = getRetentionDays('ANALYTICS_POST_RETENTION_DAYS', 90);
 
     const before = dayjs().subtract(retentionDays, 'day').startOf('day').toDate();
     await this._shortLinkSettingsRepository.pruneSnapshots(orgId, before);

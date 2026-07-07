@@ -1,3 +1,5 @@
+'use client';
+
 import { useSearchParams } from 'next/navigation';
 import { FC, useEffect } from 'react';
 import { useFireEvents } from '@gitroom/helpers/utils/use.fire.events';
@@ -9,6 +11,6 @@ export const NewSubscription: FC = () => {
     if (check) {
       fireEvents('purchase');
     }
-  }, [query]);
+  }, [query, fireEvents]);
   return null;
 };

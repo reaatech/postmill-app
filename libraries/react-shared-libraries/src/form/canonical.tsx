@@ -10,7 +10,6 @@ import React, {
 import { clsx } from 'clsx';
 import { useFormContext } from 'react-hook-form';
 import dayjs from 'dayjs';
-import { useShowPostSelector } from '../../../../apps/frontend/src/components/post-url-selector/post.url.selector';
 import { TranslatedLabel } from '../translation/translated-label';
 
 export const Canonical: FC<
@@ -22,6 +21,7 @@ export const Canonical: FC<
     name: string;
     translationKey?: string;
     translationParams?: Record<string, string | number>;
+    postSelector?: (date: dayjs.Dayjs) => Promise<string>;
   }
 > = (props) => {
   const {
@@ -32,6 +32,7 @@ export const Canonical: FC<
     error,
     translationKey,
     translationParams,
+    postSelector,
     ...rest
   } = props;
   const form = useFormContext();
@@ -40,9 +41,11 @@ export const Canonical: FC<
     if (!form || !form.formState.errors[props?.name!]) return;
     return form?.formState?.errors?.[props?.name!]?.message! as string;
   }, [form?.formState?.errors?.[props?.name!]?.message, error]);
-  const postSelector = useShowPostSelector(date);
   const onPostSelector = useCallback(async () => {
-    const id = await postSelector();
+    if (!postSelector) {
+      return;
+    }
+    const id = await postSelector(date);
     if (disableForm) {
       // @ts-ignore
       return rest.onChange({
@@ -54,7 +57,7 @@ export const Canonical: FC<
       });
     }
     return form.setValue(props.name, id);
-  }, [form]);
+  }, [form, postSelector, date, disableForm, props.name, rest.onChange]);
   return (
     <div className="flex flex-col gap-[6px]">
       <div className="flex items-center gap-[3px]">

@@ -6,7 +6,7 @@
     "bcrypt": "^6.0.0",
     "dotenv": "^16.5.0",
     "evp_bytestokey": "^1.0.3",
-    "parse5": "^6.0.1",
+    "isomorphic-dompurify": "^3.15.0",
     "tldts": "^6.1.47",
     "twitter-text": "^3.1.0",
     "next-plausible": "^3.12.0"

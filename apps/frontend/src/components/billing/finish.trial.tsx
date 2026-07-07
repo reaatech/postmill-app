@@ -1,4 +1,6 @@
-import React, { FC, useCallback, useEffect, useState } from 'react';
+'use client';
+
+import React, { FC, useEffect, useState } from 'react';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
 import { LoadingComponent } from '@gitroom/frontend/components/layout/loading';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
@@ -9,26 +11,33 @@ export const FinishTrial: FC<{ close: () => void }> = (props) => {
   const [finished, setFinished] = useState(false);
   const fetch = useFetch();
 
-  const finishSubscription = useCallback(async () => {
-    await fetch('/billing/finish-trial', {
-      method: 'POST',
-    });
-    checkFinished();
-  }, []);
-
-  const checkFinished = useCallback(async () => {
-    const {finished} = await (await fetch('/billing/is-trial-finished')).json();
-    if (!finished) {
-      await timer(2000);
-      return checkFinished();
-    }
-
-    setFinished(true);
-  }, []);
-
   useEffect(() => {
-    finishSubscription();
-  }, []);
+    let mounted = true;
+
+    const checkFinished = async () => {
+      const { finished } = await (await fetch('/billing/is-trial-finished')).json();
+      if (!mounted) return;
+      if (!finished) {
+        await timer(2000);
+        return checkFinished();
+      }
+
+      setFinished(true);
+    };
+
+    (async () => {
+      await fetch('/billing/finish-trial', {
+        method: 'POST',
+      });
+      if (mounted) {
+        checkFinished();
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [fetch]);
 
   return (
     <div className="text-textColor fixed start-0 top-0 bg-primary/80 z-[300] w-full h-full p-[60px] animate-fade justify-center flex bg-black/50">

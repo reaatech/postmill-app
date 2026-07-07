@@ -43,7 +43,11 @@ export function useProviderVersionSelection(
   // Adopt the resolved default once the catalog loads (only while untouched).
   const [touched, setTouched] = useState(false);
   useEffect(() => {
-    if (!touched) setSelected(defaultVersion);
+    if (!touched) {
+      // Sync selected version to the catalog default before the user touches it.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSelected(defaultVersion);
+    }
   }, [defaultVersion, touched]);
 
   const selectVersion = (v: string) => {

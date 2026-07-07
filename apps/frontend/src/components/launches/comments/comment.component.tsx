@@ -1,3 +1,4 @@
+'use client';
 import { FC, Fragment, useCallback, useEffect, useState } from 'react';
 import dayjs from 'dayjs';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
@@ -25,12 +26,12 @@ export const CommentBox: FC<{
     }) => {
       setNewComment(event.target.value);
     },
-    [newComment]
+    []
   );
   const changeIt = useCallback(() => {
     onChange(newComment);
     setNewComment('');
-  }, [newComment]);
+  }, [newComment, onChange]);
   return (
     <div
       className={clsx(
@@ -76,13 +77,16 @@ export const EditableCommentComponent: FC<{
   const [commentContent, setCommentContent] = useState(comment.content);
   const [editMode, setEditMode] = useState(false);
   const user = useUser();
-  const updateComment = useCallback((commentValue: string) => {
-    if (commentValue !== comment.content) {
-      setCommentContent(commentValue);
-      onEdit(commentValue);
-    }
-    setEditMode(false);
-  }, []);
+  const updateComment = useCallback(
+    (commentValue: string) => {
+      if (commentValue !== comment.content) {
+        setCommentContent(commentValue);
+        onEdit(commentValue);
+      }
+      setEditMode(false);
+    },
+    [comment.content, onEdit]
+  );
   const deleteCommentFunction = useCallback(async () => {
     if (
       await deleteDialog(
@@ -92,7 +96,7 @@ export const EditableCommentComponent: FC<{
     ) {
       onDelete();
     }
-  }, []);
+  }, [onDelete]);
   if (editMode) {
     return (
       <CommentBox
@@ -147,15 +151,11 @@ export const CommentComponent: FC<{
   const [commentsList, setCommentsList] = useState<Comments[]>([]);
   const user = useUser();
   const fetch = useFetch();
-  const load = useCallback(async () => {
-    const data = await (
-      await fetch(`/comments/${date.utc().format('YYYY-MM-DDTHH:mm:00')}`)
-    ).json();
-    setCommentsList(data);
-  }, []);
   useEffect(() => {
-    load();
-  }, []);
+    fetch(`/comments/${date.utc().format('YYYY-MM-DDTHH:mm:00')}`)
+      .then((response) => response.json())
+      .then((data) => setCommentsList(data));
+  }, [date, fetch]);
   const editComment = useCallback(
     (comment: Comments) => async (content: string) => {
       fetch(`/comments/${comment.id}`, {
@@ -166,7 +166,7 @@ export const CommentComponent: FC<{
         }),
       });
     },
-    []
+    [date, fetch]
   );
   const addComment = useCallback(
     async (content: string) => {
@@ -192,7 +192,7 @@ export const CommentComponent: FC<{
         ...list,
       ]);
     },
-    [commentsList, setCommentsList]
+    [date, fetch, user]
   );
   const deleteComment = useCallback(
     (comment: Comments) => async () => {
@@ -201,7 +201,7 @@ export const CommentComponent: FC<{
       });
       setCommentsList((list) => list.filter((item) => item.id !== comment.id));
     },
-    [commentsList, setCommentsList]
+    [fetch]
   );
   const deleteChildrenComment = useCallback(
     (parent: Comments, children: Comments) => async () => {
@@ -222,7 +222,7 @@ export const CommentComponent: FC<{
         })
       );
     },
-    [commentsList, setCommentsList]
+    [fetch]
   );
   const addChildrenComment = useCallback(
     (comment: Comments) => async (content: string) => {
@@ -258,7 +258,7 @@ export const CommentComponent: FC<{
         })
       );
     },
-    [commentsList]
+    [date, fetch, user]
   );
   const extractNameFromEmailAndCapitalize = useCallback((email: string) => {
     return (
@@ -290,8 +290,8 @@ export const CommentComponent: FC<{
       </button>
 
       <div>
-        {commentsList.map((comment, index) => (
-          <Fragment key={`comment_${index}_${comment.content}`}>
+        {commentsList.map((comment) => (
+          <Fragment key={comment.id}>
             <div
               className={clsx(
                 `flex relative flex-col`,
@@ -322,9 +322,9 @@ export const CommentComponent: FC<{
               </div>
 
               <div className="flex flex-col gap-[10px]">
-                {comment?.childrenComment?.map((childComment, index2) => (
+                {comment?.childrenComment?.map((childComment) => (
                   <div
-                    key={`comment2_${index2}_${childComment.content}`}
+                    key={childComment.id}
                     className={clsx(`flex gap-[8px] relative`)}
                   >
                     <div className="w-[40px] flex flex-col items-center">

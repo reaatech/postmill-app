@@ -4,7 +4,6 @@ import React, { useMemo, useState } from 'react';
 import dayjs from 'dayjs';
 import { useIntegrationList } from '@gitroom/frontend/components/launches/helpers/use.integration.list';
 import { useOverview } from '@gitroom/frontend/components/analytics-v2/hooks/useOverview';
-import { useRecommendations } from '@gitroom/frontend/components/analytics-v2/hooks/useRecommendations';
 import { useDashboardSummary } from './hooks/useDashboardSummary';
 import { LineChart } from '@gitroom/frontend/components/analytics-v2/charts/line.chart';
 import { EmptyState } from '@gitroom/frontend/components/analytics-v2/kit/states';
@@ -51,8 +50,8 @@ export const DashboardComponent = () => {
     [integrations]
   );
 
-  const from = useMemo(() => dayjs().subtract(7, 'day').format('YYYY-MM-DD'), []);
-  const to = useMemo(() => dayjs().format('YYYY-MM-DD'), []);
+  const from = dayjs().subtract(7, 'day').format('YYYY-MM-DD');
+  const to = dayjs().format('YYYY-MM-DD');
 
   const { data: overviewData, isLoading: overviewLoading } = useOverview({
     from,
@@ -60,8 +59,6 @@ export const DashboardComponent = () => {
     integrations: activeIntegrationIds,
     compare: false,
   });
-
-  const { isLoading: recsLoading } = useRecommendations();
 
   const mainKPI = overviewData?.kpis?.[0];
   const series = useMemo(() => {
@@ -198,11 +195,7 @@ export const DashboardComponent = () => {
             viewAllHref="/analytics?tab=insights"
             permission={['posts', 'read']}
           >
-            {recsLoading ? (
-              <div className="animate-pulse h-[100px] bg-newTableHeader rounded-[4px]" />
-            ) : (
-              <RecommendationsStrip />
-            )}
+            <RecommendationsStrip />
           </SectionCard>
         </div>
       </div>

@@ -15,16 +15,19 @@ import clsx from 'clsx';
 import { Canonical } from '@gitroom/react/form/canonical';
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { useSettings } from '@gitroom/frontend/components/launches/helpers/use.values';
+import { useShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
 
 const DevtoSettings: FC = () => {
   const form = useSettings();
   const { date } = useIntegration();
+  const postSelector = useShowPostSelector(date);
   return (
     <>
       <Input label="Title" {...form.register('title')} />
       <Canonical
         date={date}
         label="Canonical Link"
+        postSelector={postSelector}
         {...form.register('canonical')}
       />
       <FileComponent

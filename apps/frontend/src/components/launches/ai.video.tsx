@@ -1,3 +1,4 @@
+'use client';
 import { Button } from '@gitroom/react/form/button';
 import { FC, useCallback, useEffect, useState } from 'react';
 import clsx from 'clsx';
