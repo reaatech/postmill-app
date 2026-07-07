@@ -103,8 +103,10 @@ describe('AnalyticsActivity', () => {
 
     analyticsRepository = {
       upsertChannelSnapshot: vi.fn().mockResolvedValue({}),
+      upsertChannelSnapshots: vi.fn().mockResolvedValue({}),
       findPostsForSnapshots: vi.fn().mockResolvedValue([]),
       upsertPostSnapshot: vi.fn().mockResolvedValue({}),
+      upsertPostSnapshots: vi.fn().mockResolvedValue({}),
       getLatestPostSnapshots: vi.fn().mockResolvedValue([]),
       updatePostCounters: vi.fn().mockResolvedValue({}),
       deletePostSnapshotsBefore: vi.fn().mockResolvedValue({ count: 0 }),
@@ -282,7 +284,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('skips provider that has no analytics method', async () => {
@@ -293,7 +295,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('calls provider.analytics with correct arguments', async () => {
@@ -458,31 +460,31 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(3);
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledTimes(1);
 
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
-        organizationId: orgId,
-        integrationId: 'int-1',
-        metric: 'impressions',
-        value: 500,
-        date: date1,
-      });
-
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
-        organizationId: orgId,
-        integrationId: 'int-1',
-        metric: 'impressions',
-        value: 300,
-        date: date2,
-      });
-
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
-        organizationId: orgId,
-        integrationId: 'int-1',
-        metric: 'followers',
-        value: 1200,
-        date: date1,
-      });
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
+        {
+          organizationId: orgId,
+          integrationId: 'int-1',
+          metric: 'impressions',
+          value: 500,
+          date: date1,
+        },
+        {
+          organizationId: orgId,
+          integrationId: 'int-1',
+          metric: 'impressions',
+          value: 300,
+          date: date2,
+        },
+        {
+          organizationId: orgId,
+          integrationId: 'int-1',
+          metric: 'followers',
+          value: 1200,
+          date: date1,
+        },
+      ]);
     });
 
     it('skips entries where normalizeMetric returns undefined', async () => {
@@ -500,7 +502,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('skips NaN values in data points', async () => {
@@ -522,10 +524,10 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectChannelSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith(
-        expect.objectContaining({ value: 500 })
-      );
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
+        expect.objectContaining({ value: 500 }),
+      ]);
     });
 
     it('handles RefreshToken errors gracefully by continuing to next integration', async () => {
@@ -555,7 +557,7 @@ describe('AnalyticsActivity', () => {
 
       expect(provider1.analytics).toHaveBeenCalled();
       expect(provider2.analytics).toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledTimes(1);
       expect(Logger.prototype.error).not.toHaveBeenCalled();
     });
 
@@ -594,7 +596,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('handles all integrations being non-social', async () => {
@@ -607,7 +609,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('handles all integrations being disabled', async () => {
@@ -620,7 +622,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectChannelSnapshots(orgId, daysBack);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('handles token refresh returning false', async () => {
@@ -903,25 +905,26 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(2);
+      expect(analyticsRepository.upsertPostSnapshots).toHaveBeenCalledTimes(1);
 
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith({
-        organizationId: orgId,
-        postId: 'post-1',
-        integrationId: 'int-1',
-        metric: 'likes',
-        value: 42,
-        date: date1,
-      });
-
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith({
-        organizationId: orgId,
-        postId: 'post-1',
-        integrationId: 'int-1',
-        metric: 'comments',
-        value: 7,
-        date: date1,
-      });
+      expect(analyticsRepository.upsertPostSnapshots).toHaveBeenCalledWith([
+        {
+          organizationId: orgId,
+          postId: 'post-1',
+          integrationId: 'int-1',
+          metric: 'likes',
+          value: 42,
+          date: date1,
+        },
+        {
+          organizationId: orgId,
+          postId: 'post-1',
+          integrationId: 'int-1',
+          metric: 'comments',
+          value: 7,
+          date: date1,
+        },
+      ]);
     });
 
     it('skips entries where normalizeMetric returns undefined for posts', async () => {
@@ -960,10 +963,10 @@ describe('AnalyticsActivity', () => {
 
       await activity.collectPostSnapshots(orgId, daysBack);
 
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(1);
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledWith(
-        expect.objectContaining({ value: 42 })
-      );
+      expect(analyticsRepository.upsertPostSnapshots).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertPostSnapshots).toHaveBeenCalledWith([
+        expect.objectContaining({ value: 42 }),
+      ]);
     });
 
     it('handles RefreshToken errors gracefully for posts', async () => {
@@ -985,7 +988,7 @@ describe('AnalyticsActivity', () => {
       await activity.collectPostSnapshots(orgId, daysBack);
 
       expect(provider.postAnalytics).toHaveBeenCalledTimes(2);
-      expect(analyticsRepository.upsertPostSnapshot).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertPostSnapshots).toHaveBeenCalledTimes(1);
       expect(Logger.prototype.error).not.toHaveBeenCalled();
     });
 
@@ -1072,7 +1075,7 @@ describe('AnalyticsActivity', () => {
       await activity.backfillIntegration(integrationId);
 
       expect(integrationManager.getSocialIntegrationUnchecked).not.toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('returns early when integration type is not social', async () => {
@@ -1091,7 +1094,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.backfillIntegration(integrationId);
 
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('returns early when getSocialIntegrationUnchecked returns null', async () => {
@@ -1100,7 +1103,7 @@ describe('AnalyticsActivity', () => {
 
       await activity.backfillIntegration(integrationId);
 
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('calls provider.analytics with 90 days back', async () => {
@@ -1182,13 +1185,15 @@ describe('AnalyticsActivity', () => {
 
       await activity.backfillIntegration(integrationId);
 
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith({
-        organizationId: 'org-1',
-        integrationId,
-        metric: 'impressions',
-        value: 999,
-        date: date1,
-      });
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
+        expect.objectContaining({
+          organizationId: 'org-1',
+          integrationId,
+          metric: 'impressions',
+          value: 999,
+          date: date1,
+        }),
+      ]);
     });
 
     it('skips NaN values during backfill', async () => {
@@ -1209,10 +1214,10 @@ describe('AnalyticsActivity', () => {
 
       await activity.backfillIntegration(integrationId);
 
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledTimes(1);
-      expect(analyticsRepository.upsertChannelSnapshot).toHaveBeenCalledWith(
-        expect.objectContaining({ value: 100 })
-      );
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledTimes(1);
+      expect(analyticsRepository.upsertChannelSnapshots).toHaveBeenCalledWith([
+        expect.objectContaining({ value: 100 }),
+      ]);
     });
 
     it('handles RefreshToken errors by returning early', async () => {
@@ -1228,7 +1233,7 @@ describe('AnalyticsActivity', () => {
       await activity.backfillIntegration(integrationId);
 
       expect(Logger.prototype.error).not.toHaveBeenCalled();
-      expect(analyticsRepository.upsertChannelSnapshot).not.toHaveBeenCalled();
+      expect(analyticsRepository.upsertChannelSnapshots).not.toHaveBeenCalled();
     });
 
     it('handles generic errors during backfill by logging', async () => {

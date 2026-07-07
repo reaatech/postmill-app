@@ -7,6 +7,7 @@ import {
   METRIC_REGISTRY,
   isKnownMetric,
 } from '@gitroom/nestjs-libraries/integrations/social/analytics.metrics';
+import { Logger } from '@nestjs/common';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import {
@@ -192,16 +193,27 @@ export function buildSeries(
   return result;
 }
 
+// ── Shared retention-day env parser (ANALYTICS-09/10) ──
+export function getRetentionDays(envKey: string, fallback: number): number {
+  const raw = process.env[envKey];
+  if (raw === undefined || raw === '') return fallback;
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    Logger.warn(
+      `AnalyticsAggregation: invalid ${envKey}="${raw}", falling back to ${fallback}`,
+      'AnalyticsAggregation'
+    );
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
 // ── 6.1: campaign-series granularity labelling ──
 // Mirrors ANALYTICS_POST_RETENTION_DAYS (analytics.activity.ts). Post snapshots
 // older than this are rolled up into weekly rows instead of deleted, so a
 // campaign series is daily within the window and weekly beyond it.
 export function postSnapshotRetentionDays(): number {
-  const raw = process.env.ANALYTICS_POST_RETENTION_DAYS;
-  if (raw === undefined || raw === '') return 90;
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) return 90;
-  return Math.floor(parsed);
+  return getRetentionDays('ANALYTICS_POST_RETENTION_DAYS', 90);
 }
 
 // Label each series point 'daily' (within the retention window from now) or

@@ -353,6 +353,29 @@ export class AnalyticsRepository {
     });
   }
 
+  // Single round-trip root-cause read for anomaly detection (ANALYTICS-06):
+  // fetches day-post snapshots for every fired (integration, metric) group at
+  // once, bounded by the union of their candidate dates.
+  getDayPostSnapshotsForGroups(
+    orgId: string,
+    groups: { integrationId: string; metric: string }[],
+    dateStart: Date,
+    dateEnd: Date,
+  ) {
+    if (groups.length === 0) return Promise.resolve([]);
+    return this._postAnalyticsSnapshot.model.postAnalyticsSnapshot.findMany({
+      where: {
+        organizationId: orgId,
+        date: { gte: dateStart, lte: dateEnd },
+        OR: groups.map((g) => ({
+          integrationId: g.integrationId,
+          metric: g.metric,
+        })),
+      },
+      include: { post: { select: { content: true, publishDate: true } } },
+    });
+  }
+
   getChannelAnalyticsSnapshots(
     orgId: string,
     integrationId: string,
@@ -445,14 +468,13 @@ export class AnalyticsRepository {
   }
 
   async getCommentBacklogCount(orgId: string): Promise<number> {
-    const count = await this._prisma.$queryRawUnsafe<[{ count: bigint }]>(
-      `SELECT COUNT(*)::int as count FROM "SocialComment" sc
-       WHERE sc."organizationId" = $1
-         AND sc."deletedAt" IS NULL
-         AND sc."isOwn" = false
-         AND sc."status" IS DISTINCT FROM 'handled'`,
-      orgId
-    );
+    const count = await this._prisma.$queryRaw<[{ count: number }]>`
+      SELECT COUNT(*)::int as count FROM "SocialComment" sc
+      WHERE sc."organizationId" = ${orgId}
+        AND sc."deletedAt" IS NULL
+        AND sc."isOwn" = ${false}
+        AND sc."status" IS DISTINCT FROM ${'handled'}
+    `;
     return Number(count[0]?.count || 0);
   }
 
@@ -548,6 +570,69 @@ export class AnalyticsRepository {
       },
       update: { value: params.value },
     });
+  }
+
+  // Batch equivalent of upsertChannelSnapshot (ANALYTICS-04): delete the existing
+  // rows for the unique dimensions (org + integration + metric + date), then
+  // recreate them. `skipDuplicates` makes sweep retries idempotent.
+  upsertChannelSnapshots(
+    rows: {
+      organizationId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[],
+  ) {
+    if (rows.length === 0) return Promise.resolve({ count: 0 });
+    return this._prisma.$transaction([
+      this._prisma.analyticsSnapshot.deleteMany({
+        where: {
+          OR: rows.map((r) => ({
+            organizationId: r.organizationId,
+            integrationId: r.integrationId,
+            metric: r.metric,
+            date: r.date,
+          })),
+        },
+      }),
+      this._prisma.analyticsSnapshot.createMany({
+        data: rows,
+        skipDuplicates: true,
+      }),
+    ]);
+  }
+
+  // Batch equivalent of upsertPostSnapshot (ANALYTICS-05): delete the existing
+  // rows for the unique dimensions (org + post + metric + date), then recreate
+  // them. `skipDuplicates` makes sweep retries idempotent.
+  upsertPostSnapshots(
+    rows: {
+      organizationId: string;
+      postId: string;
+      integrationId: string;
+      metric: string;
+      value: number;
+      date: Date;
+    }[],
+  ) {
+    if (rows.length === 0) return Promise.resolve({ count: 0 });
+    return this._prisma.$transaction([
+      this._prisma.postAnalyticsSnapshot.deleteMany({
+        where: {
+          OR: rows.map((r) => ({
+            organizationId: r.organizationId,
+            postId: r.postId,
+            metric: r.metric,
+            date: r.date,
+          })),
+        },
+      }),
+      this._prisma.postAnalyticsSnapshot.createMany({
+        data: rows,
+        skipDuplicates: true,
+      }),
+    ]);
   }
 
   updatePostCounters(
@@ -648,9 +733,15 @@ export class AnalyticsRepository {
     ]);
   }
 
-  findIntegrationByIdRaw(integrationId: string) {
-    return this._integration.model.integration.findUnique({
-      where: { id: integrationId },
+  findIntegrationByIdRaw(integrationId: string, organizationId?: string) {
+    // ANALYTICS-01: Integration has `id @id` and a separate @@unique on
+    // (organizationId, internalId), but no unique index on (id, organizationId).
+    // `findUnique` with both fields would throw at runtime, so we use `findFirst`.
+    return this._integration.model.integration.findFirst({
+      where: {
+        id: integrationId,
+        ...(organizationId ? { organizationId } : {}),
+      },
     });
   }
 
