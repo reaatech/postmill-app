@@ -5,7 +5,7 @@
  *
  * Each is a small CONTROLLED component (value + onChange). They are leaf
  * utilities — no data fetching, no global state. Styling targets a dark editor
- * surface using the project tokens (newBgColorInner, newBorder, textColor) with
+ * surface using the project tokens (newBgColorInner, studioBorder, textColor) with
  * the accent `#2B5CD3`.
  */
 
@@ -182,10 +182,10 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
           aria-haspopup="dialog"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-[8px] h-[34px] px-[8px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[13px] hover:border-designerAccent focus:border-designerAccent transition-colors"
+          className="flex items-center gap-[8px] h-[34px] px-[8px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-textColor text-[13px] hover:border-designerAccent focus:border-designerAccent transition-colors"
         >
           <span
-            className="w-[18px] h-[18px] rounded-[4px] border border-newBorder shrink-0"
+            className="w-[18px] h-[18px] rounded-[4px] border border-studioBorder shrink-0"
             style={{ backgroundColor: value }}
           />
           <span className="font-mono uppercase">{value}</span>
@@ -197,12 +197,12 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
         {open && (
           <div
             role="dialog"
-            className="absolute z-50 mt-[6px] left-0 w-[208px] p-[10px] rounded-[10px] bg-newBgColorInner border border-newBorder shadow-menu flex flex-col gap-[10px]"
+            className="absolute z-50 mt-[6px] left-0 w-[208px] p-[10px] rounded-[10px] bg-newBgColorInner border border-studioBorder shadow-menu flex flex-col gap-[10px]"
           >
             {!enforce && (
               <div className="flex items-center gap-[8px]">
                 <span
-                  className="w-[24px] h-[24px] rounded-[6px] border border-newBorder shrink-0"
+                  className="w-[24px] h-[24px] rounded-[6px] border border-studioBorder shrink-0"
                   style={{ backgroundColor: normalizeHex(draft) ?? value }}
                 />
                 <input
@@ -218,7 +218,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                       setOpen(false);
                     }
                   }}
-                  className="flex-1 min-w-0 h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-textColor text-[13px] font-mono uppercase focus:border-designerAccent"
+                  className="flex-1 min-w-0 h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-textColor text-[13px] font-mono uppercase focus:border-designerAccent"
                 />
                 {showEyedropper && (
                   <button
@@ -226,7 +226,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                     aria-label="Pick color from screen"
                     title="Pick color from screen"
                     onClick={handleEyedropper}
-                    className="w-[30px] h-[30px] rounded-[6px] border border-newBorder bg-newBgColor hover:border-designerAccent flex items-center justify-center shrink-0 transition-colors"
+                    className="w-[30px] h-[30px] rounded-[6px] border border-studioBorder bg-newBgColor hover:border-designerAccent flex items-center justify-center shrink-0 transition-colors"
                   >
                     <svg
                       width="14"
@@ -268,7 +268,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                         className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
                         style={{
                           backgroundColor: c,
-                          borderColor: active ? ACCENT : 'var(--new-border)',
+                          borderColor: active ? ACCENT : 'var(--studio-border)',
                         }}
                       />
                     );
@@ -296,7 +296,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                         className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
                         style={{
                           backgroundColor: c,
-                          borderColor: active ? ACCENT : 'var(--new-border)',
+                          borderColor: active ? ACCENT : 'var(--studio-border)',
                         }}
                       />
                     );
@@ -324,7 +324,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                         className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
                         style={{
                           backgroundColor: c,
-                          borderColor: active ? ACCENT : 'var(--new-border)',
+                          borderColor: active ? ACCENT : 'var(--studio-border)',
                         }}
                       />
                     );
@@ -350,7 +350,7 @@ export const ColorSwatch: React.FC<ColorSwatchProps> = ({
                       className="w-[24px] h-[24px] rounded-[6px] border transition-transform hover:scale-110 focus:scale-110"
                       style={{
                         backgroundColor: c,
-                        borderColor: active ? ACCENT : 'var(--new-border)',
+                        borderColor: active ? ACCENT : 'var(--studio-border)',
                       }}
                     />
                   );
@@ -418,7 +418,7 @@ export const Slider: React.FC<SliderProps> = ({
         onBlur={onCommit}
         className="designer-slider w-full h-[4px] appearance-none rounded-full cursor-pointer focus:outline-none"
         style={{
-          background: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT} ${pct}%, var(--new-border) ${pct}%, var(--new-border) 100%)`,
+          background: `linear-gradient(90deg, ${ACCENT} 0%, ${ACCENT} ${pct}%, var(--studio-border) ${pct}%, var(--studio-border) 100%)`,
         }}
       />
     </div>
@@ -454,7 +454,7 @@ export const SegmentedControl: React.FC<SegmentedControlProps> = ({
   return (
     <div
       role="radiogroup"
-      className="inline-flex p-[3px] rounded-[8px] bg-newBgColor border border-newBorder gap-[3px]"
+      className="inline-flex p-[3px] rounded-[8px] bg-newBgColor border border-studioBorder gap-[3px]"
     >
       {options.map((opt) => {
         const active = opt.value === value;
@@ -522,7 +522,7 @@ export const Stepper: React.FC<StepperProps> = ({
           {label}
         </label>
       )}
-      <div className="inline-flex items-center h-[34px] rounded-[8px] bg-newBgColorInner border border-newBorder overflow-hidden">
+      <div className="inline-flex items-center h-[34px] rounded-[8px] bg-newBgColorInner border border-studioBorder overflow-hidden">
         <button
           type="button"
           aria-label="Decrease"
@@ -543,7 +543,7 @@ export const Stepper: React.FC<StepperProps> = ({
             const n = Number(e.target.value);
             if (!Number.isNaN(n)) onChange(clamp(n));
           }}
-          className="w-[56px] h-full text-center bg-transparent text-textColor text-[13px] font-mono border-x border-newBorder focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          className="w-[56px] h-full text-center bg-transparent text-textColor text-[13px] font-mono border-x border-studioBorder focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
         />
         <button
           type="button"
@@ -603,7 +603,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
             move(e.key === 'ArrowDown' ? 1 : -1);
           }
         }}
-        className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[14px] hover:border-designerAccent focus:border-designerAccent transition-colors"
+        className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-textColor text-[14px] hover:border-designerAccent focus:border-designerAccent transition-colors"
       >
         <span className="truncate" style={{ fontFamily: `"${value}"` }}>
           {value}
@@ -621,7 +621,7 @@ export const FontPicker: React.FC<FontPickerProps> = ({
         <ul
           role="listbox"
           aria-label="Font family"
-          className="absolute z-50 mt-[6px] left-0 w-full max-h-[260px] overflow-y-auto p-[4px] rounded-[10px] bg-newBgColorInner border border-newBorder shadow-menu"
+          className="absolute z-50 mt-[6px] left-0 w-full max-h-[260px] overflow-y-auto p-[4px] rounded-[10px] bg-newBgColorInner border border-studioBorder shadow-menu"
         >
           {fonts.map((family) => {
             const active = family === value;

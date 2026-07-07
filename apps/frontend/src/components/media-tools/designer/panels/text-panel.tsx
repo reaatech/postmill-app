@@ -121,7 +121,7 @@ export const TextPanel: FC<TextPanelProps> = ({ store, onClose }) => {
                       })
                     )
                   }
-                  className="w-full rounded-lg border border-newBorder bg-newBgColorInner p-3 text-left hover:border-designerAccent hover:bg-newColColor/10 transition-all group"
+                  className="w-full rounded-lg border border-studioBorder bg-newBgColorInner p-3 text-left hover:border-designerAccent hover:bg-studioBorder/10 transition-all group"
                 >
                   <div
                     className="text-textColor"

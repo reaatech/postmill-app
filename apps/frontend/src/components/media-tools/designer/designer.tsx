@@ -595,7 +595,7 @@ export const Designer: FC<DesignerProps> = ({
         src: imgUrl,
       });
     }
-  }, []);
+  }, [initialAssets, initialAsset, store]);
 
   // Caption handoff (Deepgram studio): open a video project — the source clip on a video
   // track + a caption track pre-built from the word timings. Loads the video's metadata
@@ -931,7 +931,7 @@ export const Designer: FC<DesignerProps> = ({
 
   return (
     <div className={`flex flex-col h-full w-full overflow-hidden bg-newBgColorInner ${isFullscreen ? 'fixed inset-0 z-[100]' : 'relative'}`}>
-      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-newBorder bg-newBgColorInner shrink-0">
+      <div className="flex items-center gap-3 px-3 py-1.5 border-b border-studioBorder bg-newBgColorInner shrink-0">
         <div className="flex items-center gap-2 shrink-0">
           <Logo size={26} className="" />
           <input
@@ -949,7 +949,7 @@ export const Designer: FC<DesignerProps> = ({
           {!isSaving && !isDirty && currentDesignId && (
             <span className="text-green-500">Saved</span>
           )}
-          {!isSaving && isDirty && <span className="text-amber-400">Unsaved</span>}
+          {!isSaving && isDirty && <span className="text-amber-600">Unsaved</span>}
         </div>
 
         <div className="flex-1" />
@@ -960,7 +960,7 @@ export const Designer: FC<DesignerProps> = ({
           <div className="contents mobile:hidden">
           <button
             onClick={() => undo()}
-            className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+            className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
             title="Undo (Ctrl+Z)"
             aria-label="Undo (Ctrl+Z)"
           >
@@ -968,7 +968,7 @@ export const Designer: FC<DesignerProps> = ({
           </button>
           <button
             onClick={() => redo()}
-            className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+            className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
             title="Redo (Ctrl+Shift+Z)"
             aria-label="Redo (Ctrl+Shift+Z)"
           >
@@ -979,7 +979,7 @@ export const Designer: FC<DesignerProps> = ({
               className={`px-2.5 py-1 text-xs rounded border transition-colors ${
                 collabEnabled
                   ? 'bg-green-500/20 border-green-500/30 text-green-400'
-                  : 'border-newBorder text-textColor/70 hover:text-textColor'
+                  : 'border-studioBorder text-textColor/70 hover:text-textColor'
               }`}
               onClick={() => setCollabEnabled(!collabEnabled)}
               title={collabEnabled ? `${connectedCount} connected` : 'Enable real-time collaboration'}
@@ -987,17 +987,17 @@ export const Designer: FC<DesignerProps> = ({
               {collabEnabled ? `👥 ${connectedCount}` : 'Share'}
             </button>
           )}
-          <div className="w-px h-6 bg-newBorder mx-1" />
+          <div className="w-px h-6 bg-studioBorder mx-1" />
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-3 py-1.5 rounded-md text-[12px] border border-newColColor text-textColor hover:bg-boxHover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+            className="px-3 py-1.5 rounded-md text-[12px] border border-studioBorder text-textColor hover:bg-boxHover disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
             aria-label="Save (Ctrl+S)"
           >
             Save
           </button>
           </div>
-          <FullscreenButton className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent shrink-0" />
+          <FullscreenButton className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent shrink-0" />
           <button
             onClick={handleExport}
             disabled={isSaving}
@@ -1017,10 +1017,10 @@ export const Designer: FC<DesignerProps> = ({
           )}
           {closeModal && (
             <>
-              <div className="w-px h-6 bg-newBorder mx-1" />
+              <div className="w-px h-6 bg-studioBorder mx-1" />
               <button
                 onClick={closeModal}
-                className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-newColColor/30 text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+                className="w-8 h-8 flex items-center justify-center rounded text-textColor hover:bg-studioBorder/30 text-[15px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
                 title="Close"
                 aria-label="Close designer"
               >
@@ -1032,7 +1032,7 @@ export const Designer: FC<DesignerProps> = ({
       </div>
 
       <div className="relative flex flex-1 min-h-0 w-full overflow-hidden">
-        <div className="w-[48px] shrink-0 flex flex-col items-center pt-2 gap-1 border-r border-newBorder bg-newBgColorInner z-30">
+        <div className="w-[48px] shrink-0 flex flex-col items-center pt-2 gap-1 border-r border-studioBorder bg-newBgColorInner z-30">
           {panels.map((p) => (
             <button
               key={p.id}
@@ -1047,7 +1047,7 @@ export const Designer: FC<DesignerProps> = ({
               className={`w-9 h-9 flex items-center justify-center rounded-lg text-[15px] transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
                 activePanel === p.id
                   ? 'bg-designerAccent/20 text-designerAccent'
-                  : 'text-textColor/60 hover:bg-newColColor/30 hover:text-textColor'
+                  : 'text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor'
               }`}
               title={p.label}
               aria-label={`${p.label} panel`}
@@ -1058,7 +1058,7 @@ export const Designer: FC<DesignerProps> = ({
         </div>
 
         {activePanel && (
-          <div className="absolute left-[48px] top-0 bottom-0 w-[260px] z-20 border-r border-newBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
+          <div className="absolute left-[48px] top-0 bottom-0 w-[260px] z-20 border-r border-studioBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
             <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider mb-3">
               {panels.find((p) => p.id === activePanel)?.label}
             </div>
@@ -1104,14 +1104,14 @@ export const Designer: FC<DesignerProps> = ({
                 relative parent), so it never covers the timeline/format tabs
                 that sit below the canvas. */}
             {!inspectorCollapsed && (
-              <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-newBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
+              <div className="absolute right-0 top-0 bottom-0 w-[280px] z-20 border-l border-studioBorder bg-newBgColorInner overflow-y-auto p-3 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
                     {hasInspectorTarget ? 'Inspector' : 'Canvas'}
                   </div>
                   <button
                     onClick={() => setInspectorCollapsed(true)}
-                    className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+                    className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
                     title="Collapse panel"
                     aria-label="Collapse properties panel"
                   >
@@ -1133,7 +1133,7 @@ export const Designer: FC<DesignerProps> = ({
             {inspectorCollapsed && (
               <button
                 onClick={() => setInspectorCollapsed(false)}
-                className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-newBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
+                className="absolute right-0 top-2 z-20 px-1.5 py-3 rounded-l-md border border-r-0 border-studioBorder bg-newBgColorInner text-textColor/60 hover:text-textColor shadow-xl text-[14px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
                 title="Show properties"
                 aria-label="Expand properties panel"
               >

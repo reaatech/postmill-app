@@ -223,7 +223,7 @@ export const TextInspector: FC<TextInspectorProps> = ({ store }) => {
                         key={preset.name}
                         type="button"
                         onClick={() => applyPreset(preset)}
-                        className="px-[10px] py-[6px] rounded-[6px] border border-newBorder bg-newBgColorInner text-left hover:border-designerAccent hover:bg-newColColor/10 transition-all"
+                        className="px-[10px] py-[6px] rounded-[6px] border border-studioBorder bg-newBgColorInner text-left hover:border-designerAccent hover:bg-studioBorder/10 transition-all"
                         title={`${preset.name}: ${preset.fontSize}px / ${preset.fontWeight} / ${preset.lineHeight}`}
                       >
                         <div className="flex items-center gap-[6px]">
@@ -257,7 +257,7 @@ export const TextInspector: FC<TextInspectorProps> = ({ store }) => {
               {FONT_PAIRINGS.map((pairing) => (
                 <div
                   key={pairing.name}
-                  className="flex items-center gap-2 rounded-[6px] border border-newBorder bg-newBgColorInner px-[10px] py-[6px]"
+                  className="flex items-center gap-2 rounded-[6px] border border-studioBorder bg-newBgColorInner px-[10px] py-[6px]"
                 >
                   <span className="text-xs text-textColor font-medium">{pairing.name}</span>
                   <div className="flex-1" />

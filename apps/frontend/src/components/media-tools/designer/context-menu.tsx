@@ -115,10 +115,10 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({ x, y, targetType, elem
     >
       {items.map((item, i) => {
         if (item.label === '-')
-          return <div key={i} className="border-t border-[#2a2a4a] my-1" />;
+          return <div key={`divider-${i}`} className="border-t border-[#2a2a4a] my-1" />;
         return (
           <button
-            key={i}
+            key={item.label}
             className="w-full text-left px-3 py-1.5 text-sm text-gray-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent focus-visible:ring-inset"
             onClick={() => {
               item.action?.();

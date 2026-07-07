@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useEffect, useRef } from 'react';
 
 export const RULER_SIZE = 20;

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useCallback, useRef, useEffect, useState } from 'react';
 import { Stage, Layer, Transformer, Rect, Line as KonvaLine, Image as KonvaImage } from 'react-konva';
 import type Konva from 'konva';
@@ -39,13 +41,14 @@ export const DesignerCanvas: FC<CanvasProps> = ({
 }) => {
   const stageRef = useRef<Konva.Stage>(null);
   useEffect(() => {
-    sharedStageRef.current = stageRef.current;
+    const current = stageRef.current;
+    sharedStageRef.current = current;
     return () => {
-      if (sharedStageRef.current === stageRef.current) {
+      if (sharedStageRef.current === current) {
         sharedStageRef.current = null;
       }
     };
-  });
+  }, [stageRef]);
   const transformerRef = useRef<Konva.Transformer>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
@@ -752,8 +755,8 @@ export const DesignerCanvas: FC<CanvasProps> = ({
               height={output.height}
             />
           )}
-          {guides.map((g, i) => (
-            <KonvaLine key={i} points={g.points} stroke="#FF3B7F" strokeWidth={1 / zoom} dash={[4, 4]} listening={false} />
+          {guides.map((g) => (
+            <KonvaLine key={g.points.join(',')} points={g.points} stroke="#FF3B7F" strokeWidth={1 / zoom} dash={[4, 4]} listening={false} />
           ))}
           {showSafeZones && safeZonePreset && (
             <SafeZoneOverlay presetId={safeZonePreset} width={output.width} height={output.height} visible={true} />
@@ -801,7 +804,7 @@ export const DesignerCanvas: FC<CanvasProps> = ({
 
       {uploadingFile && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-[#e5e7eb]/60">
-          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] text-textColor">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] text-textColor">
             <svg className={`w-4 h-4 ${reduceMotion ? '' : 'animate-spin'}`} viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="32" opacity="0.3" />
               <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
@@ -843,10 +846,10 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         );
       })()}
 
-      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-newBgColorInner border border-newBorder rounded-lg px-3 py-2 text-[12px] text-newTextColor/60">
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-newBgColorInner border border-studioBorder rounded-lg px-3 py-2 text-[12px] text-newTextColor/60">
         <button
           onClick={() => setZoom(zoom / 1.25)}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-newColColor/30"
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30"
           aria-label="Zoom out"
         >
           −
@@ -854,14 +857,14 @@ export const DesignerCanvas: FC<CanvasProps> = ({
         <span className="min-w-[40px] text-center">{Math.round(zoom * 100)}%</span>
         <button
           onClick={() => setZoom(zoom * 1.25)}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-newColColor/30"
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30"
           aria-label="Zoom in"
         >
           +
         </button>
         <button
           onClick={fitToScreen}
-          className="w-7 h-7 flex items-center justify-center rounded hover:bg-newColColor/30 text-[10px]"
+          className="w-7 h-7 flex items-center justify-center rounded hover:bg-studioBorder/30 text-[10px]"
           aria-label="Fit to screen"
         >
           ⊞

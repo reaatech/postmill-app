@@ -101,7 +101,7 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search icons…"
-        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
+        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
       />
 
       {filtered.length === 0 ? (
@@ -130,7 +130,7 @@ export const IconsPanel: FC<IconsPanelProps> = ({ store, onClose }) => {
                   })
                 )
               }
-              className="aspect-square flex items-center justify-center rounded-lg border border-newBorder bg-newBgColorInner text-designerAccent hover:border-designerAccent hover:bg-newColColor/10 transition-all"
+              className="aspect-square flex items-center justify-center rounded-lg border border-studioBorder bg-newBgColorInner text-designerAccent hover:border-designerAccent hover:bg-studioBorder/10 transition-all"
             >
               <svg
                 viewBox="0 0 24 24"

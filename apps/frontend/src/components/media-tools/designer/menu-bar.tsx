@@ -63,7 +63,7 @@ const ItemButton: FC<{ action: DesignerAction; onRun: () => void; indent?: boole
         indent && 'pl-6',
         disabled
           ? 'text-textColor/30 cursor-default'
-          : 'text-textColor hover:bg-newColColor/30'
+          : 'text-textColor hover:bg-studioBorder/30'
       )}
     >
       <span className="w-[14px] shrink-0 text-designerAccent text-[12px]">
@@ -95,13 +95,13 @@ const Dropdown: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ items,
     <div
       ref={measure}
       role="menu"
-      className="absolute top-full mt-1 min-w-[220px] max-w-[min(300px,calc(100vw-16px))] max-h-[70vh] overflow-y-auto bg-newBgColorInner border border-newBorder rounded-lg shadow-xl py-1.5 px-1 z-[120]"
+      className="absolute top-full mt-1 min-w-[220px] max-w-[min(300px,calc(100vw-16px))] max-h-[70vh] overflow-y-auto bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl py-1.5 px-1 z-[120]"
     >
       {entries.map((entry, i) => {
         const divider = i > 0 && entry.group !== entries[i - 1].group;
         return (
           <React.Fragment key={entry.type === 'sub' ? `sub-${entry.name}` : entry.action.id}>
-            {divider && <div className="my-1 border-t border-newBorder" />}
+            {divider && <div className="my-1 border-t border-studioBorder" />}
             {entry.type === 'leaf' ? (
               <ItemButton action={entry.action} onRun={onClose} />
             ) : (
@@ -164,8 +164,8 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
           className={clsx(
             'px-2.5 py-1 rounded text-[13px] transition-colors',
             open === menu
-              ? 'bg-newColColor/30 text-textColor'
-              : 'text-textColor/70 hover:bg-newColColor/20 hover:text-textColor'
+              ? 'bg-studioBorder/30 text-textColor'
+              : 'text-textColor/70 hover:bg-studioBorder/20 hover:text-textColor'
           )}
         >
           {label}
@@ -190,8 +190,8 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
             className={clsx(
               'px-2.5 py-1 rounded text-[15px] leading-none transition-colors',
               open === 'more'
-                ? 'bg-newColColor/30 text-textColor'
-                : 'text-textColor/70 hover:bg-newColColor/20 hover:text-textColor'
+                ? 'bg-studioBorder/30 text-textColor'
+                : 'text-textColor/70 hover:bg-studioBorder/20 hover:text-textColor'
             )}
           >
             ☰
@@ -199,7 +199,7 @@ export const MenuBar: FC<MenuBarProps> = ({ actions, visibleOnMobile = 4 }) => {
           {open === 'more' && (
             <div
               role="menu"
-              className="absolute right-0 top-full mt-1 min-w-[230px] max-w-[300px] bg-newBgColorInner border border-newBorder rounded-lg shadow-xl py-1.5 px-1 z-[120] max-h-[70vh] overflow-y-auto"
+              className="absolute right-0 top-full mt-1 min-w-[230px] max-w-[300px] bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl py-1.5 px-1 z-[120] max-h-[70vh] overflow-y-auto"
             >
               {overflowMenus.map((g) => (
                 <div key={g.menu} className="mb-1">
@@ -226,7 +226,7 @@ const DropdownInline: FC<{ items: DesignerAction[]; onClose: () => void }> = ({ 
         const divider = i > 0 && entry.group !== entries[i - 1].group;
         return (
           <React.Fragment key={entry.type === 'sub' ? `sub-${entry.name}` : entry.action.id}>
-            {divider && <div className="my-1 border-t border-newBorder" />}
+            {divider && <div className="my-1 border-t border-studioBorder" />}
             {entry.type === 'leaf' ? (
               <ItemButton action={entry.action} onRun={onClose} />
             ) : (

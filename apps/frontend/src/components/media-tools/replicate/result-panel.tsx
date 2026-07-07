@@ -321,7 +321,7 @@ export function ResultPanel({ medium }: { medium: Medium }) {
           {result.kind === 'image' && urls.length > 0 && (
             <div className={single ? '' : 'grid grid-cols-2 gap-3'}>
               {urls.map((url, i) => (
-                <div key={i} className="group relative">
+                <div key={url} className="group relative">
                   <img src={url} alt={`Result ${i + 1}`} className="w-full rounded-2xl border border-studioBorder" />
                   <ActionOverlay
                     onDownload={() => handleDownload(url)}

@@ -149,7 +149,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
   );
 
   return (
-    <div className="space-y-3 pt-2 border-t border-newBorder">
+    <div className="space-y-3 pt-2 border-t border-studioBorder">
       <div className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
         Common
       </div>
@@ -225,7 +225,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
           aria-checked={!!primary.locked}
           onClick={() => set({ locked: !primary.locked })}
           className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-            primary.locked ? 'bg-designerAccent' : 'bg-newBorder'
+            primary.locked ? 'bg-designerAccent' : 'bg-studioBorder'
           }`}
         >
           <span
@@ -257,21 +257,21 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
           <button
             onClick={() => alignV('top')}
             aria-label={isMulti ? 'Align tops' : 'Align top'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↑ Top
           </button>
           <button
             onClick={() => alignV('middle')}
             aria-label={isMulti ? 'Align vertical centers' : 'Align vertical center'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↕ Middle
           </button>
           <button
             onClick={() => alignV('bottom')}
             aria-label={isMulti ? 'Align bottoms' : 'Align bottom'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↓ Bottom
           </button>
@@ -280,21 +280,21 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
           <button
             onClick={() => alignH('left')}
             aria-label={isMulti ? 'Align left edges' : 'Align left'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ← Left
           </button>
           <button
             onClick={() => alignH(ALIGN_CENTER)}
             aria-label={isMulti ? 'Align horizontal centers' : 'Align horizontal center'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↔ Center
           </button>
           <button
             onClick={() => alignH('right')}
             aria-label={isMulti ? 'Align right edges' : 'Align right'}
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             → Right
           </button>
@@ -304,14 +304,14 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
             <button
               onClick={distributeHorizontal}
               aria-label="Distribute horizontally"
-              className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+              className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
             >
               ↔ H
             </button>
             <button
               onClick={distributeVertical}
               aria-label="Distribute vertically"
-              className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+              className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
             >
               ↕ V
             </button>
@@ -325,28 +325,28 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
           <button
             onClick={() => reorder(ids, 'back')}
             aria-label="Send to back"
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ⤒ Back
           </button>
           <button
             onClick={() => reorder(ids, 'backward')}
             aria-label="Send backward"
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↓ Bwd
           </button>
           <button
             onClick={() => reorder(ids, 'forward')}
             aria-label="Bring forward"
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ↑ Fwd
           </button>
           <button
             onClick={() => reorder(ids, 'front')}
             aria-label="Bring to front"
-            className="flex-1 h-7 rounded text-[11px] border border-newBorder text-textColor hover:bg-newColColor/30"
+            className="flex-1 h-7 rounded text-[11px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
           >
             ⤓ Front
           </button>
@@ -356,7 +356,7 @@ export const CommonInspector: FC<CommonInspectorProps> = ({
       {hasImageWithNatural && (
         <button
           onClick={resetToOriginal}
-          className="w-full px-3 py-2 rounded-md text-[12px] border border-newBorder text-textColor hover:bg-newColColor/30"
+          className="w-full px-3 py-2 rounded-md text-[12px] border border-studioBorder text-textColor hover:bg-studioBorder/30"
         >
           Reset to original size
         </button>

@@ -257,7 +257,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
   const showResize = popoverKind === 'resize';
 
   return (
-    <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-newBorder bg-newBgColorInner">
+    <div className="shrink-0 flex items-center gap-2 px-3 py-2 border-t border-studioBorder bg-newBgColorInner">
       <div
         ref={scrollRef}
         className="flex items-center gap-1 overflow-x-auto flex-1 min-w-0"
@@ -274,7 +274,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               className={`relative rounded-md border-2 flex flex-col items-center justify-center text-center px-2 gap-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
                 i === currentOutput
                   ? 'border-designerAccent bg-designerAccent/10'
-                  : 'border-newBorder hover:border-newColColor'
+                  : 'border-studioBorder hover:border-studioBorder'
               }`}
               style={{ minWidth: THUMB_MIN_W, height: THUMB_H }}
             >
@@ -307,7 +307,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 }}
                 title="Resize / change format"
                 aria-label="Resize or change format"
-                className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-newBorder text-[8px] text-textColor/60 hover:text-textColor"
+                className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[8px] text-textColor/60 hover:text-textColor"
               >
                 ⋮
               </button>
@@ -316,7 +316,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                   onClick={(e) => handleRemove(e, i)}
                   title="Remove format"
                   aria-label="Remove format"
-                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-newBorder text-[9px] text-red-400 hover:bg-red-500/20"
+                  className="w-4 h-4 flex items-center justify-center rounded-full bg-[#1e1e2e] border border-studioBorder text-[9px] text-red-400 hover:bg-red-500/20"
                 >
                   ×
                 </button>
@@ -337,7 +337,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 }
               }}
               aria-label="More formats"
-              className="flex items-center justify-center rounded-md border border-newBorder text-textColor/60 hover:border-newColColor hover:text-textColor text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+              className="flex items-center justify-center rounded-md border border-studioBorder text-textColor/60 hover:border-studioBorder hover:text-textColor text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
               style={{ width: 32, height: THUMB_H }}
             >
               …
@@ -346,13 +346,13 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               anchorEl={showOverflowMenu ? popoverAnchor : null}
               open={showOverflowMenu}
               onClose={closePopover}
-              className="bg-newBgColorInner border border-newBorder rounded-lg shadow-xl overflow-hidden"
+              className="bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl overflow-hidden"
             >
               <div className="max-h-60 overflow-y-auto w-52">
                 {outputs.map((output: any, i: number) => (
                   <div
                     key={output.id}
-                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-newColColor/10 group/item"
+                    className="flex items-center gap-2 px-3 py-1.5 hover:bg-studioBorder/10 group/item"
                   >
                     <button
                       onClick={() => {
@@ -413,7 +413,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             }
           }}
           aria-label="Add format"
-          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-newBorder text-textColor/50 hover:border-designerAccent hover:text-designerAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
+          className="shrink-0 flex items-center justify-center rounded-md border-2 border-dashed border-studioBorder text-textColor/50 hover:border-designerAccent hover:text-designerAccent text-[18px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent"
           style={{ width: 40, height: THUMB_H }}
         >
           +
@@ -424,7 +424,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
           open={showAddFormats}
           onClose={closePopover}
           align="right"
-          className="bg-newBgColorInner border border-newBorder rounded-lg shadow-xl overflow-hidden w-72 p-3"
+          className="bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl overflow-hidden w-72 p-3"
         >
           <div className="text-[12px] font-medium text-textColor mb-2">
             Add Formats
@@ -465,7 +465,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                               ? 'text-textColor/25 cursor-not-allowed'
                               : pendingFormats.has(p.id)
                                 ? 'text-designerAccent bg-designerAccent/10 cursor-pointer hover:bg-designerAccent/15'
-                                : 'text-textColor cursor-pointer hover:bg-newColColor/10'
+                                : 'text-textColor cursor-pointer hover:bg-studioBorder/10'
                           }`}
                         >
                           <input
@@ -495,7 +495,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             )}
           </div>
 
-          <div className="border-t border-newBorder mt-2 pt-2">
+          <div className="border-t border-studioBorder mt-2 pt-2">
             <div className="text-[10px] font-semibold text-textColor/30 uppercase tracking-wider px-1 mb-1">
               Custom Size
             </div>
@@ -505,7 +505,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 value={cW}
                 onChange={(e) => setCW(e.target.value)}
                 placeholder="W"
-                className="w-16 h-7 rounded border border-newBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
+                className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/30 text-[12px]">
                 ×
@@ -515,7 +515,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 value={cH}
                 onChange={(e) => setCH(e.target.value)}
                 placeholder="H"
-                className="w-16 h-7 rounded border border-newBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
+                className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <button
                 onClick={handleAddCustom}
@@ -527,7 +527,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
           </div>
 
           {pendingFormats.size > 0 && (
-            <div className="border-t border-newBorder mt-2 pt-2">
+            <div className="border-t border-studioBorder mt-2 pt-2">
               <button
                 onClick={handleAddFormats}
                 className="w-full py-1.5 rounded text-[12px] bg-designerAccent text-white hover:bg-designerAccent/80 font-medium"
@@ -545,7 +545,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
         anchorEl={showResize ? popoverAnchor : null}
         open={showResize}
         onClose={closePopover}
-        className="bg-newBgColorInner border border-newBorder rounded-lg shadow-xl overflow-hidden w-64 p-3"
+        className="bg-newBgColorInner border border-studioBorder rounded-lg shadow-xl overflow-hidden w-64 p-3"
       >
         <div className="text-[12px] font-medium text-textColor mb-2">
           Resize Format
@@ -560,7 +560,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
                 onClick={() =>
                   handleResize(resizeIndex!, p)
                 }
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[12px] text-textColor hover:bg-newColColor/10"
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[12px] text-textColor hover:bg-studioBorder/10"
               >
                 <span className="flex-1">{p.name}</span>
                 <span className="text-[10px] text-textColor/40">
@@ -570,14 +570,14 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
             ),
           )}
         </div>
-        <div className="border-t border-newBorder mt-2 pt-2">
+        <div className="border-t border-studioBorder mt-2 pt-2">
           <div className="flex items-center gap-1.5">
             <input
               type="number"
               value={cW}
               onChange={(e) => setCW(e.target.value)}
               placeholder="W"
-              className="w-16 h-7 rounded border border-newBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
+              className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <span className="text-textColor/30 text-[12px]">
               ×
@@ -587,7 +587,7 @@ export const OutputTabs: React.FC<OutputTabsProps> = ({ store }) => {
               value={cH}
               onChange={(e) => setCH(e.target.value)}
               placeholder="H"
-              className="w-16 h-7 rounded border border-newBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
+              className="w-16 h-7 rounded border border-studioBorder bg-newBgColor px-2 text-[11px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <button
               onClick={() =>

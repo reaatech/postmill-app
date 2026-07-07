@@ -88,7 +88,7 @@ const MiniKeyframeTimeline: FC<{
   return (
     <div
       ref={ref}
-      className="relative h-5 bg-newBgColorInner border border-newBorder/30 rounded overflow-hidden cursor-crosshair"
+      className="relative h-5 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden cursor-crosshair"
       onClick={(e) => {
         if (justDraggedRef.current) return; // ignore the click that follows a drag
         if (!ref.current) return;
@@ -146,7 +146,7 @@ const KeyframePropRow: FC<{
       </div>
       <div
         ref={ref}
-        className="relative h-3 bg-newBgColorInner border border-newBorder/30 rounded overflow-hidden"
+        className="relative h-3 bg-newBgColorInner border border-studioBorder/30 rounded overflow-hidden"
         onClick={(e) => {
           if (justDraggedRef.current) return; // ignore the click that follows a drag
           if (!ref.current) return;
@@ -181,7 +181,7 @@ const KeyframePropRow: FC<{
               key={kf.tMs}
               value={kf.ease || 'linear'}
               onChange={(e) => onEase(kf.tMs, e.target.value as KeyframeLike['ease'])}
-              className="h-5 px-1 rounded text-[9px] bg-newBgColor border border-newBorder text-textColor outline-none"
+              className="h-5 px-1 rounded text-[9px] bg-newBgColor border border-studioBorder text-textColor outline-none"
             >
               {EASE_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -437,7 +437,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       />
 
       {/* Audio */}
-      <div className="pt-1 border-t border-newBorder">
+      <div className="pt-1 border-t border-studioBorder">
         <div className="text-[11px] text-textColor/50 mb-1">Audio</div>
         <Slider
           label="Volume"
@@ -468,7 +468,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       </div>
 
       {/* Speed / Reverse / Freeze */}
-      <div className="pt-1 border-t border-newBorder space-y-2">
+      <div className="pt-1 border-t border-studioBorder space-y-2">
         <div className="text-[11px] text-textColor/50">Speed</div>
         <div className="flex gap-1">
           {PRESET_STEPS.map((s) => (
@@ -478,7 +478,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
               className={`flex-1 h-7 rounded text-[11px] font-medium transition-all ${
                 clip.speed === s && !clip.reverse
                   ? 'bg-designerAccent text-white'
-                  : 'border border-newBorder text-textColor hover:bg-boxHover'
+                  : 'border border-studioBorder text-textColor hover:bg-boxHover'
               }`}
             >
               {s}x
@@ -494,7 +494,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
             aria-checked={!!clip.reverse}
             onClick={() => updateClip({ reverse: !clip.reverse })}
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              clip.reverse ? 'bg-designerAccent' : 'bg-newBorder'
+              clip.reverse ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span
@@ -516,7 +516,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       </div>
 
       {/* Filters */}
-      <div className="pt-1 border-t border-newBorder space-y-2">
+      <div className="pt-1 border-t border-studioBorder space-y-2">
         <div className="text-[11px] text-textColor/50">Filters</div>
         <div className="text-[9px] text-amber-400/70 mb-1">
           Filters will be applied during export.
@@ -530,7 +530,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
             aria-checked={hasFilter('grayscale')}
             onClick={() => toggleFilter('grayscale', !hasFilter('grayscale'))}
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              hasFilter('grayscale') ? 'bg-designerAccent' : 'bg-newBorder'
+              hasFilter('grayscale') ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span
@@ -549,7 +549,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
             aria-checked={hasFilter('sepia')}
             onClick={() => toggleFilter('sepia', !hasFilter('sepia'))}
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              hasFilter('sepia') ? 'bg-designerAccent' : 'bg-newBorder'
+              hasFilter('sepia') ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span
@@ -597,14 +597,14 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
 
       {/* Text animation presets */}
       {clipTrackType === 'text' && (
-        <div className="pt-1 border-t border-newBorder space-y-2">
+        <div className="pt-1 border-t border-studioBorder space-y-2">
           <div className="text-[11px] text-textColor/50">Text Animations</div>
           <div className="flex flex-wrap gap-1">
             {TEXT_ANIMATION_PRESETS.map((preset) => (
               <button
                 key={preset.name}
                 onClick={() => handleApplyTextAnimation(preset.name)}
-                className="px-2 py-1 rounded text-[10px] border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-all"
+                className="px-2 py-1 rounded text-[10px] border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-all"
               >
                 {preset.name}
               </button>
@@ -614,7 +614,7 @@ export const ClipInspector: FC<ClipInspectorProps> = ({ store, outputIndex, trac
       )}
 
       {/* Keyframes */}
-      <div className="pt-1 border-t border-newBorder space-y-2">
+      <div className="pt-1 border-t border-studioBorder space-y-2">
         <div className="flex items-center justify-between">
           <div className="text-[11px] text-textColor/50">Keyframes</div>
           <span className="text-[10px] text-textColor/30">{keyframes.length}</span>

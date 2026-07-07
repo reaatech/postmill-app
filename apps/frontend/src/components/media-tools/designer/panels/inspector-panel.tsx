@@ -48,7 +48,7 @@ export const InspectorPanel: FC<InspectorProps> = ({ store }) => {
           </div>
           <button
             onClick={() => setSelectedClip(null)}
-            className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px] shrink-0"
+            className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor text-[14px] shrink-0"
             title="Clear selection"
             aria-label="Clear selection"
           >
@@ -88,7 +88,7 @@ export const InspectorPanel: FC<InspectorProps> = ({ store }) => {
         </div>
         <button
           onClick={() => setSelectedIds([])}
-          className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-newColColor/30 hover:text-textColor text-[14px] shrink-0"
+          className="w-6 h-6 flex items-center justify-center rounded text-textColor/60 hover:bg-studioBorder/30 hover:text-textColor text-[14px] shrink-0"
           title="Clear selection"
           aria-label="Clear selection"
         >

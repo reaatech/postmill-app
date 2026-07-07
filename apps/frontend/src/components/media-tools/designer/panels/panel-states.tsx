@@ -34,9 +34,9 @@ export const PanelSkeletonGrid: FC<PanelSkeletonGridProps> = ({
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className={`${aspectClassName} rounded-lg border border-newBorder bg-newBgColorInner overflow-hidden`}
+          className={`${aspectClassName} rounded-lg border border-studioBorder bg-newBgColorInner overflow-hidden`}
         >
-          <div className="w-full h-full motion-safe:animate-pulse bg-newColColor/10" />
+          <div className="w-full h-full motion-safe:animate-pulse bg-studioBorder/10" />
         </div>
       ))}
     </div>
@@ -63,7 +63,7 @@ export const PanelError: FC<PanelErrorProps> = ({ message, onRetry }) => {
       <button
         type="button"
         onClick={onRetry}
-        className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors"
+        className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors"
       >
         Try again
       </button>

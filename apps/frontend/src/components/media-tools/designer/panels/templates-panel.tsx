@@ -130,9 +130,9 @@ export const TemplatesPanel: FC<TemplatesPanelProps> = ({ store, onClose, guard 
           {data.map((template) => (
             <div
               key={template.id}
-              className="rounded-lg border border-newBorder bg-newBgColorInner overflow-hidden group"
+              className="rounded-lg border border-studioBorder bg-newBgColorInner overflow-hidden group"
             >
-              <div className="aspect-[4/3] bg-newColColor/10 flex items-center justify-center text-[20px] text-newTextColor/20">
+              <div className="aspect-[4/3] bg-studioBorder/10 flex items-center justify-center text-[20px] text-newTextColor/20">
                 {template.isSystem ? '◧' : '▣'}
               </div>
               <div className="p-2">

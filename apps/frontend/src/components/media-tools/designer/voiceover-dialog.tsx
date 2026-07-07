@@ -84,7 +84,7 @@ export const VoiceoverDialog: FC<VoiceoverDialogProps> = ({
         <button
           type="button"
           onClick={onClose}
-          className="px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-newColColor/30 transition-colors"
+          className="px-[12px] py-[8px] rounded-[8px] text-[13px] text-textColor hover:bg-studioBorder/30 transition-colors"
         >
           Cancel
         </button>
