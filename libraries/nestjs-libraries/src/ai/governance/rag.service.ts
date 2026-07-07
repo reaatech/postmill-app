@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiRagRepository } from '@gitroom/nestjs-libraries/database/prisma/ai-rag/ai-rag.repository';
@@ -55,7 +55,7 @@ interface RagHit {
 }
 
 @Injectable()
-export class RagService implements OnModuleInit {
+export class RagService implements OnModuleInit, OnModuleDestroy {
   private _logger = new Logger(RagService.name);
   private _sideTableInitialized = false;
   private _sideTableDimension: number | null = null;
@@ -677,60 +677,84 @@ export class RagService implements OnModuleInit {
     this._startWorker();
   }
 
+  async onModuleDestroy(): Promise<void> {
+    this._workerRunning = false;
+    // Closing the duplicate client unblocks any in-flight BRPOP so the worker
+    // loop can exit instead of hanging on shutdown.
+    try {
+      await this._workerRedis.quit();
+    } catch {
+      // Ignore shutdown races.
+    }
+    try {
+      await this._workerPromise;
+    } catch {
+      // Ignore worker errors during shutdown.
+    }
+  }
+
   private _workerRunning = false;
   private _workerDelayMs = 2000;
   private readonly _QUEUE_KEY = 'rag:index:queue';
   private readonly _PROCESSING_KEY = 'rag:index:processing';
+  private readonly _workerRedis = ioRedis.duplicate();
+  private _workerPromise?: Promise<void>;
 
   private async _startWorker(): Promise<void> {
     if (this._workerRunning) return;
     this._workerRunning = true;
 
-    // Upstash (and some other remote Redis providers) do not support blocking
-    // list commands such as BRPOPLPUSH. Use the non-blocking RPOPLPUSH in a poll
-    // loop instead. This keeps the atomic move from queue -> processing while
-    // staying compatible with serverless Redis endpoints.
-    const pollLoop = async () => {
-      while (this._workerRunning) {
-        let item: string | null = null;
-        try {
-          item = await ioRedis.rpoplpush(this._QUEUE_KEY, this._PROCESSING_KEY);
-        } catch {
-          // Redis unavailable — back off and retry.
-          await new Promise((r) => setTimeout(r, this._workerDelayMs));
-          continue;
-        }
-
-        if (!item) {
-          await new Promise((r) => setTimeout(r, this._workerDelayMs));
-          continue;
-        }
-
-        const job = JSON.parse(item);
-        try {
-          await this._doIndex(
-            job.organizationId,
-            job.sourceType,
-            job.sourceId,
-            job.chunks,
-            job.contentHash,
-          );
-          await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
-        } catch (err) {
-          this._logger.error(
-            `RAG worker failed for ${job.sourceType}:${job.sourceId}: ${(err as Error).message}`,
-          );
-          await ioRedis.lrem(this._PROCESSING_KEY, 1, item);
-          await ioRedis.lpush(this._QUEUE_KEY, item);
-        }
-      }
-    };
-
-    pollLoop().catch((err) => {
+    // Drain the queue on a dedicated duplicate Redis client using a blocking
+    // list command. This removes the tight non-blocking poll loop on the shared
+    // ioRedis client that could stall pipelined commands such as the throttler.
+    this._workerPromise = this._runWorker().catch((err) => {
       this._logger.error(`RAG worker crashed: ${err.message}`);
       this._workerRunning = false;
       setTimeout(() => this._startWorker(), 10_000);
     });
+  }
+
+  private async _runWorker(): Promise<void> {
+    while (this._workerRunning) {
+      let item: string | null = null;
+      try {
+        item = await this._workerRedis.brpoplpush(
+          this._QUEUE_KEY,
+          this._PROCESSING_KEY,
+          5,
+        );
+      } catch (err) {
+        if (!this._workerRunning) return;
+        this._logger.error(
+          `RAG worker Redis error: ${(err as Error).message}`,
+        );
+        await new Promise((r) => setTimeout(r, this._workerDelayMs));
+        continue;
+      }
+
+      if (!item) {
+        // Timeout expired with no work; loop back and check _workerRunning.
+        continue;
+      }
+
+      const job = JSON.parse(item);
+      try {
+        await this._doIndex(
+          job.organizationId,
+          job.sourceType,
+          job.sourceId,
+          job.chunks,
+          job.contentHash,
+        );
+        await this._workerRedis.lrem(this._PROCESSING_KEY, 1, item);
+      } catch (err) {
+        this._logger.error(
+          `RAG worker failed for ${job.sourceType}:${job.sourceId}: ${(err as Error).message}`,
+        );
+        await this._workerRedis.lrem(this._PROCESSING_KEY, 1, item);
+        await this._workerRedis.lpush(this._QUEUE_KEY, item);
+      }
+    }
   }
 
   enqueueIndexJob(params: {

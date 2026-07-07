@@ -1,5 +1,9 @@
 import { createGateway, experimental_generateVideo as generateVideo } from 'ai';
-import { Agent } from 'undici';
+import {
+  Agent,
+  fetch as undiciFetch,
+  type RequestInit as UndiciRequestInit,
+} from 'undici';
 import { metadata as providerMetadata } from './metadata';
 import {
   AiSdkMediaAdapter,
@@ -28,13 +32,13 @@ const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024;
 // One long-lived dispatcher so a multi-minute video render isn't killed by the default 5-min
 // fetch timeout. Created lazily to avoid touching undici when the gateway is never used.
 //
-// 6.1d — FIXED-HOST SSRF EXEMPTION: this deliberately bypasses `ssrfSafeDispatcher`/`safeFetch`.
+// 6.1d — FIXED-HOST SSRF EXEMPTION: this deliberately bypasses the kernel `SafeFetchPort`
+// because the 30 s SafeFetchPort timeout cannot cover a synchronous multi-minute render.
 // It is sound because the destination is NOT user-controlled — the AI-SDK `createGateway` client
 // always targets the fixed Vercel gateway host (GATEWAY_BASE, `ai-gateway.vercel.sh`); the only
 // user inputs (`model`, the source `image`) ride as request-body params, never as the fetch URL.
-// The sole reason for the raw Agent is the extended 15-min timeout that the 30 s SafeFetchPort
-// cannot provide for a synchronous multi-minute render. Do not point this dispatcher at any
-// user-derived URL.
+// We use the imported `undiciFetch` (not the global fetch) so the call still runs through the
+// same undici stack as the rest of the app and is gated by the host check below.
 let _videoDispatcher: Agent | undefined;
 function videoFetch(url: string | URL | Request, init?: RequestInit): Promise<Response> {
   if (!_videoDispatcher) {
@@ -45,7 +49,7 @@ function videoFetch(url: string | URL | Request, init?: RequestInit): Promise<Re
   if (!target.startsWith(GATEWAY_BASE) && !target.startsWith('https://ai-gateway.vercel.sh/')) {
     throw new Error('Gateway video dispatcher may only target the Vercel AI Gateway host');
   }
-  return fetch(url, { ...(init || {}), dispatcher: _videoDispatcher } as RequestInit);
+  return undiciFetch(target, { ...(init || {}), dispatcher: _videoDispatcher } as UndiciRequestInit) as unknown as Promise<Response>;
 }
 
 interface GatewayModelsResponse {

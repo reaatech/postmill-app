@@ -11,6 +11,7 @@ import {
   type AiCapabilities as AICapabilities,
   type AiModelOptions as AIModelOptions,
   type ProviderModule,
+  type SafeFetchPort,
 } from '@gitroom/provider-kernel';
 
 export class AnthropicAdapter implements AIProviderAdapter {
@@ -22,6 +23,13 @@ export class AnthropicAdapter implements AIProviderAdapter {
   ];
   readonly capabilities: AICapabilities = { text: true, image: false, vision: true, embeddings: false, speech: false, tools: true };
   readonly privacy = { dataRetention: 'API data may be used for training; opt out via API request', trainingOnData: true, description: 'Anthropic API' };
+
+  // 0.4: SSRF-safe fetch, injected by the provider module's create/validate.
+  private _safeFetch?: SafeFetchPort;
+
+  setSafeFetch(fetch: SafeFetchPort): void {
+    this._safeFetch = fetch;
+  }
 
   async listModels(_creds: Record<string, string>): Promise<ModelInfo[]> {
     // 2.5: current live model IDs only — the previous catalog carried
@@ -37,8 +45,10 @@ export class AnthropicAdapter implements AIProviderAdapter {
 
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
+    // 0.4: only over the SSRF-safe fetch — never the global fetch.
+    if (!this._safeFetch) return { ok: false, error: 'cannot validate' };
     try {
-      const response = await fetch('https://api.anthropic.com/v1/models', {
+      const response = await this._safeFetch('https://api.anthropic.com/v1/models', {
         headers: {
           'x-api-key': creds.apiKey,
           'anthropic-version': '2023-06-01',
@@ -86,6 +96,12 @@ export const anthropicAiModule: ProviderModule<any, any> = {
     credentialFields: (adapter as any).credentialFields || [],
     capabilities: (adapter as any).capabilities,
   },
-  create: () => adapter as any,
-  validateCredentials: async (ctx) => adapter.validateCredentials(ctx.credentials),
+  create: (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter as any;
+  },
+  validateCredentials: async (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter.validateCredentials(ctx.credentials);
+  },
 };

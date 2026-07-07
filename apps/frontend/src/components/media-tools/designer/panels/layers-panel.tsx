@@ -213,7 +213,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
             className={`flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-[12px] transition-all outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
               isSelected
                 ? 'bg-designerAccent/20 text-textColor'
-                : 'text-newTextColor/60 hover:bg-newColColor/10 hover:text-textColor'
+                : 'text-newTextColor/60 hover:bg-studioBorder/10 hover:text-textColor'
             }`}
           >
             <div className="w-5 h-5 flex items-center justify-center text-[11px] font-bold text-designerAccent shrink-0">
@@ -252,7 +252,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 type="button"
                 data-row-action
                 onClick={(e) => moveDown(e, idx)}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-newColColor/20 text-[10px]"
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px]"
                 title="Move down"
                 aria-label="Move layer down"
               >
@@ -262,7 +262,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 type="button"
                 data-row-action
                 onClick={(e) => moveUp(e, idx)}
-                className="w-5 h-5 flex items-center justify-center rounded hover:bg-newColColor/20 text-[10px]"
+                className="w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px]"
                 title="Move up"
                 aria-label="Move layer up"
               >
@@ -275,7 +275,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 type="button"
                 data-row-action
                 onClick={(e) => toggleVisibility(e, el.id)}
-                className={`w-5 h-5 flex items-center justify-center rounded hover:bg-newColColor/20 text-[11px] ${
+                className={`w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[11px] ${
                   el.hidden ? 'text-newTextColor/20' : 'text-newTextColor/60'
                 }`}
                 title={el.hidden ? 'Show' : 'Hide'}
@@ -287,7 +287,7 @@ export const LayersPanel: FC<LayersPanelProps> = ({ store }) => {
                 type="button"
                 data-row-action
                 onClick={(e) => toggleLock(e, el.id)}
-                className={`w-5 h-5 flex items-center justify-center rounded hover:bg-newColColor/20 text-[10px] ${
+                className={`w-5 h-5 flex items-center justify-center rounded hover:bg-studioBorder/20 text-[10px] ${
                   el.locked ? 'text-designerAccent' : 'text-newTextColor/40'
                 }`}
                 title={el.locked ? 'Unlock' : 'Lock'}

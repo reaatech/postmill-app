@@ -52,14 +52,14 @@ export const CanvasInspector: FC<CanvasInspectorProps> = ({ store, onSetBackgrou
               type="number"
               value={w}
               onChange={(e) => setW(e.target.value)}
-              className="w-full h-[34px] rounded-[6px] border border-newBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
+              className="w-full h-[34px] rounded-[6px] border border-studioBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <span className="text-textColor/30">×</span>
             <input
               type="number"
               value={h}
               onChange={(e) => setH(e.target.value)}
-              className="w-full h-[34px] rounded-[6px] border border-newBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
+              className="w-full h-[34px] rounded-[6px] border border-studioBorder bg-newBgColor px-2 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
             />
             <button
               onClick={applySize}
@@ -83,7 +83,7 @@ export const CanvasInspector: FC<CanvasInspectorProps> = ({ store, onSetBackgrou
           />
           <button
             onClick={onSetBackgroundImage}
-            className="w-full px-3 py-2 rounded-md text-[12px] border border-newBorder text-textColor hover:bg-boxHover transition-colors"
+            className="w-full px-3 py-2 rounded-md text-[12px] border border-studioBorder text-textColor hover:bg-boxHover transition-colors"
           >
             Set background image…
           </button>

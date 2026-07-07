@@ -51,7 +51,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
             className={`flex-1 py-2 rounded-lg text-[13px] font-medium capitalize transition-colors ${
               mode === m
                 ? 'bg-designerAccent text-white'
-                : 'border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover'
+                : 'border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover'
             }`}
           >
             {m}
@@ -67,7 +67,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
               setW(String(c.w));
               setH(String(c.h));
             }}
-            className="px-3 py-1.5 rounded-full text-[12px] border border-newBorder text-textColor/80 hover:border-designerAccent hover:text-textColor transition-colors"
+            className="px-3 py-1.5 rounded-full text-[12px] border border-studioBorder text-textColor/80 hover:border-designerAccent hover:text-textColor transition-colors"
           >
             {c.label} <span className="text-textColor/40">{c.w}×{c.h}</span>
           </button>
@@ -80,7 +80,7 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
           value={w}
           onChange={(e) => setW(e.target.value)}
           placeholder="W"
-          className="w-full h-[38px] rounded-lg border border-newBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
+          className="w-full h-[38px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
         />
         <span className="text-textColor/40">×</span>
         <input
@@ -88,14 +88,14 @@ export const NewDesignDialog: FC<NewDesignDialogProps> = ({ store, onClose, guar
           value={h}
           onChange={(e) => setH(e.target.value)}
           placeholder="H"
-          className="w-full h-[38px] rounded-lg border border-newBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
+          className="w-full h-[38px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[13px] text-textColor text-center outline-none focus:border-designerAccent"
         />
       </div>
 
       <div className="flex justify-end gap-2">
         <button
           onClick={onClose}
-          className="px-4 py-2 rounded-lg text-[13px] border border-newBorder text-textColor hover:bg-boxHover transition-colors"
+          className="px-4 py-2 rounded-lg text-[13px] border border-studioBorder text-textColor hover:bg-boxHover transition-colors"
         >
           Cancel
         </button>

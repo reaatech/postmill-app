@@ -152,12 +152,12 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Describe the image..."
-          className="flex-1 h-[36px] px-[10px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+          className="flex-1 h-[36px] px-[10px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         />
         {inFlight ? (
           <button
             onClick={handleCancel}
-            className="px-[12px] h-[36px] rounded-[6px] border border-newBorder text-textColor text-[13px] font-medium hover:bg-boxHover shrink-0"
+            className="px-[12px] h-[36px] rounded-[6px] border border-studioBorder text-textColor text-[13px] font-medium hover:bg-boxHover shrink-0"
           >
             Cancel
           </button>
@@ -185,7 +185,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
       {status === 'generating' && (
         <div className="flex items-center justify-center gap-2 py-6 text-newTextColor/50 text-[13px]">
           <span
-            className="w-[14px] h-[14px] rounded-full border-2 border-newBorder border-t-designerAccent motion-safe:animate-spin"
+            className="w-[14px] h-[14px] rounded-full border-2 border-studioBorder border-t-designerAccent motion-safe:animate-spin"
             aria-hidden="true"
           />
           Generating…
@@ -207,7 +207,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             type="button"
             onClick={handleGenerate}
             disabled={!prompt.trim()}
-            className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-newBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors disabled:opacity-50"
+            className="px-3 py-1.5 rounded-lg text-[12px] font-medium border border-studioBorder text-textColor hover:border-designerAccent hover:bg-boxHover transition-colors disabled:opacity-50"
           >
             Try again
           </button>
@@ -220,7 +220,7 @@ export const AiPanel: FC<AiPanelProps> = ({ store }) => {
             <button
               key={item.id}
               onClick={() => handleAddToCanvas(item)}
-              className="relative group rounded-[6px] overflow-hidden border border-newBorder hover:border-designerAccent transition-all"
+              className="relative group rounded-[6px] overflow-hidden border border-studioBorder hover:border-designerAccent transition-all"
               title="Click to add to canvas"
             >
               <img

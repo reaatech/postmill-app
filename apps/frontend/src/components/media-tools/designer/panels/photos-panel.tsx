@@ -229,7 +229,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
         onSelect={handleModalSelect}
       />
 
-      <div className="flex gap-1 bg-newColColor/10 rounded-lg p-1">
+      <div className="flex gap-1 bg-studioBorder/10 rounded-lg p-1">
         <button
           onClick={() => { setTab('photos'); setPage(1); }}
           className={`flex-1 py-1.5 rounded-md text-[12px] font-medium transition-all ${
@@ -253,7 +253,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
         value={query}
         onChange={e => { setQuery(e.target.value); setPage(1); }}
         placeholder={`Search ${tab}...`}
-        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newColColor text-[13px] outline-none focus:border-designerAccent text-textColor"
+        className="w-full h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
       />
 
       {isLoading && !data ? (
@@ -296,7 +296,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
                   })
                 );
               }}
-              className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all"
+              className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
             >
               <div className="aspect-[4/3] relative overflow-hidden">
                 <img
@@ -324,7 +324,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
           <button
             disabled={page <= 1}
             onClick={() => setPage(p => Math.max(1, p - 1))}
-            className="px-3 py-1 rounded border border-newColColor text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
+            className="px-3 py-1 rounded border border-studioBorder text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
           >
             Prev
           </button>
@@ -332,7 +332,7 @@ export const PhotosPanel: FC<PhotosPanelProps> = ({ store, onClose }) => {
           <button
             disabled={page >= (data?.totalPages || 1)}
             onClick={() => setPage(p => p + 1)}
-            className="px-3 py-1 rounded border border-newColColor text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
+            className="px-3 py-1 rounded border border-studioBorder text-[12px] text-textColor hover:bg-boxHover disabled:opacity-30"
           >
             Next
           </button>

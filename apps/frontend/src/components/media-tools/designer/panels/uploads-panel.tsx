@@ -413,9 +413,9 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
                   })
                 )
               }
-              className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all"
+              className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
             >
-              <div className="aspect-[4/3] relative overflow-hidden bg-newColColor/10">
+              <div className="aspect-[4/3] relative overflow-hidden bg-studioBorder/10">
                 <img
                   src={file.path}
                   alt={file.name}
@@ -432,13 +432,13 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       )}
 
       {audioFiles.length > 0 && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-newBorder">
+        <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
           <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Audio</div>
           {audioFiles.map((file) => (
             <button
               key={file.id}
               onClick={() => addAudioClip(file)}
-              className="flex items-center gap-2 px-2 py-1.5 rounded border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all text-left"
+              className="flex items-center gap-2 px-2 py-1.5 rounded border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all text-left"
             >
               <span className="text-[12px]">🔊</span>
               <span className="text-[11px] text-textColor truncate flex-1">{file.name}</span>
@@ -449,14 +449,14 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       )}
 
       {stickerFiles.length > 0 && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-newBorder">
+        <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
           <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Stickers</div>
           <div className="grid grid-cols-3 gap-2">
             {stickerFiles.map((file) => (
               <button
                 key={file.id}
                 onClick={() => addStickerClip(file)}
-                className="group aspect-square rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all"
+                className="group aspect-square rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
               >
                 <img
                   src={file.path}
@@ -471,7 +471,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
       )}
 
       {stockAudio && (
-        <div className="flex flex-col gap-2 pt-2 border-t border-newBorder">
+        <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
           <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Stock audio</div>
           {!stockAudio.configured ? (
             <div className="text-[11px] text-newTextColor/40 space-y-1">
@@ -490,7 +490,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
                 <button
                   key={item.id}
                   onClick={() => addStockAudioClip(item)}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all text-left"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all text-left"
                 >
                   <span className="text-[12px]">🎵</span>
                   <span className="text-[11px] text-textColor truncate flex-1">{item.name}</span>
@@ -502,7 +502,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
         </div>
       )}
 
-      <div className="flex flex-col gap-2 pt-2 border-t border-newBorder">
+      <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
         <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Upload audio</div>
         <input
           type="file"
@@ -513,7 +513,7 @@ export const UploadsPanel: FC<UploadsPanelProps> = ({ store, onClose }) => {
         />
       </div>
 
-      <div className="flex flex-col gap-2 pt-2 border-t border-newBorder">
+      <div className="flex flex-col gap-2 pt-2 border-t border-studioBorder">
         <div className="text-[11px] text-newTextColor/50 uppercase tracking-wider">Upload sticker</div>
         <input
           type="file"

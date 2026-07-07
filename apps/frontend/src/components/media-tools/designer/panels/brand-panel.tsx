@@ -326,7 +326,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           onChange={() => {
             // Brand selection is informational; palette/fonts are reactive.
           }}
-          className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+          className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
         >
           {brands.map((brand) => (
             <option key={brand.id} value={brand.id}>
@@ -352,7 +352,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
               })
             }
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              enforcementEnabled ? 'bg-purple-500' : 'bg-newBorder'
+              enforcementEnabled ? 'bg-purple-500' : 'bg-studioBorder'
             }`}
           >
             <span
@@ -475,7 +475,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                   className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                     picked
                       ? 'border-designerAccent ring-1 ring-designerAccent'
-                      : 'border-newBorder hover:border-designerAccent'
+                      : 'border-studioBorder hover:border-designerAccent'
                   }`}
                 >
                   <img
@@ -539,7 +539,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                     className={`relative aspect-video rounded-lg overflow-hidden border-2 transition-all ${
                       isIntro || isOutro
                         ? 'border-designerAccent ring-1 ring-designerAccent'
-                        : 'border-newBorder hover:border-designerAccent'
+                        : 'border-studioBorder hover:border-designerAccent'
                     }`}
                   >
                     <video
@@ -639,7 +639,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 key={i}
                 onClick={() => handleColorClick(color)}
                 disabled={!selectedElement}
-                className={`w-8 h-8 rounded-[6px] border-2 border-newBorder hover:scale-110 transition-all ${
+                className={`w-8 h-8 rounded-[6px] border-2 border-studioBorder hover:scale-110 transition-all ${
                   !selectedElement ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
                 }`}
                 style={{ backgroundColor: color }}
@@ -667,7 +667,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 key={i}
                 onClick={() => handleFontClick(font)}
                 disabled={!selectedElement || selectedElement.type !== 'text'}
-                className={`text-left px-3 py-2 rounded-[6px] border border-newBorder text-[13px] transition-all ${
+                className={`text-left px-3 py-2 rounded-[6px] border border-studioBorder text-[13px] transition-all ${
                   !selectedElement || selectedElement.type !== 'text'
                     ? 'opacity-40 cursor-not-allowed text-textColor/60'
                     : 'text-textColor hover:border-designerAccent hover:bg-boxHover cursor-pointer'
@@ -697,7 +697,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
             {customFonts.map((f) => (
               <div
                 key={f.fileId}
-                className="flex items-center justify-between px-3 py-2 rounded-[6px] border border-newBorder bg-newBgColorInner"
+                className="flex items-center justify-between px-3 py-2 rounded-[6px] border border-studioBorder bg-newBgColorInner"
               >
                 <button
                   type="button"
@@ -715,7 +715,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
                 <button
                   type="button"
                   onClick={() => handleFontDelete(f)}
-                  className="ml-2 w-5 h-5 rounded-full border border-newBorder text-[11px] text-textColor/60 hover:text-red-400 hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
+                  className="ml-2 w-5 h-5 rounded-full border border-studioBorder text-[11px] text-textColor/60 hover:text-red-400 hover:border-red-400 flex items-center justify-center shrink-0 transition-colors"
                   title={`Remove ${f.family}`}
                 >
                   ✕
@@ -736,7 +736,7 @@ export const BrandPanel: FC<BrandPanelProps> = ({ store }) => {
           type="button"
           disabled={uploading}
           onClick={() => fileInputRef.current?.click()}
-          className="w-full py-2 rounded-[6px] border border-dashed border-newBorder text-[12px] text-textColor/60 hover:text-textColor hover:border-designerAccent bg-newBgColorInner transition-colors"
+          className="w-full py-2 rounded-[6px] border border-dashed border-studioBorder text-[12px] text-textColor/60 hover:text-textColor hover:border-designerAccent bg-newBgColorInner transition-colors"
         >
           {uploading ? 'Uploading...' : '+ Upload font (.ttf, .otf, .woff2)'}
         </button>

@@ -144,7 +144,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
                 className={`w-full aspect-square rounded-lg border-2 transition-all ${
                   currentBg === preset.color
                     ? 'border-designerAccent ring-1 ring-designerAccent'
-                    : 'border-newBorder hover:border-designerAccent'
+                    : 'border-studioBorder hover:border-designerAccent'
                 }`}
               >
                 <div
@@ -168,7 +168,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
       {mode === 'gradient' && (
         <div className="flex flex-col gap-3">
           <div
-            className="w-full h-16 rounded-lg border border-newBorder"
+            className="w-full h-16 rounded-lg border border-studioBorder"
             style={{ background: gradientCss }}
           />
 
@@ -214,7 +214,7 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
               value={imageUrl}
               onChange={(e) => setImageUrl(e.target.value)}
               placeholder="Image URL…"
-              className="flex-1 h-[36px] px-3 rounded-lg bg-newBgColorInner border border-newBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
+              className="flex-1 h-[36px] px-3 rounded-lg bg-newBgColorInner border border-studioBorder text-[13px] outline-none focus:border-designerAccent text-textColor"
             />
             <button
               onClick={() => setImage(imageUrl.trim())}
@@ -258,9 +258,9 @@ export const BackgroundPanel: FC<BackgroundPanelProps> = ({ store }) => {
                 <button
                   key={file.id}
                   onClick={() => setImage(file.path, file.id)}
-                  className="group rounded-lg overflow-hidden border border-newBorder bg-newBgColorInner hover:border-designerAccent transition-all"
+                  className="group rounded-lg overflow-hidden border border-studioBorder bg-newBgColorInner hover:border-designerAccent transition-all"
                 >
-                  <div className="aspect-[4/3] relative overflow-hidden bg-newColColor/10">
+                  <div className="aspect-[4/3] relative overflow-hidden bg-studioBorder/10">
                     <img
                       src={file.path}
                       alt={file.name}

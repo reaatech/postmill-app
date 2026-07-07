@@ -106,7 +106,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
 
   return (
     <div className="absolute inset-0 z-[400] flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-newBorder bg-newBgColorInner shadow-2xl">
+      <div className="w-full max-w-2xl max-h-[88vh] overflow-y-auto rounded-2xl border border-studioBorder bg-newBgColorInner shadow-2xl">
         {step === 'home' && (
           <div className="p-6">
             <h2 className="text-[20px] font-bold text-textColor mb-1">Start a design</h2>
@@ -117,7 +117,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
             <div className="grid grid-cols-2 gap-3 mb-6">
               <button
                 onClick={() => startNew('image')}
-                className="flex flex-col items-start gap-1 p-4 rounded-xl border border-newBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
+                className="flex flex-col items-start gap-1 p-4 rounded-xl border border-studioBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
               >
                 <span className="text-[22px]">🖼️</span>
                 <span className="text-[14px] font-semibold text-textColor">New Photo</span>
@@ -125,7 +125,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
               </button>
               <button
                 onClick={() => startNew('video')}
-                className="flex flex-col items-start gap-1 p-4 rounded-xl border border-newBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
+                className="flex flex-col items-start gap-1 p-4 rounded-xl border border-studioBorder hover:border-designerAccent hover:bg-designerAccent/5 transition-colors text-left"
               >
                 <span className="text-[22px]">🎬</span>
                 <span className="text-[14px] font-semibold text-textColor">New Video</span>
@@ -133,7 +133,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
               </button>
             </div>
 
-            <div className="flex border-b border-newBorder mb-3">
+            <div className="flex border-b border-studioBorder mb-3">
               {(['my-designs', 'templates'] as const).map((t) => (
                 <button
                   key={t}
@@ -192,7 +192,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                       className={`group relative flex flex-col items-center gap-2 px-2 py-3 rounded-xl border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-designerAccent ${
                         active
                           ? 'border-designerAccent ring-1 ring-designerAccent bg-designerAccent/10'
-                          : 'border-newBorder hover:border-designerAccent/60 hover:bg-newColColor/5'
+                          : 'border-studioBorder hover:border-designerAccent/60 hover:bg-studioBorder/5'
                       }`}
                     >
                       {active && (
@@ -200,7 +200,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                           ✓
                         </span>
                       )}
-                      <div className="w-[44px] h-[44px] rounded-xl bg-newBgColor border border-newBorder flex items-center justify-center overflow-hidden">
+                      <div className="w-[44px] h-[44px] rounded-xl bg-newBgColor border border-studioBorder flex items-center justify-center overflow-hidden">
                         {p.provider ? (
                           <SafeImage
                             src={`/icons/platforms/${p.provider}.png`}
@@ -228,7 +228,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
               </div>
             </div>
 
-            <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-newBorder">
+            <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-studioBorder">
               <button
                 onClick={() => setStep('custom')}
                 className="text-[13px] text-designerAccent hover:underline"
@@ -263,7 +263,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 value={cw}
                 onChange={(e) => setCw(e.target.value)}
                 placeholder="W"
-                className="w-full h-[40px] rounded-lg border border-newBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
+                className="w-full h-[40px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
               <span className="text-textColor/40">×</span>
               <input
@@ -271,7 +271,7 @@ export const StartDialog: FC<StartDialogProps> = ({ store, fetchFn, onDone }) =>
                 value={ch}
                 onChange={(e) => setCh(e.target.value)}
                 placeholder="H"
-                className="w-full h-[40px] rounded-lg border border-newBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
+                className="w-full h-[40px] rounded-lg border border-studioBorder bg-newBgColor px-3 text-[14px] text-textColor text-center outline-none focus:border-designerAccent"
               />
             </div>
             <div className="flex justify-end">

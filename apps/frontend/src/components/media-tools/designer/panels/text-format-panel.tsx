@@ -305,7 +305,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               setFontPickerOpen((o) => !o);
               setFontSearch('');
             }}
-            className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-newBorder text-textColor text-[14px] hover:border-designerAccent focus:border-designerAccent transition-colors"
+            className="flex items-center justify-between gap-[8px] w-full h-[34px] px-[10px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-textColor text-[14px] hover:border-designerAccent focus:border-designerAccent transition-colors"
           >
             <span className="truncate" style={{ fontFamily: `"${currentFont}"` }}>
               {currentFont}
@@ -320,14 +320,14 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
           </button>
 
           {fontPickerOpen && (
-            <div className="absolute z-50 mt-[6px] left-0 w-[280px] rounded-[10px] bg-newBgColorInner border border-newBorder shadow-menu overflow-hidden">
+            <div className="absolute z-50 mt-[6px] left-0 w-[280px] rounded-[10px] bg-newBgColorInner border border-studioBorder shadow-menu overflow-hidden">
               <div className="px-[8px] pt-[6px] pb-[2px]">
                 <input
                   type="text"
                   placeholder="Search fonts..."
                   value={fontSearch}
                   onChange={(e) => setFontSearch(e.target.value)}
-                  className="w-full h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[12px] text-textColor outline-none focus:border-designerAccent placeholder:text-textColor/30"
+                  className="w-full h-[30px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-designerAccent placeholder:text-textColor/30"
                   autoFocus
                 />
               </div>
@@ -409,7 +409,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
                 update({ fontSize: value });
               }
             }}
-            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
           />
         </div>
 
@@ -421,7 +421,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               const value = parseInt(e.target.value, 10);
               update({ fontWeight: value });
             }}
-            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
           >
             {WEIGHTS.map((w) => (
               <option key={w} value={w}>
@@ -444,7 +444,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
 
       <div className="flex flex-col gap-1.5">
         <label className="text-[11px] text-newTextColor/40">Align</label>
-        <div className="flex rounded-[6px] border border-newBorder overflow-hidden">
+        <div className="flex rounded-[6px] border border-studioBorder overflow-hidden">
           {(['left', 'center', 'right'] as const).map((align) => (
             <button
               key={align}
@@ -480,7 +480,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
                 update({ lineHeight: value });
               }
             }}
-            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
           />
         </div>
 
@@ -498,7 +498,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
                 update({ letterSpacing: value });
               }
             }}
-            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-newBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
+            className="w-full h-[34px] px-[8px] rounded-[6px] bg-newBgColor border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
           />
         </div>
       </div>
@@ -542,7 +542,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               update({ textPath: value || undefined, curve: 0 });
             }}
             placeholder="M 0,50 Q 50,0 100,50 ..."
-            className="w-full h-[80px] px-[8px] py-[6px] rounded-[6px] bg-newBgColor border border-newBorder text-[12px] text-textColor outline-none focus:border-designerAccent resize-none font-mono"
+            className="w-full h-[80px] px-[8px] py-[6px] rounded-[6px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none focus:border-designerAccent resize-none font-mono"
           />
         )}
         {pathMode === 'arc' && (
@@ -558,7 +558,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       </div>
 
       {/* Text effects: drop shadow (C2) */}
-      <div className="flex flex-col gap-2 pt-1 border-t border-newBorder">
+      <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
             Drop shadow
@@ -571,7 +571,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               update({ textShadow: shadow ? undefined : { ...DEFAULT_SHADOW } })
             }
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              shadow ? 'bg-designerAccent' : 'bg-newBorder'
+              shadow ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span
@@ -621,7 +621,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
       </div>
 
       {/* Text effects: outline (C2) */}
-      <div className="flex flex-col gap-2 pt-1 border-t border-newBorder">
+      <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
           <span className="text-[12px] font-medium text-textColor/60 uppercase tracking-wider">
             Outline
@@ -636,7 +636,7 @@ export const TextFormatPanel: FC<TextFormatPanelProps> = ({ store }) => {
               })
             }
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              outline ? 'bg-designerAccent' : 'bg-newBorder'
+              outline ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span

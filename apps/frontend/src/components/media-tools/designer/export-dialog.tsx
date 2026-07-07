@@ -567,7 +567,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
                 selectedFolderId === folder.id
                   ? 'bg-designerAccent/20 text-textColor'
-                  : 'text-textColor hover:bg-newColColor/50'
+                  : 'text-textColor hover:bg-studioBorder/50'
               }`}
               style={{ paddingLeft: `${12 + depth * 16}px` }}
               onClick={() => setSelectedFolderId(folder.id)}
@@ -1147,7 +1147,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               return (
                 <div
                   key={output.id}
-                  className="flex items-center justify-between gap-2 px-2 py-1 rounded-[6px] bg-newBgColorInner border border-newColColor/50"
+                  className="flex items-center justify-between gap-2 px-2 py-1 rounded-[6px] bg-newBgColorInner border border-studioBorder/50"
                 >
                   <span className="text-[12px] text-textColor truncate flex-1">
                     {preset?.name || output.name || output.formatId}
@@ -1155,7 +1155,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <select
                     value={fmt}
                     onChange={(e) => setFormatForOutput(output.id, e.target.value as FormatValue)}
-                    className="h-[30px] px-2 rounded-[5px] bg-newBgColor border border-newBorder text-[12px] text-textColor outline-none cursor-pointer"
+                    className="h-[30px] px-2 rounded-[5px] bg-newBgColor border border-studioBorder text-[12px] text-textColor outline-none cursor-pointer"
                   >
                     {formatDefs.map((f) => (
                       <option key={f.value} value={f.value}>
@@ -1173,7 +1173,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                   <button
                     key={f.value}
                     onClick={() => setFormatForAll(f.value)}
-                    className="px-2 py-0.5 rounded-[4px] text-[10px] border border-newBorder text-newTextColor/50 hover:text-textColor hover:border-newTextColor/40 transition-all"
+                    className="px-2 py-0.5 rounded-[4px] text-[10px] border border-studioBorder text-newTextColor/50 hover:text-textColor hover:border-newTextColor/40 transition-all"
                   >
                     All {f.label}
                   </button>
@@ -1211,7 +1211,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     className={`flex-1 h-[36px] rounded-[6px] text-[13px] font-medium transition-all ${
                       scale === s.value
                         ? 'bg-designerAccent text-white'
-                        : 'border border-newBorder text-textColor hover:bg-boxHover'
+                        : 'border border-studioBorder text-textColor hover:bg-boxHover'
                     }`}
                   >
                     {s.label}
@@ -1277,7 +1277,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-between gap-2 mt-2">
             <button
               onClick={onClose}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Cancel
             </button>
@@ -1297,12 +1297,12 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
         <>
           <div className="text-[13px] font-medium text-textColor">Choose destination folder</div>
 
-          <div className="max-h-[260px] overflow-y-auto border border-newBorder rounded-[8px] p-[8px] bg-newBgColorInner">
+          <div className="max-h-[260px] overflow-y-auto border border-studioBorder rounded-[8px] p-[8px] bg-newBgColorInner">
             <div
               className={`flex items-center gap-[8px] px-[8px] py-[6px] rounded-[6px] cursor-pointer text-[13px] transition-all ${
                 selectedFolderId === null
                   ? 'bg-designerAccent/20 text-textColor'
-                  : 'text-textColor hover:bg-newColColor/50'
+                  : 'text-textColor hover:bg-studioBorder/50'
               }`}
               onClick={() => setSelectedFolderId(null)}
             >
@@ -1329,7 +1329,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               value={newFolderName}
               onChange={(e) => setNewFolderName(e.target.value)}
               placeholder="New folder name..."
-              className="flex-1 h-[36px] px-[12px] rounded-[8px] bg-newBgColorInner border border-newColColor text-[13px] text-textColor outline-none focus:border-designerAccent"
+              className="flex-1 h-[36px] px-[12px] rounded-[8px] bg-newBgColorInner border border-studioBorder text-[13px] text-textColor outline-none focus:border-designerAccent"
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleCreateFolder();
               }}
@@ -1345,7 +1345,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-between gap-2 mt-2">
             <button
               onClick={goToOptions}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Back
             </button>
@@ -1388,7 +1388,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               selectedOutputs.map((_, i) => (
                 <div
                   key={i}
-                  className="w-[100px] h-[100px] rounded-[6px] bg-newBgColorInner border border-newBorder animate-pulse flex items-center justify-center"
+                  className="w-[100px] h-[100px] rounded-[6px] bg-newBgColorInner border border-studioBorder animate-pulse flex items-center justify-center"
                 >
                   <svg
                     className="animate-spin w-[20px] h-[20px] text-newTextColor/30"
@@ -1410,7 +1410,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
               previews.map((p) => (
                 <div
                   key={p.idx}
-                  className="w-[100px] h-[100px] rounded-[6px] border border-newBorder overflow-hidden bg-newBgColorInner"
+                  className="w-[100px] h-[100px] rounded-[6px] border border-studioBorder overflow-hidden bg-newBgColorInner"
                 >
                   <img
                     src={p.dataUrl}
@@ -1424,7 +1424,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-between gap-2 mt-2">
             <button
               onClick={goToFolder}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Back
             </button>
@@ -1466,7 +1466,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 {previews.map((p) => (
                   <div
                     key={p.idx}
-                    className="w-[80px] h-[80px] rounded-[4px] border border-newBorder overflow-hidden bg-newBgColorInner"
+                    className="w-[80px] h-[80px] rounded-[4px] border border-studioBorder overflow-hidden bg-newBgColorInner"
                   >
                     <img
                       src={p.dataUrl}
@@ -1482,7 +1482,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-end gap-2 mt-2">
             <button
               onClick={onClose}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Close
             </button>
@@ -1525,8 +1525,8 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     key={`${row.outputIdx}-${row.integration?.id || idx}`}
                     className={`flex items-center gap-2 p-2 rounded-[8px] border ${
                       isSkipped
-                        ? 'border-newBorder/30 bg-newBgColorInner/30'
-                        : 'border-newBorder bg-newBgColorInner'
+                        ? 'border-studioBorder/30 bg-newBgColorInner/30'
+                        : 'border-studioBorder bg-newBgColorInner'
                     } ${
                       isUnchecked && !isSkipped ? 'opacity-50' : ''
                     }`}
@@ -1539,7 +1539,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                       className="accent-designerAccent w-[14px] h-[14px] flex-shrink-0"
                     />
 
-                    <div className="w-[36px] h-[36px] rounded-[4px] overflow-hidden flex-shrink-0 bg-newBgColor border border-newBorder/50">
+                    <div className="w-[36px] h-[36px] rounded-[4px] overflow-hidden flex-shrink-0 bg-newBgColor border border-studioBorder/50">
                       {previews[row.outputIdx]?.dataUrl ? (
                         <img
                           src={previews[row.outputIdx].dataUrl}
@@ -1605,7 +1605,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-end gap-2 mt-2">
             <button
               onClick={onClose}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Skip / Done
             </button>
@@ -1641,7 +1641,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     className={`flex-1 h-[36px] rounded-[6px] text-[13px] font-medium transition-all ${
                       videoFormat === f
                         ? 'bg-designerAccent text-white'
-                        : 'border border-newBorder text-textColor hover:bg-boxHover'
+                        : 'border border-studioBorder text-textColor hover:bg-boxHover'
                     }`}
                   >
                     {f === 'webp-animated' ? 'WebP' : f.toUpperCase()}
@@ -1660,7 +1660,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     className={`flex-1 h-[36px] rounded-[6px] text-[13px] font-medium capitalize transition-all ${
                       videoQuality === q
                         ? 'bg-designerAccent text-white'
-                        : 'border border-newBorder text-textColor hover:bg-boxHover'
+                        : 'border border-studioBorder text-textColor hover:bg-boxHover'
                     }`}
                   >
                     {q}
@@ -1740,7 +1740,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
           <div className="flex justify-between gap-2 mt-2">
             <button
               onClick={goToFolder}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Back
             </button>
@@ -1772,7 +1772,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     <span>Processing...</span>
                     <span>{renderProgress}%</span>
                   </div>
-                  <div className="w-full h-[8px] rounded-[4px] bg-newBgColorInner border border-newBorder overflow-hidden">
+                  <div className="w-full h-[8px] rounded-[4px] bg-newBgColorInner border border-studioBorder overflow-hidden">
                     <div
                       className="h-full bg-designerAccent transition-all duration-500 rounded-[4px]"
                       style={{ width: `${Math.max(renderProgress, 5)}%` }}
@@ -1821,7 +1821,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                     <div className="text-[13px] font-medium text-textColor">Poster / Thumbnail</div>
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-[80px] h-[80px] rounded-[6px] border overflow-hidden cursor-pointer ${posterSource === 'rendered' ? 'border-designerAccent ring-2 ring-designerAccent/30' : 'border-newBorder'}`}
+                        className={`w-[80px] h-[80px] rounded-[6px] border overflow-hidden cursor-pointer ${posterSource === 'rendered' ? 'border-designerAccent ring-2 ring-designerAccent/30' : 'border-studioBorder'}`}
                         onClick={() => {
                           setPosterSource('rendered');
                           setPosterUrl(renderedPosterUrl);
@@ -1842,7 +1842,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                           className={`text-[12px] px-3 py-1.5 rounded-[5px] transition-all ${
                             posterSource === 'rendered'
                               ? 'bg-designerAccent text-white'
-                              : 'border border-newBorder text-textColor hover:bg-boxHover'
+                              : 'border border-studioBorder text-textColor hover:bg-boxHover'
                           }`}
                         >
                           Use rendered poster
@@ -1851,7 +1851,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                           className={`text-[12px] px-3 py-1.5 rounded-[5px] cursor-pointer transition-all ${
                             posterSource === 'custom'
                               ? 'bg-designerAccent text-white'
-                              : 'border border-newBorder text-textColor hover:bg-boxHover'
+                              : 'border border-studioBorder text-textColor hover:bg-boxHover'
                           }`}
                         >
                           <input
@@ -1914,7 +1914,7 @@ export const ExportDialog: FC<ExportDialogProps> = ({ store, onClose }) => {
                 setStep('video-render');
                 setRenderJobs([]);
               }}
-              className="px-4 h-[38px] rounded-[6px] border border-newBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
+              className="px-4 h-[38px] rounded-[6px] border border-studioBorder text-[13px] text-textColor hover:bg-boxHover transition-all"
             >
               Back
             </button>

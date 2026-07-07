@@ -10,6 +10,7 @@ import {
   type AiCapabilities as AICapabilities,
   type AiModelOptions as AIModelOptions,
   type ProviderModule,
+  type SafeFetchPort,
 } from '@gitroom/provider-kernel';
 
 const XAI_CAPABILITIES: AICapabilities = {
@@ -49,6 +50,13 @@ export class XaiAdapter implements AIProviderAdapter {
     description: 'xAI Grok API',
   };
 
+  // 0.4: SSRF-safe fetch, injected by the provider module's create/validate.
+  private _safeFetch?: SafeFetchPort;
+
+  setSafeFetch(fetch: SafeFetchPort): void {
+    this._safeFetch = fetch;
+  }
+
   private _buildProvider(creds: Record<string, string>) {
     return createXai({ apiKey: creds.apiKey });
   }
@@ -59,8 +67,10 @@ export class XaiAdapter implements AIProviderAdapter {
 
   async validateCredentials(creds: Record<string, string>): Promise<{ ok: boolean; error?: string }> {
     if (!creds.apiKey) return { ok: false, error: 'API key is required' };
+    // 0.4: only over the SSRF-safe fetch — never the global fetch.
+    if (!this._safeFetch) return { ok: false, error: 'cannot validate' };
     try {
-      const response = await fetch(`${XAI_BASE_URL}/models`, {
+      const response = await this._safeFetch(`${XAI_BASE_URL}/models`, {
         headers: { Authorization: `Bearer ${creds.apiKey}` },
       });
       if (response.ok) return { ok: true };
@@ -100,6 +110,12 @@ export const xaiAiModule: ProviderModule<any, any> = {
     credentialFields: (adapter as any).credentialFields || [],
     capabilities: (adapter as any).capabilities,
   },
-  create: () => adapter as any,
-  validateCredentials: async (ctx) => adapter.validateCredentials(ctx.credentials),
+  create: (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter as any;
+  },
+  validateCredentials: async (ctx) => {
+    adapter.setSafeFetch(ctx.fetch);
+    return adapter.validateCredentials(ctx.credentials);
+  },
 };

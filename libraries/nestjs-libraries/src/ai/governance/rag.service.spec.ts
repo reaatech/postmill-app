@@ -15,10 +15,15 @@ vi.mock('@gitroom/nestjs-libraries/redis/redis.service', () => {
     rpoplpush: vi.fn(async (_src: string, _dst: string) => {
       return redisList.length > 0 ? redisList.pop()! : null;
     }),
+    brpoplpush: vi.fn(async (_src: string, _dst: string, _timeout: number) => {
+      return redisList.length > 0 ? redisList.pop()! : null;
+    }),
     lrem: vi.fn(async (_key: string, _count: number, _value: string) => {
       return 1;
     }),
+    quit: vi.fn().mockResolvedValue(undefined),
     on: vi.fn(),
+    duplicate: vi.fn(() => mock),
   };
   return { ioRedis: mock };
 });
@@ -705,9 +710,9 @@ describe('RagService', () => {
       const service = createService();
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
 
-      // Stop the loop after the first RPOP so the test does not hang on the
+      // Stop the loop after the first BRPOP so the test does not hang on the
       // worker's `while (this._workerRunning)` poll.
-      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         return JSON.stringify({
           organizationId: 'org-1',
@@ -731,7 +736,7 @@ describe('RagService', () => {
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
       mockRepo.replaceSourceChunks.mockRejectedValue(new Error('boom'));
 
-      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         return JSON.stringify({
           organizationId: 'org-1',
@@ -755,14 +760,14 @@ describe('RagService', () => {
       const { ioRedis } = await import('@gitroom/nestjs-libraries/redis/redis.service');
       (service as any)._workerDelayMs = 1;
 
-      vi.mocked(ioRedis.rpoplpush).mockImplementationOnce(async () => {
+      vi.mocked(ioRedis.brpoplpush).mockImplementationOnce(async () => {
         (service as any)._workerRunning = false;
         throw new Error('redis down');
       });
 
       await service.onModuleInit();
       await new Promise((r) => setTimeout(r, 10));
-      expect(ioRedis.rpoplpush).toHaveBeenCalled();
+      expect(ioRedis.brpoplpush).toHaveBeenCalled();
     });
 
     it('is idempotent — a second _startWorker is a no-op while running', async () => {

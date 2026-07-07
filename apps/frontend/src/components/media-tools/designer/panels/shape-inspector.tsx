@@ -70,7 +70,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
         onChange={(n) => set({ borderRadius: n })}
       />
 
-      <div className="flex flex-col gap-2 pt-1 border-t border-newBorder">
+      <div className="flex flex-col gap-2 pt-1 border-t border-studioBorder">
         <div className="flex items-center justify-between">
           <span className="text-[11px] text-textColor/50">Shadow</span>
           <button
@@ -83,7 +83,7 @@ export const ShapeInspector: FC<ShapeInspectorProps> = ({
               } as Partial<DesignerElement>)
             }
             className={`relative w-[40px] h-[22px] rounded-full transition-colors ${
-              shadow ? 'bg-designerAccent' : 'bg-newBorder'
+              shadow ? 'bg-designerAccent' : 'bg-studioBorder'
             }`}
           >
             <span

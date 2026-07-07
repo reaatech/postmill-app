@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Image as KonvaImage, Rect, Ellipse, Line, Star, Text as KonvaText, TextPath, Group, Shape } from 'react-konva';
 import Konva from 'konva';
@@ -701,7 +703,7 @@ export const CanvasElements: FC<ElementsProps> = ({ elements, onSelect, onContex
                 <Group key={el.id} {...commonProps}>
                   {segments.map((seg, i) => (
                     <KonvaText
-                      key={i}
+                      key={`${seg.x}-${seg.y}-${seg.text}-${seg.run.fontFamily}-${seg.run.fontSize}-${seg.run.fontStyle}-${seg.run.fontWeight}-${seg.run.fill}-${seg.run.underline ? 'u' : 'n'}`}
                       x={seg.x}
                       y={seg.y}
                       text={seg.text}

@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useEffect, useRef, useState } from 'react';
 import type { DesignerElement, TextRun } from './designer.store';
 
