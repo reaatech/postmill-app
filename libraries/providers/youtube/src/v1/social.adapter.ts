@@ -10,8 +10,8 @@ import {
 import { makeId } from '@gitroom/provider-kernel';
 import { google, youtube_v3 } from 'googleapis';
 import { OAuth2Client } from 'google-auth-library/build/src/auth/oauth2client';
-import axios from 'axios';
-import { YoutubeSettingsDto } from '@gitroom/provider-kernel';
+import { Readable } from 'node:stream';
+import { safeFetch, YoutubeSettingsDto } from '@gitroom/provider-kernel';
 import {
   BadBody,
   SocialAbstract,
@@ -471,11 +471,13 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
 
     const { settings }: { settings: YoutubeSettingsDto } = firstPost;
 
-    const response = await axios({
-      url: firstPost?.media?.[0]?.path,
-      method: 'GET',
-      responseType: 'stream',
-    });
+    const mediaPath = firstPost?.media?.[0]?.path;
+    const mediaResponse = await safeFetch(mediaPath);
+    if (!mediaResponse.ok) {
+      throw new Error(
+        `Failed to fetch media: ${mediaResponse.status} ${mediaResponse.statusText}`
+      );
+    }
 
     const all: GaxiosResponse<Schema$Video> = await this.runInConcurrent(
       async () =>
@@ -497,24 +499,24 @@ export class YoutubeProvider extends SocialAbstract implements SocialProvider {
             },
           },
           media: {
-            body: response.data,
+            body: Readable.fromWeb(mediaResponse.body as any),
           },
         }),
       true
     );
 
     if (settings?.thumbnail?.path) {
+      const thumbnailResponse = await safeFetch(settings.thumbnail.path);
+      if (!thumbnailResponse.ok) {
+        throw new Error(
+          `Failed to fetch thumbnail: ${thumbnailResponse.status} ${thumbnailResponse.statusText}`
+        );
+      }
       await this.runInConcurrent(async () =>
         youtubeClient.thumbnails.set({
           videoId: all?.data?.id!,
           media: {
-            body: (
-              await axios({
-                url: settings?.thumbnail?.path,
-                method: 'GET',
-                responseType: 'stream',
-              })
-            ).data,
+            body: Readable.fromWeb(thumbnailResponse.body as any),
           },
         })
       );

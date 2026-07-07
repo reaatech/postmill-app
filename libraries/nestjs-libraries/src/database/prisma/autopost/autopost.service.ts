@@ -1,4 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+} from '@nestjs/common';
 import { AutopostRepository } from '@gitroom/nestjs-libraries/database/prisma/autopost/autopost.repository';
 import { AutopostDto } from '@gitroom/nestjs-libraries/dtos/autopost/autopost.dto';
 import dayjs from 'dayjs';
@@ -52,7 +57,9 @@ const dallePrompt = z.object({
 export class AutopostService {
   constructor(
     private _autopostsRepository: AutopostRepository,
+    @Inject(forwardRef(() => IntegrationService))
     private _integrationService: IntegrationService,
+    @Inject(forwardRef(() => PostsService))
     private _postsService: PostsService,
     private _aiModelProvider: AIModelProvider,
     private _aiMediaService: AiMediaService
@@ -103,7 +110,7 @@ export class AutopostService {
       try {
         return await inngest.send({
           name: 'autopost/process',
-          data: { id },
+          data: { id, organizationId: orgId },
           // Unique per activation so re-activating within Inngest's ~24h dedup
           // window isn't silently deduplicated (0.9).
           id: `autopost-${id}-${Date.now()}`,
@@ -323,11 +330,15 @@ export class AutopostService {
   }
 
   async updateUrl(state: WorkflowChannelsState) {
-    await this._autopostsRepository.updateUrl(state.id, state.load.url);
+    await this._autopostsRepository.updateUrl(
+      state.id,
+      state.integrations[0]?.organizationId,
+      state.load.url
+    );
   }
 
-  async startAutopost(id: string) {
-    const getPost = await this._autopostsRepository.getAutopost(id);
+  async startAutopost(id: string, organizationId: string) {
+    const getPost = await this._autopostsRepository.getAutopost(id, organizationId);
     if (!getPost || !getPost.active) {
       return;
     }

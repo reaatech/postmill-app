@@ -73,6 +73,7 @@ apps/frontend/public/*.psd
 apps/frontend/public/*.zip
 
 dev
+!dev/psr-*.md
 coolify-compose.yml
 .env.coolify
 /.pnpm-store/

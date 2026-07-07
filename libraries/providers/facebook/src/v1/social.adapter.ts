@@ -39,6 +39,7 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
   ];
   override maxConcurrentJob = 500; // Facebook has reasonable rate limits
   private readonly logger = new Logger(FacebookProvider.name);
+  private readonly MAX_PAGE_DEPTH = 50; // cap pagination loops
   editor = 'normal' as const;
   maxLength() {
     return 63206;
@@ -335,8 +336,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
 
     const fetchPaginated = async (startUrl: string) => {
       let nextUrl: string | undefined = startUrl;
-      while (nextUrl) {
-        const response = await (await fetch(nextUrl)).json();
+      let pageCount = 0;
+      while (nextUrl && pageCount < this.MAX_PAGE_DEPTH) {
+        pageCount++;
+        const response = await (
+          await this.fetch(nextUrl, {}, 'fetch facebook pages')
+        ).json();
         if (response.data) {
           for (const page of response.data) {
             if (!seenIds.has(page.id)) {
@@ -361,8 +366,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
         | string
         | undefined = `https://graph.facebook.com/v20.0/me/businesses?access_token=${accessToken}`;
 
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
+      let bizPageCount = 0;
+      while (bizUrl && bizPageCount < this.MAX_PAGE_DEPTH) {
+        bizPageCount++;
+        const bizResponse = await (
+          await this.fetch(bizUrl, {}, 'fetch facebook businesses')
+        ).json();
         if (bizResponse.data) {
           for (const business of bizResponse.data) {
             try {
@@ -397,8 +406,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
 
     const searchPaginated = async (startUrl: string) => {
       let url: string | undefined = startUrl;
-      while (url) {
-        const response = await (await fetch(url)).json();
+      let pageCount = 0;
+      while (url && pageCount < this.MAX_PAGE_DEPTH) {
+        pageCount++;
+        const response = await (
+          await this.fetch(url, {}, 'search facebook page')
+        ).json();
         if (response.data) {
           const page = response.data.find(
             (p: any) => String(p.id) === String(pageId)
@@ -430,8 +443,12 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
         | string
         | undefined = `https://graph.facebook.com/v20.0/me/businesses?access_token=${accessToken}`;
 
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
+      let bizPageCount = 0;
+      while (bizUrl && bizPageCount < this.MAX_PAGE_DEPTH) {
+        bizPageCount++;
+        const bizResponse = await (
+          await this.fetch(bizUrl, {}, 'fetch facebook businesses')
+        ).json();
         if (bizResponse.data) {
           for (const business of bizResponse.data) {
             try {
@@ -703,8 +720,10 @@ export class FacebookProvider extends SocialAbstract implements SocialProvider {
     const since = dayjs().subtract(date, 'day').unix();
 
     const { data } = await (
-      await fetch(
-        `https://graph.facebook.com/v20.0/${id}/insights?metric=page_impressions_unique,page_posts_impressions_unique,page_post_engagements,page_daily_follows,page_video_views&access_token=${accessToken}&period=day&since=${since}&until=${until}`
+      await this.fetch(
+        `https://graph.facebook.com/v20.0/${id}/insights?metric=page_impressions_unique,page_posts_impressions_unique,page_post_engagements,page_daily_follows,page_video_views&access_token=${accessToken}&period=day&since=${since}&until=${until}`,
+        {},
+        'fetch facebook analytics'
       )
     ).json();
 

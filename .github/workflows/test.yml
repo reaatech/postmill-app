@@ -45,6 +45,11 @@ jobs:
           version: 10
           run_install: false
 
+      - name: Install native dependencies for node-canvas
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcairo2-dev libjpeg-dev libpango1.0-dev libgif-dev build-essential g++ libpixman-1-dev
+
       - name: Install dependencies
         run: pnpm install
 

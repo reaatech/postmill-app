@@ -287,7 +287,14 @@ describe('bluesky deep', () => {
   });
 
   it('post with images', async () => {
-    globalThis.fetch = vi.fn();
+    globalThis.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      arrayBuffer: vi.fn().mockResolvedValue(Buffer.from('image-data').buffer),
+      json: vi.fn(),
+      text: vi.fn(),
+      headers: new Map(),
+    });
     const integration = { customInstanceDetails: JSON.stringify({ service: 'https://bsky.social', identifier: 'testuser', password: 'pass' }) } as any;
     const r = await provider.post('did:plc:123', 'tok', [{ id: 'p1', message: 'With image', settings: {}, media: [{ type: 'image', path: 'https://ex.com/img.jpg' }] }], integration);
     expect(r).toHaveLength(1);

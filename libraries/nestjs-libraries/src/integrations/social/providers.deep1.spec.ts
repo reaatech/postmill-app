@@ -814,7 +814,27 @@ describe('youtube deep', () => {
 
   beforeEach(() => {
     provider = new YoutubeProvider();
-    globalThis.fetch = vi.fn();
+    // Media/thumbnail downloads now route through safeFetch, which delegates to
+    // globalThis.fetch in these specs. Return a fresh ReadableStream body on
+    // every call so Readable.fromWeb(mediaResponse.body) works for the
+    // googleapis upload and a second fetch (thumbnail) gets an unconsumed stream.
+    globalThis.fetch = vi.fn().mockImplementation(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(Buffer.from('video-data'));
+            controller.close();
+          },
+        }),
+        arrayBuffer: vi.fn().mockResolvedValue(Buffer.from('video-data').buffer),
+        json: vi.fn(),
+        text: vi.fn(),
+        headers: new Headers(),
+      })
+    );
   });
 
 

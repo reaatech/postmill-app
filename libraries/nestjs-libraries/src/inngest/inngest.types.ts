@@ -27,6 +27,7 @@ export type InngestEvents = {
   'autopost/process': {
     data: {
       id: string;
+      organizationId: string;
     };
   };
   'autopost/cancel': {

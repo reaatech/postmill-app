@@ -42,6 +42,8 @@ describe('SocialCommentsService', () => {
   let integrationManager: Record<string, ReturnType<typeof vi.fn>>;
   let refreshIntegrationService: Record<string, ReturnType<typeof vi.fn>>;
   let integrationService: Record<string, ReturnType<typeof vi.fn>>;
+  let webhooksService: Record<string, ReturnType<typeof vi.fn>>;
+  let orgProviderConfigManager: Record<string, ReturnType<typeof vi.fn>>;
 
   const orgId = 'org-1';
   const userId = 'user-1';
@@ -129,12 +131,22 @@ describe('SocialCommentsService', () => {
       disconnectChannel: vi.fn(),
     };
 
+    webhooksService = {
+      dispatchEvent: vi.fn().mockResolvedValue(undefined),
+    };
+
+    orgProviderConfigManager = {
+      ensureFresh: vi.fn().mockResolvedValue(undefined),
+    };
+
     service = new SocialCommentsService(
       socialCommentsRepo as any,
       postsRepo as any,
       integrationManager as any,
       refreshIntegrationService as any,
       integrationService as any,
+      webhooksService as any,
+      orgProviderConfigManager as any,
     );
   });
 
@@ -426,7 +438,7 @@ describe('SocialCommentsService', () => {
 
       const result = await service.replyToComment(orgId, userId, postId, commentId, message);
 
-      expect(socialCommentsRepo.getCommentById).toHaveBeenCalledWith(commentId);
+      expect(socialCommentsRepo.getCommentById).toHaveBeenCalledWith(commentId, orgId);
       expect(mockProvider.replyToComment).toHaveBeenCalledWith(
         basePost.integration.internalId,
         basePost.integration.token,
@@ -653,6 +665,7 @@ describe('SocialCommentsService', () => {
 
       expect(socialCommentsRepo.updateCommentStatus).toHaveBeenCalledWith(
         baseComment.id,
+        orgId,
         'handled',
       );
       expect(result.status).toBe('handled');
@@ -692,6 +705,7 @@ describe('SocialCommentsService', () => {
       );
       expect(socialCommentsRepo.assignComment).toHaveBeenCalledWith(
         baseComment.id,
+        orgId,
         'user-2',
       );
       expect(result.assigneeId).toBe('user-2');
@@ -722,6 +736,7 @@ describe('SocialCommentsService', () => {
       expect(socialCommentsRepo.isOrganizationMember).not.toHaveBeenCalled();
       expect(socialCommentsRepo.assignComment).toHaveBeenCalledWith(
         baseComment.id,
+        orgId,
         null,
       );
     });

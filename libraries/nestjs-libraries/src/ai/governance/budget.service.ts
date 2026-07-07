@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaRepository } from '@gitroom/nestjs-libraries/database/prisma/prisma.service';
 import { AiSettingsService } from '@gitroom/nestjs-libraries/database/prisma/ai-settings/ai-settings.service';
 import { AiSettingsManager } from '@gitroom/nestjs-libraries/ai/ai-settings.manager';
@@ -126,6 +126,7 @@ export class BudgetService {
   constructor(
     private _aiSettingsManager: AiSettingsManager,
     private _aiSettings: AiSettingsService,
+    @Inject(forwardRef(() => SubscriptionService))
     private _subscriptionService: SubscriptionService,
     private _spendLogRepo: PrismaRepository<'aISpendLog'>,
     private _orgRepo: PrismaRepository<'organization'>,

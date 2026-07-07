@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -21,6 +22,7 @@ import { IntegrationFunctionDto } from '@gitroom/nestjs-libraries/dtos/integrati
 import { CheckPolicies } from '@gitroom/backend/services/auth/permissions/permissions.ability';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { GetUserFromRequest } from '@gitroom/nestjs-libraries/user/user.from.request';
 import { PostsService } from '@gitroom/nestjs-libraries/database/prisma/posts/posts.service';
 import { CampaignsService } from '@gitroom/nestjs-libraries/database/prisma/campaigns/campaigns.service';
@@ -28,6 +30,16 @@ import { ConnectProviderDto } from '@gitroom/nestjs-libraries/dtos/integrations/
 import { IntegrationTimeDto } from '@gitroom/nestjs-libraries/dtos/integrations/integration.time.dto';
 import { PlugDto } from '@gitroom/nestjs-libraries/dtos/plugs/plug.dto';
 import { RefreshToken } from '@gitroom/nestjs-libraries/integrations/social.abstract';
+import { UpdateProviderSettingsDto } from '@gitroom/nestjs-libraries/dtos/integrations/update-provider-settings.dto';
+import { ChannelIdBodyDto } from '@gitroom/nestjs-libraries/dtos/integrations/channel-id-body.dto';
+import { PlugActivationDto } from '@gitroom/nestjs-libraries/dtos/integrations/plug-activation.dto';
+import { TelegramUpdatesQueryDto } from '@gitroom/nestjs-libraries/dtos/integrations/telegram-updates-query.dto';
+import { UpdateIntegrationGroupDto } from '@gitroom/nestjs-libraries/dtos/integrations/update-integration-group.dto';
+import { UpdateOnCustomerNameDto } from '@gitroom/nestjs-libraries/dtos/integrations/update-on-customer-name.dto';
+import { SetNicknameDto } from '@gitroom/nestjs-libraries/dtos/integrations/set-nickname.dto';
+import { ParseCuidPipe } from '@gitroom/nestjs-libraries/pipes/parse-cuid.pipe';
+import { MoltbookRegisterDto } from '@gitroom/nestjs-libraries/dtos/integrations/moltbook-register.dto';
+import { MoltbookStatusQueryDto } from '@gitroom/nestjs-libraries/dtos/integrations/moltbook-status-query.dto';
 
 import { timer } from '@gitroom/helpers/utils/timer';
 import { TelegramProvider } from '@gitroom/provider-telegram';
@@ -101,8 +113,8 @@ export class IntegrationsController {
   @RequirePermission('channels', 'update')
   async updateIntegrationGroup(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body() body: { group: string }
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: UpdateIntegrationGroupDto
   ) {
     const result = await this._integrationService.updateIntegrationGroup(
       org.id,
@@ -117,8 +129,8 @@ export class IntegrationsController {
   @RequirePermission('channels', 'update')
   async updateOnCustomerName(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body() body: { name: string }
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: UpdateOnCustomerNameDto
   ) {
     const result = await this._integrationService.updateOnCustomerName(
       org.id,
@@ -198,22 +210,22 @@ export class IntegrationsController {
   @RequirePermission('channels', 'update')
   async updateProviderSettings(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body('additionalSettings') body: string
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: UpdateProviderSettingsDto
   ) {
-    if (typeof body !== 'string') {
-      throw new Error('Invalid body');
-    }
-
-    await this._integrationService.updateProviderSettings(org.id, id, body);
+    await this._integrationService.updateProviderSettings(
+      org.id,
+      id,
+      body.additionalSettings
+    );
     await this._invalidateIntegrationsList(org.id);
   }
   @Post('/:id/nickname')
   @RequirePermission('channels', 'update')
   async setNickname(
     @GetOrgFromRequest() org: Organization,
-    @Param('id') id: string,
-    @Body() body: { name: string; picture: string }
+    @Param('id', ParseCuidPipe) id: string,
+    @Body() body: SetNicknameDto
   ) {
     const integration = await this._integrationService.getIntegrationById(
       org.id,
@@ -434,6 +446,18 @@ export class IntegrationsController {
       throw new Error('Invalid provider');
     }
 
+    // POSTS-23/24: allow-list callable provider methods. Tool-decorated methods
+    // plus the non-tool `mention` helper are the only legitimate dynamic-dispatch
+    // targets for this route.
+    const tools = this._integrationManager.getAllTools();
+    const allowedMethods = new Set([
+      ...(tools[integrationProvider.identifier] || []).map((t) => t.methodName),
+      'mention',
+    ]);
+    if (!allowedMethods.has(body.name)) {
+      throw new BadRequestException(`Unknown provider function: ${body.name}`);
+    }
+
     // @ts-ignore
     if (integrationProvider[body.name]) {
       try {
@@ -478,9 +502,9 @@ export class IntegrationsController {
   @RequirePermission('channels', 'update')
   async disableChannel(
     @GetOrgFromRequest() org: Organization,
-    @Body('id') id: string
+    @Body() body: ChannelIdBodyDto
   ) {
-    const result = await this._integrationService.disableChannel(org.id, id);
+    const result = await this._integrationService.disableChannel(org.id, body.id);
     await this._invalidateIntegrationsList(org.id);
     return result;
   }
@@ -489,13 +513,13 @@ export class IntegrationsController {
   @RequirePermission('channels', 'update')
   async enableChannel(
     @GetOrgFromRequest() org: Organization,
-    @Body('id') id: string
+    @Body() body: ChannelIdBodyDto
   ) {
     const result = await this._integrationService.enableChannel(
       org.id,
       // @ts-ignore
       org?.subscription?.totalChannels || pricing.FREE.channel,
-      id
+      body.id
     );
     await this._invalidateIntegrationsList(org.id);
     return result;
@@ -505,11 +529,11 @@ export class IntegrationsController {
   @RequirePermission('channels', 'delete')
   async deleteChannel(
     @GetOrgFromRequest() org: Organization,
-    @Body('id') id: string
+    @Body() body: ChannelIdBodyDto
   ) {
     const isTherePosts = await this._integrationService.getPostsForChannel(
       org.id,
-      id
+      body.id
     );
     if (isTherePosts.length) {
       for (const post of isTherePosts) {
@@ -517,7 +541,7 @@ export class IntegrationsController {
       }
     }
 
-    const result = await this._integrationService.deleteChannel(org.id, id);
+    const result = await this._integrationService.deleteChannel(org.id, body.id);
     await this._invalidateIntegrationsList(org.id);
     return result;
   }
@@ -548,15 +572,16 @@ export class IntegrationsController {
   @Put('/plugs/:id/activate')
   @RequirePermission('channels', 'update')
   async changePlugActivation(
-    @Param('id') id: string,
+    @Param('id', ParseCuidPipe) id: string,
     @GetOrgFromRequest() org: Organization,
-    @Body('status') status: boolean
+    @Body() body: PlugActivationDto
   ) {
-    return this._integrationService.changePlugActivation(org.id, id, status);
+    return this._integrationService.changePlugActivation(org.id, id, body.status);
   }
 
   @Get('/telegram/updates')
-  async getUpdates(@Query() query: { word: string; id?: number }) {
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async getUpdates(@Query() query: TelegramUpdatesQueryDto) {
     try {
       return await new TelegramProvider().getBotId(query);
     } catch (err) {
@@ -569,7 +594,8 @@ export class IntegrationsController {
   }
 
   @Post('/moltbook/register')
-  async moltbookRegister(@Body() body: { name: string; description: string }) {
+  @Throttle({ default: { limit: 30, ttl: 60000 } })
+  async moltbookRegister(@Body() body: MoltbookRegisterDto) {
     try {
       const provider = new MoltbookProvider();
       const result = await provider.registerAgent(body.name, body.description);
@@ -584,10 +610,11 @@ export class IntegrationsController {
   }
 
   @Get('/moltbook/status')
-  async moltbookStatus(@Query('apiKey') apiKey: string) {
+  @Throttle({ default: { limit: 60, ttl: 60000 } })
+  async moltbookStatus(@Query() query: MoltbookStatusQueryDto) {
     try {
       const provider = new MoltbookProvider();
-      const result = await provider.checkAgentStatus(apiKey);
+      const result = await provider.checkAgentStatus(query.apiKey);
       return { claimed: result?.status === 'claimed' };
     } catch (err) {
       return { claimed: false };

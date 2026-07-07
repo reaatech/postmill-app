@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { forwardRef, Inject, Injectable } from '@nestjs/common';
 import { pricing } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/pricing';
 import { SubscriptionRepository } from '@gitroom/nestjs-libraries/database/prisma/subscriptions/subscription.repository';
 import { IntegrationService } from '@gitroom/nestjs-libraries/database/prisma/integrations/integration.service';
@@ -11,6 +11,7 @@ import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 export class SubscriptionService {
   constructor(
     private readonly _subscriptionRepository: SubscriptionRepository,
+    @Inject(forwardRef(() => IntegrationService))
     private readonly _integrationService: IntegrationService,
     private readonly _organizationService: OrganizationService
   ) {}

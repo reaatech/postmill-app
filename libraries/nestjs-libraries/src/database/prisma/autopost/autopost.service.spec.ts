@@ -92,7 +92,7 @@ describe('AutopostService.processCron Inngest dispatch', () => {
     expect(inngest.send).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'autopost/process',
-        data: { id: 'ap-1' },
+        data: { id: 'ap-1', organizationId: 'org-1' },
         // 0.9: id is unique per activation (timestamp-suffixed), no longer the
         // constant `autopost-ap-1` that would be deduped across re-activations.
         id: expect.stringMatching(/^autopost-ap-1-\d+$/),

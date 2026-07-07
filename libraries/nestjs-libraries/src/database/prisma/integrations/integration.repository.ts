@@ -159,6 +159,7 @@ export class IntegrationRepository {
       await this._posts.model.post.updateMany({
         where: {
           integrationId: id,
+          organizationId: params.organizationId!,
         },
         data: {
           deletedAt: new Date(),
