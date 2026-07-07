@@ -1,3 +1,5 @@
+'use client';
+
 import { FC, ReactNode, useCallback, useState } from 'react';
 import clsx from 'clsx';
 import {
@@ -51,9 +53,9 @@ export const SliderComponent: FC<{
       {/* Pagination Dots */}
       {list.length > 1 && (
         <div className="absolute bottom-[10px] left-[50%] -translate-x-[50%] flex gap-2">
-          {list.map((_, index) => (
+          {list.map((child, index) => (
             <button
-              key={index}
+              key={(child as any)?.key ?? index}
               onClick={() => setShow(index)}
               className={clsx(
                 'w-2 h-2 rounded-full transition-colors cursor-pointer',

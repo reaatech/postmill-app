@@ -374,7 +374,7 @@ export const EditorWrapper: FC<{
               </div>
               <div className="w-[54px] h-[54px] rounded-full bg-newSettings opacity-80" />
             </div>
-            <div className="text-[14px] font-[600] text-white">
+            <div className="text-[14px] font-[600] text-textColor">
               {t(
                 'cant_edit_networks_when_creating_set',
                 "You can't edit networks when creating a set"
@@ -399,14 +399,14 @@ export const EditorWrapper: FC<{
               </div>
               <div className="w-[54px] h-[54px] rounded-full bg-newSettings opacity-80" />
             </div>
-            <div className="text-[14px] font-[600] text-white">
+            <div className="text-[14px] font-[600] text-textColor">
               {t(
                 'click_to_exit_global_editing',
                 'Click this button to exit global editing and customize the post for this channel'
               )}
             </div>
             <div>
-              <div className="text-white rounded-[8px] h-[44px] px-[20px] bg-[#2b5cd3] cursor-pointer flex justify-center items-center">
+              <div className="text-textColor rounded-[8px] h-[44px] px-[20px] bg-[#2b5cd3] cursor-pointer flex justify-center items-center">
                 {t('edit_content', 'Edit content')}
               </div>
             </div>
@@ -437,7 +437,7 @@ export const EditorWrapper: FC<{
                 editorType={editor}
                 allValues={items}
                 onChange={changeValue(index)}
-                key={index}
+                key={g.id}
                 num={index}
                 totalPosts={global.length}
                 value={g.content}
@@ -715,7 +715,7 @@ export const Editor: FC<{
     }
     setLoadedEditor(editorType);
     setShowEditor(false);
-  }, [editorType]);
+  }, [editorType, loadedEditor, setLoadedEditor, setShowEditor]);
 
   useEffect(() => {
     if (showEditor) {

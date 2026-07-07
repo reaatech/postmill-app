@@ -1,3 +1,4 @@
+'use client';
 import { FC, useCallback, useState } from 'react';
 import dayjs from 'dayjs';
 import { Calendar, TimeInput } from '@mantine/dates';
@@ -68,7 +69,7 @@ export const DatePicker: FC<{
                 return '!text-gray';
               }
               if (modifiers.selected) {
-                return '!text-white !bg-seventh !outline-none';
+                return '!text-textColor !bg-seventh !outline-none';
               }
               return '!text-textColor';
             }}

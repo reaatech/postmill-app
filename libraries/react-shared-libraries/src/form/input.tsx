@@ -12,6 +12,24 @@ import { clsx } from 'clsx';
 import { useFormContext, useWatch } from 'react-hook-form';
 import { TranslatedLabel } from '../translation/translated-label';
 
+const WatchTrigger: FC<{
+  name: string;
+  customUpdate?: () => void;
+}> = ({ name, customUpdate }) => {
+  const form = useFormContext();
+  const watchedValue = useWatch({
+    name,
+    control: form?.control,
+    disabled: !form,
+  });
+  useEffect(() => {
+    if (customUpdate) {
+      customUpdate();
+    }
+  }, [watchedValue, customUpdate]);
+  return null;
+};
+
 export const Input: FC<
   DetailedHTMLProps<InputHTMLAttributes<HTMLInputElement>, HTMLInputElement> & {
     removeError?: boolean;
@@ -38,19 +56,18 @@ export const Input: FC<
     ...rest
   } = props;
   const form = useFormContext();
+  const fieldError = form?.formState?.errors?.[props.name]?.message as
+    | string
+    | undefined;
   const err = useMemo(() => {
     if (error) return error;
-    if (!form || !form.formState.errors[props?.name!]) return;
-    return form?.formState?.errors?.[props?.name!]?.message! as string;
-  }, [form?.formState?.errors?.[props?.name!]?.message, error]);
-  const watch = customUpdate ? form?.watch(props.name) : null;
-  useEffect(() => {
-    if (customUpdate) {
-      customUpdate();
-    }
-  }, [watch]);
+    return fieldError;
+  }, [fieldError, error]);
   return (
     <div className="flex flex-col gap-[6px]">
+      {form && customUpdate && (
+        <WatchTrigger name={props.name} customUpdate={customUpdate} />
+      )}
       {!!label && (
         <div className={`text-[14px]`}>
           <TranslatedLabel

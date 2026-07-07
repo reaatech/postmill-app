@@ -25,6 +25,41 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
   const totalClicks = timeseries?.reduce((sum, p) => sum + p.clicks, 0) || 0;
   const totalLinks = links?.length || 0;
 
+  const columns = useMemo<Column<any>[]>(
+    () => [
+      {
+        key: 'shortUrl',
+        header: t('short_url', 'Short URL'),
+        render: (link: any) => (
+          <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimary hover:underline">
+            {link.shortUrl}
+          </a>
+        ),
+      },
+      {
+        key: 'originalUrl',
+        header: t('original_url', 'Original URL'),
+        render: (link: any) => (
+          <span className="max-w-[300px] truncate block text-newTableText" title={link.originalUrl}>
+            {link.originalUrl}
+          </span>
+        ),
+      },
+      {
+        key: 'clicks',
+        header: t('clicks', 'Clicks'),
+        align: 'right',
+        render: (link: any) => <span className="font-medium">{link.clicks}</span>,
+      },
+    ],
+    [t]
+  );
+
+  const topLinks = useMemo(
+    () => (links ? [...links].sort((a, b) => b.clicks - a.clicks).slice(0, 50) : []),
+    [links]
+  );
+
   if (error) {
     return <ErrorState title={t('failed_to_load', 'Failed to load short links')} />;
   }
@@ -60,20 +95,8 @@ export const ShortlinksTab = ({ from, to }: ShortlinksTabProps) => {
           </div>
         )}
         <DataTable
-          columns={[
-            { key: 'shortUrl', header: t('short_url', 'Short URL'), render: (link: any) => (
-              <a href={link.shortUrl} target="_blank" rel="noopener noreferrer" className="text-btnPrimary hover:underline">
-                {link.shortUrl}
-              </a>
-            )},
-            { key: 'originalUrl', header: t('original_url', 'Original URL'), render: (link: any) => (
-              <span className="max-w-[300px] truncate block text-newTableText" title={link.originalUrl}>
-                {link.originalUrl}
-              </span>
-            )},
-            { key: 'clicks', header: t('clicks', 'Clicks'), align: 'right', render: (link: any) => <span className="font-medium">{link.clicks}</span> },
-          ]}
-          data={[...links].sort((a, b) => b.clicks - a.clicks).slice(0, 50)}
+          columns={columns}
+          data={topLinks}
           keyExtractor={(link: any) => link.id}
         />
       </div>

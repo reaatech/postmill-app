@@ -1,3 +1,5 @@
+'use client';
+
 import { useDropzone } from 'react-dropzone';
 import { FC, ReactNode } from 'react';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';

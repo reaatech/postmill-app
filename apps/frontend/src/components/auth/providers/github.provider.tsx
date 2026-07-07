@@ -1,3 +1,5 @@
+'use client';
+
 import { useCallback } from 'react';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useT } from '@gitroom/react/translation/get.transation.service.client';
@@ -7,7 +9,7 @@ export const GithubProvider = () => {
   const gotoLogin = useCallback(async () => {
     const link = await (await fetch('/auth/oauth/GITHUB')).text();
     window.location.href = link;
-  }, []);
+  }, [fetch]);
   return (
     <div
       onClick={gotoLogin}

@@ -28,9 +28,9 @@ export const RecommendationsStrip: FC = () => {
   return (
     <div className="flex flex-col gap-[10px]">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[12px]">
-        {items.map((item, index) => (
+        {items.map((item) => (
           <div
-            key={`${item.type}-${item.title}-${index}`}
+            key={`${item.type}-${item.title}`}
             className="bg-newTableHeader border border-newTableBorder rounded-[10px] p-[14px] flex flex-col gap-[8px]"
           >
             <div className="flex items-center gap-[8px]">

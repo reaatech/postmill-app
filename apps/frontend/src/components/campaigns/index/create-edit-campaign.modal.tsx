@@ -197,7 +197,7 @@ export const CreateEditCampaignModal: FC<CreateEditCampaignModalProps> = ({ edit
           <p className="text-[12px] text-newTableText">{t('no_goals', 'No goals set yet.')}</p>
         )}
         {goals.map((goal, idx) => (
-          <div key={idx} className="flex gap-[8px] items-center">
+          <div key={`${goal.metric}-${goal.target}-${idx}`} className="flex gap-[8px] items-center">
             <select
               value={goal.metric}
               onChange={(e) => updateGoal(idx, { metric: e.target.value })}

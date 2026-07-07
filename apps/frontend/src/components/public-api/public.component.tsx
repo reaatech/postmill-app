@@ -490,7 +490,7 @@ const CliSection = ({ apiKey }: { apiKey: string }) => {
           ))}
         </div>
         {displaySteps.map((step, i) => (
-          <div key={i} className="flex flex-col gap-[6px]">
+          <div key={step.label} className="flex flex-col gap-[6px]">
             <div className="text-[13px] font-[600] text-newTableText">
               {i + 1}. {step.label}
             </div>

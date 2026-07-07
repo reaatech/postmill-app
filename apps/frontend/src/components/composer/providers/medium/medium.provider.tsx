@@ -12,10 +12,12 @@ import { MediumTags } from '@gitroom/frontend/components/composer/providers/medi
 import { MediumSettingsDto } from '@gitroom/nestjs-libraries/dtos/posts/providers-settings/medium.settings.dto';
 import { useIntegration } from '@gitroom/frontend/components/launches/helpers/use.integration';
 import { Canonical } from '@gitroom/react/form/canonical';
+import { useShowPostSelector } from '@gitroom/frontend/components/post-url-selector/post.url.selector';
 
 const MediumSettings: FC = () => {
   const form = useSettings();
   const { date } = useIntegration();
+  const postSelector = useShowPostSelector(date);
   return (
     <>
       <Input label="Title" {...form.register('title')} />
@@ -23,6 +25,7 @@ const MediumSettings: FC = () => {
       <Canonical
         date={date}
         label="Canonical Link"
+        postSelector={postSelector}
         {...form.register('canonical')}
       />
       <div>

@@ -12,7 +12,7 @@ import Compressor from '@uppy/compressor';
 import { useToaster } from '@gitroom/react/toaster/toaster';
 import { useLaunchStore } from '@gitroom/frontend/components/composer/store';
 import { uniqBy } from 'lodash';
-import { checkUploadLimit } from '@gitroom/nestjs-libraries/upload/upload-limits';
+import { checkUploadLimit } from '@gitroom/helpers/upload-limits.client';
 
 const MB = 1024 * 1024;
 const GB = 1024 * MB;
@@ -256,7 +256,6 @@ export function useUppyUploader(props: {
       callbacksRef.current.onStart();
     });
     uppy.on('complete', async (result) => {
-      console.log(result);
       for (const file of [...result.successful]) {
         uppy.removeFile(file.id);
       }

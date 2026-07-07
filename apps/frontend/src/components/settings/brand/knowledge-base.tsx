@@ -744,12 +744,12 @@ export const KnowledgeBase = () => {
             </div>
             {autoIndexSources.length > 0 && (
               <div className="flex flex-col gap-[4px]">
-                {autoIndexSources.map((src, idx) => (
-                  <div key={idx} className="flex items-center justify-between bg-newBgColorInner rounded-[8px] px-[12px] py-[6px] text-[13px]">
+                {autoIndexSources.map((src) => (
+                  <div key={src} className="flex items-center justify-between bg-newBgColorInner rounded-[8px] px-[12px] py-[6px] text-[13px]">
                     <code className="text-textColor">{src}</code>
                     <button
                       className="text-red-500 hover:underline ml-[8px] text-[12px]"
-                      onClick={() => setAutoIndexSources(autoIndexSources.filter((_, i) => i !== idx))}
+                      onClick={() => setAutoIndexSources(autoIndexSources.filter((s) => s !== src))}
                     >
                       {t('remove', 'Remove')}
                     </button>
@@ -930,7 +930,7 @@ export const KnowledgeBase = () => {
             ) : (
               searchResults.map((hit, i) => (
                 <div
-                  key={i}
+                  key={`${hit.sourceType}:${hit.sourceId}:${hit.text?.slice(0, 40) ?? ''}`}
                   className="bg-newBgColorInner border border-newTableBorder rounded-[8px] p-[12px] flex flex-col gap-[4px]"
                 >
                   <div className="flex items-center gap-[8px]">

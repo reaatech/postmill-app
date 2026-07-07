@@ -4,7 +4,7 @@ import { Slider } from '@gitroom/react/form/slider';
 import React, { FC, useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@gitroom/react/form/button';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
-import { Subscription } from '@prisma/client';
+import type { Subscription } from '@prisma/client';
 import { useDebouncedCallback } from 'use-debounce';
 import ReactLoading from '@gitroom/frontend/components/layout/loading';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';
@@ -41,6 +41,7 @@ export const Prorate: FC<{
   const [loading, setLoading] = useState(false);
   const calculatePrice = useDebouncedCallback(async () => {
     setLoading(true);
+    setPrice(false);
     setPrice(
       (
         await (
@@ -57,9 +58,8 @@ export const Prorate: FC<{
     setLoading(false);
   }, 500);
   useEffect(() => {
-    setPrice(false);
     calculatePrice();
-  }, [period, pack]);
+  }, [period, pack, calculatePrice]);
   if (loading) {
     return (
       <div className="pt-[12px]">
@@ -149,7 +149,7 @@ const Accept: FC<{ resolve: (res: boolean) => void }> = ({ resolve }) => {
 
     resolve(true);
     toaster.show('50% discount applied successfully');
-  }, []);
+  }, [fetch, resolve, toaster]);
 
   return (
     <div>
@@ -169,15 +169,15 @@ const Accept: FC<{ resolve: (res: boolean) => void }> = ({ resolve }) => {
 };
 const Info: FC<{
   proceed: (feedback: string) => void;
-}> = (props) => {
+}> = ({ proceed }) => {
   const [feedback, setFeedback] = useState('');
   const modal = useModals();
   const events = useFireEvents();
   const cancel = useCallback(() => {
-    props.proceed(feedback);
+    proceed(feedback);
     events('cancel_subscription');
     modal.closeAll();
-  }, [modal, feedback]);
+  }, [proceed, feedback, events, modal]);
 
   const t = useT();
 
@@ -209,6 +209,9 @@ const Info: FC<{
     </div>
   );
 };
+const normalizePeriod = (p?: string): 'MONTHLY' | 'YEARLY' =>
+  p === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
+
 export const MainBillingComponent: FC<{
   sub?: Subscription;
 }> = (props) => {
@@ -222,7 +225,7 @@ export const MainBillingComponent: FC<{
   const modal = useModals();
   const router = useRouter();
   const utm = useUtmUrl();
-  const track = useTrack();
+  const track = useTrack(user);
   const t = useT();
   const queryParams = useSearchParams();
   const [finishTrial, setFinishTrial] = useState(
@@ -233,8 +236,6 @@ export const MainBillingComponent: FC<{
     sub
   );
   const [loading, setLoading] = useState<boolean>(false);
-  const normalizePeriod = (p?: string): 'MONTHLY' | 'YEARLY' =>
-    p === 'YEARLY' ? 'YEARLY' : 'MONTHLY';
 
   const [period, setPeriod] = useState<'MONTHLY' | 'YEARLY'>(
     normalizePeriod(subscription?.period)
@@ -245,21 +246,26 @@ export const MainBillingComponent: FC<{
   const [initialChannels, setInitialChannels] = useState(
     sub?.totalChannels || 1
   );
+
   useEffect(() => {
-    if (initialChannels !== sub?.totalChannels) {
-      setInitialChannels(sub?.totalChannels || 1);
-    }
-    const subPeriod = normalizePeriod(sub?.period);
-    if (period !== subPeriod) {
+    // Sync local UI state when the subscription prop changes (e.g. after a
+    // reactivation). Calling setState here is intentional and bounded by the
+    // id check below, so it cannot loop.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    if (sub?.id !== subscription?.id) {
+      setSubscription(sub);
+      const subPeriod = normalizePeriod(sub?.period);
       setPeriod(subPeriod);
       setMonthlyOrYearly(subPeriod === 'MONTHLY' ? 'off' : 'on');
+      setInitialChannels(sub?.totalChannels || 1);
     }
-    setSubscription(sub);
-  }, [sub]);
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [sub, subscription?.id]);
+
   const updatePayment = useCallback(async () => {
     const { portal } = await (await fetch('/billing/portal')).json();
     window.location.href = portal;
-  }, []);
+  }, [fetch]);
   const currentPackage = useMemo(() => {
     if (!subscription) {
       return 'FREE';
@@ -271,7 +277,7 @@ export const MainBillingComponent: FC<{
       return '';
     }
     return subscription?.subscriptionTier;
-  }, [subscription, initialChannels, monthlyOrYearly, period]);
+  }, [subscription, monthlyOrYearly, period]);
   const moveToCheckout = useCallback(
     (billing: 'STANDARD' | 'PRO' | 'FREE', reactivate = false) =>
       async () => {
@@ -434,7 +440,7 @@ export const MainBillingComponent: FC<{
         }
         setLoading(false);
       },
-    [monthlyOrYearly, subscription, user, utm]
+    [dub, fetch, modal, monthlyOrYearly, mutate, subscription, t, toast, track, user, utm]
   );
   if (user?.isLifetime) {
     router.replace('/');

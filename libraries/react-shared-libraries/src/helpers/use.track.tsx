@@ -1,10 +1,16 @@
+'use client';
+
 import { TrackEnum } from '@gitroom/nestjs-libraries/user/track.enum';
-import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useFetch } from '@gitroom/helpers/utils/custom.fetch';
 import { useCallback } from 'react';
 import { useVariables } from '@gitroom/react/helpers/variable.context';
-export const useTrack = () => {
-  const user = useUser();
+
+/**
+ * Tracking hook. Accept the user object as an argument to avoid importing the
+ * frontend app's user context into shared libraries (breaks the
+ * react-shared-libraries -> apps/frontend cycle).
+ */
+export const useTrack = (user?: { id?: string } | null) => {
   const fetch = useFetch();
   const { facebookPixel } = useVariables();
   return useCallback(
@@ -14,7 +20,7 @@ export const useTrack = () => {
       }
       try {
         const { track: uq } = await (
-          await fetch(user ? `/user/t` : `/public/t`, {
+          await fetch(user?.id ? `/user/t` : `/public/t`, {
             method: 'POST',
             credentials: 'include',
             headers: {
@@ -37,9 +43,9 @@ export const useTrack = () => {
           });
         }
       } catch (e) {
-        console.log(e);
+        // Silently ignore tracking errors so they never break the UI.
       }
     },
-    [user]
+    [user?.id, fetch, facebookPixel]
   );
 };

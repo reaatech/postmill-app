@@ -1,3 +1,4 @@
+'use client';
 import { FC, ReactNode, useEffect, useRef } from 'react';
 import { useModals } from '@gitroom/frontend/components/layout/new-modal';
 import { deleteDialog } from '@gitroom/react/helpers/delete.dialog';

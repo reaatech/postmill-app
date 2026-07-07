@@ -2,7 +2,7 @@
 
 import { Stripe } from '@stripe/stripe-js';
 
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import {
   PaymentElement,
   BillingAddressElement,
@@ -22,16 +22,13 @@ export const EmbeddedBilling: FC<{
   showCoupon?: boolean;
   autoApplyCoupon?: string;
 }> = ({ stripe, secret, showCoupon = false, autoApplyCoupon }) => {
-  const [saveSecret, setSaveSecret] = useState(secret);
-  const [loading, setLoading] = useState(false);
   const [mode, setMode] = useCookie('mode', 'dark');
 
   const handleMode = useCallback(
     (value: string) => {
       setMode(value);
-      setLoading(true);
     },
-    []
+    [setMode]
   );
 
   useEffect(() => {
@@ -42,25 +39,10 @@ export const EmbeddedBilling: FC<{
     };
   }, [handleMode]);
 
-  useEffect(() => {
-    if (loading) {
-      setLoading(false);
-    }
-  }, [loading]);
-
-  useEffect(() => {
-    if (secret && saveSecret !== secret) {
-      setSaveSecret(secret);
-    }
-  }, [secret, setSaveSecret]);
-
-  if (saveSecret !== secret || loading) {
-    return null;
-  }
-
   return (
     <div className="flex flex-col w-full pt-[48px] billing-form flex-1 tablet:pt-0">
       <CheckoutProvider
+        key={mode}
         stripe={stripe}
         options={{
           clientSecret: secret,
@@ -450,48 +432,57 @@ export const CouponInput: FC<{ autoApplyCoupon?: string }> = ({
   const { checkout } =
     checkoutState.type === 'success' ? checkoutState : { checkout: null };
 
+  const autoAppliedRef = useRef(false);
+
+  const handleApplyCoupon = useCallback(
+    async (coupon?: string) => {
+      const code = coupon || couponCode.trim();
+      if (!code) return;
+
+      setIsApplying(true);
+      try {
+        const result = await checkout.applyPromotionCode(code);
+        if (result.type === 'error') {
+          toaster.show(
+            result.error.message ||
+              t('billing_invalid_coupon', 'Invalid coupon code'),
+            'warning'
+          );
+        } else {
+          setAppliedCode(code);
+          setCouponCode('');
+          setShowInput(false);
+          toaster.show(
+            t('billing_coupon_applied', 'Coupon applied successfully!'),
+            'success'
+          );
+        }
+      } catch (err: any) {
+        toaster.show(
+          err.message || t('billing_invalid_coupon', 'Invalid coupon code'),
+          'warning'
+        );
+      }
+      setIsApplying(false);
+    },
+    [checkout, couponCode, toaster, t]
+  );
+
   // Auto-apply coupon from backend when checkout is ready
   useEffect(() => {
-    if (autoApplyCoupon) {
-      handleApplyCoupon(undefined, autoApplyCoupon);
+    if (!autoApplyCoupon || autoAppliedRef.current || !checkout) {
+      return;
     }
-  }, []);
+    autoAppliedRef.current = true;
+    // Intentionally trigger the coupon application once when checkout becomes
+    // ready; the state updates live inside the shared handler.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    handleApplyCoupon(autoApplyCoupon);
+  }, [autoApplyCoupon, checkout, handleApplyCoupon]);
 
   // Check if a coupon is already pre-applied (e.g., auto-apply coupon from backend)
   const preAppliedCode = checkout?.discountAmounts?.[0]?.promotionCode;
   const effectiveAppliedCode = appliedCode || preAppliedCode || null;
-
-  const handleApplyCoupon = async (e?: any, coupon?: string) => {
-    if (!coupon && !couponCode.trim()) return;
-
-    setIsApplying(true);
-    try {
-      const result = await checkout.applyPromotionCode(
-        coupon || couponCode.trim()
-      );
-      if (result.type === 'error') {
-        toaster.show(
-          result.error.message ||
-            t('billing_invalid_coupon', 'Invalid coupon code'),
-          'warning'
-        );
-      } else {
-        setAppliedCode(coupon || couponCode.trim());
-        setCouponCode('');
-        setShowInput(false);
-        toaster.show(
-          t('billing_coupon_applied', 'Coupon applied successfully!'),
-          'success'
-        );
-      }
-    } catch (err: any) {
-      toaster.show(
-        err.message || t('billing_invalid_coupon', 'Invalid coupon code'),
-        'warning'
-      );
-    }
-    setIsApplying(false);
-  };
 
   const handleRemoveCoupon = async () => {
     setIsApplying(true);

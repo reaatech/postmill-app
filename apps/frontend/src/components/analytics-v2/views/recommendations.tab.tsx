@@ -51,9 +51,9 @@ export const RecommendationsTab: FC = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-[16px]">
-      {items.map((item: RecommendationItem, index: number) => (
+      {items.map((item: RecommendationItem) => (
         <div
-          key={`rec-${index}`}
+          key={`${item.type}-${item.title}`}
           className="bg-newBgColorInner rounded-[12px] border border-newTableBorder p-[20px] flex flex-col gap-[12px]"
         >
           <div className="flex items-center gap-[8px]">

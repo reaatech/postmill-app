@@ -1,6 +1,6 @@
 'use client';
 
-import { FC, useMemo } from 'react';
+import { FC } from 'react';
 import dayjs from 'dayjs';
 import { useRouter } from 'next/navigation';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
@@ -24,16 +24,11 @@ export const DashboardHeader: FC<DashboardHeaderProps> = ({
   const router = useRouter();
   const user = useUser();
 
-  const greeting = useMemo(() => {
-    const firstName = user?.profile?.name?.trim().split(/\s+/)[0] || 'there';
-    const hour = dayjs().tz(getTimezone()).hour();
-    return greetingForUser(firstName, hour);
-  }, [user?.profile?.name]);
+  const firstName = user?.profile?.name?.trim().split(/\s+/)[0] || 'there';
+  const hour = dayjs().tz(getTimezone()).hour();
+  const greeting = greetingForUser(firstName, hour);
 
-  const dateLabel = useMemo(
-    () => dayjs().tz(getTimezone()).format('dddd, MMMM D'),
-    []
-  );
+  const dateLabel = dayjs().tz(getTimezone()).format('dddd, MMMM D');
 
   return (
     <div className="flex flex-col gap-[8px] mb-[20px]">

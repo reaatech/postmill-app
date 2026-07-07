@@ -1,3 +1,4 @@
+'use client';
 import { FC, useEffect, useState } from 'react';
 import {
   Integrations,
@@ -64,8 +65,8 @@ export const InternalChannels: FC<{
   const { plugs } = props;
   return (
     <div>
-      {plugs.map((plug, index) => (
-        <Plug plug={plug} key={index} />
+      {plugs.map((plug) => (
+        <Plug plug={plug} key={plug.identifier} />
       ))}
     </div>
   );
@@ -124,9 +125,10 @@ const Plug: FC<{
   const val = watch(`plug--${plug.identifier}--integrations`);
   const active = watch(`plug--${plug.identifier}--active`);
   useEffect(() => {
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       setLoad(true);
     }, 20);
+    return () => clearTimeout(timeoutId);
   }, []);
   const [localValue, setLocalValue] = useState<Integrations[]>(
     (val || []).map((p: any) => ({

@@ -289,17 +289,17 @@ export const Sets: FC = () => {
                   <div className="flex items-center gap-[10px] mt-[6px]">
                     {channels.length > 0 ? (
                       <div className="flex items-center -space-x-[6px]">
-                        {channels.slice(0, 6).map((c: any, i: number) => (
+                        {channels.slice(0, 6).map((c: any) => (
                           c?.picture ? (
                             <img
-                              key={c.id || i}
+                              key={c.id}
                               src={c.picture}
                               alt={c.name}
                               title={c.name}
                               className="w-[20px] h-[20px] rounded-full border border-newTableBorder object-cover"
                             />
                           ) : (
-                            <div key={c?.id || i} className="w-[20px] h-[20px] rounded-full border border-newTableBorder bg-newTableHeader" title={c?.name} />
+                            <div key={c?.id} className="w-[20px] h-[20px] rounded-full border border-newTableBorder bg-newTableHeader" title={c?.name} />
                           )
                         ))}
                         {channels.length > 6 && (

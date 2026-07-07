@@ -1,3 +1,5 @@
+'use client';
+
 import { create } from 'zustand';
 import { makeId } from '@gitroom/nestjs-libraries/services/make.is';
 import { useShallow } from 'zustand/react/shallow';
@@ -118,7 +120,7 @@ export const Component: FC<{
     }
     modal?.onClose?.();
     closeModal(modal.id);
-  }, [modal.id, closeModal]);
+  }, [modal, decision, closeModal]);
 
   const RenderComponent = useMemo(() => {
     return typeof modal.children === 'function'
@@ -408,7 +410,7 @@ export const DecisionEverywhere: FC = () => {
     return () => {
       decisionModalEmitter.off('open', handler);
     };
-  }, []);
+  }, [decision]);
   return null;
 };
 

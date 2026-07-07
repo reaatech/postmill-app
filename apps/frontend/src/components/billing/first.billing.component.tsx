@@ -61,7 +61,7 @@ export const FirstBillingComponent = () => {
 
   useEffect(() => {
     setStripe(loadStripe(stripeClient));
-  }, []);
+  }, [stripeClient]);
 
   const loadCheckout = useCallback(async () => {
     return (
@@ -77,7 +77,7 @@ export const FirstBillingComponent = () => {
         }),
       })
     ).json();
-  }, [tier, period]);
+  }, [fetch, tier, period, datafast_visitor_id, datafast_session_id, dub]);
 
   const showYouTube = () => {
     modals.openModal({

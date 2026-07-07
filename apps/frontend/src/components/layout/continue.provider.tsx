@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useCallback, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { TopTitle } from '@gitroom/frontend/components/launches/helpers/top.title.component';
@@ -19,10 +21,13 @@ export const ContinueProvider: FC = () => {
   const added = searchParams.get('added');
   const continueId = searchParams.get('continue');
   const router = useRouter();
-  const load = useCallback(async (path: string) => {
-    const list = (await (await fetch(path)).json()).integrations;
-    return list;
-  }, []);
+  const load = useCallback(
+    async (path: string) => {
+      const list = (await (await fetch(path)).json()).integrations;
+      return list;
+    },
+    [fetch]
+  );
   const { data: integrations } = useSWR('/integrations/list', load, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
@@ -38,7 +43,7 @@ export const ContinueProvider: FC = () => {
     url.searchParams.delete('added');
     url.searchParams.delete('continue');
     router.push(url.toString());
-  }, []);
+  }, [mutate, router]);
   const Provider = useMemo(() => {
     if (!added) {
       return Null;
@@ -83,7 +88,7 @@ const ModalContent: FC<{
       });
       closeModal();
     },
-    [continueId, closeModal]
+    [continueId, closeModal, fetch]
   );
 
   return (
@@ -139,6 +144,9 @@ const ContinueModal: FC<{
         />
       ),
     });
+    // The modal must open exactly once when this continuation component mounts;
+    // `props` and `modals` are not stable, so listing them would reopen the modal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return null;

@@ -12,7 +12,7 @@ const UtmSaver: FC = () => {
   const [value, setValue] = useLocalStorage({ key: 'utm', defaultValue: '' });
   const searchParams = useSearchParams();
   const fireEvents = useFireEvents();
-  const track = useTrack();
+  const track = useTrack(undefined);
 
   useEffect(() => {
     if (searchParams.get('check')) {

@@ -47,6 +47,9 @@ const ProviderPreviewBridge: FC<{ provider: string }> = ({
   const [init, setInit] = useState<InitPayload>(null);
   useEffect(() => {
     if (typeof window !== 'undefined' && window.__PROVIDER_INIT__) {
+      // Reading the seeded payload must happen after mount to avoid a hydration
+      // mismatch; the server has no access to `window.__PROVIDER_INIT__`.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInit(window.__PROVIDER_INIT__ || {});
     }
   }, []);
@@ -73,6 +76,7 @@ const ProviderPreviewBridge: FC<{ provider: string }> = ({
       delete window.__validateProviderPreview__;
       delete window.__getProviderMaxCharacters__;
     };
+    // These window globals are registered once on mount; controlRef is stable.
   }, []);
 
   if (!init) {

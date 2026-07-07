@@ -16,7 +16,7 @@ export const ChangeDir: FC = () => {
     const rtlLanguages = ['he', 'ar'];
     const dir = rtlLanguages.includes(language) ? 'rtl' : 'ltr';
     document.documentElement.setAttribute('dir', dir);
-  }, []);
+  }, [language]);
 
   return null;
 };

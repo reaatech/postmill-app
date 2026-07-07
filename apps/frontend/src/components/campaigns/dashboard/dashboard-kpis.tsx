@@ -173,7 +173,7 @@ export const DashboardKpis: FC<DashboardKpisProps> = ({ dashboard }) => {
           <h3 className="text-[14px] font-semibold text-textColor">{t('goals', 'Goals')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-[12px]">
             {goals.map((g, idx) => (
-              <div key={`${g.metric}-${idx}`} className="flex flex-col gap-[4px]">
+              <div key={`${g.metric}-${g.target}-${idx}`} className="flex flex-col gap-[4px]">
                 <div className="flex justify-between text-[12px] text-newTableText">
                   <span>{metricLabel(g.metric)}</span>
                   <span>

@@ -1,3 +1,5 @@
+'use client';
+
 import { BillingComponent } from '@gitroom/frontend/components/billing/billing.component';
 import { useUser } from '@gitroom/frontend/components/layout/user.context';
 import { useVariables } from '@gitroom/react/helpers/variable.context';

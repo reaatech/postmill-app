@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, SVGProps, useEffect } from 'react';
 import clsx from 'clsx';
 import useCookie from 'react-use-cookie';
@@ -781,7 +783,7 @@ export const NoMediaIcon: FC = () => {
     return () => {
       modeEmitter.off('mode', handler);
     };
-  }, []);
+  }, [setMode]);
 
   return (
     <>

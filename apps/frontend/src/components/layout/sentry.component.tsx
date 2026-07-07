@@ -13,7 +13,7 @@ export const SentryComponent: FC<{ children: ReactNode }> = ({ children }) => {
     }
 
     initializeSentryClient(environment, dsn);
-  }, [dsn]);
+  }, [dsn, environment]);
 
   // Always render children - don't block the app
   return <>{children}</>;

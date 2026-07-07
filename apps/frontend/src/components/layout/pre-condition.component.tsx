@@ -1,3 +1,5 @@
+'use client';
+
 import React, { FC, useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { ModalWrapperComponent } from '@gitroom/frontend/components/composer/modal.wrapper.component';
@@ -41,6 +43,6 @@ export const PreConditionComponent: FC = () => {
         children: <PreConditionComponentModal />,
       });
     }
-  }, []);
+  }, [modal, query]);
   return null;
 };

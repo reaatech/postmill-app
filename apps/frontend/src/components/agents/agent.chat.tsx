@@ -754,6 +754,10 @@ const ToolCallCard: FC<{
 }> = ({ name, args, status, result }) => {
   const t = useT();
   const [expanded, setExpanded] = useState(false);
+  const details = useMemo(
+    () => JSON.stringify({ args, result }, null, 2),
+    [args, result]
+  );
   const specialist = SPECIALIST_BY_TOOL[name];
 
   const pendingDrafts = useMemo(() => extractPendingDrafts(result), [result]);
@@ -830,9 +834,7 @@ const ToolCallCard: FC<{
       </button>
       {expanded && (
         <div className="mt-[8px] text-[11px] text-newTableText overflow-auto max-h-[200px]">
-          <pre className="whitespace-pre-wrap break-words">
-            {JSON.stringify({ args, result }, null, 2)}
-          </pre>
+          <pre className="whitespace-pre-wrap break-words">{details}</pre>
         </div>
       )}
     </div>
