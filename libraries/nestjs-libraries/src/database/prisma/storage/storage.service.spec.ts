@@ -284,7 +284,7 @@ describe('StorageService — cloud quota enforcement by config id (#57)', () => 
       service.assertWithinProviderQuota(adapterMock, 'org-1', 100, 's3-1'),
     ).rejects.toMatchObject({ status: 413 });
 
-    expect(repo.findById).toHaveBeenCalledWith('s3-1');
+    expect(repo.findById).toHaveBeenCalledWith('org-1', 's3-1');
     expect(adapterMock.getUsageBytes).toHaveBeenCalled();
   });
 
@@ -450,7 +450,7 @@ describe('StorageService — updateConfig fingerprint recompute (3.5) + audit aw
       { credentials: { accessKeyId: 'rotated-key', secretAccessKey: 'x' } },
     );
 
-    const updateArg = (repo.update as any).mock.calls[0][1];
+    const updateArg = (repo.update as any).mock.calls[0][2];
     expect(updateArg).toHaveProperty('accountFingerprint');
     expect(typeof updateArg.accountFingerprint).toBe('string');
     expect(updateArg.accountFingerprint.length).toBeGreaterThan(0);
@@ -466,7 +466,7 @@ describe('StorageService — updateConfig fingerprint recompute (3.5) + audit aw
 
     await service.updateConfig('s3-1', 'org-1', { name: 'Renamed' });
 
-    const updateArg = (repo.update as any).mock.calls[0][1];
+    const updateArg = (repo.update as any).mock.calls[0][2];
     expect(updateArg).not.toHaveProperty('accountFingerprint');
   });
 

@@ -125,9 +125,9 @@ export class AiDesignerVisionCriticService implements OnModuleInit {
     await Promise.all(
       fileIds.map(async (id) => {
         try {
-          const file = await this._fileService.getFileById(id);
-          // Defense-in-depth: ensure the reference file belongs to this org.
-          if (!file || !file.path || file.organizationId !== orgId) return;
+          const file = await this._fileService.getFileById(orgId, id);
+          // Defense-in-depth: the repository already scopes to the org.
+          if (!file || !file.path) return;
           const imageUrl = await this._resolveImageUrl(orgId, file.path);
           if (!imageUrl) return;
           const prompt =

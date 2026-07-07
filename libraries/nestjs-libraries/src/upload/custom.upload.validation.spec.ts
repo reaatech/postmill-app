@@ -30,14 +30,13 @@ describe('CustomFileValidationPipe', () => {
     pipe = new CustomFileValidationPipe();
   });
 
-  it('passes non-file values through', async () => {
-    const result = await pipe.transform({ some: 'object' });
-    expect(result).toEqual({ some: 'object' });
+  it('rejects non-file values', async () => {
+    await expect(pipe.transform({ some: 'object' })).rejects.toThrow(BadRequestException);
   });
 
-  it('passes null/undefined through', async () => {
-    expect(await pipe.transform(null)).toBeNull();
-    expect(await pipe.transform(undefined)).toBeUndefined();
+  it('rejects null/undefined values', async () => {
+    await expect(pipe.transform(null)).rejects.toThrow(BadRequestException);
+    await expect(pipe.transform(undefined)).rejects.toThrow(BadRequestException);
   });
 
   it('validates a valid file buffer', async () => {

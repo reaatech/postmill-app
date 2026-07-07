@@ -9,7 +9,7 @@ export class SaveMediaInformationDto {
 
   @IsUrl()
   @ValidateIf((o) => !!o.thumbnail)
-  thumbnail: string;
+  thumbnail?: string;
 
   @IsNumber()
   @ValidateIf((o) => !!o.thumbnailTimestamp)

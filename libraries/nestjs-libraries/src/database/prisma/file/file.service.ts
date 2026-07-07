@@ -37,8 +37,8 @@ export class FileService {
    * hard-delete the DB row. This is the lifecycle endpoint for trash emptying.
    */
   async deleteFile(org: string, id: string) {
-    const file = await this._fileRepository.getFileById(id);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, id);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
 
@@ -61,8 +61,8 @@ export class FileService {
     return this._fileRepository.hardDelete(org, id);
   }
 
-  getFileById(id: string) {
-    return this._fileRepository.getFileById(id);
+  getFileById(org: string, id: string) {
+    return this._fileRepository.getFileById(org, id);
   }
 
   getByIds(org: string, ids: string[]) {
@@ -73,7 +73,7 @@ export class FileService {
     return this._fileRepository.getFileByPath(org, filePath);
   }
 
-  saveFile(
+  async saveFile(
     org: string,
     fileName: string,
     filePath: string,
@@ -81,7 +81,8 @@ export class FileService {
     folderId?: string,
     fileSize?: number
   ) {
-    return this._fileRepository.saveFile(org, fileName, filePath, originalName, folderId, fileSize);
+    const ownedFolderId = await this.resolveOwnedFolderId(org, folderId);
+    return this._fileRepository.saveFile(org, fileName, filePath, originalName, ownedFolderId, fileSize);
   }
 
   getFiles(
@@ -227,8 +228,8 @@ export class FileService {
   // ── File Operations ────────────────────────────────────
 
   async moveFile(org: string, fileId: string, folderId: string | null) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
 
@@ -273,24 +274,24 @@ export class FileService {
   }
 
   async updateFileTags(org: string, fileId: string, tags: string[]) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
     return this._fileRepository.updateFileTags(org, fileId, tags);
   }
 
   async updateFileDescription(org: string, fileId: string, description: string) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
     return this._fileRepository.updateFileDescription(org, fileId, description);
   }
 
   async renameFile(org: string, fileId: string, name: string) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
     return this._fileRepository.renameFile(org, fileId, name);
@@ -298,33 +299,34 @@ export class FileService {
 
   async bulkSave(
     org: string,
-    items: Array<{ name: string; path: string; originalName?: string; fileSize?: number }>
+    items: Array<{ name: string; path: string; originalName?: string; fileSize?: number; folderId?: string }>
   ) {
     return Promise.all(
-      items.map((item) =>
-        this._fileRepository.saveFile(
+      items.map(async (item) => {
+        const ownedFolderId = await this.resolveOwnedFolderId(org, item.folderId);
+        return this._fileRepository.saveFile(
           org,
           item.name,
           item.path,
           item.originalName,
-          undefined,
+          ownedFolderId,
           item.fileSize
-        )
-      )
+        );
+      })
     );
   }
 
   async softDelete(fileId: string, org: string) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
     return this._fileRepository.softDeleteFile(org, fileId);
   }
 
   async restore(fileId: string, org: string) {
-    const file = await this._fileRepository.getFileById(fileId);
-    if (!file || file.organizationId !== org) {
+    const file = await this._fileRepository.getFileById(org, fileId);
+    if (!file) {
       throw new HttpException('File not found', 404);
     }
     return this._fileRepository.restoreFile(org, fileId);

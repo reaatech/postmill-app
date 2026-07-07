@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { LoggerPort } from '@gitroom/provider-kernel';
 
 const mockSend = vi.fn();
+const logger: LoggerPort = {
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+};
 
 vi.mock('@aws-sdk/client-s3', () => ({
   S3Client: vi.fn(function () {
@@ -31,6 +38,7 @@ describe('R2Storage.createMultipartUpload — MIME allowlist (5.8)', () => {
     vi.clearAllMocks();
     mockSend.mockResolvedValue({ UploadId: 'up-1', Key: 'k.png' });
     adapter = new R2Storage(
+      logger,
       vi.fn() as any,
       { accessKeyId: 'a', secretAccessKey: 's' },
       'bucket',

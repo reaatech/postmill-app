@@ -55,7 +55,7 @@ describe('FilesController — quota enforcement', () => {
       } as any;
 
       await expect(
-        controller.uploadServer(org, file)
+        controller.uploadServer(org, file, {})
       ).rejects.toThrow('Storage quota exceeded');
 
       expect(storageSvcMock.resolveAdapterForFolderWithConfigId).toHaveBeenCalledWith(undefined, 'org-1');
@@ -80,7 +80,7 @@ describe('FilesController — quota enforcement', () => {
         buffer: Buffer.from('data'),
       } as any;
 
-      const result = await controller.uploadServer(org, file);
+      const result = await controller.uploadServer(org, file, {});
 
       expect(storageSvcMock.assertWithinProviderQuota).toHaveBeenCalledWith(storageMock, 'org-1', 100, null);
       expect(storageMock.uploadFile).toHaveBeenCalled();
@@ -102,7 +102,7 @@ describe('FilesController — quota enforcement', () => {
       } as any;
 
       await expect(
-        controller.uploadSimple(org, file)
+        controller.uploadSimple(org, file, {})
       ).rejects.toThrow('Over quota');
 
       expect(storageSvcMock.resolveAdapterForFolderWithConfigId).toHaveBeenCalledWith(undefined, 'org-1');
@@ -123,7 +123,7 @@ describe('FilesController — quota enforcement', () => {
         buffer: Buffer.from('data'),
       } as any;
 
-      const result = await controller.uploadSimple(org, file, 'true');
+      const result = await controller.uploadSimple(org, file, { preventSave: true });
 
       expect(result).toHaveProperty('path');
       expect(fileSvcMock.saveFile).not.toHaveBeenCalled();

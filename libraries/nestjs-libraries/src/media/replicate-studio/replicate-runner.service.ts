@@ -108,11 +108,8 @@ export class ReplicateRunnerService {
     fileId: string,
     orgId: string,
   ): Promise<{ path: string; publicUrl: string; folderId: string | null } | null> {
-    const file = await this._fileService.getFileById(fileId);
-    if (!file) {
-      return null;
-    }
-    if (file.organizationId !== orgId) {
+    const file = await this._fileService.getFileById(orgId, fileId);
+    if (!file || file.organizationId !== orgId) {
       throw new ForbiddenException('File not found');
     }
 

@@ -17,6 +17,7 @@ import {
   StorageCapability,
   StorageFileEntry,
   CredentialField,
+  LoggerPort,
   parseDataUrl,
   fromBuffer,
   fromFile,
@@ -48,6 +49,7 @@ export class LocalStorage implements StorageCapability {
   readonly type = TYPE;
 
   constructor(
+    private readonly _logger: LoggerPort,
     private uploadDirectory: string,
     private tenantId?: string,
     private _fetch?: SafeFetchPort,
@@ -254,7 +256,7 @@ export class LocalStorage implements StorageCapability {
         originalname: `${randomName}${safeExt}`,
       };
     } catch (err) {
-      console.warn(`Local storage upload failed: ${(err as Error).message}`);
+      this._logger.warn(`Local storage upload failed: ${(err as Error).message}`);
       throw err;
     }
   }
@@ -263,12 +265,11 @@ export class LocalStorage implements StorageCapability {
     let targetPath = filePath;
     const frontendUrl = process.env.FRONTEND_URL || '';
     if (targetPath.startsWith(frontendUrl + '/uploads/')) {
-      targetPath = this._safeJoin(
-        targetPath.slice((frontendUrl + '/uploads/').length),
-      );
+      targetPath = targetPath.slice((frontendUrl + '/uploads/').length);
     } else if (targetPath.startsWith('/uploads/')) {
-      targetPath = this._safeJoin(targetPath.slice('/uploads/'.length));
+      targetPath = targetPath.slice('/uploads/'.length);
     }
+    targetPath = this._safeJoin(targetPath);
     return new Promise((resolve, reject) => {
       unlink(targetPath, (err) => {
         if (err) reject(err);
@@ -281,18 +282,11 @@ export class LocalStorage implements StorageCapability {
     let targetPath = pathOrKey;
     const frontendUrl = process.env.FRONTEND_URL || '';
     if (targetPath.startsWith(frontendUrl + '/uploads/')) {
-      targetPath = path.join(
-        this.uploadDirectory,
-        targetPath.slice((frontendUrl + '/uploads/').length),
-      );
+      targetPath = targetPath.slice((frontendUrl + '/uploads/').length);
     } else if (targetPath.startsWith('/uploads/')) {
-      targetPath = path.join(
-        this.uploadDirectory,
-        targetPath.slice('/uploads/'.length),
-      );
-    } else if (!path.isAbsolute(targetPath)) {
-      targetPath = path.join(this.uploadDirectory, targetPath.replace(/^\//, ''));
+      targetPath = targetPath.slice('/uploads/'.length);
     }
+    targetPath = this._safeJoin(targetPath);
     return readFileSync(targetPath);
   }
 
@@ -329,6 +323,7 @@ class LocalStorageCapability implements StorageCapability {
   private get a(): LocalStorage {
     if (!this.adapter) {
       this.adapter = new LocalStorage(
+        this.ctx.logger,
         process.env.UPLOAD_DIRECTORY || './uploads',
         this.ctx.orgId,
         this.ctx.fetch,

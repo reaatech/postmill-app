@@ -58,7 +58,7 @@ describe('FilesController — uploadServer temp file cleanup', () => {
     const fs = await import('fs');
     const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
 
-    await controller.uploadServer(org, file);
+    await controller.uploadServer(org, file, {});
 
     expect(unlinkSpy).toHaveBeenCalledWith('/tmp/postmill-uploads/test123.png');
 
@@ -79,7 +79,7 @@ describe('FilesController — uploadServer temp file cleanup', () => {
     const fs = await import('fs');
     const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
 
-    await expect(controller.uploadServer(org, file)).rejects.toThrow('Upload failed');
+    await expect(controller.uploadServer(org, file, {})).rejects.toThrow('Upload failed');
     expect(unlinkSpy).toHaveBeenCalledWith('/tmp/postmill-uploads/test123.png');
 
     unlinkSpy.mockRestore();
@@ -103,7 +103,7 @@ describe('FilesController — uploadServer temp file cleanup', () => {
     const fs = await import('fs');
     const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
 
-    await expect(controller.uploadServer(org, file)).rejects.toThrow('Save failed');
+    await expect(controller.uploadServer(org, file, {})).rejects.toThrow('Save failed');
     expect(unlinkSpy).toHaveBeenCalledWith('/tmp/postmill-uploads/test123.png');
 
     unlinkSpy.mockRestore();
@@ -126,7 +126,7 @@ describe('FilesController — uploadServer temp file cleanup', () => {
     const fs = await import('fs');
     const unlinkSpy = vi.spyOn(fs.promises, 'unlink').mockResolvedValue(undefined);
 
-    await controller.uploadServer(org, file);
+    await controller.uploadServer(org, file, {});
 
     expect(unlinkSpy).not.toHaveBeenCalled();
 

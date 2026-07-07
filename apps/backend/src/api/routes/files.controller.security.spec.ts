@@ -152,7 +152,7 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
       const { ctrl, storageService, fileService } = makeController();
 
       await expect(
-        ctrl.saveMedia(org, 'name', 'https://evil.com/uploads/x.png', 'x.png'),
+        ctrl.saveMedia(org, { name: 'name', path: 'https://evil.com/uploads/x.png', originalName: 'x.png' } as any),
       ).rejects.toMatchObject({ status: 400, message: 'Invalid storage path' });
 
       expect(storageService.resolveAdapterForFolder).not.toHaveBeenCalled();
@@ -164,7 +164,7 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
       adapter.readFile.mockRejectedValue(new Error('NoSuchKey'));
 
       await expect(
-        ctrl.saveMedia(org, 'name', 'https://app.example.com/uploads/missing.png', 'missing.png'),
+        ctrl.saveMedia(org, { name: 'name', path: 'https://app.example.com/uploads/missing.png', originalName: 'missing.png' } as any),
       ).rejects.toMatchObject({ status: 404, message: 'Storage object not found' });
 
       expect(storageService.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');
@@ -177,9 +177,7 @@ describe('FilesController — tenant isolation & content-pack mint', () => {
 
       const result = await ctrl.saveMedia(
         org,
-        'saved.png',
-        'https://app.example.com/uploads/owned.png',
-        'owned.png',
+        { name: 'saved.png', path: 'https://app.example.com/uploads/owned.png', originalName: 'owned.png' } as any,
       );
 
       expect(storageService.resolveAdapterForFolder).toHaveBeenCalledWith(undefined, 'org-1');

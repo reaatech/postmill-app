@@ -17,6 +17,10 @@ export class BulkSaveMediaItemDto {
   @IsOptional()
   @IsString()
   originalName?: string;
+
+  @IsOptional()
+  @IsString()
+  folderId?: string;
 }
 
 export class BulkSaveMediaDto {

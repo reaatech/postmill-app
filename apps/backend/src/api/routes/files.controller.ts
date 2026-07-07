@@ -40,6 +40,10 @@ import { BulkDeleteMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.del
 import { BulkMoveMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.move.media.dto';
 import { BulkSaveMediaDto } from '@gitroom/nestjs-libraries/dtos/file/bulk.save.media.dto';
 import { GetFilesQueryDto } from '@gitroom/nestjs-libraries/dtos/file/get.files.query.dto';
+import { SaveMediaDto } from '@gitroom/nestjs-libraries/dtos/file/save.media.dto';
+import { UploadServerBodyDto } from '@gitroom/nestjs-libraries/dtos/file/upload.server.dto';
+import { UploadSimpleBodyDto } from '@gitroom/nestjs-libraries/dtos/file/upload.simple.dto';
+import { SearchFilesQueryDto } from '@gitroom/nestjs-libraries/dtos/file/search.files.query.dto';
 import { diskStorage } from 'multer';
 import { tmpdir } from 'os';
 import { mkdirSync } from 'fs';
@@ -145,8 +149,9 @@ export class FilesController {
   async uploadServer(
     @GetOrgFromRequest() org: Organization,
     @UploadedFile() file: Express.Multer.File,
-    @Body('folderId') folderId?: string
+    @Body() body: UploadServerBodyDto
   ) {
+    const folderId = body.folderId;
     try {
       const { adapter, configId } = await this._storageService.resolveAdapterForFolderWithConfigId(folderId, org.id);
       await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0, configId);
@@ -173,15 +178,16 @@ export class FilesController {
   async uploadSimple(
     @GetOrgFromRequest() org: Organization,
     @UploadedFile('file') file: Express.Multer.File,
-    @Body('preventSave') preventSave: string = 'false',
-    @Body('folderId') folderId?: string
+    @Body() body: UploadSimpleBodyDto
   ) {
+    const folderId = body.folderId;
+    const preventSave = body.preventSave ?? false;
     const { adapter, configId } = await this._storageService.resolveAdapterForFolderWithConfigId(folderId, org.id);
     await this._storageService.assertWithinProviderQuota(adapter, org.id, file?.size || 0, configId);
     const originalName = file.originalname;
     const getFile = await adapter.uploadFile(file);
 
-    if (preventSave === 'true') {
+    if (preventSave) {
       const { path } = getFile;
       return { path };
     }
@@ -201,21 +207,18 @@ export class FilesController {
   @RequirePermission('media', 'create')
   async saveMedia(
     @GetOrgFromRequest() org: Organization,
-    @Body('name') name: string,
-    @Body('path') path: string,
-    @Body('originalName') originalName: string,
-    @Body('folderId') folderId?: string
+    @Body() body: SaveMediaDto
   ) {
-    if (!name) {
+    if (!body.name) {
       return false;
     }
-    const buffer = await this._assertPathBelongsToOrg(org.id, path, folderId);
+    const buffer = await this._assertPathBelongsToOrg(org.id, body.path, body.folderId);
     return this._fileService.saveFile(
       org.id,
-      name,
-      path,
-      originalName || undefined,
-      folderId,
+      body.name,
+      body.path,
+      body.originalName || undefined,
+      body.folderId,
       buffer.length
     );
   }
@@ -366,10 +369,9 @@ export class FilesController {
   @RequirePermission('media', 'read')
   searchFiles(
     @GetOrgFromRequest() org: Organization,
-    @Query('q') query: string,
-    @Query('folderId') folderId?: string
+    @Query() query: SearchFilesQueryDto
   ) {
-    return this._fileService.searchFiles(org.id, query, folderId);
+    return this._fileService.searchFiles(org.id, query.q, query.folderId);
   }
 
   @Get('/folder/:folderId')
@@ -405,7 +407,7 @@ export class FilesController {
   ) {
     const items = await Promise.all(
       body.items.map(async (item) => {
-        const buffer = await this._assertPathBelongsToOrg(org.id, item.path);
+        const buffer = await this._assertPathBelongsToOrg(org.id, item.path, item.folderId);
         return { ...item, fileSize: buffer.length };
       })
     );

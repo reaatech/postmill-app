@@ -21,6 +21,7 @@ import {
   StorageCapability,
   StorageFileEntry,
   CredentialField,
+  LoggerPort,
   parseDataUrl,
   fromBuffer,
 } from '@gitroom/provider-kernel';
@@ -63,11 +64,22 @@ const ALLOWED_EXT_TO_MIME: Record<string, string> = {
   '.mp4': 'video/mp4',
 };
 
+function stripQueryStringAndExtractKey(filePath: string): string | undefined {
+  let pathname: string;
+  try {
+    pathname = new URL(filePath).pathname;
+  } catch {
+    pathname = filePath.split('?')[0];
+  }
+  return pathname.includes('/') ? pathname.split('/').pop() : pathname;
+}
+
 export class R2Storage implements StorageCapability {
   readonly type = TYPE;
   private client: S3Client;
 
   constructor(
+    private readonly _logger: LoggerPort,
     private _fetch: SafeFetchPort,
     private credentials: { accessKeyId: string; secretAccessKey: string },
     private bucket: string,
@@ -245,19 +257,19 @@ export class R2Storage implements StorageCapability {
         stream: file.buffer as any,
       };
     } catch (err) {
-      console.warn(`R2 upload failed: ${(err as Error).message}`);
+      this._logger.warn(`R2 upload failed: ${(err as Error).message}`);
       throw err;
     }
   }
 
   async removeFile(filePath: string): Promise<void> {
-    const key = filePath.split('/').pop();
+    const key = stripQueryStringAndExtractKey(filePath);
     if (!key) return;
     await this.deleteFile(key);
   }
 
   async readFile(pathOrKey: string): Promise<Buffer> {
-    const key = pathOrKey.includes('/') ? pathOrKey.split('/').pop() : pathOrKey;
+    const key = stripQueryStringAndExtractKey(pathOrKey);
     if (!key) throw new Error('Invalid object key');
     const response = await this.client.send(
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -425,6 +437,7 @@ class CloudflareR2StorageCapability implements StorageCapability {
       }
       const extras = (this.ctx.extras || {}) as Record<string, any>;
       this.adapter = new R2Storage(
+        this.ctx.logger,
         this.ctx.fetch,
         this.ctx.credentials as any,
         extras.bucket,

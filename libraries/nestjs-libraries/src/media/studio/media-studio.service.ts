@@ -259,8 +259,8 @@ export class MediaStudioService {
   // Resolve a /files asset to a URL the provider can fetch (cloud → public URL, local →
   // media-directory URL). Mirrors the HeyGen/Replicate resolvers.
   private async _resolvePublicUrl(orgId: string, fileId: string): Promise<string> {
-    const file = await this._fileService.getFileById(fileId);
-    if (!file || file.organizationId !== orgId) {
+    const file = await this._fileService.getFileById(orgId, fileId);
+    if (!file) {
       throw new ForbiddenException('File not found');
     }
     if (file.path.startsWith('https://')) return file.path;

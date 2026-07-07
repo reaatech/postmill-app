@@ -56,6 +56,23 @@ export class FileRepository {
     private _fileFolder: PrismaRepository<'fileFolder'>
   ) {}
 
+  /**
+   * Verify a client-supplied folder id belongs to `org` before attaching a file
+   * to it. Returns the id when owned, otherwise undefined so the file lands
+   * unfoldered rather than in another org's folder.
+   */
+  private async _resolveOwnedFolderId(
+    org: string,
+    folderId?: string | null
+  ): Promise<string | undefined> {
+    if (!folderId) return undefined;
+    const folder = await this._fileFolder.model.fileFolder.findFirst({
+      where: { id: folderId, organizationId: org },
+      select: { id: true },
+    });
+    return folder ? folder.id : undefined;
+  }
+
   async saveFile(
     org: string,
     fileName: string,
@@ -95,6 +112,8 @@ export class FileRepository {
 
     meta.fileSize = resolvedFileSize;
 
+    const ownedFolderId = await this._resolveOwnedFolderId(org, folderId);
+
     const data: any = {
       organization: {
         connect: {
@@ -107,11 +126,8 @@ export class FileRepository {
       originalName: originalName || null,
       fileSize: resolvedFileSize,
       metadata: meta as Prisma.InputJsonValue,
+      ...(ownedFolderId ? { folder: { connect: { id: ownedFolderId } } } : {}),
     };
-
-    if (folderId) {
-      data.folderId = folderId;
-    }
 
     return this._file.model.file.create({
       data,
@@ -127,7 +143,7 @@ export class FileRepository {
     });
   }
 
-  saveGeneratedMedia(
+  async saveGeneratedMedia(
     org: string,
     data: {
       name: string;
@@ -138,6 +154,7 @@ export class FileRepository {
       metadata?: Record<string, unknown>;
     },
   ) {
+    const ownedFolderId = await this._resolveOwnedFolderId(org, data.folderId);
     return this._file.model.file.create({
       data: {
         organization: { connect: { id: org } },
@@ -145,7 +162,7 @@ export class FileRepository {
         path: data.path,
         type: data.type,
         fileSize: data.fileSize ?? 0,
-        ...(data.folderId ? { folder: { connect: { id: data.folderId } } } : {}),
+        ...(ownedFolderId ? { folder: { connect: { id: ownedFolderId } } } : {}),
         ...(data.metadata
           ? { metadata: data.metadata as Prisma.InputJsonValue }
           : {}),
@@ -160,10 +177,11 @@ export class FileRepository {
     });
   }
 
-  getFileById(id: string) {
+  getFileById(org: string, id: string) {
     return this._file.model.file.findUnique({
       where: {
         id,
+        organizationId: org,
       },
       include: {
         folder: {

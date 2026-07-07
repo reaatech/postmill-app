@@ -24,9 +24,9 @@ export class StorageRepository {
     });
   }
 
-  findById(id: string) {
+  findById(orgId: string, id: string) {
     return this._storage.model.storageProviderConfig.findUnique({
-      where: { id },
+      where: { id, organizationId: orgId },
     });
   }
 
@@ -49,6 +49,7 @@ export class StorageRepository {
   }
 
   update(
+    orgId: string,
     id: string,
     data: {
       name?: string;
@@ -62,14 +63,14 @@ export class StorageRepository {
     }
   ) {
     return this._storage.model.storageProviderConfig.update({
-      where: { id },
+      where: { id, organizationId: orgId },
       data,
     });
   }
 
-  delete(id: string) {
+  delete(orgId: string, id: string) {
     return this._storage.model.storageProviderConfig.delete({
-      where: { id },
+      where: { id, organizationId: orgId },
     });
   }
 
