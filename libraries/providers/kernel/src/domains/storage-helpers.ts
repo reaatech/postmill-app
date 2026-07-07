@@ -10,7 +10,7 @@ import { randomBytes } from 'crypto';
 import * as fileType from 'file-type';
 import { CredentialField } from '../manifest';
 import { ProviderModule, ProviderRuntimeContext } from '../module';
-import { SafeFetchPort } from '../ports';
+import { LoggerPort, SafeFetchPort } from '../ports';
 import { StorageCapability, StorageFileEntry } from './storage';
 
 // ── file-type compat shim ──────────────────────────────────────────────────
@@ -71,6 +71,16 @@ export function parseDataUrl(
   return { buffer, mime };
 }
 
+function stripQueryStringAndExtractKey(filePath: string): string | undefined {
+  let pathname: string;
+  try {
+    pathname = new URL(filePath).pathname;
+  } catch {
+    pathname = filePath.split('?')[0];
+  }
+  return pathname.includes('/') ? pathname.split('/').pop() : pathname;
+}
+
 const ALLOWED_MIME_TYPES = new Set<string>([
   'image/jpeg',
   'image/png',
@@ -127,6 +137,7 @@ export class S3StorageBase implements StorageCapability {
   protected client: S3Client;
 
   constructor(
+    private readonly _logger: LoggerPort,
     protected _fetch: SafeFetchPort,
     type: string,
     protected region: string,
@@ -301,19 +312,19 @@ export class S3StorageBase implements StorageCapability {
         stream: file.buffer as any,
       };
     } catch (err) {
-      console.warn(`S3 upload failed: ${(err as Error).message}`);
+      this._logger.warn(`S3 upload failed: ${(err as Error).message}`);
       throw err;
     }
   }
 
   async removeFile(filePath: string): Promise<void> {
-    const key = filePath.split('/').pop();
+    const key = stripQueryStringAndExtractKey(filePath);
     if (!key) return;
     await this.deleteFile(key);
   }
 
   async readFile(pathOrKey: string): Promise<Buffer> {
-    const key = pathOrKey.includes('/') ? pathOrKey.split('/').pop() : pathOrKey;
+    const key = stripQueryStringAndExtractKey(pathOrKey);
     if (!key) throw new Error('Invalid object key');
     const response = await this.client.send(
       new GetObjectCommand({ Bucket: this.bucket, Key: key }),
@@ -400,6 +411,7 @@ export function makeS3StorageModule(
           ? cfg.resolveEndpoint(region, extras.endpoint)
           : extras.endpoint;
         this.adapter = new S3StorageBase(
+          this.ctx.logger,
           this.ctx.fetch,
           cfg.type,
           region,

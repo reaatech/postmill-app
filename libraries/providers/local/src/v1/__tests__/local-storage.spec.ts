@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { LoggerPort } from '@gitroom/provider-kernel';
 
 vi.mock('fs', () => ({
   mkdirSync: vi.fn(),
@@ -23,6 +24,12 @@ import { LocalStorage } from '../storage.adapter';
 
 describe('LocalStorage', () => {
   const uploadDir = '/uploads';
+  const logger: LoggerPort = {
+    log: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,7 +40,7 @@ describe('LocalStorage', () => {
     it('reads a file from disk given a full URL', async () => {
       const buffer = Buffer.from('content');
       (readFileSync as any).mockReturnValue(buffer);
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
 
       const result = await adapter.readFile(
         'http://localhost:4200/uploads/2026/01/15/abc.png',
@@ -48,7 +55,7 @@ describe('LocalStorage', () => {
     it('reads a file given a relative path', async () => {
       const buffer = Buffer.from('content');
       (readFileSync as any).mockReturnValue(buffer);
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
 
       await adapter.readFile('/uploads/2026/01/15/abc.png');
 
@@ -60,7 +67,7 @@ describe('LocalStorage', () => {
     it('reads a file given a simple key', async () => {
       const buffer = Buffer.from('content');
       (readFileSync as any).mockReturnValue(buffer);
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
 
       const result = await adapter.readFile('abc.png');
 
@@ -71,14 +78,14 @@ describe('LocalStorage', () => {
 
   describe('type', () => {
     it('returns LOCAL as the provider type', () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       expect(adapter.type).toBe('LOCAL');
     });
   });
 
   describe('testConnection', () => {
     it('returns success when able to write and delete a test file', async () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.testConnection();
       expect(result.ok).toBe(true);
     });
@@ -87,7 +94,7 @@ describe('LocalStorage', () => {
       (fs.writeFileSync as any).mockImplementation(() => {
         throw new Error('Permission denied');
       });
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.testConnection();
       expect(result.ok).toBe(false);
       expect(result.error).toBeTruthy();
@@ -104,7 +111,7 @@ describe('LocalStorage', () => {
       (fs.readdirSync as any).mockReturnValue(['file.txt']);
       (fs.statSync as any).mockReturnValue(statMock);
 
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.getUsageBytes();
 
       expect(result).toBe(BigInt(100));
@@ -121,7 +128,7 @@ describe('LocalStorage', () => {
         .mockReturnValueOnce(dirStat)
         .mockReturnValueOnce(fileStat);
 
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.getUsageBytes();
 
       expect(result).toBe(BigInt(50));
@@ -129,7 +136,7 @@ describe('LocalStorage', () => {
 
     it('returns 0 when directory is empty or inaccessible files are skipped', async () => {
       (fs.readdirSync as any).mockReturnValue([]);
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.getUsageBytes();
       expect(result).toBe(BigInt(0));
     });
@@ -138,7 +145,7 @@ describe('LocalStorage', () => {
       (fs.readdirSync as any).mockImplementation(() => {
         throw new Error('IO error');
       });
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.getUsageBytes();
       // When walk throws at the top level, the outer catch returns null
       expect([null, BigInt(0)]).toContain(result);
@@ -147,7 +154,7 @@ describe('LocalStorage', () => {
 
   describe('getFileUrl', () => {
     it('constructs a public URL for a local file', () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const url = adapter.getFileUrl('2026/01/15/abc.png');
       expect(url).toBe('http://localhost:4200/uploads/2026/01/15/abc.png');
     });
@@ -159,7 +166,7 @@ describe('LocalStorage', () => {
       (fs.readdirSync as any).mockReturnValue(['abc.png']);
       (fs.statSync as any).mockReturnValue(stat);
 
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       const result = await adapter.listFiles();
 
       expect(result).toHaveLength(1);
@@ -175,13 +182,13 @@ describe('LocalStorage', () => {
 
   describe('deleteFile', () => {
     it('deletes a file by absolute path', async () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       await adapter.deleteFile('2026/01/15/abc.png');
       expect(fs.unlink).toHaveBeenCalled();
     });
 
     it('blocks a key containing ../ path traversal', async () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       await expect(
         adapter.deleteFile('../../etc/passwd'),
       ).rejects.toThrow(/path traversal/i);
@@ -191,7 +198,7 @@ describe('LocalStorage', () => {
 
   describe('removeFile', () => {
     it('blocks a /uploads/ path escaping the upload directory', async () => {
-      const adapter = new LocalStorage(uploadDir);
+      const adapter = new LocalStorage(logger, uploadDir);
       await expect(
         adapter.removeFile('/uploads/../../etc/passwd'),
       ).rejects.toThrow(/path traversal/i);

@@ -26,9 +26,15 @@ vi.mock('@aws-sdk/client-s3', () => ({
 }));
 
 import { S3StorageBase } from '../domains/storage-helpers';
-import type { SafeFetchPort } from '../ports';
+import type { SafeFetchPort, LoggerPort } from '../ports';
 
 const fetchStub: SafeFetchPort = async () => new Response();
+const logger: LoggerPort = {
+  log: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+  debug: vi.fn(),
+};
 
 describe('S3StorageBase', () => {
   const creds = { accessKeyId: 'key', secretAccessKey: 'secret' };
@@ -39,7 +45,7 @@ describe('S3StorageBase', () => {
     endpoint?: string,
     publicUrl?: string,
   ) =>
-    new S3StorageBase(fetchStub, 'S3', region, creds, bucket, endpoint, publicUrl);
+    new S3StorageBase(logger, fetchStub, 'S3', region, creds, bucket, endpoint, publicUrl);
 
   beforeEach(() => {
     vi.clearAllMocks();
