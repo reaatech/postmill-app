@@ -38,13 +38,13 @@ export class AdminNotificationsController {
     const team = await this._organizationRepository.getTeam(organization.id);
     const members = team?.users ?? [];
 
-    let targetUserIds = new Set(members.map((m) => m.user.id));
+    const allMemberIds = new Set(members.map((m) => m.user.id));
+
+    let targetUserIds = allMemberIds;
 
     if (body.targetUserIds && body.targetUserIds.length > 0) {
       targetUserIds = new Set(
-        members
-          .map((m) => m.user.id)
-          .filter((id) => body.targetUserIds!.includes(id))
+        Array.from(targetUserIds).filter((id) => body.targetUserIds!.includes(id))
       );
     }
 
@@ -52,7 +52,12 @@ export class AdminNotificationsController {
       const roleKeys = new Set(body.targetRoles);
       targetUserIds = new Set(
         members
-          .filter((m) => m.roleRef && roleKeys.has(m.roleRef.key))
+          .filter(
+            (m) =>
+              targetUserIds.has(m.user.id) &&
+              m.roleRef &&
+              roleKeys.has(m.roleRef.key)
+          )
           .map((m) => m.user.id)
       );
     }

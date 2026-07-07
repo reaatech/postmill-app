@@ -1,4 +1,13 @@
-import { IsBoolean, IsEnum, IsOptional, IsString, ValidateNested } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsBoolean,
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  ValidateNested,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export type NotificationChannel = 'email' | 'push' | 'inApp';
@@ -137,13 +146,15 @@ export class BroadcastNotificationDto {
   @IsString()
   message!: string;
 
-  @IsString()
-  type!: string;
-
   @IsOptional()
+  @IsUUID('4', { each: true })
+  @ArrayMaxSize(1000)
   targetUserIds?: string[];
 
   @IsOptional()
+  @IsString({ each: true })
+  @MaxLength(64, { each: true })
+  @ArrayMaxSize(1000)
   targetRoles?: string[];
 
   @IsOptional()
