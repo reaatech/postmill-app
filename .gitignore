@@ -73,8 +73,6 @@ apps/frontend/public/g.js
 apps/frontend/public/*.psd
 apps/frontend/public/*.zip
 
-dev
-!dev/psr-*.md
 coolify-compose.yml
 .env.coolify
 /.pnpm-store/
@@ -84,3 +82,5 @@ coolify-compose.yml
 # host-dev local upload tree (UPLOAD_DIRECTORY points at a repo-root/local uploads dir)
 uploads/
 apps/backend/uploads/
+/dev/*
+!dev/pfr-*.md
