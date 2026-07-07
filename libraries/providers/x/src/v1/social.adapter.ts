@@ -175,7 +175,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     fields: { likesAmount: string }
   ) {
     // @ts-ignore
-    // eslint-disable-next-line prefer-rest-params
     const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
     const appKey = getOrgCredential(integration.organizationId, 'x', 'clientId') || '';
     const appSecret = getOrgCredential(integration.organizationId, 'x', 'clientSecret') || '';
@@ -263,7 +262,6 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     fields: { likesAmount: string; post: string }
   ) {
     // @ts-ignore
-    // eslint-disable-next-line prefer-rest-params
     const [accessTokenSplit, accessSecretSplit] = integration.token.split(':');
     const appKey = getOrgCredential(integration.organizationId, 'x', 'clientId') || '';
     const appSecret = getOrgCredential(integration.organizationId, 'x', 'clientSecret') || '';
@@ -638,38 +636,52 @@ export class XProvider extends SocialAbstract implements SocialProvider {
     ];
   }
 
+  private readonly maxTimelinePageDepth = +(
+    process.env.X_ANALYTICS_MAX_PAGE_DEPTH || '10'
+  );
+
   private loadAllTweets = async (
     client: TwitterApi,
     id: string,
     until: string,
     since: string,
-    token = ''
+    maxPageDepth = this.maxTimelinePageDepth
   ): Promise<TweetV2[]> => {
-    const tweets = await client.v2.userTimeline(id, {
-      'tweet.fields': ['id'],
-      'user.fields': [],
-      'poll.fields': [],
-      'place.fields': [],
-      'media.fields': [],
-      exclude: ['replies', 'retweets'],
-      start_time: since,
-      end_time: until,
-      max_results: 100,
-      ...(token ? { pagination_token: token } : {}),
-    });
+    const allTweets: TweetV2[] = [];
+    let token: string | undefined;
+    let pages = 0;
 
-    return [
-      ...tweets.data.data,
-      ...(tweets.data.data.length === 100
-        ? await this.loadAllTweets(
-            client,
-            id,
-            until,
-            since,
-            tweets.meta.next_token
-          )
-        : []),
-    ];
+    while (pages < maxPageDepth) {
+      const tweets = await client.v2.userTimeline(id, {
+        'tweet.fields': ['id'],
+        'user.fields': [],
+        'poll.fields': [],
+        'place.fields': [],
+        'media.fields': [],
+        exclude: ['replies', 'retweets'],
+        start_time: since,
+        end_time: until,
+        max_results: 100,
+        ...(token ? { pagination_token: token } : {}),
+      });
+
+      allTweets.push(...tweets.data.data);
+      pages++;
+
+      if (tweets.data.data.length !== 100 || !tweets.meta.next_token) {
+        break;
+      }
+
+      token = tweets.meta.next_token;
+    }
+
+    if (pages >= maxPageDepth) {
+      this.logger.warn(
+        `X loadAllTweets reached max page depth (${maxPageDepth}) for user ${id}; stopping pagination.`
+      );
+    }
+
+    return allTweets;
   };
 
   async analytics(

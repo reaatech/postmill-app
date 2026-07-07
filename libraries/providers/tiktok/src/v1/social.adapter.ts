@@ -273,31 +273,32 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       refresh_token: refreshToken,
     };
 
-    const { access_token, refresh_token, ...all } = await (
-      await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    const tokenResponse = await this.fetch(
+      'https://open.tiktokapis.com/v2/oauth/token/',
+      {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         method: 'POST',
         body: new URLSearchParams(value).toString(),
-      })
-    ).json();
+      }
+    );
+    const { access_token, refresh_token, ...all } = await tokenResponse.json();
 
+    const userResponse = await this.fetch(
+      'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
     const {
       data: {
         user: { avatar_url, display_name, open_id, username },
       },
-    } = await (
-      await fetch(
-        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        }
-      )
-    ).json();
+    } = await userResponse.json();
 
     return {
       refreshToken: refresh_token,
@@ -350,33 +351,34 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
       }${process?.env?.FRONTEND_URL}/integrations/social/tiktok`,
     };
 
-    const { access_token, refresh_token, scope } = await (
-      await fetch('https://open.tiktokapis.com/v2/oauth/token/', {
+    const tokenResponse = await this.fetch(
+      'https://open.tiktokapis.com/v2/oauth/token/',
+      {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         method: 'POST',
         body: new URLSearchParams(value).toString(),
-      })
-    ).json();
+      }
+    );
+    const { access_token, refresh_token, scope } = await tokenResponse.json();
 
     this.checkScopes(this.scopes, scope);
 
+    const userResponse = await this.fetch(
+      'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${access_token}`,
+        },
+      }
+    );
     const {
       data: {
         user: { avatar_url, display_name, open_id, username },
       },
-    } = await (
-      await fetch(
-        'https://open.tiktokapis.com/v2/user/info/?fields=open_id,avatar_url,display_name,union_id,username',
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${access_token}`,
-          },
-        }
-      )
-    ).json();
+    } = await userResponse.json();
 
     return {
       id: open_id.replace(/-/g, ''),
@@ -390,20 +392,19 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
   }
 
   async maxVideoLength(accessToken: string) {
+    const response = await this.fetch(
+      'https://open.tiktokapis.com/v2/post/publish/creator_info/query/',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
     const {
       data: { max_video_post_duration_sec },
-    } = await (
-      await fetch(
-        'https://open.tiktokapis.com/v2/post/publish/creator_info/query/',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json; charset=UTF-8',
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      )
-    ).json();
+    } = await response.json();
 
     return {
       maxDurationSeconds: max_video_post_duration_sec,
@@ -415,8 +416,8 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
     publishId: string,
     accessToken: string
   ): Promise<{ url: string; id: string }> {
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
+    const maxAttempts = 30;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const post = await (
         await this.fetch(
           'https://open.tiktokapis.com/v2/post/publish/status/fetch/',
@@ -467,8 +468,21 @@ export class TiktokProvider extends SocialAbstract implements SocialProvider {
         );
       }
 
+      if (attempt === maxAttempts) {
+        throw new BadBody(
+          'tiktok-publish-timeout',
+          JSON.stringify({ publishId, status }),
+          Buffer.from(JSON.stringify({ publishId, status })),
+          `TikTok publish status did not become terminal after ${maxAttempts} attempts (last status: ${status})`
+        );
+      }
+
       await timer(10000);
     }
+
+    throw new Error(
+      `TikTok publish status polling exited unexpectedly for ${publishId}`
+    );
   }
 
   private postingMethod(

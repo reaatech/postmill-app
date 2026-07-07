@@ -272,7 +272,6 @@ export class PinterestProvider
     const chunks: Uint8Array[] = [];
     let total = 0;
     try {
-      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -374,8 +373,17 @@ export class PinterestProvider
         );
       }
 
-      let statusCode = '';
-      while (statusCode !== 'succeeded') {
+      // Pinterest media statuses: registered → processing → succeeded|failed.
+      // Cap both attempts and wall-clock time so a stuck or unknown status can
+      // never spin forever.
+      const maxAttempts = 20; // ≈10 minutes with 30s sleeps
+      const maxDurationMs = 10 * 60 * 1000;
+      const startedAt = Date.now();
+      let statusCode: string | undefined;
+      let attempts = 0;
+      const nonTerminalStatuses = ['registered', 'processing'];
+
+      do {
         const mediafile = await (
           await this.fetch(
             'https://api.pinterest.com/v5/media/' + media_id,
@@ -391,7 +399,9 @@ export class PinterestProvider
           )
         ).json();
 
-        if (mediafile.status === 'failed') {
+        statusCode = mediafile.status;
+
+        if (statusCode === 'failed') {
           throw new BadBody(
             'pinterest',
             JSON.stringify({}),
@@ -400,9 +410,31 @@ export class PinterestProvider
           );
         }
 
+        if (statusCode === 'succeeded') {
+          break;
+        }
+
+        if (!nonTerminalStatuses.includes(statusCode)) {
+          throw new BadBody(
+            'pinterest',
+            JSON.stringify({ status: statusCode }),
+            {} as any,
+            `Unexpected Pinterest media status: ${statusCode}`
+          );
+        }
+
+        attempts += 1;
+        if (attempts >= maxAttempts || Date.now() - startedAt >= maxDurationMs) {
+          throw new BadBody(
+            'pinterest',
+            JSON.stringify({ status: statusCode, attempts }),
+            {} as any,
+            `Pinterest video processing timed out (status: ${statusCode}, attempts: ${attempts})`
+          );
+        }
+
         await timer(30000);
-        statusCode = mediafile.status;
-      }
+      } while (true);
 
       mediaId = media_id;
     }

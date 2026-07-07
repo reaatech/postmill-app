@@ -170,27 +170,43 @@ export class ThreadsProvider extends SocialAbstract implements SocialProvider {
     };
   }
 
+  private readonly maxContainerStatusAttempts = 60;
+  private readonly containerStatusDeadlineMs = 10 * 60 * 1000;
+
   private async checkLoaded(
     mediaContainerId: string,
     accessToken: string
   ): Promise<boolean> {
-    const { status, id, error_message } = await (
-      await this.fetch(
-        `https://graph.threads.net/v1.0/${mediaContainerId}?fields=status,error_message&access_token=${accessToken}`
-      )
-    ).json();
+    const deadline = Date.now() + this.containerStatusDeadlineMs;
+    let attempts = 0;
 
-    if (status === 'ERROR') {
-      throw new Error(id);
+    while (attempts < this.maxContainerStatusAttempts && Date.now() < deadline) {
+      const { status, id, error_message } = await (
+        await this.fetch(
+          `https://graph.threads.net/v1.0/${mediaContainerId}?fields=status,error_message&access_token=${accessToken}`
+        )
+      ).json();
+
+      if (status === 'ERROR') {
+        throw new Error(id);
+      }
+
+      if (status === 'FINISHED') {
+        await timer(2000);
+        return true;
+      }
+
+      attempts += 1;
+
+      // Only sleep if we are going to poll again.
+      if (attempts < this.maxContainerStatusAttempts && Date.now() < deadline) {
+        await timer(2200);
+      }
     }
 
-    if (status === 'FINISHED') {
-      await timer(2000);
-      return true;
-    }
-
-    await timer(2200);
-    return this.checkLoaded(mediaContainerId, accessToken);
+    throw new Error(
+      `Threads media container ${mediaContainerId} did not finish processing after ${this.maxContainerStatusAttempts} attempts / ${this.containerStatusDeadlineMs / 60000} minutes`
+    );
   }
 
   private async fetchUserInfo(accessToken: string) {

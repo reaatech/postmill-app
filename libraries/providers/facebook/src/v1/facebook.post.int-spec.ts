@@ -18,7 +18,7 @@ interface Rec {
 
 function recorder(handler: (url: string, init: any, n: number) => any): Rec[] {
   const recs: Rec[] = [];
-  const undiciFetch = (async (input: any, init: any = {}) => {
+  const undiciFetch = (async (input: any, init: any = {}): Promise<any> => {
     recs.push({
       url: String(input),
       method: init.method || 'GET',
@@ -28,13 +28,13 @@ function recorder(handler: (url: string, init: any, n: number) => any): Rec[] {
     return handler(String(input), init, recs.length);
   }) as any;
   setSocialFetchPorts({
-    getVpnDispatcher: () => undefined,
+    getVpnDispatcher: ((): undefined => undefined) as any,
     ssrfSafeDispatcher: undefined,
-    isSafePublicHttpsUrl: async () => true,
+    isSafePublicHttpsUrl: (async () => true) as any,
     undiciFetch,
     RefreshTokenError: class extends Error {},
     BadBodyError: class extends Error {},
-    timer: (async () => undefined) as any,
+    timer: (async (): Promise<void> => undefined) as any,
     sharp: (() => ({ metadata: async () => ({ width: 100, height: 100 }) })) as any,
     readOrFetch: (async () => Buffer.from('x')) as any,
     safeFetch: undiciFetch,
@@ -42,13 +42,13 @@ function recorder(handler: (url: string, init: any, n: number) => any): Rec[] {
   return recs;
 }
 
-function res(body: any, status = 200) {
+function res(body: any, status = 200): any {
   return {
     status,
     ok: status >= 200 && status < 300,
     json: async () => body,
     text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
-    headers: { get: () => null },
+    headers: { get: ((): null => null) as any },
   } as any;
 }
 

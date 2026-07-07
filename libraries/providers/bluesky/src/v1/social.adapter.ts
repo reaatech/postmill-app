@@ -29,7 +29,6 @@ import { AuthService } from '@gitroom/helpers/auth/auth.service';
 import sharp from 'sharp';
 import { Plug } from '@gitroom/helpers/decorators/plug.decorator';
 import { timer } from '@gitroom/helpers/utils/timer';
-import axios from 'axios';
 import { stripHtmlValidation } from '@gitroom/helpers/utils/strip.html.validation';
 import { Rules } from '@gitroom/provider-kernel';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
@@ -38,12 +37,16 @@ import { safeFetch } from '@gitroom/provider-kernel';
 import { metadata as providerMetadata } from './metadata';
 async function reduceImageBySize(url: string, maxSizeKB = 976) {
   try {
-    // Known proxy gap: module-scope helper (no `this`), so it cannot route
-    // through SocialAbstract.fetch() — this image download gets neither the
-    // ssrfSafeDispatcher nor per-channel VPN egress. Fetches a post media URL
-    // (not a provider API host). See README "Known proxy gap".
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-    let imageBuffer = Buffer.from(response.data);
+    // Routed through safeFetch so the image download is validated as a public
+    // HTTPS URL and re-validated per redirect hop. This is a post media URL
+    // (not a provider API host), so it does not use SocialAbstract.fetch();
+    // per-channel VPN egress is therefore not applied. See README "Known proxy gap".
+    const response = await safeFetch(url);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch image: ${response.statusText}`);
+    }
+    const arrayBuffer = await response.arrayBuffer();
+    let imageBuffer = Buffer.from(arrayBuffer);
 
     // Use sharp to get the metadata of the image
     const metadata = await sharp(imageBuffer).metadata();
@@ -126,10 +129,27 @@ async function uploadVideo(
   let blob: BlobRef | undefined = jobStatus.blob;
   const videoAgent = new AtpAgent({ service: 'https://video.bsky.app' });
 
+  // Bluesky video blob processing can hang; cap both attempts and wall-clock
+  // time so a stuck job fails terminally instead of polling forever.
+  const maxAttempts = 20; // 20 × 30s = 10 minutes
+  const deadline = Date.now() + 10 * 60 * 1000;
+  let attempts = 0;
+
   while (!blob) {
+    if (attempts >= maxAttempts || Date.now() > deadline) {
+      throw new BadBody(
+        'bluesky',
+        JSON.stringify({}),
+        {} as any,
+        'Could not upload video, blob processing timed out'
+      );
+    }
+
     const { data: status } = await videoAgent.app.bsky.video.getJobStatus({
       jobId: jobStatus.jobId,
     });
+    attempts++;
+
     if (status.jobStatus.blob) {
       blob = status.jobStatus.blob;
     }

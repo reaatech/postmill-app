@@ -43,6 +43,8 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
     return 63206;
   }
 
+  private readonly maxGroupPages = 100;
+
   override handleErrors(
     body: string
   ):
@@ -190,14 +192,18 @@ export class MeweProvider extends SocialAbstract implements SocialProvider {
       const instanceUrl = getOrgCredential(integration.organizationId, 'mewe', 'redirectUri') || 'https://mewe.com';
       const allGroups: any[] = [];
       let nextUrl: string | null = `${instanceUrl}/api/dev/groups`;
+      let pages = 0;
 
-      while (nextUrl) {
-        const response = await fetch(nextUrl, {
-          method: 'GET',
-          headers: this.authHeaders(accessToken, appId, apiKey),
-        });
-
-        if (!response.ok) break;
+      while (nextUrl && pages < this.maxGroupPages) {
+        pages += 1;
+        const response = await this.fetch(
+          nextUrl,
+          {
+            method: 'GET',
+            headers: this.authHeaders(accessToken, appId, apiKey),
+          },
+          'mewe-groups'
+        );
 
         const data = await response.json();
         allGroups.push(...(data.groups || []));

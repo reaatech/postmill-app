@@ -20,6 +20,13 @@ import { Rules } from '../social-rules-decorator';
 import { hasExtension } from '@gitroom/helpers/utils/has.extension';
 import { Logger } from '@nestjs/common';
 
+/** Maximum number of status checks while waiting for a single media upload to finish. */
+export const INSTAGRAM_MAX_MEDIA_UPLOAD_POLL_ATTEMPTS = 60;
+/** Maximum number of status checks while waiting for a carousel container to finish. */
+export const INSTAGRAM_MAX_CAROUSEL_CONTAINER_POLL_ATTEMPTS = 60;
+/** Maximum pagination depth for page / Business Manager discovery. */
+export const INSTAGRAM_MAX_PAGES_PAGINATION_DEPTH = 100;
+
 @Rules(
   "Instagram should have at least one attachment, if it's a story, it can have only one picture"
 )
@@ -429,7 +436,7 @@ export class InstagramProvider
     clientInformation?: ClientInformation
   ) {
     const getAccessToken = await (
-      await fetch(
+      await this.fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           `?client_id=${clientInformation?.client_id || ''}` +
           `&redirect_uri=${encodeURIComponent(
@@ -443,7 +450,7 @@ export class InstagramProvider
     ).json();
 
     const { access_token, expires_in, ...all } = await (
-      await fetch(
+      await this.fetch(
         'https://graph.facebook.com/v20.0/oauth/access_token' +
           '?grant_type=fb_exchange_token' +
           `&client_id=${clientInformation?.client_id || ''}` +
@@ -453,7 +460,7 @@ export class InstagramProvider
     ).json();
 
     const { data } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/me/permissions?access_token=${access_token}`
       )
     ).json();
@@ -464,7 +471,7 @@ export class InstagramProvider
     this.checkScopes(this.scopes, permissions);
 
     const { id, name, picture } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/me?fields=id,name,picture&access_token=${access_token}`
       )
     ).json();
@@ -487,8 +494,9 @@ export class InstagramProvider
 
     const fetchPaginated = async (startUrl: string) => {
       let nextUrl: string | undefined = startUrl;
-      while (nextUrl) {
-        const response = await (await fetch(nextUrl)).json();
+      let pageCount = 0;
+      while (nextUrl && pageCount < INSTAGRAM_MAX_PAGES_PAGINATION_DEPTH) {
+        const response = await (await this.fetch(nextUrl)).json();
         if (response.data) {
           for (const page of response.data) {
             if (!seenPageIds.has(page.id)) {
@@ -498,6 +506,7 @@ export class InstagramProvider
           }
         }
         nextUrl = response.paging?.next;
+        pageCount++;
       }
     };
 
@@ -512,9 +521,10 @@ export class InstagramProvider
       let bizUrl:
         | string
         | undefined = `https://graph.facebook.com/v20.0/me/businesses?access_token=${accessToken}`;
+      let bizPageCount = 0;
 
-      while (bizUrl) {
-        const bizResponse = await (await fetch(bizUrl)).json();
+      while (bizUrl && bizPageCount < INSTAGRAM_MAX_PAGES_PAGINATION_DEPTH) {
+        const bizResponse = await (await this.fetch(bizUrl)).json();
         if (bizResponse.data) {
           for (const business of bizResponse.data) {
             try {
@@ -535,6 +545,7 @@ export class InstagramProvider
           }
         }
         bizUrl = bizResponse.paging?.next;
+        bizPageCount++;
       }
     } catch {
       // Business Manager API not available for all users
@@ -547,7 +558,7 @@ export class InstagramProvider
           return {
             pageId: p.id,
             ...(await (
-              await fetch(
+              await this.fetch(
                 `https://graph.facebook.com/v20.0/${p.instagram_business_account.id}?fields=name,profile_picture_url&access_token=${accessToken}`
               )
             ).json()),
@@ -570,13 +581,13 @@ export class InstagramProvider
   ) {
     const [accessToken, userToken] = token.split('___');
     const { access_token, ...all } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/${data.pageId}?fields=access_token,name,picture.type(large)&access_token=${accessToken}`
       )
     ).json();
 
     const { id, name, profile_picture_url, username } = await (
-      await fetch(
+      await this.fetch(
         `https://graph.facebook.com/v20.0/${data.id}?fields=username,name,profile_picture_url&access_token=${accessToken}`
       )
     ).json();
@@ -654,7 +665,11 @@ export class InstagramProvider
         ).json();
 
         let status = 'IN_PROGRESS';
-        while (status === 'IN_PROGRESS') {
+        let pollAttempts = 0;
+        while (
+          status === 'IN_PROGRESS' &&
+          pollAttempts < INSTAGRAM_MAX_MEDIA_UPLOAD_POLL_ATTEMPTS
+        ) {
           const { status_code } = await (
             await this.fetch(
               `https://${type}/v20.0/${photoId}?access_token=${
@@ -666,8 +681,16 @@ export class InstagramProvider
               true
             )
           ).json();
-          await timer(30000);
           status = status_code;
+          pollAttempts++;
+          if (status === 'IN_PROGRESS') {
+            await timer(30000);
+          }
+        }
+        if (status === 'IN_PROGRESS') {
+          throw new Error(
+            `Instagram media upload status polling exceeded ${INSTAGRAM_MAX_MEDIA_UPLOAD_POLL_ATTEMPTS} attempts`
+          );
         }
         return photoId;
       }) || []
@@ -747,7 +770,11 @@ export class InstagramProvider
       ).json();
 
       let status = 'IN_PROGRESS';
-      while (status === 'IN_PROGRESS') {
+      let pollAttempts = 0;
+      while (
+        status === 'IN_PROGRESS' &&
+        pollAttempts < INSTAGRAM_MAX_CAROUSEL_CONTAINER_POLL_ATTEMPTS
+      ) {
         const { status_code } = await (
           await this.fetch(
             `https://${type}/v20.0/${containerId}?fields=status_code&access_token=${
@@ -759,8 +786,16 @@ export class InstagramProvider
             true
           )
         ).json();
-        await timer(30000);
         status = status_code;
+        pollAttempts++;
+        if (status === 'IN_PROGRESS') {
+          await timer(30000);
+        }
+      }
+      if (status === 'IN_PROGRESS') {
+        throw new Error(
+          `Instagram carousel container status polling exceeded ${INSTAGRAM_MAX_CAROUSEL_CONTAINER_POLL_ATTEMPTS} attempts`
+        );
       }
 
       const { id: mediaId, ...all4 } = await (
@@ -888,13 +923,13 @@ export class InstagramProvider
     const since = dayjs().subtract(date, 'day').unix();
 
     const { data, ...all } = await (
-      await fetch(
+      await this.fetch(
         `https://${graphHost}/v21.0/${id}/insights?metric=follower_count,reach&access_token=${accessToken}&period=day&since=${since}&until=${until}`
       )
     ).json();
 
     const { data: data2, ...all2 } = await (
-      await fetch(
+      await this.fetch(
         `https://${graphHost}/v21.0/${id}/insights?metric_type=total_value&metric=likes,views,comments,shares,saves,replies&access_token=${accessToken}&period=day&since=${since}&until=${until}`
       )
     ).json();

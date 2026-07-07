@@ -264,8 +264,27 @@ export class WhopProvider extends SocialAbstract implements SocialProvider {
           body: fileBuffer,
         });
 
+        // Cap upload-status polling so a stuck upload cannot spin forever
+        // (POSTS-06). 120 attempts × 5 s ≈ 10 min, plus a hard 10 min deadline.
+        const maxAttempts = 120;
+        const deadlineMs = 10 * 60 * 1000;
+        const startTime = Date.now();
+        let attempts = 0;
         let uploadStatus = 'pending';
+
         while (uploadStatus !== 'ready') {
+          attempts += 1;
+          if (attempts > maxAttempts) {
+            throw new Error(
+              `Whop file upload status polling exceeded ${maxAttempts} attempts`
+            );
+          }
+          if (Date.now() - startTime > deadlineMs) {
+            throw new Error(
+              'Whop file upload status polling exceeded the 10 minute deadline'
+            );
+          }
+
           const fileStatus = await (
             await this.fetch(
               `https://api.whop.com/api/v1/files/${createFileResponse.id}`,
